@@ -36,14 +36,14 @@ instance Foreign.Storable.Storable Bool
   -- Defined in ‘Foreign.Storable’
 instance GHC.Generics.Generic Bool -- Defined in ‘GHC.Generics’
 instance GHC.Bits.Bits Bool -- Defined in ‘GHC.Bits’
-instance GHC.Bits.FiniteBits Bool -- Defined in ‘GHC.Bits’
-instance GHC.Ix.Ix Bool -- Defined in ‘GHC.Ix’
 instance Bounded Bool -- Defined in ‘GHC.Enum’
 instance Enum Bool -- Defined in ‘GHC.Enum’
-instance Eq Bool -- Defined in ‘GHC.Classes’
+instance GHC.Bits.FiniteBits Bool -- Defined in ‘GHC.Bits’
+instance GHC.Ix.Ix Bool -- Defined in ‘GHC.Ix’
 instance Ord Bool -- Defined in ‘GHC.Classes’
 instance Read Bool -- Defined in ‘GHC.Read’
 instance Show Bool -- Defined in ‘GHC.Show’
+instance Eq Bool -- Defined in ‘GHC.Classes’
 instance Traversable ((,) Int) -- Defined in ‘Data.Traversable’
 instance Foldable ((,) Int) -- Defined in ‘Data.Foldable’
 instance Functor ((,) Int) -- Defined in ‘GHC.Base’

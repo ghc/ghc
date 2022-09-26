@@ -13,7 +13,7 @@ module RaeJobTalk where
 
 import Data.Type.Bool
 import Data.Type.Equality hiding ((:~~:)(..))
-import GHC.TypeLits
+import GHC.TypeLits hiding (SSymbol)
 import Data.Proxy
 import GHC.Exts hiding (Lifted, BoxedRep)
 import Data.Kind

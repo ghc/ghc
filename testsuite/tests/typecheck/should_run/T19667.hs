@@ -18,7 +18,7 @@ class KnownSymbol (n :: Symbol) where
 symbolVal :: forall n proxy . KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of SSymbol x -> x
 
--- See Note [NOINLINE someNatVal] in GHC.TypeNats
+-- See Note [NOINLINE withSomeSNat] in GHC.TypeNats
 {-# NOINLINE reifySymbol #-}
 reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => Proxy n -> r) -> r
 reifySymbol n k = withDict @(KnownSymbol Any) @(SSymbol Any) (SSymbol n) (k @Any) (Proxy @(Any @Symbol))

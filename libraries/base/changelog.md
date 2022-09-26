@@ -37,6 +37,12 @@
     related discussion, as well as [the migration
     guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md).
   * Add `gcdetails_block_fragmentation_bytes` to `GHC.Stats.GCDetails` to track heap fragmentation.
+  * `GHC.TypeLits` and `GHC.TypeNats` now export the `natSing`, `symbolSing`,
+    and `charSing` methods of `KnownNat`, `KnownSymbol`, and `KnownChar`,
+    respectively. They also export the `SNat`, `SSymbol`, and `SChar` types
+    that are used in these methods and provide an API to interact with these
+    types, per
+    [CLC proposal #85](https://github.com/haskell/core-libraries-committee/issues/85).
 
 ## 4.17.0.0 *August 2022*
 

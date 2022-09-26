@@ -11,6 +11,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -34,15 +38,20 @@ module GHC.TypeLits
     N.Natural, N.Nat, Symbol  -- Symbol is declared in GHC.Types in package ghc-prim
 
     -- * Linking type and value level
-  , N.KnownNat, natVal, natVal'
-  , KnownSymbol, symbolVal, symbolVal'
-  , KnownChar, charVal, charVal'
+  , N.KnownNat(natSing), natVal, natVal'
+  , KnownSymbol(symbolSing), symbolVal, symbolVal'
+  , KnownChar(charSing), charVal, charVal'
   , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
   , someNatVal, someSymbolVal, someCharVal
   , N.sameNat, sameSymbol, sameChar
   , OrderingI(..)
   , N.cmpNat, cmpSymbol, cmpChar
-
+    -- ** Singleton values
+  , N.SNat, SSymbol, SChar
+  , pattern N.SNat, pattern SSymbol, pattern SChar
+  , fromSNat, fromSSymbol, fromSChar
+  , withSomeSNat, withSomeSSymbol, withSomeSChar
+  , N.withKnownNat, withKnownSymbol, withKnownChar
 
     -- * Functions on type literals
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
@@ -58,17 +67,19 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise, withDict)
-import GHC.Types(Symbol, Char)
+import GHC.Base ( Eq(..), Functor(..), Ord(..), Ordering(..), String
+                , (.), otherwise, withDict )
+import GHC.Types(Symbol, Char, TYPE)
 import GHC.TypeError(ErrorMessage(..), TypeError)
 import GHC.Num(Integer, fromInteger)
-import GHC.Show(Show(..))
+import GHC.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Read(Read(..))
 import GHC.Real(toInteger)
 import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Coercion (Coercion(..), TestCoercion(..))
+import Data.Type.Equality((:~:)(Refl), TestEquality(..))
 import Data.Type.Ord(OrderingI(..))
 import Unsafe.Coerce(unsafeCoerce)
 
@@ -91,7 +102,7 @@ natVal p = toInteger (N.natVal p)
 -- | @since 4.7.0.0
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
 symbolVal _ = case symbolSing :: SSymbol n of
-                SSymbol x -> x
+                UnsafeSSymbol x -> x
 
 -- | @since 4.8.0.0
 natVal' :: forall n. N.KnownNat n => Proxy# n -> Integer
@@ -100,7 +111,7 @@ natVal' p = toInteger (N.natVal' p)
 -- | @since 4.8.0.0
 symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
 symbolVal' _ = case symbolSing :: SSymbol n of
-                SSymbol x -> x
+                UnsafeSSymbol x -> x
 
 
 -- | This type represents unknown type-level symbols.
@@ -113,11 +124,11 @@ class KnownChar (n :: Char) where
 
 charVal :: forall n proxy. KnownChar n => proxy n -> Char
 charVal _ = case charSing :: SChar n of
-                 SChar x -> x
+                 UnsafeSChar x -> x
 
 charVal' :: forall n. KnownChar n => Proxy# n -> Char
 charVal' _ = case charSing :: SChar n of
-                SChar x -> x
+                UnsafeSChar x -> x
 
 data SomeChar = forall n. KnownChar n => SomeChar (Proxy n)
 
@@ -133,10 +144,8 @@ someNatVal n
 --
 -- @since 4.7.0.0
 someSymbolVal :: String -> SomeSymbol
-someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
-{-# NOINLINE someSymbolVal #-}
--- For details see Note [NOINLINE someNatVal] in "GHC.TypeNats"
--- The issue described there applies to `someSymbolVal` as well.
+someSymbolVal s = withSomeSSymbol s (\(ss :: SSymbol s) ->
+                  withKnownSymbol ss (SomeSymbol @s Proxy))
 
 -- | @since 4.7.0.0
 instance Eq SomeSymbol where
@@ -159,8 +168,8 @@ instance Read SomeSymbol where
 --
 -- @since 4.16.0.0
 someCharVal :: Char -> SomeChar
-someCharVal n   = withSChar SomeChar (SChar n) Proxy
-{-# NOINLINE someCharVal #-}
+someCharVal c = withSomeSChar c (\(sc :: SChar c) ->
+                withKnownChar sc (SomeChar @c Proxy))
 
 instance Eq SomeChar where
   SomeChar x == SomeChar y = charVal x == charVal y
@@ -210,22 +219,20 @@ type family NatToChar (n :: N.Nat) :: Char
 -- same type-level symbols, or 'Nothing'.
 --
 -- @since 4.7.0.0
-sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
+sameSymbol :: forall a b proxy1 proxy2.
+              (KnownSymbol a, KnownSymbol b) =>
               proxy1 a -> proxy2 b -> Maybe (a :~: b)
-sameSymbol x y
-  | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
-  | otherwise                   = Nothing
+sameSymbol _ _ = testEquality (symbolSing @a) (symbolSing @b)
 
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level characters, or 'Nothing'.
 --
 -- @since 4.16.0.0
-sameChar :: (KnownChar a, KnownChar b) =>
-              proxy1 a -> proxy2 b -> Maybe (a :~: b)
-sameChar x y
-  | charVal x == charVal y  = Just (unsafeCoerce Refl)
-  | otherwise                = Nothing
+sameChar :: forall a b proxy1 proxy2.
+            (KnownChar a, KnownChar b) =>
+            proxy1 a -> proxy2 b -> Maybe (a :~: b)
+sameChar _ _ = testEquality (charSing @a) (charSing @b)
 
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
@@ -257,20 +264,217 @@ cmpChar x y = case compare (charVal x) (charVal y) of
 
 
 --------------------------------------------------------------------------------
--- PRIVATE:
+-- Singleton values
 
-newtype SSymbol (s :: Symbol) = SSymbol String
+-- | Return the 'Integer' corresponding to @n@ in an @'SNat' n@ value.
+-- The returned 'Integer' is always non-negative.
+--
+-- For a version of this function that returns a 'Natural' instead of an
+-- 'Integer', see 'N.fromSNat' in "GHC.TypeNats".
+--
+-- @since 4.18.0.0
+fromSNat :: N.SNat n -> Integer
+fromSNat sn = toInteger (N.fromSNat sn)
 
+-- | Attempt to convert an 'Integer' into an @'SNat' n@ value, where @n@ is a
+-- fresh type-level natural number. If the 'Integer' argument is non-negative,
+-- invoke the continuation with @Just sn@, where @sn@ is the @'SNat' n@ value.
+-- If the 'Integer' argument is negative, invoke the continuation with
+-- 'Nothing'.
+--
+-- For a version of this function where the continuation uses @'SNat@ n@
+-- instead of @'Maybe' ('SNat' n)@, see 'N.withSomeSNat' in "GHC.TypeNats".
+--
+-- @since 4.18.0.0
+withSomeSNat :: forall rep (r :: TYPE rep).
+                Integer -> (forall n. Maybe (N.SNat n) -> r) -> r
+withSomeSNat n k
+  | n >= 0    = N.withSomeSNat (fromInteger n) (\sn -> k (Just sn))
+  | otherwise = k Nothing
+
+-- | A value-level witness for a type-level symbol. This is commonly referred
+-- to as a /singleton/ type, as for each @s@, there is a single value that
+-- inhabits the type @'SSymbol' s@ (aside from bottom).
+--
+-- The definition of 'SSymbol' is intentionally left abstract. To obtain an
+-- 'SSymbol' value, use one of the following:
+--
+-- 1. The 'symbolSing' method of 'KnownSymbol'.
+--
+-- 2. The @SSymbol@ pattern synonym.
+--
+-- 3. The 'withSomeSSymbol' function, which creates an 'SSymbol' from a
+--    'String'.
+--
+-- @since 4.18.0.0
+newtype SSymbol (s :: Symbol) = UnsafeSSymbol String
+
+-- | A explicitly bidirectional pattern synonym relating an 'SSymbol' to a
+-- 'KnownSymbol' constraint.
+--
+-- As an __expression__: Constructs an explicit @'SSymbol' s@ value from an
+-- implicit @'KnownSymbol' s@ constraint:
+--
+-- @
+-- SSymbol @s :: 'KnownSymbol' s => 'SSymbol' s
+-- @
+--
+-- As a __pattern__: Matches on an explicit @'SSymbol' s@ value bringing
+-- an implicit @'KnownSymbol' s@ constraint into scope:
+--
+-- @
+-- f :: 'SSymbol' s -> ..
+-- f SSymbol = {- SSymbol s in scope -}
+-- @
+--
+-- @since 4.18.0.0
+pattern SSymbol :: forall s. () => KnownSymbol s => SSymbol s
+pattern SSymbol <- (knownSymbolInstance -> KnownSymbolInstance)
+  where SSymbol = symbolSing
+
+-- An internal data type that is only used for defining the SSymbol pattern
+-- synonym.
+data KnownSymbolInstance (s :: Symbol) where
+  KnownSymbolInstance :: KnownSymbol s => KnownSymbolInstance s
+
+-- An internal function that is only used for defining the SSymbol pattern
+-- synonym.
+knownSymbolInstance :: SSymbol s -> KnownSymbolInstance s
+knownSymbolInstance ss = withKnownSymbol ss KnownSymbolInstance
+
+-- | @since 4.18.0.0
+instance Show (SSymbol s) where
+  showsPrec p (UnsafeSSymbol s)
+    = showParen (p > appPrec)
+      ( showString "SSymbol @"
+        . showsPrec appPrec1 s
+      )
+
+-- | @since 4.18.0.0
+instance TestEquality SSymbol where
+  testEquality (UnsafeSSymbol x) (UnsafeSSymbol y)
+    | x == y    = Just (unsafeCoerce Refl)
+    | otherwise = Nothing
+
+-- | @since 4.18.0.0
+instance TestCoercion SSymbol where
+  testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
+
+-- | Return the String corresponding to @s@ in an @'SSymbol' s@ value.
+--
+-- @since 4.18.0.0
+fromSSymbol :: SSymbol s -> String
+fromSSymbol (UnsafeSSymbol s) = s
+
+-- | Convert an explicit @'SSymbol' s@ value into an implicit @'KnownSymbol' s@
+-- constraint.
+--
+-- @since 4.18.0.0
+withKnownSymbol :: forall s rep (r :: TYPE rep).
+                   SSymbol s -> (KnownSymbol s => r) -> r
+withKnownSymbol = withDict @(KnownSymbol s)
 -- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
-withSSymbol :: forall a b.
-               (KnownSymbol a => Proxy a -> b)
-            -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = withDict @(KnownSymbol a) x f y
 
-newtype SChar (s :: Char) = SChar Char
+-- | Convert a 'String' into an @'SSymbol' s@ value, where @s@ is a fresh
+-- type-level symbol.
+--
+-- @since 4.18.0.0
+withSomeSSymbol :: forall rep (r :: TYPE rep).
+                   String -> (forall s. SSymbol s -> r) -> r
+withSomeSSymbol s k = k (UnsafeSSymbol s)
+{-# NOINLINE withSomeSSymbol #-}
+-- For details see Note [NOINLINE withSomeSNat] in "GHC.TypeNats"
+-- The issue described there applies to `withSomeSSymbol` as well.
 
+-- | A value-level witness for a type-level character. This is commonly referred
+-- to as a /singleton/ type, as for each @c@, there is a single value that
+-- inhabits the type @'SChar' c@ (aside from bottom).
+--
+-- The definition of 'SChar' is intentionally left abstract. To obtain an
+-- 'SChar' value, use one of the following:
+--
+-- 1. The 'charSing' method of 'KnownChar'.
+--
+-- 2. The @SChar@ pattern synonym.
+--
+-- 3. The 'withSomeSChar' function, which creates an 'SChar' from a 'Char'.
+--
+-- @since 4.18.0.0
+newtype SChar (s :: Char) = UnsafeSChar Char
+
+-- | A explicitly bidirectional pattern synonym relating an 'SChar' to a
+-- 'KnownChar' constraint.
+--
+-- As an __expression__: Constructs an explicit @'SChar' c@ value from an
+-- implicit @'KnownChar' c@ constraint:
+--
+-- @
+-- SChar @c :: 'KnownChar' c => 'SChar' c
+-- @
+--
+-- As a __pattern__: Matches on an explicit @'SChar' c@ value bringing
+-- an implicit @'KnownChar' c@ constraint into scope:
+--
+-- @
+-- f :: 'SChar' c -> ..
+-- f SChar = {- SChar c in scope -}
+-- @
+--
+-- @since 4.18.0.0
+pattern SChar :: forall c. () => KnownChar c => SChar c
+pattern SChar <- (knownCharInstance -> KnownCharInstance)
+  where SChar = charSing
+
+-- An internal data type that is only used for defining the SChar pattern
+-- synonym.
+data KnownCharInstance (n :: Char) where
+  KnownCharInstance :: KnownChar c => KnownCharInstance c
+
+-- An internal function that is only used for defining the SChar pattern
+-- synonym.
+knownCharInstance :: SChar c -> KnownCharInstance c
+knownCharInstance sc = withKnownChar sc KnownCharInstance
+
+-- | @since 4.18.0.0
+instance Show (SChar c) where
+  showsPrec p (UnsafeSChar c)
+    = showParen (p > appPrec)
+      ( showString "SChar @"
+        . showsPrec appPrec1 c
+      )
+
+-- | @since 4.18.0.0
+instance TestEquality SChar where
+  testEquality (UnsafeSChar x) (UnsafeSChar y)
+    | x == y    = Just (unsafeCoerce Refl)
+    | otherwise = Nothing
+
+-- | @since 4.18.0.0
+instance TestCoercion SChar where
+  testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
+
+-- | Return the 'Char' corresponding to @c@ in an @'SChar' c@ value.
+--
+-- @since 4.18.0.0
+fromSChar :: SChar c -> Char
+fromSChar (UnsafeSChar c) = c
+
+-- | Convert an explicit @'SChar' c@ value into an implicit @'KnownChar' c@
+-- constraint.
+--
+-- @since 4.18.0.0
+withKnownChar :: forall c rep (r :: TYPE rep).
+                 SChar c -> (KnownChar c => r) -> r
+withKnownChar = withDict @(KnownChar c)
 -- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
-withSChar :: forall a b.
-             (KnownChar a => Proxy a -> b)
-            -> SChar a      -> Proxy a -> b
-withSChar f x y = withDict @(KnownChar a) x f y
+
+-- | Convert a 'Char' into an @'SChar' c@ value, where @c@ is a fresh type-level
+-- character.
+--
+-- @since 4.18.0.0
+withSomeSChar :: forall rep (r :: TYPE rep).
+                 Char -> (forall c. SChar c -> r) -> r
+withSomeSChar c k = k (UnsafeSChar c)
+{-# NOINLINE withSomeSChar #-}
+-- For details see Note [NOINLINE withSomeSNat] in "GHC.TypeNats"
+-- The issue described there applies to `withSomeSChar` as well.

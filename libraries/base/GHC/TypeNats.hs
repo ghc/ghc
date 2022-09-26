@@ -13,6 +13,9 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -26,10 +29,16 @@ module GHC.TypeNats
     Natural -- declared in GHC.Num.Natural in package ghc-bignum
   , Nat
     -- * Linking type and value level
-  , KnownNat, natVal, natVal'
+  , KnownNat(natSing), natVal, natVal'
   , SomeNat(..)
   , someNatVal
   , sameNat
+    -- ** Singleton values
+  , SNat
+  , pattern SNat
+  , fromSNat
+  , withSomeSNat
+  , withKnownNat
 
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
@@ -39,15 +48,16 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), otherwise, WithDict(..))
+import GHC.Base(Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise)
 import GHC.Types
 import GHC.Num.Natural(Natural)
-import GHC.Show(Show(..))
+import GHC.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Read(Read(..))
 import GHC.Prim(Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Coercion (Coercion(..), TestCoercion(..))
+import Data.Type.Equality((:~:)(Refl), TestEquality(..))
 import Data.Type.Ord(OrderingI(..), type (<=), type (<=?))
 import Unsafe.Coerce(unsafeCoerce)
 
@@ -73,12 +83,12 @@ class KnownNat (n :: Nat) where
 -- | @since 4.10.0.0
 natVal :: forall n proxy. KnownNat n => proxy n -> Natural
 natVal _ = case natSing :: SNat n of
-             SNat x -> x
+             UnsafeSNat x -> x
 
 -- | @since 4.10.0.0
 natVal' :: forall n. KnownNat n => Proxy# n -> Natural
 natVal' _ = case natSing :: SNat n of
-             SNat x -> x
+             UnsafeSNat x -> x
 
 -- | This type represents unknown type-level natural numbers.
 --
@@ -89,66 +99,72 @@ data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
 --
 -- @since 4.10.0.0
 someNatVal :: Natural -> SomeNat
-someNatVal n = withSNat SomeNat (SNat n) Proxy
-{-# NOINLINE someNatVal #-} -- See Note [NOINLINE someNatVal]
+someNatVal n = withSomeSNat n (\(sn :: SNat n) ->
+               withKnownNat sn (SomeNat @n Proxy))
 
 {-
-Note [NOINLINE someNatVal]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-`someNatVal` converts a natural number to an existentially quantified
-dictionary for `KnownNat` (aka `SomeNat`).  The existential quantification
-is very important, as it captures the fact that we don't know the type
-statically, although we do know that it exists.   Because this type is
-fully opaque, we should never be able to prove that it matches anything else.
-This is why coherence should still hold:  we can manufacture a `KnownNat k`
-dictionary, but it can never be confused with a `KnownNat 33` dictionary,
-because we should never be able to prove that `k ~ 33`.
+Note [NOINLINE withSomeSNat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The function
 
-But how to implement `someNatVal`?  We can't quite implement it "honestly"
-because `SomeNat` needs to "hide" the type of the newly created dictionary,
-but we don't know what the actual type is!  If `someNatVal` was built into
-the language, then we could manufacture a new skolem constant,
-which should behave correctly.
+    withSomeSNat :: forall rep (r :: TYPE rep).
+                    Natural -> (forall k. SNat k -> r) -> r
 
-Since extra language constructors have additional maintenance costs,
-we use a trick to implement `someNatVal` in the library.  The idea is that
-instead of generating a "fresh" type for each use of `someNatVal`, we simply
-use GHC's placeholder type `Any` (of kind `Nat`). So, the elaborated
-version of the code is:
+converts a `Natural` number to a singleton natural `SNat k`, where the `k` is
+locally quantified in a continuation (hence the `forall k`). The local
+quantification is important: we can manufacture an `SNat k` value, but it can
+never be confused with (say) an `SNat 33` value, because we should never be
+able to prove that `k ~ 33`. Moreover, if we call `withSomeSNat` twice, we'll
+get an `SNat k1` value and an `SNat k2` value, but again we can't confuse them.
+`SNat` is a singleton type!
 
-  someNatVal n = withSNat @T (SomeNat @T) (SNat @T n) (Proxy @T)
+But how to implement `withSomeSNat`? We have no way to make up a fresh type
+variable. To do that we need `runExists`: see #19675.
+
+Lacking `runExists`, we use a trick to implement `withSomeSNat`: instead of
+generating a "fresh" type for each use of `withSomeSNat`, we simply use GHC's
+placeholder type `Any` (of kind `Nat`), thus (in Core):
+
+  withSomeSNat n f = f @T (UnsafeSNat @T n)
+    where type T = Any @Nat
+
+***  BUT we must mark `withSomeSNat` as NOINLINE! ***
+(And the same for withSomeSSymbol and withSomeSChar in GHC.TypeLits.)
+
+If we inline it we'll lose the type distinction between separate calls (those
+"fresh" type variables just turn into `T`). And that can interact badly with
+GHC's type-class specialiser. Consider this definition, where
+`foo :: KnownNat n => blah`:
+
+  ex :: Natural
+  ex = withSomeSNat 1 (\(s1 :: SNat one) -> withKnownNat @one s1 $
+       withSomeSNat 2 (\(s2 :: SNat two) -> withKnownNat @two s2 $
+       foo @one ... + foo @two ...))
+
+In the last line we have in scope two distinct dictionaries of types
+`KnownNat one` and `KnownNat two`. The calls `foo @one` and `foo @two` each pick
+out one of those dictionaries to pass to `foo`.
+
+But if we inline `withSomeSNat` we'll get (switching to Core):
+
+  ex = withKnownNat @T (UnsafeSNat @T 1) (\(kn1 :: KnownNat T) ->
+       withKnownNat @T (UnsafeSNat @T 2) (\(kn2 :: KnownNat T) ->
+       foo @T kn1 ... + foo @T kn2 ...))
     where type T = Any Nat
 
-After inlining and simplification, this ends up looking something like this:
+We are now treading on thin ice. We have two dictionaries `kn1` and `kn2`, both
+of type `KnownNat T`, but with different implementations. GHC may specialise
+`foo` at type `T` using one of these dictionaries and use that same
+specialisation for the other. See #16586 for more examples of where something
+like this has actually happened.
 
-  someNatVal n = SomeNat @T (KnownNat @T (SNat @T n)) (Proxy @T)
-    where type T = Any Nat
+`KnownNat` should be a singleton type, but if we allow `withSomeSNat` to inline
+it won't be a singleton type any more. We have lost the "fresh type variable".
 
-`KnownNat` is the constructor for dictionaries for the class `KnownNat`.
-See Note [withDict] in "GHC.Tc.Instance.Class" for details on how
-we actually construct the dictionary.
-
-Note that using `Any Nat` is not really correct, as multiple calls to
-`someNatVal` would violate coherence:
-
-  type T = Any Nat
-
-  x = SomeNat @T (KnownNat @T (SNat @T 1)) (Proxy @T)
-  y = SomeNat @T (KnownNat @T (SNat @T 2)) (Proxy @T)
-
-Note that now the code has two dictionaries with the same type, `KnownNat Any`,
-but they have different implementations, namely `SNat 1` and `SNat 2`.  This
-is not good, as GHC assumes coherence, and it is free to interchange
-dictionaries of the same type, but in this case this would produce an incorrect
-result.   See #16586 for examples of this happening.
-
-We can avoid this problem by making the definition of `someNatVal` opaque
-and we do this by using a `NOINLINE` pragma.  This restores coherence, because
-GHC can only inspect the result of `someNatVal` by pattern matching on the
-existential, which would generate a new type.  This restores correctness,
-at the cost of having a little more allocation for the `SomeNat` constructors.
+TL;DR. We avoid this problem by making the definition of `withSomeSNat` opaque,
+using an `NOINLINE` pragma. When we get `runExists` (#19675) we will be able to
+stop using this hack.
 -}
-
 
 
 -- | @since 4.7.0.0
@@ -218,11 +234,10 @@ type family Log2 (m :: Nat) :: Nat
 -- same type-level numbers, or 'Nothing'.
 --
 -- @since 4.7.0.0
-sameNat :: (KnownNat a, KnownNat b) =>
+sameNat :: forall a b proxy1 proxy2.
+           (KnownNat a, KnownNat b) =>
            proxy1 a -> proxy2 b -> Maybe (a :~: b)
-sameNat x y
-  | natVal x == natVal y = Just (unsafeCoerce Refl)
-  | otherwise            = Nothing
+sameNat _ _ = testEquality (natSing @a) (natSing @b)
 
 -- | Like 'sameNat', but if the numbers aren't equal, this additionally
 -- provides proof of LT or GT.
@@ -241,12 +256,96 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 
 
 --------------------------------------------------------------------------------
--- PRIVATE:
+-- Singleton values
 
-newtype SNat    (n :: Nat)    = SNat    Natural
+-- | A value-level witness for a type-level natural number. This is commonly
+-- referred to as a /singleton/ type, as for each @n@, there is a single value
+-- that inhabits the type @'SNat' n@ (aside from bottom).
+--
+-- The definition of 'SNat' is intentionally left abstract. To obtain an 'SNat'
+-- value, use one of the following:
+--
+-- 1. The 'natSing' method of 'KnownNat'.
+--
+-- 2. The @SNat@ pattern synonym.
+--
+-- 3. The 'withSomeSNat' function, which creates an 'SNat' from a 'Natural'
+--    number.
+--
+-- @since 4.18.0.0
+newtype SNat (n :: Nat) = UnsafeSNat Natural
 
+-- | A explicitly bidirectional pattern synonym relating an 'SNat' to a
+-- 'KnownNat' constraint.
+--
+-- As an __expression__: Constructs an explicit @'SNat' n@ value from an
+-- implicit @'KnownNat' n@ constraint:
+--
+-- @
+-- SNat @n :: 'KnownNat' n => 'SNat' n
+-- @
+--
+-- As a __pattern__: Matches on an explicit @'SNat' n@ value bringing
+-- an implicit @'KnownNat' n@ constraint into scope:
+--
+-- @
+-- f :: 'SNat' n -> ..
+-- f SNat = {- SNat n in scope -}
+-- @
+--
+-- @since 4.18.0.0
+pattern SNat :: forall n. () => KnownNat n => SNat n
+pattern SNat <- (knownNatInstance -> KnownNatInstance)
+  where SNat = natSing
+
+-- An internal data type that is only used for defining the SNat pattern
+-- synonym.
+data KnownNatInstance (n :: Nat) where
+  KnownNatInstance :: KnownNat n => KnownNatInstance n
+
+-- An internal function that is only used for defining the SNat pattern
+-- synonym.
+knownNatInstance :: SNat n -> KnownNatInstance n
+knownNatInstance sn = withKnownNat sn KnownNatInstance
+
+-- | @since 4.18.0.0
+instance Show (SNat n) where
+  showsPrec p (UnsafeSNat n)
+    = showParen (p > appPrec)
+      ( showString "SNat @"
+        . showsPrec appPrec1 n
+      )
+
+-- | @since 4.18.0.0
+instance TestEquality SNat where
+  testEquality (UnsafeSNat x) (UnsafeSNat y)
+    | x == y    = Just (unsafeCoerce Refl)
+    | otherwise = Nothing
+
+-- | @since 4.18.0.0
+instance TestCoercion SNat where
+  testCoercion x y = fmap (\Refl -> Coercion) (testEquality x y)
+
+-- | Return the 'Natural' number corresponding to @n@ in an @'SNat' n@ value.
+--
+-- @since 4.18.0.0
+fromSNat :: SNat n -> Natural
+fromSNat (UnsafeSNat n) = n
+
+-- | Convert an explicit @'SNat' n@ value into an implicit @'KnownNat' n@
+-- constraint.
+--
+-- @since 4.18.0.0
+withKnownNat :: forall n rep (r :: TYPE rep).
+                SNat n -> (KnownNat n => r) -> r
+withKnownNat = withDict @(KnownNat n)
 -- See Note [withDict] in "GHC.Tc.Instance.Class" in GHC
-withSNat :: forall a b.
-            (KnownNat a => Proxy a -> b)
-         -> SNat a      -> Proxy a -> b
-withSNat f x y = withDict @(KnownNat a) x f y
+
+-- | Convert a 'Natural' number into an @'SNat' n@ value, where @n@ is a fresh
+-- type-level natural number.
+--
+-- @since 4.18.0.0
+withSomeSNat :: forall rep (r :: TYPE rep).
+                Natural -> (forall n. SNat n -> r) -> r
+withSomeSNat n k = k (UnsafeSNat n)
+{-# NOINLINE withSomeSNat #-} -- See Note [NOINLINE withSomeSNat]

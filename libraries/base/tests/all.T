@@ -257,6 +257,7 @@ test('T13167',
      [when(opsys('mingw32'), only_ways(['winio', 'winio_threaded'])),
       fragile_for(16536, concurrent_ways)],
      compile_and_run, [''])
+test('T15183', normal, compile_and_run, [''])
 test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])

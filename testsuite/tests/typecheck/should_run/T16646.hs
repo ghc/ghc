@@ -21,7 +21,7 @@ instance KnownNat n => Reifies n Integer where
   reflect = natVal
 
 reify :: forall a r. a -> (forall (s :: Type). Reifies s a => Proxy s -> r) -> r
-{-# NOINLINE reify #-} -- See Note [NOINLINE someNatVal] in GHC.TypeNats
+{-# NOINLINE reify #-} -- See Note [NOINLINE withSomeSNat] in GHC.TypeNats
 reify a k = withDict @(Reifies (Any @Type) a)
                      @(forall (proxy :: Type -> Type). proxy Any -> a)
                      (const a) (k @Any) Proxy

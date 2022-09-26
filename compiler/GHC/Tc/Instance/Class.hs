@@ -571,15 +571,15 @@ Some further observations about `withDict`:
 (WD3) As an alternative to `withDict`, one could define functions like `withT`
       above in terms of `unsafeCoerce`. This is more error-prone, however.
 
-(WD4) In order to define things like `reifySymbol` below:
+(WD4) In order to define things like `withKnownNat` below:
 
-        reifySymbol :: forall r. String -> (forall (n :: Symbol). KnownSymbol n => r) -> r
+        withKnownNat :: SNat n -> (KnownNat n => r) -> r
 
       `withDict` needs to be instantiated with `Any`, like so:
 
-        reifySymbol n k = withDict @(KnownSymbol Any) @String @r n (k @Any)
+        withKnownNat = withDict @(KnownNat Any) @(SNat Any) @r
 
-      The use of `Any` is explained in Note [NOINLINE someNatVal] in
+      The use of `Any` is explained in Note [NOINLINE withSomeSNat] in
       base:GHC.TypeNats.
 
 (WD5) In earlier implementations, `withDict` was implemented as an identifier

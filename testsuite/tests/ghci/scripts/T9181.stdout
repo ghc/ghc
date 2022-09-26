@@ -16,6 +16,16 @@ class GHC.TypeLits.KnownSymbol n where
   {-# MINIMAL symbolSing #-}
 type GHC.TypeLits.NatToChar :: GHC.Num.Natural.Natural -> Char
 type family GHC.TypeLits.NatToChar a
+pattern GHC.TypeLits.SChar
+  :: () => GHC.TypeLits.KnownChar c => GHC.TypeLits.SChar c
+type role GHC.TypeLits.SChar phantom
+type GHC.TypeLits.SChar :: Char -> *
+newtype GHC.TypeLits.SChar s = GHC.TypeLits.UnsafeSChar Char
+pattern GHC.TypeLits.SSymbol
+  :: () => GHC.TypeLits.KnownSymbol s => GHC.TypeLits.SSymbol s
+type role GHC.TypeLits.SSymbol phantom
+type GHC.TypeLits.SSymbol :: GHC.Types.Symbol -> *
+newtype GHC.TypeLits.SSymbol s = GHC.TypeLits.UnsafeSSymbol String
 type GHC.TypeLits.SomeChar :: *
 data GHC.TypeLits.SomeChar
   = forall (n :: Char).
@@ -38,6 +48,9 @@ GHC.TypeLits.cmpChar ::
 GHC.TypeLits.cmpSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   proxy1 a -> proxy2 b -> Data.Type.Ord.OrderingI a b
+GHC.TypeLits.fromSChar :: GHC.TypeLits.SChar c -> Char
+GHC.TypeLits.fromSNat :: GHC.TypeNats.SNat n -> Integer
+GHC.TypeLits.fromSSymbol :: GHC.TypeLits.SSymbol s -> String
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
@@ -55,6 +68,21 @@ GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
 GHC.TypeLits.symbolVal' ::
   GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
+GHC.TypeLits.withKnownChar ::
+  GHC.TypeLits.SChar c -> (GHC.TypeLits.KnownChar c => r) -> r
+GHC.TypeLits.withKnownSymbol ::
+  GHC.TypeLits.SSymbol s -> (GHC.TypeLits.KnownSymbol s => r) -> r
+GHC.TypeLits.withSomeSChar ::
+  Char -> (forall (c :: Char). GHC.TypeLits.SChar c -> r) -> r
+GHC.TypeLits.withSomeSNat ::
+  Integer
+  -> (forall (n :: GHC.TypeNats.Nat).
+      Maybe (GHC.TypeNats.SNat n) -> r)
+  -> r
+GHC.TypeLits.withSomeSSymbol ::
+  String
+  -> (forall (s :: GHC.Types.Symbol). GHC.TypeLits.SSymbol s -> r)
+  -> r
 type (GHC.TypeNats.*) :: GHC.Num.Natural.Natural
                          -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.*) a b
@@ -123,6 +151,12 @@ data Data.Type.Ord.OrderingI a b where
   Data.Type.Ord.GTI :: forall {k} (a :: k) (b :: k).
                        (Data.Type.Ord.Compare a b ~ 'GT) =>
                        Data.Type.Ord.OrderingI a b
+pattern GHC.TypeNats.SNat
+  :: () => GHC.TypeNats.KnownNat n => GHC.TypeNats.SNat n
+type role GHC.TypeNats.SNat phantom
+type GHC.TypeNats.SNat :: GHC.TypeNats.Nat -> *
+newtype GHC.TypeNats.SNat n
+  = GHC.TypeNats.UnsafeSNat GHC.Num.Natural.Natural
 type GHC.TypeNats.SomeNat :: *
 data GHC.TypeNats.SomeNat
   = forall (n :: GHC.TypeNats.Nat).
@@ -142,3 +176,5 @@ GHC.TypeNats.cmpNat ::
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
   proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
+GHC.TypeNats.withKnownNat ::
+  GHC.TypeNats.SNat n -> (GHC.TypeNats.KnownNat n => r) -> r
