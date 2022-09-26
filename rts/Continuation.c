@@ -472,12 +472,14 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
     stack = pop_stack_chunk(cap, tso);
 
     for (StgWord i = 0; i < full_chunks; i++) {
-      memcpy(cont_stack, stack->sp, stack->stack_size * sizeof(StgWord));
-      cont_stack += stack->stack_size;
+      const size_t chunk_words = stack->stack + stack->stack_size - stack->sp - sizeofW(StgUnderflowFrame);
+      memcpy(cont_stack, stack->sp, chunk_words * sizeof(StgWord));
+      cont_stack += chunk_words;
       stack = pop_stack_chunk(cap, tso);
     }
 
     memcpy(cont_stack, stack->sp, last_chunk_words * sizeof(StgWord));
+    cont_stack += last_chunk_words;
     stack->sp += last_chunk_words;
   }
 
