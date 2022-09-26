@@ -780,3 +780,28 @@ function h$stg_sig_install(sigNo, actionCode, sigSet_d, sigSet_o) {
   // XXX dummy implementation
   return 0;
 }
+
+const h$word_float_conv_buf = new DataView(new ArrayBuffer(8));
+
+function h$stg_word32ToFloatzh(v) {
+  h$word_float_conv_buf.setUint32(0, v);
+  return h$word_float_conv_buf.getFloat32(0);
+}
+
+function h$stg_floatToWord32zh(v) {
+  h$word_float_conv_buf.setFloat32(0, v);
+  return h$word_float_conv_buf.getUint32(0);
+}
+
+function h$stg_word64ToDoublezh(h,l) {
+  h$word_float_conv_buf.setUint32(0, h);
+  h$word_float_conv_buf.setUint32(4, l);
+  return h$word_float_conv_buf.getFloat64(0);
+}
+
+function h$stg_doubleToWord64zh(v) {
+  h$word_float_conv_buf.setFloat64(0, v);
+  var l = h$word_float_conv_buf.getUint32(4);
+  var h = h$word_float_conv_buf.getUint32(0);
+  RETURN_UBX_TUP2(h,l);
+}
