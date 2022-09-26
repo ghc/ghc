@@ -424,6 +424,7 @@ data GeneralFlag
    -- variables that have otherwise identical names.
    | Opt_SuppressUniques
    | Opt_SuppressStgExts
+   | Opt_SuppressStgReps
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
    | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
    | Opt_SuppressCoreSizes  -- ^ Suppress per binding Core size stats in dumps

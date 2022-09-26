@@ -1448,7 +1448,8 @@ instance OutputableP Platform CLabel where
   pdoc !platform lbl = getPprStyle $ \pp_sty ->
                         case pp_sty of
                           PprDump{} -> pprCLabel platform lbl
-                          _         -> pprPanic "Labels in code should be printed with pprCLabel or pprAsmLabel" (pprCLabel platform lbl)
+                          _         -> let lbl_doc = (pprCLabel platform lbl)
+                                       in pprTraceUserWarning (text "Labels in code should be printed with pprCLabel or pprAsmLabel" <> lbl_doc) lbl_doc
 
 pprCLabelStyle :: forall doc. IsLine doc => Platform -> LabelStyle -> CLabel -> doc
 pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]

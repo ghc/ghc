@@ -244,7 +244,8 @@ ubxSumRepType constrs0
     in
       sumRep
 
-layoutUbxSum :: SortedSlotTys -- Layout of sum. Does not include tag.
+layoutUbxSum :: HasDebugCallStack
+             => SortedSlotTys -- Layout of sum. Does not include tag.
                               -- We assume that they are in increasing order
              -> [SlotTy]      -- Slot types of things we want to map to locations in the
                               -- sum layout
@@ -267,7 +268,8 @@ layoutUbxSum sum_slots0 arg_slots0 =
       | otherwise
       = findSlot arg (slot_idx + 1) slots useds
     findSlot _ _ [] _
-      = pprPanic "findSlot" (text "Can't find slot" $$ ppr sum_slots0 $$ ppr arg_slots0)
+      = pprPanic "findSlot" (text "Can't find slot" $$ text "sum_slots:" <> ppr sum_slots0
+                                                    $$ text "arg_slots:" <> ppr arg_slots0 )
 
 --------------------------------------------------------------------------------
 
@@ -347,18 +349,17 @@ fitsIn ty1 ty2
   = Just ty1
   | isWordSlot ty1 && isWordSlot ty2
   = Just (max ty1 ty2)
-  | isFloatSlot ty1 && isFloatSlot ty2
-  = Just (max ty1 ty2)
   | otherwise
   = Nothing
+  -- We used to share slots between Float/Double but currently we can't easily
+  -- covert between float/double in a way that is both work free and safe.
+  -- So we put them in different slots.
+  -- See Note [Casting slot arguments]
   where
     isWordSlot Word64Slot = True
     isWordSlot WordSlot   = True
     isWordSlot _          = False
 
-    isFloatSlot DoubleSlot = True
-    isFloatSlot FloatSlot  = True
-    isFloatSlot _          = False
 
 
 {- **********************************************************************
