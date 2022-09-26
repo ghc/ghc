@@ -26,7 +26,6 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
-import Control.Monad.Fail (MonadFail (..))
 import Data.Char ( isSpace )
 import Data.Foldable ( toList )
 import Data.List.NonEmpty ( NonEmpty )
@@ -44,7 +43,7 @@ import GHC
 import GHC.Driver.Session
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
-                         , tyVarKind, updateTyVarKind, isInvisibleArgFlag )
+                         , tyVarKind, updateTyVarKind, isInvisibleForAllTyFlag )
 import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
@@ -726,7 +725,7 @@ defaultRuntimeRepVars = go emptyVarEnv
     go :: TyVarEnv () -> Type -> Type
     go subs (ForAllTy (Bndr var flg) ty)
       | isRuntimeRepVar var
-      , isInvisibleArgFlag flg
+      , isInvisibleForAllTyFlag flg
       = let subs' = extendVarEnv subs var ()
         in go subs' ty
       | otherwise

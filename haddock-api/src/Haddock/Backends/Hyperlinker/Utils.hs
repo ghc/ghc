@@ -22,7 +22,7 @@ import GHC.Iface.Ext.Types ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, Hi
 import GHC.Iface.Type
 import GHC.Types.Name      ( getOccFS, getOccString )
 import GHC.Driver.Ppr      ( showSDoc )
-import GHC.Types.Var       ( VarBndr(..) )
+import GHC.Types.Var       ( VarBndr(..), visArg, invisArg, TypeOrConstraint(..) )
 
 import System.FilePath.Posix ((</>), (<.>))
 
@@ -129,8 +129,8 @@ recoverFullIfaceTypes df flattened ast = fmap (printed A.!) ast
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (getOccFS n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy w a b) = IfaceFunTy VisArg w a b
-    go (HQualTy con b) = IfaceFunTy InvisArg many_ty con b
+    go (HFunTy w a b)  = IfaceFunTy (visArg TypeLike)   w a b          -- t1 -> t2
+    go (HQualTy con b) = IfaceFunTy (invisArg TypeLike) many_ty con b  -- c => t
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)

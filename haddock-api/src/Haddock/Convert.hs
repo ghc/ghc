@@ -26,19 +26,19 @@ import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
-import Data.Either (lefts, rights)
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
+import GHC.Core.PatSyn
+import GHC.Core.TyCon
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqTypes )
+
 import GHC.Hs
 import GHC.Types.TyThing
 import GHC.Types.Name
 import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )
-import GHC.Core.PatSyn
-import GHC.Tc.Utils.TcType
-import GHC.Core.TyCon
-import GHC.Core.Type
-import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
                   , unitTy, promotedNilDataCon, promotedConsDataCon )
@@ -58,6 +58,7 @@ import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars, mkEmptySigType )
 
+import Data.Either (lefts, rights)
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 import Data.Either                           ( partitionEithers )
 
@@ -202,7 +203,7 @@ synifyTyCon
   -> TyCon               -- ^ type constructor to convert
   -> Either ErrMsg (TyClDecl GhcRn)
 synifyTyCon prr _coax tc
-  | isFunTyCon tc || isPrimTyCon tc
+  | isPrimTyCon tc
   = return $
     DataDecl { tcdLName = synifyNameN tc
              , tcdTyVars = HsQTvs  { hsq_ext = []   -- No kind polymorphism
@@ -426,7 +427,7 @@ synifyDataCon use_gadt_syntax dc =
            { con_ext    = noAnn
            , con_name   = name
            , con_forall = False
-           , con_ex_tvs = map (synifyTyVarBndr . (mkTyCoVarBinder InferredSpec)) ex_tvs
+           , con_ex_tvs = map (synifyTyVarBndr . (mkForAllTyBinder InferredSpec)) ex_tvs
            , con_mb_cxt = ctx
            , con_args   = hat
            , con_doc    = Nothing }
@@ -515,7 +516,7 @@ annotHsType _    _ hs_ty = hs_ty
 tyConArgsPolyKinded :: TyCon -> [Bool]
 tyConArgsPolyKinded tc =
      map (is_poly_ty . tyVarKind)      tc_vis_tvs
-  ++ map (is_poly_ty . tyCoBinderType) tc_res_kind_vis_bndrs
+  ++ map (is_poly_ty . piTyBinderType) tc_res_kind_vis_bndrs
   ++ repeat True
   where
     is_poly_ty :: Type -> Bool
@@ -527,8 +528,8 @@ tyConArgsPolyKinded tc =
     tc_vis_tvs :: [TyVar]
     tc_vis_tvs = tyConVisibleTyVars tc
 
-    tc_res_kind_vis_bndrs :: [TyCoBinder]
-    tc_res_kind_vis_bndrs = filter isVisibleBinder $ fst $ splitPiTys $ tyConResKind tc
+    tc_res_kind_vis_bndrs :: [PiTyBinder]
+    tc_res_kind_vis_bndrs = filter isVisiblePiTyBinder $ fst $ splitPiTys $ tyConResKind tc
 
 --states of what to do with foralls:
 data SynifyTypeState
@@ -661,15 +662,18 @@ synifyType _ vs ty@(AppTy {}) = let
   ty_head' = synifyType WithinType vs ty_head
   ty_args' = map (synifyType WithinType vs) $
              filterOut isCoercionTy $
-             filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
+             filterByList (map isVisibleForAllTyFlag $ appTyForAllTyFlags ty_head ty_args)
                           ty_args
   in foldl (\t1 t2 -> noLocA $ HsAppTy noExtField t1 t2) ty_head' ty_args'
-synifyType s vs funty@(FunTy InvisArg _ _ _) = synifySigmaType s vs funty
-synifyType _ vs       (FunTy VisArg w t1 t2) = let
-  s1 = synifyType WithinType vs t1
-  s2 = synifyType WithinType vs t2
-  w' = synifyMult vs w
-  in noLocA $ HsFunTy noAnn w' s1 s2
+
+synifyType s vs funty@(FunTy af w t1 t2)
+  | isInvisibleFunArg af = synifySigmaType s vs funty
+  | otherwise            = noLocA $ HsFunTy noAnn w' s1 s2
+  where
+    s1 = synifyType WithinType vs t1
+    s2 = synifyType WithinType vs t2
+    w' = synifyMult vs w
+
 synifyType s vs forallty@(ForAllTy (Bndr _ argf) _ty) =
   case argf of
     Required    -> synifyVisForAllType vs forallty
@@ -803,8 +807,8 @@ noKindTyVars _ _ = emptyVarSet
 
 synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
 synifyMult vs t = case t of
-                    One  -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
-                    Many -> HsUnrestrictedArrow noHsUniTok
+                    OneTy  -> HsLinearArrow (HsPct1 noHsTok noHsUniTok)
+                    ManyTy -> HsUnrestrictedArrow noHsUniTok
                     ty -> HsExplicitMult noHsTok (synifyType WithinType vs ty) noHsUniTok
 
 
@@ -824,7 +828,7 @@ synifyPatSynType ps =
 
   in implicitForAll ts [] (univ_tvs ++ ex_tvs) req_theta'
        (\vs -> implicitForAll ts vs [] prov_theta (synifyType WithinType))
-       (mkVisFunTys arg_tys res_ty)
+       (mkScaledFunTys arg_tys res_ty)
 
 synifyTyLit :: TyLit -> HsTyLit GhcRn
 synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
@@ -925,7 +929,7 @@ tcSplitSigmaTyPreserveSynonyms ty =
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitSomeForAllTysPreserveSynonyms ::
-  (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
+  (ForAllTyFlag -> Bool) -> Type -> ([ForAllTyBinder], Type)
 tcSplitSomeForAllTysPreserveSynonyms argf_pred ty = split ty ty []
   where
     split _ (ForAllTy tvb@(Bndr _ argf) ty') tvs
@@ -935,12 +939,12 @@ tcSplitSomeForAllTysPreserveSynonyms argf_pred ty = split ty ty []
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitForAllTysReqPreserveSynonyms :: Type -> ([ReqTVBinder], Type)
 tcSplitForAllTysReqPreserveSynonyms ty =
-  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isVisibleArgFlag ty
+  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isVisibleForAllTyFlag ty
       req_bndrs         = mapMaybe mk_req_bndr_maybe all_bndrs in
   assert ( req_bndrs `equalLength` all_bndrs)
     (req_bndrs, body)
   where
-    mk_req_bndr_maybe :: TyCoVarBinder -> Maybe ReqTVBinder
+    mk_req_bndr_maybe :: ForAllTyBinder -> Maybe ReqTVBinder
     mk_req_bndr_maybe (Bndr tv argf) = case argf of
       Required    -> Just $ Bndr tv ()
       Invisible _ -> Nothing
@@ -948,12 +952,12 @@ tcSplitForAllTysReqPreserveSynonyms ty =
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitForAllTysInvisPreserveSynonyms :: Type -> ([InvisTVBinder], Type)
 tcSplitForAllTysInvisPreserveSynonyms ty =
-  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isInvisibleArgFlag ty
+  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isInvisibleForAllTyFlag ty
       inv_bndrs         = mapMaybe mk_inv_bndr_maybe all_bndrs in
   assert ( inv_bndrs `equalLength` all_bndrs)
     (inv_bndrs, body)
   where
-    mk_inv_bndr_maybe :: TyCoVarBinder -> Maybe InvisTVBinder
+    mk_inv_bndr_maybe :: ForAllTyBinder -> Maybe InvisTVBinder
     mk_inv_bndr_maybe (Bndr tv argf) = case argf of
       Invisible s -> Just $ Bndr tv s
       Required    -> Nothing
@@ -971,5 +975,6 @@ tcSplitPhiTyPreserveSynonyms ty0 = split ty0 []
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitPredFunTyPreserveSynonyms_maybe :: Type -> Maybe (PredType, Type)
-tcSplitPredFunTyPreserveSynonyms_maybe (FunTy InvisArg _ arg res) = Just (arg, res)
+tcSplitPredFunTyPreserveSynonyms_maybe (FunTy af _ arg res)
+  | isInvisibleFunArg af = Just (arg, res)
 tcSplitPredFunTyPreserveSynonyms_maybe _ = Nothing

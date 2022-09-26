@@ -314,7 +314,7 @@ renameType t = case t of
   XHsType a                 -> pure (XHsType a)
   HsExplicitListTy _ a b  -> HsExplicitListTy noAnn a <$> mapM renameLType b
   HsExplicitTupleTy _ b   -> HsExplicitTupleTy noAnn <$> mapM renameLType b
-  HsSpliceTy (HsUntypedSpliceTop _ st)  _ -> renameType st
+  HsSpliceTy (HsUntypedSpliceTop _ st)  _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
 

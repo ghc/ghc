@@ -40,7 +40,7 @@ import GHC.Utils.Outputable (text, sep, (<+>))
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
-import GHC.Builtin.Types.Prim( funTyConName )
+import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Types.Var hiding (varName)
 import GHC.HsToCore.Docs
 
@@ -209,7 +209,7 @@ argCount (CastTy t _)    = argCount t
 argCount _ = 0
 
 simplify :: Type -> SimpleType
-simplify (FunTy _ _ t1 t2)  = SimpleType (SName funTyConName) [simplify t1, simplify t2]
+simplify (FunTy _ _ t1 t2)  = SimpleType (SName unrestrictedFunTyConName) [simplify t1, simplify t2]
 simplify (ForAllTy _ t) = simplify t
 simplify (AppTy t1 t2) = SimpleType s (ts ++ maybeToList (simplify_maybe t2))
   where (SimpleType s ts) = simplify t1
