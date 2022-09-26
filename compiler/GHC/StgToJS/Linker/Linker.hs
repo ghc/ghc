@@ -65,7 +65,7 @@ import           Data.Int
 import           Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
 import           Data.IORef
-import           Data.List  ( partition, nub, foldl', intercalate, group, sort
+import           Data.List  ( partition, nub, intercalate, group, sort
                             , groupBy, intersperse
                             )
 import           Data.Map.Strict          (Map)
@@ -77,7 +77,7 @@ import           Data.Word
 
 import           GHC.Generics (Generic)
 
-import           System.FilePath (splitPath, (<.>), (</>), dropExtension)
+import           System.FilePath ((<.>), (</>), dropExtension)
 import           System.Directory ( createDirectoryIfMissing
                                   , doesFileExist
                                   , getCurrentDirectory
@@ -390,9 +390,6 @@ linkerStats meta s =
     module_stats = "code size per module (in bytes):\n\n" <> unlines (map (concatMap showMod) pkgMods)
 
 
-splitPath' :: FilePath -> [FilePath]
-splitPath' = map (filter (`notElem` ("/\\"::String))) . splitPath
-
 getPackageArchives :: StgToJSConfig -> [([FilePath],[String])] -> IO [FilePath]
 getPackageArchives cfg pkgs =
   filterM doesFileExist [ p </> "lib" ++ l ++ profSuff <.> "a"
@@ -401,15 +398,6 @@ getPackageArchives cfg pkgs =
     -- XXX the profiling library name is probably wrong now
     profSuff | csProf cfg = "_p"
              | otherwise  = ""
-
--- fixme the wired-in package id's we get from GHC we have no version
-getShims :: [FilePath] -> [UnitId] -> IO ([FilePath], [FilePath])
-getShims = panic "Panic from getShims: Shims not implemented! no to shims!"
--- getShims dflags extraFiles pkgDeps = do
---   (w,a) <- collectShims (getLibDir dflags </> "shims")
---                         (map (convertPkg dflags) pkgDeps)
---   extraFiles' <- mapM canonicalizePath extraFiles
---   return (w, a++extraFiles')
 
 {- | convenience: combine rts.js, lib.js, out.js to all.js that can be run
      directly with node.js or SpiderMonkey jsshell
@@ -478,16 +466,6 @@ writeRunner _settings out = do
   perms <- getPermissions runner
   setPermissions runner (perms {executable = True})
 
--- | write the manifest.webapp file that for firefox os
-writeWebAppManifest :: FilePath -- ^ top directory
-                    -> FilePath -- ^ output directory
-                    -> IO ()
-writeWebAppManifest top out = do
-  e <- doesFileExist manifestFile
-  unless e $ B.readFile (top </> "manifest.webapp") >>= B.writeFile manifestFile
-  where
-    manifestFile = out </> "manifest.webapp"
-
 rtsExterns :: FastString
 rtsExterns =
   "// GHCJS RTS externs for closure compiler ADVANCED_OPTIMIZATIONS\n\n" <>
@@ -497,10 +475,6 @@ rtsExterns =
 writeExterns :: FilePath -> IO ()
 writeExterns out = writeFile (out </> "all.js.externs")
   $ unpackFS rtsExterns
-
--- | get all functions in a module
-modFuns :: Deps -> [ExportedFun]
-modFuns (Deps _m _r e _b) = M.keys e
 
 -- | get all dependencies for a given set of roots
 getDeps :: Map Module Deps  -- ^ loaded deps
@@ -638,18 +612,6 @@ readArObject ar_state mod ar_file = do
 
   go_entries entries
 
-{- | Static dependencies are symbols that need to be linked regardless
-     of whether the linked program refers to them. For example
-     dependencies that the RTS uses or symbols that the user program
-     refers to directly
- -}
-newtype StaticDeps =
-  StaticDeps { unStaticDeps :: [(FastString, FastString)] -- module/symbol
-             }
-
-noStaticDeps :: StaticDeps
-noStaticDeps = StaticDeps []
-
 
 -- | A helper function to read system dependencies that are hardcoded via a file
 -- path.
@@ -736,13 +698,16 @@ thDeps pkgs = diffDeps pkgs $
   , S.fromList $ mkBaseFuns "GHC.JS.Prim.TH.Eval" ["runTHServer"]
   )
 
-
+-- | Export the functions in base
 mkBaseFuns :: FastString -> [FastString] -> [ExportedFun]
 mkBaseFuns = mkExportedFuns baseUnitId
 
+-- | Export the Prim functions
 mkPrimFuns :: FastString -> [FastString] -> [ExportedFun]
 mkPrimFuns = mkExportedFuns primUnitId
 
+-- | Given a @UnitId@, a module name, and a set of symbols in the module,
+-- package these into an @ExportedFun@.
 mkExportedFuns :: UnitId -> FastString -> [FastString] -> [ExportedFun]
 mkExportedFuns uid mod_name symbols = map mk_fun symbols
   where
@@ -765,67 +730,12 @@ mkJsSymbol mod s = mkFastString $ mconcat
      will all come from the same version, but it's undefined which one.
  -}
 
-type SDep = (FastString, FastString) -- ^ module/symbol
-
-staticDeps :: UnitEnv
-           -> [(FastString, Module)]   -- ^ wired-in package names / keys
-           -> StaticDeps              -- ^ deps from yaml file
-           -> (StaticDeps, Set UnitId, Set ExportedFun)
-                                      -- ^ the StaticDeps contains the symbols
-                                      --   for which no package could be found
-staticDeps unit_env wiredin sdeps = mkDeps sdeps
-  where
-    u_st  = ue_units unit_env
-    mkDeps (StaticDeps ds) =
-      let (u, p, r) = foldl' resolveDep ([], S.empty, S.empty) ds
-      in  (StaticDeps u, closePackageDeps u_st p, r)
-    resolveDep :: ([SDep], Set UnitId, Set ExportedFun)
-               -> SDep
-               -> ([SDep], Set UnitId, Set ExportedFun)
-    resolveDep (unresolved, pkgs, resolved) dep@(mod_name, s) =
-      -- lookup our module in wiredin names
-      case lookup mod_name wiredin of
-             -- we didn't find the module in wiredin so add to unresolved
-             Nothing -> ( dep : unresolved, pkgs, resolved)
-             -- this is a wired in module
-             Just mod  ->
-               let mod_uid = moduleUnitId mod
-               in case lookupUnitId u_st mod_uid of
-                 -- couldn't find the uid for this wired in package so explode
-                 Nothing -> pprPanic ("Package key for wired-in dependency could not be found.`"
-                                     ++ "I looked for: "
-                                     ++ unpackFS mod_name
-                                     ++ " received " ++ moduleNameString (moduleName mod)
-                                     ++ " but could not find: " ++ unitString mod_uid
-                                     ++ " in the UnitState."
-                                     ++ " Here is too much info for you: ")
-                            $ pprWithUnitState u_st (ppr mod)
-                 -- we are all good, add the uid to the package set, construct
-                 -- its symbols on the fly and add the module to exported symbol
-                 -- set
-                 Just _ -> ( unresolved
-                           , S.insert mod_uid pkgs
-                           , S.insert (ExportedFun mod
-                                       . LexicalFastString $ mkJsSymbol mod s) resolved
-                           )
-
-closePackageDeps :: UnitState -> Set UnitId -> Set UnitId
-closePackageDeps u_st pkgs
-  | S.size pkgs == S.size pkgs' = pkgs
-  | otherwise                   = closePackageDeps u_st pkgs'
-  where
-    pkgs' = pkgs `S.union` S.fromList (concatMap deps $ S.toList pkgs)
-    notFound = error "closePackageDeps: package not found"
-    deps :: UnitId -> [UnitId]
-    deps = unitDepends
-         . fromMaybe notFound
-         . lookupUnitId u_st
-
--- read all dependency data from the to-be-linked files
+-- | read all dependency data from the to-be-linked files
 loadObjDeps :: [LinkedObj] -- ^ object files to link
             -> IO (Map Module (Deps, DepsLocation), [LinkableUnit])
 loadObjDeps objs = prepareLoadedDeps <$> mapM readDepsFile' objs
 
+-- | Load dependencies for the Linker from Ar
 loadArchiveDeps :: GhcjsEnv
                 -> [FilePath]
                 -> IO ( Map Module (Deps, DepsLocation)
@@ -859,9 +769,11 @@ loadArchiveDeps' archives = do
               let !deps = objDeps obj
               pure $ Just (deps, ArchiveFile ar_file)
 
+-- | Predicate to check that an entry in Ar is a JS payload
 isJsFile :: Ar.ArchiveEntry -> Bool
 isJsFile = checkEntryHeader "//JavaScript"
 
+-- | Ensure that the entry header to the Archive object is sound.
 checkEntryHeader :: B.ByteString -> Ar.ArchiveEntry -> Bool
 checkEntryHeader header entry =
   B.take (B.length header) (Ar.filedata entry) == header
@@ -879,7 +791,7 @@ prepareLoadedDeps deps =
 requiredUnits :: Deps -> [LinkableUnit]
 requiredUnits d = map (depsModule d,) (IS.toList $ depsRequired d)
 
--- read dependencies from an object that might have already been into memory
+-- | read dependencies from an object that might have already been into memory
 -- pulls in all Deps from an archive
 readDepsFile' :: LinkedObj -> IO (Deps, DepsLocation)
 readDepsFile' = \case
@@ -889,8 +801,3 @@ readDepsFile' = \case
   ObjFile file -> do
     deps <- readObjectDeps file
     pure (deps,ObjectFile file)
-
--- generateBase :: FilePath -> Base -> IO ()
--- generateBase outDir b =
---   BL.writeFile (outDir </> "out.base.symbs") (renderBase b)
-

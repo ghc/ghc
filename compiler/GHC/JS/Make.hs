@@ -103,6 +103,7 @@ module GHC.JS.Make
   , returnStack, assignAllEqual, assignAll, assignAllReverseOrder
   , declAssignAll
   , nullStat, (.^)
+  , trace
   -- ** Hash combinators
   , jhEmpty
   , jhSingle
@@ -527,9 +528,11 @@ assignAll xs ys = mconcat (zipWith (|=) xs ys)
 assignAllReverseOrder :: [JExpr] -> [JExpr] -> JStat
 assignAllReverseOrder xs ys = mconcat (reverse (zipWith (|=) xs ys))
 
-
 declAssignAll :: [Ident] -> [JExpr] -> JStat
 declAssignAll xs ys = mconcat (zipWith (||=) xs ys)
+
+trace :: ToJExpr a => a -> JStat
+trace ex = appS "h$log" [toJExpr ex]
 
 
 --------------------------------------------------------------------------------
@@ -661,6 +664,7 @@ allocClsA i = toJExpr (TxtI (clsCache ! i))
 --------------------------------------------------------------------------------
 -- New Identifiers
 --------------------------------------------------------------------------------
+
 -- | The 'ToSat' class is heavily used in the Introduction function. It ensures
 -- that all identifiers in the EDSL are tracked and named with an 'IdentSupply'.
 class ToSat a where

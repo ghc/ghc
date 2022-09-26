@@ -17,7 +17,9 @@
 -- Top level driver of the JavaScript Backend RTS. This file is an
 -- implementation of the JS RTS for the JS backend written as an EDSL in
 -- Haskell. It assumes the existence of pre-generated JS functions, included as
--- js-sources...
+-- js-sources in base. These functions are similarly assumed for non-inline
+-- Primops, See 'GHC.StgToJS.Prim'. Most of the elements in this module are
+-- constants in Haskell Land which define pieces of the JS RTS.
 --
 -----------------------------------------------------------------------------
 
@@ -46,23 +48,37 @@ import Data.Monoid
 import Data.Char (toLower, toUpper)
 import qualified Data.Bits          as Bits
 
+-- | The garbageCollector resets registers and result variables.
 garbageCollector :: JStat
 garbageCollector =
   mconcat [ TxtI "h$resetRegisters"  ||= jLam (mconcat $ map resetRegister [minBound..maxBound])
           , TxtI "h$resetResultVars" ||= jLam (mconcat $ map resetResultVar [minBound..maxBound])
           ]
 
-
+-- | Reset the register 'r' in JS Land. Note that this "resets" by setting the
+-- register to a dummy variable called "null", /not/ by setting to JS's nil
+-- value.
 resetRegister :: StgReg -> JStat
 resetRegister r = toJExpr r |= null_
 
+-- | Reset the return variable 'r' in JS Land. Note that this "resets" by
+-- setting the register to a dummy variable called "null", /not/ by setting to
+-- JS's nil value.
 resetResultVar :: StgRet -> JStat
 resetResultVar r = toJExpr r |= null_
 
-{-
-  use h$c1, h$c2, h$c3, ... h$c24 instead of making objects manually so layouts
-  and fields can be changed more easily
- -}
+-- | Define closures based on size, these functions are syntactic sugar, e.g., a
+-- Haskell function which generates some useful JS. Each Closure constructor
+-- follows the naming convention h$cN, where N is a natural number. For example,
+-- h$c (with the nat omitted) is a JS Land Constructor for a closure in JS land
+-- which has a single entry function 'f', and no fields; identical to h$c0. h$c1
+-- is a JS Land Constructor for a closure with an entry function 'f', and a
+-- /single/ field 'x1', 'Just foo' is an example of this kind of closure. h$c2
+-- is a JS Land Constructor for a closure with an entry function and two data
+-- fields: 'x1' and 'x2'. And so on. Note that this has JIT performance
+-- implications; you should use h$c1, h$c2, h$c3, ... h$c24 instead of making
+-- objects manually so layouts and fields can be changed more easily and so the
+-- JIT can optimize better.
 closureConstructors :: StgToJSConfig -> JStat
 closureConstructors s = BlockStat
   [ declClsConstr "h$c" ["f"] $ Closure
@@ -192,6 +208,7 @@ closureConstructors s = BlockStat
         extra_args = ValExpr . JHash . listToUniqMap . zip ds $ map (toJExpr . TxtI) ds
         fun        = JFunc (map TxtI ds) (checkD <> returnS extra_args)
 
+-- | JS Payload to perform stack manipulation in the RTS
 stackManip :: JStat
 stackManip = mconcat (map mkPush [1..32]) <>
              mconcat (map mkPpush [1..255])
@@ -242,6 +259,7 @@ bhLneStats _s p frameSize =
                     ]
 
 
+-- | JS payload to declare the registers
 declRegs :: JStat
 declRegs =
   mconcat [ TxtI "h$regs" ||= toJExpr (JList [])
@@ -253,6 +271,7 @@ declRegs =
       declReg r = (decl . TxtI . mkFastString . ("h$"++) . map toLower . show) r
                   <> BlockStat [AssignStat (toJExpr r) (ValExpr (JInt 0))] -- [j| `r` = 0; |]
 
+-- | JS payload to define getters and setters on the registers.
 regGettersSetters :: JStat
 regGettersSetters =
   mconcat [ TxtI "h$getReg" ||= jLam (\n   -> SwitchStat n getRegCases mempty)
@@ -264,6 +283,7 @@ regGettersSetters =
     setRegCases v =
       map (\r -> (toJExpr (jsRegToInt r), (toJExpr r |= toJExpr v) <> returnS undefined_)) regsFromR1
 
+-- | JS payload that defines the functions to load each register
 loadRegs :: JStat
 loadRegs = mconcat $ map mkLoad [1..32]
   where
@@ -275,8 +295,9 @@ loadRegs = mconcat $ map mkLoad [1..32]
                    fun    = JFunc args (mconcat assign)
                in fname ||= toJExpr fun
 
--- assign registers R1 ... Rn
--- assigns Rn first
+-- | Assign registers R1 ... Rn in descending order, that is assign Rn first.
+-- This function uses the 'assignRegs'' array to construct functions which set
+-- the registers.
 assignRegs :: StgToJSConfig -> [JExpr] -> JStat
 assignRegs _ [] = mempty
 assignRegs s xs
@@ -287,15 +308,24 @@ assignRegs s xs
   where
     l = length xs
 
+-- | JS payload which defines an array of function symbols that set N registers
+-- from M parameters. For example, h$l2 compiles to:
+-- @
+--    function h$l4(x1, x2, x3, x4) {
+--      h$r4 = x1;
+--      h$r3 = x2;
+--      h$r2 = x3;
+--      h$r1 = x4;
+--    };
+-- @
 assignRegs' :: Array Int Ident
 assignRegs' = listArray (1,32) (map (TxtI . mkFastString . ("h$l"++) . show) [(1::Int)..32])
 
+-- | JS payload to declare return variables.
 declRets :: JStat
 declRets = mconcat $ map (decl . TxtI . mkFastString . ("h$"++) . map toLower . show) (enumFrom Ret1)
 
-trace :: ToJExpr a => a -> JStat
-trace ex = appS "h$log" [toJExpr ex]
-
+-- | JS payload defining the types closures.
 closureTypes :: JStat
 closureTypes = mconcat (map mkClosureType (enumFromTo minBound maxBound)) <> closureTypeName
   where
@@ -311,6 +341,7 @@ closureTypes = mconcat (map mkClosureType (enumFromTo minBound maxBound)) <> clo
     ifCT :: JExpr -> ClosureType -> JStat
     ifCT arg ct = jwhenS (arg .===. toJExpr ct) (returnS (toJExpr (show ct)))
 
+-- | JS payload declaring the RTS functions.
 rtsDecls :: JStat
 rtsDecls = jsSaturate (Just "h$RTSD") $
   mconcat [ TxtI "h$currentThread"   ||= null_                   -- thread state object for current thread
@@ -325,15 +356,19 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
           , declRegs
           , declRets]
 
+-- | print the embedded RTS to a String
 rtsText :: StgToJSConfig -> String
 rtsText = show . pretty . rts
 
+-- | print the RTS declarations to a String.
 rtsDeclsText :: String
 rtsDeclsText = show . pretty $ rtsDecls
 
+-- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
 rts :: StgToJSConfig -> JStat
 rts = jsSaturate (Just "h$RTS") . rts'
 
+-- | JS Payload which defines the embedded RTS.
 rts' :: StgToJSConfig -> JStat
 rts' s =
   mconcat [ closureConstructors s

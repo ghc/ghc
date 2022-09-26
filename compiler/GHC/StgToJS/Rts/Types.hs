@@ -26,34 +26,31 @@ import GHC.JS.Syntax
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 
-import GHC.Utils.Monad.State.Strict
+--------------------------------------------------------------------------------
+-- Syntactic Sugar for some Utilities we want in JS land
+--------------------------------------------------------------------------------
 
-import GHC.Data.FastString
-
-
+-- | Syntactic sugar, i.e., a Haskell function which generates useful JS code.
+-- Given a @JExpr@, 'ex', inject a trace statement on 'ex' in the compiled JS
+-- program
 traceRts :: StgToJSConfig -> JExpr -> JStat
-traceRts s ex = jStatIf (csTraceRts s) (appS "h$log" [ex])
+traceRts s ex | (csTraceRts s)  = appS "h$log" [ex]
+              | otherwise       = mempty
 
+-- | Syntactic sugar. Given a @JExpr@, 'ex' which is assumed to be a predicate,
+-- and a message 'm', assert that 'not ex' is True, if not throw an exception in
+-- JS land with message 'm'.
 assertRts :: ToJExpr a => StgToJSConfig -> JExpr -> a -> JStat
-assertRts s ex m = jStatIf (csAssertRts s)
-  (jwhenS (UOpExpr NotOp ex) (appS "throw" [toJExpr m]))
+assertRts s ex m | csAssertRts s = jwhenS (UOpExpr NotOp ex) (appS "throw" [toJExpr m])
+                 | otherwise     = mempty
 
-jStatIf :: Bool -> JStat -> JStat
-jStatIf True s = s
-jStatIf _    _ = mempty
-
+-- | name of the closure 'c'
 clName :: JExpr -> JExpr
 clName c = c .^ "n"
 
+-- | Type name of the closure 'c'
 clTypeName :: JExpr -> JExpr
 clTypeName c = app "h$closureTypeName" [c .^ "t"]
-
-type C = State GenState JStat
-
-assertRtsStat :: C -> C
-assertRtsStat stat = do
-  s <- gets gsSettings
-  if csAssertRts s then stat else return mempty
 
 -- number of  arguments (arity & 0xff = arguments, arity >> 8 = number of registers)
 stackFrameSize :: JExpr -- ^ assign frame size to this
@@ -71,33 +68,11 @@ stackFrameSize tgt f =
                ]
         ))
 
--- some utilities do do something with a range of regs
--- start or end possibly supplied as javascript expr
+--------------------------------------------------------------------------------
+-- Register utilities
+--------------------------------------------------------------------------------
+
+-- | Perform the computation 'f', on the range of registers bounded by 'start'
+-- and 'end'.
 withRegs :: StgReg -> StgReg -> (StgReg -> JStat) -> JStat
-withRegs start end f = mconcat $ map f [start..end]
-
-withRegs' :: StgReg -> StgReg -> (StgReg -> JStat) -> JStat
-withRegs' start end = withRegs start end
-
--- start from js expr, start is guaranteed to be at least min
--- from low to high (fallthrough!)
-withRegsS :: JExpr -> StgReg -> StgReg -> Bool -> (StgReg -> JStat) -> JStat
-withRegsS start min end fallthrough f =
-  SwitchStat start (map mkCase [min..end]) mempty
-    where
-      brk | fallthrough = mempty
-          | otherwise   = BreakStat Nothing
-      mkCase r = let stat = f r
-                  in (toJExpr r, mconcat [stat , stat , brk])
-
--- end from js expr, from high to low
-withRegsRE :: StgReg -> JExpr -> StgReg -> Bool -> (StgReg -> JStat) -> JStat
-withRegsRE start end max fallthrough f =
-  SwitchStat end (reverse $ map mkCase [start..max]) mempty
-    where
-      brk | fallthrough = mempty
-          | otherwise   = BreakStat Nothing
-      mkCase r = (toJExpr (fromEnum r), mconcat [f r , brk])
-
-jsVar :: String -> JExpr
-jsVar = ValExpr . JVar . TxtI . mkFastString
+withRegs start end f = mconcat $ fmap f [start..end]
