@@ -576,13 +576,13 @@ Options affecting a Haskell pre-processor
     .. code-block:: sh
 
         #!/bin/sh
-        ( echo "{-# LINE 1 \"$2\" #-}" ; iconv -f l1 -t utf-8 $2 ) > $3
+        ( echo "{-# LINE 1 \"$1\" #-}" ; iconv -f l1 -t utf-8 $2 ) > $3
 
     and pass ``-F -pgmF convert.sh`` to GHC. The ``-f l1`` option tells
     iconv to convert your Latin-1 file, supplied in argument ``$2``,
     while the "-t utf-8" options tell iconv to return a UTF-8 encoded
     file. The result is redirected into argument ``$3``. The
-    ``echo "{-# LINE 1 \"$2\" #-}"`` just makes sure that your error
+    ``echo "{-# LINE 1 \"$1\" #-}"`` just makes sure that your error
     positions are reported as in the original source file.
 
 .. _options-codegen:
