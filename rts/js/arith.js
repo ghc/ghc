@@ -335,12 +335,9 @@ var h$convertInt    = new Int32Array(h$convertBuffer);
 // use direct inspection through typed array for decoding floating point numbers if this test gives
 // the expected answer. fixme: does this test catch all non-ieee or weird endianness situations?
 h$convertFloat[0] = 0.75;
-// h$convertFloat[0] = 1/0; // to force using fallbacks
-var h$decodeFloatInt   = h$convertInt[0] === 1061158912 ? h$decodeFloatIntArray   : h$decodeFloatIntFallback;
-var h$decodeDouble2Int = h$convertInt[0] === 1061158912 ? h$decodeDouble2IntArray : h$decodeDouble2IntFallback;
 
-function h$decodeFloatIntArray(d) {
-    TRACE_ARITH("decodeFloatIntArray: " + d);
+function h$decodeFloatInt(d) {
+    TRACE_ARITH("decodeFloatInt: " + d);
     if(isNaN(d)) {
         RETURN_UBX_TUP2(-12582912, 105);
     }
@@ -351,47 +348,29 @@ function h$decodeFloatIntArray(d) {
     var s   = i&8388607;
     if(exp === 0) { // zero or denormal
         if(s === 0) {
-            TRACE_ARITH("decodeFloatIntArray s: 0 e: 0");
+            TRACE_ARITH("decodeFloatInt s: 0 e: 0");
             RETURN_UBX_TUP2(0, 0);
         } else {
-            h$convertFloat[0] = d*8388608;
+            h$convertFloat[0] = d*8388608; // put d in the normal range (~ shift left 23 bits)
             i = h$convertInt[0];
-            TRACE_ARITH("decodeFloatIntArray s: " + (sgn * (i&8388607)) +  " e: " + ((i&2139095040) >> 23) - 173);
-            RETURN_UBX_TUP2(sgn*(i&8388607), ((i&2139095040) >> 23) - 173)
+            s = (i&8388607) | 8388608;
+            e = ((i >> 23) & 0xff) - 173; // take into account normalization above (150+23)
+            TRACE_ARITH("decodeFloatInt s: " + (sgn * s) +  " e: " + e);
+            RETURN_UBX_TUP2(sgn*s, e)
         }
     } else {
-      TRACE_ARITH("decodeFloatIntArray s: " + (sgn * (s|8388608)) +  " e: " + (exp-150));
+      TRACE_ARITH("decodeFloatInt s: " + (sgn * (s|8388608)) +  " e: " + (exp-150));
       RETURN_UBX_TUP2(sgn * (s|8388608), exp - 150);
     }
 }
 
-function h$decodeFloatIntFallback(d) {
-    TRACE_ARITH("decodeFloatIntFallback: " + d);
-    if(isNaN(d)) {
-      RETURN_UBX_TUP2(-12582912, 105);
-    }
-    var ret0, ret1;
-    CALL_UBX_TUP2(ret0, ret1, h$integer_cmm_decodeDoublezhFallback(d));
-    var exponent = ret0 + 29;
-    var significand = ret1.shiftRight(28).add(h$bigOne).shiftRight(1).intValue();
-    if(exponent > 105) {
-      exponent = 105;
-      significand = d > 0 ? 8388608 : -8388608;
-    } else if(exponent < -151 || significand === 0) {
-      significand = 0;
-      exponent = 0;
-    }
-    TRACE_ARITH("decodeFloatIntFallback s: " + significand + " e: " + exponent);
-    RETURN_UBX_TUP2(significand, exponent);
-}
-
-function h$decodeDouble2IntArray(d) {
-    TRACE_ARITH("decodeDouble2IntArray: " + d);
+function h$decodeDouble2Int(d) {
+    TRACE_ARITH("decodeDouble2Int: " + d);
     if(isNaN(d)) {
 	RETURN_UBX_TUP4(1, -1572864, 0, 972);
     }
     h$convertDouble[0] = d;
-  TRACE_ARITH("decodeDouble2IntArray binary: " + h$convertInt[0].toString(2) + " " + h$convertInt[1].toString(2));
+  TRACE_ARITH("decodeDouble2Int binary: " + h$convertInt[0].toString(2) + " " + h$convertInt[1].toString(2));
     var i1 = h$convertInt[1];
     var ret1, ret2 = h$convertInt[0], ret3;
     var exp = (i1&2146435072)>>>20;
@@ -410,24 +389,8 @@ function h$decodeDouble2IntArray(d) {
     ret3 = exp-1075;
     ret1 = (i1&1048575)|1048576;
   }
-    TRACE_ARITH("decodeDouble2IntArray: exp: " + ret3 + " significand: " + ret1 + " " + ret2);
+    TRACE_ARITH("decodeDouble2Int: exp: " + ret3 + " significand: " + ret1 + " " + ret2);
     RETURN_UBX_TUP4(i1<0?-1:1,ret1,ret2,ret3);
-}
-
-function h$decodeDouble2IntFallback(d) {
-    TRACE_ARITH("decodeDouble2IntFallback: " + d);
-    if(isNaN(d)) {
-	RETURN_UBX_TUP4(1,-1572864,0,972);
-    }
-    var exponent, significand;
-    CALL_UBX_TUP2(exponent, significand, h$integer_cmm_decodeDoublezhFallback(d));
-    var sign = d<0?-1:1;
-    var s = significand.abs();
-    var ret1 = s.shiftRight(32).intValue();
-    var ret2 = s.intValue();
-    var ret3 = exponent;
-    TRACE_ARITH("decodeDouble2IntFallback: exp: " + ret3 + " significand: " + ret1 + " " + ret2);
-    RETURN_UBX_TUP4(sign, ret1, ret2, ret3);
 }
 
 // round .5 to nearest even number
