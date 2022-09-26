@@ -163,7 +163,10 @@ mapSndM = traverse . traverse
 -- | Monadic version of concatMap
 concatMapM :: (Monad m, Traversable f) => (a -> m [b]) -> f a -> m [b]
 concatMapM f xs = liftM concat (mapM f xs)
-{-# SPECIALIZE concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b] #-}
+{-# INLINE concatMapM #-}
+-- It's better to inline to inline this than to specialise
+--     concatMapM :: (Monad m) => (a -> m [b]) -> [a] -> m [b]
+-- Inlining cuts compiler allocation by around 1%
 
 -- | Applicative version of mapMaybe
 mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]

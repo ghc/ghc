@@ -1919,7 +1919,9 @@ wrapJoinCont env cont thing_inside
 
 
 --------------------
-trimJoinCont :: Id -> Maybe JoinArity -> SimplCont -> SimplCont
+trimJoinCont :: Id         -- Used only in error message
+             -> Maybe JoinArity
+             -> SimplCont -> SimplCont
 -- Drop outer context from join point invocation (jump)
 -- See Note [Join points and case-of-case]
 
@@ -2017,6 +2019,17 @@ outside.  Surprisingly tricky!
                      Variables
 *                                                                      *
 ************************************************************************
+
+Note [zapSubstEnv]
+~~~~~~~~~~~~~~~~~~
+When simplifying something that has already been simplified, be sure to
+zap the SubstEnv.  This is VITAL.  Consider
+     let x = e in
+     let y = \z -> ...x... in
+     \ x -> ...y...
+
+We'll clone the inner \x, adding x->x' in the id_subst Then when we
+inline y, we must *not* replace x by x' in the inlined copy!!
 -}
 
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
@@ -2035,86 +2048,28 @@ simplVar env var
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
   = case substId env var of
-      ContEx tvs cvs ids e ->
-          let env' = setSubstEnv env tvs cvs ids
-          in simplExprF env' e cont
-          -- Don't trim; haven't already simplified e,
-          -- so the cont is not embodied in e
+      ContEx tvs cvs ids e -> simplExprF env' e cont
+        -- Don't trimJoinCont; haven't already simplified e,
+        -- so the cont is not embodied in e
+        where
+          env' = setSubstEnv env tvs cvs ids
 
-      DoneId var1 -> do
-          logger <- getLogger
-          let cont' = trimJoinCont var (isJoinId_maybe var1) cont
-          completeCall logger env var1 cont'
+      DoneId var1 ->
+        do { rule_base <- getSimplRules
+           ; let cont' = trimJoinCont var1 (isJoinId_maybe var1) cont
+                 info  = mkArgInfo env rule_base var1 cont'
+           ; rebuildCall env info cont' }
 
-      DoneEx e mb_join ->
-          let env' = zapSubstEnv env
-              cont' = trimJoinCont var mb_join cont
-          in simplExprF env' e cont'
-              -- Note [zapSubstEnv]
-              -- ~~~~~~~~~~~~~~~~~~
-              -- The template is already simplified, so don't re-substitute.
-              -- This is VITAL.  Consider
-              --      let x = e in
-              --      let y = \z -> ...x... in
-              --      \ x -> ...y...
-              -- We'll clone the inner \x, adding x->x' in the id_subst
-              -- Then when we inline y, we must *not* replace x by x' in
-              -- the inlined copy!!
+      DoneEx e mb_join -> simplExprF env' e cont'
+        where
+          cont' = trimJoinCont var mb_join cont
+          env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
 
 ---------------------------------------------------------
 --      Dealing with a call site
 
-completeCall :: Logger -> SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
-completeCall logger env var cont
-  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
-                                lone_variable arg_infos interesting_cont
-  -- Inline the variable's RHS
-  = do { checkedTick (UnfoldingDone var)
-       ; dump_inline expr cont
-       ; let env1 = zapSubstEnv env
-       ; simplExprF env1 expr cont }
-
-  | otherwise
-  -- Don't inline; instead rebuild the call
-  = do { rule_base <- getSimplRules
-       ; let rules = getRules rule_base var
-             info = mkArgInfo env var rules
-                              n_val_args call_cont
-       ; rebuildCall env info cont }
-
-  where
-    uf_opts    = seUnfoldingOpts env
-    case_depth = seCaseDepth env
-    (lone_variable, arg_infos, call_cont) = contArgs cont
-    n_val_args       = length arg_infos
-    interesting_cont = interestingCallContext env call_cont
-    active_unf       = activeUnfolding (seMode env) var
-
-    log_inlining doc
-      = liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify)
-           Opt_D_dump_inlinings
-           "" FormatText doc
-
-    dump_inline unfolding cont
-      | not (logHasDumpFlag logger Opt_D_dump_inlinings) = return ()
-      | not (logHasDumpFlag logger Opt_D_verbose_core2core)
-      = when (isExternalName (idName var)) $
-            log_inlining $
-                sep [text "Inlining done:", nest 4 (ppr var)]
-      | otherwise
-      = log_inlining $
-           sep [text "Inlining done: " <> ppr var,
-                nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
-                              text "Cont:  " <+> ppr cont])]
-
-rebuildCall :: SimplEnv
-            -> ArgInfo
-            -> SimplCont
+rebuildCall :: SimplEnv -> ArgInfo -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
--- We decided not to inline, so
---    - simplify the arguments
---    - try rewrite rules
---    - and rebuild
 
 ---------- Bottoming applications --------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) cont
@@ -2137,27 +2092,48 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_dmds = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
----------- Try rewrite RULES --------------
--- See Note [Trying rewrite rules]
+---------- Try inlining, if ai_rewrite = TryInlining --------
+-- In the TryInlining case we try inlining immediately, before simplifying
+-- any (more) arguments. Why?  See Note [Rewrite rules and inlining].
+--
+-- If there are rewrite rules we'll skip this case until we have
+-- simplified enough args to satisfy nr_wanted==0 in the TryRules case below
+-- Then we'll try the rules, and if that fails, we'll do TryInlining
 rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
-                              , ai_rules = Just (nr_wanted, rules) }) cont
+                              , ai_rewrite = TryInlining }) cont
+  = do { logger <- getLogger
+       ; let full_cont = pushSimplifiedRevArgs env rev_args cont
+       ; mb_inline <- tryInlining env logger fun full_cont
+       ; case mb_inline of
+            Just expr -> do { checkedTick (UnfoldingDone fun)
+                            ; let env1 = zapSubstEnv env
+                            ; simplExprF env1 expr full_cont }
+            Nothing -> rebuildCall env (info { ai_rewrite = TryNothing }) cont
+       }
+
+---------- Try rewrite RULES, if ai_rewrite = TryRules --------------
+-- See Note [Rewrite rules and inlining]
+-- See also Note [Trying rewrite rules]
+rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
+                              , ai_rewrite = TryRules nr_wanted rules }) cont
   | nr_wanted == 0 || no_more_args
-  , let info' = info { ai_rules = Nothing }
   = -- We've accumulated a simplified call in <fun,rev_args>
     -- so try rewrite rules; see Note [RULES apply to simplified arguments]
     -- See also Note [Rules for recursive functions]
     do { mb_match <- tryRules env rules fun (reverse rev_args) cont
        ; case mb_match of
              Just (env', rhs, cont') -> simplExprF env' rhs cont'
-             Nothing                 -> rebuildCall env info' cont }
+             Nothing -> rebuildCall env (info { ai_rewrite = TryInlining }) cont }
   where
+    -- If we have run out of arguments, just try the rules; there might
+    -- be some with lower arity.  Casts get in the way -- they aren't
+    -- allowed on rule LHSs
     no_more_args = case cont of
                       ApplyToTy  {} -> False
                       ApplyToVal {} -> False
                       _             -> True
 
-
----------- Simplify applications and casts --------------
+---------- Simplify type applications and casts --------------
 rebuildCall env info (CastIt co cont)
   = rebuildCall env (addCastTo info co) cont
 
@@ -2202,6 +2178,7 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
              call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
        ; return (emptyFloats env, call') }
 
+---------- Simplify value arguments --------------------
 rebuildCall env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_hole_ty = fun_ty
@@ -2237,6 +2214,42 @@ rebuildCall env fun_info
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   = rebuild env (argInfoExpr fun rev_args) cont
 
+-----------------------------------
+tryInlining :: SimplEnv -> Logger -> OutId -> SimplCont -> SimplM (Maybe OutExpr)
+tryInlining env logger var cont
+  | Just expr <- callSiteInline logger uf_opts case_depth var active_unf
+                                lone_variable arg_infos interesting_cont
+  = do { dump_inline expr cont
+       ; return (Just expr) }
+
+  | otherwise
+  = return Nothing
+
+  where
+    uf_opts    = seUnfoldingOpts env
+    case_depth = seCaseDepth env
+    (lone_variable, arg_infos, call_cont) = contArgs cont
+    interesting_cont = interestingCallContext env call_cont
+    active_unf       = activeUnfolding (seMode env) var
+
+    log_inlining doc
+      = liftIO $ logDumpFile logger (mkDumpStyle alwaysQualify)
+           Opt_D_dump_inlinings
+           "" FormatText doc
+
+    dump_inline unfolding cont
+      | not (logHasDumpFlag logger Opt_D_dump_inlinings) = return ()
+      | not (logHasDumpFlag logger Opt_D_verbose_core2core)
+      = when (isExternalName (idName var)) $
+            log_inlining $
+                sep [text "Inlining done:", nest 4 (ppr var)]
+      | otherwise
+      = log_inlining $
+           sep [text "Inlining done: " <> ppr var,
+                nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
+                              text "Cont:  " <+> ppr cont])]
+
+
 {- Note [Trying rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider an application (f e1 e2 e3) where the e1,e2,e3 are not yet
@@ -2271,6 +2284,38 @@ we match f's rules against the un-simplified RHS, it won't match.  This
 makes a particularly big difference when superclass selectors are involved:
         op ($p1 ($p2 (df d)))
 We want all this to unravel in one sweep.
+
+Note [Rewrite rules and inlining]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general we try to arrange that inlining is disabled (via a pragma) if
+a rewrite rule should apply, so that the rule has a decent chance to fire
+before we inline the function.
+
+But it turns out that (especially when type-class specialisation or
+SpecConstr is involved) it is very helpful for the the rewrite rule to
+"win" over inlining when both are active at once: see #21851, #22097.
+
+The simplifier arranges to do this, as follows. In effect, the ai_rewrite
+field of the ArgInfo record is the state of a little state-machine:
+
+* mkArgInfo sets the ai_rewrite field to TryRules if there are any rewrite
+  rules avaialable for that function.
+
+* rebuildCall simplifies arguments until enough are simplified to match the
+  rule with greatest arity.  See Note [RULES apply to simplified arguments]
+  and the first field of `TryRules`.
+
+  But no more! As soon as we have simplified enough arguments to satisfy the
+  maximum-arity rules, we try the rules; see Note [Trying rewrite rules].
+
+* Once we have tried rules (or immediately if there are no rules) set
+  ai_rewrite to TryInlining, and the Simplifier will try to inline the
+  function.  We want to try this immediately (before simplifying any (more)
+  arguments). Why? Consider
+      f BIG      where   f = \x{OneOcc}. ...x...
+  If we inline `f` before simplifying `BIG` well use preInlineUnconditionally,
+  and we'll simplify BIG once, at x's occurrence, rather than twice.
+
 
 Note [Avoid redundant simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2327,7 +2372,8 @@ See Note [No free join points in arityType] in GHC.Core.Opt.Arity
 -}
 
 tryRules :: SimplEnv -> [CoreRule]
-         -> Id -> [ArgSpec]
+         -> Id
+         -> [ArgSpec]   -- In /normal, forward/ order
          -> SimplCont
          -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
 
@@ -3668,7 +3714,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
   | otherwise
   = do { join_bndr <- newJoinId [arg_bndr] res_ty
        ; let arg_info = ArgInfo { ai_fun   = join_bndr
-                                , ai_rules = Nothing, ai_args  = []
+                                , ai_rewrite = TryNothing, ai_args  = []
                                 , ai_encl  = False, ai_dmds  = repeat topDmd
                                 , ai_discs = repeat 0 }
        ; return ( addJoinFloats (emptyFloats env) $

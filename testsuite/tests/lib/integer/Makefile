@@ -11,8 +11,9 @@ CHECK2 = grep -q -- '$1' folding.simpl || \
 
 .PHONY: integerConstantFolding
 integerConstantFolding:
-	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -ddump-simpl > folding.simpl
+	'$(TEST_HC)' -Wall -v0 -O --make integerConstantFolding -fforce-recomp -ddump-simpl -dno-debug-output > folding.simpl
 # All the 100nnn values should be constant-folded away
+# -dno-debug-output suppresses a "Glomming" message
 	! grep -q '\<100[0-9][0-9][0-9]\>' folding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' folding.simpl; }
 	$(call CHECK,\<200007\>,plusInteger)
 	$(call CHECK,\<683234160\>,timesInteger)
@@ -64,8 +65,9 @@ IntegerConversionRules:
 
 .PHONY: naturalConstantFolding
 naturalConstantFolding:
-	'$(TEST_HC)' -Wall -v0 -O --make naturalConstantFolding -fforce-recomp -ddump-simpl > folding.simpl
+	'$(TEST_HC)' -Wall -v0 -O --make naturalConstantFolding -fforce-recomp -ddump-simpl -dno-debug-output > folding.simpl
 # All the 100nnn values should be constant-folded away
+# -dno-debug-output suppresses a "Glomming" message
 	! grep -q '\<100[0-9][0-9][0-9]\>' folding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' folding.simpl; }
 	# Bit arithmetic
 	$(call CHECK,\<532\>,andNatural)

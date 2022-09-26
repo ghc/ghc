@@ -430,3 +430,7 @@ test('T22028', normal, compile, ['-O -ddump-rule-firings'])
 test('T22114', normal, compile, ['-O'])
 test('T21286',  normal, multimod_compile, ['T21286', '-O -ddump-rule-firings'])
 
+# One module, T21851.hs, has OPTIONS_GHC -ddump-simpl
+test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O -dno-typeable-binds -dsuppress-uniques'])
+# One module, T22097.hs, has OPTIONS_GHC -ddump-simpl
+test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-O -dno-typeable-binds -dsuppress-uniques'])

@@ -30,9 +30,10 @@ module GHC.Core.Opt.Simplify.Utils (
         interestingCallContext,
 
         -- ArgInfo
-        ArgInfo(..), ArgSpec(..), mkArgInfo,
+        ArgInfo(..), ArgSpec(..), RewriteCall(..), mkArgInfo,
         addValArgTo, addCastTo, addTyArgTo,
-        argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
+        argInfoExpr, argInfoAppArgs,
+        pushSimplifiedArgs, pushSimplifiedRevArgs,
         isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
@@ -52,6 +53,7 @@ import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
 import GHC.Core.FVs
 import GHC.Core.Utils
+import GHC.Core.Rules( getRules )
 import GHC.Core.Opt.Arity
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
@@ -210,6 +212,7 @@ data SimplCont
 
 type StaticEnv = SimplEnv       -- Just the static part is relevant
 
+-- See Note [DupFlag invariants]
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
              | OkToDup     -- Simplified and small
@@ -226,8 +229,9 @@ perhapsSubstTy dup env ty
 {- Note [StaticEnv invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We pair up an InExpr or InAlts with a StaticEnv, which establishes the
-lexical scope for that InExpr.  When we simplify that InExpr/InAlts, we
-use
+lexical scope for that InExpr.
+
+When we simplify that InExpr/InAlts, we use
   - Its captured StaticEnv
   - Overriding its InScopeSet with the larger one at the
     simplification point.
@@ -244,13 +248,14 @@ isn't big enough.
 
 Note [DupFlag invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-In both (ApplyToVal dup _ env k)
-   and  (Select dup _ _ env k)
+In both ApplyToVal { se_dup = dup, se_env = env, se_cont = k}
+   and  Select { se_dup = dup, se_env = env, se_cont = k}
 the following invariants hold
 
   (a) if dup = OkToDup, then continuation k is also ok-to-dup
-  (b) if dup = OkToDup or Simplified, the subst-env is empty
-      (and hence no need to re-simplify)
+  (b) if dup = OkToDup or Simplified, the subst-env is empty,
+               or at least is always ignored; the payload is
+               already an OutThing
 -}
 
 instance Outputable DupFlag where
@@ -309,7 +314,8 @@ data ArgInfo
         ai_fun   :: OutId,      -- The function
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
 
-        ai_rules :: FunRules,   -- Rules for this function
+        ai_rewrite :: RewriteCall,  -- What transformation to try next for this call
+             -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
 
         ai_encl :: Bool,        -- Flag saying whether this function
                                 -- or an enclosing one has rules (recursively)
@@ -324,6 +330,12 @@ data ArgInfo
                                 --   non-zero => be keener to inline
                                 --   Always infinite
     }
+
+data RewriteCall  -- What rewriting to try next for this call
+                  -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
+  = TryRules FullArgCount [CoreRule]
+  | TryInlining
+  | TryNothing
 
 data ArgSpec
   = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
@@ -349,20 +361,20 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
 addValArgTo ai arg hole_ty
-  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rewrite = rew } <- ai
       -- Pop the top demand and and discounts off
   , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
-  = ai { ai_args  = arg_spec : ai_args ai
-       , ai_dmds  = dmds
-       , ai_discs = discs
-       , ai_rules = decRules rules }
+  = ai { ai_args    = arg_spec : ai_args ai
+       , ai_dmds    = dmds
+       , ai_discs   = discs
+       , ai_rewrite = decArgCount rew }
   | otherwise
   = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
     -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
-addTyArgTo ai arg_ty hole_ty = ai { ai_args = arg_spec : ai_args ai
-                                  , ai_rules = decRules (ai_rules ai) }
+addTyArgTo ai arg_ty hole_ty = ai { ai_args    = arg_spec : ai_args ai
+                                  , ai_rewrite = decArgCount (ai_rewrite ai) }
   where
     arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
 
@@ -381,19 +393,22 @@ argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
 argInfoAppArgs (ValArg { as_arg = arg }  : as) = arg     : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
-pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
-pushSimplifiedArgs _env []           k = k
-pushSimplifiedArgs env  (arg : args) k
-  = case arg of
-      TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
-               -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg { as_arg = arg, as_hole_ty = hole_ty }
-             -> ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
-                           , sc_hole_ty = hole_ty, sc_cont = rest }
-      CastBy c -> CastIt c rest
-  where
-    rest = pushSimplifiedArgs env args k
-           -- The env has an empty SubstEnv
+pushSimplifiedArgs, pushSimplifiedRevArgs
+  :: SimplEnv
+  -> [ArgSpec]   -- In normal, forward order for pushSimplifiedArgs,
+                 -- in /reverse/ order for pushSimplifiedRevArgs
+  -> SimplCont -> SimplCont
+pushSimplifiedArgs    env args cont = foldr  (pushSimplifiedArg env)             cont args
+pushSimplifiedRevArgs env args cont = foldl' (\k a -> pushSimplifiedArg env a k) cont args
+
+pushSimplifiedArg :: SimplEnv -> ArgSpec -> SimplCont -> SimplCont
+pushSimplifiedArg _env (TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }) cont
+  = ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont }
+pushSimplifiedArg env (ValArg { as_arg = arg, as_hole_ty = hole_ty }) cont
+  = ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
+                 -- The SubstEnv will be ignored since sc_dup=Simplified
+               , sc_hole_ty = hole_ty, sc_cont = cont }
+pushSimplifiedArg _ (CastBy c) cont = CastIt c cont
 
 argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
@@ -406,18 +421,14 @@ argInfoExpr fun rev_args
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
+decArgCount :: RewriteCall -> RewriteCall
+decArgCount (TryRules n rules) = TryRules (n-1) rules
+decArgCount rew                = rew
 
-type FunRules = Maybe (Int, [CoreRule]) -- Remaining rules for this function
-     -- Nothing => No rules
-     -- Just (n, rules) => some rules, requiring at least n more type/value args
-
-decRules :: FunRules -> FunRules
-decRules (Just (n, rules)) = Just (n-1, rules)
-decRules Nothing           = Nothing
-
-mkFunRules :: [CoreRule] -> FunRules
-mkFunRules [] = Nothing
-mkFunRules rs = Just (n_required, rs)
+mkTryRules :: [CoreRule] -> RewriteCall
+-- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
+mkTryRules [] = TryInlining
+mkTryRules rs = TryRules n_required rs
   where
     n_required = maximum (map ruleArity rs)
 
@@ -516,6 +527,7 @@ contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
 contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
 contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
+
 -------------------
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions,
@@ -525,6 +537,14 @@ countArgs (ApplyToVal { sc_cont = cont }) = 1 + countArgs cont
 countArgs (CastIt _ cont)                 = countArgs cont
 countArgs _                               = 0
 
+countValArgs :: SimplCont -> Int
+-- Count value arguments only
+countValArgs (ApplyToTy  { sc_cont = cont }) = 1 + countValArgs cont
+countValArgs (ApplyToVal { sc_cont = cont }) = 1 + countValArgs cont
+countValArgs (CastIt _ cont)                 = countValArgs cont
+countValArgs _                               = 0
+
+-------------------
 contArgs :: SimplCont -> (Bool, [ArgSummary], SimplCont)
 -- Summarises value args, discards type args and coercions
 -- The returned continuation of the call is only used to
@@ -579,29 +599,26 @@ contEvalContext k = case k of
     -- and case binder dmds, see addCaseBndrDmd. No priority right now.
 
 -------------------
-mkArgInfo :: SimplEnv
-          -> Id
-          -> [CoreRule] -- Rules for function
-          -> Int        -- Number of value args
-          -> SimplCont  -- Context of the call
-          -> ArgInfo
+mkArgInfo :: SimplEnv -> RuleEnv -> Id -> SimplCont -> ArgInfo
 
-mkArgInfo env fun rules n_val_args call_cont
+mkArgInfo env rule_base fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
-            , ai_rules = fun_rules
+            , ai_rewrite = fun_rules
             , ai_encl = False
             , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun   = fun
             , ai_args  = []
-            , ai_rules = fun_rules
-            , ai_encl  = interestingArgContext rules call_cont
+            , ai_rewrite = fun_rules
+            , ai_encl  = notNull rules || contHasRules cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
-    fun_rules = mkFunRules rules
+    rules      = getRules rule_base fun
+    fun_rules  = mkTryRules rules
+    n_val_args = countValArgs cont
 
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
@@ -814,7 +831,7 @@ interestingCallContext env cont
         -- a build it's *great* to inline it here.  So we must ensure that
         -- the context for (f x) is not totally uninteresting.
 
-interestingArgContext :: [CoreRule] -> SimplCont -> Bool
+contHasRules :: SimplCont -> Bool
 -- If the argument has form (f x y), where x,y are boring,
 -- and f is marked INLINE, then we don't want to inline f.
 -- But if the context of the argument is
@@ -822,33 +839,29 @@ interestingArgContext :: [CoreRule] -> SimplCont -> Bool
 -- where g has rules, then we *do* want to inline f, in case it
 -- exposes a rule that might fire.  Similarly, if the context is
 --      h (g (f x x))
--- where h has rules, then we do want to inline f; hence the
--- call_cont argument to interestingArgContext
+-- where h has rules, then we do want to inline f.  So contHasRules
+-- tries to see if the context of the f-call is a call to a function
+-- with rules.
 --
--- The ai-rules flag makes this happen; if it's
+-- The ai_encl flag makes this happen; if it's
 -- set, the inliner gets just enough keener to inline f
 -- regardless of how boring f's arguments are, if it's marked INLINE
 --
 -- The alternative would be to *always* inline an INLINE function,
 -- regardless of how boring its context is; but that seems overkill
 -- For example, it'd mean that wrapper functions were always inlined
---
--- The call_cont passed to interestingArgContext is the context of
--- the call itself, e.g. g <hole> in the example above
-interestingArgContext rules call_cont
-  = notNull rules || enclosing_fn_has_rules
+contHasRules cont
+  = go cont
   where
-    enclosing_fn_has_rules = go call_cont
-
-    go (Select {})                  = False
-    go (ApplyToVal {})              = False  -- Shouldn't really happen
-    go (ApplyToTy  {})              = False  -- Ditto
-    go (StrictArg { sc_fun = fun }) = ai_encl fun
-    go (StrictBind {})              = False      -- ??
-    go (CastIt _ c)                 = go c
-    go (Stop _ RuleArgCtxt _)       = True
-    go (Stop _ _ _)                 = False
-    go (TickIt _ c)                 = go c
+    go (ApplyToVal { sc_cont = cont }) = go cont
+    go (ApplyToTy  { sc_cont = cont }) = go cont
+    go (CastIt _ cont)                 = go cont
+    go (StrictArg { sc_fun = fun })    = ai_encl fun
+    go (Stop _ RuleArgCtxt _)          = True
+    go (TickIt _ c)                    = go c
+    go (Select {})                     = False
+    go (StrictBind {})                 = False      -- ??
+    go (Stop _ _ _)                    = False
 
 {- Note [Interesting arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
