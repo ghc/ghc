@@ -616,20 +616,20 @@ function h$decodeDoubleInt64(d) {
 
 function h$__int_encodeDouble(j,e) {
   if (!j) return 0;
-  return (j|0) ** (e|0);
+  return (j|0) * (2 ** (e|0));
 }
 
 function h$__word_encodeDouble(j,e) {
   if (!j) return 0;
-  return (j>>>0) ** (e|0);
+  return (j>>>0) * (2 ** (e|0));
 }
 
 function h$__int_encodeFloat(j,e) {
   if (!j) return 0;
-  return h$fround((j|0) ** (e|0));
+  return h$fround((j|0) * (2 ** (e|0)));
 }
 
 function h$__word_encodeFloat(j,e) {
   if (!j) return 0;
-  return h$fround((j>>>0) ** (e|0));
+  return h$fround((j>>>0) * (2 ** (e|0)));
 }
