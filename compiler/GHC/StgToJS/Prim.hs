@@ -1214,8 +1214,9 @@ genPrim prof ty op = case op of
 
 ------------------------------ Unhandled primops -------------------
 
-  ShrinkSmallMutableArrayOp_Char    -> unhandledPrimop op
-  GetSizeofSmallMutableArrayOp      -> unhandledPrimop op
+  ShrinkSmallMutableArrayOp_Char    -> \[]  [a,n] -> PrimInline $ appS "h$shrinkMutableCharArray" [a,n]
+  GetSizeofSmallMutableArrayOp      -> \[r] [a]   -> PrimInline $ r |= a .^ "length"
+
 
 
   AtomicReadAddrOp_Word             -> \[r] [a,o]   -> PrimInline $ r |= dv_u32 a o
