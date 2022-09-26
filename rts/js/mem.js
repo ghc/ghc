@@ -992,6 +992,10 @@ function h$shrinkMutableByteArray(a, n) {
   }
 }
 
+function h$shrinkMutableArray(a, n) {
+  a.length = n;
+}
+
 function h$compareByteArrays(a1,o1,a2,o2,n) {
   for(var i = 0; i < n; i++) {
     var x = a1.u8[i + o1];
