@@ -98,12 +98,15 @@ test('linker_unload_native',
 
 ######################################
 test('linker_error1', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error1'])
 
 test('linker_error2', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error2'])
 
 test('linker_error3', [extra_files(['linker_error.c']),
+                       js_skip, # dynamic linking not supported by the JS backend
                        ignore_stderr], makefile_test, ['linker_error3'])
 
 ######################################
