@@ -75,9 +75,13 @@ test('T5435_v_gcc',
      makefile_test, ['T5435_v_gcc'])
 test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
+      js_skip, # dynamic linking not supported by the JS backend
       check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
-test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, ['T5435_dyn_gcc'])
+test('T5435_dyn_gcc',
+     [extra_files(['T5435.hs', 'T5435_gcc.c']),
+      js_skip], # dynamic linking not supported by the JS backend
+     makefile_test, ['T5435_dyn_gcc'])
 
 ######################################
 test('linker_unload',
