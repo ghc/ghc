@@ -87,7 +87,7 @@ import GHC.Core.Ppr( {- instances -} )
 import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
 import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
-import GHC.Types.RepType ( typePrimRep1 )
+import GHC.Types.RepType ( typePrimRep1, typePrimRep )
 import GHC.Utils.Panic.Plain
 
 {-
@@ -740,12 +740,23 @@ pprStgTopBinding = pprGenStgTopBinding
 pprStgTopBindings :: OutputablePass pass => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
 pprStgTopBindings = pprGenStgTopBindings
 
+pprIdWithRep :: Id -> SDoc
+pprIdWithRep v = ppr v <> pprTypeRep (idType v)
+
+pprTypeRep :: Type -> SDoc
+pprTypeRep ty =
+    ppUnlessOption sdocSuppressStgReps $
+    char ':' <> case typePrimRep ty of
+                  [r] -> ppr r
+                  r -> ppr r
+
+
 instance Outputable StgArg where
   ppr = pprStgArg
 
 pprStgArg :: StgArg -> SDoc
-pprStgArg (StgVarArg var) = ppr var
-pprStgArg (StgLitArg con) = ppr con
+pprStgArg (StgVarArg var) = pprIdWithRep var
+pprStgArg (StgLitArg con) = ppr con <> pprTypeRep (literalType con)
 
 instance OutputablePass pass => Outputable  (GenStgExpr pass) where
   ppr = pprStgExpr panicStgPprOpts

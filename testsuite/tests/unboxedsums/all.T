@@ -35,3 +35,13 @@ test('T20858b', [extra_files(['T20858.hs'])
                 ,extra_hc_opts("-fprint-explicit-runtime-reps -fprint-explicit-kinds")]
               , ghci_script, ['T20858b.script'])
 test('T20859', normal, compile, [''])
+
+test('T22208', normal, compile, ['-dstg-lint -dcmm-lint'])
+test('ManyUbxSums',
+     [ pre_cmd('{compiler} --run ./GenManyUbxSums.hs'),
+       extra_files(['GenManyUbxSums.hs', 'ManyUbxSums_Addr.hs']),
+     ],
+     multi_compile_and_run,
+     ['ManyUbxSums',
+        [('ManyUbxSums_Addr.hs','')]
+        , '-v0 -dstg-lint -dcmm-lint'])

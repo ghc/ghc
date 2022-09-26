@@ -1446,7 +1446,8 @@ def compile_cmp_asm(name: TestName,
                     ext: str,
                     extra_hc_opts: str
                     ) -> PassFail:
-    print('Compile only, extra args = ', extra_hc_opts)
+    if extra_hc_opts:
+        print('Compile only, extra args = ', extra_hc_opts)
     result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
@@ -1473,7 +1474,8 @@ def compile_grep_asm(name: TestName,
                      is_substring: bool,
                      extra_hc_opts: str
                      ) -> PassFail:
-    print('Compile only, extra args = ', extra_hc_opts)
+    if extra_hc_opts:
+        print('Compile and grep asm, extra args = ', extra_hc_opts)
     result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
@@ -1494,7 +1496,8 @@ def compile_grep_core(name: TestName,
                       way: WayName,
                       extra_hc_opts: str
                       ) -> PassFail:
-    print('Compile only, extra args = ', extra_hc_opts)
+    if extra_hc_opts:
+        print('Compile only, extra args = ', extra_hc_opts)
     result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):

@@ -2434,6 +2434,7 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressStgExts
+                  setGeneralFlag Opt_SuppressStgReps
                   setGeneralFlag Opt_SuppressTypeSignatures
                   setGeneralFlag Opt_SuppressCoreSizes
                   setGeneralFlag Opt_SuppressTimestamps)
@@ -3372,6 +3373,7 @@ dFlagsDeps = [
   depFlagSpec' "suppress-stg-free-vars" Opt_SuppressStgExts
      (useInstead "-d" "suppress-stg-exts"),
   flagSpec "suppress-stg-exts"          Opt_SuppressStgExts,
+  flagSpec "suppress-stg-reps"          Opt_SuppressStgReps,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-coercion-types"    Opt_SuppressCoercionTypes,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
@@ -3817,7 +3819,8 @@ defaultFlags settings
       Opt_SimplPreInlining,
       Opt_VersionMacros,
       Opt_RPath,
-      Opt_CompactUnwind
+      Opt_CompactUnwind,
+      Opt_SuppressStgReps
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -5031,6 +5034,7 @@ initSDocContext dflags style = SDC
   , sdocSuppressUniques             = gopt Opt_SuppressUniques dflags
   , sdocSuppressModulePrefixes      = gopt Opt_SuppressModulePrefixes dflags
   , sdocSuppressStgExts             = gopt Opt_SuppressStgExts dflags
+  , sdocSuppressStgReps             = gopt Opt_SuppressStgReps dflags
   , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
