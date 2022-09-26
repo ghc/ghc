@@ -8,16 +8,17 @@ import re
 #
 config.compiler_always_flags = ghc_compiler_always_flags.split()
 
-# By default, the 'normal' and 'hpc' ways are enabled. In addition, certain
+# By default, the 'normal' way is enabled. In addition, certain
 # ways are enabled automatically if this GHC supports them. Ways that fall in
-# this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
+# this group are 'hpc', 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
 # 'profthreaded', 'ghci', and whichever of 'static/dyn' is not this GHC's
 # default mode. Other ways should be set explicitly from .T files.
-config.compile_ways       = ['normal', 'hpc']
-config.run_ways           = ['normal', 'hpc']
+config.compile_ways       = ['normal']
+config.run_ways           = ['normal']
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways         = ['prof', 'normal_h',
+config.other_ways         = ['hpc',
+                             'prof', 'normal_h',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'sanity',
@@ -33,6 +34,7 @@ config.other_ways         = ['prof', 'normal_h',
                              'nonmoving_thr_ghc',
                              'compacting_gc',
                              ]
+
 
 if ghc_with_native_codegen:
     config.compile_ways.append('optasm')
@@ -64,6 +66,16 @@ if windows:
         config.run_ways += winio_ways
     else:
         config.other_ways += winio_ways
+
+# LLVM
+if not config.unregisterised and not config.arch == "js" and config.have_llvm:
+    config.compile_ways.append('optllvm')
+    config.run_ways.append('optllvm')
+
+# HPC
+if not config.arch == "js":
+    config.compile_ways.append('hpc')
+    config.run_ways.append('hpc')
 
 config.way_flags = {
     'normal'       : [],
@@ -180,15 +192,6 @@ llvm_ways     = [x[0] for x in config.way_flags.items()
 
 
 def get_compiler_info():
-    if config.unregisterised:
-        print("Unregisterised build; skipping LLVM ways...")
-    elif config.arch == "js":
-        print("JavaScript backend; skipping LLVM ways...")
-    elif config.have_llvm:
-        config.compile_ways.append('optllvm')
-        config.run_ways.append('optllvm')
-    else:
-        print("Failed to find `llc` command; skipping LLVM ways...")
 
     # Whether GHC itself was built using the LLVM backend. We need to know this
     # since some tests in ext-interp fail when stage2 ghc is built using
