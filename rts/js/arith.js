@@ -324,7 +324,11 @@ function h$isDoubleDenormalized(d) {
 }
 
 function h$isFloatDenormalized(d) {
-  return (d !== 0 && Math.abs(d) < 2.2250738585072014e-308) ? 1 : 0;
+  h$convertFloat[0] = d;
+  var i = h$convertInt[0];
+  var exp = (i >> 23) & 0xff;
+  var s   = i&8388607;
+  return ((s !== 0 && exp === 0) ? 1 : 0);
 }
 
 var h$convertBuffer = new ArrayBuffer(8);
