@@ -335,6 +335,7 @@ var h$convertBuffer = new ArrayBuffer(8);
 var h$convertDouble = new Float64Array(h$convertBuffer);
 var h$convertFloat  = new Float32Array(h$convertBuffer);
 var h$convertInt    = new Int32Array(h$convertBuffer);
+var h$convertWord   = new Uint32Array(h$convertBuffer);
 
 // use direct inspection through typed array for decoding floating point numbers if this test gives
 // the expected answer. fixme: does this test catch all non-ieee or weird endianness situations?
@@ -599,4 +600,27 @@ function h$__int_encodeFloat(j,e) {
 function h$__word_encodeFloat(j,e) {
   if (!j) return 0;
   return h$fround((j>>>0) * (2 ** (e|0)));
+}
+
+function h$stg_word32ToFloatzh(v) {
+  h$convertWord[0] = v;
+  return h$convertFloat[0];
+}
+
+function h$stg_floatToWord32zh(v) {
+  h$convertFloat[0] = v;
+  return h$convertWord[0];
+}
+
+function h$stg_word64ToDoublezh(h,l) {
+  h$convertWord[0] = l;
+  h$convertWord[1] = h;
+  return h$convertDouble[0];
+}
+
+function h$stg_doubleToWord64zh(v) {
+  h$convertDouble[0] = v;
+  var l = h$convertWord[0];
+  var h = h$convertWord[1];
+  RETURN_UBX_TUP2(h,l);
 }
