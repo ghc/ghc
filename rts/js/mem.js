@@ -1338,7 +1338,7 @@ function h$pdep32(src, mask) {
       k++;
     }
   }
-  return dst;
+  return (dst >>> 0);
 }
 
 function h$pdep64(src_b, src_a, mask_b, mask_a) {
@@ -1360,7 +1360,7 @@ function h$pdep64(src_b, src_a, mask_b, mask_a) {
      k++;
    }
  }
- RETURN_UBX_TUP2(dst_b, dst_a);
+ RETURN_UBX_TUP2((dst_b >>> 0), (dst_a >>> 0));
 }
 
 function h$pext8(src, mask) {
