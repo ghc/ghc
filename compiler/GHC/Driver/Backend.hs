@@ -463,7 +463,7 @@ backendDescription :: Backend -> String
 backendDescription (Named NCG)         = "native code generator"
 backendDescription (Named LLVM)        = "LLVM"
 backendDescription (Named ViaC)        = "compiling via C"
-backendDescription (Named JavaScript)  = "compiling to JavaScript via emscripten"
+backendDescription (Named JavaScript)  = "compiling to JavaScript"
 backendDescription (Named Interpreter) = "byte-code interpreter"
 backendDescription (Named NoBackend)   = "no code generated"
 
