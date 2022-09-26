@@ -220,21 +220,17 @@ addInertForAll new_qci
 
 {- Note [Do not add duplicate quantified instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (#15244):
+As an optimisation, we avoid adding duplicate quantified instances to the
+inert set; we use a simple duplicate check using tcEqType for simplicity,
+even though it doesn't account for superficial differences, e.g. it will count
+the following two constraints as different (#22223):
 
-  f :: (C g, D g) => ....
-  class S g => C g where ...
-  class S g => D g where ...
-  class (forall a. Eq a => Eq (g a)) => S g where ...
+  - forall a b. C a b
+  - forall b a. C a b
 
-Then in f's RHS there are two identical quantified constraints
-available, one via the superclasses of C and one via the superclasses
-of D.  The two are identical, and it seems wrong to reject the program
-because of that. But without doing duplicate-elimination we will have
-two matching QCInsts when we try to solve constraints arising from f's
-RHS.
-
-The simplest thing is simply to eliminate duplicates, which we do here.
+The main logic that allows us to pick local instances, even in the presence of
+duplicates, is explained in Note [Use only the best matching quantified constraint]
+in GHC.Tc.Solver.Interact.
 -}
 
 {- *********************************************************************

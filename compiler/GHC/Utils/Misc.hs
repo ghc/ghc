@@ -43,6 +43,8 @@ module GHC.Utils.Misc (
 
         chunkList,
 
+        holes,
+
         changeLast,
         mapLastM,
 
@@ -505,6 +507,13 @@ expectOnly msg _     = panic ("expectOnly: " ++ msg)
 chunkList :: Int -> [a] -> [[a]]
 chunkList _ [] = []
 chunkList n xs = as : chunkList n bs where (as,bs) = splitAt n xs
+
+-- | Compute all the ways of removing a single element from a list.
+--
+--  > holes [1,2,3] = [(1, [2,3]), (2, [1,3]), (3, [1,2])]
+holes :: [a] -> [(a, [a])]
+holes []     = []
+holes (x:xs) = (x, xs) : mapSnd (x:) (holes xs)
 
 -- | Replace the last element of a list with another element.
 changeLast :: [a] -> a -> [a]

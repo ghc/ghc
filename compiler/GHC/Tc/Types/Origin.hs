@@ -464,8 +464,7 @@ data CtOrigin
   -- have 'InstSCOrigin' origin.
   | InstSCOrigin ScDepth      -- ^ The number of superclass selections necessary to
                               -- get this constraint; see Note [Replacement vs keeping]
-                              -- and Note [Use only the best local instance], both in
-                              -- GHC.Tc.Solver.Interact
+                              -- in GHC.Tc.Solver.Interact
                  TypeSize     -- ^ If @(C ty1 .. tyn)@ is the largest class from
                               --    which we made a superclass selection in the chain,
                               --    then @TypeSize = sizeTypes [ty1, .., tyn]@
@@ -478,12 +477,13 @@ data CtOrigin
   --      f = e
   -- When typechecking body of 'f', the superclasses of the Given (Foo a)
   -- will have 'OtherSCOrigin'.
-  -- Needed for Note [Replacement vs keeping] and
-  -- Note [Use only the best local instance], both in GHC.Tc.Solver.Interact.
+  --
+  -- Needed for Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
   | OtherSCOrigin ScDepth -- ^ The number of superclass selections necessary to
                           -- get this constraint
-                  SkolemInfoAnon   -- ^ Where the sub-class constraint arose from
-                               -- (used only for printing)
+                  SkolemInfoAnon
+                    -- ^ Where the sub-class constraint arose from
+                    -- (used only for printing)
 
   -- All the others are for *wanted* constraints
 

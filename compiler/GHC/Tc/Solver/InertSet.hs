@@ -1558,23 +1558,28 @@ matchableGivens loc_w pred_w inerts@(IS { inert_cans = inert_cans })
     matchable_given :: Ct -> Bool
     matchable_given ct
       | CtGiven { ctev_loc = loc_g, ctev_pred = pred_g } <- ctEvidence ct
-      = mightEqualLater inerts pred_g loc_g pred_w loc_w
+      = isJust $ mightEqualLater inerts pred_g loc_g pred_w loc_w
 
       | otherwise
       = False
 
-mightEqualLater :: InertSet -> TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
+mightEqualLater :: InertSet -> TcPredType -> CtLoc -> TcPredType -> CtLoc -> Maybe Subst
 -- See Note [What might equal later?]
 -- Used to implement logic in Note [Instance and Given overlap] in GHC.Tc.Solver.Interact
 mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
   | prohibitedSuperClassSolve given_loc wanted_loc
-  = False
+  = Nothing
 
   | otherwise
   = case tcUnifyTysFG bind_fun [flattened_given] [flattened_wanted] of
-      SurelyApart              -> False  -- types that are surely apart do not equal later
-      MaybeApart MARInfinite _ -> False  -- see Example 7 in the Note.
-      _                        -> True
+      Unifiable subst
+        -> Just subst
+      MaybeApart reason subst
+        | MARInfinite <- reason -- see Example 7 in the Note.
+        -> Nothing
+        | otherwise
+        -> Just subst
+      SurelyApart -> Nothing
 
   where
     in_scope  = mkInScopeSet $ tyCoVarsOfTypes [given_pred, wanted_pred]

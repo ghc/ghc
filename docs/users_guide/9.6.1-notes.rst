@@ -68,6 +68,16 @@ Language
   :extension:`TypeData`. This extension permits ``type data`` declarations
   as a more fine-grained alternative to :extension:`DataKinds`.
 
+- GHC now does a better job of solving constraints in the presence of multiple
+  matching quantified constraints. For example, if we want to solve
+  ``C a b Int`` and we have matching quantified constraints: ::
+
+    forall x y z. (Ord x, Enum y, Num z) => C x y z
+    forall u v. (Enum v, Eq u) => C u v Int
+
+  Then GHC will use the second quantified constraint to solve ``C a b Int``,
+  as it has a strictly weaker precondition.
+
 Compiler
 ~~~~~~~~
 

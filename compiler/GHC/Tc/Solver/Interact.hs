@@ -50,6 +50,7 @@ import GHC.Types.Var.Env
 
 import qualified Data.Semigroup as S
 import Control.Monad
+import Data.Maybe ( listToMaybe, mapMaybe )
 import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
 import GHC.Driver.Session
@@ -2470,109 +2471,236 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 matchLocalInst pred loc
   = do { inerts@(IS { inert_cans = ics }) <- getTcSInerts
        ; case match_local_inst inerts (inert_insts ics) of
-           ([], Nothing) -> do { traceTcS "No local instance for" (ppr pred)
-                               ; return NoInstance }
+          { ([], []) -> do { traceTcS "No local instance for" (ppr pred)
+                           ; return NoInstance }
+          ; (matches, unifs) ->
+    do { matches <- mapM mk_instDFun matches
+       ; unifs   <- mapM mk_instDFun unifs
+         -- See Note [Use only the best matching quantified constraint]
+       ; case dominatingMatch matches of
+          { Just (dfun_id, tys, theta)
+            | all ((theta `impliedBySCs`) . thdOf3) unifs
+            ->
+            do { let result = OneInst { cir_new_theta = theta
+                                      , cir_mk_ev     = evDFunApp dfun_id tys
+                                      , cir_what      = LocalInstance }
+               ; traceTcS "Best local instance found:" $
+                  vcat [ text "pred:" <+> ppr pred
+                       , text "result:" <+> ppr result
+                       , text "matches:" <+> ppr matches
+                       , text "unifs:" <+> ppr unifs ]
+               ; return result }
 
-             -- See Note [Use only the best local instance] about
-             -- superclass depths
-           (matches, unifs)
-             | [(dfun_ev, inst_tys)] <- best_matches
-             , maybe True (> min_sc_depth) unifs
-             -> do { let dfun_id = ctEvEvId dfun_ev
-                   ; (tys, theta) <- instDFunType dfun_id inst_tys
-                   ; let result = OneInst { cir_new_theta = theta
-                                          , cir_mk_ev     = evDFunApp dfun_id tys
-                                          , cir_what      = LocalInstance }
-                   ; traceTcS "Best local inst found:" (ppr result)
-                   ; traceTcS "All local insts:" (ppr matches)
-                   ; return result }
-
-             | otherwise
-             -> do { traceTcS "Multiple local instances for" (ppr pred)
-                   ; return NotSure }
-
-             where
-               extract_depth = sc_depth . ctEvLoc . fst
-               min_sc_depth = minimum (map extract_depth matches)
-               best_matches = filter ((== min_sc_depth) . extract_depth) matches }
+          ; mb_best ->
+            do { traceTcS "Multiple local instances; not committing to any"
+                  $ vcat [ text "pred:" <+> ppr pred
+                         , text "matches:" <+> ppr matches
+                         , text "unifs:" <+> ppr unifs
+                         , text "best_match:" <+> ppr mb_best ]
+               ; return NotSure }}}}}
   where
     pred_tv_set = tyCoVarsOfType pred
 
-    sc_depth :: CtLoc -> Int
-    sc_depth ctloc = case ctLocOrigin ctloc of
-      InstSCOrigin depth _  -> depth
-      OtherSCOrigin depth _ -> depth
-      _                     -> 0
+    mk_instDFun :: (CtEvidence, [DFunInstType]) -> TcS InstDFun
+    mk_instDFun (ev, tys) =
+      let dfun_id = ctEvEvId ev
+      in do { (tys, theta) <- instDFunType (ctEvEvId ev) tys
+            ; return (dfun_id, tys, theta) }
 
-    -- See Note [Use only the best local instance] about superclass depths
+    -- Compute matching and unifying local instances
     match_local_inst :: InertSet
                      -> [QCInst]
                      -> ( [(CtEvidence, [DFunInstType])]
-                        , Maybe Int )   -- Nothing ==> no unifying local insts
-                                        -- Just n ==> unifying local insts, with
-                                        --            minimum superclass depth
-                                        --            of n
+                        , [(CtEvidence, [DFunInstType])] )
     match_local_inst _inerts []
-      = ([], Nothing)
-    match_local_inst inerts (qci@(QCI { qci_tvs = qtvs, qci_pred = qpred
-                               , qci_ev = qev })
-                             : qcis)
+      = ([], [])
+    match_local_inst inerts (qci@(QCI { qci_tvs  = qtvs
+                                      , qci_pred = qpred
+                                      , qci_ev   = qev })
+                            :qcis)
       | let in_scope = mkInScopeSet (qtv_set `unionVarSet` pred_tv_set)
       , Just tv_subst <- ruleMatchTyKiX qtv_set (mkRnEnv2 in_scope)
                                         emptyTvSubstEnv qpred pred
       , let match = (qev, map (lookupVarEnv tv_subst) qtvs)
-      = (match:matches, unif)
+      = (match:matches, unifs)
 
       | otherwise
       = assertPpr (disjointVarSet qtv_set (tyCoVarsOfType pred))
                   (ppr qci $$ ppr pred)
             -- ASSERT: unification relies on the
             -- quantified variables being fresh
-        (matches, unif `combine` this_unif)
+        (matches, this_unif `combine` unifs)
       where
         qloc = ctEvLoc qev
         qtv_set = mkVarSet qtvs
+        (matches, unifs) = match_local_inst inerts qcis
         this_unif
-          | mightEqualLater inerts qpred qloc pred loc = Just (sc_depth qloc)
-          | otherwise = Nothing
-        (matches, unif) = match_local_inst inerts qcis
+          | Just subst <- mightEqualLater inerts qpred qloc pred loc
+          = Just (qev, map  (lookupTyVar subst) qtvs)
+          | otherwise
+          = Nothing
 
-        combine Nothing  Nothing    = Nothing
-        combine (Just n) Nothing    = Just n
-        combine Nothing  (Just n)   = Just n
-        combine (Just n1) (Just n2) = Just (n1 `min` n2)
+        combine Nothing  us = us
+        combine (Just u) us = u : us
 
-{- Note [Use only the best local instance]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Instance dictionary function and type.
+type InstDFun = (DFunId, [TcType], TcThetaType)
+
+-- | Try to find a local quantified instance that dominates all others,
+-- i.e. which has a weaker instance context than all the others.
+--
+-- See Note [Use only the best matching quantified constraint].
+dominatingMatch :: [InstDFun] -> Maybe InstDFun
+dominatingMatch matches =
+  listToMaybe $ mapMaybe (uncurry go) (holes matches)
+  -- listToMaybe: arbitrarily pick any one context that is weaker than
+  -- all others, e.g. so that we can handle [Eq a, Num a] vs [Num a, Eq a]
+  -- (see test case T22223).
+
+  where
+    go :: InstDFun -> [InstDFun] -> Maybe InstDFun
+    go this [] = Just this
+    go this@(_,_,this_theta) ((_,_,other_theta):others)
+      | this_theta `impliedBySCs` other_theta
+      = go this others
+      | otherwise
+      = Nothing
+
+-- | Whether a collection of constraints is implied by another collection,
+-- according to a simple superclass check.
+--
+-- See Note [When does a quantified instance dominate another?].
+impliedBySCs :: TcThetaType -> TcThetaType -> Bool
+impliedBySCs c1 c2 = all in_c2 c1
+  where
+    in_c2 :: TcPredType -> Bool
+    in_c2 pred = any (pred `eqType`) c2_expanded
+
+    c2_expanded :: [TcPredType]  -- Includes all superclasses
+    c2_expanded = [ q | p <- c2, q <- p : transSuperClasses p ]
+
+
+{- Note [When does a quantified instance dominate another?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When matching local quantified instances, it's useful to be able to pick
+the one with the weakest precondition, e.g. if one has both
+
+  [G] d1: forall a b. ( Eq a, Num b, C a b  ) => D a b
+  [G] d2: forall a  .                C a Int  => D a Int
+  [W] {w}: D a Int
+
+Then it makes sense to use d2 to solve w, as doing so we end up with a strictly
+weaker proof obligation of `C a Int`, compared to `(Eq a, Num Int, C a Int)`
+were we to use d1.
+
+In theory, to compute whether one context implies another, we would need to
+recursively invoke the constraint solver. This is expensive, so we instead do
+a simple check using superclasses, implemented in impliedBySCs.
+
+Examples:
+
+ - [Eq a] is implied by [Ord a]
+ - [Ord a] is not implied by [Eq a],
+ - any context is implied by itself,
+ - the empty context is implied by any context.
+
+Note [Use only the best matching quantified constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (#20582) the ambiguity check for
   (forall a. Ord (m a), forall a. Semigroup a => Eq (m a)) => m Int
 
 Because of eager expansion of given superclasses, we get
-  [G] forall a. Ord (m a)
-  [G] forall a. Eq (m a)
-  [G] forall a. Semigroup a => Eq (m a)
+  [G] d1: forall a. Ord (m a)
+  [G] d2: forall a. Eq (m a)
+  [G] d3: forall a. Semigroup a => Eq (m a)
 
-  [W] forall a. Ord (m a)
-  [W] forall a. Semigroup a => Eq (m a)
+  [W] {w1}: forall a. Ord (m a)
+  [W] {w2}: forall a. Semigroup a => Eq (m a)
 
 The first wanted is solved straightforwardly. But the second wanted
-matches *two* local instances. Our general rule around multiple local
+matches *two* local instances: d2 and d3. Our general rule around multiple local
 instances is that we refuse to commit to any of them. However, that
 means that our type fails the ambiguity check. That's bad: the type
 is perfectly fine. (This actually came up in the wild, in the streamly
 library.)
 
-The solution is to prefer local instances with fewer superclass selections.
-So, matchLocalInst is careful to whittle down the matches only to the
-ones with the shallowest superclass depth, and also to worry about unifying
-local instances that are at that depth (or less).
+The solution is to prefer local instances which are easier to prove, meaning
+that they have a weaker precondition. In this case, the empty context
+of d2 is a weaker constraint than the "Semigroup a" context of d3, so we prefer
+using it when proving w2. This allows us to pass the ambiguity check here.
 
-By preferring these shallower local instances, we can use the last given
-listed above and pass the ambiguity check.
+Our criterion for solving a Wanted by matching local quantified instances is
+thus as follows:
 
-The instance-depth mechanism uses the same superclass depth
-information as described in Note [Replacement vs keeping], 2a.
+  - There is a matching local quantified instance that dominates all others
+    matches, in the sense of [When does a quantified instance dominate another?].
+    Any such match do, we pick it arbitrarily (the T22223 example below says why).
+  - This local quantified instance also dominates all the unifiers, as we
+    wouldn't want to commit to a single match when we might have multiple,
+    genuinely different matches after further unification takes place.
 
-Test case: typecheck/should_compile/T20582.
+Some other examples:
 
+
+  #15244:
+
+    f :: (C g, D g) => ....
+    class S g => C g where ...
+    class S g => D g where ...
+    class (forall a. Eq a => Eq (g a)) => S g where ...
+
+  Here, in f's RHS, there are two identical quantified constraints
+  available, one via the superclasses of C and one via the superclasses
+  of D. Given that each implies the other, we pick one arbitrarily.
+
+
+  #22216:
+
+    class Eq a
+    class Eq a => Ord a
+    class (forall b. Eq b => Eq (f b)) => Eq1 f
+    class (Eq1 f, forall b. Ord b => Ord (f b)) => Ord1 f
+
+  Suppose we have
+
+    [G] d1: Ord1 f
+    [G] d2: Eq a
+    [W] {w}: Eq (f a)
+
+  Superclass expansion of d1 gives us:
+
+    [G] d3 : Eq1 f
+    [G] d4 : forall b. Ord b => Ord (f b)
+
+  expanding d4 and d5 gives us, respectively:
+
+    [G] d5 : forall b. Eq  b => Eq (f b)
+    [G] d6 : forall b. Ord b => Eq (f b)
+
+  Now we have two matching local instances that we could use when solving the
+  Wanted. However, it's obviously silly to use d6, given that d5 provides us with
+  as much information, with a strictly weaker precondition. So we pick d5 to solve
+  w. If we chose d6, we would get [W] Ord a, which in this case we can't solve.
+
+
+  #22223:
+
+    [G] forall a b. (Eq a, Ord b) => C a b
+    [G] forall a b. (Ord b, Eq a) => C a b
+    [W] C x y
+
+  Here we should be free to pick either quantified constraint, as they are
+  equivalent up to re-ordering of the constraints in the context.
+  See also Note [Do not add duplicate quantified instances]
+  in GHC.Tc.Solver.Monad.
+
+Test cases:
+  typecheck/should_compile/T20582
+  quantified-constraints/T15244
+  quantified-constraints/T22216{a,b,c,d,e}
+  quantified-constraints/T22223
+
+Historical note: a previous solution was to instead pick the local instance
+with the least superclass depth (see Note [Replacement vs keeping]),
+but that doesn't work for the example from #22216.
 -}
