@@ -529,7 +529,6 @@ function h$ctz64(x1,x2) {
 }
 
 var h$fround            = null;
-var h$truncateFloat_buf = null;
 if(typeof Math.fround === 'function') {
   h$fround = function(f) {
     TRACE_ARITH("fround (native): " + f);
@@ -538,9 +537,8 @@ if(typeof Math.fround === 'function') {
 } else {
   h$fround = function(f) {
     TRACE_ARITH("fround (buffer): " + f);
-    if(!h$truncateFloat_buf) h$truncateFloat_buf = new Float32Array(1);
-    h$truncateFloat_buf[0] = f;
-    return h$truncateFloat_buf[0];
+    h$convertFloat[0] = f;
+    return h$convertFloat[0];
   }
 }
 
