@@ -60,7 +60,6 @@ import           Data.Map (Map)
 import           Data.Int
 import qualified Data.List as List
 import           Data.Maybe
-import qualified Data.Set as S
 import           GHC.Data.FastString
 
 import           GHC.JS.Syntax
@@ -451,7 +450,7 @@ buildFunId i = TxtI (mkFastString $ "h$$$f" ++ show i)
 
 -- result is ordered, does not contain duplicates
 findGlobals :: UniqSet FastString -> JStat -> [FastString]
-findGlobals globals stat = filter isGlobal . map itxt . S.toList $ identsS stat
+findGlobals globals stat = filter isGlobal . map itxt . uniqDSetToList $ identsS stat
   where
     locals     = mkUniqSet (findLocals stat)
     isGlobal i = elementOfUniqSet i globals && not (elementOfUniqSet i locals)
@@ -787,7 +786,7 @@ findDefinitions _                                 = []
 hashSingleDefinition :: UniqSet FastString -> Ident -> JExpr -> (FastString, HashBuilder)
 hashSingleDefinition globals (TxtI i) expr = (i, ht 0 <> render st <> mconcat (map hobj globalRefs))
   where
-    globalRefs = filter (`elementOfUniqSet` globals) . map itxt $ S.toList (identsE expr)
+    globalRefs = filter (`elementOfUniqSet` globals) . map itxt $ uniqDSetToList (identsE expr)
     globalMap  = listToUniqMap $ zip globalRefs (map (mkFastString . ("h$$$global_"++) . show) [(1::Int)..])
     expr'      = identsE' (\i@(TxtI t) ->  maybe i TxtI (lookupUniqMap globalMap t)) expr
     st         = AssignStat (ValExpr (JVar (TxtI "dummy"))) expr'

@@ -59,7 +59,7 @@ import Data.Maybe
 import Data.Data
 
 -- | Maps indexed by 'Uniquable' keys
-newtype UniqMap k a = UniqMap (UniqFM k (k, a))
+newtype UniqMap k a = UniqMap { getUniqMap :: UniqFM k (k, a) }
     deriving (Data, Eq, Functor)
 type role UniqMap nominal representational
 

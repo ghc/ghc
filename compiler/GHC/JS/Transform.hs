@@ -39,15 +39,14 @@ import qualified Data.Map as M
 import Text.Read (readMaybe)
 import Data.Functor.Identity
 import Control.Monad
-import Data.Semigroup
 import Data.Bifunctor
-import Data.Set (Set)
-import qualified Data.Set as Set
 
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Panic
+import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.DSet
 
 mapExprIdent :: (Ident -> JExpr) -> JExpr -> JExpr
 mapExprIdent f = fst (mapIdent f)
@@ -98,50 +97,51 @@ mapIdent f = (map_expr, map_stat)
       ContinueStat{}        -> s
 
 {-# INLINE identsS #-}
-identsS :: JStat -> Set Ident
+identsS :: JStat -> UniqDSet Ident
 identsS = \case
-  DeclStat i         -> Set.singleton i
+  DeclStat i         -> unitUniqDSet i
   ReturnStat e       -> identsE e
-  IfStat e s1 s2     -> identsE e <> identsS s1 <> identsS s2
-  WhileStat _ e s    -> identsE e <> identsS s
-  ForInStat _ i e s  -> Set.singleton i <> identsE e <> identsS s
-  SwitchStat e xs s  -> identsE e <> foldl' (<>) Set.empty (map traverseCase xs) <> identsS s
-                          where traverseCase (e,s) = identsE e <> identsS s
-  TryStat s1 i s2 s3 -> identsS s1 <> Set.singleton i <> identsS s2 <> identsS s3
-  BlockStat xs       -> foldl' (<>) Set.empty (map identsS xs)
-  ApplStat e es      -> identsE e <> foldl' (<>) Set.empty (map identsE es)
+  IfStat e s1 s2     -> identsE e `unionUniqDSets` identsS s1 `unionUniqDSets` identsS s2
+  WhileStat _ e s    -> identsE e `unionUniqDSets` identsS s
+  ForInStat _ i e s  -> unitUniqDSet i `unionUniqDSets` identsE e `unionUniqDSets` identsS s
+  SwitchStat e xs s  -> identsE e `unionUniqDSets` foldl' unionUniqDSets emptyUniqDSet (map traverseCase xs) `unionUniqDSets` identsS s
+                          where traverseCase (e,s) = identsE e `unionUniqDSets` identsS s
+  TryStat s1 i s2 s3 -> identsS s1 `unionUniqDSets` unitUniqDSet i `unionUniqDSets` identsS s2 `unionUniqDSets` identsS s3
+  BlockStat xs       -> foldl' unionUniqDSets emptyUniqDSet (map identsS xs)
+  ApplStat e es      -> identsE e `unionUniqDSets` foldl' unionUniqDSets emptyUniqDSet (map identsE es)
   UOpStat _op e      -> identsE e
-  AssignStat e1 e2   -> identsE e1 <> identsE e2
+  AssignStat e1 e2   -> identsE e1 `unionUniqDSets` identsE e2
   UnsatBlock{}       -> error "identsS: UnsatBlock"
   LabelStat _l s     -> identsS s
-  BreakStat{}        -> Set.empty
-  ContinueStat{}     -> Set.empty
+  BreakStat{}        -> emptyUniqDSet
+  ContinueStat{}     -> emptyUniqDSet
 
 {-# INLINE identsE #-}
-identsE :: JExpr -> Set Ident
+identsE :: JExpr -> UniqDSet Ident
 identsE = \case
   ValExpr v         -> identsV v
   SelExpr e _i      -> identsE e -- do not rename properties
-  IdxExpr e1 e2     -> identsE e1 <> identsE e2
-  InfixExpr _ e1 e2 -> identsE e1 <> identsE e2
+  IdxExpr e1 e2     -> identsE e1 `unionUniqDSets` identsE e2
+  InfixExpr _ e1 e2 -> identsE e1 `unionUniqDSets` identsE e2
   UOpExpr _ e       -> identsE e
-  IfExpr e1 e2 e3   -> identsE e1 <> identsE e2 <> identsE e3
-  ApplExpr e es     -> identsE e <> foldl' (<>) Set.empty (map identsE es)
+  IfExpr e1 e2 e3   -> identsE e1 `unionUniqDSets` identsE e2 `unionUniqDSets` identsE e3
+  ApplExpr e es     -> identsE e `unionUniqDSets` foldl' unionUniqDSets emptyUniqDSet (map identsE es)
   UnsatExpr{}       -> error "identsE: UnsatExpr"
 
 {-# INLINE identsV #-}
-identsV :: JVal -> Set Ident
+identsV :: JVal -> UniqDSet Ident
 identsV = \case
-  JVar i       -> Set.singleton i
-  JList xs     -> foldl' (<>) Set.empty (map identsE xs)
-  JDouble{}    -> Set.empty
-  JInt{}       -> Set.empty
-  JStr{}       -> Set.empty
-  JRegEx{}     -> Set.empty
+  JVar i       -> unitUniqDSet i
+  JList xs     -> foldl' unionUniqDSets emptyUniqDSet (map identsE xs)
+  JDouble{}    -> emptyUniqDSet
+  JInt{}       -> emptyUniqDSet
+  JStr{}       -> emptyUniqDSet
+  JRegEx{}     -> emptyUniqDSet
   -- nonDetEltsUniqMap doesn't introduce non-determinism because the Set ignores
   -- the List's ordering in favour of lexical comparisons
-  JHash m      -> foldl' (<>) Set.empty (map (identsE . snd) $ nonDetEltsUniqMap m)
-  JFunc args s -> Set.fromList args <> identsS s
+  -- foldl' (<>) Set.empty (map (identsE . snd) $ nonDetEltsUniqMap m)
+  JHash m      -> foldUFM unionUniqDSets emptyUniqDSet (mapUFM snd . getUniqMap $ mapUniqMap identsE m)
+  JFunc args s -> mkUniqDSet args `unionUniqDSets` identsS s
   UnsatVal{}   -> error "identsV: UnsatVal"
 
 
