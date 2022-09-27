@@ -129,8 +129,8 @@ Note [The architecture of the Core optimizer]
 
 Conceptually the Core optimizer consists of two stages:
 
- 1. The planning stage.
- 2. The execution stage.
+ 1. **The planning stage**: where we take the user-specified input (currently in `DynFlags`) and produce a domain-specific configuration for just this pipeline stage (a `[CoreToDo]` value). This configuration is the plan.
+ 2. **The execution stage**: where we we take a Core program (a `ModGuts`) and the configuration (a `[CoreToDo]`) and optimize that program according to the `[CoreToDo]` plan, producing a new `ModGuts`.
 
 This division is mirrored in the interface of the different optimizations. For
 each of those optimzations we have
