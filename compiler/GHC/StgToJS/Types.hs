@@ -3,6 +3,22 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.Types
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+--
+-- Module that holds the Types required for the StgToJS pass
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Types where
 
 import GHC.Prelude
@@ -34,8 +50,10 @@ import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Control.DeepSeq
 
+-- | A State monad over IO holding the generator state.
 type G = StateT GenState IO
 
+-- | The JS code generator state
 data GenState = GenState
   { gsSettings  :: StgToJSConfig          -- ^ codegen settings, read-only
   , gsModule    :: !Module                -- ^ current module
@@ -46,7 +64,7 @@ data GenState = GenState
   , gsGlobal    :: [JStat]                -- ^ global (per module) statements (gets included when anything else from the module is used)
   }
 
--- | the state relevant for the current binding group
+-- | The JS code generator state relevant for the current binding group
 data GenGroupState = GenGroupState
   { ggsToplevelStats :: [JStat]        -- ^ extra toplevel statements for the binding group
   , ggsClosureInfo   :: [ClosureInfo]  -- ^ closure metadata (info tables) for the binding group
@@ -58,6 +76,7 @@ data GenGroupState = GenGroupState
   , ggsForeignRefs   :: [ForeignJSRef]
   }
 
+-- | The Configuration record for the StgToJS pass
 data StgToJSConfig = StgToJSConfig
   -- flags
   { csInlinePush      :: !Bool
@@ -75,6 +94,7 @@ data StgToJSConfig = StgToJSConfig
   , csContext         :: !SDocContext
   }
 
+-- | Information relevenat to code generation for closures.
 data ClosureInfo = ClosureInfo
   { ciVar     :: FastString -- ^ object being infod
   , ciRegs    :: CIRegs     -- ^ size of the payload (in number of JS values)
@@ -85,8 +105,9 @@ data ClosureInfo = ClosureInfo
   }
   deriving stock (Eq, Show, Generic)
 
+-- | Closure information, 'ClosureInfo', registers
 data CIRegs
-  = CIRegsUnknown
+  = CIRegsUnknown                     -- ^ A value witnessing a state of unknown registers
   | CIRegs { ciRegsSkip  :: Int       -- ^ unused registers before actual args start
            , ciRegsTypes :: [VarType] -- ^ args
            }
@@ -94,28 +115,30 @@ data CIRegs
 
 instance NFData CIRegs
 
+-- | Closure Information, 'ClosureInfo', layout
 data CILayout
-  = CILayoutVariable            -- layout stored in object itself, first position from the start
-  | CILayoutUnknown             -- fixed size, but content unknown (for example stack apply frame)
+  = CILayoutVariable            -- ^ layout stored in object itself, first position from the start
+  | CILayoutUnknown             -- ^ fixed size, but content unknown (for example stack apply frame)
       { layoutSize :: !Int
       }
-  | CILayoutFixed               -- whole layout known
-      { layoutSize :: !Int      -- closure size in array positions, including entry
-      , layout     :: [VarType]
+  | CILayoutFixed               -- ^ whole layout known
+      { layoutSize :: !Int      -- ^ closure size in array positions, including entry
+      , layout     :: [VarType] -- ^ The set of sized Types to layout
       }
   deriving stock (Eq, Ord, Show, Generic)
 
 instance NFData CILayout
 
+-- | The type of 'ClosureInfo'
 data CIType
-  = CIFun { citArity :: !Int  -- ^ function arity
-          , citRegs  :: !Int  -- ^ number of registers for the args
+  = CIFun { citArity :: !Int         -- ^ function arity
+          , citRegs  :: !Int         -- ^ number of registers for the args
           }
-  | CIThunk
-  | CICon { citConstructor :: !Int }
-  | CIPap
-  | CIBlackhole
-  | CIStackFrame
+  | CIThunk                          -- ^ The closure is a THUNK
+  | CICon { citConstructor :: !Int } -- ^ The closure is a Constructor
+  | CIPap                            -- ^ The closure is a Partial Application
+  | CIBlackhole                      -- ^ The closure is a black hole
+  | CIStackFrame                     -- ^ The closure is a stack frame
   deriving stock (Eq, Ord, Show, Generic)
 
 instance NFData CIType
@@ -131,18 +154,18 @@ instance ToJExpr CIStatic where
   toJExpr (CIStaticRefs [])  = null_ -- [je| null |]
   toJExpr (CIStaticRefs rs)  = toJExpr (map TxtI rs)
 
--- function argument and free variable types
+-- | Free variable types
 data VarType
-  = PtrV     -- pointer = reference to heap object (closure object)
-  | VoidV    -- no fields
+  = PtrV     -- ^ pointer = reference to heap object (closure object)
+  | VoidV    -- ^ no fields
   -- | FloatV   -- one field -- no single precision supported
-  | DoubleV  -- one field
-  | IntV     -- one field
-  | LongV    -- two fields
-  | AddrV    -- a pointer not to the heap: two fields, array + index
-  | RtsObjV  -- some RTS object from GHCJS (for example TVar#, MVar#, MutVar#, Weak#)
-  | ObjV     -- some JS object, user supplied, be careful around these, can be anything
-  | ArrV     -- boxed array
+  | DoubleV  -- ^ A Double: one field
+  | IntV     -- ^ An Int (32bit because JS): one field
+  | LongV    -- ^ A Long: two fields one for the upper 32bits, one for the lower (NB: JS is little endian)
+  | AddrV    -- ^ a pointer not to the heap: two fields, array + index
+  | RtsObjV  -- ^ some RTS object from GHCJS (for example TVar#, MVar#, MutVar#, Weak#)
+  | ObjV     -- ^ some JS object, user supplied, be careful around these, can be anything
+  | ArrV     -- ^ boxed array
   deriving stock (Eq, Ord, Enum, Bounded, Show, Generic)
 
 instance NFData VarType
@@ -150,16 +173,36 @@ instance NFData VarType
 instance ToJExpr VarType where
   toJExpr = toJExpr . fromEnum
 
+-- | The type of identifiers. These determine the suffix of generated functions
+-- in JS Land. For example, the entry function for the 'Just' constructor is a
+-- 'IdConEntry' which compiles to:
+-- @
+-- function h$baseZCGHCziMaybeziJust_con_e() { return h$rs() };
+-- @
+-- which just returns whatever the stack point is pointing to. Whereas the entry
+-- function to 'Just' is an 'IdEntry' and does the work. It compiles to:
+-- @
+-- function h$baseZCGHCziMaybeziJust_e() {
+--    var h$$baseZCGHCziMaybezieta_8KXnScrCjF5 = h$r2;
+--    h$r1 = h$c1(h$baseZCGHCziMaybeziJust_con_e, h$$baseZCGHCziMaybezieta_8KXnScrCjF5);
+--    return h$rs();
+--    };
+-- @
+-- Which loads some payload from register 2, and applies the Constructor Entry
+-- function for the Just to the payload, returns the result in register 1 and
+-- returns whatever is on top of the stack
 data IdType
-  = IdPlain
-  | IdEntry
-  | IdConEntry
+  = IdPlain     -- ^ A plain identifier for values, no suffix added
+  | IdEntry     -- ^ An entry function, suffix = "_e" in 'GHC.StgToJS.Ids.makeIdentForId'
+  | IdConEntry  -- ^ A Constructor entry function, suffix = "_con_e" in 'GHC.StgToJS.Ids.makeIdentForId'
   deriving (Enum, Eq, Ord)
 
+-- | Keys to differentiate Ident's in the ID Cache
 data IdKey
   = IdKey !Int !Int !IdType
   deriving (Eq, Ord)
 
+-- | Some other symbol
 data OtherSymb
   = OtherSymb !Module !FastString
   deriving Eq
@@ -168,17 +211,21 @@ instance Ord OtherSymb where
   compare (OtherSymb m1 t1) (OtherSymb m2 t2)
     = stableModuleCmp m1 m2 <> lexicalCompareFS t1 t2
 
+-- | The identifier cache indexed on 'IdKey' local to a module
 newtype IdCache = IdCache (M.Map IdKey Ident)
+
+-- | The global Identifier Cache
 newtype GlobalIdCache = GlobalIdCache (M.Map Ident (IdKey, Id))
 
+-- | A Stack Slot is either known or unknown. We avoid maybe here for more
+-- strictness.
 data StackSlot
   = SlotId !Id !Int
   | SlotUnknown
   deriving (Eq, Ord)
 
-
 data StaticInfo = StaticInfo
-  { siVar    :: !FastString -- ^ global object
+  { siVar    :: !FastString    -- ^ global object
   , siVal    :: !StaticVal     -- ^ static initialization
   , siCC     :: !(Maybe Ident) -- ^ optional CCS name
   } deriving stock (Eq, Show, Typeable, Generic)
@@ -207,15 +254,17 @@ data StaticUnboxed
 
 instance NFData StaticUnboxed
 
+-- | Static Arguments
 data StaticArg
-  = StaticObjArg !FastString     -- ^ reference to a heap object
-  | StaticLitArg !StaticLit             -- ^ literal
+  = StaticObjArg !FastString             -- ^ reference to a heap object
+  | StaticLitArg !StaticLit              -- ^ literal
   | StaticConArg !FastString [StaticArg] -- ^ unfloated constructor
   deriving stock (Eq, Show, Generic)
 
 instance Outputable StaticArg where
   ppr x = text (show x)
 
+-- | A Static literal value
 data StaticLit
   = BoolLit   !Bool
   | IntLit    !Integer
@@ -239,6 +288,7 @@ instance ToJExpr StaticLit where
   toJExpr (BinLit b)            = app (mkFastString "h$rstr") [toJExpr (map toInteger (BS.unpack b))]
   toJExpr (LabelLit _isFun lbl) = var lbl
 
+-- | A foreign reference to some JS code
 data ForeignJSRef = ForeignJSRef
   { foreignRefSrcSpan  :: !FastString
   , foreignRefPattern  :: !FastString
@@ -260,13 +310,13 @@ data LinkableUnit = LinkableUnit
   , luForeignRefs  :: [ForeignJSRef]
   }
 
--- one toplevel block in the object file
+-- | one toplevel block in the object file
 data ObjUnit = ObjUnit
-  { oiSymbols  :: ![FastString]   -- toplevel symbols (stored in index)
-  , oiClInfo   :: ![ClosureInfo]  -- closure information of all closures in block
-  , oiStatic   :: ![StaticInfo]   -- static closure data
-  , oiStat     :: !JStat          -- the code
-  , oiRaw      :: !BS.ByteString  -- raw JS code
+  { oiSymbols  :: ![FastString]   -- ^ toplevel symbols (stored in index)
+  , oiClInfo   :: ![ClosureInfo]  -- ^ closure information of all closures in block
+  , oiStatic   :: ![StaticInfo]   -- ^ static closure data
+  , oiStat     :: !JStat          -- ^ the code
+  , oiRaw      :: !BS.ByteString  -- ^ raw JS code
   , oiFExports :: ![ExpFun]
   , oiFImports :: ![ForeignJSRef]
   }
@@ -277,6 +327,7 @@ data ExpFun = ExpFun
   , result :: !JSFFIType
   } deriving (Eq, Ord, Show)
 
+-- | Types of FFI values
 data JSFFIType
   = Int8Type
   | Int16Type
@@ -303,6 +354,8 @@ instance Outputable TypedExpr where
   ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
           $$  text "PrimReps: " <+> ppr (typex_typ x)
 
+-- | A Primop result is either an inlining of some JS payload, or a primitive
+-- call to a JS function defined in Shim files in base.
 data PrimRes
   = PrimInline JStat  -- ^ primop is inline, result is assigned directly
   | PRPrimCall JStat  -- ^ primop is async call, primop returns the next
@@ -316,16 +369,17 @@ data ExprResult
 newtype ExprValData = ExprValData [JExpr]
   deriving newtype (Eq)
 
--- closure types
+-- | A Closure is one of six types
 data ClosureType
-  = Thunk
-  | Fun
-  | Pap
-  | Con
-  | Blackhole
-  | StackFrame
+  = Thunk       -- ^ The closure is a THUNK
+  | Fun         -- ^ The closure is a Function
+  | Pap         -- ^ The closure is a Partial Application
+  | Con         -- ^ The closure is a Constructor
+  | Blackhole   -- ^ The closure is a Blackhole
+  | StackFrame  -- ^ The closure is a stack frame
   deriving (Show, Eq, Ord, Enum, Bounded)
 
+-- | Convert 'ClosureType' to an Int
 ctNum :: ClosureType -> Int
 ctNum Fun        = 1
 ctNum Con        = 2
@@ -334,6 +388,7 @@ ctNum Pap        = 3
 ctNum Blackhole  = 5
 ctNum StackFrame = -1
 
+-- | Convert 'ClosureType' to a String
 ctJsName :: ClosureType -> String
 ctJsName = \case
   Thunk      -> "CLOSURE_TYPE_THUNK"
@@ -347,13 +402,15 @@ instance ToJExpr ClosureType where
   toJExpr e = toJExpr (ctNum e)
 
 
+-- | A thread is in one of 4 states
 data ThreadStatus
-  = Running
-  | Blocked
-  | Finished
-  | Died
+  = Running   -- ^ The thread is running
+  | Blocked   -- ^ The thread is blocked
+  | Finished  -- ^ The thread is done
+  | Died      -- ^ The thread has died
   deriving (Show, Eq, Ord, Enum, Bounded)
 
+-- | Convert the status of a thread in JS land to an Int
 threadStatusNum :: ThreadStatus -> Int
 threadStatusNum = \case
   Running  -> 0
@@ -361,6 +418,7 @@ threadStatusNum = \case
   Finished -> 16
   Died     -> 17
 
+-- | convert the status of a thread in JS land to a string
 threadStatusJsName :: ThreadStatus -> String
 threadStatusJsName = \case
   Running  -> "THREAD_RUNNING"
