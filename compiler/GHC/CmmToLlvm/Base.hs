@@ -59,7 +59,8 @@ import GHC.Utils.Logger
 
 import Data.Maybe (fromJust)
 import Control.Monad.Trans.State (StateT (..))
-import Data.List (sortBy, groupBy, isPrefixOf)
+import Data.List (isPrefixOf)
+import qualified Data.List.NonEmpty as NE
 import Data.Ord (comparing)
 
 -- ----------------------------------------------------------------------------
@@ -192,7 +193,7 @@ padLiveArgs platform live =
     -- set of real registers to be passed. E.g. FloatReg, DoubleReg and XmmReg
     -- all use the same real regs on X86-64 (XMM registers).
     --
-    classes         = groupBy sharesClass fprLive
+    classes         = NE.groupBy sharesClass fprLive
     sharesClass a b = regsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
     norm x          = CmmGlobal ((fpr_ctor x) 1)             -- get the first register of the family
 
@@ -202,10 +203,10 @@ padLiveArgs platform live =
     -- E.g. sortedRs = [   F2,   XMM4, D5]
     --      output   = [D1,   D3]
     padded      = concatMap padClass classes
-    padClass rs = go sortedRs [1..]
+    padClass rs = go (NE.toList sortedRs) 1
       where
-         sortedRs = sortBy (comparing fpr_num) rs
-         maxr     = last sortedRs
+         sortedRs = NE.sortBy (comparing fpr_num) rs
+         maxr     = NE.last sortedRs
          ctor     = fpr_ctor maxr
 
          go [] _ = []
@@ -216,10 +217,9 @@ padLiveArgs platform live =
                text "Found two different Cmm registers (" <> ppr c1 <> text "," <> ppr c2 <>
                text ") both alive AND mapped to the same real register: " <> ppr real <>
                text ". This isn't currently supported by the LLVM backend."
-         go (c:cs) (f:fs)
-            | fpr_num c == f = go cs fs              -- already covered by a real register
-            | otherwise      = ctor f : go (c:cs) fs -- add padding register
-         go _ _ = undefined -- unreachable
+         go (c:cs) f
+            | fpr_num c == f = go cs f                    -- already covered by a real register
+            | otherwise      = ctor f : go (c:cs) (f + 1) -- add padding register
 
     fpr_ctor :: GlobalReg -> Int -> GlobalReg
     fpr_ctor (FloatReg _)  = FloatReg

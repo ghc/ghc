@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Data.List (group)
+import qualified Data.List.NonEmpty as NE
 import Data.Bits
 import Data.Word
 import Control.Monad
@@ -40,7 +40,7 @@ main = do
 
     b1024 = roll (map fromIntegral (take 128 [0x80::Int .. ]))
 
-    rle = map (\x -> (length x, head x)) . group
+    rle = map (\x -> (length x, NE.head x)) . NE.group
 
 
     roll :: [Word8] -> Integer

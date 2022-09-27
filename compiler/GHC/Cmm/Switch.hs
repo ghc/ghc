@@ -20,8 +20,7 @@ import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label (Label)
 
 import Data.Maybe
-import Data.List (groupBy)
-import Data.Function (on)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 
 -- Note [Cmm Switches, the general plan]
@@ -204,8 +203,8 @@ switchTargetsToList (SwitchTargets _ _ mbdef branches)
 switchTargetsFallThrough :: SwitchTargets -> ([([Integer], Label)], Maybe Label)
 switchTargetsFallThrough (SwitchTargets _ _ mbdef branches) = (groups, mbdef)
   where
-    groups = map (\xs -> (map fst xs, snd (head xs))) $
-             groupBy ((==) `on` snd) $
+    groups = map (\xs -> (map fst (NE.toList xs), snd (NE.head xs))) $
+             NE.groupWith snd $
              M.toList branches
 
 -- | Custom equality helper, needed for "GHC.Cmm.CommonBlockElim"

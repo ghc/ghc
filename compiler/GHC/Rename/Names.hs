@@ -93,7 +93,9 @@ import Data.Either      ( partitionEithers )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
-import Data.List        ( partition, (\\), find, sortBy, groupBy, sortOn )
+import Data.List        ( partition, (\\), find, sortBy )
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Function    ( on )
 import qualified Data.Set as S
 import Data.Foldable    ( toList )
@@ -1968,7 +1970,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
           all_non_overloaded = all (not . flIsOverloaded)
 
     combine :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
-    combine = map merge . groupBy ((==) `on` getKey) . sortOn getKey
+    combine = map merge . NE.groupAllWith getKey
 
     getKey :: LImportDecl GhcRn -> (Bool, Maybe ModuleName, ModuleName)
     getKey decl =
@@ -1980,10 +1982,9 @@ getMinimalImports = fmap combine . mapM mk_minimal
         idecl :: ImportDecl GhcRn
         idecl = unLoc decl
 
-    merge :: [LImportDecl GhcRn] -> LImportDecl GhcRn
-    merge []                     = error "getMinimalImports: unexpected empty list"
-    merge decls@((L l decl) : _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
-      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) decls
+    merge :: NonEmpty (LImportDecl GhcRn) -> LImportDecl GhcRn
+    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
+      where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) $ NE.toList decls
 
 
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()

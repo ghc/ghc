@@ -2,6 +2,7 @@ module Rules.Dependencies (buildPackageDependencies) where
 
 import Data.Bifunctor
 import Data.Function
+import qualified Data.List.NonEmpty as NE
 
 import Base
 import Context
@@ -67,9 +68,8 @@ buildPackageDependencies rs = do
         writeFileChanged deps . unlines
                               . map (\(src, deps) -> unwords $ src : deps)
                               . map (bimap unifyPath (map unifyPath))
-                              . map (bimap head concat . unzip)
-                              . groupBy ((==) `on` fst)
-                              . sortBy (compare `on` fst)
+                              . map (bimap NE.head concat . NE.unzip)
+                              . NE.groupAllWith fst
                               $ parseMakefile mkDeps
 
 

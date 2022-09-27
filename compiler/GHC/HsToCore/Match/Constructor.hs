@@ -36,8 +36,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import Control.Monad(liftM)
-import Data.List (groupBy)
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -143,13 +143,13 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         -- and returns the types of the *value* args, which is what we want
 
               match_group :: [Id]
-                          -> [(ConArgPats, EquationInfo)] -> DsM (MatchResult CoreExpr)
+                          -> NonEmpty (ConArgPats, EquationInfo)
+                          -> DsM (MatchResult CoreExpr)
               -- All members of the group have compatible ConArgPats
               match_group arg_vars arg_eqn_prs
-                = assert (notNull arg_eqn_prs) $
-                  do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
+                = do { (wraps, eqns') <- liftM NE.unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-                     ; match_result <- match (group_arg_vars ++ vars) ty eqns'
+                     ; match_result <- match (group_arg_vars ++ vars) ty (NE.toList eqns')
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 
@@ -184,9 +184,9 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                 -- suggestions for the new variables
 
         -- Divide into sub-groups; see Note [Record patterns]
-        ; let groups :: [[(ConArgPats, EquationInfo)]]
-              groups = groupBy compatible_pats [ (pat_args (firstPat eqn), eqn)
-                                               | eqn <- eqn1:eqns ]
+        ; let groups :: NonEmpty (NonEmpty (ConArgPats, EquationInfo))
+              groups = NE.groupBy1 compatible_pats
+                     $ fmap (\eqn -> (pat_args (firstPat eqn), eqn)) (eqn1 :| eqns)
 
         ; match_results <- mapM (match_group arg_vars) groups
 
@@ -210,8 +210,8 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 
     -- Choose the right arg_vars in the right order for this group
     -- Note [Record patterns]
-    select_arg_vars :: [Id] -> [(ConArgPats, EquationInfo)] -> [Id]
-    select_arg_vars arg_vars ((arg_pats, _) : _)
+    select_arg_vars :: [Id] -> NonEmpty (ConArgPats, EquationInfo) -> [Id]
+    select_arg_vars arg_vars ((arg_pats, _) :| _)
       | RecCon flds <- arg_pats
       , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
@@ -224,7 +224,6 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (hsRecFieldId rpat))
-    select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool

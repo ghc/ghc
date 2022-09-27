@@ -29,7 +29,8 @@ import GHC.Driver.Env
 
 import Control.Monad
 import Data.Function
-import Data.List (sort, sortBy, groupBy)
+import Data.List (sort, sortOn)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ord
 import GHC.Driver.Phases
@@ -176,14 +177,13 @@ collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
 
 makeTagGroupsWithSrcInfo :: [TagInfo] -> IO [[TagInfo]]
 makeTagGroupsWithSrcInfo tagInfos = do
-  let groups = groupBy ((==) `on` tagFile) $ sortBy (comparing tagFile) tagInfos
+  let groups = NE.groupAllWith tagFile tagInfos
   mapM addTagSrcInfo groups
 
   where
-    addTagSrcInfo [] = throwGhcException (CmdLineError "empty tag file group??")
-    addTagSrcInfo group@(tagInfo:_) = do
+    addTagSrcInfo group@(tagInfo NE.:| _) = do
       file <- readFile $ tagFile tagInfo
-      let sortedGroup = sortBy (comparing tagLine) group
+      let sortedGroup = sortOn tagLine (NE.toList group)
       return $ perFile sortedGroup 1 0 $ lines file
 
     perFile allTags@(tag:tags) cnt pos allLs@(l:ls)

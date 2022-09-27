@@ -80,7 +80,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
-import Data.List (sortBy, nubBy, partition)
+import Data.List (nubBy, partition)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
@@ -443,7 +443,7 @@ rnImplicitTvBndrs :: HsDocContext
                   -> ([Name] -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (NE.groupBy eqLocated $ sortBy cmpLocated $ implicit_vs_with_dups) $ \case
+  = do { implicit_vs <- forM (NE.groupAllWith unLoc $ implicit_vs_with_dups) $ \case
            (x :| []) -> return x
            (x :| _) -> do
              let msg = mkTcRnUnknownMessage $ mkPlainError noHints $

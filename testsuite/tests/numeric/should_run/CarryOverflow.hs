@@ -5,7 +5,8 @@ import GHC.Exts
 
 import Control.Monad
 import Data.Bits
-import Data.List (sort, group)
+import Data.List (sort)
+import qualified Data.List.NonEmpty as NE
 import System.Exit
 
 allEqual :: Eq a => [a] -> Bool
@@ -13,7 +14,7 @@ allEqual [] = error "allEqual: nothing to compare"
 allEqual (x:xs) = all (== x) xs
 
 testWords :: [Word]
-testWords = map head . group . sort $
+testWords = map NE.head . NE.group . sort $
             concatMap (\w -> [w - 1, w, w + 1]) $
             concatMap (\w -> [w, maxBound - w]) $
             trailingOnes ++ randoms

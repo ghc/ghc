@@ -122,8 +122,9 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( elemIndices, find, group, intercalate, intersperse,
+import Data.List ( elemIndices, find, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Map as M
@@ -3699,11 +3700,11 @@ completeSetOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
     where opts = "args":"prog":"prompt":"prompt-cont":"prompt-function":
                  "prompt-cont-function":"editor":"stop":flagList
-          flagList = map head $ group $ sort allNonDeprecatedFlags
+          flagList = map NE.head $ NE.group $ sort allNonDeprecatedFlags
 
 completeSeti = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) flagList)
-    where flagList = map head $ group $ sort allNonDeprecatedFlags
+    where flagList = map NE.head $ NE.group $ sort allNonDeprecatedFlags
 
 completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)

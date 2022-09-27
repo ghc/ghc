@@ -88,7 +88,8 @@ import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUn
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.Function
-import Data.List (partition, sortBy, groupBy, intersect)
+import Data.List (partition, sortBy, intersect)
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Data.Bag ( unitBag )
 
@@ -1699,7 +1700,7 @@ badFieldsUpd rbinds data_cons
             in
             -- Fields that don't change the membership status of the set
             -- are redundant and can be dropped.
-            map (fst . head) $ groupBy ((==) `on` snd) growingSets
+            map (fst . NE.head) $ NE.groupWith snd growingSets
 
     aMember = assert (not (null members) ) fst (head members)
     (members, nonMembers) = partition (or . snd) membership

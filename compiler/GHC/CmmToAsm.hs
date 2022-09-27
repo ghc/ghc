@@ -139,7 +139,8 @@ import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 
-import Data.List (sortBy, groupBy)
+import Data.List (sortBy)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Monad
@@ -769,17 +770,14 @@ makeImportsDoc config imports
         -- Generate "symbol stubs" for all external symbols that might
         -- come from a dynamic library.
         dyld_stubs :: [CLabel] -> SDoc
-{-      dyld_stubs imps = vcat $ map pprDyldSymbolStub $
-                                    map head $ group $ sort imps-}
         -- (Hack) sometimes two Labels pretty-print the same, but have
         -- different uniques; so we compare their text versions...
         dyld_stubs imps
                 | needImportedSymbols config
                 = vcat $
                         (pprGotDeclaration config :) $
-                        map ( pprImportedSymbol config . fst . head) $
-                        groupBy (\(_,a) (_,b) -> a == b) $
-                        sortBy (\(_,a) (_,b) -> compare a b) $
+                        fmap ( pprImportedSymbol config . fst . NE.head) $
+                        NE.groupAllWith snd $
                         map doPpr $
                         imps
                 | otherwise

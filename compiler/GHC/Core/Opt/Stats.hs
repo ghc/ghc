@@ -22,12 +22,14 @@ import GHC.Utils.Outputable as Outputable
 
 import GHC.Data.FastString
 
-import Data.List (groupBy, sortBy)
+import Data.List (sortOn)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Ord
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
-import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
+import GHC.Utils.Panic (throwGhcException, GhcException(..))
 
 getVerboseSimplStats :: (Bool -> SDoc) -> SDoc
 getVerboseSimplStats = getPprDebug          -- For now, anyway
@@ -205,18 +207,16 @@ pprTickCounts :: Map Tick Int -> SDoc
 pprTickCounts counts
   = vcat (map pprTickGroup groups)
   where
-    groups :: [[(Tick,Int)]]    -- Each group shares a common tag
-                                -- toList returns common tags adjacent
-    groups = groupBy same_tag (Map.toList counts)
-    same_tag (tick1,_) (tick2,_) = tickToTag tick1 == tickToTag tick2
+    groups :: [NonEmpty (Tick, Int)] -- Each group shares a common tag
+                                     -- toList returns common tags adjacent
+    groups = NE.groupWith (tickToTag . fst) (Map.toList counts)
 
-pprTickGroup :: [(Tick, Int)] -> SDoc
-pprTickGroup group@((tick1,_):_)
-  = hang (int (sum [n | (_,n) <- group]) <+> text (tickString tick1))
+pprTickGroup :: NonEmpty (Tick, Int) -> SDoc
+pprTickGroup group@((tick1,_) :| _)
+  = hang (int (sum (fmap snd group)) <+> text (tickString tick1))
        2 (vcat [ int n <+> pprTickCts tick
                                     -- flip as we want largest first
-               | (tick,n) <- sortBy (flip (comparing snd)) group])
-pprTickGroup [] = panic "pprTickGroup"
+               | (tick,n) <- sortOn (Down . snd) (NE.toList group)])
 
 data Tick  -- See Note [Which transformations are innocuous]
   = PreInlineUnconditionally    Id
