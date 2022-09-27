@@ -129,8 +129,12 @@ Note [The architecture of the Core optimizer]
 
 Conceptually the Core optimizer consists of two stages:
 
- 1. **The planning stage**: where we take the user-specified input (currently in `DynFlags`) and produce a domain-specific configuration for just this pipeline stage (a `[CoreToDo]` value). This configuration is the plan.
- 2. **The execution stage**: where we we take a Core program (a `ModGuts`) and the configuration (a `[CoreToDo]`) and optimize that program according to the `[CoreToDo]` plan, producing a new `ModGuts`.
+ 1. **The planning stage**: where we take the user-specified input (currently in
+    `DynFlags`) and produce a domain-specific configuration for just this
+    pipeline stage (a `[CoreToDo]` value). This configuration is the plan.
+ 2. **The execution stage**: where we we take a Core program (a `ModGuts`) and
+    the configuration (a `[CoreToDo]`) and optimize that program according to
+    the `[CoreToDo]` plan, producing a new `ModGuts`.
 
 This division is mirrored in the interface of the different optimizations. For
 each of those optimzations we have
@@ -151,19 +155,65 @@ question and derives the configuration for each pass from the session's state
 `GHC.Driver.Config.Core.Opt` as well. The `CoreToDo` type that is finally used
 to wrap this configuration value is a sum type enumerating all the optimizations
 available in GHC.
+As an example suppose we have a `DynFlags` value "dflags" with
+  gopt Opt_FullLaziness dflags == True
+  floatLamArgs dflags == Just 42
 
-The entrypoint of the second stage are the `optimizeCore*` functions found in
-GHC.Driver.Core.Opt. These functions is part of the Application Layer and
-utilize the `runCorePasses` function from `GHC.Core.Opt` which is the
-counterpart of these functions in the Domain Layer. In other words, while the
-`optimizeCore*` know about `HscEnv` and are therefore bound to a concrete
-driver, `runCorePasses` is more independent as it is a component of its own.
+If we pass that dflags value to the `getCoreToDo` planning function we receive a
+list like
+  [ ...
+  , CoreDoFloatOutwards FloatOutSwitches
+    { floatOutLambdas   = Just 0
+    , floatOutConstants = True
+    , floatOutOverSatApps = False
+    , floatToTopLevelOnly = False
+    }
+  , ...
+  , CoreDoFloatOutwards FloatOutSwitches
+    { floatOutLambdas     = Just 42
+    , floatOutConstants   = True
+    , floatOutOverSatApps = True
+    , floatToTopLevelOnly = False
+    }
+  , ...
+  ]
 
-`runCorePasses` is essentially an interpreter for the `CoreToDo`s constructed in
-the planning phase. It calls the entrypoints of the passes with their respective
-configurations as arguments as well as some execution context like the unit
-environment, the rules and the type family instance in scope, and most notably
-the module we wish to compile (`ModGuts`).
+This plan contains two "instructions" to perform two FloatOut optimization
+passes with the given configuration. Note that these configurations draw their
+values from dflags and the planning function `getCoreToDo` alone and are
+independent of the modules they might be applied to.
+
+The entrypoint of the second stage is the `runCorePasses` function found in
+GHC.Core.Opt. It is essentially an interpreter for the `CoreToDo`s constructed
+in the planning stage. It calls the entrypoints of the passes with their
+respective configurations as arguments as well as some execution context like
+the unit environment, the rules and the type family instance in scope, and most
+notably the module we wish to compile (`ModGuts`).
+Feeding the list with the two FloatOut configurations above to that function
+would result in two calls of
+  ...
+  floatOutwards logger
+    (FloatOutSwitches { floatOutLambdas = Just 0, ... }) us binds
+  ...
+  floatOutwards logger
+    (FloatOutSwitches { floatOutLambdas = Just 42, ... }) us binds'
+  ...
+where the Logger "logger" and the unique supply "us" are supplied by the
+execution context of the interpreter and binds and binds' are the Core bindings
+of the `ModGuts` being optimized.
+
+The Core Optimizer itself is invoked by calling one of the `optimizeCore*`
+functions found in GHC.Driver.Core.Opt. These functions is part of the
+Application Layer and utilize both the `getCoreToDo` function -- which is part
+of the Application Layer as well -- and the `runCorePasses` function which is
+part of the Domain Layer. Here, the terms "Application Layer" and "Domain Layer"
+are terms borrowed from Domain Driven Design and its application in the context
+of GHC is layed out in the "Modularizing GHC" paper
+(https://hsyl20.fr/home/posts/2022-05-03-modularizing-ghc-paper.html).
+In other words, while the `optimizeCore*` and `getCoreToDo` know about `HscEnv`
+and `DynFlags` and are therefore bound to a concrete driver, `runCorePasses` is
+more independent as it is a component of its own. As such it could be used by a
+different driver that produces a plan in a completely different way.
 
 A similar split in functionality is done for the Core Linting: After each pass
 we may check the sanity of the resulting Core running a so-called EndPass check.
