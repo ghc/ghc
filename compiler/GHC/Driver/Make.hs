@@ -1161,9 +1161,10 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       hug_var <- gets hug_var
       !build_map <- getBuildMap
       res_var <- liftIO newEmptyMVar
-      let
+      let loop_unit :: UnitId
+          !loop_unit = nodeKeyUnitId (gwib_mod (head deps))
           !build_deps = getDependencies (map gwib_mod deps) build_map
-      let loop_action = do
+      let loop_action = withCurrentUnit loop_unit $ do
             (hug, tdeps) <- wait_deps_hug hug_var build_deps
             hsc_env <- asks hsc_env
             let new_hsc = setHUG hug hsc_env
