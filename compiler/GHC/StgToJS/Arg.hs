@@ -1,6 +1,20 @@
 {-# LANGUAGE LambdaCase #-}
 
--- | Code generation of application arguments
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.Args
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+--  Code generation of application arguments
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Arg
   ( genArg
   , genIdArg
@@ -94,6 +108,7 @@ JavaScript runtime.
 
 -}
 
+-- | Generate JS code for static arguments
 genStaticArg :: HasDebugCallStack => StgArg -> G [StaticArg]
 genStaticArg a = case a of
   StgLitArg l -> map StaticLitArg <$> genStaticLit l
@@ -161,9 +176,11 @@ genArg a = case a of
            return [allocDynamicE inl_alloc e as Nothing]
       x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
+-- | Generate a Var as JExpr
 genIdArg :: HasDebugCallStack => Id -> G [JExpr]
 genIdArg i = genArg (StgVarArg i)
 
+-- | Generate an Id as an Ident
 genIdArgI :: HasDebugCallStack => Id -> G [Ident]
 genIdArgI i
   | isVoid r     = return []
@@ -172,14 +189,14 @@ genIdArgI i
   where
     r = uTypeVt . idType $ i
 
-
+-- | Generate IDs for stack arguments. See 'StgToJS.Expr.loadRetArgs' for use case
 genIdStackArgI :: HasDebugCallStack => Id -> G [(Ident,StackSlot)]
 genIdStackArgI i = zipWith f [1..] <$> genIdArgI i
   where
     f :: Int -> Ident -> (Ident,StackSlot)
     f n ident = (ident, SlotId i n)
 
-
+-- | Allocate Static Constructors
 allocConStatic :: HasDebugCallStack => Ident -> CostCentreStack -> DataCon -> [StgArg] -> G ()
 allocConStatic (TxtI to) cc con args = do
   as <- mapM genStaticArg args
@@ -217,6 +234,7 @@ allocConStatic (TxtI to) cc con args = do
                 (TxtI e) <- identForDataConWorker con
                 emitStatic to (StaticData e xs) cc'
 
+-- | Allocate unboxed constructors
 allocUnboxedConStatic :: DataCon -> [StaticArg] -> StaticArg
 allocUnboxedConStatic con = \case
   []
@@ -229,6 +247,7 @@ allocUnboxedConStatic con = \case
   _ -> pprPanic "allocUnboxedConStatic: not an unboxed constructor" (ppr con)
 
 
+-- | Allocate Static list
 allocateStaticList :: [StgArg] -> StgArg -> G StaticVal
 allocateStaticList xs a@(StgVarArg i)
   | isDataConId_maybe i == Just nilDataCon = listAlloc xs Nothing
