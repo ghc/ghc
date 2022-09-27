@@ -361,7 +361,13 @@ runJsPhase pipe_env hsc_env input_fn = do
 
           -- the header lets the linker recognize processed JavaScript files
           -- But don't add JavaScript header to object files!
-          is_js_obj <- isJsObjectFile input_fn
+
+          is_js_obj <- if True
+                        then pure False
+                        else isJsObjectFile input_fn
+                        -- FIXME (Sylvain 2022-09): this call makes the
+                        -- testsuite go into a loop, I don't know why yet!
+                        -- Disabling it for now.
 
           if is_js_obj
             then copyWithHeader "" input_fn output_fn
