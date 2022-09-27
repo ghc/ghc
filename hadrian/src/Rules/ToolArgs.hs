@@ -153,6 +153,7 @@ toolTargets = [ binary
               , directory
               , process
               , exceptions
+              , filepath
               -- , ghc     -- # depends on ghc library
               -- , runGhc  -- # depends on ghc library
               , ghcBoot
