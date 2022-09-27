@@ -1,4 +1,18 @@
--- | Deals with JS identifiers
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.Ids
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+--  Module to deal with JS identifiers
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Ids
   ( freshUnique
   , freshIdent
