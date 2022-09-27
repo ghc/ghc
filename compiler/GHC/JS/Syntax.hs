@@ -103,6 +103,7 @@ import GHC.Generics
 
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
+import GHC.Types.Unique
 import GHC.Types.Unique.Map
 
 -- | A supply of identifiers, possibly empty
@@ -385,7 +386,8 @@ instance Show SaneDouble where
 
 -- | A newtype wrapper around 'FastString' for JS identifiers.
 newtype Ident = TxtI { itxt :: FastString }
- deriving stock (Show, Typeable, Eq, Generic)
+ deriving stock   (Show, Typeable, Eq, Generic)
+ deriving newtype (Uniquable)
 
 instance Ord Ident where
   compare (TxtI fs1) (TxtI fs2) = lexicalCompareFS fs1 fs2

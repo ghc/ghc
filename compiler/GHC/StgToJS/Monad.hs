@@ -45,6 +45,8 @@ import qualified Data.Set  as S
 import qualified Data.List as L
 import Data.Function
 
+import GHC.Types.Unique.DSet
+
 runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
 runG config m unfloat action = State.evalStateT action (initState config m unfloat)
 
@@ -153,9 +155,9 @@ setGlobalIdCache v = State.modify (\s -> s { gsGroup = (gsGroup s) { ggsGlobalId
 liftToGlobal :: JStat -> G [(Ident, Id)]
 liftToGlobal jst = do
   GlobalIdCache gidc <- getGlobalIdCache
-  let sids  = S.filter (`M.member` gidc) (identsS jst)
-      cnt   = M.fromListWith (+) (map (,(1::Integer)) $ S.toList sids)
-      sids' = L.sortBy (compare `on` (cnt M.!)) (nub' $ S.toList sids)
+  let sids  = filterUniqDSet (`M.member` gidc) (identsS jst)
+      cnt   = M.fromListWith (+) (map (,(1::Integer)) $ uniqDSetToList sids)
+      sids' = L.sortBy (compare `on` (cnt M.!)) (nub' $ uniqDSetToList sids)
   pure $ map (\s -> (s, snd $ gidc M.! s)) sids'
 
 nub' :: (Ord a, Eq a) => [a] -> [a]
