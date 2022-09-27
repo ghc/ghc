@@ -1201,6 +1201,7 @@ AC_CONFIG_FILES(
 [ mk/project.mk
   hadrian/cfg/system.config
   hadrian/ghci-cabal
+  hadrian/ghci-multi-cabal
   hadrian/ghci-stack
   docs/users_guide/ghc_config.py
   distrib/configure.ac
