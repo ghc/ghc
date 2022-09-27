@@ -4,6 +4,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 #include <ghcplatform.h>
 
@@ -353,34 +354,38 @@ runJsPhase pipe_env hsc_env input_fn = do
         let unit_env   = hsc_unit_env hsc_env
 
         output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-        need_cpp <- jsFileNeedsCpp input_fn
-        tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
-
-        -- the header lets the linker recognize processed JavaScript files
-        -- But don't add JavaScript header to object files!
-        is_js_obj <- isJsObjectFile input_fn
-        let header
-              | is_js_obj = ""
-              | otherwise = "//JavaScript\n"
 
         -- if the input filename is the same as the output, then we've probably
         -- generated the object ourselves, we leave the file alone
         when (input_fn /= output_fn) $ do
-          if need_cpp
-          then do
-            doCpp logger
-                    tmpfs
-                    dflags
-                    unit_env
-                    (CppOpts
-                        { cppUseCc = True
-                        , cppLinePragmas = False
-                        })
-                    []
-                    input_fn
-                    tmp_fn
-            copyWithHeader header tmp_fn output_fn
-          else copyWithHeader header input_fn output_fn
+
+          -- the header lets the linker recognize processed JavaScript files
+          -- But don't add JavaScript header to object files!
+          is_js_obj <- isJsObjectFile input_fn
+
+          if is_js_obj
+            then copyWithHeader "" input_fn output_fn
+            else do
+              -- header appended to JS files stored as .o to recognize them.
+              let header = "//JavaScript\n"
+              jsFileNeedsCpp input_fn >>= \case
+                False -> copyWithHeader header input_fn output_fn
+                True  -> do
+                  -- run CPP on the input JS file
+                  tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+                  doCpp logger
+                          tmpfs
+                          dflags
+                          unit_env
+                          (CppOpts
+                              { cppUseCc = True
+                              , cppLinePragmas = False
+                              })
+                          []
+                          input_fn
+                          tmp_fn
+                  copyWithHeader header tmp_fn output_fn
+
         return output_fn
 
 jsFileNeedsCpp :: FilePath -> IO Bool
