@@ -84,9 +84,11 @@ multiSetup pkg_s = do
       gens <- interpretInContext c generatedDependencies
       need (srcs ++ gens)
       let rexp m = ["-reexported-module", m]
+      let hidir = root </> "interfaces" </> pkgPath p
       writeFile' (resp_file root p) (intercalate "\n" (th_hack arg_list
                                                       ++  modules cd
-                                                      ++ concatMap rexp (reexportModules cd) ))
+                                                      ++ concatMap rexp (reexportModules cd)
+                                                      ++ ["-outputdir", hidir]))
       return (resp_file root p)
 
 
