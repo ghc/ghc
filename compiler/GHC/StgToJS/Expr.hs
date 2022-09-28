@@ -3,6 +3,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.Expr
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+--  Code generation of Expressions
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Expr
   ( genExpr
   , genEntryType
@@ -246,9 +261,9 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
   emitToplevel (ei ||= toJExpr (JFunc []
     (mconcat [DeclStat ii, p, ac, r1 |= toJExpr ii, returnStack])))
 
--- generate the entry function for a local closure
+-- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
-genEntry _ _i StgRhsCon {} = return () -- mempty -- error "local data entry"
+genEntry _ _i StgRhsCon {} = return ()
 genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = resetSlots $ do
   let live = stgLneLiveExpr rhs -- error "fixme" -- probably find live vars in body
   ll    <- loadLiveFun live
@@ -272,6 +287,9 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = res
   where
     entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
+-- | Generate the entry function types for identifiers. Note that this only
+-- returns either 'CIThunk' or 'CIFun'. Everything else (PAP Blackhole etc.) is
+-- filtered as not a RuntimeRepKinded type.
 genEntryType :: HasDebugCallStack => [Id] -> G CIType
 genEntryType []   = return CIThunk
 genEntryType args0 = do
@@ -280,6 +298,7 @@ genEntryType args0 = do
   where
     args = filter (not . isRuntimeRepKindedTy . idType) args0
 
+-- | Generate the body of an object
 genBody :: HasDebugCallStack
          => ExprCtx
          -> Id
@@ -316,7 +335,7 @@ genBody ctx i startReg args e = do
 
   return $ la <> lav <> e <> returnStack
 
--- find the result type after applying the function to the arguments
+-- | Find the result type after applying the function to the arguments
 resultSize :: HasDebugCallStack => [Id] -> Type -> [(PrimRep, Int)]
 resultSize xxs@(_:xs) t
   -- case: (# x, y, z #) -> r
@@ -355,6 +374,8 @@ resultSize [] t
   where
     t' = unwrapType t
 
+-- | Ensure that the set of identifiers has valid 'RuntimeRep's. This function
+-- returns a no-op when 'csRuntimeAssert' in 'StgToJSConfig' is False.
 verifyRuntimeReps :: HasDebugCallStack => [Id] -> G JStat
 verifyRuntimeReps xs = do
   runtime_assert <- csRuntimeAssert <$> getSettings
@@ -379,16 +400,23 @@ verifyRuntimeReps xs = do
     ver _ _       = mempty
     v f as = ApplStat (var f) as
 
+-- | Given a set of 'Id's, bind each 'Id' to the appropriate data fields in N
+-- registers. This assumes these data fields have already been populated in the
+-- registers. For the empty, singleton, and binary case use register 1, for any
+-- more use as many registers as necessary.
 loadLiveFun :: [Id] -> G JStat
 loadLiveFun l = do
    l' <- concat <$> mapM identsForId l
    case l' of
      []  -> return mempty
+     -- set the ident to d1 field of register 1
      [v] -> return (v ||= r1 .^ closureField1_)
+     -- set the idents to d1 and d2 fields of register 1
      [v1,v2] -> return $ mconcat
                         [ v1 ||= r1 .^ closureField1_
                         , v2 ||= r1 .^ closureField2_
                         ]
+     -- and so on
      (v:vs)  -> do
        d <- freshIdent
        let l'' = mconcat . zipWith (loadLiveVar $ toJExpr d) [(1::Int)..] $ vs
@@ -401,8 +429,10 @@ loadLiveFun l = do
         loadLiveVar d n v = let ident = TxtI (dataFieldName n)
                             in  DeclStat v `mappend` (toJExpr v |= SelExpr d ident)
 
+-- | Pop a let-no-escape frame off the stack
 popLneFrame :: Bool -> Int -> ExprCtx -> G JStat
 popLneFrame inEntry size ctx = do
+  -- calculate the new stack size
   let ctx' = ctxLneShrinkStack ctx size
 
   let gen_id_slot (i,n) = do
@@ -415,6 +445,7 @@ popLneFrame inEntry size ctx = do
   let skip = if inEntry then 1 else 0 -- pop the frame header
   popSkipI skip is
 
+-- | Generate an updated given an 'Id'
 genUpdFrame :: UpdateFlag -> Id -> G JStat
 genUpdFrame u i
   | isReEntrant u   = pure mempty
@@ -461,9 +492,16 @@ genStaticRefs lv
     getStaticRef :: Id -> G (Maybe FastString)
     getStaticRef = fmap (fmap itxt . listToMaybe) . identsForId
 
--- reorder the things we need to push to reuse existing stack values as much as possible
--- True if already on the stack at that location
-optimizeFree :: HasDebugCallStack => Int -> [Id] -> G [(Id,Int,Bool)]
+-- | Reorder the things we need to push to reuse existing stack values as much
+-- as possible True if already on the stack at that location
+optimizeFree
+  :: HasDebugCallStack
+  => Int
+  -> [Id]
+  -> G [(Id,Int,Bool)] -- ^ A list of stack slots.
+                       -- -- Id: stored on the slot
+                       -- -- Int: the part of the value that is stored
+                       -- -- Bool: True when the slot already contains a value
 optimizeFree offset ids = do
   -- this line goes wrong                               vvvvvvv
   let -- ids' = concat $ map (\i -> map (i,) [1..varSize . uTypeVt . idType $ i]) ids
@@ -483,7 +521,7 @@ optimizeFree offset ids = do
       allSlots           = L.sortBy (compare `on` \(_,_,x,_) -> x) (fixed ++ remaining')
   return $ map (\(i,n,_,b) -> (i,n,b)) allSlots
 
--- allocate local closures
+-- | Allocate local closures
 allocCls :: Maybe JStat -> [(Id, CgStgRhs)] -> G JStat
 allocCls dynMiddle xs = do
    (stat, dyn) <- partitionEithers <$> mapM toCl xs
@@ -520,6 +558,8 @@ allocCls dynMiddle xs = do
                        <*> pure cc)
 
 -- fixme CgCase has a reps_compatible check here
+-- | Consume Stg case statement and generate a case statement. See also
+-- 'genAlts'
 genCase :: HasDebugCallStack
         => ExprCtx
         -> Id
@@ -611,19 +651,33 @@ genRet ctx e at as l = freshIdent >>= f
       MultiValAlt _n -> idVt e
       _              -> [PtrV]
 
+    -- special case for popping CCS but preserving stack size
+    pop_handle_CCS :: [(JExpr, StackSlot)] -> G JStat
+    pop_handle_CCS [] = return mempty
+    pop_handle_CCS xs = do
+      -- grab the slots from 'xs' and push
+      addSlots (map snd xs)
+      -- move the stack pointer into the stack by ''length xs + n'
+      a <- adjSpN (length xs)
+      -- now load from the top of the stack
+      return (loadSkip 0 (map fst xs) <> a)
+
     fun free = resetSlots $ do
       decs          <- declVarsForId e
       load          <- flip assignAll (map toJExpr [R1 ..]) . map toJExpr <$> identsForId e
       loadv         <- verifyRuntimeReps [e]
       ras           <- loadRetArgs free
       rasv          <- verifyRuntimeReps (map (\(x,_,_)->x) free)
-      restoreCCS    <- ifProfilingM $ popUnknown [jCurrentCCS]
+      restoreCCS    <- ifProfilingM . pop_handle_CCS $ pure (jCurrentCCS, SlotUnknown)
       rlne          <- popLneFrame False lneLive ctx'
       rlnev         <- verifyRuntimeReps lneVars
       (alts, _altr) <- genAlts ctx' e at Nothing as
       return $ decs <> load <> loadv <> ras <> rasv <> restoreCCS <> rlne <> rlnev <> alts <>
                returnStack
 
+-- | Consume an Stg case alternative and generate the corresponding alternative
+-- in JS land. If one alternative is a continuation then we must normalize the
+-- other alternatives. See 'Branch' and 'normalizeBranches'.
 genAlts :: HasDebugCallStack
         => ExprCtx        -- ^ lhs to assign expression result to
         -> Id             -- ^ id being matched
@@ -712,6 +766,9 @@ genAlts ctx e at me alts = do
   ver <- verifyMatchRep e at
   pure (ver <> st, er)
 
+-- | If 'StgToJSConfig.csRuntimeAssert' is set, then generate an assertion that
+-- asserts the pattern match is valid, e.g., the match is attempted on a
+-- Boolean, a Data Constructor, or some number.
 verifyMatchRep :: HasDebugCallStack => Id -> AltType -> G JStat
 verifyMatchRep x alt = do
   runtime_assert <- csRuntimeAssert <$> getSettings
@@ -723,6 +780,8 @@ verifyMatchRep x alt = do
         pure $ ApplStat (var "h$verify_match_alg") (ValExpr(JStr(mkFastString (renderWithContext defaultSDocContext (ppr tc)))):ix)
       _ -> pure mempty
 
+-- | A 'Branch' represents a possible branching path of an Stg case statement,
+-- i.e., a possible code path from an 'StgAlt'
 data Branch a = Branch
   { branch_expr   :: a
   , branch_stat   :: JStat
@@ -730,8 +789,8 @@ data Branch a = Branch
   }
   deriving (Eq,Functor)
 
--- if one branch ends in a continuation but another is inline,
--- we need to adjust the inline branch to use the continuation convention
+-- | If one branch ends in a continuation but another is inline, we need to
+-- adjust the inline branch to use the continuation convention
 normalizeBranches :: ExprCtx
                   -> [Branch a]
                   -> (ExprResult, [Branch a])
@@ -750,6 +809,9 @@ normalizeBranches ctx brs
                         }
       _ -> b
 
+-- | Load an unboxed tuple. "Loading" means getting all 'Idents' from the input
+-- ID's, declaring them as variables in JS land and binding them, in order, to
+-- 'es'.
 loadUbxTup :: [JExpr] -> [Id] -> Int -> G JStat
 loadUbxTup es bs _n = do
   bs' <- concatMapM identsForId bs
@@ -759,7 +821,7 @@ mkSw :: [JExpr] -> [Branch (Maybe [JExpr])] -> JStat
 mkSw [e] cases = mkSwitch e (fmap (fmap (fmap head)) cases)
 mkSw es cases  = mkIfElse es cases
 
--- switch for pattern matching on constructors or prims
+-- | Switch for pattern matching on constructors or prims
 mkSwitch :: JExpr -> [Branch (Maybe JExpr)] -> JStat
 mkSwitch e cases
   | [Branch (Just c1) s1 _] <- n
@@ -794,6 +856,10 @@ mkIfElse e s = go (L.reverse s)
         [] -> panic "mkIfElse: empty expression list"
         _  -> panic "mkIfElse: multiple DEFAULT cases"
 
+-- | Wrapper to contruct sequences of (===), e.g.,
+--
+-- > mkEq [l0,l1,l2] [r0,r1,r2] = (l0 === r0) && (l1 === r1) && (l2 === r2)
+--
 mkEq :: [JExpr] -> [JExpr] -> JExpr
 mkEq es1 es2
   | length es1 == length es2 = foldl1 (InfixExpr LAndOp) (zipWith (InfixExpr StrictEqOp) es1 es2)
@@ -824,6 +890,7 @@ mkAlgBranch top d alt
     (ej, er) <- genExpr top (alt_rhs alt)
     return (Branch cc (b <> ej) er)
 
+-- | Generate a primitive If-expression
 mkPrimIfBranch :: ExprCtx
                -> [VarType]
                -> CgStgAlt
@@ -846,8 +913,8 @@ caseCond = \case
     [e] -> pure (Just e)
     es  -> pprPanic "caseCond: expected single-variable literal" (ppr es)
 
--- load parameters from constructor
 -- fixme use single tmp var for all branches
+-- | Load parameters from constructor
 loadParams :: JExpr -> [Id] -> G JStat
 loadParams from args = do
   as <- concat <$> zipWithM (\a u -> map (,u) <$> identsForId a) args use
@@ -872,7 +939,9 @@ loadParams from args = do
     loadConVarsIfUsed fr cs = mconcat $ zipWith f cs [(1::Int)..]
       where f (x,u) n = loadIfUsed (SelExpr fr (TxtI (dataFieldName n))) x u
 
--- not a Monoid
+-- | Determine if a branch will end in a continuation or not. If not the inline
+-- branch must be normalized. See 'normalizeBranches'
+-- NB. not a Monoid
 branchResult :: HasDebugCallStack => [ExprResult] -> ExprResult
 branchResult = \case
   []                   -> panic "branchResult: empty list"
@@ -882,11 +951,14 @@ branchResult = \case
     | elem ExprCont es -> ExprCont
     | otherwise        -> ExprInline Nothing
 
+-- | Push return arguments onto the stack. The 'Bool' tracks whether the value
+-- is already on the stack or not, used in 'StgToJS.Stack.pushOptimized'.
 pushRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> JExpr -> G JStat
 pushRetArgs free fun = do
   rs <- mapM (\(i,n,b) -> (\es->(es!!(n-1),b)) <$> genIdArg i) free
   pushOptimized (rs++[(fun,False)])
 
+-- | Load the return arguments then pop the stack frame
 loadRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> G JStat
 loadRetArgs free = do
   ids <- mapM (\(i,n,_b) -> (!! (n-1)) <$> genIdStackArgI i) free
@@ -959,6 +1031,9 @@ allocDynAll haveDecl middle cls = do
   objs <- makeObjs
   pure $ mconcat [objs, middle', fillObjs, checkObjs]
 
+-- | Generate a primop. This function wraps around the real generator
+-- 'GHC.StgToJS.genPrim', handling the 'ExprCtx' and all arguments before
+-- generating the primop.
 genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> Type -> G (JStat, ExprResult)
 genPrimOp ctx op args t = do
   as <- concatMapM genArg args

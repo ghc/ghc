@@ -254,7 +254,9 @@ data StaticUnboxed
 
 instance NFData StaticUnboxed
 
--- | Static Arguments
+-- | Static Arguments. Static Arguments are things that are statically
+-- allocated, i.e., they exist at program startup. These are static heap objects
+-- or literals or things that have been floated to the top level binding by ghc.
 data StaticArg
   = StaticObjArg !FastString             -- ^ reference to a heap object
   | StaticLitArg !StaticLit              -- ^ literal

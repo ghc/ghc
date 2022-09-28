@@ -1,7 +1,38 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
--- | Stack manipulation
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.JS.Stack
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+-- Utilities and wrappers for Stack manipulation in JS Land.
+--
+-- In general, functions suffixed with a tick do the actual work, functions
+-- suffixed with an "I" are identical to the non-I versions but work on 'Ident's
+--
+-- The stack in JS land is held in the special JS array 'h$stack' and the stack
+-- pointer is held in 'h$sp'. The top of the stack thus exists at
+-- 'h$stack[h$sp]'. h$stack[h$sp + i] where i > 0, moves deeper into the stack
+-- into older entries, whereas h$stack[h$sp - i] moves towards the top of the
+-- stack.
+--
+-- The stack layout algorithm is slightly peculiar. It makes an effort to
+-- remember recently popped things so that if these values need to be pushed
+-- then they can be quickly. The implementation for this is storing these values
+-- above the stack pointer, and the pushing will skip slots that we know we will
+-- use and fill in slots marked as unknown. Thus, you may find that our push and
+-- pop functions do some non-traditional stack manipulation such as adding slots
+-- in pop or removing slots in push.
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.Stack
   ( resetSlots
   , isolateSlots
@@ -10,7 +41,6 @@ module GHC.StgToJS.Stack
   , addSlots
   , dropSlots
   , addUnknownSlots
-  , adjPushStack
   , push
   , push'
   , adjSpN
@@ -24,12 +54,8 @@ module GHC.StgToJS.Stack
   , pushOptimized'
   , pushOptimized
   , pushLneFrame
-  , pop
-  , popn
-  , popUnknown
-  , popSkipUnknown
+  , popN
   , popSkip
-  , popSkip'
   , popSkipI
   , loadSkip
   -- * Thunk update
@@ -62,7 +88,7 @@ import Data.Array
 import Data.Monoid
 import Control.Monad
 
--- | Run the action with no stack info
+-- | Run the action, 'm', with no stack info
 resetSlots :: G a -> G a
 resetSlots m = do
   s <- getSlots
@@ -73,7 +99,8 @@ resetSlots m = do
   setStackDepth d
   return a
 
--- | run the action with current stack info, but don't let modifications propagate
+-- | run the action, 'm', with current stack info, but don't let modifications
+-- propagate
 isolateSlots :: G a -> G a
 isolateSlots m = do
   s <- getSlots
@@ -117,13 +144,9 @@ addSlots xs = do
   s <- getSlots
   setSlots (xs ++ s)
 
+-- | drop 'n' slots from our stack knowledge
 dropSlots :: Int -> G ()
 dropSlots n = modifySlots (drop n)
-
-adjPushStack :: Int -> G ()
-adjPushStack n = do
-  modifyStackDepth (+n)
-  dropSlots n
 
 push :: [JExpr] -> G JStat
 push xs = do
@@ -137,42 +160,85 @@ push' cs xs
    | csInlinePush cs || l > 32 || l < 2 = adjSp' l <> mconcat items
    | otherwise                          = ApplStat (toJExpr $ pushN ! l) xs
   where
-    items = zipWith (\i e -> AssignStat ((IdxExpr stack) (toJExpr (offset i))) (toJExpr e))
-                    [(1::Int)..] xs
+    items = zipWith f [(1::Int)..] xs
     offset i | i == l    = sp
              | otherwise = InfixExpr SubOp sp (toJExpr (l - i))
     l = length xs
+    f i e = AssignStat ((IdxExpr stack) (toJExpr (offset i))) (toJExpr e)
 
 
+-- | Grow the stack pointer by 'n' without modifying the stack depth. The stack
+-- is just a JS array so we add to grow (instead of the traditional subtract)
 adjSp' :: Int -> JStat
 adjSp' 0 = mempty
 adjSp' n = sp |= InfixExpr AddOp sp (toJExpr n)
 
+-- | Shrink the stack pointer by 'n'. The stack grows downward so substract
 adjSpN' :: Int -> JStat
 adjSpN' 0 = mempty
 adjSpN' n = sp |= InfixExpr SubOp sp (toJExpr n)
 
+-- | Wrapper which adjusts the stack pointer /and/ modifies the stack depth
+-- tracked in 'G'. See also 'adjSp'' which actually does the stack pointer
+-- manipulation.
 adjSp :: Int -> G JStat
 adjSp 0 = return mempty
 adjSp n = do
+  -- grow depth by n
   modifyStackDepth (+n)
   return (adjSp' n)
 
+-- | Shrink the stack and stack pointer. NB: This function is unsafe when the
+-- input 'n', is negative. This function wraps around 'adjSpN' which actually
+-- performs the work.
 adjSpN :: Int -> G JStat
 adjSpN 0 = return mempty
 adjSpN n = do
   modifyStackDepth (\x -> x - n)
   return (adjSpN' n)
 
+-- | A constant array that holds global function symbols which do N pushes onto
+-- the stack. For example:
+-- @
+-- function h$p1(x1) {
+--   ++h$sp;
+--   h$stack[(h$sp - 0)] = x1;
+-- };
+-- function h$p2(x1, x2) {
+--   h$sp += 2;
+--   h$stack[(h$sp - 1)] = x1;
+--   h$stack[(h$sp - 0)] = x2;
+-- };
+-- @
+--
+-- and so on up to 32.
 pushN :: Array Int Ident
 pushN = listArray (1,32) $ map (TxtI . mkFastString . ("h$p"++) . show) [(1::Int)..32]
 
+-- | Convert all function symbols in 'pushN' to global top-level functions. This
+-- is a hack which converts the function symbols to variables. This hack is
+-- caught in 'GHC.StgToJS.Printer.prettyBlock'' to turn these into global
+-- functions.
 pushN' :: Array Int JExpr
 pushN' = fmap (ValExpr . JVar) pushN
+  where
 
+-- | Partial Push functions. Like 'pushN' except these push functions skip
+-- slots. For example,
+-- @
+-- function h$pp33(x1, x2) {
+--   h$sp += 6;
+--   h$stack[(h$sp - 5)] = x1;
+--   h$stack[(h$sp - 0)] = x2;
+-- };
+-- @
+--
+-- The 33rd entry skips slots 1-4 to bind the top of the stack and the 6th
+-- slot. See 'pushOptimized' and 'pushOptimized'' for use cases.
 pushNN :: Array Integer Ident
 pushNN = listArray (1,255) $ map (TxtI . mkFastString . ("h$pp"++) . show) [(1::Int)..255]
 
+-- | Like 'pushN'' but for the partial push functions
 pushNN' :: Array Integer JExpr
 pushNN' = fmap (ValExpr . JVar) pushNN
 
@@ -216,82 +282,67 @@ pushOptimized xs = do
     offset i | i == l    = sp
              | otherwise = InfixExpr SubOp sp (toJExpr (l - i))
 
+-- | push a let-no-escape frame onto the stack
 pushLneFrame :: HasDebugCallStack => Int -> ExprCtx -> G JStat
 pushLneFrame size ctx =
   let ctx' = ctxLneShrinkStack ctx size
   in pushOptimized' (ctxLneFrameVars ctx')
 
-popUnknown :: [JExpr] -> G JStat
-popUnknown xs = popSkipUnknown 0 xs
-
-popSkipUnknown :: Int -> [JExpr] -> G JStat
-popSkipUnknown n xs = popSkip n (map (,SlotUnknown) xs)
-
-pop :: [(JExpr,StackSlot)] -> G JStat
-pop = popSkip 0
-
--- | pop the expressions, but ignore the top n elements of the stack
-popSkip :: Int -> [(JExpr,StackSlot)] -> G JStat
-popSkip 0 [] = pure mempty
-popSkip n [] = addUnknownSlots n >> adjSpN n
-popSkip n xs = do
-  addUnknownSlots n
-  addSlots (map snd xs)
-  a <- adjSpN (length xs + n)
-  return (loadSkip n (map fst xs) <> a)
-
--- | pop things, don't upstate stack knowledge
-popSkip' :: Int     -- ^ number of slots to skip
+-- | Pop things, don't update the stack knowledge in 'G'
+popSkip :: Int      -- ^ number of slots to skip
          -> [JExpr] -- ^ assign stack slot values to these
          -> JStat
-popSkip' 0 []  = mempty
-popSkip' n []  = adjSpN' n
-popSkip' n tgt = loadSkip n tgt <> adjSpN' (length tgt + n)
+popSkip 0 []  = mempty
+popSkip n []  = adjSpN' n
+popSkip n tgt = loadSkip n tgt <> adjSpN' (length tgt + n)
 
--- | like popSkip, but without modifying the stack pointer
+-- | Load 'length (xs :: [JExpr])' things from the stack at offset 'n :: Int'.
+-- This function does no stack pointer manipulation, it merely indexes into the
+-- stack and loads payloads into 'xs'.
 loadSkip :: Int -> [JExpr] -> JStat
 loadSkip = loadSkipFrom sp
+  where
+    loadSkipFrom :: JExpr -> Int -> [JExpr] -> JStat
+    loadSkipFrom fr n xs = mconcat items
+      where
+        items = reverse $ zipWith f [(0::Int)..] (reverse xs)
+        -- helper to generate sp - n offset to index with
+        offset 0 = fr
+        offset n = InfixExpr SubOp fr  (toJExpr n)
+        -- helper to load stack .! i into ex, e.g., ex = stack[i]
+        f i ex   = ex |= IdxExpr stack (toJExpr (offset (i+n)))
 
-loadSkipFrom :: JExpr -> Int -> [JExpr] -> JStat
-loadSkipFrom fr n xs = mconcat items
-    where
-      items = reverse $ zipWith (\i ex -> ex |= IdxExpr stack (toJExpr (offset (i+n))))
-                                [(0::Int)..]
-                                (reverse xs)
-      offset 0 = toJExpr fr
-      offset n = InfixExpr SubOp (toJExpr fr) (toJExpr n)
 
-
--- declare and pop
+-- | Pop but preserve the first N slots
 popSkipI :: Int -> [(Ident,StackSlot)] -> G JStat
 popSkipI 0 [] = pure mempty
-popSkipI n [] = adjSpN n
+popSkipI n [] = popN n
 popSkipI n xs = do
+  -- add N unknown slots
   addUnknownSlots n
+  -- now add the slots from xs, after this line the stack should look like
+  -- [xs] ++ [Unknown...] ++ old_stack
   addSlots (map snd xs)
+  -- move stack pointer into the stack by (length xs + n), basically resetting
+  -- the stack pointer
   a <- adjSpN (length xs + n)
+  -- now load skipping first N slots
   return (loadSkipI n (map fst xs) <> a)
 
--- like popSkip, but without modifying sp
+-- | Just like 'loadSkip' but operate on 'Ident's rather than 'JExpr'
 loadSkipI :: Int -> [Ident] -> JStat
 loadSkipI = loadSkipIFrom sp
+  where loadSkipIFrom :: JExpr -> Int -> [Ident] -> JStat
+        loadSkipIFrom fr n xs = mconcat items
+          where
+            items = reverse $ zipWith f [(0::Int)..] (reverse xs)
+            offset 0 = fr
+            offset n = InfixExpr SubOp fr (toJExpr n)
+            f i ex   = ex ||= IdxExpr stack (toJExpr (offset (i+n)))
 
-loadSkipIFrom :: JExpr -> Int -> [Ident] -> JStat
-loadSkipIFrom fr n xs = mconcat items
-    where
-      items = reverse $ zipWith f [(0::Int)..] (reverse xs)
-      offset 0 = fr
-      offset n = InfixExpr SubOp fr (toJExpr n)
-      f i ex = ex ||= IdxExpr stack (toJExpr (offset (i+n)))
-
-popn :: Int -> G JStat
-popn n = addUnknownSlots n >> adjSpN n
-
-updateThunk' :: StgToJSConfig -> JStat
-updateThunk' settings =
-  if csInlineBlackhole settings
-    then bhStats settings True
-    else ApplStat (var "h$bh") []
+-- | Blindly pop N slots
+popN :: Int -> G JStat
+popN n = addUnknownSlots n >> adjSpN n
 
 -- | Generate statements to update the current node with a blackhole
 bhStats :: StgToJSConfig -> Bool -> JStat
@@ -302,8 +353,23 @@ bhStats s pushUpd = mconcat
   , toJExpr R1 .^ closureField2_ |= null_ -- will be filled with waiters array
   ]
 
+-- | Wrapper around 'updateThunk'', performs the stack manipulation before
+-- updating the Thunk.
 updateThunk :: G JStat
 updateThunk = do
   settings <- getSettings
-  adjPushStack 2 -- update frame size
+  -- update frame size
+  let adjPushStack :: Int -> G ()
+      adjPushStack n = do modifyStackDepth (+n)
+                          dropSlots n
+  adjPushStack 2
   return $ (updateThunk' settings)
+
+-- | Update a thunk by checking 'StgToJSConfig'. If the config inlines black
+-- holes then update inline, else make an explicit call to the black hole
+-- handler.
+updateThunk' :: StgToJSConfig -> JStat
+updateThunk' settings =
+  if csInlineBlackhole settings
+    then bhStats settings True
+    else ApplStat (var "h$bh") []

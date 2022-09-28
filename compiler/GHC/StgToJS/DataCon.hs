@@ -1,6 +1,21 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  GHC.StgToJS.DataCon
+-- Copyright   :  (c) The University of Glasgow 2001
+-- License     :  BSD-style (see the file LICENSE)
+--
+-- Maintainer  :  Jeffrey Young  <jeffrey.young@iohk.io>
+--                Luite Stegeman <luite.stegeman@iohk.io>
+--                Sylvain Henry  <sylvain.henry@iohk.io>
+--                Josh Meredith  <josh.meredith@iohk.io>
+-- Stability   :  experimental
+--
+--  Code generation of data constructors
+-----------------------------------------------------------------------------
+
 module GHC.StgToJS.DataCon
   ( genCon
   , allocCon
@@ -35,6 +50,7 @@ import GHC.Data.FastString
 
 import Data.Maybe
 
+-- | Generate a data constructor. Special handling for unboxed tuples
 genCon :: ExprCtx -> DataCon -> [JExpr] -> G JStat
 genCon ctx con args
   | isUnboxedTupleDataCon con
@@ -46,6 +62,8 @@ genCon ctx con args
   | xs <- concatMap typex_expr (ctxTarget ctx)
   = pprPanic "genCon: unhandled DataCon" (ppr (con, args, xs))
 
+-- | Allocate a data constructor. Allocate in this context means bind the data
+-- constructor to 'to'
 allocCon :: Ident -> DataCon -> CostCentreStack -> [JExpr] -> G JStat
 allocCon to con cc xs
   | isBoolDataCon con || isUnboxableCon con =
@@ -60,6 +78,9 @@ allocCon to con cc xs
       ccsJ <- if prof then ccsVarJ cc else return Nothing
       return $ allocDynamic cs False to e xs ccsJ
 
+-- | Allocate an unboxed data constructor. If we have a bool we calculate the
+-- right value. If not then we expect a singleton list and unbox by converting
+-- ''C x' to 'x'. NB. This function may panic.
 allocUnboxedCon :: DataCon -> [JExpr] -> JExpr
 allocUnboxedCon con = \case
   []
@@ -69,6 +90,7 @@ allocUnboxedCon con = \case
     | isUnboxableCon con -> x
   xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con,xs))
 
+-- | Allocate an entry function. See 'GHC.StgToJS.hs' for the object layout.
 allocDynamicE :: Bool          -- ^ csInlineAlloc from StgToJSConfig
               -> JExpr
               -> [JExpr]
@@ -93,6 +115,7 @@ allocDynamicE  inline_alloc entry free cc
                 (x:xs) -> (x,toJExpr (JHash $ listToUniqMap (zip dataFields xs)))
     dataFields = map (mkFastString . ('d':) . show) [(1::Int)..]
 
+-- | Allocate a dynamic object
 allocDynamic :: StgToJSConfig -> Bool -> Ident -> JExpr -> [JExpr] -> Maybe JExpr -> JStat
 allocDynamic s haveDecl to entry free cc =
   dec to `mappend` (toJExpr to |= allocDynamicE (csInlineAlloc s) entry free cc)
