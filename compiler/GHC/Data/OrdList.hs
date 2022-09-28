@@ -28,6 +28,8 @@ import GHC.Utils.Misc (strictMap)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semigroup
 
 infixl 5  `appOL`
@@ -37,7 +39,7 @@ infixr 5  `consOL`
 data OrdList a
   = None
   | One a
-  | Many [a]          -- Invariant: non-empty
+  | Many (NonEmpty a)
   | Cons a (OrdList a)
   | Snoc (OrdList a) a
   | Two (OrdList a) -- Invariant: non-empty
@@ -100,8 +102,12 @@ pattern ConsOL :: a -> OrdList a -> OrdList a
 pattern ConsOL x xs <- (viewCons -> VJust x xs) where
   ConsOL x xs = consOL x xs
 {-# COMPLETE NilOL, ConsOL #-}
+
 viewCons :: OrdList a -> VMaybe a (OrdList a)
-viewCons (One a)       = VJust a NilOL
+viewCons None        = VNothing
+viewCons (One a)     = VJust a NilOL
+viewCons (Many (a :| [])) = VJust a NilOL
+viewCons (Many (a :| b : bs)) = VJust a (Many (b :| bs))
 viewCons (Cons a as) = VJust a as
 viewCons (Snoc as a) = case viewCons as of
   VJust a' as' -> VJust a' (Snoc as' a)
@@ -109,15 +115,18 @@ viewCons (Snoc as a) = case viewCons as of
 viewCons (Two as1 as2) = case viewCons as1 of
   VJust a' as1' -> VJust a' (Two as1' as2)
   VNothing      -> viewCons as2
-viewCons _ = VNothing
 
 pattern SnocOL :: OrdList a -> a -> OrdList a
 pattern SnocOL xs x <- (viewSnoc -> VJust xs x) where
   SnocOL xs x = snocOL xs x
 {-# COMPLETE NilOL, SnocOL #-}
+
 viewSnoc :: OrdList a -> VMaybe (OrdList a) a
-viewSnoc (One a)       = VJust NilOL a
-viewSnoc (Many (reverse -> a:as)) = VJust (Many (reverse as)) a
+viewSnoc None        = VNothing
+viewSnoc (One a)     = VJust NilOL a
+viewSnoc (Many as)   = (`VJust` NE.last as) $ case NE.init as of
+  [] -> NilOL
+  b : bs -> Many (b :| bs)
 viewSnoc (Snoc as a) = VJust as a
 viewSnoc (Cons a as) = case viewSnoc as of
   VJust as' a' -> VJust (Cons a as') a'
@@ -125,18 +134,17 @@ viewSnoc (Cons a as) = case viewSnoc as of
 viewSnoc (Two as1 as2) = case viewSnoc as2 of
   VJust as2' a' -> VJust (Two as1 as2') a'
   VNothing      -> viewSnoc as1
-viewSnoc _ = VNothing
 
 headOL None        = panic "headOL"
 headOL (One a)     = a
-headOL (Many as)   = head as
+headOL (Many as)   = NE.head as
 headOL (Cons a _)  = a
 headOL (Snoc as _) = headOL as
 headOL (Two as _)  = headOL as
 
 lastOL None        = panic "lastOL"
 lastOL (One a)     = a
-lastOL (Many as)   = last as
+lastOL (Many as)   = NE.last as
 lastOL (Cons _ as) = lastOL as
 lastOL (Snoc _ a)  = a
 lastOL (Two _ as)  = lastOL as
@@ -164,7 +172,7 @@ fromOL a = go a []
         go (Cons a b) acc = a : go b acc
         go (Snoc a b) acc = go a (b:acc)
         go (Two a b)  acc = go a (go b acc)
-        go (Many xs)  acc = xs ++ acc
+        go (Many xs)  acc = NE.toList xs ++ acc
 
 fromOLReverse :: OrdList a -> [a]
 fromOLReverse a = go a []
@@ -175,7 +183,7 @@ fromOLReverse a = go a []
         go (Cons a b) acc = go b (a : acc)
         go (Snoc a b) acc = b : go a acc
         go (Two a b)  acc = go b (go a acc)
-        go (Many xs)  acc = reverse xs ++ acc
+        go (Many xs)  acc = reverse (NE.toList xs) ++ acc
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
 mapOL = fmap
@@ -192,7 +200,9 @@ mapOL' f (Snoc xs x) = let !x1 = f x
 mapOL' f (Two b1 b2) = let !b1' = mapOL' f b1
                            !b2' = mapOL' f b2
                        in Two b1' b2'
-mapOL' f (Many xs)   = Many $! strictMap f xs
+mapOL' f (Many (x :| xs)) = let !x1 = f x
+                                !xs1 = strictMap f xs
+                            in Many (x1 :| xs1)
 
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
 foldrOL _ z None        = z
@@ -214,7 +224,7 @@ foldlOL k z (Many xs)   = foldl' k z xs
 toOL :: [a] -> OrdList a
 toOL [] = None
 toOL [x] = One x
-toOL xs = Many xs
+toOL (x : xs) = Many (x :| xs)
 
 reverseOL :: OrdList a -> OrdList a
 reverseOL None = None
@@ -222,7 +232,7 @@ reverseOL (One x) = One x
 reverseOL (Cons a b) = Snoc (reverseOL b) a
 reverseOL (Snoc a b) = Cons b (reverseOL a)
 reverseOL (Two a b)  = Two (reverseOL b) (reverseOL a)
-reverseOL (Many xs)  = Many (reverse xs)
+reverseOL (Many xs)  = Many (NE.reverse xs)
 
 -- | Compare not only the values but also the structure of two lists
 strictlyEqOL :: Eq a => OrdList a   -> OrdList a -> Bool
