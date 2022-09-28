@@ -185,8 +185,16 @@ function h$wakeupDelayed(now) {
 }
 
 function h$delayThread(time) {
-  var now = Date.now();
   var ms = time/1000; // we have no microseconds in JS
+  return h$delayThreadMs(ms);
+}
+
+function h$sleep(secs) {
+  return h$delayThreadMs(secs*1000);
+}
+
+function h$delayThreadMs(ms) {
+  var now = Date.now();
   TRACE_SCHEDULER("delaying " + h$threadString(h$currentThread) + " " + ms + "ms (" + (now+ms) + ")");
   h$delayed.add(now+ms, h$currentThread);
   h$currentThread.delayed = true;
