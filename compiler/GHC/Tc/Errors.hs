@@ -83,6 +83,7 @@ import Data.Foldable      ( toList )
 import Data.Function      ( on )
 import Data.List          ( partition, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import Data.Ord           ( comparing )
 import qualified Data.Semigroup as S
 
@@ -2205,24 +2206,24 @@ mk_dict_err :: HasCallStack => SolverReportErrCtxt -> (ErrorItem, ClsInstLookupR
             -> TcM TcSolverReportMsg
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Left clas), otherwise return (Right pred)
-mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped))
-  | null matches  -- No matches but perhaps several unifiers
-  = do { (_, rel_binds, item) <- relevantBindings True ctxt item
-       ; candidate_insts <- get_candidate_instances
-       ; (imp_errs, field_suggestions) <- record_field_suggestions
-       ; return (cannot_resolve_msg item candidate_insts rel_binds imp_errs field_suggestions) }
+mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEmpty matches, NE.nonEmpty unsafe_overlapped) of
+  (Nothing, _)  -> do -- No matches but perhaps several unifiers
+    { (_, rel_binds, item) <- relevantBindings True ctxt item
+    ; candidate_insts <- get_candidate_instances
+    ; (imp_errs, field_suggestions) <- record_field_suggestions
+    ; return (cannot_resolve_msg item candidate_insts rel_binds imp_errs field_suggestions) }
 
-  | null unsafe_overlapped   -- Some matches => overlap errors
-  = return $ overlap_msg
+  -- Some matches => overlap errors
+  (Just matchesNE, Nothing) -> return $
+    OverlappingInstances item (NE.map fst matchesNE) (getPotentialUnifiers unifiers)
 
-  | otherwise
-  = return $ safe_haskell_msg
+  (Just (match :| []), Just unsafe_overlappedNE) -> return $
+    UnsafeOverlap item (fst match) (NE.map fst unsafe_overlappedNE)
+  (Just (_ :| rest), Just{}) -> pprPanic "should be empty" (ppr rest)
   where
     orig          = errorItemOrigin item
     pred          = errorItemPred item
     (clas, tys)   = getClassPredTys pred
-    ispecs        = [ispec | (ispec, _) <- matches]
-    unsafe_ispecs = [ispec | (ispec, _) <- unsafe_overlapped]
 
     get_candidate_instances :: TcM [ClsInst]
     -- See Note [Report candidate instances]
@@ -2270,18 +2271,6 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped))
                        -> [ImportError] -> [GhcHint] -> TcSolverReportMsg
     cannot_resolve_msg item candidate_insts binds imp_errs field_suggestions
       = CannotResolveInstance item (getPotentialUnifiers unifiers) candidate_insts imp_errs field_suggestions binds
-
-    -- Overlap errors.
-    overlap_msg, safe_haskell_msg :: TcSolverReportMsg
-    -- Normal overlap error
-    overlap_msg
-      = assert (not (null matches)) $ OverlappingInstances item ispecs (getPotentialUnifiers unifiers)
-
-    -- Overlap error because of Safe Haskell (first
-    -- match should be the most specific match)
-    safe_haskell_msg
-     = assert (matches `lengthIs` 1 && not (null unsafe_ispecs)) $
-       UnsafeOverlap item ispecs unsafe_ispecs
 
 {- Note [Report candidate instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

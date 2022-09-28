@@ -2377,8 +2377,8 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
                   sep [text "Matching givens (or their superclasses):"
                       , nest 2 (vcat matching_givens)]
     ,  potentialInstancesErrMsg
-        (PotentialInstances { matches, unifiers })
-    ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
+        (PotentialInstances { matches = NE.toList matches, unifiers })
+    ,  ppWhen (null matching_givens && null (NE.tail matches) && null unifiers) $
        -- Intuitively, some given matched the wanted in their
        -- flattened or rewritten (from given equalities) form
        -- but the matcher can't figure that out because the
@@ -2388,7 +2388,7 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
          sep [ text "There exists a (perhaps superclass) match:"
              , nest 2 (vcat (pp_givens useful_givens))]
 
-    ,  ppWhen (isSingleton matches) $
+    ,  ppWhen (null $ NE.tail matches) $
        parens (vcat [ ppUnless (null tyCoVars) $
                         text "The choice depends on the instantiation of" <+>
                           quotes (pprWithCommas ppr tyCoVars)
@@ -2433,12 +2433,12 @@ pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
   vcat [ addArising ct_loc (text "Unsafe overlapping instances for"
                   <+> pprType (mkClassPred clas tys))
        , sep [text "The matching instance is:",
-              nest 2 (pprInstance $ head matches)]
+              nest 2 (pprInstance matches)]
        , vcat [ text "It is compiled in a Safe module and as such can only"
               , text "overlap instances from the same module, however it"
               , text "overlaps the following instances from different" <+>
                 text "modules:"
-              , nest 2 (vcat [pprInstances $ unsafe_overlapped])
+              , nest 2 (vcat [pprInstances $ NE.toList unsafe_overlapped])
               ]
        ]
   where

@@ -3028,7 +3028,7 @@ data TcSolverReportMsg
   -- Test cases: tcfail118, tcfail121, tcfail218.
   | OverlappingInstances
     { overlappingInstances_item     :: ErrorItem
-    , overlappingInstances_matches  :: [ClsInst]
+    , overlappingInstances_matches  :: NE.NonEmpty ClsInst
     , overlappingInstances_unifiers :: [ClsInst] }
 
   -- | Could not solve a constraint from instances because
@@ -3038,8 +3038,8 @@ data TcSolverReportMsg
   -- Test cases: SH_Overlap{1,2,5,6,7,11}.
   | UnsafeOverlap
     { unsafeOverlap_item    :: ErrorItem
-    , unsafeOverlap_matches :: [ClsInst]
-    , unsafeOverlapped      :: [ClsInst] }
+    , unsafeOverlap_matches :: ClsInst
+    , unsafeOverlapped      :: NE.NonEmpty ClsInst }
 
   deriving Generic
 
