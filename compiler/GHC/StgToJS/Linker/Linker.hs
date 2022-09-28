@@ -15,16 +15,18 @@
 --                Josh Meredith  <josh.meredith@iohk.io>
 -- Stability   :  experimental
 --
--- GHCJS linker, collects dependencies from the object files (.js_o, js_p_o),
+-- GHCJS linker, collects dependencies from the object files
 -- which contain linkable units with dependency information
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToJS.Linker.Linker where
+module GHC.StgToJS.Linker.Linker
+  ( link
+  )
+where
 
 import Prelude
 
-import GHC.Platform.Ways
 import GHC.Platform.Host (hostPlatformArchOS)
 
 import           GHC.StgToJS.Linker.Types
@@ -86,7 +88,7 @@ import           System.Directory ( createDirectoryIfMissing
                                   , getPermissions
                                   )
 
-import GHC.Driver.Session (targetWays_, DynFlags(..))
+import GHC.Driver.Session (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
@@ -136,7 +138,7 @@ link :: GhcjsEnv
 link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
-      link_res <- link' env lc_cfg cfg dflags logger unit_env out include pkgs objFiles jsFiles
+      link_res <- link' env lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles
                     isRootFun extraStaticDeps
 
       let genBase = isJust (lcGenBase lc_cfg)
@@ -202,7 +204,6 @@ readShimsArchive ar_file = do
 link' :: GhcjsEnv
       -> JSLinkConfig
       -> StgToJSConfig
-      -> DynFlags
       -> Logger
       -> UnitEnv
       -> String                     -- ^ target (for progress message)
@@ -213,7 +214,7 @@ link' :: GhcjsEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
   = do
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
@@ -240,9 +241,8 @@ link' env lc_cfg cfg dflags logger unit_env target _include pkgs objFiles _jsFil
       -- c   <- newMVar M.empty
       let preload_units = preloadUnits (ue_units unit_env)
 
-      let rtsPkgs     =  map stringToUnitId ["@rts", "@rts_" ++ waysTag (targetWays_ $ dflags)]
-          pkgs' :: [UnitId]
-          pkgs'       = nub (rtsPkgs ++ preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
+      let pkgs' :: [UnitId]
+          pkgs'       = nub (preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
           pkgs''      = filter (not . isAlreadyLinked base) pkgs'
           ue_state    = ue_units $ unit_env
           -- pkgLibPaths = mkPkgLibPaths pkgs'
@@ -688,14 +688,6 @@ rtsDeps pkgs = diffDeps pkgs $
           , "(,,,,,,,,,)"
           ]
       ]
-  )
-
--- | dependencies for the Template Haskell, these need to be linked when running
---   Template Haskell (in addition to the RTS deps)
-thDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
-thDeps pkgs = diffDeps pkgs $
-  ( [ baseUnitId ]
-  , S.fromList $ mkBaseFuns "GHC.JS.Prim.TH.Eval" ["runTHServer"]
   )
 
 -- | Export the functions in base

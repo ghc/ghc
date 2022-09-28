@@ -40,14 +40,14 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 
 data DependencyDataCache = DDC
-  { ddcModule :: !(IntMap Unit)               -- ^ Unique Module -> Object.Package
+  { ddcModule :: !(IntMap Unit)               -- ^ Unique Module -> Unit
   , ddcId     :: !(IntMap Object.ExportedFun) -- ^ Unique Id     -> Object.ExportedFun (only to other modules)
   , ddcOther  :: !(Map OtherSymb Object.ExportedFun)
   }
 
 -- | Generate module dependency data
 --
--- Generate the object's dependy data, taking care that package and module names
+-- Generate the object's dependency data, taking care that package and module names
 -- are only stored once
 genDependencyData
   :: HasDebugCallStack
