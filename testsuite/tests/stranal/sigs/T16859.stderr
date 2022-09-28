@@ -1,7 +1,7 @@
 
 ==================== Strictness signatures ====================
 T16859.bar: <1!A><L>
-T16859.baz: <1L><1!P(L)><1C1(L)>
+T16859.baz: <1L><1!P(L)><1C(1,L)>
 T16859.buz: <1!P(L,L)>
 T16859.foo: <1L><L>
 T16859.mkInternalName: <1!P(L)><1L><1L>
@@ -27,7 +27,7 @@ T16859.n_uniq: 1
 
 ==================== Strictness signatures ====================
 T16859.bar: <1!A><L>
-T16859.baz: <1L><1!P(L)><1C1(L)>
+T16859.baz: <1L><1!P(L)><1C(1,L)>
 T16859.buz: <1!P(L,L)>
 T16859.foo: <1L><L>
 T16859.mkInternalName: <1!P(L)><1L><1L>

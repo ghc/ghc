@@ -285,14 +285,14 @@ Moving parts:
      f g x = Just (case g x of { ... })
 
   Here 'f' is lazy in 'g', but it guarantees to call it no
-  more than once.  So g will get a C1(U) usage demand.
+  more than once.  So g will get a C(1,U) usage demand.
 
 * Occurrence analysis propagates this usage information
   (in the demand signature of a function) to its calls.
   Example, given 'f' above
      f (\x.e) blah
 
-  Since f's demand signature says it has a C1(U) usage demand on its
+  Since f's demand signature says it has a C(1,U) usage demand on its
   first argument, the occurrence analyser sets the \x to be one-shot.
   This is done via the occ_one_shots field of OccEnv.
 

@@ -12,7 +12,7 @@ Foo.foogle: 1
 
 
 ==================== Strictness signatures ====================
-Foo.f: <MP(A,1C1(L),A)><L>
+Foo.f: <MP(A,1C(1,L),A)><L>
 Foo.foogle: <L><L>
 
 

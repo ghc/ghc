@@ -11,7 +11,7 @@ encodeUtf8BuilderEscaped [InlPrag=INLINE (sat-args=1)]
   :: BP.BoundedPrim Word8 -> Text -> B.Builder
 [GblId,
  Arity=5,
- Str=<M!P(L,LCS(C1(C1(!P(L,1L)))))><1!P(L,L,L)><1CL(C1(L))><1L><L>,
+ Str=<M!P(L,LC(S,C(1,C(1,!P(L,1L)))))><1!P(L,L,L)><1C(L,C(1,L))><1L><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
@@ -301,7 +301,7 @@ encodeUtf8BuilderEscaped
            case be_a1kE of
            { Data.ByteString.Builder.Prim.Internal.BP bx5_a27M ds1_a27N ->
            join {
-             $j_s28Z [Dmd=1C1(L)]
+             $j_s28Z [Dmd=1C(1,L)]
                :: GHC.Prim.Int#
                   -> (# GHC.Prim.State# GHC.Prim.RealWorld, B.BuildSignal r_a238 #)
              [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
@@ -330,7 +330,7 @@ encodeUtf8BuilderEscaped
                                            :: GHC.Prim.State# GHC.Prim.RealWorld) ->
                                         letrec {
                                           $s$wouterLoop_s29Y [Occ=LoopBreaker,
-                                                              Dmd=LCS(C1(C1(C1(!P(L,L)))))]
+                                                              Dmd=LC(S,C(1,C(1,C(1,!P(L,L)))))]
                                             :: GHC.Prim.Addr#
                                                -> GHC.Prim.Addr#
                                                -> GHC.Prim.Int#
@@ -396,7 +396,7 @@ encodeUtf8BuilderEscaped
                                                                   = GHC.Prim.-#
                                                                       iend_s27f sc2_s29U } in
                                                               join {
-                                                                $j3_s27P [Dmd=1C1(!P(L,L))]
+                                                                $j3_s27P [Dmd=1C(1,!P(L,L))]
                                                                   :: GHC.Prim.Int#
                                                                      -> (# GHC.Prim.State#
                                                                              GHC.Prim.RealWorld,
@@ -415,7 +415,7 @@ encodeUtf8BuilderEscaped
                                                                             sc2_s29U y_a23f } in
                                                                     joinrec {
                                                                       $s$wgo_s2ai [Occ=LoopBreaker,
-                                                                                   Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                   Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                         :: GHC.Prim.State#
                                                                              GHC.Prim.RealWorld
                                                                            -> GHC.Prim.Addr#
@@ -496,7 +496,7 @@ encodeUtf8BuilderEscaped
                                                                                   joinrec {
                                                                                     $wgo_Xk [InlPrag=[2],
                                                                                              Occ=LoopBreaker,
-                                                                                             Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                             Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                                       :: GHC.Prim.Int#
                                                                                          -> Ptr
                                                                                               Word8
@@ -641,7 +641,7 @@ encodeUtf8BuilderEscaped
                                                 };
                                           $wouterLoop_s28Y [InlPrag=[2],
                                                             Occ=LoopBreaker,
-                                                            Dmd=SCS(C1(C1(L)))]
+                                                            Dmd=SC(S,C(1,C(1,L)))]
                                             :: GHC.Prim.Int#
                                                -> B.BufferRange
                                                -> GHC.Prim.State# GHC.Prim.RealWorld
@@ -709,7 +709,7 @@ encodeUtf8BuilderEscaped
                                                                   = GHC.Prim.-#
                                                                       iend_s27f ww_s28T } in
                                                               join {
-                                                                $j3_s27P [Dmd=1C1(!P(L,L))]
+                                                                $j3_s27P [Dmd=1C(1,!P(L,L))]
                                                                   :: GHC.Prim.Int#
                                                                      -> (# GHC.Prim.State#
                                                                              GHC.Prim.RealWorld,
@@ -728,7 +728,7 @@ encodeUtf8BuilderEscaped
                                                                             ww_s28T y_a23f } in
                                                                     joinrec {
                                                                       $s$wgo_s29j [Occ=LoopBreaker,
-                                                                                   Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                   Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                         :: GHC.Prim.State#
                                                                              GHC.Prim.RealWorld
                                                                            -> GHC.Prim.Addr#
@@ -808,7 +808,7 @@ encodeUtf8BuilderEscaped
                                                                                        ipv1_a26M #) ->
                                                                                   joinrec {
                                                                                     $s$wgo1_s29t [Occ=LoopBreaker,
-                                                                                                  Dmd=LCS(C1(C1(!P(L,L))))]
+                                                                                                  Dmd=LC(S,C(1,C(1,!P(L,L))))]
                                                                                       :: GHC.Prim.State#
                                                                                            GHC.Prim.RealWorld
                                                                                          -> GHC.Prim.Addr#
@@ -901,7 +901,7 @@ encodeUtf8BuilderEscaped
                                                                                         };
                                                                                     $wgo_Xk [InlPrag=[2],
                                                                                              Occ=LoopBreaker,
-                                                                                             Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                             Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                                       :: GHC.Prim.Int#
                                                                                          -> Ptr
                                                                                               Word8
@@ -1055,7 +1055,7 @@ encodeUtf8BuilderEscaped
                                  [LclId]
                                  y1_s27t = GHC.Prim.-# iend_s27f bx1_d22N } in
                                join {
-                                 $j2_s27P [Dmd=1C1(!P(L,L))]
+                                 $j2_s27P [Dmd=1C(1,!P(L,L))]
                                    :: GHC.Prim.Int#
                                       -> (# GHC.Prim.State# GHC.Prim.RealWorld,
                                             B.BuildSignal r_a238 #)
@@ -1066,7 +1066,7 @@ encodeUtf8BuilderEscaped
                                        [LclId]
                                        iendTmp_s27v = GHC.Prim.+# bx1_d22N y_a23f } in
                                      join {
-                                       exit_Xc [Dmd=LCS(C1(C1(!P(L,L))))]
+                                       exit_Xc [Dmd=LC(S,C(1,C(1,!P(L,L))))]
                                          :: GHC.Prim.Int#
                                             -> GHC.Prim.State# GHC.Prim.RealWorld
                                             -> GHC.Prim.Addr#
@@ -1082,7 +1082,7 @@ encodeUtf8BuilderEscaped
                                                (ipv_s24F [OS=OneShot] :: GHC.Prim.Addr#)
                                          = letrec {
                                              $s$wouterLoop_s2bC [Occ=LoopBreaker,
-                                                                 Dmd=SCS(C1(C1(C1(!P(L,L)))))]
+                                                                 Dmd=SC(S,C(1,C(1,C(1,!P(L,L)))))]
                                                :: GHC.Prim.Addr#
                                                   -> GHC.Prim.Addr#
                                                   -> GHC.Prim.Int#
@@ -1149,7 +1149,7 @@ encodeUtf8BuilderEscaped
                                                                      = GHC.Prim.-#
                                                                          iend_s27f sc2_s2by } in
                                                                  join {
-                                                                   $j4_Xn [Dmd=1C1(!P(L,L))]
+                                                                   $j4_Xn [Dmd=1C(1,!P(L,L))]
                                                                      :: GHC.Prim.Int#
                                                                         -> (# GHC.Prim.State#
                                                                                 GHC.Prim.RealWorld,
@@ -1170,7 +1170,7 @@ encodeUtf8BuilderEscaped
                                                                                sc2_s2by y3_Xo } in
                                                                        joinrec {
                                                                          $s$wgo_s2bW [Occ=LoopBreaker,
-                                                                                      Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                      Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                            :: GHC.Prim.State#
                                                                                 GHC.Prim.RealWorld
                                                                               -> GHC.Prim.Addr#
@@ -1254,7 +1254,7 @@ encodeUtf8BuilderEscaped
                                                                                      joinrec {
                                                                                        $wgo_Xu [InlPrag=[2],
                                                                                                 Occ=LoopBreaker,
-                                                                                                Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                                Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                                          :: GHC.Prim.Int#
                                                                                             -> Ptr
                                                                                                  Word8
@@ -1400,7 +1400,7 @@ encodeUtf8BuilderEscaped
                                                    };
                                              $wouterLoop_s28Y [InlPrag=[2],
                                                                Occ=LoopBreaker,
-                                                               Dmd=LCS(C1(C1(L)))]
+                                                               Dmd=LC(S,C(1,C(1,L)))]
                                                :: GHC.Prim.Int#
                                                   -> B.BufferRange
                                                   -> GHC.Prim.State# GHC.Prim.RealWorld
@@ -1469,7 +1469,7 @@ encodeUtf8BuilderEscaped
                                                                      = GHC.Prim.-#
                                                                          iend_s27f ww1_s28T } in
                                                                  join {
-                                                                   $j4_Xn [Dmd=1C1(!P(L,L))]
+                                                                   $j4_Xn [Dmd=1C(1,!P(L,L))]
                                                                      :: GHC.Prim.Int#
                                                                         -> (# GHC.Prim.State#
                                                                                 GHC.Prim.RealWorld,
@@ -1490,7 +1490,7 @@ encodeUtf8BuilderEscaped
                                                                                ww1_s28T y3_Xo } in
                                                                        joinrec {
                                                                          $s$wgo_s2b3 [Occ=LoopBreaker,
-                                                                                      Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                      Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                            :: GHC.Prim.State#
                                                                                 GHC.Prim.RealWorld
                                                                               -> GHC.Prim.Addr#
@@ -1573,7 +1573,7 @@ encodeUtf8BuilderEscaped
                                                                                           ipv2_a26M #) ->
                                                                                      joinrec {
                                                                                        $s$wgo1_s2bd [Occ=LoopBreaker,
-                                                                                                     Dmd=LCS(C1(C1(!P(L,L))))]
+                                                                                                     Dmd=LC(S,C(1,C(1,!P(L,L))))]
                                                                                          :: GHC.Prim.State#
                                                                                               GHC.Prim.RealWorld
                                                                                             -> GHC.Prim.Addr#
@@ -1666,7 +1666,7 @@ encodeUtf8BuilderEscaped
                                                                                            };
                                                                                        $wgo_Xu [InlPrag=[2],
                                                                                                 Occ=LoopBreaker,
-                                                                                                Dmd=SCS(C1(C1(!P(L,L))))]
+                                                                                                Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                                                          :: GHC.Prim.Int#
                                                                                             -> Ptr
                                                                                                  Word8
@@ -1810,7 +1810,7 @@ encodeUtf8BuilderEscaped
                                            $s$wouterLoop_s2bC
                                              ipv_s24F bx4_d22Q ww_s28F eta4_s28I } in
                                      joinrec {
-                                       $s$wgo_s2cO [Occ=LoopBreaker, Dmd=SCS(C1(C1(!P(L,L))))]
+                                       $s$wgo_s2cO [Occ=LoopBreaker, Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                          :: GHC.Prim.State# GHC.Prim.RealWorld
                                             -> GHC.Prim.Addr#
                                             -> GHC.Prim.Int#
@@ -1860,7 +1860,7 @@ encodeUtf8BuilderEscaped
                                                    { (# ipv_a26L, ipv1_a26M #) ->
                                                    joinrec {
                                                      $s$wgo1_s2cY [Occ=LoopBreaker,
-                                                                   Dmd=LCS(C1(C1(!P(L,L))))]
+                                                                   Dmd=LC(S,C(1,C(1,!P(L,L))))]
                                                        :: GHC.Prim.State# GHC.Prim.RealWorld
                                                           -> GHC.Prim.Addr#
                                                           -> GHC.Prim.Int#
@@ -1927,7 +1927,7 @@ encodeUtf8BuilderEscaped
                                                          };
                                                      $wgo_Xd [InlPrag=[2],
                                                               Occ=LoopBreaker,
-                                                              Dmd=SCS(C1(C1(!P(L,L))))]
+                                                              Dmd=SC(S,C(1,C(1,!P(L,L))))]
                                                        :: GHC.Prim.Int#
                                                           -> Ptr Word8
                                                           -> GHC.Prim.State# GHC.Prim.RealWorld

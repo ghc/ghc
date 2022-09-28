@@ -1,6 +1,6 @@
 
 ==================== Strictness signatures ====================
-T21717.g: <SCS(P(ML,ML))>
+T21717.g: <SC(S,P(ML,ML))>
 
 
 
@@ -10,6 +10,6 @@ T21717.g: 1
 
 
 ==================== Strictness signatures ====================
-T21717.g: <SCS(P(ML,ML))>
+T21717.g: <SC(S,P(ML,ML))>
 
 

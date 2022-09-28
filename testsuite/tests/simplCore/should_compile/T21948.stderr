@@ -14,7 +14,7 @@ T21948.nf'1
      -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
 [GblId,
  Arity=5,
- Str=<MC1(A)><MC1(L)><L><1!P(L)><L>,
+ Str=<MC(1,A)><MC(1,L)><L><1!P(L)><L>,
  Cpr=1(, 1),
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
@@ -91,7 +91,7 @@ T21948.nf'1
         [LclId]
         lvl1_s11A = reduce_aBy lvl_s111 } in
       joinrec {
-        $wgo_s11i [InlPrag=[2], Occ=LoopBreaker, Dmd=SCS(C1(!P(L,L)))]
+        $wgo_s11i [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,C(1,!P(L,L)))]
           :: GHC.Prim.Int64#
              -> GHC.Prim.State# GHC.Prim.RealWorld
              -> (# GHC.Prim.State# GHC.Prim.RealWorld, () #)
@@ -114,7 +114,7 @@ T21948.nf'1
 nf' :: forall b a. (b -> ()) -> (a -> b) -> a -> Int64 -> IO ()
 [GblId,
  Arity=5,
- Str=<MC1(A)><MC1(L)><L><1!P(L)><L>,
+ Str=<MC(1,A)><MC(1,L)><L><1!P(L)><L>,
  Cpr=1(, 1),
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

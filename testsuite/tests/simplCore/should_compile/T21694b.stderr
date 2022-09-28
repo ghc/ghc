@@ -65,7 +65,7 @@ f = \ (@p_ax8)
         [LclId[JoinId(0)(Nothing)]]
         exit_X3 = (eta_B0, x_agu, eta1_B1) } in
       joinrec {
-        $wj_sM6 [InlPrag=[2], Occ=LoopBreaker, Dmd=SCS(!P(L,L,L))]
+        $wj_sM6 [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,!P(L,L,L))]
           :: GHC.Prim.Int# -> (a_aL5, p_ax8, c_aL6)
         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<1L>, Unf=OtherCon []]
         $wj_sM6 (ww_sM3 :: GHC.Prim.Int#)

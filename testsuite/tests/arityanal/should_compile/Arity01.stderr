@@ -41,7 +41,7 @@ F1.s1 = GHC.Num.Integer.IS 3#
 
 -- RHS size: {terms: 8, types: 7, coercions: 0, joins: 0/0}
 s :: forall {t1} {t2}. Num t1 => (t1 -> t2) -> t2
-[GblId, Arity=2, Str=<MP(A,A,A,A,A,A,1C1(L))><1C1(L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 60] 50 0}]
+[GblId, Arity=2, Str=<MP(A,A,A,A,A,A,1C(1,L))><1C(1,L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [30 60] 50 0}]
 s = \ (@t) (@t1) ($dNum :: Num t) (f :: t -> t1) -> f (fromInteger @t $dNum F1.s1)
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}

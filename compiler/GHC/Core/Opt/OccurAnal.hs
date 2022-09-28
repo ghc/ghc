@@ -2368,7 +2368,7 @@ A:  Saturated applications:  eg   f e1 .. en
     f's strictness signature into e1 .. en, but /only/ if n is enough to
     saturate the strictness signature. A strictness signature like
 
-          f :: C1(C1(L))LS
+          f :: C(1,C(1,L))LS
 
     means that *if f is applied to three arguments* then it will guarantee to
     call its first argument at most once, and to call the result of that at

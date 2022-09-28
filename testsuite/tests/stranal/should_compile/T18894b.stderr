@@ -38,7 +38,7 @@ expensive
       (case n of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 1#) }, case n of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 2#) })
 
 -- RHS size: {terms: 20, types: 11, coercions: 0, joins: 0/0}
-eta [InlPrag=NOINLINE, Dmd=UCU(CS(U))] :: Int -> Int -> Int
+eta [InlPrag=NOINLINE, Dmd=UCU(C(S,U))] :: Int -> Int -> Int
 [LclId,
  Arity=1,
  Str=<UP(U)>,
@@ -130,7 +130,7 @@ $wexpensive
          case w of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 2#) } #)
 
 -- RHS size: {terms: 19, types: 12, coercions: 0, joins: 0/0}
-eta [InlPrag=NOINLINE, Dmd=UCU(CS(U))] :: Int -> Int -> Int
+eta [InlPrag=NOINLINE, Dmd=UCU(C(S,U))] :: Int -> Int -> Int
 [LclId,
  Arity=2,
  Str=<MP(U)><SP(U)>,

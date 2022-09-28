@@ -46,7 +46,7 @@ $s$wsFoldr1_szbtK
              (Let1627448493XsSym4 x_azbOM m_azbFg ipv_szbwN ipv_szbwO))
 [LclId,
  Arity=4,
- Str=<L,U><L,U><L,U><C(S(C(S))),C(U(1*C1(U)))>]
+ Str=<L,U><L,U><L,U><C(S(C(S))),C(U(1*C(1,U)))>]
 $s$wsFoldr1_szbtK =
   \ (@ (m_azbFg :: a_afdP_azbON))
     (@ (x_azbOM :: TyFun
@@ -123,7 +123,7 @@ $s$wsFoldr1_szbtK =
                            <a_afdP_azbON>_N <a_afdP_azbON>_N <Apply x_azbOM m_XzbGe>_N
                          :: Sing (Apply x_azbOM m_XzbGe)
                             ~R# R:Sing(->)f (Apply x_azbOM m_XzbGe))
-            of wild_X3X { SLambda ds_XzbBr [Dmd=<C(S),1*C1(U)>] ->
+            of wild_X3X { SLambda ds_XzbBr [Dmd=<C(S),1*C(1,U)>] ->
             (ds_XzbBr
                @ (Foldr1 x_azbOM (ipv_XzbyV : ipv_XzbxR))
                (($wsFoldr1_szbuc

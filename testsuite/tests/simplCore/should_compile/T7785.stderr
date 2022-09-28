@@ -75,7 +75,7 @@ shared
      f Int -> f Int
 [LclIdX,
  Arity=2,
- Str=<UC1(CS(CS(U)))><U>,
+ Str=<UC(1,C(S,C(S,U)))><U>,
  RULES: "SPEC shared @[]"
             forall ($dMyFunctor_sHz :: MyFunctor [])
                    (irred_sHA :: Domain [] Int).
@@ -83,7 +83,7 @@ shared
               = $sshared_sHD]
 shared
   = \ (@(f_ayh :: * -> *))
-      ($dMyFunctor_ayi [Dmd=UC1(CS(CS(U)))] :: MyFunctor f_ayh)
+      ($dMyFunctor_ayi [Dmd=UC(1,C(S,C(S,U)))] :: MyFunctor f_ayh)
       (irred_ayj :: Domain f_ayh Int) ->
       let {
         f_sHy :: f_ayh Int -> f_ayh Int

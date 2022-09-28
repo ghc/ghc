@@ -14,7 +14,7 @@ T19890.foo1 [InlPrag=INLINABLE, Occ=LoopBreaker]
   :: forall {a}. Num a => Bool -> a -> a
 [GblId,
  Arity=3,
- Str=<SP(SCS(C1(L)),A,A,A,A,A,L)><1L><L>,
+ Str=<SP(SC(S,C(1,L)),A,A,A,A,A,L)><1L><L>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 70 0] 230 0
          Tmpl= \ (@a_aye)
@@ -42,7 +42,7 @@ end Rec }
 foo :: forall a. Num a => Bool -> Wombat a
 [GblId,
  Arity=3,
- Str=<SP(SCS(C1(L)),A,A,A,A,A,L)><1L><L>,
+ Str=<SP(SC(S,C(1,L)),A,A,A,A,A,L)><1L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]

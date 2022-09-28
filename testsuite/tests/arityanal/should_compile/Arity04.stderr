@@ -15,7 +15,7 @@ f4g = \ (y :: Int) -> case y of { GHC.Types.I# x -> GHC.Types.I# (GHC.Prim.+# x 
 Rec {
 -- RHS size: {terms: 17, types: 6, coercions: 0, joins: 0/0}
 f4h [Occ=LoopBreaker] :: (Int -> Int) -> Int -> Int
-[GblId, Arity=2, Str=<1C1(L)><1P(SL)>, Unf=OtherCon []]
+[GblId, Arity=2, Str=<1C(1,L)><1P(SL)>, Unf=OtherCon []]
 f4h
   = \ (f :: Int -> Int) (x :: Int) ->
       case x of wild { GHC.Types.I# x1 ->

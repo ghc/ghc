@@ -11,7 +11,7 @@ f pr = (case pr of (a,b) -> a /= b, True)
 g :: Int -> (Bool, Bool)
 g x = let y = let z = odd x in (z,z) in f y
 
--- | Should put demand `LCS(C1(L))` on `f`, telling us that whenever `myfoldl`
+-- | Should put demand `LC(S,C(1,L))` on `f`, telling us that whenever `myfoldl`
 -- evaluates `f`, it will also call it at least once (`S`) and then always call
 -- it with a second argument (`1`).
 -- This in turn allows us to eta-reduce `(\a b -> f a b)` to `f` (not tested,
@@ -20,7 +20,7 @@ myfoldl :: (a -> b -> a) -> a -> [b] -> a
 myfoldl f z [] = z
 myfoldl f !z (x:xs) = myfoldl (\a b -> f a b) (f z x) xs
 
--- | Should put demand `LCL(C1(L))` on `f`
+-- | Should put demand `LC(L,C(1,L))` on `f`
 blah :: (Int -> Int -> Int) -> Int -> Int
 blah f 0 = 0
 blah f 1 = f `seq` 1

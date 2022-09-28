@@ -24,7 +24,7 @@ go :: forall t a. (Num a, Num t, Eq a, Eq t) => t -> a -> a
 [GblId,
  Arity=6,
  Caf=NoCafRefs,
- Str=<L,U(C(C1(U)),A,C(C1(U)),A,A,A,1*C1(U))><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,U(C(C1(U)),A)><S(C(C(S))L),U(C(C1(U)),A)><L,U><L,U>,
+ Str=<L,U(C(C(1,U)),A,C(C(1,U)),A,A,A,1*C(1,U))><L,U(A,C(C(1,U)),A,A,A,A,C(U))><L,U(C(C(1,U)),A)><S(C(C(S))L),U(C(C(1,U)),A)><L,U><L,U>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [150 150 30 60 0 0] 610 0}]

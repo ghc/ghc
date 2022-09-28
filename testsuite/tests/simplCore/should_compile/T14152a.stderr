@@ -124,7 +124,7 @@ T14152.go1
 go :: forall t a. (Num a, Num t, Eq a, Eq t) => t -> a -> a
 [GblId,
  Arity=6,
- Str=<L,U(C(C1(U)),A,C(C1(U)),A,A,A,1*C1(U))><L,U(A,C(C1(U)),A,A,A,A,C(U))><L,U(C(C1(U)),A)><S(C(C(S))L),U(C(C1(U)),A)><L,U><L,U>,
+ Str=<L,U(C(C(1,U)),A,C(C(1,U)),A,A,A,1*C(1,U))><L,U(A,C(C(1,U)),A,A,A,A,C(U))><L,U(C(C(1,U)),A)><S(C(C(S))L),U(C(C(1,U)),A)><L,U><L,U>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [120 120 30 60 0 0] 582 0}]
@@ -156,7 +156,7 @@ go
           = case == @ t_a2l3 $dEq1_a2la ds_d2md lvl14_s2o2 of {
               False ->
                 join {
-                  $j_s2py [Dmd=<C(S),1*C1(U)>] :: Maybe a_a2i4 -> a_a2i4
+                  $j_s2py [Dmd=<C(S),1*C(1,U)>] :: Maybe a_a2i4 -> a_a2i4
                   [LclId[JoinId(1)], Arity=1, Str=<S,U>, Unf=OtherCon []]
                   $j_s2py (thunk_s2nZ [OS=OneShot] :: Maybe a_a2i4)
                     = let {

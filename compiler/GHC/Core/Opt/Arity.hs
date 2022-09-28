@@ -977,7 +977,7 @@ idDemandOneShots bndr
     call_arity = idCallArity bndr
 
     dmd_one_shots :: [OneShotInfo]
-    -- If the demand info is Cx(C1(C1(.))) then we know that an
+    -- If the demand info is C(x,C(1,C(1,.))) then we know that an
     -- application to one arg is also an application to three
     dmd_one_shots = argOneShots (idDemandInfo bndr)
 
@@ -1086,10 +1086,10 @@ uses info from both Call Arity and demand analysis.
 We may have /more/ call demands from the calls than we have lambdas
 in the binding.  E.g.
     let f1 = \x. g x x in ...(f1 p q r)...
-    -- Demand on f1 is Cx(C1(C1(L)))
+    -- Demand on f1 is C(x,C(1,C(1,L)))
 
     let f2 = \y. error y in ...(f2 p q r)...
-    -- Demand on f2 is Cx(C1(C1(L)))
+    -- Demand on f2 is C(x,C(1,C(1,L)))
 
 In both these cases we can eta expand f1 and f2 to arity 3.
 But /only/ for called-once demands.  Suppose we had
@@ -2522,11 +2522,11 @@ Let's take the simple example of #21261, where `g` (actually, `f`) is defined as
   g c = c 1 2 + c 3 4
 Then this is how the pieces are put together:
 
-  * Demand analysis infers `<SCS(C1(L))>` for `g`'s demand signature
+  * Demand analysis infers `<SC(S,C(1,L))>` for `g`'s demand signature
 
   * When the Simplifier next simplifies the argument in `g (\x y. e x y)`, it
     looks up the *evaluation context* of the argument in the form of the
-    sub-demand `CS(C1(L))` and stores it in the 'SimplCont'.
+    sub-demand `C(S,C(1,L))` and stores it in the 'SimplCont'.
     (Why does it drop the outer evaluation cardinality of the demand, `S`?
     Because it's irrelevant! When we simplify an expression, we do so under the
     assumption that it is currently under evaluation.)
@@ -2535,7 +2535,7 @@ Then this is how the pieces are put together:
 
   * Then the simplifier takes apart the lambda and simplifies the lambda group
     and then calls 'tryEtaReduce' when rebuilding the lambda, passing the
-    evaluation context `CS(C1(L))` along. Then we simply peel off 2 call
+    evaluation context `C(S,C(1,L))` along. Then we simply peel off 2 call
     sub-demands `Cn` and see whether all of the n's (here: `S=C_1N` and
     `1=C_11`) were strict. And strict they are! Thus, it will eta-reduce
     `\x y. e x y` to `e`.

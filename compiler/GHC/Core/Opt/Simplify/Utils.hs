@@ -566,10 +566,10 @@ contEvalContext k = case k of
   ApplyToTy{sc_cont=k}       -> contEvalContext k
     --  ApplyToVal{sc_cont=k}      -> mkCalledOnceDmd $ contEvalContext k
     -- Not 100% sure that's correct, . Here's an example:
-    --   f (e x) and f :: <SCS(C1(L))>
+    --   f (e x) and f :: <SC(S,C(1,L))>
     -- then what is the evaluation context of 'e' when we simplify it? E.g.,
-    --   simpl e (ApplyToVal x $ Stop "CS(C1(L))")
-    -- then it *should* be "C1(CS(C1(L))", so perhaps correct after all.
+    --   simpl e (ApplyToVal x $ Stop "C(S,C(1,L))")
+    -- then it *should* be "C(1,C(S,C(1,L))", so perhaps correct after all.
     -- But for now we just panic:
   ApplyToVal{}               -> pprPanic "contEvalContext" (ppr k)
   StrictArg{sc_fun=fun_info} -> subDemandIfEvaluated (head (ai_dmds fun_info))

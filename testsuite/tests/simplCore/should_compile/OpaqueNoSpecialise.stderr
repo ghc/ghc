@@ -12,7 +12,7 @@ lvl = GHC.Num.Integer.IS 1#
 f [InlPrag=OPAQUE] :: forall {t}. Num t => t -> [t]
 [GblId,
  Arity=2,
- Str=<LP(A,LCS(C1(L)),A,A,A,A,MC1(L))><L>,
+ Str=<LP(A,LC(S,C(1,L)),A,A,A,A,MC(1,L))><L>,
  Unf=OtherCon []]
 f = \ (@t) ($dNum :: Num t) (eta :: t) ->
       let {
@@ -20,7 +20,7 @@ f = \ (@t) ($dNum :: Num t) (eta :: t) ->
         [LclId]
         lvl1 = fromInteger @t $dNum lvl } in
       letrec {
-        f1 [Occ=LoopBreaker, Dmd=SCS(L)] :: t -> [t]
+        f1 [Occ=LoopBreaker, Dmd=SC(S,L)] :: t -> [t]
         [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
         f1 = \ (x :: t) -> GHC.Types.: @t x (f1 (- @t $dNum x lvl1)); } in
       f1 eta

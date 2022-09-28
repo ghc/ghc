@@ -157,7 +157,7 @@ Consider a CoreProgram like
 where e* are exported, but n* are not.
 Intuitively, we can see that @n1@ is only ever called with two arguments
 and in every call site, the first component of the result of the call
-is evaluated. Thus, we'd like it to have idDemandInfo @LCL(CM(P(1L,A))@.
+is evaluated. Thus, we'd like it to have idDemandInfo @LC(L,C(M,P(1L,A))@.
 NB: We may *not* give e2 a similar annotation, because it is exported and
 external callers might use it in arbitrary ways, expressed by 'topDmd'.
 This can then be exploited by Nested CPR and eta-expansion,
@@ -671,7 +671,7 @@ There are several wrinkles:
   values are evaluated even if they are not used. Example from #9254:
      f :: (() -> (# Int#, () #)) -> ()
           -- Strictness signature is
-          --    <1C1(P(A,1L))>
+          --    <1C(1,P(A,1L))>
           -- I.e. calls k, but discards first component of result
      f k = case k () of (# _, r #) -> r
 
@@ -1176,10 +1176,10 @@ look a little puzzling.  E.g.
     (     B -> j 4             )
     (     C -> \y. blah        )
 
-The entire thing is in a C1(L) context, so j's strictness signature
+The entire thing is in a C(1,L) context, so j's strictness signature
 will be    [A]b
 meaning one absent argument, returns bottom.  That seems odd because
-there's a \y inside.  But it's right because when consumed in a C1(L)
+there's a \y inside.  But it's right because when consumed in a C(1,L)
 context the RHS of the join point is indeed bottom.
 
 Note [Demand signatures are computed for a threshold arity based on idArity]
@@ -1222,12 +1222,12 @@ analyse for more incoming arguments than idArity. Example:
       then \y -> ... y ...
       else \y -> ... y ...
 
-We'd analyse `f` under a unary call demand C1(L), corresponding to idArity
+We'd analyse `f` under a unary call demand C(1,L), corresponding to idArity
 being 1. That's enough to look under the manifest lambda and find out how a
 unary call would use `x`, but not enough to look into the lambdas in the if
 branches.
 
-On the other hand, if we analysed for call demand C1(C1(L)), we'd get useful
+On the other hand, if we analysed for call demand C(1,C(1,L)), we'd get useful
 strictness info for `y` (and more precise info on `x`) and possibly CPR
 information, but
 
@@ -2335,7 +2335,7 @@ generator, though.  So:
    This way, correct information finds its way into the module interface
    (strictness signatures!) and the code generator (single-entry thunks!)
 
-Note that, in contrast, the single-call information (CM(..)) /can/ be
+Note that, in contrast, the single-call information (C(M,..)) /can/ be
 relied upon, as the simplifier tends to be very careful about not
 duplicating actual function calls.
 

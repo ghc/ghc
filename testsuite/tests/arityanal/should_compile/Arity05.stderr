@@ -9,12 +9,12 @@ F5.f5g1 = GHC.Num.Integer.IS 1#
 
 -- RHS size: {terms: 12, types: 9, coercions: 0, joins: 0/0}
 f5g :: forall {a} {t}. Num a => (t -> a) -> t -> a
-[GblId, Arity=3, Str=<SP(1C1(C1(L)),A,A,A,A,A,MC1(L))><MC1(L)><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 60 0] 90 0}]
+[GblId, Arity=3, Str=<SP(1C(1,C(1,L)),A,A,A,A,A,MC(1,L))><MC(1,L)><L>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [60 60 0] 90 0}]
 f5g = \ (@a) (@t) ($dNum :: Num a) (h :: t -> a) (z :: t) -> + @a $dNum (h z) (fromInteger @a $dNum F5.f5g1)
 
 -- RHS size: {terms: 17, types: 12, coercions: 0, joins: 0/0}
 f5h :: forall {a} {t}. Num a => (t -> a) -> t -> (t -> a) -> a
-[GblId, Arity=4, Str=<SP(SCS(C1(L)),A,A,A,A,A,MC1(L))><MC1(L)><L><MC1(L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [90 60 0 60] 150 0}]
+[GblId, Arity=4, Str=<SP(SC(S,C(1,L)),A,A,A,A,A,MC(1,L))><MC(1,L)><L><MC(1,L)>, Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True, Guidance=IF_ARGS [90 60 0 60] 150 0}]
 f5h = \ (@a) (@t) ($dNum :: Num a) (f :: t -> a) (x :: t) (g :: t -> a) -> + @a $dNum (f x) (+ @a $dNum (g x) (fromInteger @a $dNum F5.f5g1))
 
 -- RHS size: {terms: 4, types: 1, coercions: 0, joins: 0/0}

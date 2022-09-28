@@ -5,7 +5,7 @@ import GHC.Exts
 f :: (() -> (# Int#, () #)) -> ()
 {-# NOINLINE f #-}
 -- Strictness signature was (7.8.2)
---    <C(S(LS)), 1*C1(U(A,1*U()))>
+--    <C(S(LS)), 1*C(1,U(A,1*U()))>
 -- I.e. calls k, but discards first component of result
 f k = case k () of (# _, r #) -> r
 

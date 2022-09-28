@@ -26,7 +26,7 @@ T13156.f
 [GblId,
  Arity=2,
  Caf=NoCafRefs,
- Str=<C(S),1*C1(U)><L,U>,
+ Str=<C(S),1*C(1,U)><L,U>,
  Unf=OtherCon []]
 T13156.f =
   \ (@ p)

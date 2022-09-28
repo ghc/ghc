@@ -618,10 +618,10 @@ multCard (Card a) (Card b)
 --   * 'fst' puts demand @1P(1L,A)@ on its argument: It evaluates the argument
 --     pair strictly and the first component strictly, but no nested info
 --     beyond that (@L@). Its second argument is not used at all.
---   * '$' puts demand @1C1(L)@ on its first argument: It calls (@C@) the
+--   * '$' puts demand @1C(1,L)@ on its first argument: It calls (@C@) the
 --     argument function with one argument, exactly once (@1@). No info
 --     on how the result of that call is evaluated (@L@).
---   * 'maybe' puts demand @MCM(L)@ on its second argument: It evaluates
+--   * 'maybe' puts demand @MC(M,L)@ on its second argument: It evaluates
 --     the argument function at most once ((M)aybe) and calls it once when
 --     it is evaluated.
 --   * @fst p + fst p@ puts demand @SP(SL,A)@ on @p@: It's @1P(1L,A)@
@@ -960,22 +960,22 @@ isWeakDmd dmd@(n :* _) = not (isStrict n) && is_plus_idem_dmd dmd
 evalDmd :: Demand
 evalDmd = C_1N :* topSubDmd
 
--- | First argument of 'GHC.Exts.maskAsyncExceptions#': @1C1(L)@.
+-- | First argument of 'GHC.Exts.maskAsyncExceptions#': @1C(1,L)@.
 -- Called exactly once.
 strictOnceApply1Dmd :: Demand
 strictOnceApply1Dmd = C_11 :* mkCall C_11 topSubDmd
 
--- | First argument of 'GHC.Exts.atomically#': @SCS(L)@.
+-- | First argument of 'GHC.Exts.atomically#': @SC(S,L)@.
 -- Called at least once, possibly many times.
 strictManyApply1Dmd :: Demand
 strictManyApply1Dmd = C_1N :* mkCall C_1N topSubDmd
 
--- | First argument of catch#: @MCM(L)@.
+-- | First argument of catch#: @MC(M,L)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
 lazyApply1Dmd = C_01 :* mkCall C_01 topSubDmd
 
--- | Second argument of catch#: @MCM(C1(L))@.
+-- | Second argument of catch#: @MC(M,C(1,L))@.
 -- Calls its arg lazily, but then applies it exactly once to an additional argument.
 lazyApply2Dmd :: Demand
 lazyApply2Dmd = C_01 :* mkCall C_01 (mkCall C_11 topSubDmd)
@@ -1017,11 +1017,11 @@ strictifyDictDmd _  dmd = dmd
 lazifyDmd :: Demand -> Demand
 lazifyDmd = multDmd C_01
 
--- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C1(d)@.
+-- | Wraps the 'SubDemand' with a one-shot call demand: @d@ -> @C(1,d)@.
 mkCalledOnceDmd :: SubDemand -> SubDemand
 mkCalledOnceDmd sd = mkCall C_11 sd
 
--- | @mkCalledOnceDmds n d@ returns @C1(C1...(C1 d))@ where there are @n@ @C1@'s.
+-- | @mkCalledOnceDmds n d@ returns @C(1,C1...C(1,d))@ where there are @n@ @C1@'s.
 mkCalledOnceDmds :: Arity -> SubDemand -> SubDemand
 mkCalledOnceDmds arity sd = iterate mkCalledOnceDmd sd !! arity
 
@@ -1080,9 +1080,9 @@ argOneShots (_ :* sd) = go sd
     go _    = []
 
 -- |
--- @saturatedByOneShots n CM(CM(...)) = True@
+-- @saturatedByOneShots n C(M,C(M,...)) = True@
 --   <=>
--- There are at least n nested CM(..) calls.
+-- There are at least n nested C(M,..) calls.
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots _ AbsDmd    = True
@@ -1195,8 +1195,8 @@ Premise:
     myfoldl f z [] = z
     myfoldl f !z (x:xs) = myfoldl (\a b -> f a b) (f z x) xs
     ```
-    Here, we can give `f` a demand of `LCS(C1(L))` (instead of the lazier
-    `LCL(C1(L))`) which says "Whenever `f` is evaluated (lazily), it is also
+    Here, we can give `f` a demand of `LC(S,C(1,L))` (instead of the lazier
+    `LC(L,C(1,L))`) which says "Whenever `f` is evaluated (lazily), it is also
     called with two arguments".
     And Note [Eta reduction based on evaluation context] means we can rewrite
     `\a b -> f a b` to `f` in the call site of `myfoldl`. Nice!
@@ -1214,7 +1214,7 @@ Premise:
         2 -> snd (g m)
         _ -> uncurry (+) (g m)
     ```
-    We want to give `g` the demand `MC1(P(MP(L),1P(L)))`, so we see that in each
+    We want to give `g` the demand `MC(1,P(MP(L),1P(L)))`, so we see that in each
     call site of `g`, we are strict in the second component of the returned
     pair. That in turn means that Nested CPR can unbox the result of the
     division even though it might throw.
@@ -1226,14 +1226,14 @@ Note [SubDemand denotes at least one evaluation].
 
 We *could* do better when both Demands are lazy already. Example
   (fun 1, fun 2)
-Both args put Demand SCS(L) on `fun`. The lazy pair arg context lazifies
-this to LCS(L), and it would be reasonable to report this Demand on `fun` for
+Both args put Demand SC(S,L) on `fun`. The lazy pair arg context lazifies
+this to LC(S,L), and it would be reasonable to report this Demand on `fun` for
 the entire pair expression; after all, `fun` is called whenever it is evaluated.
 But our definition of `plusDmd` will compute
-  LCS(L) + LCS(L) = (L+L)(M*CS(L) + M*CS(L)) = L(CL(L)) = L
+  LC(S,L) + LC(S,L) = (L+L)(M*C(S,L) + M*C(S,L)) = L(C(L,L)) = L
 Which is clearly less precise.
 Doing better here could mean to `lub` when both demands are lazy, e.g.,
-  LCS(L) + LCS(L) = (L+L)(CS(L) ⊔ CS(L)) = L(CS(L))
+  LC(S,L) + LC(S,L) = (L+L)(C(S,L) ⊔ C(S,L)) = L(C(S,L))
 Indeed that's what we did at one point between 9.4 and 9.6 after !7599, but it
 means that we need a function `lubPlusSubDmd` that lubs on lower bounds but
 plus'es upper bounds, implying maintenance challenges and complicated
@@ -1250,7 +1250,7 @@ pair, their interpretation is quite different. Example:
   f x = fst x * snd x
     -- f :: <SP(1L,1L)>, because 1P(1L,A)+1P(A,1L) = SP(1L,1L)
   g x = fst (x 1) * snd (x 2)
-    -- g :: <SCS(P(ML,ML))>, because 1C1(P(1L,A))+1C1(P(A,1L)) = SCS(P(ML,ML))
+    -- g :: <SC(S,P(ML,ML))>, because 1C(1,P(1L,A))+1C(1,P(A,1L)) = SC(S,P(ML,ML))
 
 The point about this example is that both demands have P(A,1L)/P(1L,A) as
 sub-expressions, but when these sub-demands occur
@@ -1296,21 +1296,21 @@ not matter for strictness analysis/lower bounds, thus it would be sound to use
 
 Note [mkCall and plusSubDmd]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never rewrite a strict, non-absent Call sub-demand like CS(S) to a
+We never rewrite a strict, non-absent Call sub-demand like C(S,S) to a
 polymorphic sub-demand like S, otherwise #21085 strikes. Consider the
 following inequality (would also for M and 1 instead of L and S, but we forbid
 such Polys):
 
-  L+S = S = CS(S) < CS(L) = CL(L)+CS(S)
+  L+S = S = C(S,S) < C(S,L) = C(L,L)+C(S,S)
 
-Note that L=CL(L). If we also had S=CS(S), we'd be in trouble: Now
+Note that L=C(L,L). If we also had S=C(S,S), we'd be in trouble: Now
 `plusSubDmd` would no longer maintain the equality relation on sub-demands,
 much less monotonicity. Bad!
 
 Clearly, `n <= Cn(n)` is unproblematic, as is `n >= Cn(n)` for any `n`
-except 1 and S. But `CS(S) >= S` would mean trouble, because then we'd get
-the problematic `CS(S) = S`. We have just established that `S < CS(S)`!
-As such, the rewrite CS(S) to S is anti-monotone and we forbid it, first
+except 1 and S. But `C(S,S) >= S` would mean trouble, because then we'd get
+the problematic `C(S,S) = S`. We have just established that `S < C(S,S)`!
+As such, the rewrite C(S,S) to S is anti-monotone and we forbid it, first
 and foremost in `mkCall` (which is the only place that rewrites Cn(n) to n).
 
 Crisis and #21085 averted!
@@ -1320,7 +1320,7 @@ Note [Computing one-shot info]
 Consider a call
     f (\pqr. e1) (\xyz. e2) e3
 where f has usage signature
-    <CM(CL(CM(L)))><CM(L)><L>
+    <C(M,C(L,C(M,L)))><C(M,L)><L>
 Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
@@ -1371,7 +1371,7 @@ We then tried to store the Boxity in 'Demand' instead, for these reasons:
 
 But then we regressed in T7837 (grep #19871 for boring specifics), which needed
 to transfer an ambient unboxed *demand* on a dictionary selector to its argument
-dictionary, via a 'Call' sub-demand `C1(sd)`, as
+dictionary, via a 'Call' sub-demand `C(1,sd)`, as
 Note [Demand transformer for a dictionary selector] explains. Annoyingly,
 the boxity info has to be stored in the *sub-demand* `sd`! There's no demand
 to store the boxity in. So we bit the bullet and now we store Boxity in
@@ -1919,16 +1919,16 @@ Consider
 this has a strictness signature of
   <1L><1L>b
 meaning that we don't know what happens when we call err in weaker contexts than
-C1(C1(L)), like @err `seq` ()@ (1A) and @err 1 `seq` ()@ (CS(A)). We
+C(1,C(1,L)), like @err `seq` ()@ (1A) and @err 1 `seq` ()@ (C(S,A)). We
 may not unleash the botDiv, hence assume topDiv. Of course, in
-@err 1 2 `seq` ()@ the incoming demand CS(CS(A)) is strong enough and we see
+@err 1 2 `seq` ()@ the incoming demand C(S,C(S,A)) is strong enough and we see
 that the expression diverges.
 
 Now consider a function
   f g = g 1 2
-with signature <C1(C1(L))>, and the expression
+with signature <C(1,C(1,L))>, and the expression
   f err `seq` ()
-now f puts a strictness demand of C1(C1(L)) onto its argument, which is unleashed
+now f puts a strictness demand of C(1,C(1,L)) onto its argument, which is unleashed
 on err via the App rule. In contrast to weaker head strictness, this demand is
 strong enough to unleash err's signature and hence we see that the whole
 expression diverges!
@@ -1988,7 +1988,7 @@ Note [Demands from unsaturated function calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a demand transformer d1 -> d2 -> r for f.
 If a sufficiently detailed demand is fed into this transformer,
-e.g <C1(C1(L))> arising from "f x1 x2" in a strict, use-once context,
+e.g <C(1,C(1,L))> arising from "f x1 x2" in a strict, use-once context,
 then d1 and d2 is precisely the demand unleashed onto x1 and x2 (similar for
 the free variable environment) and furthermore the result information r is the
 one we want to use.
@@ -1996,9 +1996,9 @@ one we want to use.
 An anonymous lambda is also an unsaturated function all (needs one argument,
 none given), so this applies to that case as well.
 
-But the demand fed into f might be less than C1(C1(L)). Then we have to
+But the demand fed into f might be less than C(1,C(1,L)). Then we have to
 'multDmdType' the announced demand type. Examples:
- * Not strict enough, e.g. C1(C1(L)):
+ * Not strict enough, e.g. C(1,C(1,L)):
    - We have to multiply all argument and free variable demands with C_01,
      zapping strictness.
    - We have to multiply divergence with C_01. If r says that f Diverges for sure,
@@ -2006,7 +2006,7 @@ But the demand fed into f might be less than C1(C1(L)). Then we have to
      be passed. If the demand is lower, we may just as well converge.
      If we were tracking definite convergence, than that would still hold under
      a weaker demand than expected by the demand transformer.
- * Used more than once, e.g. CS(C1(L)):
+ * Used more than once, e.g. C(S,C(1,L)):
    - Multiply with C_1N. Even if f puts a used-once demand on any of its argument
      or free variables, if we call f multiple times, we may evaluate this
      argument or free variable multiple times.
@@ -2076,8 +2076,8 @@ yields a more precise demand type:
     incoming demand   |  demand type
     --------------------------------
     1A                  |  <L><L>{}
-    C1(C1(L))           |  <1P(L)><L>{}
-    C1(C1(1P(1P(L),A))) |  <1P(A)><A>{}
+    C(1,C(1,L))           |  <1P(L)><L>{}
+    C(1,C(1,1P(1P(L),A))) |  <1P(A)><A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
 the arity of the incoming call demand due to the anonymous lambda.
@@ -2305,7 +2305,7 @@ element). Here's the diagram:
   SubDemand --F_f----> DmdType
 
 With
-  α(C1(C1(_))) = >=2
+  α(C(1,C(1,_))) = >=2
   α(_)         =  <2
   γ(ty)        =  ty
 and F_f being the abstract transformer of f's RHS and f_f being the abstracted
@@ -2335,7 +2335,7 @@ f d v = op_sel (sc_sel d) v
 
 What do we learn about the demand on 'd'?  Alas, we see only the
 demand from 'sc_sel', namely '1P(1,A)'.  We /don't/ see that 'd' really has a nested
-demand '1P(1P(A,1C1(1)),A)'.  On the other hand, if we inlined the two selectors
+demand '1P(1P(A,1C(1,1)),A)'.  On the other hand, if we inlined the two selectors
 we'd have
 
 f d x = case d of (x,_) ->
@@ -2582,7 +2582,7 @@ instance Outputable Demand where
 -- | See Note [Demand notation]
 instance Outputable SubDemand where
   ppr (Poly b n)  = pp_boxity b <> ppr n
-  ppr (Call n sd) = char 'C' <> ppr n <> parens (ppr sd)
+  ppr (Call n sd) = char 'C' <> parens (ppr n <> comma <> ppr sd)
   ppr (Prod b ds) = pp_boxity b <> char 'P' <> parens (fields ds)
     where
       fields []     = empty

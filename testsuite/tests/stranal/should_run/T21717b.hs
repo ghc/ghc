@@ -2,7 +2,7 @@ import System.Environment
 import GHC.Exts
 
 g :: (Int -> (Int, Int)) -> Int
--- Should *not* infer strictness SCS(P(SL,SL)) for h
+-- Should *not* infer strictness SC(S,P(SL,SL)) for h
 -- Otherwise `main` could use CbV on the error exprs below
 g h = fst (h 0) + snd (h 1)
 {-# NOINLINE g #-}

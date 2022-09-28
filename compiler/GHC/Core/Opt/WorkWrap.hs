@@ -925,15 +925,15 @@ attach OneShot annotations to the worker’s lambda binders.
 Example:
 
   -- Original function
-  f [Demand=<L,1*C1(U)>] :: (a,a) -> a
+  f [Demand=<L,1*C(1,U)>] :: (a,a) -> a
   f = \p -> ...
 
   -- Wrapper
-  f [Demand=<L,1*C1(U)>] :: a -> a -> a
+  f [Demand=<L,1*C(1,U)>] :: a -> a -> a
   f = \p -> case p of (a,b) -> $wf a b
 
   -- Worker
-  $wf [Demand=<L,1*C1(C1(U))>] :: Int -> Int
+  $wf [Demand=<L,1*C(1,C(1,U))>] :: Int -> Int
   $wf = \a b -> ...
 
 We need to check whether the original function is called once, with
@@ -942,7 +942,7 @@ takes the arity of the original function (resp. the wrapper) and the demand on
 the original function.
 
 The demand on the worker is then calculated using mkWorkerDemand, and always of
-the form [Demand=<L,1*(C1(...(C1(U))))>]
+the form [Demand=<L,1*(C(1,...(C(1,U))))>]
 
 Note [Thunk splitting]
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -1,6 +1,6 @@
 
 ==================== Strictness signatures ====================
-T21081.blah: <LCL(C1(L))><1!P(1L)>
+T21081.blah: <LC(L,C(1,L))><1!P(1L)>
 T21081.blurg: <S!P(SL)>
 T21081.blurg2: <S!P(SL)>
 T21081.call1: <MP(1L,A)>
@@ -9,7 +9,7 @@ T21081.call3: <LP(ML,A)>
 T21081.call4: <MP(1L,A)><1A>
 T21081.call5: <MP(1L,A)><MA>
 T21081.call6: <MP(1L,A)><MP(1L,A)><1L>
-T21081.do_blah: <LCS(C1(L))>
+T21081.do_blah: <LC(S,C(1,L))>
 T21081.f: <MP(SL,SL)>
 T21081.fst': <1!P(1L,A)>
 T21081.g: <ML>
@@ -17,7 +17,7 @@ T21081.h: <MP(ML,ML)><1!P(1L)>
 T21081.h2: <L><S!P(SL)>
 T21081.i: <1L><1L><MP(ML,ML)>
 T21081.j: <S!P(1L,1L)>
-T21081.myfoldl: <LCS(C1(L))><1L><1L>
+T21081.myfoldl: <LC(S,C(1,L))><1L><1L>
 T21081.snd': <1!P(A,1L)>
 
 
@@ -46,7 +46,7 @@ T21081.snd':
 
 
 ==================== Strictness signatures ====================
-T21081.blah: <LCL(C1(L))><1!P(1L)>
+T21081.blah: <LC(L,C(1,L))><1!P(1L)>
 T21081.blurg: <1!P(SL)>
 T21081.blurg2: <1!P(SL)>
 T21081.call1: <MP(1L,A)>
@@ -55,7 +55,7 @@ T21081.call3: <LP(ML,A)>
 T21081.call4: <MP(1L,A)><1A>
 T21081.call5: <MP(1L,A)><MA>
 T21081.call6: <MP(1L,A)><MP(1L,A)><1L>
-T21081.do_blah: <LCS(C1(L))>
+T21081.do_blah: <LC(S,C(1,L))>
 T21081.f: <MP(SL,SL)>
 T21081.fst': <1!P(1L,A)>
 T21081.g: <ML>
@@ -63,7 +63,7 @@ T21081.h: <MP(ML,ML)><1!P(1L)>
 T21081.h2: <L><1!P(SL)>
 T21081.i: <1L><1L><MP(ML,ML)>
 T21081.j: <1!P(1L,1L)>
-T21081.myfoldl: <LCS(C1(L))><1L><1L>
+T21081.myfoldl: <LC(S,C(1,L))><1L><1L>
 T21081.snd': <1!P(A,1L)>
 
 

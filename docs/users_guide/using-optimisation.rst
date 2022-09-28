@@ -1354,7 +1354,7 @@ by saying ``-fno-wombat``.
 
         sd   ::= card                     polymorphic sub-demand, card at every level
               |  P(d,d,..)                product sub-demand
-              |  Ccard(sd)                call sub-demand
+              |  C(card,sd)               call sub-demand
 
     For example, ``fst`` is strict in its argument, and also in the first
     component of the argument.  It will not evaluate the argument's second
@@ -1414,14 +1414,14 @@ by saying ``-fno-wombat``.
         maybe n _ Nothing  = n
         maybe _ s (Just a) = s a
 
-    We give it demand signature ``<L><MCM(L)><1L>``.  The ``CM(L)`` is a *call
+    We give it demand signature ``<L><MC(M,L)><1L>``.  The ``C(M,L)`` is a *call
     sub-demand* that says "Called at most once, where the result is used
     according to ``L``". The expression ``f `seq` f 1`` puts ``f`` under
-    demand ``SC1(L)`` and serves as an example where the upper bound on
+    demand ``SC(1,L)`` and serves as an example where the upper bound on
     evaluation cardinality doesn't coincide with that of the call cardinality.
 
     Cardinality is always relative to the enclosing call cardinality, so
-    ``g 1 2 + g 3 4`` puts ``g`` under demand ``SCS(C1(L))``, which says
+    ``g 1 2 + g 3 4`` puts ``g`` under demand ``SC(S,C(1,L))``, which says
     "called multiple times (``S``), but every time it is called with one
     argument, it is applied exactly once to another argument (``1``)".
 
