@@ -740,7 +740,7 @@ stackApply s fun_name nargs nvars =
                ] (appS "throw" [toJExpr ("panic: " <> fun_name <> ", unexpected closure type: ") + (entryClosureType c)])
              ]
 
-    funExact c = popSkip' 1 (reverse $ take nvars jsRegsFromR2) <> returnS c
+    funExact c = popSkip 1 (reverse $ take nvars jsRegsFromR2) <> returnS c
     stackArgs = map (\x -> stack .! (sp - toJExpr x)) [1..nvars]
 
     papCase :: JExpr -> JStat
