@@ -216,6 +216,7 @@ link' :: GhcjsEnv
       -> IO LinkResult
 link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
   = do
+      let ue_state = ue_units $ unit_env
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
       let rootSelector | Just baseMod <- lcGenBase lc_cfg =
@@ -236,29 +237,51 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRo
         BaseFile _file -> panic "support for base bundle not implemented" -- loadBase file
         BaseState b   -> return b
 
-      let (rdPkgs, rds) = rtsDeps pkgs
+      let (rts_wired_units, rts_wired_functions) = rtsDeps pkgs
 
-      -- c   <- newMVar M.empty
       let preload_units = preloadUnits (ue_units unit_env)
 
-      let pkgs' :: [UnitId]
-          pkgs'       = nub (preload_units ++ rdPkgs ++ reverse objPkgs ++ reverse pkgs)
-          pkgs''      = filter (not . isAlreadyLinked base) pkgs'
-          ue_state    = ue_units $ unit_env
-          -- pkgLibPaths = mkPkgLibPaths pkgs'
-          -- getPkgLibPaths :: UnitId -> ([FilePath],[String])
-          -- getPkgLibPaths k = fromMaybe ([],[]) (lookup k pkgLibPaths)
-      (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs')
-      pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state pkgs'')
+      -- all the units we want to link together, without their dependencies
+      let root_units = nub (preload_units ++ rts_wired_units ++ reverse objPkgs ++ reverse pkgs)
+
+      -- all the units we want to link together, including their dependencies
+      let all_units = transitive_units root_units
+
+          -- compute transitive unit dependencies
+          transitive_units = reverse . transitive_units_ []
+          transitive_units_ xs = \case
+            []     -> xs
+            (u:us)
+              | u == mainUnitId -> transitive_units_ (u:xs) us
+              | otherwise       -> case lookupUnitId ue_state u of
+                  Nothing -> unit_not_found u
+                  Just d  ->
+                    let deps         = unitDepends d
+                        is_new_dep x = x `notElem` xs
+                        new_deps     = filter is_new_dep deps
+                    in case new_deps of
+                      [] -> transitive_units_ (u:xs) us
+                      ds -> transitive_units_ xs     (ds ++ (u:us))
+
+          unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
+
+      let
+        -- units that weren't already linked in the base bundle
+        -- (or all of them, if no base bundle)
+        bundle_diff = filter (not . is_in_bundle) all_units
+        is_in_bundle uid = uid `elem` basePkgs base
+
+      (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
+      pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state bundle_diff)
 
       when (logVerbAtLeast logger 2) $
         logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
 
       -- compute dependencies
-      let dep_units      = pkgs' ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
+      let dep_units      = all_units ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
           dep_map        = objDepsMap `M.union` archsDepsMap
           excluded_units = baseUnits base -- already linked units
-          dep_fun_roots  = roots `S.union` rds `S.union` extraStaticDeps
+          dep_fun_roots  = roots `S.union` rts_wired_functions `S.union` extraStaticDeps
           dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
 
       all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
@@ -270,8 +293,8 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRo
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
 
-      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rds code
-      let base'  = Base compactorState (nub $ basePkgs base ++ pkgs'')
+      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rts_wired_functions code
+      let base'  = Base compactorState (nub $ basePkgs base ++ bundle_diff)
                          (all_deps `S.union` baseUnits base)
 
       return $ LinkResult
@@ -285,8 +308,6 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRo
         , linkBase        = base'
         }
   where
-    isAlreadyLinked :: Base -> UnitId -> Bool
-    isAlreadyLinked b uid = uid `elem` basePkgs b
 
     mkPkgLibPaths :: UnitState -> [UnitId] -> [(UnitId, ([FilePath],[String]))]
     mkPkgLibPaths u_st
@@ -613,8 +634,7 @@ readArObject ar_state mod ar_file = do
   go_entries entries
 
 
--- | A helper function to read system dependencies that are hardcoded via a file
--- path.
+-- | A helper function to read system dependencies that are hardcoded
 diffDeps
   :: [UnitId]                    -- ^ Packages that are already Linked
   -> ([UnitId], Set ExportedFun) -- ^ New units and functions to link
@@ -714,13 +734,6 @@ mkJsSymbol mod s = mkFastString $ mconcat
   , zEncodeString (unitModuleString mod <> ".")
   , zString (zEncodeFS s)
   ]
-
-{- | read a static dependencies specification and give the roots
-
-     if dependencies come from a versioned (non-hardwired) package
-     that is linked multiple times, then the returned dependencies
-     will all come from the same version, but it's undefined which one.
- -}
 
 -- | read all dependency data from the to-be-linked files
 loadObjDeps :: [LinkedObj] -- ^ object files to link
