@@ -260,7 +260,9 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRo
                         is_new_dep x = x `notElem` xs
                         new_deps     = filter is_new_dep deps
                     in case new_deps of
-                      [] -> transitive_units_ (u:xs) us
+                      []
+                        | u `elem` xs -> transitive_units_ xs us
+                        | otherwise   -> transitive_units_ (u:xs) us
                       ds -> transitive_units_ xs     (ds ++ (u:us))
 
           unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
