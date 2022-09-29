@@ -75,7 +75,7 @@ module GHC.Tc.Gen.HsType (
         funAppCtxt, addTyConFlavCtxt
    ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Hs
 import GHC.Rename.Utils
@@ -130,7 +130,8 @@ import GHC.Data.Maybe
 import GHC.Data.Bag( unitBag )
 
 import Data.Function ( on )
-import Data.List.NonEmpty as NE( NonEmpty(..), nubBy )
+import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.List ( find, mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
@@ -3169,19 +3170,19 @@ tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed
 -- Push level, capture constraints, and emit an implication constraint.
 -- The implication constraint has a ForAllSkol ic_info,
 --   so that it is subject to a telescope test.
-tcExplicitTKBndrsX skol_mode bndrs thing_inside
-  | null bndrs
-  = do { res <- thing_inside
+tcExplicitTKBndrsX skol_mode bndrs thing_inside = case nonEmpty bndrs of
+    Nothing -> do
+       { res <- thing_inside
        ; return ([], res) }
 
-  | otherwise
-  = do { (tclvl, wanted, (skol_tvs, res))
+    Just bndrs1 -> do
+       { (tclvl, wanted, (skol_tvs, res))
              <- pushLevelAndCaptureConstraints $
                 bindExplicitTKBndrsX skol_mode bndrs $
                 thing_inside
 
        -- Set up SkolemInfo for telescope test
-       ; let bndr_1 = head bndrs; bndr_n = last bndrs
+       ; let bndr_1 = NE.head bndrs1; bndr_n = NE.last bndrs1
        ; skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn  (unLoc <$> bndrs)))
          -- Notice that we use ForAllSkol here, ignoring the enclosing
          -- skol_info unlike tcImplicitTKBndrs, because the bad-telescope

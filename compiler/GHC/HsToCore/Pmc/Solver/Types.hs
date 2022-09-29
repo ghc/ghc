@@ -348,9 +348,9 @@ isDataConSolution _                                             = False
 lookupSolution :: Nabla -> Id -> Maybe PmAltConApp
 lookupSolution nabla x = case vi_pos (lookupVarInfo (nabla_tm_st nabla) x) of
   []                                         -> Nothing
-  pos
+  pos@(x:_)
     | Just sol <- find isDataConSolution pos -> Just sol
-    | otherwise                              -> Just (head pos)
+    | otherwise                              -> Just x
 
 --------------------------------------------------------------------------------
 -- The rest is just providing an IR for (overloaded!) literals and AltCons that

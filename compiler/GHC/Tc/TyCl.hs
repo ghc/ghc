@@ -4669,7 +4669,7 @@ checkValidClass cls
         -- Test case: rep-poly/RepPolyClassMethod.
 
         ; unless constrained_class_methods $
-          mapM_ check_constraint (tail (cls_pred:op_theta))
+          mapM_ check_constraint op_theta
 
         ; check_dm ctxt sel_id cls_pred tau2 dm
         }

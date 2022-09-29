@@ -1403,7 +1403,6 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
   where
     data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
-    one_constr = n_cons == 1
 
         ------------ gfoldl
     gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
@@ -1420,11 +1419,11 @@ gen_Data_binds loc (DerivInstTys{dit_rep_tc = rep_tc})
         ------------ gunfold
     gunfold_bind = mkSimpleGeneratedFunBind loc
                      gunfold_RDR
-                     [k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat]
+                     [k_Pat, z_Pat, if n_cons == 1 then nlWildPat else c_Pat]
                      gunfold_rhs
 
     gunfold_rhs
-        | one_constr = mk_unfold_rhs (head data_cons)   -- No need for case
+        | [con] <- data_cons = mk_unfold_rhs con   -- No need for case
         | otherwise  = nlHsCase (nlHsVar conIndex_RDR `nlHsApp` c_Expr)
                                 (map gunfold_alt data_cons)
 

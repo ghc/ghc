@@ -1221,15 +1221,15 @@ buildSRTChain
         ( [CmmDeclSRTs] -- The SRT object(s)
         , SRTEntry      -- label to use in the info table
         )
-buildSRTChain _ [] = panic "buildSRT: empty"
 buildSRTChain profile cafSet =
   case splitAt mAX_SRT_SIZE cafSet of
+    ([], _) -> panic "buildSRT: empty"
     (these, []) -> do
       (decl,lbl) <- buildSRT profile these
       return ([decl], lbl)
-    (these,those) -> do
-      (rest, rest_lbl) <- buildSRTChain profile (head these : those)
-      (decl,lbl) <- buildSRT profile (rest_lbl : tail these)
+    (this:these,those) -> do
+      (rest, rest_lbl) <- buildSRTChain profile (this : those)
+      (decl,lbl) <- buildSRT profile (rest_lbl : these)
       return (decl:rest, lbl)
   where
     mAX_SRT_SIZE = 16

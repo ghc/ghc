@@ -30,7 +30,7 @@ module GHC.Rename.Names (
         ImportDeclUsage
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -755,7 +755,7 @@ extendGlobalRdrEnvRn avails new_fixities
     -- This establishes INVARIANT 1 of GlobalRdrEnvs
     add_gre env gre
       | not (null dups)    -- Same OccName defined twice
-      = do { addDupDeclErr (gre : dups); return env }
+      = do { addDupDeclErr (gre :| dups); return env }
 
       | otherwise
       = return (extendGlobalRdrEnv env gre)
@@ -2153,10 +2153,9 @@ badImportItemErr iface decl_spec ie avails
 illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
 
-addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
-addDupDeclErr [] = panic "addDupDeclErr: empty list"
-addDupDeclErr gres@(gre : _)
-  = addErrAt (getSrcSpan (last sorted_names)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
+addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
+addDupDeclErr gres@(gre :| _)
+  = addErrAt (getSrcSpan (NE.last sorted_names)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     -- Report the error at the later location
     vcat [text "Multiple declarations of" <+>
              quotes (ppr (greOccName gre)),
@@ -2164,11 +2163,11 @@ addDupDeclErr gres@(gre : _)
              -- latter might not be in scope in the RdrEnv and so will
              -- be printed qualified.
           text "Declared at:" <+>
-                   vcat (map (ppr . nameSrcLoc) sorted_names)]
+                   vcat (toList $ ppr . nameSrcLoc <$> sorted_names)]
   where
     sorted_names =
-      sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
-             (map greMangledName gres)
+      NE.sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
+             (fmap greMangledName gres)
 
 
 

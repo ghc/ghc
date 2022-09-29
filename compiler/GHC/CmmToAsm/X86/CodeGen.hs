@@ -3353,9 +3353,9 @@ invertCondBranches (Just cfg) keep bs =
     invert bs
   where
     invert :: [NatBasicBlock Instr] -> [NatBasicBlock Instr]
-    invert ((BasicBlock lbl1 ins@(_:_:_xs)):b2@(BasicBlock lbl2 _):bs)
+    invert (BasicBlock lbl1 ins:b2@(BasicBlock lbl2 _):bs)
       | --pprTrace "Block" (ppr lbl1) True,
-        (jmp1,jmp2) <- last2 ins
+        Just (jmp1,jmp2) <- last2 ins
       , JXX cond1 target1 <- jmp1
       , target1 == lbl2
       --, pprTrace "CutChance" (ppr b1) True

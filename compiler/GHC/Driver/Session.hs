@@ -4467,12 +4467,11 @@ setCallerCcFilters arg =
 
 setMainIs :: String -> DynP ()
 setMainIs arg
-  | not (null main_fn) && isLower (head main_fn)
-     -- The arg looked like "Foo.Bar.baz"
+  | x:_ <- main_fn, isLower x  -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d { mainFunIs = Just main_fn,
                     mainModuleNameIs = mkModuleName main_mod }
 
-  | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
+  | x:_ <- arg, isUpper x  -- The arg looked like "Foo" or "Foo.Bar"
   = upd $ \d -> d { mainModuleNameIs = mkModuleName arg }
 
   | otherwise                   -- The arg looked like "baz"

@@ -22,7 +22,7 @@ module GHC.Core.Opt.OccurAnal (
     zapLambdaBndrs
   ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Core
 import GHC.Core.FVs
@@ -59,6 +59,8 @@ import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL, mapAccumR)
+import Data.List.NonEmpty (NonEmpty (..), nonEmpty)
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -3129,7 +3131,7 @@ tagNonRecBinder :: TopLevelFlag           -- At top level?
 tagNonRecBinder lvl usage binder
  = let
      occ     = lookupDetails usage binder
-     will_be_join = decideJoinPointHood lvl usage [binder]
+     will_be_join = decideJoinPointHood lvl usage (NE.singleton binder)
      occ'    | will_be_join = -- must already be marked AlwaysTailCalled
                               assert (isAlwaysTailCalled occ) occ
              | otherwise    = markNonTail occ
@@ -3154,7 +3156,11 @@ tagRecBinders lvl body_uds details_s
      -- 1. Determine join-point-hood of whole group, as determined by
      --    the *unadjusted* usage details
      unadj_uds     = foldr andUDs body_uds rhs_udss
-     will_be_joins = decideJoinPointHood lvl unadj_uds bndrs
+
+     -- This is only used in `mb_join_arity`, to adjust each `Details` in `details_s`, thus,
+     -- when `bndrs` is non-empty. So, we only write `maybe False` as `decideJoinPointHood`
+     -- takes a `NonEmpty CoreBndr`; the default value `False` won't affect program behavior.
+     will_be_joins = maybe False (decideJoinPointHood lvl unadj_uds) (nonEmpty bndrs)
 
      -- 2. Adjust usage details of each RHS, taking into account the
      --    join-point-hood decision
@@ -3210,12 +3216,12 @@ setBinderOcc occ_info bndr
 --
 -- See Note [Invariants on join points] in "GHC.Core".
 decideJoinPointHood :: TopLevelFlag -> UsageDetails
-                    -> [CoreBndr]
+                    -> NonEmpty CoreBndr
                     -> Bool
 decideJoinPointHood TopLevel _ _
   = False
 decideJoinPointHood NotTopLevel usage bndrs
-  | isJoinId (head bndrs)
+  | isJoinId (NE.head bndrs)
   = warnPprTrace (not all_ok)
                  "OccurAnal failed to rediscover join point(s)" (ppr bndrs)
                  all_ok

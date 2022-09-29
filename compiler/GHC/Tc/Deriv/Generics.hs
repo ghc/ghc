@@ -21,7 +21,7 @@ module GHC.Tc.Deriv.Generics
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Hs
 import GHC.Core.Type
@@ -62,6 +62,9 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
+import qualified Data.List as Partial (last)
+import Data.List.NonEmpty (nonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust)
 
 {-
@@ -291,9 +294,9 @@ canDoGenerics1 dit@(DerivInstTys{dit_rep_tc = rep_tc}) =
       , ft_var = caseVar, ft_co_var = caseVar
 
       -- (component_0,component_1,...,component_n)
-      , ft_tup = \_ components -> if any _ccdg1_hasParam (init components)
-                                  then bmbad con
-                                  else foldr bmplus bmzero components
+      , ft_tup = \_ components -> case nonEmpty components of
+            Just components' | any _ccdg1_hasParam (NE.init components') -> bmbad con
+            _ -> foldr bmplus bmzero components
 
       -- (dom -> rng), where the head of ty is not a tuple tycon
       , ft_fun = \dom rng -> -- cf #8516
@@ -344,7 +347,7 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
   where
     dc_inst_univs = dataConInstUnivs dc tc_args
     last_dc_inst_univ = assert (not (null dc_inst_univs)) $
-                        last dc_inst_univs
+                        Partial.last dc_inst_univs
 
 
 -- Bindings for the Generic instance

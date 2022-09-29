@@ -9,7 +9,7 @@ module GHC.Unit.Module.Env
    , partitionModuleEnv
    , moduleEnvKeys, moduleEnvElts, moduleEnvToList
    , unitModuleEnv, isEmptyModuleEnv
-   , extendModuleEnvWith, filterModuleEnv
+   , extendModuleEnvWith, filterModuleEnv, mapMaybeModuleEnv
 
      -- * ModuleName mappings
    , ModuleNameEnv, DModuleNameEnv
@@ -93,6 +93,10 @@ instance Ord NDModule where
 filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
 filterModuleEnv f (ModuleEnv e) =
   ModuleEnv (Map.filterWithKey (f . unNDModule) e)
+
+mapMaybeModuleEnv :: (Module -> a -> Maybe b) -> ModuleEnv a -> ModuleEnv b
+mapMaybeModuleEnv f (ModuleEnv e) =
+  ModuleEnv (Map.mapMaybeWithKey (f . unNDModule) e)
 
 elemModuleEnv :: Module -> ModuleEnv a -> Bool
 elemModuleEnv m (ModuleEnv e) = Map.member (NDModule m) e

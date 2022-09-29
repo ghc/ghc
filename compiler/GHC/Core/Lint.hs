@@ -3196,8 +3196,8 @@ dumpLoc (UnfoldingOf b)
 dumpLoc (BodyOfLetRec [])
   = (noSrcLoc, text "In body of a letrec with no binders")
 
-dumpLoc (BodyOfLetRec bs@(_:_))
-  = ( getSrcLoc (head bs), text "In the body of letrec with binders" <+> pp_binders bs)
+dumpLoc (BodyOfLetRec bs@(b:_))
+  = ( getSrcLoc b, text "In the body of letrec with binders" <+> pp_binders bs)
 
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)

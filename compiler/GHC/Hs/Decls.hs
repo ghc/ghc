@@ -487,10 +487,11 @@ pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
  = hsep [pprLHsContext context, pp_tyvars tyvars]
   where
     pp_tyvars (varl:varsr)
-      | fixity == Infix && length varsr > 1
+      | fixity == Infix, varr:varsr'@(_:_) <- varsr
+         -- If varsr has at least 2 elements, parenthesize.
          = hsep [char '(',ppr (unLoc varl), pprInfixOcc (unLoc thing)
-                , (ppr.unLoc) (head varsr), char ')'
-                , hsep (map (ppr.unLoc) (tail varsr))]
+                , (ppr.unLoc) varr, char ')'
+                , hsep (map (ppr.unLoc) varsr')]
       | fixity == Infix
          = hsep [ppr (unLoc varl), pprInfixOcc (unLoc thing)
          , hsep (map (ppr.unLoc) varsr)]

@@ -70,6 +70,7 @@ import GHC.Unit.External
 
 import Data.Bifunctor ( bimap )
 import Data.Dynamic
+import Data.Maybe (listToMaybe)
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
@@ -328,8 +329,8 @@ getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleE
 getFirstAnnotations deserialize guts
   = bimap mod name <$> getAnnotations deserialize guts
   where
-    mod = mapModuleEnv head . filterModuleEnv (const $ not . null)
-    name = mapNameEnv head . filterNameEnv (not . null)
+    mod = mapMaybeModuleEnv (const listToMaybe)
+    name = mapMaybeNameEnv listToMaybe
 
 {-
 Note [Annotations]

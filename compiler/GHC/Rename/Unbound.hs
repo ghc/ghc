@@ -328,8 +328,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
       | otherwise                             = True
     where
       hpt_uniques = map fst (udfmToList hpt)
-      is_last_loaded_mod _ []         = False
-      is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
+      is_last_loaded_mod modnam uniqs = lastMaybe uniqs == Just (getUnique modnam)
       glob_mods = nub [ mod
                      | gre <- globalRdrEnvElts global_env
                      , (mod, _) <- qualsInScope gre

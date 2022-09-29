@@ -32,7 +32,7 @@ module GHC.Core.InstEnv (
         isOverlappable, isOverlapping, isIncoherent
     ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Tc.Utils.TcType -- InstEnv is really part of the type checker,
               -- and depends on TcType in many ways
@@ -50,6 +50,8 @@ import GHC.Core.Unify
 import GHC.Types.Basic
 import GHC.Types.Id
 import Data.Data        ( Data )
+import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe       ( isJust )
 
 import GHC.Utils.Outputable
@@ -280,16 +282,18 @@ mkLocalInstance dfun oflag tvs cls tys
 
     -- See Note [When exactly is an instance decl an orphan?]
     orph | is_local cls_name   = NotOrphan (nameOccName cls_name)
-         | all notOrphan mb_ns = assert (not (null mb_ns)) $ head mb_ns
+         | all notOrphan mb_ns = NE.head mb_ns
          | otherwise           = IsOrphan
 
     notOrphan NotOrphan{} = True
     notOrphan _ = False
 
-    mb_ns :: [IsOrphan]    -- One for each fundep; a locally-defined name
-                           -- that is not in the "determined" arguments
-    mb_ns | null fds   = [choose_one arg_names]
-          | otherwise  = map do_one fds
+    mb_ns :: NonEmpty IsOrphan
+    -- One for each fundep; a locally-defined name
+    -- that is not in the "determined" arguments
+    mb_ns = case nonEmpty fds of
+        Nothing -> NE.singleton (choose_one arg_names)
+        Just fds -> fmap do_one fds
     do_one (_ltvs, rtvs) = choose_one [ns | (tv,ns) <- cls_tvs `zip` arg_names
                                             , not (tv `elem` rtvs)]
 

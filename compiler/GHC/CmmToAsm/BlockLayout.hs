@@ -13,7 +13,7 @@ module GHC.CmmToAsm.BlockLayout
     ( sequenceTop, backendMaintainsCfg)
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Platform
 
@@ -42,6 +42,9 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.List (sortOn, sortBy, nub)
+import qualified Data.List as Partial (head, tail)
+import Data.List.NonEmpty (nonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Foldable (toList)
 import qualified Data.Set as Set
 import Data.STRef
@@ -354,7 +357,7 @@ chainToBlocks (BlockChain blks) = fromOL blks
 breakChainAt :: BlockId -> BlockChain
              -> (BlockChain,BlockChain)
 breakChainAt bid (BlockChain blks)
-    | not (bid == head rblks)
+    | not (bid == Partial.head rblks)
     = panic "Block not in chain"
     | otherwise
     = (BlockChain (toOL lblks),
@@ -493,7 +496,7 @@ mergeChains edges chains
         merge :: forall s. [CfgEdge] -> LabelMap (Point s BlockChain) -> ST s BlockChain
         merge [] chains = do
             chains' <- mapM find =<< (nub <$> (mapM repr $ mapElems chains)) :: ST s [BlockChain]
-            return $ foldl' chainConcat (head chains') (tail chains')
+            return $ foldl' chainConcat (Partial.head chains') (Partial.tail chains')
         merge ((CfgEdge from to _):edges) chains
         --   | pprTrace "merge" (ppr (from,to) <> ppr chains) False
         --   = undefined
@@ -593,8 +596,8 @@ buildChains edges blocks
             toChain <- readSTRef toRef
             let newChain = chainConcat fromChain toChain
             ref <- newSTRef newChain
-            let start = head $ takeL 1 newChain
-            let end = head $ takeR 1 newChain
+            let start = Partial.head $ takeL 1 newChain
+            let end = Partial.head $ takeR 1 newChain
             -- chains <- sequence $ mapMap readSTRef chainStarts
             -- pprTraceM "pre-fuse chains:" $ ppr chains
             buildNext
@@ -772,13 +775,13 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
           -> [GenBasicBlock i]
 dropJumps _    [] = []
-dropJumps info ((BasicBlock lbl ins):todo)
-    | not . null $ ins --This can happen because of shortcutting
-    , [dest] <- jumpDestsOfInstr (last ins)
-    , ((BasicBlock nextLbl _) : _) <- todo
+dropJumps info (BasicBlock lbl ins:todo)
+    | Just ins <- nonEmpty ins --This can happen because of shortcutting
+    , [dest] <- jumpDestsOfInstr (NE.last ins)
+    , BasicBlock nextLbl _ : _ <- todo
     , not (mapMember dest info)
     , nextLbl == dest
-    = BasicBlock lbl (init ins) : dropJumps info todo
+    = BasicBlock lbl (NE.init ins) : dropJumps info todo
     | otherwise
     = BasicBlock lbl ins : dropJumps info todo
 
@@ -869,10 +872,10 @@ mkNode edgeWeights block@(BasicBlock id instrs) =
             ((target,info):_)
               | length successors > 2 || edgeWeight info <= 0 -> []
               | otherwise -> [target]
-          | otherwise
-          = case jumpDestsOfInstr (last instrs) of
-                [one] -> [one]
-                _many -> []
+          | Just instr <- lastMaybe instrs
+          , [one] <- jumpDestsOfInstr instr
+          = [one]
+          | otherwise = []
 
 
 seqBlocks :: LabelMap i -> [Node BlockId (GenBasicBlock t1)]

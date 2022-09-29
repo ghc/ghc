@@ -48,7 +48,7 @@ Alternative approaches that did not work properly:
 -}
 module GHC.Parser.PostProcess.Haddock (addHaddockToModule) where
 
-import GHC.Prelude hiding (head, mod)
+import GHC.Prelude hiding (head, init, last, mod, tail)
 
 import GHC.Hs
 
@@ -60,7 +60,8 @@ import Data.Semigroup
 import Data.Foldable
 import Data.Traversable
 import Data.Maybe
-import Data.List.NonEmpty (head)
+import Data.List.NonEmpty (nonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -699,7 +700,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
     case con_decl of
       ConDeclGADT { con_g_ext, con_names, con_dcolon, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
         -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-        con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (head con_names))
+        con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (NE.head con_names))
         con_g_args' <-
           case con_g_args of
             PrefixConGADT ts -> PrefixConGADT <$> addHaddock ts
@@ -873,13 +874,13 @@ addConTrailingDoc l_sep =
                     doc <- selectDocString trailingDocs
                     return $ L l' (con_fld { cd_fld_doc = fmap lexLHsDocString doc })
               con_args' <- case con_args con_decl of
-                x@(PrefixCon _ [])  -> x <$ reportExtraDocs trailingDocs
-                x@(RecCon (L _ [])) -> x <$ reportExtraDocs trailingDocs
-                PrefixCon _ ts -> PrefixCon noTypeArgs <$> mapLastM mk_doc_ty ts
+                x@(PrefixCon _ ts) -> case nonEmpty ts of
+                    Nothing -> x <$ reportExtraDocs trailingDocs
+                    Just ts -> PrefixCon noTypeArgs . toList <$> mapLastM mk_doc_ty ts
+                x@(RecCon (L l_rec flds)) -> case nonEmpty flds of
+                    Nothing -> x <$ reportExtraDocs trailingDocs
+                    Just flds -> RecCon . L l_rec . toList <$> mapLastM mk_doc_fld flds
                 InfixCon t1 t2 -> InfixCon t1 <$> mk_doc_ty t2
-                RecCon (L l_rec flds) -> do
-                  flds' <- mapLastM mk_doc_fld flds
-                  return (RecCon (L l_rec flds'))
               return $ L l (con_decl{ con_args = con_args' })
             else do
               con_doc' <- selectDoc (con_doc con_decl `mcons` (map lexLHsDocString trailingDocs))

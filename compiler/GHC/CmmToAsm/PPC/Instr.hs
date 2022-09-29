@@ -33,7 +33,7 @@ module GHC.CmmToAsm.PPC.Instr
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Cond
@@ -58,6 +58,8 @@ import GHC.Platform
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Types.Unique.Supply
 
+import Data.Foldable (toList)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 
 
@@ -679,10 +681,11 @@ makeFarBranches
         -> [NatBasicBlock Instr]
         -> [NatBasicBlock Instr]
 makeFarBranches info_env blocks
-    | last blockAddresses < nearLimit = blocks
-    | otherwise = zipWith handleBlock blockAddresses blocks
+    | NE.last blockAddresses < nearLimit = blocks
+    | otherwise = zipWith handleBlock blockAddressList blocks
     where
-        blockAddresses = scanl (+) 0 $ map blockLen blocks
+        blockAddresses = NE.scanl (+) 0 $ map blockLen blocks
+        blockAddressList = toList blockAddresses
         blockLen (BasicBlock _ instrs) = length instrs
 
         handleBlock addr (BasicBlock id instrs)
@@ -703,4 +706,4 @@ makeFarBranches info_env blocks
         -- to calculate things exactly
         nearLimit = 7000 - mapSize info_env * maxRetInfoTableSizeW
 
-        blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddresses
+        blockAddressMap = listToUFM $ zip (map blockId blocks) blockAddressList

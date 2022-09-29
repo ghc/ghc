@@ -109,7 +109,7 @@ module GHC.Hs.Utils(
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
   ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Hs.Decls
 import GHC.Hs.Binds
@@ -150,6 +150,8 @@ import Data.Either
 import Data.Foldable ( toList )
 import Data.Function
 import Data.List ( partition, deleteBy )
+import Data.List.NonEmpty ( nonEmpty )
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -220,8 +222,9 @@ mkLamCaseMatchGroup origin lc_variant (L l matches)
 
 mkLocatedList :: Semigroup a
   => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
-mkLocatedList [] = noLocA []
-mkLocatedList ms = L (noAnnSrcSpan $ locA $ combineLocsA (head ms) (last ms)) ms
+mkLocatedList ms = case nonEmpty ms of
+    Nothing -> noLocA []
+    Just ms1 -> L (noAnnSrcSpan $ locA $ combineLocsA (NE.head ms1) (NE.last ms1)) ms
 
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsApp e1 e2 = addCLocAA e1 e2 (HsApp noComments e1 e2)
@@ -656,7 +659,7 @@ missingTupArg ann = Missing ann
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
 mkLHsPatTup []     = noLocA $ TuplePat noExtField [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat noExtField lpats Boxed
+mkLHsPatTup lpats@(lpat:_) = L (getLoc lpat) $ TuplePat noExtField lpats Boxed
 
 -- | The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: IsSrcSpanAnn p a

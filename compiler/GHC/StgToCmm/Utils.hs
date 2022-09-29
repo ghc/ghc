@@ -46,7 +46,7 @@ module GHC.StgToCmm.Utils (
         convertInfoProvMap, cmmInfoTableToInfoProvEnt
   ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Platform
 import GHC.StgToCmm.Monad
@@ -448,8 +448,8 @@ emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
                -> [(Literal, CmmAGraphScoped)] -- Tagged branches
                -> CmmAGraphScoped              -- Default branch (always)
                -> FCode ()                     -- Emit the code
-emitCmmLitSwitch _scrut []       deflt = emit $ fst deflt
-emitCmmLitSwitch scrut  branches deflt = do
+emitCmmLitSwitch _scrut [] deflt = emit $ fst deflt
+emitCmmLitSwitch scrut branches@(branch:_) deflt = do
     scrut' <- assignTemp' scrut
     join_lbl <- newBlockId
     deflt_lbl <- label_code join_lbl deflt
@@ -460,7 +460,7 @@ emitCmmLitSwitch scrut  branches deflt = do
         rep = typeWidth cmm_ty
 
     -- We find the necessary type information in the literals in the branches
-    let (signed,range) = case head branches of
+    let (signed,range) = case branch of
           (LitNumber nt _, _) -> (signed,range)
             where
               signed = litNumIsSigned nt

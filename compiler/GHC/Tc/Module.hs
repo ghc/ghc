@@ -891,9 +891,9 @@ checkHiBootIface'
       | name `elem` boot_dfun_names = return ()
 
         -- Check that the actual module exports the same thing
-      | not (null missing_names)
-      = addErrAt (nameSrcSpan (head missing_names))
-                 (missingBootThing True (head missing_names) "exported by")
+      | missing_name:_ <- missing_names
+      = addErrAt (nameSrcSpan missing_name)
+                 (missingBootThing True missing_name "exported by")
 
         -- If the boot module does not *define* the thing, we are done
         -- (it simply re-exports it, and names match, so nothing further to do)

@@ -1299,10 +1299,11 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes platform a_reps_sizeW
          a_reps_pushed_RAW
-            | null a_reps_pushed_r_to_l || not (isVoidRep (head a_reps_pushed_r_to_l))
-            = panic "GHC.StgToByteCode.generateCCall: missing or invalid World token?"
+            | x:xs <- a_reps_pushed_r_to_l
+            , isVoidRep x
+            = reverse xs
             | otherwise
-            = reverse (tail a_reps_pushed_r_to_l)
+            = panic "GHC.StgToByteCode.generateCCall: missing or invalid World token?"
 
          -- Now: a_reps_pushed_RAW are the reps which are actually on the stack.
          -- push_args is the code to do that.
@@ -1371,9 +1372,8 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
          -- Get the arg reps, zapping the leading Addr# in the dynamic case
          a_reps --  | trace (showSDoc (ppr a_reps_pushed_RAW)) False = error "???"
                 | is_static = a_reps_pushed_RAW
-                | otherwise = if null a_reps_pushed_RAW
-                              then panic "GHC.StgToByteCode.generateCCall: dyn with no args"
-                              else tail a_reps_pushed_RAW
+                | _:xs <- a_reps_pushed_RAW = xs
+                | otherwise = panic "GHC.StgToByteCode.generateCCall: dyn with no args"
 
          -- push the Addr#
          (push_Addr, d_after_Addr)
@@ -1857,11 +1857,9 @@ mkMultiBranch maybe_ncons raw_ways = do
          testEQ NoDiscr    _          = panic "mkMultiBranch NoDiscr"
 
          -- None of these will be needed if there are no non-default alts
-         (init_lo, init_hi)
-            | null notd_ways
-            = panic "mkMultiBranch: awesome foursome"
-            | otherwise
-            = case fst (head notd_ways) of
+         (init_lo, init_hi) = case notd_ways of
+            [] -> panic "mkMultiBranch: awesome foursome"
+            (discr, _):_ -> case discr of
                 DiscrI _ -> ( DiscrI minBound,  DiscrI maxBound )
                 DiscrW _ -> ( DiscrW minBound,  DiscrW maxBound )
                 DiscrF _ -> ( DiscrF minF,      DiscrF maxF )

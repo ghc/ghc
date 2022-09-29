@@ -2152,14 +2152,17 @@ diffBinds :: Bool -> RnEnv2 -> [(Var, CoreExpr)] -> [(Var, CoreExpr)]
 diffBinds top env binds1 = go (length binds1) env binds1
  where go _    env []     []
           = ([], env)
-       go fuel env binds1 binds2
-          -- No binds left to compare? Bail out early.
-          | null binds1 || null binds2
-          = (warn env binds1 binds2, env)
+       go _fuel env [] binds2
+          -- No binds remaining to compare on the left? Bail out early.
+          = (warn env [] binds2, env)
+       go _fuel env binds1 []
+          -- No binds remaining to compare on the right? Bail out early.
+          = (warn env binds1 [], env)
+       go fuel env binds1@(bind1:_) binds2@(_:_)
           -- Iterated over all binds without finding a match? Then
           -- try speculatively matching binders by order.
           | fuel == 0
-          = if not $ env `inRnEnvL` fst (head binds1)
+          = if not $ env `inRnEnvL` fst bind1
             then let env' = uncurry (rnBndrs2 env) $ unzip $
                             zip (sort $ map fst binds1) (sort $ map fst binds2)
                  in go (length binds1) env' binds1 binds2
@@ -2175,7 +2178,6 @@ diffBinds top env binds1 = go (length binds1) env binds1
                 binds1 (binds2l ++ binds2r)
           | otherwise -- No match, so push back (FIXME O(n^2))
           = go (fuel-1) env (binds1++[(bndr1,expr1)]) binds2
-       go _ _ _ _ = panic "diffBinds: impossible" -- GHC isn't smart enough
 
        -- We have tried everything, but couldn't find a good match. So
        -- now we just return the comparison results when we pair up

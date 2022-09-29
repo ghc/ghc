@@ -121,6 +121,7 @@ import GHC.Utils.Ppr       ( Doc, Mode(..) )
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
+import GHC.Utils.Misc (lastMaybe)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -716,7 +717,7 @@ quotes d = sdocOption sdocCanUseUnicode $ \case
       in case str of
          []                   -> Pretty.quotes pp_d
          '\'' : _             -> pp_d
-         _ | '\'' <- last str -> pp_d
+         _ | Just '\'' <- lastMaybe str -> pp_d
            | otherwise        -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc

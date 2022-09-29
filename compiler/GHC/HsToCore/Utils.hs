@@ -821,7 +821,7 @@ is_triv_pat _            = False
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
 mkLHsPatTup []     = noLocA $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = L (getLoc (head lpats)) $
+mkLHsPatTup lpats@(L l _:_)  = L l $
                      mkVanillaTuplePat lpats Boxed
 
 mkVanillaTuplePat :: [LPat GhcTc] -> Boxity -> Pat GhcTc

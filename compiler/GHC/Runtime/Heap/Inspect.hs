@@ -23,7 +23,7 @@ module GHC.Runtime.Heap.Inspect(
      constrClosToName -- exported to use in test T4891
  ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 import GHC.Platform
 
 import GHC.Runtime.Interpreter as GHCi
@@ -67,6 +67,8 @@ import GHC.IO (throwIO)
 import Control.Monad
 import Data.Maybe
 import Data.List ((\\))
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import GHC.Exts
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
@@ -431,13 +433,14 @@ cPprTermBase y =
    --Note pprinting of list terms is not lazy
    ppr_list :: Precedence -> Term -> m SDoc
    ppr_list p (Term{subTerms=[h,t]}) = do
-       let elems      = h : getListTerms t
-           isConsLast = not (termType (last elems) `eqType` termType h)
+       let elems      = h :| getListTerms t
+           elemList   = toList elems
+           isConsLast = not (termType (NE.last elems) `eqType` termType h)
            is_string  = all (isCharTy . ty) elems
            chars = [ chr (fromIntegral w)
-                   | Term{subTerms=[Prim{valRaw=[w]}]} <- elems ]
+                   | Term{subTerms=[Prim{valRaw=[w]}]} <- elemList ]
 
-       print_elems <- mapM (y cons_prec) elems
+       print_elems <- mapM (y cons_prec) elemList
        if is_string
         then return (Ppr.doubleQuotes (Ppr.text chars))
         else if isConsLast

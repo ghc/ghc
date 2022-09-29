@@ -124,7 +124,7 @@ module GHC.Utils.Misc (
         HasDebugCallStack,
     ) where
 
-import GHC.Prelude hiding ( last )
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
@@ -133,7 +133,9 @@ import GHC.Utils.Fingerprint
 
 import Data.Data
 import qualified Data.List as List
-import Data.List.NonEmpty  ( NonEmpty(..), last )
+import qualified Data.List as Partial ( head )
+import Data.List.NonEmpty  ( NonEmpty(..), last, nonEmpty )
+import qualified Data.List.NonEmpty as NE
 
 import GHC.Exts
 import GHC.Stack (HasCallStack)
@@ -522,11 +524,9 @@ changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
 
 -- | Apply an effectful function to the last list element.
--- Assumes a non-empty list (panics otherwise).
-mapLastM :: Functor f => (a -> f a) -> [a] -> f [a]
-mapLastM _ [] = panic "mapLastM: empty list"
-mapLastM f [x] = (\x' -> [x']) <$> f x
-mapLastM f (x:xs) = (x:) <$> mapLastM f xs
+mapLastM :: Functor f => (a -> f a) -> NonEmpty a -> f (NonEmpty a)
+mapLastM f (x:|[]) = NE.singleton <$> f x
+mapLastM f (x0:|x1:xs) = (x0 NE.<|) <$> mapLastM f (x1:|xs)
 
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()
@@ -590,7 +590,7 @@ isSortedBy cmp = sorted
 
 minWith :: Ord b => (a -> b) -> [a] -> a
 minWith get_key xs = assert (not (null xs) )
-                     head (sortWith get_key xs)
+                     Partial.head (sortWith get_key xs)
 
 nubSort :: Ord a => [a] -> [a]
 nubSort = Set.toAscList . Set.fromList
@@ -741,12 +741,10 @@ spanEnd p l = go l [] [] l
           | p x       = go yes (x : rev_yes) rev_no                  xs
           | otherwise = go xs  []            (x : rev_yes ++ rev_no) xs
 
--- | Get the last two elements in a list. Partial!
+-- | Get the last two elements in a list.
 {-# INLINE last2 #-}
-last2 :: [a] -> (a,a)
-last2 = List.foldl' (\(_,x2) x -> (x2,x)) (partialError,partialError)
-  where
-    partialError = panic "last2 - list length less than two"
+last2 :: [a] -> Maybe (a,a)
+last2 = uncurry (liftA2 (,)) . List.foldl' (\(_,x2) x -> (x2, Just x)) (Nothing, Nothing)
 
 lastMaybe :: [a] -> Maybe a
 lastMaybe [] = Nothing
@@ -764,17 +762,12 @@ onJust dflt = flip (maybe dflt)
 -- If you are guaranteed to use both, this will
 -- be more efficient.
 snocView :: [a] -> Maybe ([a],a)
-snocView [] = Nothing
-snocView xs
-    | (xs,x) <- go xs
-    = Just (xs,x)
+snocView = fmap go . nonEmpty
   where
-    go :: [a] -> ([a],a)
-    go [x] = ([],x)
-    go (x:xs)
-        | !(xs',x') <- go xs
-        = (x:xs', x')
-    go [] = error "impossible"
+    go :: NonEmpty a -> ([a],a)
+    go (x:|xs) = case nonEmpty xs of
+        Nothing -> ([],x)
+        Just xs -> case go xs of !(xs', x') -> (x:xs', x')
 
 split :: Char -> String -> [String]
 split c s = case rest of

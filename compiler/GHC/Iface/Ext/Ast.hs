@@ -23,7 +23,7 @@ module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, en
 
 import GHC.Utils.Outputable(ppr)
 
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Types.Avail            ( Avails )
 import GHC.Data.Bag               ( Bag, bagToList )
@@ -71,7 +71,8 @@ import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.Foldable              ( toList )
 import Data.Functor.Identity      ( Identity(..) )
-import Data.List.NonEmpty         ( NonEmpty(..) )
+import Data.List.NonEmpty         ( NonEmpty(..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Void                  ( Void, absurd )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
@@ -334,10 +335,11 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
         Nothing -> pure ()
         Just c -> forM_ (classSCSelIds c) $ \v ->
           addUnlocatedEvBind v (EvidenceVarBind (EvInstBind True (className c)) ModuleScope Nothing)
-    let spanFile file children = case children of
-          [] -> realSrcLocSpan (mkRealSrcLoc file 1 1)
-          _ -> mkRealSrcSpan (realSrcSpanStart $ nodeSpan $ head children)
-                             (realSrcSpanEnd   $ nodeSpan $ last children)
+    let spanFile file children = case nonEmpty children of
+          Nothing -> realSrcLocSpan (mkRealSrcLoc file 1 1)
+          Just children -> mkRealSrcSpan
+              (realSrcSpanStart $ nodeSpan (NE.head children))
+              (realSrcSpanEnd   $ nodeSpan (NE.last children))
 
         flat_asts = concat
           [ tasts
