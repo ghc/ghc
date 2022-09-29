@@ -21,7 +21,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToJS.Linker.Linker
-  ( link
+  ( jsLinkBinary
   )
 where
 
@@ -95,6 +95,8 @@ import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.TmpFs (TmpFs)
 import GHC.Utils.Binary
 import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
+import GHC.Utils.CliOption
+import GHC.Utils.Monad
 
 import GHC.Linker.Static.Utils (exeFileName)
 
@@ -118,6 +120,31 @@ newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.A
 
 emptyArchiveState :: IO ArchiveState
 emptyArchiveState = ArchiveState <$> newIORef M.empty
+
+jsLinkBinary
+  :: JSLinkConfig
+  -> StgToJSConfig
+  -> [FilePath]
+  -> Logger
+  -> TmpFs
+  -> DynFlags
+  -> UnitEnv
+  -> [FilePath]
+  -> [UnitId]
+  -> IO ()
+jsLinkBinary lc_cfg cfg js_srcs logger tmpfs dflags u_env objs dep_pkgs = do
+  -- additional objects to link are passed as FileOption ldInputs...
+  let cmdline_objs = [ f | FileOption _ f <- ldInputs dflags ]
+  -- discriminate JavaScript sources from real object files.
+  (cmdline_js_srcs, cmdline_js_objs) <- partitionM isJsFile cmdline_objs
+  let
+      objs'    = map ObjFile (objs ++ cmdline_js_objs)
+      js_srcs' = js_srcs ++ cmdline_js_srcs
+      isRoot _ = True
+      exe      = jsExeFileName dflags
+
+  env <- newGhcjsEnv
+  void $ link env lc_cfg cfg logger tmpfs dflags u_env exe mempty dep_pkgs objs' js_srcs' isRoot mempty
 
 -- | link and write result to disk (jsexe directory)
 link :: GhcjsEnv
@@ -195,7 +222,7 @@ readShimsArchive ar_file = do
     where
       readEntry :: Ar.ArchiveEntry -> IO (Maybe B.ByteString)
       readEntry ar_entry
-        | isJsFile ar_entry = pure $ Just (Ar.filedata ar_entry)
+        | isJsArchiveEntry ar_entry = pure $ Just (Ar.filedata ar_entry)
         | otherwise = pure Nothing
 
 
@@ -214,7 +241,7 @@ link' :: GhcjsEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
   = do
       let ue_state = ue_units $ unit_env
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
@@ -295,7 +322,7 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles _jsFiles isRo
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
 
-      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rts_wired_functions code
+      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rts_wired_functions code jsFiles
       let base'  = Base compactorState (nub $ basePkgs base ++ bundle_diff)
                          (all_deps `S.union` baseUnits base)
 
@@ -334,8 +361,9 @@ renderLinker
   -> CompactorState
   -> Set ExportedFun
   -> [ModuleCode] -- ^ linked code per module
+  -> [FilePath]   -- ^ additional JS files
   -> IO (FilePath -> IO (), Int64, CompactorState, LinkerStats)
-renderLinker settings cfg renamer_state rtsDeps code = do
+renderLinker settings cfg renamer_state rtsDeps code jsFiles = do
 
   -- extract ModuleCode fields required to make a LinkedUnit
   let code_to_linked_unit c = LinkedUnit
@@ -348,9 +376,12 @@ renderLinker settings cfg renamer_state rtsDeps code = do
   let (renamer_state', compacted, meta) = compact settings cfg renamer_state
                                             (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
                                             (map code_to_linked_unit code)
+
+  js_files_contents <- mconcat <$> mapM BL.readFile jsFiles
+
   let
     render_all fp = do
-      BL.writeFile fp rendered_all
+      BL.writeFile fp (rendered_all <> js_files_contents)
 
     -- render result into JS code
     rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
@@ -776,14 +807,22 @@ loadArchiveDeps' archives = do
               let !deps = objDeps obj
               pure $ Just (deps, ArchiveFile ar_file)
 
--- | Predicate to check that an entry in Ar is a JS payload
-isJsFile :: Ar.ArchiveEntry -> Bool
-isJsFile = checkEntryHeader "//JavaScript"
+-- | Predicate to check that an entry in Ar is a JS source
+isJsArchiveEntry :: Ar.ArchiveEntry -> Bool
+isJsArchiveEntry entry = isJsBS (Ar.filedata entry)
 
--- | Ensure that the entry header to the Archive object is sound.
-checkEntryHeader :: B.ByteString -> Ar.ArchiveEntry -> Bool
-checkEntryHeader header entry =
-  B.take (B.length header) (Ar.filedata entry) == header
+-- | Predicate to check that a file is a JS source
+isJsFile :: FilePath -> IO Bool
+isJsFile fp = isJsBS <$> B.readFile fp
+
+isJsBS :: B.ByteString -> Bool
+isJsBS bs = B.take (B.length jsHeader) bs == jsHeader
+  where
+    -- Header added to JS sources to discriminate them from other object files.
+    -- They all have .o extension but JS sources have this header.
+    jsHeader :: B.ByteString
+    jsHeader = "//JavaScript"
+
 
 
 prepareLoadedDeps :: [(Deps, DepsLocation)]
