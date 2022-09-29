@@ -2,9 +2,10 @@
 {-# LANGUAGE DataKinds, GADTs, RankNTypes, TypeOperators, KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 
 module GHC.Wasm.IR
-  ( WasmIR(..), (<>), pattern WasmIf, wasmReturn
+  ( WasmIR(..), (<>), pattern WasmIf32, wasmReturn
   , BrTableInterval(..), inclusiveInterval
   , brTableLimit
 
@@ -19,6 +20,8 @@ where
 import GHC.Prelude
 
 import Data.Kind
+import Data.Type.Equality
+
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable hiding ((<>))
@@ -45,6 +48,14 @@ data WasmTypeTag :: WasmType -> Type where
   TagI64 :: WasmTypeTag 'I64
   TagF64 :: WasmTypeTag 'F64
 
+instance TestEquality WasmTypeTag where
+  TagI32 `testEquality` TagI32 = Just Refl
+  TagI64 `testEquality` TagI64 = Just Refl
+  TagF32 `testEquality` TagF32 = Just Refl
+  TagF64 `testEquality` TagF64 = Just Refl
+  _ `testEquality` _ = Nothing
+
+
 -- | List of WebAssembly types used to describe the sequence of WebAssembly
 -- values that a block of code may expect on the stack or leave on the stack.
 
@@ -66,58 +77,66 @@ data WasmFunctionType pre post =
 -- | Representation of WebAssembly control flow.
 -- Normally written as
 -- @
---   WasmIR pre post
+--   WasmIR bool pre post
 -- @
--- Type parameter `s` is the type of (unspecified) statements.
--- It might be instantiated with an open Cmm block or with a sequence
--- of Wasm instructions.
--- Parameter `e` is the type of expressions.
+-- Type parameter `bool` represents the Wasm type of Boolean results
 -- Parameter `pre` represents the values that are expected on the
 -- WebAssembly stack when the code runs, and `post` represents
 -- the state of the stack on completion.
 
-data WasmIR :: [WasmType] -> [WasmType] -> Type where
+data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
 
-  WasmPush  :: WasmTypeTag t -> WasmIR stack (t ': stack) -> WasmIR stack (t ': stack)
+  WasmPush  :: WasmTypeTag t -> WasmIR bool stack (t ': stack) -> WasmIR bool stack (t ': stack)
 
   WasmBlock :: WasmFunctionType pre post
-            -> WasmIR pre post
-            -> WasmIR pre post
+            -> WasmIR bool pre post
+            -> WasmIR bool pre post
   WasmLoop  :: WasmFunctionType pre post
-            -> WasmIR pre post
-            -> WasmIR pre post
+            -> WasmIR bool pre post
+            -> WasmIR bool pre post
   WasmIfTop :: WasmFunctionType pre post
-            -> WasmIR pre post
-            -> WasmIR pre post
-            -> WasmIR ('I32 ': pre) post
+            -> WasmIR bool pre post
+            -> WasmIR bool pre post
+            -> WasmIR bool (bool ': pre) post
 
-  WasmBr   :: Int -> WasmIR dropped destination -- not typechecked
-  WasmFallthrough :: WasmIR dropped destination
+  WasmBr   :: Int -> WasmIR bool dropped destination -- not typechecked
+  WasmFallthrough :: WasmIR bool dropped destination
           -- generates no code, but has the same type as a branch
 
   WasmBrTable :: e
               -> BrTableInterval -- for testing
               -> [Int]           -- targets
               -> Int             -- default target
-              -> WasmIR dropped destination
+              -> WasmIR bool dropped destination
               -- invariant: the table interval is contained
               -- within [0 .. pred (length targets)]
   WasmReturnTop :: WasmTypeTag t
-                -> WasmIR (t ': t1star) t2star -- as per type system
+                -> WasmIR bool (t ': t1star) t2star -- as per type system
 
-  WasmActions :: s -> WasmIR stack stack   -- basic block: one entry, one exit
-  WasmSeq :: WasmIR pre mid -> WasmIR mid post -> WasmIR pre post
+  WasmActions :: s -> WasmIR bool stack stack   -- basic block: one entry, one exit
+  WasmSeq :: WasmIR bool pre mid -> WasmIR bool mid post -> WasmIR bool pre post
 
   ----------------------------
 
-  WasmConst :: WasmTypeTag t -> Integer -> WasmIR pre (t : pre)
+  WasmInt   :: WasmTypeTag t -> Integer  -> WasmIR bool pre (t : pre)
+  WasmFloat :: WasmTypeTag t -> Rational -> WasmIR bool pre (t : pre)
 
-  WasmAdd :: WasmTypeTag t -> WasmIR (t : t : stack) (t : stack)
+  WasmAdd  :: WasmTypeTag t -> WasmIR bool (t : t : stack) (t : stack)
+  WasmSub  :: WasmTypeTag t -> WasmIR bool (t : t : stack) (t : stack)
+  WasmS_Ge :: WasmTypeTag t -> WasmIR bool (t : t : stack) (bool : stack)  -- signed >=
 
-  WasmCCall :: SymName -> WasmIR pre post -- completely untyped
-  WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR (t : pre) pre
-  WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR pre (t : pre)
-  WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR (t : pre) pre
+  WasmNot :: WasmTypeTag t -> WasmIR bool (t : stack) (t : stack)  -- bitwise
+
+  -----
+
+  WasmCCall :: SymName -> WasmIR bool pre post -- completely untyped
+  WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR bool (t : pre) pre
+  WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR bool pre (t : pre)
+  WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR bool (t : pre) pre
+
+  WasmLift :: (pre' ~ (t : pre), post' ~ (t : post)) =>
+              WasmTypeTag t -> WasmIR bool pre post -> WasmIR bool pre' post'
+
 
 
 
@@ -146,27 +165,27 @@ inclusiveInterval lo hi
                          BrTableInterval lo count
     | otherwise = panic "GHC.Wasm.ControlFlow: empty interval"
 
-(<>) :: forall pre mid post
-      . WasmIR pre mid
-     -> WasmIR mid post
-     -> WasmIR pre post
+(<>) :: forall bool pre mid post
+      . WasmIR bool pre mid
+     -> WasmIR bool mid post
+     -> WasmIR bool pre post
 (<>) = WasmSeq
 -- N.B. Fallthrough can't be optimized away because of type checking.
 
 
 
 -- Syntactic sugar.
-pattern WasmIf :: WasmFunctionType pre post
-               -> WasmIR pre ('I32 : pre)
-               -> WasmIR pre post
-               -> WasmIR pre post
-               -> WasmIR pre post
+pattern WasmIf32 :: WasmFunctionType pre post
+                 -> WasmIR 'I32 pre ('I32 : pre)
+                 -> WasmIR 'I32 pre post
+                 -> WasmIR 'I32 pre post
+                 -> WasmIR 'I32 pre post
 
-pattern WasmIf ty e t f =
+pattern WasmIf32 ty e t f =
     WasmPush TagI32 e `WasmSeq` WasmIfTop ty t f
 
 -- More syntactic sugar.
-wasmReturn :: WasmTypeTag t -> WasmIR t1star (t : t1star) -> WasmIR t1star t2star
+wasmReturn :: WasmTypeTag t -> WasmIR bool t1star (t : t1star) -> WasmIR bool t1star t2star
 wasmReturn tag e = WasmPush tag e `WasmSeq` WasmReturnTop tag
 
 
