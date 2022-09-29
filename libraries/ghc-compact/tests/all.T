@@ -1,4 +1,7 @@
-setTestOpts(extra_ways(['sanity', 'compacting_gc']))
+setTestOpts(
+  [extra_ways(['sanity', 'compacting_gc']),
+   js_skip # compact API not supported by the JS backend
+  ])
 
 test('compact_simple', normal, compile_and_run, [''])
 test('compact_loop', normal, compile_and_run, [''])
