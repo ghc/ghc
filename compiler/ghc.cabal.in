@@ -664,7 +664,6 @@ Library
         GHC.StgToJS.UnitUtils
         GHC.StgToJS.Utils
         GHC.StgToJS.Linker.Compactor
-        GHC.StgToJS.Linker.Dynamic
         GHC.StgToJS.Linker.Linker
         GHC.StgToJS.Linker.Types
         GHC.StgToJS.Linker.Utils

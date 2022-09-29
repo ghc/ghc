@@ -17,6 +17,8 @@ module GHC.Utils.Monad
         , anyM, allM, orM
         , foldlM, foldlM_, foldrM
         , whenM, unlessM
+        , filterOutM
+        , partitionM
         ) where
 
 -------------------------------------------------------------------------------
@@ -206,6 +208,19 @@ whenM mb thing = do { b <- mb
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = do { cond <- condM
                        ; unless cond acc }
+
+-- | Like 'filterM', only it reverses the sense of the test.
+filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
+filterOutM p =
+  foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
+
+-- | Monadic version of @partition@
+partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a], [a])
+partitionM _ [] = pure ([], [])
+partitionM f (x:xs) = do
+    res <- f x
+    (as,bs) <- partitionM f xs
+    pure ([x | res]++as, [x | not res]++bs)
 
 {- Note [The one-shot state monad trick]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
