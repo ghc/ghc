@@ -809,6 +809,7 @@ Library
         GHC.Wasm.ControlFlow.FromCmm
         GHC.Wasm.ControlFlow.ToAsm
         GHC.Wasm.IR
+        GHC.Wasm.Tx
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Basic

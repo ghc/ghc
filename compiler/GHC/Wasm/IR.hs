@@ -31,9 +31,9 @@ Description : Representation of control-flow portion of the WebAssembly instruct
 
 -- | WebAssembly type of a WebAssembly value that WebAssembly code
 -- could either expect on the evaluation stack or leave on the evaluation
--- stack.  At present we support only 32-bit values.
+-- stack.
 
-data WasmType = I32 | F32
+data WasmType = I32 | F32 | I64 | F64
   deriving (Eq, Show)
 
 
@@ -42,6 +42,8 @@ data WasmType = I32 | F32
 data WasmTypeTag :: WasmType -> Type where
   TagI32 :: WasmTypeTag 'I32
   TagF32 :: WasmTypeTag 'F32
+  TagI64 :: WasmTypeTag 'I64
+  TagF64 :: WasmTypeTag 'F64
 
 -- | List of WebAssembly types used to describe the sequence of WebAssembly
 -- values that a block of code may expect on the stack or leave on the stack.
@@ -106,12 +108,17 @@ data WasmIR :: [WasmType] -> [WasmType] -> Type where
   WasmActions :: s -> WasmIR stack stack   -- basic block: one entry, one exit
   WasmSeq :: WasmIR pre mid -> WasmIR mid post -> WasmIR pre post
 
+  ----------------------------
+
+  WasmConst :: WasmTypeTag t -> Integer -> WasmIR pre (t : pre)
+
   WasmAdd :: WasmTypeTag t -> WasmIR (t : t : stack) (t : stack)
 
   WasmCCall :: SymName -> WasmIR pre post -- completely untyped
   WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR (t : pre) pre
   WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR pre (t : pre)
   WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR (t : pre) pre
+
 
 
 data BrTableInterval
