@@ -524,9 +524,9 @@ Pragmas for pattern synonyms
 ----------------------------
 
 The :ref:`inlinable-pragma`, :ref:`inline-pragma` and :ref:`noinline-pragma` are supported for pattern
-synonyms. For example: ::
+synonyms as of GHC 9.2. For example: ::
 
-    patternInlinablePattern x = [x]
+    pattern InlinablePattern x = [x]
     {-# INLINABLE InlinablePattern #-}
     pattern InlinedPattern x = [x]
     {-# INLINE InlinedPattern #-}
