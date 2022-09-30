@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE LambdaCase          #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -152,21 +153,25 @@ staticInitStat _prof (StaticInfo i sv cc) =
 
 -- | declare and do first-pass init of a global object (create JS object for heap objects)
 staticDeclStat :: StaticInfo -> JStat
-staticDeclStat (StaticInfo si sv _) =
-  let si' = TxtI si
-      ssv (StaticUnboxed u)       = Just (ssu u)
-      ssv (StaticThunk Nothing)   = Nothing
-      ssv _                       = Just (app "h$d" [])
-      ssu (StaticUnboxedBool b)   = app "h$p" [toJExpr b]
-      ssu (StaticUnboxedInt i)    = app "h$p" [toJExpr i]
-      ssu (StaticUnboxedDouble d) = app "h$p" [toJExpr (unSaneDouble d)]
-      ssu (StaticUnboxedString str) = ApplExpr (initStr str) []
-      ssu StaticUnboxedStringOffset {} = 0
-  in  maybe (appS "h$di" [toJExpr si']) (\v -> DeclStat si' `mappend` (toJExpr si' |= v)) (ssv sv)
+staticDeclStat (StaticInfo global_name static_value _) = decl
+  where
+    global_ident = TxtI global_name
+    decl_init v  = DeclStat global_ident `mappend` (toJExpr global_ident |= v)
+    decl_no_init = appS "h$di" [toJExpr global_ident]
 
--- | JS expression corresponding to a static string
-initStr :: BS.ByteString -> JExpr
-initStr str = app "h$str" [ValExpr (JStr . mkFastStringByteString $! str)]
+    decl = case static_value of
+      StaticUnboxed u     -> decl_init (unboxed_expr u)
+      StaticThunk Nothing -> decl_no_init -- CAF initialized in an alternative way
+      _                   -> decl_init (app "h$d" [])
+
+    unboxed_expr = \case
+      StaticUnboxedBool b          -> app "h$p" [toJExpr b]
+      StaticUnboxedInt i           -> app "h$p" [toJExpr i]
+      StaticUnboxedDouble d        -> app "h$p" [toJExpr (unSaneDouble d)]
+      StaticUnboxedString str      -> app "h$rawStringData" [ValExpr (to_byte_list str)]
+      StaticUnboxedStringOffset {} -> 0
+
+    to_byte_list = JList . map (Int . fromIntegral) . BS.unpack
 
 -- | rename a heap object, which means adding it to the
 --  static init table in addition to the renamer
