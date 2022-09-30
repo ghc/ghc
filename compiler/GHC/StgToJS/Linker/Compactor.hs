@@ -240,20 +240,6 @@ staticIdentsA :: (FastString -> FastString) -> StaticArg -> StaticArg
 staticIdentsA f (StaticObjArg t) = StaticObjArg $! f t
 staticIdentsA _ x = x
 
-
-{- |
-  The Base data structure contains the information we need
-  to do incremental linking against a base bundle.
-
-  base file format:
-  GHCJSBASE
-  [renamer state]
-  [linkedPackages]
-  [packages]
-  [modules]
-  [symbols]
- -}
-
 staticInfoArgs :: Applicative f => (StaticArg -> f StaticArg) -> StaticInfo -> f StaticInfo
 staticInfoArgs f (StaticInfo si sv sa) = StaticInfo si <$> staticValArgs f sv <*> pure sa
 
