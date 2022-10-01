@@ -1,3 +1,2 @@
 T14774.$p1D [InlPrag=[~]] :: forall a. D a => C a
- RULES: Built in rule for T14774.$p1D: "Class op $p1D"]
 T14774.$p1D

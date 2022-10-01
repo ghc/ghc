@@ -5,12 +5,7 @@ Result size of Tidy Core
 
 -- RHS size: {terms: 2, types: 3, coercions: 1, joins: 0/0}
 T2431.$WRefl [InlPrag=INLINE[final] CONLIKE] :: forall a. a :~: a
-[GblId[DataConWrapper],
- Caf=NoCafRefs,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)}]
+[GblId[DataConWrapper], Unf=OtherCon []]
 T2431.$WRefl
   = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)
 
