@@ -477,9 +477,9 @@ mkDictSelId name clas
                -- See Note [Type classes and linear types]
 
     base_info = noCafIdInfo
-                `setArityInfo`          1
-                `setDmdSigInfo`     strict_sig
-                `setCprSigInfo`            topCprSig
+                `setArityInfo`  1
+                `setDmdSigInfo` strict_sig
+                `setCprSigInfo` topCprSig
 
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
@@ -697,6 +697,8 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
 
+             -- The signature is purely for passes like the Simplifier, not for
+             -- DmdAnal itself; see Note [DmdAnal for DataCon wrappers].
              wrap_sig = mkClosedDmdSig wrap_arg_dmds topDiv
 
              wrap_arg_dmds =
@@ -1321,9 +1323,9 @@ mkFCallId uniq fcall ty
     name = mkFCallName uniq occ_str
 
     info = noCafIdInfo
-           `setArityInfo`          arity
-           `setDmdSigInfo`     strict_sig
-           `setCprSigInfo`            topCprSig
+           `setArityInfo`  arity
+           `setDmdSigInfo` strict_sig
+           `setCprSigInfo` topCprSig
 
     (bndrs, _) = tcSplitPiTys ty
     arity      = count isAnonTyCoBinder bndrs

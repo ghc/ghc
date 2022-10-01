@@ -553,12 +553,15 @@ analysing their unfolding. A few reasons for the change:
      *workers*, because their transformers need to adapt to CPR for their
      arguments in 'cprTransformDataConWork' to enable Note [Nested CPR].
      Better keep it all in this module! The alternative would be that
-     'GHC.Types.Id.Make' depends on DmdAnal.
+     'GHC.Types.Id.Make' depends on CprAnal.
   3. In the future, Nested CPR could take a better account of incoming args
      in cprAnalApp and do some beta-reduction on the fly, like !1866 did. If
      any of those args had the CPR property, then we'd even get Nested CPR for
      DataCon wrapper calls, for free. Not so if we simply give the wrapper a
      single CPR sig in 'GHC.Types.Id.Make.mkDataConRep'!
+
+DmdAnal also looks through the wrapper's unfolding:
+See Note [DmdAnal for DataCon wrappers].
 
 Note [Trimming to mAX_CPR_SIZE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
