@@ -1,0 +1,387 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 204, types: 100, coercions: 0, joins: 4/4}
+
+-- RHS size: {terms: 13, types: 14, coercions: 0, joins: 0/0}
+T13966.$WMkStream [InlPrag=INLINE[final] CONLIKE]
+  :: forall a s. (s -> Step s a) %1 -> s %1 -> Stream a
+[GblId[DataConWrapper],
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=<SL><SL>,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 (@s)
+                 (conrep [Occ=Once1] :: s -> Step s a)
+                 (conrep [Occ=Once1] :: s) ->
+                 case conrep of conrep [Occ=Once1] { __DEFAULT ->
+                 case conrep of conrep [Occ=Once1] { __DEFAULT ->
+                 T13966.MkStream @a[sk:1] @s conrep conrep
+                 }
+                 }}]
+T13966.$WMkStream
+  = \ (@a)
+      (@s)
+      (conrep [Occ=Once1] :: s -> Step s a)
+      (conrep [Occ=Once1] :: s) ->
+      case conrep of conrep [Occ=Once1] { __DEFAULT ->
+      case conrep of conrep [Occ=Once1] { __DEFAULT ->
+      T13966.MkStream @a[sk:1] @s conrep conrep
+      }
+      }
+
+-- RHS size: {terms: 10, types: 7, coercions: 0, joins: 0/0}
+T13966.$WYield [InlPrag=INLINE[final] CONLIKE]
+  :: forall s a. a %1 -> s %1 -> Step s a
+[GblId[DataConWrapper],
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=<L><SL>,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@s)
+                 (@a)
+                 (conrep [Occ=Once1] :: a)
+                 (conrep [Occ=Once1] :: s) ->
+                 case conrep of conrep [Occ=Once1] { __DEFAULT ->
+                 T13966.Yield @s[sk:1] @a[sk:1] conrep conrep
+                 }}]
+T13966.$WYield
+  = \ (@s)
+      (@a)
+      (conrep [Occ=Once1] :: a)
+      (conrep [Occ=Once1] :: s) ->
+      case conrep of conrep [Occ=Once1] { __DEFAULT ->
+      T13966.Yield @s[sk:1] @a[sk:1] conrep conrep
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T13966.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$trModule3 = GHC.Types.TrNameS T13966.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T13966.$trModule2 = "T13966"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$trModule1 = GHC.Types.TrNameS T13966.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13966.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$trModule
+  = GHC.Types.Module T13966.$trModule3 T13966.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep = GHC.Types.KindRepVar 1#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$krep1 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep1 = GHC.Types.KindRepVar 0#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStep2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T13966.$tcStep2 = "Step"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStep1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tcStep1 = GHC.Types.TrNameS T13966.$tcStep2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStep :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tcStep
+  = GHC.Types.TyCon
+      4795970440733571714##64
+      746480991599097167##64
+      T13966.$trModule
+      T13966.$tcStep1
+      0#
+      GHC.Types.krep$*->*->*
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep2 :: [GHC.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep2
+  = GHC.Types.:
+      @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep3 :: [GHC.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep3 = GHC.Types.: @GHC.Types.KindRep $krep1 $krep2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Done1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+T13966.$tc'Done1 = GHC.Types.KindRepTyConApp T13966.$tcStep $krep3
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Done3 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T13966.$tc'Done3 = "'Done"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Done2 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'Done2 = GHC.Types.TrNameS T13966.$tc'Done3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Done :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'Done
+  = GHC.Types.TyCon
+      17981254629359194635##64
+      7035660859504720669##64
+      T13966.$trModule
+      T13966.$tc'Done2
+      2#
+      T13966.$tc'Done1
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep4 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep4 = GHC.Types.KindRepFun $krep1 T13966.$tc'Done1
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Yield1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+T13966.$tc'Yield1 = GHC.Types.KindRepFun $krep $krep4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Yield3 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T13966.$tc'Yield3 = "'Yield"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Yield2 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'Yield2 = GHC.Types.TrNameS T13966.$tc'Yield3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'Yield :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'Yield
+  = GHC.Types.TyCon
+      12509027992732981867##64
+      10807841595111507558##64
+      T13966.$trModule
+      T13966.$tc'Yield2
+      2#
+      T13966.$tc'Yield1
+
+-- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
+$krep5 :: [GHC.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep5
+  = GHC.Types.:
+      @GHC.Types.KindRep $krep1 (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep6 :: [GHC.Types.KindRep]
+[GblId, Unf=OtherCon []]
+$krep6 = GHC.Types.: @GHC.Types.KindRep $krep $krep5
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep7 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep7 = GHC.Types.KindRepTyConApp T13966.$tcStep $krep6
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep8 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep8 = GHC.Types.KindRepFun $krep $krep7
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStream2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T13966.$tcStream2 = "Stream"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStream1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tcStream1 = GHC.Types.TrNameS T13966.$tcStream2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13966.$tcStream :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tcStream
+  = GHC.Types.TyCon
+      8322222206990517662##64
+      15940001482947244467##64
+      T13966.$trModule
+      T13966.$tcStream1
+      0#
+      GHC.Types.krep$*Arr*
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep9 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep9 = GHC.Types.KindRepTyConApp T13966.$tcStream $krep5
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep10 :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+$krep10 = GHC.Types.KindRepFun $krep $krep9
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'MkStream1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Unf=OtherCon []]
+T13966.$tc'MkStream1 = GHC.Types.KindRepFun $krep8 $krep10
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'MkStream3 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 0}]
+T13966.$tc'MkStream3 = "'MkStream"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'MkStream2 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'MkStream2 = GHC.Types.TrNameS T13966.$tc'MkStream3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T13966.$tc'MkStream :: GHC.Types.TyCon
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T13966.$tc'MkStream
+  = GHC.Types.TyCon
+      11135849478716215307##64
+      9679177004609975919##64
+      T13966.$trModule
+      T13966.$tc'MkStream2
+      2#
+      T13966.$tc'MkStream1
+
+-- RHS size: {terms: 45, types: 17, coercions: 0, joins: 4/4}
+chain [InlPrag=[2]] :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1!P(L)>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1!] :: Int) ->
+                 case x of { GHC.Types.I# ww [Occ=OnceL1] ->
+                 join {
+                   $j [Occ=OnceL1!T[1]] :: Int %1 -> Int
+                   [LclId[JoinId(1)(Nothing)], Arity=1]
+                   $j (ww1 [Occ=Once1, OS=OneShot] :: Int) = ww1 } in
+                 joinrec {
+                   $wloop_sum [InlPrag=[2], Occ=LoopBreakerT[2]]
+                     :: GHC.Prim.Int# -> GHC.Prim.Int# -> Int
+                   [LclId[JoinId(2)(Nothing)], Arity=2, Str=<L><L>, Unf=OtherCon []]
+                   $wloop_sum (ww1 :: GHC.Prim.Int#)
+                              (ww2 [Occ=Once1] :: GHC.Prim.Int#)
+                     = let {
+                         a [Occ=OnceL1] :: Int
+                         [LclId, Unf=OtherCon []]
+                         a = GHC.Types.I# ww1 } in
+                       joinrec {
+                         $wnext [InlPrag=[2], Occ=LoopBreakerT[1]] :: GHC.Prim.Int# -> Int
+                         [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
+                         $wnext (ww3 :: GHC.Prim.Int#)
+                           = case GHC.Prim.># ww3 ww of {
+                               __DEFAULT ->
+                                 case GHC.Prim.remInt# ww3 2# of {
+                                   __DEFAULT -> jump $wnext (GHC.Prim.+# ww3 1#);
+                                   0# -> jump $wloop_sum (GHC.Prim.+# ww1 ww3) (GHC.Prim.+# ww3 1#)
+                                 };
+                               1# -> jump $j a
+                             }; } in
+                       jump $wnext ww2; } in
+                 jump $wloop_sum 0# 1#
+                 }}]
+chain
+  = \ (x :: Int) ->
+      case x of { GHC.Types.I# ww ->
+      joinrec {
+        $wloop_sum [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,C(1,!P(L)))]
+          :: GHC.Prim.Int# -> GHC.Prim.Int# -> Int
+        [LclId[JoinId(2)(Nothing)], Arity=2, Str=<L><L>, Unf=OtherCon []]
+        $wloop_sum (ww1 :: GHC.Prim.Int#) (ww2 :: GHC.Prim.Int#)
+          = join {
+              exit [Dmd=LC(S,!P(L))] :: GHC.Prim.Int# -> Int
+              [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>]
+              exit (ww3 [OS=OneShot] :: GHC.Prim.Int#)
+                = jump $wloop_sum (GHC.Prim.+# ww1 ww3) (GHC.Prim.+# ww3 1#) } in
+            join {
+              exit1 [Dmd=L!P(L)] :: Int
+              [LclId[JoinId(0)(Nothing)]]
+              exit1 = GHC.Types.I# ww1 } in
+            joinrec {
+              $wnext [InlPrag=[2], Occ=LoopBreaker, Dmd=SC(S,!P(L))]
+                :: GHC.Prim.Int# -> Int
+              [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>, Unf=OtherCon []]
+              $wnext (ww3 :: GHC.Prim.Int#)
+                = case GHC.Prim.># ww3 ww of {
+                    __DEFAULT ->
+                      case GHC.Prim.remInt# ww3 2# of {
+                        __DEFAULT -> jump $wnext (GHC.Prim.+# ww3 1#);
+                        0# -> jump exit ww3
+                      };
+                    1# -> jump exit1
+                  }; } in
+            jump $wnext ww2; } in
+      jump $wloop_sum 0# 1#
+      }
+
+
+

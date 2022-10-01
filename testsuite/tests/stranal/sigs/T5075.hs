@@ -17,10 +17,10 @@ g x y = go x
       True  -> Just x
       False -> go (x*2)
 
--- Here, go is not a join point, but still should be WW'd for Just.
--- Unfortunately, CPR can't see that (+?) returns Just, so h won't get the CPR
--- property. It probably could by only considering the @Just@ case of the
--- inlined (+?).
+-- Here, go is not a join point (call-site loopification doesn't trigger because
+-- it is marked NOINLINE), but still should be WW'd for Just. Unfortunately,
+-- CPR can't see that (+?) returns Just, so h won't get the CPR property. It
+-- probably could by only considering the @Just@ case of the inlined (+?).
 h :: Int -> Maybe Int
 h x = go x +? go (x+1)
   where
@@ -29,3 +29,4 @@ h x = go x +? go (x+1)
     go z
       | z > 10    = Just (x + z)
       | otherwise = go (z*2)
+    {-# NOINLINE go #-}

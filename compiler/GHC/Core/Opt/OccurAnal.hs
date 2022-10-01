@@ -58,7 +58,44 @@ import GHC.Utils.Trace
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
-import Data.List (mapAccumL, mapAccumR)
+import Data.List (mapAccumL, mapAccumR, find)
+
+{-
+************************************************************************
+*                                                                      *
+    OccurAnalConfig
+*                                                                      *
+************************************************************************
+-}
+
+data OccurAnalConfig
+  = OAC { oac_unf_act  :: !(Id -> Bool)          -- ^ Which Id unfoldings are active
+        , oac_rule_act :: !(Activation -> Bool)  -- ^ Which rules are active
+             -- See Note [Finding rule RHS free vars]
+        , oac_loopify  :: !Bool                  -- ^ Do loopification?
+             -- See Note [Join point loopification]
+        }
+
+pureOccurAnalConfig :: OccurAnalConfig
+pureOccurAnalConfig
+  -- Used in the pure 'occurAnalyseExpr'.
+  -- To be conservative, we say that all
+  -- inlines and rules are active and that
+  -- loopification is deactivated
+  = OAC { oac_unf_act  = \_ -> True
+        , oac_rule_act = \_ -> True
+        , oac_loopify  = False
+        }
+
+fullOccurAnalConfig :: (Id -> Bool) -> (Activation -> Bool) -> OccurAnalConfig
+fullOccurAnalConfig active_unf active_rule
+  -- Used in the full, pre-Simplification 'occurAnalysePgm'.
+  -- There we know the precise unfolding and rule activation
+  -- and we want loopification to happen.
+  = OAC { oac_unf_act  = active_unf
+        , oac_rule_act = active_rule
+        , oac_loopify  = True
+        }
 
 {-
 ************************************************************************
@@ -74,7 +111,7 @@ Here's the externally-callable interface:
 occurAnalyseExpr :: CoreExpr -> CoreExpr
 occurAnalyseExpr expr = expr'
   where
-    (WithUsageDetails _ expr') = occAnal initOccEnv expr
+    (WithUsageDetails _ expr') = occAnal (initOccEnv pureOccurAnalConfig) expr
 
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
@@ -89,8 +126,7 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv { occ_rule_act = active_rule
-                          , occ_unf_act  = active_unf }
+    init_env = initOccEnv (fullOccurAnalConfig active_unf active_rule)
 
     (WithUsageDetails final_usage occ_anald_binds) = go init_env binds
     (WithUsageDetails _ occ_anald_glommed_binds) = occAnalRecBind init_env TopLevel
@@ -720,6 +756,79 @@ Thus the overall sequence taking place in 'occAnalNonRecBind' and
 
 (In the recursive case, this logic is spread between 'makeNode' and
 'occAnalRec'.)
+
+Note [Join point loopification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T13966, a Skip-less unfoldr/destroy stream pipeline
+
+  data Stream a = forall s. MkStream (s -> Step s a) s
+  data Step s a = Done | Yield a s -- NB: No Skip
+
+  sum :: Stream Int -> Int
+  sum (MkStream next s0) = loop_sum 0 s0
+    where
+      loop_sum !a !s = case next s of
+        Done       -> a
+        Yield x s' -> loop_sum (a + x) s'
+
+
+  filter :: (a -> Bool) -> Stream a -> Stream a
+  filter p (MkStream next0 s0) = MkStream next s0
+    where
+      next s = case next0 s of
+        Done                   -> Done
+        Yield x s' | p x       -> Yield x s'
+                   | otherwise -> next    s'  -- NB: recursive call
+
+  enumFromTo :: Int -> Int -> Stream Int
+  enumFromTo ...
+
+  chain :: Int -> Int
+  chain = sum . filter even . enumFromTo 1
+
+Note that the stepper function of `filter` is recursive; this means that
+its inlined occurrences in `chain` will optimise to this form:
+
+  letrec { next x = case ... of ... -> next (x+1); ... -> ... } in
+  joinrec { loop_sum a s = ... case next s of ... loop_sum ... } in
+  loop_sum ...
+
+Note that `next` is *nearly* a join point: All recursive calls are in tail
+position, but the external call in `loop_sum` isn't. `next` could become a join
+point if it was floated inside the `joinrec`, but FloatIn hesitates to float in
+a let(rec) into a non-one-shot context such as `loop_sum` and it doesn't dare
+to anticipate joinpointhood of `next` after the float.
+
+So instead it would be good to *loopify* and transform the letrec `next` to
+
+  let {
+    next x = joinrec {
+      next x = case ... of ... -> next (x+1); ... -> ...
+    } in next x
+  } in ... as before ...
+
+And now the RHS of the non-recursive `next` is quite cheap to duplicate and
+since there is only one syntactic occurrence it is quite likely to inline, so we
+get a tight loop. Besides, if it *doesn't* inline, the code we get is no worse.
+
+(You might think that the loopified form has unconditionally favorable
+operational properties even if the let is not inlined, because a jump is cheaper
+than a full function call. But we have Note [Self-recursive tail calls] that
+makes sure that the pre-loopified code actually has the same performance.)
+
+We implement this *transformation* in the Occurrence Analyser because it is has
+all the necessary information at hand in `occAnalRec` while the Simplifier
+would not; specifically, it sees that `next`'s recursive calls are all in
+tail-position. That information would be lost when combining with the occurrence
+information from the letrec's body.
+
+We hide loopification behind a a config switch, `oac_loopify`, so that it only
+applies prior to Simplification and not during CorePrep (where it would destroy
+global Id freshness) or analysis of unfoldings, say.
+
+There are multiple tickets that discuss loopification of join points in
+particular; see #13966, #14068, #14287 and #22227. Rest assured, there are
+regression tests T13966, T14287, T22227 (#14068 has no reproducer).
 -}
 
 
@@ -856,8 +965,19 @@ occAnalRec !_ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
         -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
 occAnalRec env lvl (CyclicSCC details_s) (WithUsageDetails body_uds binds)
-  | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
-  = WithUsageDetails body_uds binds     -- See Note [Dead code]
+  | null used_bndrs
+  = WithUsageDetails body_uds binds  -- See Note [Dead code]
+
+  | oac_loopify (occ_config env)     -- Try Note [Join point loopification]
+  , [loop_entry] <- used_bndrs
+  , let loc_details_s = map (\d -> d{nd_bndr=localiseId (nd_bndr d)}) details_s
+      -- when we loopify a top-level binding, we have to localise its binders
+  , Just (wrap_entry, body_uds', tail_call_uds) <-
+      tryLoopify lvl loop_entry bndrs body_uds loc_details_s
+  , WithUsageDetails loop_uds loop_binds <-
+      occAnalRec env NotTopLevel (CyclicSCC loc_details_s) (WithUsageDetails tail_call_uds [])
+  , let !new_bind = wrap_entry loop_binds
+  = WithUsageDetails (markAllNonTail loop_uds `andUDs` body_uds') (new_bind : binds)
 
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (ppr loop_breaker_nodes)
@@ -865,6 +985,7 @@ occAnalRec env lvl (CyclicSCC details_s) (WithUsageDetails body_uds binds)
 
   where
     bndrs      = map nd_bndr details_s
+    used_bndrs = filter (`usedIn` body_uds) bndrs -- NB: look at body_uds, not total_uds
     all_simple = all nd_simple details_s
 
     ------------------------------
@@ -889,6 +1010,30 @@ occAnalRec env lvl (CyclicSCC details_s) (WithUsageDetails body_uds binds)
           -- and reOrderNodes deals with exactly that case.
           -- Saves a SCC analysis in a common case
 
+tryLoopify :: TopLevelFlag -> Id -> [Id] -> UsageDetails -> [Details]
+           -> Maybe ([CoreBind] -> CoreBind, UsageDetails, UsageDetails)
+-- See Note [Join point loopification]
+tryLoopify lvl loop_entry bndrs body_uds details_s
+  | not (isJoinId loop_entry)
+  , NoTailCallInfo <- tailCallInfo $ lookupDetails body_uds loop_entry
+      -- otherwise turn it into a joinrec rightaway
+  , let unadj_uds = foldr (andUDs . nd_uds) emptyDetails details_s
+  , decideJoinPointHood NotTopLevel unadj_uds bndrs
+      -- Main test is in tagRecBinders. Keep in sync
+      -- NotTopLevel: After loopification, bndrs would be a local binding,
+      --              regardless of whether it came from the top-level or not
+  , AlwaysTailCalled arity <- tailCallInfo $ lookupDetails unadj_uds loop_entry
+  , Just loop_nds <- find ((== loop_entry) . nd_bndr) details_s
+  , (!lam_bndrs,_) <- collectNBinders arity (nd_rhs loop_nds)
+  , let !tail_call_uds = mkOneOcc loop_entry IsInteresting arity
+  , (body_uds',loop_entry') <- tagNonRecBinder lvl body_uds loop_entry
+      -- NB: Here we pass lvl, because the NonRec will stay at the same level
+  = Just (wrap_entry loop_entry' lam_bndrs, body_uds', tail_call_uds)
+  | otherwise
+  = Nothing
+  where
+    wrap_entry f xs binds =
+      NonRec f (mkLams xs (mkLets binds (mkVarApps (Var f) xs)))
 
 {- *********************************************************************
 *                                                                      *
@@ -1433,7 +1578,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     (WithUsageDetails unf_uds unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
 
     --------- IMP-RULES --------
-    is_active     = occ_rule_act env :: Activation -> Bool
+    is_active     = oac_rule_act (occ_config env) :: Activation -> Bool
     imp_rule_info = lookupImpRules imp_rule_edges bndr
     imp_rule_uds  = impRulesScopeUsage imp_rule_info
     imp_rule_fvs  = impRulesActiveFvs is_active bndr_set imp_rule_info
@@ -1487,7 +1632,7 @@ mkLoopBreakerNodes !env lvl body_uds details_s
               -- Note [Deterministic SCC] in GHC.Data.Graph.Directed.
       where
         new_nd = nd { nd_bndr = new_bndr, nd_score = score }
-        score  = nodeScore env new_bndr lb_deps nd
+        score  = nodeScore (occ_config env) new_bndr lb_deps nd
         lb_deps = extendFvs_ rule_fv_env inl_fvs
         -- See Note [Loop breaker dependencies]
 
@@ -1519,12 +1664,12 @@ group { f1 = e1; ...; fn = en } are:
 -}
 
 ------------------------------------------
-nodeScore :: OccEnv
+nodeScore :: OccurAnalConfig
           -> Id        -- Binder with new occ-info
           -> VarSet    -- Loop-breaker dependencies
           -> Details
           -> NodeScore
-nodeScore !env new_bndr lb_deps
+nodeScore !cfg new_bndr lb_deps
           (ND { nd_bndr = old_bndr, nd_rhs = bind_rhs })
 
   | not (isId old_bndr)     -- A type or coercion variable is never a loop breaker
@@ -1533,7 +1678,7 @@ nodeScore !env new_bndr lb_deps
   | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
   = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
 
-  | not (occ_unf_act env old_bndr) -- A binder whose inlining is inactive (e.g. has
+  | not (oac_unf_act cfg old_bndr) -- A binder whose inlining is inactive (e.g. has
   = (0, 0, True)                   -- a NOINLINE pragma) makes a great loop breaker
 
   | exprIsTrivial rhs
@@ -2454,12 +2599,9 @@ scrutinised y).
 -}
 
 data OccEnv
-  = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
+  = OccEnv { occ_config     :: !OccurAnalConfig
+           , occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
-           , occ_unf_act    :: Id -> Bool          -- Which Id unfoldings are active
-           , occ_rule_act   :: Activation -> Bool  -- Which rules are active
-             -- See Note [Finding rule RHS free vars]
-
            -- See Note [The binder-swap substitution]
            -- If  x :-> (y, co)  is in the env,
            -- then please replace x by (y |> sym mco)
@@ -2500,18 +2642,13 @@ instance Outputable OccEncl where
 -- See Note [OneShots]
 type OneShots = [OneShotInfo]
 
-initOccEnv :: OccEnv
-initOccEnv
-  = OccEnv { occ_encl      = OccVanilla
+initOccEnv :: OccurAnalConfig -> OccEnv
+initOccEnv cfg
+  = OccEnv { occ_config    = cfg
+           , occ_encl      = OccVanilla
            , occ_one_shots = []
-
-                 -- To be conservative, we say that all
-                 -- inlines and rules are active
-           , occ_unf_act   = \_ -> True
-           , occ_rule_act  = \_ -> True
-
-           , occ_bs_env = emptyVarEnv
-           , occ_bs_rng = emptyVarSet }
+           , occ_bs_env    = emptyVarEnv
+           , occ_bs_rng    = emptyVarSet }
 
 noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env

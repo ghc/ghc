@@ -428,8 +428,19 @@ test('T21763', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T21763a', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T22028', normal, compile, ['-O -ddump-rule-firings'])
 test('T22114', normal, compile, ['-O'])
-test('T21286',  normal, multimod_compile, ['T21286', '-O -ddump-rule-firings'])
+test('T21286', normal, multimod_compile, ['T21286', '-O -ddump-rule-firings'])
 test('T21148', [grep_errmsg(r'Cpr=') ], compile, ['-O -ddump-simpl'])
+
+# next should be loopified and turned into a join point
+test('T13966', [grep_errmsg(r'jump \S*next') ], compile, ['-O -dsuppress-uniques -ddump-simpl'])
+# filterStep should be loopified and turned into a join point
+test('T14287', [grep_errmsg(r'jump \S*filterStep') ], compile, ['-O -dsuppress-uniques -ddump-simpl'])
+# step should be loopified and turned into a join point
+test('T22227', [grep_errmsg(r'jump \S*step') ], compile, ['-O -dsuppress-uniques -ddump-simpl'])
+# (Belongs more to T22227 than in testsuite/tests/cmm)
+# $wtsum should have 2 calls in Cmm (one in tsum, the other in $wtsum).
+# 3 calls would mean that Note [Self-recursive tail calls] failed.
+test('T22227', [grep_errmsg(r'call \S*tsum_info') ], compile, ['-O -dsuppress-uniques -ddump-cmm'])
 
 # One module, T21851.hs, has OPTIONS_GHC -ddump-simpl
 test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O -dno-typeable-binds -dsuppress-uniques'])
