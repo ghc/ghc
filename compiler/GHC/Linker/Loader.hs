@@ -77,6 +77,7 @@ import GHC.Unit.Env
 import GHC.Unit.Finder
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.WholeCoreBindings
 import GHC.Unit.Module.Deps
 import GHC.Unit.Home.ModInfo
 import GHC.Unit.State as Packages
@@ -840,11 +841,17 @@ getLinkDeps hsc_env pls replace_osuf span mods
 
     while_linking_expr = text "while linking an interpreted expression"
 
-        -- This one is a build-system bug
+
+    -- See Note [Using Byte Code rather than Object Code for Template Haskell]
+    homeModLinkable :: DynFlags -> HomeModInfo -> Maybe Linkable
+    homeModLinkable dflags hmi =
+      if gopt Opt_UseBytecodeRatherThanObjects dflags
+        then homeModInfoByteCode hmi <|> homeModInfoObject hmi
+        else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
 
     get_linkable osuf mod      -- A home-package module
         | Just mod_info <- lookupHugByModule mod (hsc_HUG hsc_env)
-        = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
+        = adjust_linkable (Maybes.expectJust "getLinkDeps" (homeModLinkable dflags mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
@@ -889,7 +896,34 @@ getLinkDeps hsc_env pls replace_osuf span mods
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
+            adjust_ul _ l@LoadedBCOs{} = return l
+            adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
 
+{-
+Note [Using Byte Code rather than Object Code for Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The `-fprefer-byte-code` flag allows a user to specify that they want to use
+byte code (if availble) rather than object code for home module dependenices
+when executing Template Haskell splices.
+
+Why might you want to use byte code rather than object code?
+
+* Producing object code is much slower than producing byte code (for example if you're using -fno-code)
+* Linking many large object files, which happens once per splice, is quite expensive. (#21700)
+
+So we allow the user to choose to use byte code rather than object files if they want to avoid these
+two pitfalls.
+
+When using `-fprefer-byte-code` you have to arrange to have the byte code availble.
+In normal --make mode it will not be produced unless you enable `-fbyte-code-and-object-code`.
+See Note [Home module build products] for some more information about that.
+
+The only other place where the flag is consulted is when enabling code generation
+with `-fno-code`, which does so to anticipate what decision we will make at the
+splice point about what we would prefer.
+
+-}
 
 {- **********************************************************************
 
@@ -1133,7 +1167,7 @@ dynLinkBCOs bco_opts interp pls bcos = do
             unlinkeds                = concatMap linkableUnlinked new_bcos
 
             cbcs :: [CompiledByteCode]
-            cbcs      = map byteCodeOfObject unlinkeds
+            cbcs      = concatMap byteCodeOfObject unlinkeds
 
 
             ies        = map bc_itbls cbcs

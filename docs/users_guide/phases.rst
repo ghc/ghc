@@ -636,6 +636,19 @@ Options affecting code generation
     useful if you want to type check over multiple runs of GHC without
     compiling dependencies.
 
+.. ghc-flag:: -fwrite-if-simplfied-core
+    :shortdesc: Write an interface file containing the simplified core of the module.
+    :type: dynamic
+    :category: codegen
+
+    The interface file will contain all the bindings for a module. From
+    this interface file we can restart code generation to produce byte-code.
+
+    The definition of bindings which are included in this
+    depend on the optimisation level. Any definitions which are already included in
+    an interface file (via an unfolding for an exported identifier) are reused.
+
+
 .. ghc-flag:: -fobject-code
     :shortdesc: Generate object code
     :type: dynamic
@@ -643,7 +656,7 @@ Options affecting code generation
 
     Generate object code. This is the default outside of GHCi, and can
     be used with GHCi to cause object code to be generated in preference
-    to bytecode.
+    to byte-code. Therefore this flag disables :ghc-flag:`-fbyte-code-and-object-code`.
 
 .. ghc-flag:: -fbyte-code
     :shortdesc: Generate byte-code
@@ -654,6 +667,19 @@ Options affecting code generation
     GHCi. Byte-code can currently only be used in the interactive
     interpreter, not saved to disk. This option is only useful for
     reversing the effect of :ghc-flag:`-fobject-code`.
+
+.. ghc-flag:: -fbyte-code-and-object-code
+    :shortdesc: Generate object code and byte-code
+    :type: dynamic
+    :category: codegen
+
+    Generate object code and byte-code. This is useful with the flags
+    :ghc-flag:`-fprefer-byte-code` and :ghc-flag:`-fwrite-if-simplfied-core`.
+
+    This flag implies :ghc-flag:`-fwrite-if-simplfied-core`.
+
+    :ghc-flag:`-fbyte-code` and :ghc-flag:`-fobject-code` disable this flag as
+    they specify that GHC should *only* write object code or byte-code respectively.
 
 .. ghc-flag:: -fPIC
     :shortdesc: Generate position-independent code (where available)
@@ -745,6 +771,24 @@ Options affecting code generation
     :ghc-flag:`-fno-expose-internal-symbols <-fexpose-internal-symbols>`
     suppresses all non-global symbol table entries, resulting in smaller object
     file sizes at the expense of debuggability.
+
+
+.. ghc-flag:: -fprefer-byte-code
+    :shortdesc: Use byte-code if it is available to evaluate TH splices
+    :type: dynamic
+    :category: codegen
+
+    If a home package module has byte-code available then use that instead of
+    and object file (if that's available) to evaluate and run TH splices.
+
+    This is useful with flags such as :ghc-flag:`-fbyte-code-and-object-code`, which
+    tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplfied-core` which
+    allows byte-code to be generated from an interface file.
+
+    This flag also interacts with :ghc-flag:`-fno-code`, if this flag is enabled
+    then any modules which are required to be compiled for Template Haskell evaluation
+    will generate byte-code rather than object code.
+
 
 .. _options-linker:
 

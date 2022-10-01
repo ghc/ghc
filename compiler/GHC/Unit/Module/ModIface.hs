@@ -200,6 +200,11 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- Ditto data constructors, class operations, except that
                 -- the hash of the parent class/tycon changes
 
+        mi_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo],
+                -- ^ Extra variable definitions which are **NOT** exposed but when
+                -- combined with mi_decls allows us to restart code generation.
+                -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
+
         mi_globals  :: !(Maybe GlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
                 -- the /original source/ code for this module. which
@@ -349,6 +354,7 @@ instance Binary ModIface where
                  mi_warns     = warns,
                  mi_anns      = anns,
                  mi_decls     = decls,
+                 mi_extra_decls = extra_decls,
                  mi_insts     = insts,
                  mi_fam_insts = fam_insts,
                  mi_rules     = rules,
@@ -392,6 +398,7 @@ instance Binary ModIface where
         lazyPut bh warns
         lazyPut bh anns
         put_ bh decls
+        put_ bh extra_decls
         put_ bh insts
         put_ bh fam_insts
         lazyPut bh rules
@@ -423,6 +430,7 @@ instance Binary ModIface where
         warns       <- {-# SCC "bin_warns" #-} lazyGet bh
         anns        <- {-# SCC "bin_anns" #-} lazyGet bh
         decls       <- {-# SCC "bin_tycldecls" #-} get bh
+        extra_decls <- get bh
         insts       <- {-# SCC "bin_insts" #-} get bh
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
@@ -446,6 +454,7 @@ instance Binary ModIface where
                  mi_fixities    = fixities,
                  mi_warns       = warns,
                  mi_decls       = decls,
+                 mi_extra_decls = extra_decls,
                  mi_globals     = Nothing,
                  mi_insts       = insts,
                  mi_fam_insts   = fam_insts,
@@ -494,6 +503,7 @@ emptyPartialModIface mod
                mi_fam_insts   = [],
                mi_rules       = [],
                mi_decls       = [],
+               mi_extra_decls = Nothing,
                mi_globals     = Nothing,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
@@ -541,11 +551,12 @@ emptyIfaceHashCache _occ = Nothing
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
+                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
-    f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
-    rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+    f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` f13 `seq` rnf f14 `seq` rnf f15 `seq` rnf f16 `seq`
+    rnf f17 `seq` f18 `seq` rnf f19 `seq` rnf f20 `seq` f21 `seq` f22 `seq` f23 `seq` rnf f24
     `seq` ()
+
 
 instance NFData (ModIfaceBackend) where
   rnf (ModIfaceBackend f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13)

@@ -110,11 +110,12 @@ import Data.IORef
 -}
 
 mkPartialIface :: HscEnv
+               -> CoreProgram
                -> ModDetails
                -> ModSummary
                -> ModGuts
                -> PartialModIface
-mkPartialIface hsc_env mod_details mod_summary
+mkPartialIface hsc_env core_prog mod_details mod_summary
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -128,7 +129,7 @@ mkPartialIface hsc_env mod_details mod_summary
          , mg_trust_pkg    = self_trust
          , mg_docs         = docs
          }
-  = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
+  = mkIface_ hsc_env this_mod core_prog hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages docs mod_summary mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
@@ -185,9 +186,10 @@ mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
           -> ModSummary
+          -> Maybe CoreProgram
           -> TcGblEnv           -- Usages, deprecations, etc
           -> IO ModIface
-mkIfaceTc hsc_env safe_mode mod_details mod_summary
+mkIfaceTc hsc_env safe_mode mod_details mod_summary mb_program
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -228,7 +230,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
           docs <- extractDocs (ms_hspp_opts mod_summary) tc_result
 
           let partial_iface = mkIface_ hsc_env
-                   this_mod hsc_src
+                   this_mod (fromMaybe [] mb_program) hsc_src
                    used_th deps rdr_env
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
@@ -237,7 +239,7 @@ mkIfaceTc hsc_env safe_mode mod_details mod_summary
 
           mkFullIface hsc_env partial_iface Nothing
 
-mkIface_ :: HscEnv -> Module -> HscSource
+mkIface_ :: HscEnv -> Module -> CoreProgram -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings GhcRn -> HpcInfo
          -> Bool
@@ -248,7 +250,7 @@ mkIface_ :: HscEnv -> Module -> HscSource
          -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
-         this_mod hsc_src used_th deps rdr_env fix_env src_warns
+         this_mod core_prog hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          docs mod_summary
          ModDetails{  md_insts     = insts,
@@ -268,6 +270,9 @@ mkIface_ hsc_env
         semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
         show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
+
+        extra_decls = if gopt Opt_WriteIfSimplifedCore dflags then Just [ toIfaceTopBind b | b <- core_prog ]
+                                                           else Nothing
         decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
@@ -319,6 +324,7 @@ mkIface_ hsc_env
           mi_globals     = maybeGlobalRdrEnv rdr_env,
           mi_used_th     = used_th,
           mi_decls       = decls,
+          mi_extra_decls = extra_decls,
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,

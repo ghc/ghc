@@ -2902,10 +2902,11 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fbyte-code"
       (noArgM $ \dflags -> do
         setBackend interpreterBackend
-        pure $ gopt_set dflags Opt_ByteCode)
-  , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
-      dflags <- liftEwM getCmdLineState
+        pure $ flip gopt_unset Opt_ByteCodeAndObjectCode (gopt_set dflags Opt_ByteCode))
+  , make_ord_flag defFlag "fobject-code"     $ noArgM $ \dflags -> do
       setBackend $ platformDefaultBackend (targetPlatform dflags)
+      dflags' <- liftEwM getCmdLineState
+      pure $ gopt_unset dflags' Opt_ByteCodeAndObjectCode
 
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
@@ -3480,6 +3481,7 @@ fFlagsDeps = [
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
+  flagSpec "write-if-simplfied-core"          Opt_WriteIfSimplifedCore,
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
@@ -3500,7 +3502,9 @@ fFlagsDeps = [
   flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
   flagSpec "keep-cafs"                        Opt_KeepCAFs,
   flagSpec "link-rts"                         Opt_LinkRts,
-  flagSpec' "compact-unwind"                   Opt_CompactUnwind
+  flagSpec "byte-code-and-object-code"        Opt_ByteCodeAndObjectCode,
+  flagSpec "prefer-byte-code"                 Opt_UseBytecodeRatherThanObjects,
+  flagSpec' "compact-unwind"                  Opt_CompactUnwind
       (\turn_on -> updM (\dflags -> do
         unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
@@ -3871,6 +3875,8 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
                 ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
+                ,(Opt_WriteIfSimplifedCore, turnOn, Opt_WriteInterface)
+                ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifedCore)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- General flags that are switched on/off when other general flags are switched

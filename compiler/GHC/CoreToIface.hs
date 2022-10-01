@@ -7,6 +7,7 @@ module GHC.CoreToIface
     , toIfaceTvBndrs
     , toIfaceIdBndr
     , toIfaceBndr
+    , toIfaceTopBndr
     , toIfaceForAllBndr
     , toIfaceTyCoVarBinders
     , toIfaceTyVar
@@ -35,6 +36,7 @@ module GHC.CoreToIface
     , toIfUnfolding
     , toIfaceTickish
     , toIfaceBind
+    , toIfaceTopBind
     , toIfaceAlt
     , toIfaceCon
     , toIfaceApp
@@ -438,6 +440,15 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
   -- Put into the interface file any IdInfo that GHC.Core.Tidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 
+toIfaceTopBndr :: Id -> IfaceTopBndrInfo
+toIfaceTopBndr id
+  = if isExternalName name
+      then IfGblTopBndr name
+      else IfLclTopBndr (occNameFS (getOccName id)) (toIfaceType (idType id))
+                        (toIfaceIdInfo (idInfo id)) (toIfaceIdDetails (idDetails id))
+  where
+    name = getName id
+
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
 toIfaceIdDetails (WorkerLikeId dmds)          = IfWorkerLikeId dmds
@@ -570,9 +581,32 @@ toIfaceTickish (Breakpoint {})         = Nothing
    -- should not be serialised (#8333)
 
 ---------------------
-toIfaceBind :: Bind Id -> IfaceBinding
+toIfaceBind :: Bind Id -> IfaceBinding IfaceLetBndr
 toIfaceBind (NonRec b r) = IfaceNonRec (toIfaceLetBndr b) (toIfaceExpr r)
 toIfaceBind (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr r) | (b,r) <- prs]
+
+toIfaceTopBind :: Bind Id -> IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo
+toIfaceTopBind b =
+  case b of
+    NonRec b r -> uncurry IfaceNonRec (do_one (b, r))
+    Rec prs -> IfaceRec (map do_one prs)
+  where
+        do_one (b, rhs) =
+          let top_bndr = toIfaceTopBndr b
+              rhs' = case top_bndr of
+                      -- Use the existing unfolding for a global binder if we store that anyway.
+                      -- See Note [Interface File with Core: Sharing RHSs]
+                      IfGblTopBndr {} -> if already_has_unfolding b then IfUseUnfoldingRhs else IfRhs (toIfaceExpr rhs)
+                      -- Local binders will have had unfoldings trimmed so have
+                      -- to serialise the whole RHS.
+                      IfLclTopBndr {} -> IfRhs (toIfaceExpr rhs)
+          in (top_bndr, rhs')
+
+        already_has_unfolding b =
+                                -- The identifier has an unfolding, which we are going to serialise anyway
+                                hasCoreUnfolding (realIdUnfolding b)
+                                -- But not a stable unfolding, we want the optimised unfoldings.
+                                && not (isStableUnfolding (realIdUnfolding b))
 
 ---------------------
 toIfaceAlt :: CoreAlt -> IfaceAlt
@@ -717,5 +751,32 @@ for RSR (if it exists).  Doing so makes the bootstrapped GHC itself
 slower by 8% overall (on #9872a-d, and T1969: the reason
 is that these NOINLINE'd functions now can't be profitably inlined
 outside of the hs-boot loop.
+
+Note [Interface File with Core: Sharing RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In order to avoid duplicating definitions for bindings which already have unfoldings
+we do some minor headstands to avoid serialising the RHS of a definition if it has
+*any* unfolding.
+
+* Only global things have unfoldings, because local things have had their unfoldings stripped.
+* For any global thing which has an unstable unfolding, we just use that.
+
+In order to implement this sharing:
+
+* When creating the interface, check the criteria above and don't serialise the RHS
+  if such a case.
+  See
+* When reading an interface, look at the realIdUnfolding, and then the unfoldingTemplate.
+  See `tc_iface_binding` for where this happens.
+
+There are two main reasons why the mi_extra_decls field exists rather than shoe-horning
+all the core bindings
+
+1. mi_extra_decls retains the recursive group structure of the original program which
+   is very convenient as otherwise we would have to do the analysis again when loading
+   the program.
+2. There are additional local top-level bindings which don't make it into mi_decls. It's
+   best to keep these separate from mi_decls as mi_decls is used to compute the ABI hash.
 
 -}

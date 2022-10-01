@@ -7,6 +7,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -209,7 +210,7 @@ compileOne :: HscEnv
            -> Int             -- ^ module N ...
            -> Int             -- ^ ... of M
            -> Maybe ModIface  -- ^ old interface, if we have one
-           -> Maybe Linkable  -- ^ old linkable, if we have one
+           -> HomeModLinkable  -- ^ old linkable, if we have one
            -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compileOne = compileOne' (Just batchMsg)
@@ -220,7 +221,7 @@ compileOne' :: Maybe Messager
             -> Int             -- ^ module N ...
             -> Int             -- ^ ... of M
             -> Maybe ModIface  -- ^ old interface, if we have one
-            -> Maybe Linkable  -- ^ old linkable, if we have one
+            -> HomeModLinkable
             -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compileOne' mHscMessage
@@ -243,8 +244,9 @@ compileOne' mHscMessage
    let pipeline = hscPipeline pipe_env (setDumpPrefix pipe_env plugin_hsc_env, upd_summary, status)
    (iface, linkable) <- runPipeline (hsc_hooks hsc_env) pipeline
    -- See Note [ModDetails and --make mode]
-   details <- initModDetails plugin_hsc_env upd_summary iface
-   return $! HomeModInfo iface details linkable
+   details <- initModDetails plugin_hsc_env iface
+   linkable' <- traverse (initWholeCoreBindings plugin_hsc_env iface details) (homeMod_bytecode linkable)
+   return $! HomeModInfo iface details (linkable { homeMod_bytecode = linkable' })
 
  where lcl_dflags  = ms_hspp_opts summary
        location    = ms_location summary
@@ -405,7 +407,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
                           $ home_mod_infos
 
             -- the linkables to link
-            linkables = map (expectJust "link".hm_linkable) home_mod_infos
+            linkables = map (expectJust "link". homeModInfoObject) home_mod_infos
 
         debugTraceMsg logger 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
@@ -710,7 +712,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
            $ phaseIfFlag hsc_env flag def action
 
 -- | The complete compilation pipeline, from start to finish
-fullPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> m (ModIface, Maybe Linkable)
+fullPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> HscSource -> m (ModIface, HomeModLinkable)
 fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   (dflags, input_fn) <- preprocessPipeline pipe_env hsc_env pp_fn
   let hsc_env' = hscSetFlags dflags hsc_env
@@ -719,7 +721,7 @@ fullPipeline pipe_env hsc_env pp_fn src_flavour = do
   hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status)
 
 -- | Everything after preprocess
-hscPipeline :: P m => PipeEnv ->  ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, Maybe Linkable)
+hscPipeline :: P m => PipeEnv ->  ((HscEnv, ModSummary, HscRecompStatus)) -> m (ModIface, HomeModLinkable)
 hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
   case hsc_recomp_status of
     HscUpToDate iface mb_linkable -> return (iface, mb_linkable)
@@ -728,7 +730,7 @@ hscPipeline pipe_env (hsc_env_with_plugins, mod_sum, hsc_recomp_status) = do
       hscBackendAction <- use (T_HscPostTc hsc_env_with_plugins mod_sum tc_result warnings mb_old_hash )
       hscBackendPipeline pipe_env hsc_env_with_plugins mod_sum hscBackendAction
 
-hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, Maybe Linkable)
+hscBackendPipeline :: P m => PipeEnv -> HscEnv -> ModSummary -> HscBackendAction -> m (ModIface, HomeModLinkable)
 hscBackendPipeline pipe_env hsc_env mod_sum result =
   if backendGeneratesCode (backend (hsc_dflags hsc_env)) then
     do
@@ -739,8 +741,8 @@ hscBackendPipeline pipe_env hsc_env mod_sum result =
       return res
   else
     case result of
-      HscUpdate iface ->  return (iface, Nothing)
-      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing) <*> pure Nothing
+      HscUpdate iface ->  return (iface, emptyHomeModInfoLinkable)
+      HscRecomp {} -> (,) <$> liftIO (mkFullIface hsc_env (hscs_partial_iface result) Nothing) <*> pure emptyHomeModInfoLinkable
     -- TODO: Why is there not a linkable?
     -- Interpreter -> (,) <$> use (T_IO (mkFullIface hsc_env (hscs_partial_iface result) Nothing)) <*> pure Nothing
 
@@ -749,7 +751,7 @@ hscGenBackendPipeline :: P m
   -> HscEnv
   -> ModSummary
   -> HscBackendAction
-  -> m (ModIface, Maybe Linkable)
+  -> m (ModIface, HomeModLinkable)
 hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
   let mod_name = moduleName (ms_mod mod_sum)
       src_flavour = (ms_hsc_src mod_sum)
@@ -764,7 +766,8 @@ hscGenBackendPipeline pipe_env hsc_env mod_sum result = do
         unlinked_time <- liftIO (liftIO getCurrentTime)
         final_unlinked <- DotO <$> use (T_MergeForeign pipe_env hsc_env o_fp fos)
         let !linkable = LM unlinked_time (ms_mod mod_sum) [final_unlinked]
-        return (Just linkable)
+        -- Add the object linkable to the potential bytecode linkable which was generated in HscBackend.
+        return (mlinkable { homeMod_object = Just linkable })
   return (miface, final_linkable)
 
 asPipeline :: P m => Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m (Maybe ObjFile)
@@ -860,7 +863,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    as :: P m => Bool -> m (Maybe FilePath)
    as use_cpp = asPipeline use_cpp pipe_env hsc_env Nothing input_fn
 
-   objFromLinkable (_, Just (LM _ _ [DotO lnk])) = Just lnk
+   objFromLinkable (_, homeMod_object -> Just (LM _ _ [DotO lnk])) = Just lnk
    objFromLinkable _ = Nothing
 
 

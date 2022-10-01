@@ -3,6 +3,7 @@
 
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -46,11 +47,16 @@ module GHC.Driver.Main
     , Messager, batchMsg, batchMultiMsg
     , HscBackendAction (..), HscRecompStatus (..)
     , initModDetails
+    , initWholeCoreBindings
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
     , hscGenHardCode
     , hscInteractive
+    , mkCgInteractiveGuts
+    , CgInteractiveGuts
+    , generateByteCode
+    , generateFreshByteCode
 
     -- * Running passes separately
     , hscRecompStatus
@@ -146,7 +152,7 @@ import GHC.HsToCore
 
 import GHC.StgToByteCode    ( byteCodeGen )
 
-import GHC.IfaceToCore  ( typecheckIface )
+import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
 import GHC.Iface.Load   ( ifaceStats, writeIface )
 import GHC.Iface.Make
@@ -261,13 +267,20 @@ import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
-import System.IO (fixIO)
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty ((:|)))
+import GHC.Unit.Module.WholeCoreBindings
+import GHC.Types.TypeEnv
+import System.IO
+import {-# SOURCE #-} GHC.Driver.Pipeline
+import Data.Time
+
+import System.IO.Unsafe ( unsafeInterleaveIO )
+import GHC.Iface.Env ( trace_if )
 
 
 {- **********************************************************************
@@ -674,7 +687,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                     Nothing -> hscParse' mod_summary
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
-                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 mod_summary
+                then do (iface, _) <- liftIO $ hscSimpleIface hsc_env Nothing tc_result0 mod_summary
                         ioMsgMaybe $ hoistTcRnMessage $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
@@ -804,7 +817,7 @@ hscRecompStatus :: Maybe Messager
                 -> HscEnv
                 -> ModSummary
                 -> Maybe ModIface
-                -> Maybe Linkable
+                -> HomeModLinkable
                 -> (Int,Int)
                 -> IO HscRecompStatus
 hscRecompStatus
@@ -833,26 +846,60 @@ hscRecompStatus
         if not (backendGeneratesCode (backend lcl_dflags)) then
             -- No need for a linkable, we're good to go
           do msg $ UpToDate
-             return $ HscUpToDate checked_iface Nothing
+             return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
         else
           -- Do need linkable
           do
-            -- Check to see whether the expected build products already exist.
-            -- If they don't exists then we trigger recompilation.
-            recomp_linkable_result <- case () of
-               -- Interpreter can use either already loaded bytecode or loaded object code
-               _ | backendCanReuseLoadedCode (backend lcl_dflags) -> do
-                     let res = checkByteCode old_linkable
-                     case res of
-                       UpToDateItem _ -> pure res
-                       _ -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-                 -- Need object files for making object files
-                 | backendWritesFiles (backend lcl_dflags) -> liftIO $ checkObjects lcl_dflags old_linkable mod_summary
-                 | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
+            -- 1. Just check whether we have bytecode/object linkables and then
+            -- we will decide if we need them or not.
+            bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
+            obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
+            trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
+
+            let just_bc = justBytecode <$> bc_linkable
+                just_o  = justObjects  <$> obj_linkable
+                _maybe_both_os = case (bc_linkable, obj_linkable) of
+                            (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
+                            -- If missing object code, just say we need to recompile because of object code.
+                            (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
+                            -- If just missing byte code, just use the object code
+                            -- so you should use -fprefer-byte-code with -fwrite-if-simplfied-core or you'll
+                            -- end up using bytecode on recompilation
+                            (_, UpToDateItem {} ) -> just_o
+
+                definitely_both_os = case (bc_linkable, obj_linkable) of
+                            (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
+                            -- If missing object code, just say we need to recompile because of object code.
+                            (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
+                            -- If just missing byte code, just use the object code
+                            -- so you should use -fprefer-byte-code with -fwrite-if-simplfied-core or you'll
+                            -- end up using bytecode on recompilation
+                            (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
+
+--            pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
+            -- 2. Decide which of the products we will need
+            let recomp_linkable_result = case () of
+                  _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
+                        case bc_linkable of
+                          -- If bytecode is available for Interactive then don't load object code
+                          UpToDateItem _ -> just_bc
+                          _ -> case obj_linkable of
+                                  -- If o is availabe, then just use that
+                                  UpToDateItem _ -> just_o
+                                  _ -> outOfDateItemBecause MissingBytecode Nothing
+                     -- Need object files for making object files
+                     | backendWritesFiles (backend lcl_dflags) ->
+                        if gopt Opt_ByteCodeAndObjectCode lcl_dflags
+                          -- We say we are going to write both, so recompile unless we have both
+                          then definitely_both_os
+                          -- Only load the object file unless we are saying we need to produce both.
+                          -- Unless we do this then you can end up using byte-code for a module you specify -fobject-code for.
+                          else just_o
+                     | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
             case recomp_linkable_result of
               UpToDateItem linkable -> do
                 msg $ UpToDate
-                return $ HscUpToDate checked_iface $ Just linkable
+                return $ HscUpToDate checked_iface $ linkable
               OutOfDateItem reason _ -> do
                 msg $ NeedsRecompile reason
                 return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
@@ -892,14 +939,24 @@ checkObjects dflags mb_old_linkable summary = do
 -- | Check to see if we can reuse the old linkable, by this point we will
 -- have just checked that the old interface matches up with the source hash, so
 -- no need to check that again here
-checkByteCode :: Maybe Linkable -> MaybeValidated Linkable
-checkByteCode mb_old_linkable =
+checkByteCode :: ModIface -> ModSummary -> Maybe Linkable -> IO (MaybeValidated Linkable)
+checkByteCode iface mod_sum mb_old_linkable =
   case mb_old_linkable of
     Just old_linkable
       | not (isObjectLinkable old_linkable)
-      -> UpToDateItem old_linkable
-    _ -> outOfDateItemBecause MissingBytecode Nothing
+      -> return $ (UpToDateItem old_linkable)
+    _ -> loadByteCode iface mod_sum
 
+loadByteCode :: ModIface -> ModSummary -> IO (MaybeValidated Linkable)
+loadByteCode iface mod_sum = do
+    let
+      this_mod   = ms_mod mod_sum
+      if_date    = fromJust $ ms_iface_date mod_sum
+    case mi_extra_decls iface of
+      Just extra_decls -> do
+          let fi = WholeCoreBindings extra_decls this_mod (ms_location mod_sum)
+          return (UpToDateItem (LM if_date this_mod [CoreBindings fi]))
+      _ -> return $ outOfDateItemBecause MissingBytecode Nothing
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
@@ -907,11 +964,11 @@ checkByteCode mb_old_linkable =
 
 -- Knot tying!  See Note [Knot-tying typecheckIface]
 -- See Note [ModDetails and --make mode]
-initModDetails :: HscEnv -> ModSummary -> ModIface -> IO ModDetails
-initModDetails hsc_env mod_summary iface =
+initModDetails :: HscEnv -> ModIface -> IO ModDetails
+initModDetails hsc_env iface =
   fixIO $ \details' -> do
-    let act hpt  = addToHpt hpt (ms_mod_name mod_summary)
-                                (HomeModInfo iface details' Nothing)
+    let act hpt  = addToHpt hpt (moduleName $ mi_module iface)
+                                (HomeModInfo iface details' emptyHomeModInfoLinkable)
     let !hsc_env' = hscUpdateHPT act hsc_env
     -- NB: This result is actually not that useful
     -- in one-shot mode, since we're not going to do
@@ -919,6 +976,29 @@ initModDetails hsc_env mod_summary iface =
     -- in make mode, since this HMI will go into the HPT.
     genModDetails hsc_env' iface
 
+-- Hydrate any WholeCoreBindings linkables into BCOs
+initWholeCoreBindings :: HscEnv -> ModIface -> ModDetails -> Linkable -> IO Linkable
+initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM utc_time this_mod <$> mapM go uls
+  where
+    go (CoreBindings fi) = do
+        let act hpt  = addToHpt hpt (moduleName $ mi_module mod_iface)
+                                (HomeModInfo mod_iface details emptyHomeModInfoLinkable)
+        types_var <- newIORef (md_types details)
+        let kv = knotVarsFromModuleEnv (mkModuleEnv [(this_mod, types_var)])
+        let hsc_env' = hscUpdateHPT act hsc_env { hsc_type_env_vars = kv }
+        core_binds <- initIfaceCheck (text "l") hsc_env' $ typecheckWholeCoreBindings types_var fi
+        -- MP: The NoStubs here is only from (I think) the TH `qAddForeignFilePath` feature but it's a bit unclear what to do
+        -- with these files, do we have to read and serialise the foreign file? I will leave it for now until someone
+        -- reports a bug.
+        let cgi_guts = CgInteractiveGuts this_mod core_binds (typeEnvTyCons (md_types details)) NoStubs Nothing []
+        -- The bytecode generation itself is lazy because otherwise even when doing
+        -- recompilation checking the bytecode will be generated (which slows things down a lot)
+        -- the laziness is OK because generateByteCode just depends on things already loaded
+        -- in the interface file.
+        LoadedBCOs <$> (unsafeInterleaveIO $ do
+                  trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
+                  generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
+    go ul = return ul
 
 {-
 Note [ModDetails and --make mode]
@@ -1018,7 +1098,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
                 {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details summary simplified_guts)
+                force (mkPartialIface hsc_env (cg_binds cg_guts) details summary simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
@@ -1026,11 +1106,29 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
                              hscs_old_iface_hash = mb_old_hash
                            }
 
-      -- We are not generating code, so we can skip simplification
+      Just desugared_guts | gopt Opt_WriteIfSimplifedCore dflags -> do
+          -- If -fno-code is enabled (hence we fall through to this case)
+          -- Running the simplifier once is necessary before doing byte code generation
+          -- in order to inline data con wrappers but we honour whatever level of simplificication the
+          -- user requested. See #22008 for some discussion.
+          plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+          simplified_guts <- hscSimplify' plugins desugared_guts
+          (cg_guts, _) <-
+              liftIO $ hscTidy hsc_env simplified_guts
+
+          (iface, _details) <- liftIO $
+            hscSimpleIface hsc_env (Just $ cg_binds cg_guts) tc_result summary
+
+          liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
+
+          return $ HscUpdate iface
+
+
+      -- We are not generating code or writing an interface with simplfied core so we can skip simplification
       -- and generate a simple interface.
       _ -> do
         (iface, _details) <- liftIO $
-          hscSimpleIface hsc_env tc_result summary
+          hscSimpleIface hsc_env Nothing tc_result summary
 
         liftIO $ hscMaybeWriteIface logger dflags True iface mb_old_hash (ms_location summary)
 
@@ -1642,16 +1740,18 @@ hscSimplify' plugins ds_result = do
 -- | Generate a stripped down interface file, e.g. for boot files or when ghci
 -- generates interface files. See Note [simpleTidyPgm - mkBootModDetailsTc]
 hscSimpleIface :: HscEnv
+               -> Maybe CoreProgram
                -> TcGblEnv
                -> ModSummary
                -> IO (ModIface, ModDetails)
-hscSimpleIface hsc_env tc_result summary
-    = runHsc hsc_env $ hscSimpleIface' tc_result summary
+hscSimpleIface hsc_env mb_core_program tc_result summary
+    = runHsc hsc_env $ hscSimpleIface' mb_core_program tc_result summary
 
-hscSimpleIface' :: TcGblEnv
+hscSimpleIface' :: Maybe CoreProgram
+                -> TcGblEnv
                 -> ModSummary
                 -> Hsc (ModIface, ModDetails)
-hscSimpleIface' tc_result summary = do
+hscSimpleIface' mb_core_program tc_result summary = do
     hsc_env   <- getHscEnv
     logger    <- getLogger
     details   <- liftIO $ mkBootModDetailsTc logger tc_result
@@ -1659,7 +1759,7 @@ hscSimpleIface' tc_result summary = do
     new_iface
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
-               mkIfaceTc hsc_env safe_mode details summary tc_result
+               mkIfaceTc hsc_env safe_mode details summary mb_core_program tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, details)
@@ -1770,22 +1870,35 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             return (output_filename, stub_c_exists, foreign_fps, Just cg_infos)
 
 
+-- The part of CgGuts that we need for HscInteractive
+data CgInteractiveGuts = CgInteractiveGuts { cgi_module :: Module
+                                           , cgi_binds  :: CoreProgram
+                                           , cgi_tycons :: [TyCon]
+                                           , cgi_foreign :: ForeignStubs
+                                           , cgi_modBreaks ::  Maybe ModBreaks
+                                           , cgi_spt_entries :: [SptEntry]
+                                           }
+
+mkCgInteractiveGuts :: CgGuts -> CgInteractiveGuts
+mkCgInteractiveGuts CgGuts{cg_module, cg_binds, cg_tycons, cg_foreign, cg_modBreaks, cg_spt_entries}
+  = CgInteractiveGuts cg_module cg_binds cg_tycons cg_foreign cg_modBreaks cg_spt_entries
+
 hscInteractive :: HscEnv
-               -> CgGuts
+               -> CgInteractiveGuts
                -> ModLocation
                -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
 hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let logger = hsc_logger hsc_env
     let tmpfs  = hsc_tmpfs hsc_env
-    let CgGuts{ -- This is the last use of the ModGuts in a compilation.
+    let CgInteractiveGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
-               cg_module   = this_mod,
-               cg_binds    = core_binds,
-               cg_tycons   = tycons,
-               cg_foreign  = foreign_stubs,
-               cg_modBreaks = mod_breaks,
-               cg_spt_entries = spt_entries } = cgguts
+               cgi_module   = this_mod,
+               cgi_binds    = core_binds,
+               cgi_tycons   = tycons,
+               cgi_foreign  = foreign_stubs,
+               cgi_modBreaks = mod_breaks,
+               cgi_spt_entries = spt_entries } = cgguts
 
         data_tycons = filter isDataTyCon tycons
         -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1812,6 +1925,32 @@ hscInteractive hsc_env cgguts location = do
         <- outputForeignStubs logger tmpfs dflags (hsc_units hsc_env) this_mod location foreign_stubs
     return (istub_c_exists, comp_bc, spt_entries)
 
+generateByteCode :: HscEnv
+  -> CgInteractiveGuts
+  -> ModLocation
+  -> IO [Unlinked]
+generateByteCode hsc_env cgguts mod_location = do
+  (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
+
+  stub_o <- case hasStub of
+            Nothing -> return []
+            Just stub_c -> do
+                stub_o <- compileForeign hsc_env LangC stub_c
+                return [DotO stub_o]
+
+  let hs_unlinked = [BCOs comp_bc spt_entries]
+  return (hs_unlinked ++ stub_o)
+
+generateFreshByteCode :: HscEnv
+  -> ModuleName
+  -> CgInteractiveGuts
+  -> ModLocation
+  -> IO Linkable
+generateFreshByteCode hsc_env mod_name cgguts mod_location = do
+  ul <- generateByteCode hsc_env cgguts mod_location
+  unlinked_time <- getCurrentTime
+  let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name) ul
+  return linkable
 ------------------------------
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> FilePath -> IO (Maybe FilePath)

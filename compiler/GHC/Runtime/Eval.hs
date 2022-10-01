@@ -62,7 +62,6 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
-import GHC.Linker.Types
 import GHC.Linker.Loader as Loader
 
 import GHC.Hs
@@ -1242,17 +1241,18 @@ dynCompileExpr expr = do
 showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
     withSession $ \hsc_env -> do
-        interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
+        let interpreted =
+              case lookupHug (hsc_HUG hsc_env) (ms_unitid mod_summary) (ms_mod_name mod_summary) of
+               Nothing       -> panic "missing linkable"
+               Just mod_info -> isJust (homeModInfoByteCode mod_info)  && isNothing (homeModInfoObject mod_info)
         return (showSDoc dflags $ showModMsg dflags interpreted (ModuleNode [] mod_summary))
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
-  case lookupHpt (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
+  case lookupHug (hsc_HUG hsc_env) (ms_unitid mod_summary) (ms_mod_name mod_summary) of
         Nothing       -> panic "missing linkable"
-        Just mod_info -> return $ case hm_linkable mod_info of
-          Nothing       -> True
-          Just linkable -> not (isObjectLinkable linkable)
+        Just mod_info -> return . isNothing $ homeModInfoByteCode mod_info
 
 ----------------------------------------------------------------------------
 -- RTTI primitives

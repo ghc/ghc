@@ -70,7 +70,7 @@ import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.Deps
 
 import Control.Monad
-import Data.List (sortBy, sort)
+import Data.List (sortBy, sort, sortOn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Word (Word64)
@@ -136,6 +136,10 @@ data MaybeValidated a
       (Maybe a)
       -- ^ The old item, if it exists
   deriving (Functor)
+
+instance Outputable a => Outputable (MaybeValidated a) where
+  ppr (UpToDateItem a) = text "UpToDate" <+> ppr a
+  ppr (OutOfDateItem r _) = text "OutOfDate: " <+> ppr r
 
 outOfDateItemBecause :: RecompReason -> Maybe a -> MaybeValidated a
 outOfDateItemBecause reason item = OutOfDateItem (RecompBecause reason) item
@@ -1197,6 +1201,16 @@ addFingerprints hsc_env iface0
        sorted_decls = Map.elems $ Map.fromList $
                           [(getOccName d, e) | e@(_, d) <- decls_w_hashes]
 
+       -- This key is safe because mi_extra_decls contains tidied things.
+       getOcc (IfGblTopBndr b) = getOccName b
+       getOcc (IfLclTopBndr fs _ _ _) = mkVarOccFS fs
+
+       binding_key (IfaceNonRec b _) = IfaceNonRec (getOcc b) ()
+       binding_key (IfaceRec bs) = IfaceRec (map (\(b, _) -> (getOcc b, ())) bs)
+
+       sorted_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
+       sorted_extra_decls = sortOn binding_key <$> mi_extra_decls iface0
+
    -- the flag hash depends on:
    --   - (some of) dflags
    -- it returns two hashes, one that shouldn't change
@@ -1254,7 +1268,7 @@ addFingerprints hsc_env iface0
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_decls = sorted_decls, mi_extra_decls = sorted_extra_decls, mi_final_exts = final_iface_exts }
    --
    return final_iface
 

@@ -22,6 +22,7 @@ import Prelude
 import System.Mem
 import System.Mem.Weak
 import GHC.Types.Unique.DFM
+import Control.Exception
 
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.
@@ -32,7 +33,7 @@ data LeakModIndicators = LeakModIndicators
   { leakMod :: Weak HomeModInfo
   , leakIface :: Weak ModIface
   , leakDetails :: Weak ModDetails
-  , leakLinkable :: Maybe (Weak Linkable)
+  , leakLinkable :: [Maybe (Weak Linkable)]
   }
 
 -- | Grab weak references to some of the data structures representing
@@ -44,8 +45,12 @@ getLeakIndicators hsc_env =
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing
-      leakLinkable <- mapM (`mkWeakPtr` Nothing) hm_linkable
+      leakLinkable <-  mkWeakLinkables hm_linkable
       return $ LeakModIndicators{..}
+  where
+    mkWeakLinkables :: HomeModLinkable -> IO [Maybe (Weak Linkable)]
+    mkWeakLinkables (HomeModLinkable mbc mo) =
+      mapM (\ln -> traverse (flip mkWeakPtr Nothing <=< evaluate) ln) [mbc, mo]
 
 -- | Look at the LeakIndicators collected by an earlier call to
 -- `getLeakIndicators`, and print messasges if any of them are still
@@ -63,7 +68,7 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
       Nothing -> return ()
       Just miface -> report ("ModIface:" ++ moduleNameString (moduleName (mi_module miface))) (Just miface)
     deRefWeak leakDetails >>= report "ModDetails"
-    forM_ leakLinkable $ \l -> deRefWeak l >>= report "Linkable"
+    forM_ leakLinkable $ \l -> forM_ l $ \l' -> deRefWeak l' >>= report "Linkable"
  where
   report :: String -> Maybe a -> IO ()
   report _ Nothing = return ()

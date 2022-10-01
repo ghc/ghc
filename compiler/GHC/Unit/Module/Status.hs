@@ -10,13 +10,13 @@ import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
 
 import GHC.Utils.Fingerprint
-import GHC.Linker.Types
 import GHC.Utils.Outputable
+import GHC.Unit.Home.ModInfo
 
 -- | Status of a module in incremental compilation
 data HscRecompStatus
     -- | Nothing to do because code already exists.
-    = HscUpToDate ModIface (Maybe Linkable)
+    = HscUpToDate ModIface HomeModLinkable
     -- | Recompilation of module, or update of interface is required. Optionally
     -- pass the old interface hash to avoid updating the existing interface when
     -- it has not changed.

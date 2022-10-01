@@ -282,12 +282,12 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
     mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = op $ msObjFilePath mod_summary
+    files    = [ obj_file ]
+               ++ [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
+               ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
     message = case backendSpecialModuleSource (backend dflags) recomp of
                 Just special -> text special
-                Nothing ->
-                  if gopt Opt_BuildDynamicToo  dflags
-                    then text obj_file <> comma <+> text dyn_file
-                    else text obj_file
+                Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (map text files)
 
 
 
