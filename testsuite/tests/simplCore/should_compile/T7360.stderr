@@ -7,7 +7,6 @@ Result size of Tidy Core
 T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int %1 -> Foo
 [GblId[DataConWrapper],
  Arity=1,
- Caf=NoCafRefs,
  Str=<SL>,
  Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

@@ -380,9 +380,10 @@ tidyProgram opts (ModGuts { mg_module           = mod
                           }) = do
 
   let implicit_binds = concatMap getImplicitBinds tcs
+      all_binds = implicit_binds ++ binds
 
-  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod binds implicit_binds imp_rules
-  let (trimmed_binds, trimmed_rules) = findExternalRules opts binds imp_rules unfold_env
+  (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod all_binds imp_rules
+  let (trimmed_binds, trimmed_rules) = findExternalRules opts all_binds imp_rules unfold_env
 
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
 
@@ -419,7 +420,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
       tidy_rules     = tidyRules tidy_env trimmed_rules
 
       -- See Note [Injecting implicit bindings]
-      all_tidy_binds = implicit_binds ++ tidy_binds'
+      all_tidy_binds = tidy_binds'
 
       -- Get the TyCons to generate code for.  Careful!  We must use
       -- the untidied TyCons here, because we need
@@ -646,12 +647,11 @@ type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
 chooseExternalIds :: TidyOpts
                   -> Module
                   -> [CoreBind]
-                  -> [CoreBind]
                   -> [CoreRule]
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds opts mod binds implicit_binds imp_id_rules
+chooseExternalIds opts mod binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -680,10 +680,9 @@ chooseExternalIds opts mod binds implicit_binds imp_id_rules
   rule_rhs_vars = mapUnionVarSet ruleRhsFreeVars imp_id_rules
 
   binders          = map fst $ flattenBinds binds
-  implicit_binders = bindersOfBinds implicit_binds
   binder_set       = mkVarSet binders
 
-  avoids   = [getOccName name | bndr <- binders ++ implicit_binders,
+  avoids   = [getOccName name | bndr <- binders,
                                 let name = idName bndr,
                                 isExternalName name ]
                 -- In computing our "avoids" list, we must include
@@ -1010,7 +1009,7 @@ findExternalRules opts binds imp_id_rules unfold_env
                 -- See Note [Which rules to expose]
 
     is_external_id id = case lookupVarEnv unfold_env id of
-                          Just (name, _) -> isExternalName name
+                          Just (name, _) -> isExternalName name && not (isImplicitId id)
                           Nothing        -> False
 
     trim_binds :: [CoreBind]
