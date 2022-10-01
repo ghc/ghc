@@ -48,7 +48,6 @@ import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
 import Data.List.NonEmpty ( NonEmpty(..) )
-import qualified Data.List.NonEmpty as NE
 
 -- import GHC.Driver.Ppr
 
@@ -344,10 +343,7 @@ desugarMatch vars (L match_loc (Match { m_pats = L _ pats, m_grhss = grhss })) =
 desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (PmGRHSs Pre)
 desugarGRHSs match_loc pp_pats grhss = do
   lcls <- desugarLocalBinds (grhssLocalBinds grhss)
-  grhss' <- traverse (desugarLGRHS match_loc pp_pats)
-              . expectJust "desugarGRHSs"
-              . NE.nonEmpty
-              $ grhssGRHSs grhss
+  grhss' <- traverse (desugarLGRHS match_loc pp_pats) (grhssGRHSs grhss)
   return PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss' }
 
 -- | Desugar a guarded right-hand side to a single 'GrdTree'
@@ -392,7 +388,7 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
       -- See Note [Long-distance information for HsLocalBinds] for why this
       -- pattern match is so very specific.
       | L _ [L _ Match{m_pats = L _ [], m_grhss = grhss}] <- mg_alts mg
-      , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
+      , GRHSs{grhssGRHSs = L _ (GRHS _ _grds rhs) :| []} <- grhss = do
           core_rhs <- dsLExpr rhs
           return (GdOne (PmLet x core_rhs))
     go (L _ (XHsBindsLR (AbsBinds

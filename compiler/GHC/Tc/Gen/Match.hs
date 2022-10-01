@@ -19,7 +19,7 @@ module GHC.Tc.Gen.Match
    ( tcFunBindMatches
    , tcCaseMatches
    , tcLambdaMatches
-   , tcGRHSList
+   , tcGRHSNE
    , tcGRHSsPat
    , TcStmtChecker
    , TcExprStmtChecker
@@ -77,9 +77,11 @@ import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Types.Basic( VisArity, isDoExpansionGenerated )
 
+import qualified GHC.Data.List.NonEmpty as NE
+
 import Control.Monad
 import Control.Arrow ( second )
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (mapMaybe)
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -300,15 +302,15 @@ tcGRHSs :: AnnoBody body
 -- but we don't need to do that any more
 tcGRHSs ctxt tc_body (GRHSs _ grhss binds) res_ty
   = do  { (binds', grhss') <- tcLocalBinds binds $ do
-                                       tcGRHSList ctxt tc_body grhss res_ty
+                                       tcGRHSNE ctxt tc_body grhss res_ty
         ; return (GRHSs emptyComments grhss' binds') }
 
-tcGRHSList :: forall body. AnnoBody body
+tcGRHSNE :: forall body. AnnoBody body
            => HsMatchContextRn -> TcMatchAltChecker body
-           -> [LGRHS GhcRn (LocatedA (body GhcRn))] -> ExpRhoType
-           -> TcM [LGRHS GhcTc (LocatedA (body GhcTc))]
-tcGRHSList ctxt tc_body grhss res_ty
-   = do { (usages, grhss') <- mapAndUnzipM (wrapLocSndMA tc_alt) grhss
+           -> NonEmpty (LGRHS GhcRn (LocatedA (body GhcRn))) -> ExpRhoType
+           -> TcM (NonEmpty (LGRHS GhcTc (LocatedA (body GhcTc))))
+tcGRHSNE ctxt tc_body grhss res_ty
+   = do { (usages, grhss') <- unzip <$> traverse (wrapLocSndMA tc_alt) grhss
         ; tcEmitBindingUsage $ supUEs usages
         ; return grhss' }
    where

@@ -157,7 +157,7 @@ import GHC.Utils.Panic
 import Control.Arrow ( first )
 import Data.Foldable ( toList )
 import Data.List ( partition )
-import Data.List.NonEmpty ( nonEmpty )
+import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 
 import Data.IntMap ( IntMap )
@@ -207,8 +207,8 @@ unguardedGRHSs loc rhs an
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
                      ~ EpAnn NoEpAnns
              => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
-             -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
-unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
+             -> NonEmpty (LGRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+unguardedRHS an loc rhs = NE.singleton $ L (noAnnSrcSpan loc) (GRHS an [] rhs)
 
 type AnnoBody p body
   = ( XMG (GhcPass p) (LocatedA (body (GhcPass p))) ~ Origin

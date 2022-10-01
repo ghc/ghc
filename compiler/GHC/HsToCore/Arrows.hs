@@ -530,7 +530,7 @@ multiple scrutinees)
 dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam _ LamSingle (MG { mg_alts
           = (L _ [L _ (Match { m_pats  = L _ pats
-                             , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })]) }))
+                             , m_grhss = GRHSs _ (L _ (GRHS _ [] body) :| _) _ })]) }))
         env_ids
   = dsCmdLam ids local_vars stack_ty res_ty pats body env_ids
 
@@ -1215,7 +1215,7 @@ leavesMatch (L _ (Match { m_pats = L _ pats
     [(body,
       mkVarSet (collectLStmtsBinders CollWithDictBinders stmts)
         `unionVarSet` defined_vars)
-    | L _ (GRHS _ stmts body) <- grhss]
+    | L _ (GRHS _ stmts body) <- toList grhss]
 
 -- Replace the leaf commands in a match
 

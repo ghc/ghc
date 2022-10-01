@@ -52,6 +52,7 @@ import Data.List (isSuffixOf, intersperse)
 import Trace.Hpc.Mix
 
 import Data.Bifunctor (second)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -527,7 +528,7 @@ addTickHsExpr (HsIf x e1 e2 e3) =
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
 addTickHsExpr (HsMultiIf ty alts)
-  = do { let isOneOfMany = case alts of [_] -> False; _ -> True
+  = do { let isOneOfMany = case alts of { (_ :| []) -> False; _ -> True; }
        ; alts' <- mapM (traverse $ addTickGRHS isOneOfMany False False) alts
        ; return $ HsMultiIf ty alts' }
 addTickHsExpr (HsLet x binds e) =

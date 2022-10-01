@@ -147,6 +147,7 @@ test('T2713', normal, compile_fail, ['-v0'])
 test('T2674', normal, compile_fail, ['-v0'])
 test('TH_emptycase', normal, compile, ['-v0'])
 test('T24046', normal, compile, ['-v0'])
+test('EmptyGuard', normal, compile_fail, ['-v0'])
 
 test('T2386', [only_ways(['normal'])], makefile_test, ['T2386'])
 

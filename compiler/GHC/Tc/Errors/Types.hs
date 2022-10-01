@@ -6782,6 +6782,7 @@ data ConversionFailReason
   | InvalidImplicitParamBinding
   | DefaultDataInstDecl ![LDataFamInstDecl GhcPs]
   | FunBindLacksEquations !TH.Name
+  | EmptyGuard
   deriving Generic
 
 data IllegalDecls

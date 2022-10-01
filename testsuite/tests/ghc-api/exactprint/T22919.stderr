@@ -107,7 +107,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T22919.hs:2:5-9 })
                (NoEpAnns)
@@ -135,7 +136,8 @@
                  (NoExtField)
                  (HsChar
                   (SourceText 's')
-                  ('s'))))))]
+                  ('s'))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

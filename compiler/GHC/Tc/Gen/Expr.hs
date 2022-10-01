@@ -56,7 +56,7 @@ import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match( tcBody, tcLambdaMatches, tcCaseMatches
-                       , tcGRHSList, tcDoStmts )
+                       , tcGRHSNE, tcDoStmts )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Zonk.TcType
@@ -528,7 +528,7 @@ Not using 'sup' caused #23814.
 -}
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { alts' <- tcGRHSList IfAlt tcBody alts res_ty
+  = do { alts' <- tcGRHSNE IfAlt tcBody alts res_ty
                   -- See Note [MultiWayIf linearity checking]
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }

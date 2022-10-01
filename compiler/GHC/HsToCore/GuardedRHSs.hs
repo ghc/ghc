@@ -24,13 +24,12 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Pmc.Types ( Nablas )
 import GHC.Core.Type ( Type )
-import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.Multiplicity
-import Control.Monad ( zipWithM )
-import Data.List.NonEmpty ( NonEmpty, toList )
+import Data.List.NonEmpty ( NonEmpty )
+import qualified GHC.Data.List.NonEmpty as NE
 
 {-
 @dsGuarded@ is used for GRHSs.
@@ -62,9 +61,8 @@ dsGRHSs :: HsMatchContextRn
                                        --   one for each GRHS.
         -> DsM (MatchResult CoreExpr)
 dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_nablas
-  = assert (notNull grhss) $
-    do { match_results <- assert (length grhss == length rhss_nablas) $
-                          zipWithM (dsGRHS hs_ctx rhs_ty) (toList rhss_nablas) grhss
+  = do { match_results <- assert (length grhss == length rhss_nablas) $
+                          NE.zipWithM (dsGRHS hs_ctx rhs_ty) rhss_nablas grhss
        ; nablas <- getPmNablas
        -- We need to remember the Nablas from the particular match context we
        -- are in, which might be different to when dsLocalBinds is actually

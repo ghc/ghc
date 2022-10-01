@@ -1966,7 +1966,8 @@
             (GRHSs
              (EpaComments
               [])
-             [(L
+             (:|
+              (L
                (EpAnn
                 (EpaSpan { DumpTypecheckedAst.hs:20:6-23 })
                 (NoEpAnns)
@@ -2019,7 +2020,8 @@
                     (NoExtField)
                     (HsString
                      (SourceText "hello")
-                     {FastString: "hello"})))))))]
+                     {FastString: "hello"})))))))
+              [])
              (EmptyLocalBinds
               (NoExtField)))))]))))]
     (False))))]

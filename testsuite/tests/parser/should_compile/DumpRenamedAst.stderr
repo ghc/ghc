@@ -70,7 +70,8 @@
                (GRHSs
                 (EpaComments
                  [])
-                [(L
+                (:|
+                 (L
                   (EpAnn
                    (EpaSpan { DumpRenamedAst.hs:35:6-23 })
                    (NoEpAnns)
@@ -123,7 +124,8 @@
                        (NoExtField)
                        (HsString
                         (SourceText "hello")
-                        {FastString: "hello"})))))))]
+                        {FastString: "hello"})))))))
+                 [])
                 (EmptyLocalBinds
                  (NoExtField)))))]))))])]
      []))

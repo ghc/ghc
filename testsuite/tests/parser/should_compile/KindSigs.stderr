@@ -1064,7 +1064,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { KindSigs.hs:23:9-12 })
                (NoEpAnns)
@@ -1103,7 +1104,8 @@
                    (EpaComments
                     []))
                   (Exact
-                   {Name: ()}))))))]
+                   {Name: ()}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1781,7 +1783,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { KindSigs.hs:35:6-11 })
                (NoEpAnns)
@@ -1815,7 +1818,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: True}))))))]
+                   {OccName: True}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

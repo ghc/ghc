@@ -75,7 +75,8 @@ import qualified Data.Data as Data (Fixity(..))
 import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import Data.Void (Void)
 
 {- *********************************************************************
@@ -804,14 +805,9 @@ ppr_expr (HsIf _ e1 e2 e3)
          nest 4 (ppr e3)]
 
 ppr_expr (HsMultiIf _ alts)
-  = hang (text "if") 3  (vcat (map ppr_alt alts))
+  = hang (text "if") 3  (vcat $ toList $ NE.map ppr_alt alts)
   where ppr_alt (L _ (GRHS _ guards expr)) =
-          hang vbar 2 (ppr_one one_alt)
-          where
-            ppr_one [] = panic "ppr_exp HsMultiIf"
-            ppr_one (h:t) = hang h 2 (sep t)
-            one_alt = [ interpp'SP guards
-                      , text "->" <+> pprDeeper (ppr expr) ]
+          hang vbar 2 (hang (interpp'SP guards) 2 (text "->" <+> pprDeeper (ppr expr)))
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
@@ -1569,18 +1565,15 @@ isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
 isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
 isSingletonMatchGroup matches
   | [L _ match] <- matches
-  , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
+  , Match { m_grhss = GRHSs { grhssGRHSs = _ :| [] } } <- match
   = True
   | otherwise
   = False
 
 matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
--- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
-matchGroupArity (MG { mg_alts = alts })
-  | L _ (alt1:_) <- alts = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
-  | otherwise            = panic "matchGroupArity"
-
+matchGroupArity MG { mg_alts = L _ [] } = 1 -- See Note [Empty mg_alts]
+matchGroupArity MG { mg_alts = L _ (alt1 : _) } = count (isVisArgPat . unLoc) (hsLMatchPats alt1)
 
 hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
 hsLMatchPats (L _ (Match { m_pats = L _ pats })) = pats
@@ -1681,7 +1674,7 @@ pprMatch (Match { m_pats = L _ pats, m_ctxt = ctxt, m_grhss = grhss })
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
          => HsMatchContext fn -> GRHSs (GhcPass idR) body -> SDoc
 pprGRHSs ctxt (GRHSs _ grhss binds)
-  = vcat (map (pprGRHS ctxt . unLoc) grhss)
+  = vcat (toList $ NE.map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
   -- EmptyLocalBinds means no "where" keyword
  $$ ppUnless (eqEmptyLocalBinds binds)
@@ -2459,7 +2452,7 @@ FieldLabelStrings
 
 instance (UnXRec p, Outputable (XRec p FieldLabelString)) => Outputable (FieldLabelStrings p) where
   ppr (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unXRec @p) flds))
+    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
 
 instance (UnXRec p, Outputable (XRec p FieldLabelString)) => OutputableBndr (FieldLabelStrings p) where
   pprInfixOcc = pprFieldLabelStrings
@@ -2471,7 +2464,7 @@ instance (UnXRec p,  Outputable (XRec p FieldLabelString)) => OutputableBndr (Lo
 
 pprFieldLabelStrings :: forall p. (UnXRec p, Outputable (XRec p FieldLabelString)) => FieldLabelStrings p -> SDoc
 pprFieldLabelStrings (FieldLabelStrings flds) =
-    hcat (punctuate dot (map (ppr . unXRec @p) flds))
+    hcat (punctuate dot (toList $ NE.map (ppr . unXRec @p) flds))
 
 pprPrefixFastString :: FastString -> SDoc
 pprPrefixFastString fs = pprPrefixOcc (mkVarUnqual fs)

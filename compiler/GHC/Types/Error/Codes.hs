@@ -778,6 +778,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "InvalidImplicitParamBinding"                   = 51603
   GhcDiagnosticCode "DefaultDataInstDecl"                           = 39639
   GhcDiagnosticCode "FunBindLacksEquations"                         = 52078
+  GhcDiagnosticCode "EmptyGuard"                                    = 45149
 
   -- TcRnDodgyImports/DodgyImportsReason
   GhcDiagnosticCode "DodgyImportsEmptyParent"                       = 99623

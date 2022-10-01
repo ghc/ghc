@@ -5705,6 +5705,8 @@ pprConversionFailReason = \case
     text "Function binding for"
     <+> quotes (text (TH.pprint nm))
     <+> text "has no equations"
+  EmptyGuard ->
+    text "Empty guard"
 
 pprTyThingUsedWrong :: WrongThingSort -> TcTyThing -> Name -> SDoc
 pprTyThingUsedWrong sort thing name =

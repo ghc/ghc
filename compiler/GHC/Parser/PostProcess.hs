@@ -174,7 +174,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty ( NonEmpty (..) )
 
 {- **********************************************************************
 
@@ -1643,7 +1643,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
   -- | Return a pattern without ambiguity, or fail in a non-pattern context.
   ecpFromPat' :: LPat GhcPs -> PV (LocatedA b)
-  mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
+  mkHsProjUpdatePV :: SrcSpan -> Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs)))
     -> LocatedA b -> Bool -> Maybe (EpToken "=") -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "let ... in ..."
   mkHsLetPV
@@ -2934,7 +2934,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
         let f = occNameFS . rdrNameOcc $ rdr
             fl = DotFieldOcc noAnn (L loc (FieldLabelString f))
             lf = locA loc
-        in mkRdrProjUpdate l (L lf [L (l2l loc) fl]) (punnedVar f) pun anns
+        in mkRdrProjUpdate l (L lf (L (l2l loc) fl :| [])) (punnedVar f) pun anns
         where
           -- If punning, compute HsVar "f" otherwise just arg. This
           -- has the effect that sentinel HsVar "pun-rhs" is replaced
@@ -3557,10 +3557,9 @@ mkRdrProjection flds anns =
     , proj_flds = fmap unLoc flds
     }
 
-mkRdrProjUpdate :: SrcSpanAnnA -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
+mkRdrProjUpdate :: SrcSpanAnnA -> Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs)))
                 -> LHsExpr GhcPs -> Bool -> Maybe (EpToken "=")
                 -> LHsRecProj GhcPs (LHsExpr GhcPs)
-mkRdrProjUpdate _ (L _ []) _ _ _ = panic "mkRdrProjUpdate: The impossible has happened!"
 mkRdrProjUpdate loc (L l flds) arg isPun anns =
   L loc HsFieldBind {
       hfbAnn = anns

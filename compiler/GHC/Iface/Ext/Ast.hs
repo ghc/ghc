@@ -433,7 +433,7 @@ getRealSpan _ = Nothing
 
 grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ EpAnn NoEpAnns)
            => GRHSs (GhcPass p) (LocatedA (body (GhcPass p))) -> SrcSpan
-grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (spanHsLocaLBinds bs) (map getLocA xs)
+grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (spanHsLocaLBinds bs) (NE.map getLocA xs)
 
 bindingsOnly :: [Context Name] -> HieM [HieAST a]
 bindingsOnly [] = pure []

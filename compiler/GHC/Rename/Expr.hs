@@ -28,7 +28,7 @@ module GHC.Rename.Expr (
         AnnoBody, UnexpectedStatement(..)
    ) where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, scanl, tail)
 import GHC.Hs
 
 import GHC.Tc.Errors.Types
@@ -63,6 +63,7 @@ import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Misc
+import qualified GHC.Data.List.NonEmpty as NE
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
@@ -77,12 +78,12 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
 import Data.List (unzip4, minimumBy)
-import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
+import Data.List.NonEmpty ( NonEmpty(..), head, init, last, nonEmpty, scanl, tail )
 import Control.Arrow (first)
 import Data.Ord
 import Data.Array
-import qualified Data.List.NonEmpty as NE
 import GHC.Driver.Env (HscEnv)
+import Data.Foldable (toList)
 
 {- Note [Handling overloaded and rebindable constructs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -890,7 +891,7 @@ rnDotFieldOcc :: DotFieldOcc GhcPs ->  DotFieldOcc GhcRn
 rnDotFieldOcc (DotFieldOcc x label) = DotFieldOcc x label
 
 rnFieldLabelStrings :: FieldLabelStrings GhcPs -> FieldLabelStrings GhcRn
-rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (map (fmap rnDotFieldOcc) fls)
+rnFieldLabelStrings (FieldLabelStrings fls) = FieldLabelStrings (fmap (fmap rnDotFieldOcc) fls)
 
 {-
 ************************************************************************
@@ -1033,7 +1034,8 @@ methodNamesMatch (MG { mg_alts = L _ ms })
 -------------------------------------------------
 -- gaw 2004
 methodNamesGRHSs :: GRHSs GhcRn (LHsCmd GhcRn) -> FreeVars
-methodNamesGRHSs (GRHSs _ grhss _) = plusFVs (map methodNamesGRHS grhss)
+methodNamesGRHSs (GRHSs _ grhss _)
+  = foldl' (flip plusFV) emptyFVs (NE.map methodNamesGRHS grhss)
 
 -------------------------------------------------
 
@@ -1803,7 +1805,7 @@ be used later.
 
 glomSegments :: HsStmtContextRn
              -> [Segment (LStmt GhcRn body)]
-             -> [Segment [LStmt GhcRn body]]
+             -> [Segment (NonEmpty (LStmt GhcRn body))]
                                   -- Each segment has a non-empty list of Stmts
 -- See Note [Glomming segments]
 
@@ -1819,7 +1821,7 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
     seg_defs  = plusFVs ds `plusFV` defs
     seg_uses  = plusFVs us `plusFV` uses
     seg_fwds  = plusFVs fs `plusFV` fwds
-    seg_stmts = stmt : concat ss
+    seg_stmts = stmt :| concatMap toList ss
 
     grab :: NameSet             -- The client
          -> [Segment a]
@@ -1835,24 +1837,23 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
 ----------------------------------------------------
 segsToStmts :: Stmt GhcRn (LocatedA (body GhcRn))
                                   -- A RecStmt with the SyntaxOps filled in
-            -> [Segment [LStmt GhcRn (LocatedA (body GhcRn))]]
+            -> [Segment (NonEmpty (LStmt GhcRn (LocatedA (body GhcRn))))]
                                   -- Each Segment has a non-empty list of Stmts
             -> FreeVars           -- Free vars used 'later'
             -> ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
 
 segsToStmts _ [] fvs_later = ([], fvs_later)
 segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
-  = assert (not (null ss))
-    (new_stmt : later_stmts, later_uses `plusFV` uses)
+  = (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
     new_stmt | non_rec   = head ss
              | otherwise = L (getLoc (head ss)) rec_stmt
-    rec_stmt = empty_rec_stmt { recS_stmts     = noLocA ss
+    rec_stmt = empty_rec_stmt { recS_stmts     = noLocA (toList ss)
                               , recS_later_ids = nameSetElemsStable used_later
                               , recS_rec_ids   = nameSetElemsStable fwds }
           -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
-    non_rec    = isSingleton ss && isEmptyNameSet fwds
+    non_rec    = NE.isSingleton ss && isEmptyNameSet fwds
     used_later = defs `intersectNameSet` later_uses
                                 -- The ones needed after the RecStmt
 
@@ -2246,7 +2247,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
          tup = mkBigLHsVarTup pvars noExtField
      (stmts',fvs2) <- stmtTreeToStmts monad_names ctxt tree [] pvarset
      (mb_ret, fvs1) <-
-        if | L _ (XStmtLR ApplicativeStmt{}) <- last stmts' ->
+        if | Just (L _ (XStmtLR ApplicativeStmt{})) <- lastMaybe stmts' ->
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
              -- Need 'pureAName' and not 'returnMName' here, so that it requires
@@ -2840,7 +2841,7 @@ rnHsIf p b1 b2
 -- mkGetField arg field calculates a get_field @field arg expression.
 -- e.g. z.x = mkGetField z x = get_field @x z
 mkGetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> HsExpr GhcRn
-mkGetField get_field arg field = unLoc (head $ mkGet get_field [arg] field)
+mkGetField get_field arg field = unLoc (head $ mkGet get_field (arg :| []) field)
 
 -- mkSetField a field b calculates a set_field @field expression.
 -- e.g mkSetSetField a field b = set_field @"field" a b (read as "set field 'field' to a on b").
@@ -2849,10 +2850,9 @@ mkSetField :: Name -> LHsExpr GhcRn -> LocatedAn NoEpAnns FieldLabelString -> LH
 mkSetField set_field a (L _ (FieldLabelString field)) b =
   genHsApp (genHsApp (genHsVar set_field `genAppType` genHsTyLit field) b) a
 
-mkGet :: Name -> [LHsExpr GhcRn] -> LocatedAn NoEpAnns FieldLabelString -> [LHsExpr GhcRn]
-mkGet get_field l@(r : _) (L _ (FieldLabelString field)) =
-  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) : l
-mkGet _ [] _ = panic "mkGet : The impossible has happened!"
+mkGet :: Name -> NonEmpty (LHsExpr GhcRn) -> LocatedAn NoEpAnns FieldLabelString -> NonEmpty (LHsExpr GhcRn)
+mkGet get_field l@(r :| _) (L _ (FieldLabelString field)) =
+  wrapGenSpan (genHsApp (genHsVar get_field `genAppType` genHsTyLit field) r) NE.<| l
 
 mkSet :: Name -> LHsExpr GhcRn -> (LocatedAn NoEpAnns FieldLabelString, LHsExpr GhcRn) -> LHsExpr GhcRn
 mkSet set_field acc (field, g) = wrapGenSpan (mkSetField set_field g field acc)
@@ -2875,10 +2875,10 @@ mkProjection getFieldName circName (field :| fields) = foldl' f (proj field) fie
 mkProjUpdateSetField :: Name -> Name -> LHsRecProj GhcRn (LHsExpr GhcRn) -> (LHsExpr GhcRn -> LHsExpr GhcRn)
 mkProjUpdateSetField get_field set_field (L _ (HsFieldBind { hfbLHS = (L _ (FieldLabelStrings flds')), hfbRHS = arg } ))
   = let {
-      ; flds = map (fmap (unLoc . dfoLabel)) flds'
+      ; flds = NE.map (fmap (unLoc . dfoLabel)) flds'
       ; final = last flds  -- quux
       ; fields = init flds   -- [foo, bar, baz]
-      ; getters = \a -> foldl' (mkGet get_field) [a] fields  -- Ordered from deep to shallow.
+      ; getters = \a -> foldl' (mkGet get_field) (a :| []) fields  -- Ordered from deep to shallow.
           -- [getField@"baz"(getField@"bar"(getField@"foo" a), getField@"bar"(getField@"foo" a), getField@"foo" a, a]
       ; zips = \a -> (final, head (getters a)) : zip (reverse fields) (tail (getters a)) -- Ordered from deep to shallow.
           -- [("quux", getField@"baz"(getField@"bar"(getField@"foo" a)), ("baz", getField@"bar"(getField@"foo" a)), ("bar", getField@"foo" a), ("foo", a)]

@@ -129,7 +129,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { mod185.hs:5:6-24 })
                (NoEpAnns)
@@ -164,7 +165,8 @@
                     []))
                   (Qual
                    {ModuleName: Prelude}
-                   {OccName: undefined}))))))]
+                   {OccName: undefined}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

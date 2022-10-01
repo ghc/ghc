@@ -127,7 +127,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpParsedAstComments.hs:9:5-7 })
                (NoEpAnns)
@@ -159,7 +160,8 @@
                    (IL
                     (SourceText 1)
                     (False)
-                    (1))))))))]
+                    (1))))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -246,7 +248,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpParsedAstComments.hs:(14,5)-(16,3) })
                (NoEpAnns)
@@ -324,7 +327,8 @@
                           (False)
                           (1))))))
                      (NoExtField)
-                     (NoExtField)))])))))]
+                     (NoExtField)))])))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -397,7 +401,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpParsedAstComments.hs:19:6-23 })
                (NoEpAnns)
@@ -452,7 +457,8 @@
                    (NoExtField)
                    (HsString
                     (SourceText "hello")
-                    {FastString: "hello"})))))))]
+                    {FastString: "hello"})))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

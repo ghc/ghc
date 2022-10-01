@@ -316,7 +316,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:(10,5)-(12,3) })
                (NoEpAnns)
@@ -468,7 +469,8 @@
                         (Unqual
                          {OccName: a}))))
                      (NoExtField)
-                     (NoExtField)))])))))]
+                     (NoExtField)))])))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -627,7 +629,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:(15,5)-(19,3) })
                (NoEpAnns)
@@ -740,7 +743,8 @@
                         (Unqual
                          {OccName: b}))))
                      (NoExtField)
-                     (NoExtField)))])))))]
+                     (NoExtField)))])))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -890,7 +894,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:22:5-30 })
                (NoEpAnns)
@@ -1039,7 +1044,8 @@
                         (Unqual
                          {OccName: s}))))
                      (NoExtField)
-                     (NoExtField)))])))))]
+                     (NoExtField)))])))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1106,7 +1112,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:24:3-13 })
                (NoEpAnns)
@@ -1140,7 +1147,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: undefined}))))))]
+                   {OccName: undefined}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1207,7 +1215,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:25:3-13 })
                (NoEpAnns)
@@ -1241,7 +1250,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: undefined}))))))]
+                   {OccName: undefined}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1310,7 +1320,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:26:3-13 })
                (NoEpAnns)
@@ -1344,7 +1355,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: undefined}))))))]
+                   {OccName: undefined}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1830,7 +1842,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:32:5-7 })
                (NoEpAnns)
@@ -1864,7 +1877,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: x}))))))]
+                   {OccName: x}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -1936,7 +1950,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:34:9-35 })
                (NoEpAnns)
@@ -2058,7 +2073,8 @@
                            (GRHSs
                             (EpaComments
                              [])
-                            [(L
+                            (:|
+                             (L
                               (EpAnn
                                (EpaSpan { DumpSemis.hs:34:20-21 })
                                (NoEpAnns)
@@ -2090,7 +2106,8 @@
                                    (IL
                                     (SourceText 2)
                                     (False)
-                                    (2))))))))]
+                                    (2))))))))
+                             [])
                             (EmptyLocalBinds
                              (NoExtField)))))]))))
                    ,(L
@@ -2166,7 +2183,8 @@
                            (GRHSs
                             (EpaComments
                              [])
-                            [(L
+                            (:|
+                             (L
                               (EpAnn
                                (EpaSpan { DumpSemis.hs:34:25-26 })
                                (NoEpAnns)
@@ -2198,7 +2216,8 @@
                                    (IL
                                     (SourceText 3)
                                     (False)
-                                    (3))))))))]
+                                    (3))))))))
+                             [])
                             (EmptyLocalBinds
                              (NoExtField)))))]))))]
                    []))
@@ -2219,7 +2238,8 @@
                      (EpaComments
                       []))
                     (Unqual
-                     {OccName: y}))))))))]
+                     {OccName: y}))))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
@@ -2305,7 +2325,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { DumpSemis.hs:(36,7)-(44,4) })
                (NoEpAnns)
@@ -2415,7 +2436,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:39:8-13 })
                           (NoEpAnns)
@@ -2444,7 +2466,8 @@
                             (NoExtField)
                             (HsChar
                              (SourceText 'a')
-                             ('a'))))))]
+                             ('a'))))))
+                        [])
                        (EmptyLocalBinds
                         (NoExtField)))))
                    ,(L
@@ -2488,7 +2511,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:40:8-13 })
                           (NoEpAnns)
@@ -2517,7 +2541,8 @@
                             (NoExtField)
                             (HsChar
                              (SourceText 'b')
-                             ('b'))))))]
+                             ('b'))))))
+                        [])
                        (EmptyLocalBinds
                         (NoExtField)))))
                    ,(L
@@ -2564,7 +2589,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:41:8-13 })
                           (NoEpAnns)
@@ -2593,7 +2619,8 @@
                             (NoExtField)
                             (HsChar
                              (SourceText 'c')
-                             ('c'))))))]
+                             ('c'))))))
+                        [])
                        (EmptyLocalBinds
                         (NoExtField)))))
                    ,(L
@@ -2643,7 +2670,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { DumpSemis.hs:42:8-13 })
                           (NoEpAnns)
@@ -2672,9 +2700,11 @@
                             (NoExtField)
                             (HsChar
                              (SourceText 'd')
-                             ('d'))))))]
+                             ('d'))))))
+                        [])
                        (EmptyLocalBinds
-                        (NoExtField)))))]))))))]
+                        (NoExtField)))))]))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

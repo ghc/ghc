@@ -107,7 +107,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test20297.hs:5:5-7 })
                (NoEpAnns)
@@ -147,7 +148,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: x}))))))]
+                   {OccName: x}))))))
+             [])
             (HsValBinds
              (EpAnn
               (EpaSpan { <no location info> })
@@ -235,7 +237,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test20297.hs:9:5-7 })
                (NoEpAnns)
@@ -269,7 +272,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: x}))))))]
+                   {OccName: x}))))))
+             [])
             (HsValBinds
              (EpAnn
               (EpaSpan { Test20297.hs:(10,3)-(11,26) })
@@ -353,7 +357,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { Test20297.hs:11:17-26 })
                           (NoEpAnns)
@@ -427,7 +432,8 @@
                                    (Unqual
                                     {OccName: stuff}))))
                                 (NoExtField)
-                                (NoExtField)))])))))]
+                                (NoExtField)))])))))
+                        [])
                        (EmptyLocalBinds
                         (NoExtField)))))]))))]
               [])))))])))))]))
@@ -542,7 +548,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test20297.ppr.hs:4:3-5 })
                (NoEpAnns)
@@ -576,7 +583,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: x}))))))]
+                   {OccName: x}))))))
+             [])
             (HsValBinds
              (EpAnn
               (EpaSpan { <no location info> })
@@ -658,7 +666,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { Test20297.ppr.hs:7:3-5 })
                (NoEpAnns)
@@ -692,7 +701,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: x}))))))]
+                   {OccName: x}))))))
+             [])
             (HsValBinds
              (EpAnn
               (EpaSpan { Test20297.ppr.hs:(8,3)-(9,24) })
@@ -770,7 +780,8 @@
                       (GRHSs
                        (EpaComments
                         [])
-                       [(L
+                       (:|
+                        (L
                          (EpAnn
                           (EpaSpan { Test20297.ppr.hs:9:15-24 })
                           (NoEpAnns)
@@ -844,7 +855,8 @@
                                    (Unqual
                                     {OccName: stuff}))))
                                 (NoExtField)
-                                (NoExtField)))])))))]
+                                (NoExtField)))])))))
+                        [])
                        (EmptyLocalBinds
                         (NoExtField)))))]))))]
               [])))))])))))]))

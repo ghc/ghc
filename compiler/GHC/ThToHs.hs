@@ -1107,10 +1107,9 @@ cvtl e = wrapLA (cvt e)
                                        ; return $ ExplicitSum noAnn alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ mkHsIf x' y' z' noAnn }
-    cvt (MultiIfE alts)
-      | null alts      = failWith MultiWayIfWithoutAlts
-      | otherwise      = do { alts' <- mapM cvtpair alts
-                            ; return $ HsMultiIf noAnn alts' }
+    cvt (MultiIfE alts) = case nonEmpty alts of
+        Nothing -> failWith MultiWayIfWithoutAlts
+        Just alts -> HsMultiIf noAnn <$> traverse cvtpair alts
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs LetExpression ds
                             ; e' <- cvtl e; return $ HsLet noAnn  ds' e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
@@ -1385,10 +1384,12 @@ cvtMatch ctxt (TH.Match p body decs)
         ; decs' <- cvtLocalDecs WhereClause decs
         ; returnLA $ Hs.Match noExtField ctxt (noLocA [lp]) (GRHSs emptyComments g' decs') }
 
-cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
-cvtGuard (GuardedB pairs) = mapM cvtpair pairs
+cvtGuard :: TH.Body -> CvtM (NonEmpty (LGRHS GhcPs (LHsExpr GhcPs)))
+cvtGuard (GuardedB pairs) = case nonEmpty pairs of
+    Nothing -> failWith EmptyGuard
+    Just pairs -> traverse cvtpair pairs
 cvtGuard (NormalB e)      = do { e' <- cvtl e
-                               ; g' <- returnLA $ GRHS noAnn [] e'; return [g'] }
+                               ; g' <- returnLA $ GRHS noAnn [] e'; return (g' :| []) }
 
 cvtpair :: (TH.Guard, TH.Exp) -> CvtM (LGRHS GhcPs (LHsExpr GhcPs))
 cvtpair (NormalG ge,rhs) = do { ge' <- cvtl ge; rhs' <- cvtl rhs

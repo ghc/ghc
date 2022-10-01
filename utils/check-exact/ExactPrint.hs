@@ -1515,6 +1515,11 @@ instance (ExactPrint a) => ExactPrint (Maybe a) where
   setAnnotationAnchor ma _ _ _ = ma
   exact ma = mapM markAnnotated ma
 
+instance (ExactPrint a) => ExactPrint (NonEmpty a) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor ls _ _ _ = ls
+  exact ls = mapM markAnnotated ls
+
 -- ---------------------------------------------------------------------
 
 -- | 'Located (HsModule GhcPs)' corresponds to 'ParsedSource'

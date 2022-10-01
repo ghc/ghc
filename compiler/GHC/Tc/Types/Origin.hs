@@ -84,6 +84,7 @@ import GHC.Types.Unique.Supply
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.Kind as Hs
+import Data.List.NonEmpty (NonEmpty (..))
 
 {- *********************************************************************
 *                                                                      *
@@ -775,8 +776,8 @@ grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin
 grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
 
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
-lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
-lGRHSCtOrigin [L _ (GRHS _ _ (L _ e))] = exprCtOrigin e
+lGRHSCtOrigin :: NonEmpty (LGRHS GhcRn (LHsExpr GhcRn)) -> CtOrigin
+lGRHSCtOrigin (L _ (GRHS _ _ (L _ e)) :| []) = exprCtOrigin e
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
 pprCtOrigin :: CtOrigin -> SDoc

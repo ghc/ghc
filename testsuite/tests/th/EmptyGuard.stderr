@@ -1,0 +1,4 @@
+EmptyGuard.hs:7:2: error: [GHC-45149]
+    Empty guard
+    When splicing a TH declaration: foo
+

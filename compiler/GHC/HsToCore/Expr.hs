@@ -434,10 +434,6 @@ dsExpr (HsIf _ guard_expr then_expr else_expr)
        ; return $ mkIfThenElse pred b1 b2 }
 
 dsExpr (HsMultiIf res_ty alts)
-  | null alts
-  = mkErrorExpr
-
-  | otherwise
   = do { let grhss = GRHSs emptyComments  alts emptyLocalBinds
        ; rhss_nablas  <- pmcGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_nablas

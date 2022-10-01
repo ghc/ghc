@@ -90,9 +90,13 @@ supUE (UsageEnv e1 b1) (UsageEnv e2 b2) = UsageEnv (plusNameEnv_CD2 combineUsage
          combineUsage Nothing  Nothing  = pprPanic "supUE" (ppr e1 <+> ppr e2)
 -- Note: If you are changing this logic, check 'mkMultSup' in Multiplicity as well.
 
-supUEs :: [UsageEnv] -> UsageEnv
+-- Used with @f = '[]'@ and @f = 'NonEmpty'@
+supUEs :: Foldable f => f UsageEnv -> UsageEnv
 supUEs = foldr supUE bottomUE
 
+-- INLINE to ensure specialization at use site, and to avoid multiple specialization on the same
+-- type
+{-# INLINE supUEs #-}
 
 deleteUE :: NamedThing n => UsageEnv -> n -> UsageEnv
 deleteUE (UsageEnv e b) x = UsageEnv (delFromNameEnv e (getName x)) b

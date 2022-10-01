@@ -130,7 +130,7 @@ values (see function @mkRdrRecordUpd@ in 'GHC.Parser.PostProcess').
 type LFieldLabelStrings p = XRec p (FieldLabelStrings p)
 
 newtype FieldLabelStrings p =
-  FieldLabelStrings [XRec p (DotFieldOcc p)]
+  FieldLabelStrings (NonEmpty (XRec p (DotFieldOcc p)))
 
 -- Field projection updates (e.g. @foo.bar.baz = 1@). See Note
 -- [RecordDotSyntax field updates].
@@ -429,7 +429,7 @@ data HsExpr p
                 (LHsExpr p)    --  else part
 
   -- | Multi-way if
-  | HsMultiIf   (XMultiIf p) [LGRHS p (LHsExpr p)]
+  | HsMultiIf   (XMultiIf p) (NonEmpty (LGRHS p (LHsExpr p)))
 
   -- | let(rec)
   | HsLet       (XLet p)
@@ -871,10 +871,13 @@ patterns in each equation.
 
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result, and origin
-       , mg_alts    :: XRec p [LMatch p body] } -- The alternatives
+       , mg_alts    :: XRec p [LMatch p body]
+         -- The alternatives, see Note [Empty mg_alts] for what it means if 'mg_alts' is empty.
+       }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
+
   | XMatchGroup !(XXMatchGroup p body)
 
 -- | Located Match
@@ -920,6 +923,21 @@ annotations
     (&&&  ) [] [] =  []
     xs    &&&   [] =  xs
     (  &&&  ) [] ys =  ys
+
+
+Note [Empty mg_alts]
+~~~~~~~~~~~~~~~~~~~~~~
+A `MatchGroup` for a function definition must have at least one alt, as it is not possible to
+define a function by zero clauses — the compiler would consider this a missing definition,
+rather than one with no clauses.
+
+However, a `MatchGroup` for a `case` or `\ case` expression may be empty, as such an expression
+may have zero branches. (Note: A `\ cases` expression may not have zero branches; see GHC
+proposal 302).
+
+Ergo, if we have no alts, it must be either a `case` or a `\ case` expression; such expressions
+have match arity 1.
+
 -}
 
 
@@ -929,7 +947,7 @@ annotations
 data GRHSs p body
   = GRHSs {
       grhssExt :: XCGRHSs p body,
-      grhssGRHSs :: [LGRHS p body],     -- ^ Guarded RHSs
+      grhssGRHSs :: NonEmpty (LGRHS p body),     -- ^ Guarded RHSs
       grhssLocalBinds :: HsLocalBinds p -- ^ The where clause
     }
   | XGRHSs !(XXGRHSs p body)

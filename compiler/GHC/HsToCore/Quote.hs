@@ -69,6 +69,7 @@ import GHC.Utils.Monad
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import qualified GHC.Data.List.NonEmpty as NE
 
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
@@ -1585,8 +1586,8 @@ repE (HsIf _ x y z)       = do
                             c <- repLE z
                             repCond a b c
 repE (HsMultiIf _ alts)
-  = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
-       ; expr' <- repMultiIf (nonEmptyCoreList alts')
+  = do { (binds, alts') <- NE.unzip <$> mapM repLGRHS alts
+       ; expr' <- repMultiIf (nonEmptyCoreList' alts')
        ; wrapGenSyms (concat binds) expr' }
 repE (HsLet _ bs e)       = do { (ss,ds) <- repBinds bs
                                ; e2 <- addBinds ss (repLE e)
@@ -1786,13 +1787,13 @@ repClauseTup (L _ (Match { m_pats = L _ ps
      ; clause <- repClause ps1 gs ds
      ; wrapGenSyms (ss1++ss2) clause }}}
 
-repGuards ::  [LGRHS GhcRn (LHsExpr GhcRn)] ->  MetaM (Core (M TH.Body))
-repGuards [L _ (GRHS _ [] e)]
+repGuards :: NonEmpty (LGRHS GhcRn (LHsExpr GhcRn)) ->  MetaM (Core (M TH.Body))
+repGuards (L _ (GRHS _ [] e) :| [])
   = do {a <- repLE e; repNormal a }
 repGuards other
   = do { zs <- mapM repLGRHS other
-       ; let (xs, ys) = unzip zs
-       ; gd <- repGuarded (nonEmptyCoreList ys)
+       ; let (xs, ys) = NE.unzip zs
+       ; gd <- repGuarded (nonEmptyCoreList' ys)
        ; wrapGenSyms (concat xs) gd }
 
 repLGRHS :: LGRHS GhcRn (LHsExpr GhcRn)
@@ -2118,7 +2119,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = L _ ps
-                      , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
+                      , m_grhss = GRHSs _ (L _ (GRHS _ [] e) :| [])
                                               (EmptyLocalBinds _) } ))
  = do { let bndrs = collectPatsBinders CollNoDictBinders ps ;
       ; ss  <- mkGenSyms bndrs

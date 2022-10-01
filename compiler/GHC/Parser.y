@@ -42,7 +42,7 @@ where
 import Control.Monad      ( unless, liftM, when, (<=<) )
 import GHC.Exts
 import Data.Maybe         ( maybeToList )
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), head, init, last, tail )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
@@ -63,7 +63,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GHC.Utils.Panic
-import GHC.Prelude
+import GHC.Prelude hiding ( head, init, last, tail )
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
@@ -2703,11 +2703,11 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
                                                       bs)) } }
         | gdrhs wherebinds      {% do { let {L l (bs, csw) = adaptWhereBinds $2}
                                       ; acs (comb2 $1 (L l bs)) (\loc cs -> L loc
-                                                (GRHSs (cs Semi.<> csw) (reverse (unLoc $1)) bs)) }}
+                                                (GRHSs (cs Semi.<> csw) (NE.reverse (unLoc $1)) bs)) }}
 
-gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
-        : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
-        | gdrh                  { sL1 $1 [$1] }
+gdrhs :: { Located (NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
+        : gdrhs gdrh            { sLL $1 $> ($2 NE.<| unLoc $1) }
+        | gdrh                  { sL1 $1 (NE.singleton $1) }
 
 gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
         : '|' guardquals '=' exp  {% runPV (unECP $4) >>= \ $4 ->
@@ -3052,7 +3052,7 @@ aexp    :: { ECP }
                                            fmap ecpFromExp $
                                            do { let (L _ ((o,c),_)) = $2
                                               ; amsA' (sLL $1 $> $ HsMultiIf (epTok $1, o, c)
-                                                     (reverse $ snd $ unLoc $2)) }}
+                                                     (NE.reverse $ snd $ unLoc $2)) }}
         | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                                              return $ ECP $
                                                $4 >>= \ $4 ->
@@ -3279,8 +3279,8 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                                 ; return (Tuple (Right t : snd $2)) } }
            | commas tup_tail
                  { $2 >>= \ $2 ->
-                   do { let {cos = map (\ll -> (Left (EpAnn (spanAsAnchor ll) True emptyComments))) (fst $1) }
-                      ; return (Tuple (cos ++ $2)) } }
+                   do { let {cos = NE.map (\ll -> (Left (EpAnn (spanAsAnchor ll) True emptyComments))) (fst $1) }
+                      ; return (Tuple (toList cos ++ $2)) } }
 
            | texp bars   { unECP $1 >>= \ $1 -> return $
                             (Sum 1  (snd $2 + 1) $1 [] (fst $2)) }
@@ -3492,22 +3492,22 @@ alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
                                       do { let {L l (bs, csw) = adaptWhereBinds $2}
                                          ; acs (comb2 alt (L l bs)) (\loc cs -> L loc (GRHSs (cs Semi.<> csw) (unLoc alt) bs)) }}
 
-ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
+ralt :: { forall b. DisambECP b => PV (Located (NonEmpty (LGRHS GhcPs (LocatedA b)))) }
         : '->' exp            { unECP $2 >>= \ $2 ->
                                 acs (comb2 $1 $>) (\loc cs -> L loc (unguardedRHS (EpAnn (spanAsAnchor $ comb2 $1 $2) (GrhsAnn Nothing (Right $ epUniTok $1)) cs) (comb2 $1 $2) $2)) }
         | gdpats              { $1 >>= \gdpats ->
-                                return $ sL1 gdpats (reverse (unLoc gdpats)) }
+                                return $ sL1 gdpats (NE.reverse (unLoc gdpats)) }
 
-gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
+gdpats :: { forall b. DisambECP b => PV (Located (NonEmpty (LGRHS GhcPs (LocatedA b)))) }
         : gdpats gdpat { $1 >>= \gdpats ->
                          $2 >>= \gdpat ->
-                         return $ sLL gdpats gdpat (gdpat : unLoc gdpats) }
-        | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat [gdpat] }
+                         return $ sLL gdpats gdpat (gdpat NE.<| unLoc gdpats) }
+        | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat (NE.singleton gdpat) }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
 -- we don't need it.
-ifgdpats :: { Located ((EpToken "{", EpToken "}"), [LGRHS GhcPs (LHsExpr GhcPs)]) }
+ifgdpats :: { Located ((EpToken "{", EpToken "}"), NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))) }
          : '{' gdpats '}'                 {% runPV $2 >>= \ $2 ->
                                              return $ sLL $1 $> ((epTok $1,epTok $3),unLoc $2)  }
          |     gdpats close               {% runPV $1 >>= \ $1 ->
@@ -3650,7 +3650,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top = sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2))  f) : t
+                                fields = top :| L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2))  f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = False
@@ -3666,7 +3666,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                             let top =  sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
-                                fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) f) : t
+                                fields = top :| L (noAnnSrcSpan lf') (DotFieldOcc (AnnFieldLabel (Just $ epTok $2)) f) : t
                                 final = last fields
                                 l = comb2 $1 $3
                                 isPun = True
@@ -3725,13 +3725,13 @@ name_boolformula :: { LBooleanFormula GhcPs }
 
 name_boolformula_and :: { LBooleanFormula GhcPs }
         : name_boolformula_and_list
-                  { sLLa (head $1) (last $1) (And ($1)) }
+                  { sLLa (head $1) (last $1) (And (toList $1)) }
 
-name_boolformula_and_list :: { [LBooleanFormula GhcPs] }
-        : name_boolformula_atom                               { [$1] }
+name_boolformula_and_list :: { NonEmpty (LBooleanFormula GhcPs) }
+        : name_boolformula_atom                               { NE.singleton $1 }
         | name_boolformula_atom ',' name_boolformula_and_list
             {% do { h <- addTrailingCommaL $1 (epTok $2)
-                  ; return (h : $3) } }
+                  ; return (h NE.<| $3) } }
 
 name_boolformula_atom :: { LBooleanFormula GhcPs }
         : '(' name_boolformula ')'  {% amsr (sLL $1 $> (Parens $2))
@@ -3779,10 +3779,10 @@ qcon_list : qcon                  { [$1] }
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
         : '(' commas ')'        {% amsr (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
-                                       (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }
+                                       (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (toList $ fst $2)) []) }
         | '(#' '#)'             {% amsr (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly (NameParensHash (epTok $1) (epTok $2)) []) }
         | '(#' commas '#)'      {% amsr (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
-                                       (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }
+                                       (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (toList $ fst $2)) []) }
 
 syscon :: { LocatedN RdrName }
         : sysdcon               {  L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
@@ -3823,12 +3823,12 @@ gtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, including unit t
 ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
         | '(' commas ')'        {% do { n <- mkTupleSyntaxTycon Boxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParens (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (toList $ fst $2)) []) }}
         | '(#' commas '#)'      {% do { n <- mkTupleSyntaxTycon Unboxed (snd $2 + 1)
-                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (fst $2)) []) }}
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas (NameParensHash (epTok $1) (epTok $3)) (map (EpTok . srcSpan2e) (toList $ fst $2)) []) }}
         | '(#' bars '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
                                       ; amsr (sLL $1 $> $ (getRdrName (sumTyCon (snd $2 + 1))))
-                                       (NameAnnBars (epTok $1, epTok $3) (fst $2) []) } }
+                                       (NameAnnBars (epTok $1, epTok $3) (toList $ fst $2) []) } }
         | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        (NameAnnRArrow  (Just $ epTok $1) (epUniTok $2) (Just $ epTok $3) []) }
 
@@ -4157,9 +4157,9 @@ modid   :: { LocatedA ModuleName }
                                    (concatFS [mod, fsLit ".", c])
                                 }
 
-commas :: { ([SrcSpan],Int) }   -- One or more commas
-        : commas ','             { ((fst $1)++[gl $2],snd $1 + 1) }
-        | ','                    { ([gl $1],1) }
+commas :: { (NonEmpty SrcSpan,Int) }   -- One or more commas
+        : commas ','             { (foldr (NE.<|) (NE.singleton $ gl $2) (fst $1) ,snd $1 + 1) }
+        | ','                    { (NE.singleton $ gl $1, 1) }
 
 bars0 :: { ([EpToken "|"],Int) }     -- Zero or more bars
         : bars                   { $1 }

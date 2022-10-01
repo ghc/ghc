@@ -69,6 +69,7 @@ GHC.Data.Graph.Directed
 GHC.Data.Graph.Directed.Internal
 GHC.Data.Graph.UnVar
 GHC.Data.List.Infinite
+GHC.Data.List.NonEmpty
 GHC.Data.List.SetOps
 GHC.Data.Maybe
 GHC.Data.OrdList

@@ -136,7 +136,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { T20846.hs:4:8-18 })
                (NoEpAnns)
@@ -170,7 +171,8 @@
                    (EpaComments
                     []))
                   (Unqual
-                   {OccName: undefined}))))))]
+                   {OccName: undefined}))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

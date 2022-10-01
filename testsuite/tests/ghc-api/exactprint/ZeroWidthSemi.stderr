@@ -119,7 +119,8 @@
            (GRHSs
             (EpaComments
              [])
-            [(L
+            (:|
+             (L
               (EpAnn
                (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
                (NoEpAnns)
@@ -151,7 +152,8 @@
                    (IL
                     (SourceText 0)
                     (False)
-                    (0))))))))]
+                    (0))))))))
+             [])
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
 

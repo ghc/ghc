@@ -358,7 +358,7 @@ hard_hole_fits.hs:32:30: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsMultiIf xmi gls) = _
     • Relevant bindings include
-        gls :: [LGRHS GhcPs (LHsExpr GhcPs)]
+        gls :: GHC.Internal.Base.NonEmpty (LGRHS GhcPs (LHsExpr GhcPs))
           (bound at hard_hole_fits.hs:32:23)
         xmi :: Language.Haskell.Syntax.Extension.XMultiIf GhcPs
           (bound at hard_hole_fits.hs:32:19)
