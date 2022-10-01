@@ -985,6 +985,10 @@ dmdTransform env var sd
   | isDataConWorkId var
   = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr var $$ ppr sd $$ ppr ty) $
     dmdTransformDataConSig (idArity var) sd
+  -- See Note [DmdAnal for DataCon wrappers]
+  | isDataConWrapId var, let rhs = uf_tmpl (realIdUnfolding var)
+  , WithDmdType dmd_ty _rhs' <- dmdAnal env sd rhs
+  = dmd_ty
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.
@@ -1387,6 +1391,45 @@ Now f's optimised RHS will be \x.a, but if we change g to (error "..")
 (since it is apparently Absent) and then inline (\x. fst g) we get
 disaster.  But regardless, #18638 was a more complicated version of
 this, that actually happened in practice.
+
+Note [DmdAnal for DataCon wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We give DataCon wrappers a (necessarily flat) demand signature in
+`GHC.Types.Id.Make.mkDataConRep`, so that passes such as the Simplifier can
+exploit it via the call to `GHC.Core.Opt.Simplify.Utils.isStrictArgInfo` in
+`GHC.Core.Opt.Simplify.Iteration.rebuildCall`. But during DmdAnal, we *ignore*
+the demand signature of a DataCon wrapper, and instead analyse its unfolding at
+every call site.
+
+The reason is that DataCon *worker*s have very precise demand transformers,
+computed by `dmdTransformDataConSig`. It would be awkward if DataCon *wrappers*
+would behave much less precisely during DmdAnal. Example:
+
+   data T1 = MkT1 { get_x1 :: Int,  get_y1 :: Int }
+   data T2 = MkT2 { get_x2 :: !Int, get_y2 :: Int }
+   f1 x y = get_x1 (MkT1 x y)
+   f2 x y = get_x2 (MkT2 x y)
+
+Here `MkT1` has no wrapper. `get_x1` puts a demand `!P(1!L,A)` on its argument,
+and `dmdTransformDataConSig` will transform that demand to an absent demand on
+`y` in `f1` and an unboxing demand on `x`.
+But `MkT2` has a wrapper (to evaluate the first field). If demand analysis deals
+with `MkT2` only through its demand signature, demand signatures can't transform
+an incoming demand `P(1!L,A)` in a useful way, so we won't get an absent demand
+on `y` in `f2` or see that `x` can be unboxed. That's a serious loss.
+
+The example above will not actually occur, because $WMkT2 would be inlined.
+Nevertheless, we can get interesting sub-demands on DataCon wrapper
+applications in boring contexts; see T22241.
+
+You might worry about the efficiency cost of demand-analysing datacon wrappers
+at every call site. But in fact they are inlined /anyway/ in the Final phase,
+which happens before DmdAnal, so few wrappers remain. And analysing the
+unfoldings for the remaining calls (which are those in a boring context) will be
+exactly as (in)efficent as if we'd inlined those calls. It turns out to be not
+measurable in practice.
+
+See also Note [CPR for DataCon wrappers] in `GHC.Core.Opt.CprAnal`.
 
 Note [Boxity for bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
