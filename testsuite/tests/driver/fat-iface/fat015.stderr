@@ -1,0 +1,6 @@
+[1 of 6] Compiling FatQuote         ( FatQuote.hs, FatQuote.o, FatQuote.dyn_o )
+[2 of 6] Compiling FatQuote1        ( FatQuote1.hs, FatQuote1.o, FatQuote1.dyn_o )
+[3 of 6] Compiling FatQuote2        ( FatQuote2.hs, FatQuote2.o, FatQuote2.dyn_o )
+[4 of 6] Compiling FatTH1           ( FatTH1.hs, FatTH1.o, FatTH1.dyn_o )
+[5 of 6] Compiling FatTH2           ( FatTH2.hs, FatTH2.o, FatTH2.dyn_o )
+[6 of 6] Compiling FatTHTop         ( FatTHTop.hs, nothing )

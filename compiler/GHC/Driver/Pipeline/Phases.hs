@@ -17,10 +17,10 @@ import GHC.Driver.Errors.Types
 import GHC.Fingerprint.Type
 import GHC.Unit.Module.Location ( ModLocation )
 import GHC.Unit.Module.ModIface
-import GHC.Linker.Types
 import GHC.Driver.Phases
 
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
+import GHC.Unit.Home.ModInfo
 
 -- Typed Pipeline Phases
 -- MP: TODO: We need to refine the arguments to each of these phases so recompilation
@@ -39,7 +39,7 @@ data TPhase res where
               -> Messages GhcMessage
               -> Maybe Fingerprint
               -> TPhase HscBackendAction
-  T_HscBackend :: PipeEnv -> HscEnv -> ModuleName -> HscSource -> ModLocation -> HscBackendAction -> TPhase ([FilePath], ModIface, Maybe Linkable, FilePath)
+  T_HscBackend :: PipeEnv -> HscEnv -> ModuleName -> HscSource -> ModLocation -> HscBackendAction -> TPhase ([FilePath], ModIface, HomeModLinkable, FilePath)
   T_CmmCpp :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_Cmm :: PipeEnv -> HscEnv -> FilePath -> TPhase ([FilePath], FilePath)
   T_Cc :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> TPhase FilePath

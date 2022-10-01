@@ -1126,6 +1126,10 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
         , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
+        , case mi_extra_decls iface of
+            Nothing -> empty
+            Just eds -> text "extra decls:"
+                          $$ nest 2 (vcat ([ppr bs | bs <- eds]))
         , vcat (map ppr (mi_insts iface))
         , vcat (map ppr (mi_fam_insts iface))
         , vcat (map ppr (mi_rules iface))

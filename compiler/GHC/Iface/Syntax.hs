@@ -5,14 +5,15 @@
 
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Iface.Syntax (
         module GHC.Iface.Type,
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
-        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceJoinInfo(..),
-        IfaceBinding(..), IfaceConAlt(..),
+        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceJoinInfo(..), IfaceBinding,
+        IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
@@ -22,7 +23,7 @@ module GHC.Iface.Syntax (
         IfaceAxBranch(..),
         IfaceTyConParent(..),
         IfaceCompleteMatch(..),
-        IfaceLFInfo(..),
+        IfaceLFInfo(..), IfaceTopBndrInfo(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -116,6 +117,7 @@ putIfaceTopBndr bh name =
       UserData{ ud_put_binding_name = put_binding_name } ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
           put_binding_name bh name
+
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,
@@ -548,7 +550,7 @@ data IfaceExpr
   | IfaceApp    IfaceExpr IfaceExpr
   | IfaceCase   IfaceExpr IfLclName [IfaceAlt]
   | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
-  | IfaceLet    IfaceBinding  IfaceExpr
+  | IfaceLet    (IfaceBinding IfaceLetBndr) IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
   | IfaceLitRubbish IfaceType -- See GHC.Types.Literal
@@ -571,14 +573,23 @@ data IfaceConAlt = IfaceDefault
                  | IfaceDataAlt IfExtName
                  | IfaceLitAlt Literal
 
-data IfaceBinding
-  = IfaceNonRec IfaceLetBndr IfaceExpr
-  | IfaceRec    [(IfaceLetBndr, IfaceExpr)]
+type IfaceBinding b = IfaceBindingX IfaceExpr b
+
+data IfaceBindingX r b
+  = IfaceNonRec b r
+  | IfaceRec    [(b, r)]
+  deriving (Functor, Foldable, Traversable, Ord, Eq)
 
 -- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
 -- It's used for *non-top-level* let/rec binders
 -- See Note [IdInfo on nested let-bindings]
 data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
+
+data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDetails
+                      | IfGblTopBndr IfaceTopBndr
+
+-- See Note [Interface File with Core: Sharing RHSs]
+data IfaceMaybeRhs = IfUseUnfoldingRhs | IfRhs IfaceExpr
 
 data IfaceJoinInfo = IfaceNotJoinPoint
                    | IfaceJoinPoint JoinArity
@@ -695,6 +706,21 @@ instance HasOccName IfaceDecl where
 
 instance Outputable IfaceDecl where
   ppr = pprIfaceDecl showToIface
+
+instance (Outputable r, Outputable b) => Outputable (IfaceBindingX r b) where
+  ppr b = case b of
+            (IfaceNonRec b r) -> ppr_bind (b, r)
+            (IfaceRec pairs) -> sep [text "rec {", nest 2 (sep (map ppr_bind pairs)),text "}"]
+    where
+      ppr_bind (b, r) = ppr b <+> equals <+> ppr r
+
+instance Outputable IfaceTopBndrInfo where
+    ppr (IfLclTopBndr lcl_name _ _ _) = ppr lcl_name
+    ppr (IfGblTopBndr gbl) = ppr gbl
+
+instance Outputable IfaceMaybeRhs where
+  ppr IfUseUnfoldingRhs = text "<unfolding>"
+  ppr (IfRhs ie) = ppr ie
 
 {-
 Note [Minimal complete definition]
@@ -2452,7 +2478,7 @@ instance Binary IfaceConAlt where
             1 -> liftM IfaceDataAlt $ get bh
             _ -> liftM IfaceLitAlt  $ get bh
 
-instance Binary IfaceBinding where
+instance (Binary r, Binary b) => Binary (IfaceBindingX b r) where
     put_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
     put_ bh (IfaceRec ac)       = putByte bh 1 >> put_ bh ac
     get bh = do
@@ -2472,6 +2498,38 @@ instance Binary IfaceLetBndr where
                 c <- get bh
                 d <- get bh
                 return (IfLetBndr a b c d)
+
+instance Binary IfaceTopBndrInfo where
+    put_ bh (IfLclTopBndr lcl ty info dets) = do
+            putByte bh 0
+            put_ bh lcl
+            put_ bh ty
+            put_ bh info
+            put_ bh dets
+    put_ bh (IfGblTopBndr gbl) = do
+            putByte bh 1
+            put_ bh gbl
+    get bh = do
+      tag <- getByte bh
+      case tag of
+        0 -> IfLclTopBndr <$> get bh <*> get bh <*> get bh <*> get bh
+        1 -> IfGblTopBndr <$> get bh
+        _ -> pprPanic "IfaceTopBndrInfo" (intWithCommas tag)
+
+instance Binary IfaceMaybeRhs where
+  put_ bh IfUseUnfoldingRhs = putByte bh 0
+  put_ bh (IfRhs e) = do
+    putByte bh 1
+    put_ bh e
+
+  get bh = do
+    b <- getByte bh
+    case b of
+      0 -> return IfUseUnfoldingRhs
+      1 -> IfRhs <$> get bh
+      _ -> pprPanic "IfaceMaybeRhs" (intWithCommas b)
+
+
 
 instance Binary IfaceJoinInfo where
     put_ bh IfaceNotJoinPoint = putByte bh 0
@@ -2630,10 +2688,18 @@ instance NFData IfaceExpr where
 instance NFData IfaceAlt where
   rnf (IfaceAlt con bndrs rhs) = rnf con `seq` rnf bndrs `seq` rnf rhs
 
-instance NFData IfaceBinding where
+instance (NFData b, NFData a) => NFData (IfaceBindingX a b) where
   rnf = \case
     IfaceNonRec bndr e -> rnf bndr `seq` rnf e
     IfaceRec binds -> rnf binds
+
+instance NFData IfaceTopBndrInfo where
+  rnf (IfGblTopBndr n) = n `seq` ()
+  rnf (IfLclTopBndr fs ty info dets) = rnf fs `seq` rnf ty `seq` rnf info `seq` rnf dets `seq` ()
+
+instance NFData IfaceMaybeRhs where
+  rnf IfUseUnfoldingRhs = ()
+  rnf (IfRhs ce) = rnf ce `seq` ()
 
 instance NFData IfaceLetBndr where
   rnf (IfLetBndr nm ty id_info join_info) =

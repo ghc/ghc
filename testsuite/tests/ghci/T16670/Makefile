@@ -19,6 +19,6 @@ T16670_th:
 	$(MAKE) -s --no-print-directory clean
 	mkdir my-odir
 	echo ":load T16670_th.hs" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) \
-		-v0 -fno-code -fwrite-interface -odir my-odir
-	find . -name T16670_th.o
-	test -f my-odir/T16670_th.o
+		-v0 -fno-code -fno-prefer-byte-code -fwrite-interface -odir my-odir
+	find . -name TH.o
+	test -f my-odir/TH.o

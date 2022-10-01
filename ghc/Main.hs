@@ -209,6 +209,11 @@ main' postLoadMode units dflags0 args flagWarnings = do
         where def_ghci_flags = dflags1 `gopt_set` Opt_ImplicitImportQualified
                                        `gopt_set` Opt_IgnoreOptimChanges
                                        `gopt_set` Opt_IgnoreHpcChanges
+                                       -- Setting this by default has the nice effect that
+                                       -- -fno-code and --interactive falls back to interpreter rather than
+                                       -- object code but has little other effect unless you are also using
+                                       -- fat interface files.
+                                       `gopt_set` Opt_UseBytecodeRatherThanObjects
 
   logger1 <- getLogger
   let logger2 = setLogFlags logger1 (initLogFlags dflags2)

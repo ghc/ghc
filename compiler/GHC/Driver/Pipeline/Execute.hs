@@ -26,7 +26,6 @@ import GHC.Unit.Types
 import GHC.Types.SourceFile
 import GHC.Unit.Module.Status
 import GHC.Unit.Module.ModIface
-import GHC.Linker.Types
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Driver.CmdLine
@@ -57,7 +56,6 @@ import GHC.Unit.State
 import GHC.Unit.Home
 import GHC.Data.Maybe
 import GHC.Iface.Make
-import Data.Time
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
 import GHC.Data.StringBuffer
@@ -83,6 +81,7 @@ import GHC.Driver.Config.Finder
 import GHC.Rename.Names
 
 import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Home.ModInfo
 
 newtype HookedUse a = HookedUse { runHookedUse :: (Hooks, PhaseHook) -> IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch) via (ReaderT (Hooks, PhaseHook) IO)
@@ -504,7 +503,7 @@ runHscBackendPhase :: PipeEnv
                    -> HscSource
                    -> ModLocation
                    -> HscBackendAction
-                   -> IO ([FilePath], ModIface, Maybe Linkable, FilePath)
+                   -> IO ([FilePath], ModIface, HomeModLinkable, FilePath)
 runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
   let dflags = hsc_dflags hsc_env
       logger = hsc_logger hsc_env
@@ -526,7 +525,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
                HsBootFile -> touchObjectFile logger dflags o_file
                HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
 
-             return ([], iface, Nothing, o_file)
+             return ([], iface, emptyHomeModInfoLinkable, o_file)
       HscRecomp { hscs_guts = cgguts,
                   hscs_mod_location = mod_location,
                   hscs_partial_iface = partial_iface,
@@ -537,12 +536,21 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
            else if backendWritesFiles (backend dflags) then
              do
               output_fn <- phaseOutputFilenameNew next_phase pipe_env hsc_env (Just location)
-              (outputFilename, mStub, foreign_files, mb_cg_infos) <-
+              (outputFilename, mStub, foreign_files, cg_infos) <-
+
                 hscGenHardCode hsc_env cgguts mod_location output_fn
-              final_iface <- mkFullIface hsc_env partial_iface mb_cg_infos
+              final_iface <- mkFullIface hsc_env partial_iface cg_infos
 
               -- See Note [Writing interface files]
               hscMaybeWriteIface logger dflags False final_iface mb_old_iface_hash mod_location
+              mlinkable <-
+                if backendGeneratesCode (backend dflags) && gopt Opt_ByteCodeAndObjectCode dflags
+                  then do
+                    bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+                    return $ emptyHomeModInfoLinkable { homeMod_bytecode = Just bc }
+
+                  else return emptyHomeModInfoLinkable
+
 
               stub_o <- mapM (compileStub hsc_env) mStub
               foreign_os <-
@@ -553,7 +561,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
               -- have some way to do before the object file is produced
               -- In future we can split up the driver logic more so that this function
               -- is in TPipeline and in this branch we can invoke the rest of the backend phase.
-              return (fos, final_iface, Nothing, outputFilename)
+              return (fos, final_iface, mlinkable, outputFilename)
 
            else
               -- In interpreted mode the regular codeGen backend is not run so we
@@ -561,20 +569,8 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
             do
               final_iface <- mkFullIface hsc_env partial_iface Nothing
               hscMaybeWriteIface logger dflags True final_iface mb_old_iface_hash location
-
-              (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts mod_location
-
-              stub_o <- case hasStub of
-                        Nothing -> return []
-                        Just stub_c -> do
-                            stub_o <- compileStub hsc_env stub_c
-                            return [DotO stub_o]
-
-              let hs_unlinked = [BCOs comp_bc spt_entries]
-              unlinked_time <- getCurrentTime
-              let !linkable = LM unlinked_time (mkHomeModule (hsc_home_unit hsc_env) mod_name)
-                             (hs_unlinked ++ stub_o)
-              return ([], final_iface, Just linkable, panic "interpreter")
+              bc <- generateFreshByteCode hsc_env mod_name (mkCgInteractiveGuts cgguts) mod_location
+              return ([], final_iface, emptyHomeModInfoLinkable { homeMod_bytecode = Just bc } , panic "interpreter")
 
 
 runUnlitPhase :: HscEnv -> FilePath -> FilePath -> IO FilePath
@@ -717,7 +713,7 @@ runHscPhase pipe_env hsc_env0 input_fn src_flavour = do
   let plugin_hsc_env = plugin_hsc_env' { hsc_type_env_vars = knotVarsFromModuleEnv (mkModuleEnv [(mod, type_env_var)]) }
 
   status <- hscRecompStatus (Just msg) plugin_hsc_env mod_summary
-                        Nothing Nothing (1, 1)
+                        Nothing emptyHomeModInfoLinkable (1, 1)
 
   return (plugin_hsc_env, mod_summary, status)
 

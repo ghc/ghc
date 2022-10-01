@@ -448,7 +448,7 @@ addHmiToCache :: ModIfaceCache -> HomeModInfo -> IO ()
 addHmiToCache c (HomeModInfo i _ l) = iface_addToCache c (CachedIface i l)
 
 data CachedIface = CachedIface { cached_modiface :: !ModIface
-                               , cached_linkable :: !(Maybe Linkable) }
+                               , cached_linkable :: !HomeModLinkable }
 
 noIfaceCache :: Maybe ModIfaceCache
 noIfaceCache = Nothing
@@ -833,7 +833,7 @@ pruneCache hpt summ
            linkable'
                 | Just ms <- lookupUFM ms_map modl
                 , mi_src_hash iface /= ms_hs_hash ms
-                = Nothing
+                = emptyHomeModInfoLinkable
                 | otherwise
                 = linkable
 
@@ -1270,7 +1270,7 @@ upsweep_mod :: HscEnv
             -> IO HomeModInfo
 upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   hmi <- compileOne' mHscMessage hsc_env summary
-          mod_index nmods (hm_iface <$> old_hmi) (old_hmi >>= hm_linkable)
+          mod_index nmods (hm_iface <$> old_hmi) (maybe emptyHomeModInfoLinkable hm_linkable old_hmi)
 
   -- MP: This is a bit janky, because before you add the entries you have to extend the HPT with the module
   -- you just compiled. Another option, would be delay adding anything until after upsweep has finished, but I
@@ -1278,7 +1278,7 @@ upsweep_mod hsc_env mHscMessage old_hmi summary mod_index nmods =  do
   -- This function only does anything if the linkable produced is a BCO, which only happens with the
   -- bytecode backend, no need to guard against the backend type additionally.
   addSptEntries (hscUpdateHPT (\hpt -> addToHpt hpt (ms_mod_name summary) hmi) hsc_env)
-                (hm_linkable hmi)
+                (homeModInfoByteCode hmi)
 
   return hmi
 

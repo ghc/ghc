@@ -752,7 +752,7 @@ fromEvalResult (EvalSuccess a) = return a
 
 getModBreaks :: HomeModInfo -> ModBreaks
 getModBreaks hmi
-  | Just linkable <- hm_linkable hmi,
+  | Just linkable <- homeModInfoByteCode hmi,
     [cbc] <- mapMaybe onlyBCOs $ linkableUnlinked linkable
   = fromMaybe emptyModBreaks (bc_breaks cbc)
   | otherwise

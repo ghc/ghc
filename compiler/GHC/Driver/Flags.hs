@@ -372,6 +372,7 @@ data GeneralFlag
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode
+   | Opt_ByteCodeAndObjectCode
    | Opt_LinkRts
 
    -- output style opts
@@ -442,6 +443,8 @@ data GeneralFlag
    | Opt_KeepOFiles
 
    | Opt_BuildDynamicToo
+   | Opt_WriteIfSimplifedCore
+   | Opt_UseBytecodeRatherThanObjects
 
    -- safe haskell flags
    | Opt_DistrustAllPackages
