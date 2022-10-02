@@ -373,8 +373,10 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         wrap_rhs'    = Cast wrap_rhs co
-        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity
-                                                (length args) simpl_opts wrap_rhs'
+        fn_id_w_inl  = fn_id
+                       `setIdUnfolding`
+                       mkInlineUnfoldingWithArity simpl_opts VanillaSrc
+                                                  (length args)  wrap_rhs'
 
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], mempty, mempty)
 
