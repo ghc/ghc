@@ -1,6 +1,8 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE KindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -20,6 +22,7 @@
 
 module GHC.Prim.PtrEq
   ( reallyUnsafePtrEquality,
+    unsafePtrEquality#,
     sameArray#,
     sameMutableArray#,
     sameSmallArray#,
@@ -35,7 +38,7 @@ module GHC.Prim.PtrEq
   ) where
 
 import GHC.Prim
-import GHC.Types () -- Make implicit dependency known to build system
+import GHC.Types (UnliftedType) -- Also make implicit dependency known to build system
 default () -- Double and Integer aren't available yet
 
 {- **********************************************************************
@@ -74,49 +77,62 @@ reallyUnsafePtrEquality = reallyUnsafePtrEquality#
 -- See Note [Pointer comparison operations]
 --   in primops.txt.pp
 
+-- | Compare the underlying pointers of two unlifted values for equality.
+--
+-- This is less dangerous than 'reallyUnsafePtrEquality',
+-- since the arguments are guaranteed to be evaluated.
+-- This means there is no risk of accidentally comparing
+-- a thunk.
+-- It's however still more dangerous than e.g. 'sameArray#'.
+--
+unsafePtrEquality# :: forall (a :: UnliftedType) (b :: UnliftedType). a -> b -> Int#
+unsafePtrEquality# = reallyUnsafePtrEquality#
+-- See Note [Pointer comparison operations]
+--   in primops.txt.pp
+
 -- | Compare the underlying pointers of two arrays.
 sameArray# :: Array# a -> Array# a -> Int#
-sameArray# = reallyUnsafePtrEquality#
+sameArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two mutable arrays.
 sameMutableArray# :: MutableArray# s a -> MutableArray# s a -> Int#
-sameMutableArray# = reallyUnsafePtrEquality#
+sameMutableArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two small arrays.
 sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
-sameSmallArray# = reallyUnsafePtrEquality#
+sameSmallArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two small mutable arrays.
 sameSmallMutableArray# :: SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
-sameSmallMutableArray# = reallyUnsafePtrEquality#
+sameSmallMutableArray# = unsafePtrEquality#
 
 -- | Compare the pointers of two byte arrays.
 sameByteArray# :: ByteArray# -> ByteArray# -> Int#
-sameByteArray# = reallyUnsafePtrEquality#
+sameByteArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two mutable byte arrays.
 sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Int#
-sameMutableByteArray# = reallyUnsafePtrEquality#
+sameMutableByteArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'MutVar#'s.
 sameMutVar# :: MutVar# s a -> MutVar# s a -> Int#
-sameMutVar# = reallyUnsafePtrEquality#
+sameMutVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'TVar#'s.
 sameTVar# :: TVar# s a -> TVar# s a -> Int#
-sameTVar# = reallyUnsafePtrEquality#
+sameTVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'MVar#'s.
 sameMVar# :: MVar# s a -> MVar# s a -> Int#
-sameMVar# = reallyUnsafePtrEquality#
+sameMVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'IOPort#'s.
 sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
-sameIOPort# = reallyUnsafePtrEquality#
+sameIOPort# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'PromptTag#'s.
 samePromptTag# :: PromptTag# a -> PromptTag# a -> Int#
-samePromptTag# = reallyUnsafePtrEquality#
+samePromptTag# = unsafePtrEquality#
 
 -- Note [Comparing stable names]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,4 +146,4 @@ samePromptTag# = reallyUnsafePtrEquality#
 
 -- | Compare two stable names for equality.
 eqStableName# :: StableName# a -> StableName# b -> Int#
-eqStableName# = reallyUnsafePtrEquality#
+eqStableName# = unsafePtrEquality#

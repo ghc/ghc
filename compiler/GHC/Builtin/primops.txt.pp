@@ -3429,29 +3429,47 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- The primop `reallyUnsafePtrEquality#` does a direct pointer
 -- equality between two (boxed) values.  Several things to note:
 --
--- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
---   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
---   This levity-polymorphism comes from the use of the type variables
---   "v" and "w". See Note [Levity and representation polymorphic primops]
+-- (PE1) It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
+--       TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
+--       This levity-polymorphism comes from the use of the type variables
+--       "v" and "w". See Note [Levity and representation polymorphic primops]
 --
--- * It does not evaluate its arguments. The user of the primop is responsible
---   for doing so.
+-- (PE2) It is hetero-typed; you can compare pointers of different types.
+--       This is used in various packages such as containers & unordered-containers.
 --
--- * It is hetero-typed; you can compare pointers of different types.
---   This is used in various packages such as containers & unordered-containers.
+-- (PE3) It does not evaluate its arguments. The user of the primop is responsible
+--       for doing so.  Consider
+--            let { x = p+q; y = q+p } in reallyUnsafePtrEquality# x y
+--       Here `x` and `y` point to different closures, so the expression will
+--       probably return False; but if `x` and/or `y` were evaluated for some
+--       other reason, then it might return True.
 --
--- * It is obviously very dangerous, because
---      let x = f y in reallyUnsafePtrEquality# x x
---   will probably return True, whereas
---      reallyUnsafePtrEquality# (f y) (f y)
---   will probably return False. ("probably", because it's affected
---   by CSE and inlining).
+-- (PE4) It is obviously very dangerous, because replacing equals with equals
+--       in the program can change the result.  For example
+--           let x = f y in reallyUnsafePtrEquality# x x
+--       will probably return True, whereas
+--            reallyUnsafePtrEquality# (f y) (f y)
+--       will probably return False. ("probably", because it's affected
+--       by CSE and inlining).
 --
--- * reallyUnsafePtrEquality# can't fail, but it is marked as such
---   to prevent it from floating out.
---   See Note [reallyUnsafePtrEquality# can_fail]
+-- (PE5) reallyUnsafePtrEquality# can't fail, but it is marked as such
+--       to prevent it from floating out.
+--       See Note [reallyUnsafePtrEquality# can_fail]
 --
--- The library GHC.Exts provides several less Wild-West functions
+-- The library GHC.Prim.PtrEq (and GHC.Exts) provides
+--
+--   unsafePtrEquality# ::
+--     forall (a :: UnliftedType) (b :: UnliftedType). a -> b -> Int#
+--
+-- It is still heterotyped (like (PE2)), but it's restricted to unlifted types
+-- (unlike (PE1)).  That means that (PE3) doesn't apply: unlifted types are
+-- always evaluated, which makes it a bit less unsafe.
+--
+-- However unsafePtrEquality# is /implemented/ by a call to
+-- reallyUnsafePtrEquality#, so using the former is really just a documentation
+-- hint to the reader of the code.  GHC behaves no differently.
+--
+-- The same library provides less Wild-West functions
 -- for use in specific cases, namely:
 --
 --   reallyUnsafePtrEquality :: a -> a -> Int#  -- not levity-polymorphic, nor hetero-typed
@@ -3469,7 +3487,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 --   sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
 --   eqStableName# :: StableName# a -> StableName# b -> Int#
 --
--- These operations are all specialisations of reallyUnsafePtrEquality#.
+-- These operations are all specialisations of unsafePtrEquality#.
 
 -- Note [reallyUnsafePtrEquality# can_fail]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

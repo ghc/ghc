@@ -49,6 +49,7 @@ module GHC.ArrayArray
   where
 
 import GHC.Prim
+import GHC.Prim.PtrEq ( unsafePtrEquality# )
 import GHC.Types ( Type, UnliftedType, isTrue# )
 import Unsafe.Coerce ( unsafeCoerce, unsafeCoerceUnlifted )
 default ()
@@ -148,8 +149,8 @@ copyMutableArrayArray# = unsafeCoerce copyMutableArray#
 
 -- | Compare the underlying pointers of two arrays of arrays.
 sameArrayArray# :: ArrayArray# -> ArrayArray# -> Int#
-sameArrayArray# (ArrayArray# arr1) (ArrayArray# arr2) = reallyUnsafePtrEquality# arr1 arr2
+sameArrayArray# (ArrayArray# arr1) (ArrayArray# arr2) = unsafePtrEquality# arr1 arr2
 
 -- | Compare the underlying pointers of two mutable arrays of arrays.
 sameMutableArrayArray# :: MutableArrayArray# s -> MutableArrayArray# s -> Int#
-sameMutableArrayArray# (MutableArrayArray# marr1) (MutableArrayArray# marr2 ) = reallyUnsafePtrEquality# marr1 marr2
+sameMutableArrayArray# (MutableArrayArray# marr1) (MutableArrayArray# marr2 ) = unsafePtrEquality# marr1 marr2

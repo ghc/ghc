@@ -48,6 +48,7 @@ module GHC.Exts
         -- ** Pointer comparison operations
         -- See `Note [Pointer comparison operations]` in primops.txt.pp
         reallyUnsafePtrEquality,
+        unsafePtrEquality#,
         eqStableName#,
         sameArray#,
         sameMutableArray#,
