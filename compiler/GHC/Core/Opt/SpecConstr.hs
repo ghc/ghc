@@ -32,6 +32,7 @@ import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
+import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils

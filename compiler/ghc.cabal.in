@@ -322,6 +322,7 @@ Library
         GHC.Core.Opt.SetLevels
         GHC.Core.Opt.Simplify
         GHC.Core.Opt.Simplify.Env
+        GHC.Core.Opt.Simplify.Inline
         GHC.Core.Opt.Simplify.Iteration
         GHC.Core.Opt.Simplify.Monad
         GHC.Core.Opt.Simplify.Utils

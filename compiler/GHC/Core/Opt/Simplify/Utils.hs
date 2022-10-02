@@ -47,6 +47,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
+import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Stats ( Tick(..) )
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr

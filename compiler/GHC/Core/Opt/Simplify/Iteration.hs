@@ -21,6 +21,7 @@ import GHC.Core
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
+import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
