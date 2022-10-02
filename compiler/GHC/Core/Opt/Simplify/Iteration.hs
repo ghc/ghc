@@ -7,7 +7,6 @@
 
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
--- {-# OPTIONS_GHC -ddump-simpl -ddump-to-file -ddump-stg-final -dsuppress-coercions -dsuppress-coercion-types #-}
 
 module GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules ) where
 
