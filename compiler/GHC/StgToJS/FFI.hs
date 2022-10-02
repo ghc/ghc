@@ -194,7 +194,7 @@ parseFFIPattern' callback javascriptCc pat t ret args
         where
           (TxtI i') = i
           err = pprPanic "parseFFIPattern': invalid placeholder, check function type"
-                  (vcat [ppr pat, text (unpackFS i'), ppr args, ppr t])
+                  (vcat [text pat, text (unpackFS i'), ppr args, ppr t])
     traceCall cs as
         | csTraceForeign cs = ApplStat (var "h$traceForeign") [toJExpr pat, toJExpr as]
         | otherwise         = mempty

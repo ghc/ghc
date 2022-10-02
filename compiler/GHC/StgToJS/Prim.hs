@@ -1211,16 +1211,18 @@ genPrim prof ty op = case op of
                                                                , dv_s_u32 a o w
                                                                ]
 
-
------------------------------- Unhandled primops -------------------
-
   ShrinkSmallMutableArrayOp_Char    -> \[]  [a,n] -> PrimInline $ appS "h$shrinkMutableCharArray" [a,n]
   GetSizeofSmallMutableArrayOp      -> \[r] [a]   -> PrimInline $ r |= a .^ "length"
 
-
-
   AtomicReadAddrOp_Word             -> \[r] [a,o]   -> PrimInline $ r |= dv_u32 a o
   AtomicWriteAddrOp_Word            -> \[]  [a,o,w] -> PrimInline $ dv_s_u32 a o w
+
+
+------------------------------ Unhandled primops -------------------
+
+  NewPromptTagOp                    -> unhandledPrimop op
+  PromptOp                          -> unhandledPrimop op
+  Control0Op                        -> unhandledPrimop op
 
   NewIOPortOp                       -> unhandledPrimop op
   ReadIOPortOp                      -> unhandledPrimop op
