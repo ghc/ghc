@@ -21,7 +21,8 @@ module GHC.Core.Opt.Simplify.Env (
         extendTvSubst, extendCvSubst,
         zapSubstEnv, setSubstEnv, bumpCaseDepth,
         getInScope, setInScopeFromE, setInScopeFromF,
-        setInScopeSet, modifyInScope, addNewInScopeIds, addNewInScopeId, addNewInScopeBndr,
+        setInScopeSet, modifyInScope, addNewInScopeIds,
+        addNewInScopeId, addNewInScopeBndr,
         getSimplRules, enterRecGroupRHSs,
 
         -- * Substitution results

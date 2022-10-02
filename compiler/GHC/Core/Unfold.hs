@@ -28,7 +28,7 @@ module GHC.Core.Unfold (
         updateFunAppDiscount, updateDictDiscount,
         updateVeryAggressive, updateCaseScaling,
         updateCaseThreshold, updateReportPrefix,
-        updateMaxAppDepth, updateMaxGuideDepth,
+        updateMaxDiscountDepth,
 
         inlineBoringOk,
         ArgSummary(..), nonTrivArg,
@@ -91,13 +91,9 @@ data UnfoldingOpts = UnfoldingOpts
    , unfoldingReportPrefix :: !(Maybe String)
       -- ^ Only report inlining decisions for names with this prefix
 
-   , unfoldingMaxAppDepth :: !Int
+   , unfoldingMaxDiscountDepth :: !Int
       -- ^ When considering unfolding a definition look this deep
-      -- into the applied argument.
-
-   , unfoldingMaxGuideDepth :: !Int
-      -- ^ When creating unfolding guidance look this deep into
-      -- nested argument use.
+      -- into the applied arguments and into nested argument use.
 
    }
 
@@ -134,8 +130,7 @@ defaultUnfoldingOpts = UnfoldingOpts
       -- Don't filter inlining decision reports
    , unfoldingReportPrefix = Nothing
 
-   , unfoldingMaxAppDepth = 20
-   , unfoldingMaxGuideDepth = 20
+   , unfoldingMaxDiscountDepth = 20
    }
 
 -- Helpers for "GHC.Driver.Session"
@@ -165,11 +160,9 @@ updateCaseScaling n opts = opts { unfoldingCaseScaling = n }
 updateReportPrefix :: Maybe String -> UnfoldingOpts -> UnfoldingOpts
 updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
 
-updateMaxAppDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
-updateMaxAppDepth n opts = opts { unfoldingMaxAppDepth = n }
+updateMaxDiscountDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
+updateMaxDiscountDepth n opts = opts { unfoldingMaxDiscountDepth = n }
 
-updateMaxGuideDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
-updateMaxGuideDepth n opts = opts { unfoldingMaxGuideDepth = n }
 
 {-
 Note [Occurrence analysis of unfoldings]
@@ -474,7 +467,7 @@ sizeExpr :: UnfoldingOpts
 sizeExpr opts !bOMB_OUT_SIZE top_args' expr
   = size_up depth_limit (mkUnVarSet top_args') expr
   where
-    depth_limit = unfoldingMaxGuideDepth opts
+    depth_limit = unfoldingMaxDiscountDepth opts
     size_up :: Int -> UnVarSet -> Expr Var -> ExprSize
     size_up !depth !arg_comps (Cast e _) = size_up depth arg_comps e
     size_up !depth arg_comps (Tick _ e) = size_up depth arg_comps e

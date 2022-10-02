@@ -404,8 +404,7 @@ decision about inlining a specific binding.
 * :ghc-flag:`-funfolding-case-scaling=⟨n⟩`
 * :ghc-flag:`-funfolding-dict-discount=⟨n⟩`
 * :ghc-flag:`-funfolding-fun-discount=⟨n⟩`
-* :ghc-flag:`-funfolding-max-guide-depth=⟨n⟩`
-* :ghc-flag:`-funfolding-max-arg-depth=⟨n⟩`
+* :ghc-flag:`-funfolding-discount-depth=⟨n⟩`
 
 Should the simplifier run out of ticks because of a inlining loop
 users are encouraged to try decreasing :ghc-flag:`-funfolding-case-threshold=⟨n⟩`

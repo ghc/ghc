@@ -1997,10 +1997,6 @@ bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 bindersOfBinds :: [Bind b] -> [b]
 bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
 
-{-# INLINE foldBindersOf #-}
-foldBindersOf :: (a -> b -> a) -> Bind b -> a -> a
-foldBindersOf f b r = foldl' f r (bindersOf b)
-
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]

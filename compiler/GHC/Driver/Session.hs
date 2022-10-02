@@ -2825,10 +2825,8 @@ dynamic_flags_deps = [
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-case-scaling"
       (intSuffix   (\n d -> d { unfoldingOpts = updateCaseScaling n (unfoldingOpts d)}))
-  , make_ord_flag defFlag "funfolding-max-arg-depth"
-      (intSuffix   (\n d -> d { unfoldingOpts = updateMaxAppDepth n (unfoldingOpts d)}))
-  , make_ord_flag defFlag "funfolding-max-guide-depth"
-      (intSuffix   (\n d -> d { unfoldingOpts = updateMaxGuideDepth n (unfoldingOpts d)}))
+  , make_ord_flag defFlag "funfolding-discount-depth"
+      (intSuffix   (\n d -> d { unfoldingOpts = updateMaxDiscountDepth n (unfoldingOpts d)}))
 
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))

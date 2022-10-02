@@ -689,7 +689,7 @@ interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
 interestingArg env e =
   go env depth_limit 0 e
     where
-    depth_limit = unfoldingMaxAppDepth . sm_uf_opts . seMode $ env
+    depth_limit = unfoldingMaxDiscountDepth . sm_uf_opts . seMode $ env
 
     -- n is # value args to which the expression is applied
     go :: SimplEnv -> Int -> Int -> CoreExpr -> ArgSummary
