@@ -533,6 +533,21 @@ function h$sliceArray(a, start, n) {
   return r;
 }
 
+// copy between two mutable arrays. Range may overlap
+function h$copyMutableArray(a1,o1,a2,o2,n) {
+  if (n <= 0) return;
+
+  if (o1 < o2) {
+    for (var i=n-1;i>=0;i--) { // start from the end to handle potential overlap
+      a2[o2+i] = a1[o1+i];
+    }
+  } else {
+    for (var i=0;i<n;i++) {
+      a2[o2+i] = a1[o1+i];
+    }
+  }
+}
+
 function h$memcpy() {
   if(arguments.length === 3) {  // ByteArray# -> ByteArray# copy
     var dst = arguments[0];

@@ -541,7 +541,7 @@ genPrim prof ty op = case op of
         [ ma .! (Add i o2) |= a .! (Add i o1)
         , preIncrS i
         ]
-  CopyMutableArrayOp  -> \[]  [a1,o1,a2,o2,n] -> genPrim prof ty CopyArrayOp [] [a1,o1,a2,o2,n]
+  CopyMutableArrayOp  -> \[]  [a1,o1,a2,o2,n] -> PrimInline $ appS "h$copyMutableArray" [a1,o1,a2,o2,n]
   CloneArrayOp        -> \[r] [a,start,n]     -> PrimInline $ r |= app "h$sliceArray" [a,start,n]
   CloneMutableArrayOp -> \[r] [a,start,n]     -> genPrim prof ty CloneArrayOp [r] [a,start,n]
   FreezeArrayOp       -> \[r] [a,start,n]     -> PrimInline $ r |= app "h$sliceArray" [a,start,n]
