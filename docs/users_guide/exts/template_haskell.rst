@@ -159,13 +159,14 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
       general ``'``\ ⟨thing⟩ interprets ⟨thing⟩ in an expression
       context.
 
-      A name whose second character is a single quote (sadly) cannot be
-      quoted in this way, because it will be parsed instead as a quoted
-      character. For example, if the function is called ``f'7`` (which
-      is a legal Haskell identifier), an attempt to quote it as ``'f'7``
-      would be parsed as the character literal ``'f'`` followed by the
-      numeric literal ``7``. There is no current escape mechanism in
-      this (unusual) situation.
+      A name whose second character is a single quote cannot be quoted in
+      exactly this way, because it will be parsed instead as a quoted
+      character. For example, if the function is called ``f'7`` (which is a
+      legal Haskell identifier), an attempt to quote it as ``'f'7`` would be
+      parsed as the character literal ``'f'`` followed by the numeric literal
+      ``7``. As for promoted constructors (:ref:`_promotion-syntax`), the
+      workaround is to add a space between the quote and the name. The name of
+      the function ``f'7`` is thus written ``' f'7``.
 
    -  ``''T`` has type ``Name``, and names the type constructor ``T``.
       That is, ``''``\ ⟨thing⟩ interprets ⟨thing⟩ in a type context.
