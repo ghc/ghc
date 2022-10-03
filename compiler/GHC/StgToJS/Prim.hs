@@ -394,8 +394,8 @@ genPrim prof ty op = case op of
   WordNeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .!==. y)
   WordLtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<.  y)
   WordLeOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .<=. y)
-  WordToDoubleOp   -> \[r] [x]   -> PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
-  WordToFloatOp    -> \[r] [x]   -> PrimInline $ r |= (Add (BAnd x (Int 0x7FFFFFFF)) (x .>>>. (Int 31))) `Mul` Int 2147483648
+  WordToDoubleOp   -> \[r] [x]   -> PrimInline $ r |= x
+  WordToFloatOp    -> \[r] [x]   -> PrimInline $ r |= math_fround [x]
   PopCnt8Op        -> \[r] [x]   -> PrimInline $ r |= var "h$popCntTab" .! (mask8 x)
   PopCnt16Op       -> \[r] [x]   -> PrimInline $ r |= Add (var "h$popCntTab" .! (mask8 x))
                                                       (var "h$popCntTab" .! (mask8 (x .>>>. Int 8)))
