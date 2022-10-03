@@ -122,7 +122,8 @@ module GHC.JS.Make
   -- ** Math functions
   -- $math
   , math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin,
-    math_atan, math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh
+    math_atan, math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh,
+    math_cosh, math_sinh, math_tanh, math_expm1, math_log1p, math_fround
   -- * Statement helpers
   , decl
   -- * Miscellaneous
@@ -592,7 +593,8 @@ math_ :: FastString -> [JExpr] -> JExpr
 math_ op args = ApplExpr (math .^ op) args
 
 math_log, math_sin, math_cos, math_tan, math_exp, math_acos, math_asin, math_atan,
-  math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh, math_sign
+  math_abs, math_pow, math_sqrt, math_asinh, math_acosh, math_atanh, math_sign,
+  math_sinh, math_cosh, math_tanh, math_expm1, math_log1p, math_fround
   :: [JExpr] -> JExpr
 math_log   = math_ "log"
 math_sin   = math_ "sin"
@@ -609,6 +611,12 @@ math_sqrt  = math_ "sqrt"
 math_asinh = math_ "asinh"
 math_acosh = math_ "acosh"
 math_atanh = math_ "atanh"
+math_sinh  = math_ "sinh"
+math_cosh  = math_ "cosh"
+math_tanh  = math_ "tanh"
+math_expm1 = math_ "expm1"
+math_log1p = math_ "log1p"
+math_fround = math_ "fround"
 
 instance Num JExpr where
     x + y = InfixExpr AddOp x y

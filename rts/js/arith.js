@@ -622,3 +622,19 @@ function h$stg_doubleToWord64zh(v) {
   var h = h$convertWord[1];
   RETURN_UBX_TUP2(h,l);
 }
+
+function h$log1p(x) {
+  return Math.log1p(x);
+}
+
+function h$log1pf(x) {
+  return h$fround(Math.log1p(x));
+}
+
+function h$expm1(x) {
+  return Math.expm1(x);
+}
+
+function h$expm1f(x) {
+  return h$fround(Math.expm1(x));
+}
