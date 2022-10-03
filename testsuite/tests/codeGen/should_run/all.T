@@ -163,7 +163,10 @@ test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
 test('PopCnt', [omit_ways(['ghci']), js_skip], multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
-test('T12059', normal, compile_and_run, [''])
+test('T12059',
+  [ js_skip # ByteArrays are always pinned with the JS backend
+  ],
+  compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
 test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
 test('T12757', normal, compile_and_run, [''])
