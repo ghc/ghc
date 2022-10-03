@@ -729,7 +729,7 @@ rtsDeps pkgs = diffDeps pkgs $
           [ ":"
           , "[]"
           ]
-      , mkPrimFuns "GHC.Tuple"
+      , mkPrimFuns "GHC.Tuple.Prim"
           [ "(,)"
           , "(,,)"
           , "(,,,)"
