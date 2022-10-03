@@ -185,8 +185,7 @@ compareByteArraysFromBeginning (ByteArray ba1#) (ByteArray ba2#) (I# n#)
 -- | Do two byte arrays share the same pointer?
 sameByteArray :: ByteArray# -> ByteArray# -> Bool
 sameByteArray ba1 ba2 =
-    case reallyUnsafePtrEquality# (unsafeCoerce# ba1 :: ()) (unsafeCoerce# ba2 :: ()) of
-      r -> isTrue# r
+    case sameByteArray# ba1 ba2 of r -> isTrue# r
 
 -- | @since 4.17.0.0
 instance Eq ByteArray where
