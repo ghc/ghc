@@ -1200,14 +1200,28 @@ genPrim prof ty op = case op of
   FetchOrAddrOp_Word                -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BOr   r a o v
   FetchXorAddrOp_Word               -> \[r] [a,o,v] -> PrimInline $ fetchOpAddr BXor  r a o v
 
-  InterlockedExchange_Addr          -> \[r_a,r_o] [a1,o1,a2,o2] -> PrimInline $
-                                                             mconcat [ r_a |= a1
-                                                                     , r_o |= o1
-                                                                     , a1 .! o1 |= a2 .! o2
-                                                                     , o1       |= o2
-                                                                     ]
+  InterlockedExchange_Addr          -> \[r_a,r_o] [a1,o1,_a2,o2] -> PrimInline $
+                                          -- this primop can't be implemented
+                                          -- correctly because we don't store
+                                          -- the array reference part of an Addr#,
+                                          -- only the offset part.
+                                          --
+                                          -- So let's assume that all the array
+                                          -- references are the same...
+                                          --
+                                          -- Note: we could generate an assert
+                                          -- that checks that a1 === a2. However
+                                          -- we can't check that the Addr# read
+                                          -- at Addr# a2[o2] also comes from this
+                                          -- a1/a2 array.
+                                          mconcat [ r_a |= a1 -- might be wrong (see above)
+                                                  , r_o |= dv_u32 a1 o1
+                                                  -- TODO (see above)
+                                                  -- assert that a1 === a2
+                                                  , dv_s_u32 a1 o1 o2
+                                                  ]
   InterlockedExchange_Word          -> \[r] [a,o,w] -> PrimInline $
-                                                       mconcat [ r |= a .! o
+                                                       mconcat [ r |= dv_u32 a o
                                                                , dv_s_u32 a o w
                                                                ]
 
