@@ -34,7 +34,12 @@ import GHC.Exts.Heap.StackFFI (bitsInWord)
 import GHC.Exts.Heap.Closures (closureSize)
 import System.Mem (performMajorGC)
 
-type StackFrameIter# = (# StackSnapshot#, Word# #)
+type StackFrameIter# = (#
+                          -- | StgStack
+                          StackSnapshot#,
+                          -- | offset in machine words
+                          Word#
+                        #)
 
 data StackFrameIter = StackFrameIter StackFrameIter#
 
@@ -52,11 +57,27 @@ advanceStackFrameIter (StackFrameIter (# s, i #)) = let (# s', i', hasNext #) = 
 
 foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
 
+foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
+
+data BitmapEntry = BitmapEntry {
+    closureFrame :: StackFrameIter,
+    isPrimitive :: Bool
+  } deriving (Show)
+
+toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
+toBitmapEntries _ _ 0 = []
+toBitmapEntries sfi@(StackFrameIter(# s, i #) bitmap size = BitmapEntry {
+  closureFrame = sfi,
+  isPrimitive = (bitmap .&. 1) == 0
+                                            } : toBitmapEntries (StackFrameIter (# s , i + 1 #)) (bitmap `shiftR` 1) (size - 1)
+
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter (StackFrameIter (# s, i #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s i)) of
      RET_BCO -> RetBCO
-     RET_SMALL -> RetSmall None []
+     RET_SMALL -> let (# bitmap#, size# #) = getSmallBitmap# s i
+                  in
+                    RetSmall None []
      RET_BIG ->  RetBig []
      RET_FUN ->  RetFun
      UPDATE_FRAME ->  UpdateFrame

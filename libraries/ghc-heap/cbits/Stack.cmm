@@ -48,7 +48,7 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     }
   }
 
-  ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul\n", stack, newStack, frameSize, newIndex, hasNext);
+  ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
   return (newStack, newIndex, hasNext);
 }
 
@@ -56,7 +56,7 @@ derefStackWordzh (P_ stack, W_ index) {
   P_ sp;
   sp = StgStack_sp(stack);
 
-  return (W_[sp + index]);
+  return (W_[sp + WDS(index)]);
 }
 
 getInfoTableTypezh (P_ stack, W_ index) {
@@ -68,4 +68,22 @@ getInfoTableTypezh (P_ stack, W_ index) {
     type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
     ccall debugBelch("getInfoTableTypezh - stack %p , index %ul, closure ptr p %p, info ptr %p, itbl type %ul\n", stack, index, p, info, type);
     return (type);
+}
+
+getSmallBitmapzh(P_ stack, W_ index) {
+  P_ itbl;
+  itbl = %INFO_PTR(StgStack_sp(stack) + WDS(index));
+
+  W_ bitmap, size;
+  (bitmap) = ccall getBitmapWord(itbl);
+  (size) = ccall getBitmapSize(itbl);
+
+  ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul", bitmap, size);
+  return (bitmap, size);
+}
+
+unpackClosureFromStackFramezh(P_ stack, W_ index){
+  P_ closurePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  return (stg_unpackClosurezh(closurePtr));
 }
