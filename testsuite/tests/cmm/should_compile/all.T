@@ -1,4 +1,7 @@
-#
+setTestOpts(
+  [ js_skip # Cmm not supported by the JS backend
+  ])
+
 test('selfloop', [cmm_src], compile, ['-no-hs-main'])
 test('cmm_sink_sp', [ only_ways(['optasm']), grep_errmsg('(\[Sp.*\]).*(=).*(\[.*R1.*\]).*;',[1,2,3]), cmm_src], compile, ['-no-hs-main -ddump-cmm -dsuppress-uniques -O'])
 
