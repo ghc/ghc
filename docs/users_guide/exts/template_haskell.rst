@@ -164,7 +164,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
       character. For example, if the function is called ``f'7`` (which is a
       legal Haskell identifier), an attempt to quote it as ``'f'7`` would be
       parsed as the character literal ``'f'`` followed by the numeric literal
-      ``7``. As for promoted constructors (:ref:`_promotion-syntax`), the
+      ``7``. As for promoted constructors (:ref:`promotion-syntax`), the
       workaround is to add a space between the quote and the name. The name of
       the function ``f'7`` is thus written ``' f'7``.
 
