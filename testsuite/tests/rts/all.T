@@ -267,9 +267,13 @@ test('T7815', [ multi_cpu_race,
 test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
      compile_and_run, [''])
 
-# Times out in ghci way
-test('T7919', [when(fast(), skip), omit_ways(['ghci'] + prof_ways)], compile_and_run,
-     [config.ghc_th_way_flags])
+# Times out in ghci way.
+# Also times out on x86_64-linux from time to time.
+test('T7919', [ when(fast(), skip)
+              , omit_ways(['ghci'] + prof_ways)
+              , when(platform('x86_64-unknown-linux'), fragile(22283))
+              ]
+              , compile_and_run, [config.ghc_th_way_flags])
 
 test('T8035', normal, compile_and_run, [''])
 
