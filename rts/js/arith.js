@@ -528,20 +528,6 @@ function h$ctz64(x1,x2) {
     return (x2 === 0) ? 32 + h$ctz32(x1) : h$ctz32(x2);
 }
 
-var h$fround            = null;
-if(typeof Math.fround === 'function') {
-  h$fround = function(f) {
-    TRACE_ARITH("fround (native): " + f);
-    return Math.fround(f);
-  }
-} else {
-  h$fround = function(f) {
-    TRACE_ARITH("fround (buffer): " + f);
-    h$convertFloat[0] = f;
-    return h$convertFloat[0];
-  }
-}
-
 function h$decodeDoubleInt64(d) {
   TRACE_ARITH("decodeDoubleInt64: " + d);
   if(isNaN(d)) {
@@ -592,12 +578,12 @@ function h$__word_encodeDouble(j,e) {
 
 function h$__int_encodeFloat(j,e) {
   if (!j) return 0;
-  return h$fround((j|0) * (2 ** (e|0)));
+  return Math.fround((j|0) * (2 ** (e|0)));
 }
 
 function h$__word_encodeFloat(j,e) {
   if (!j) return 0;
-  return h$fround((j>>>0) * (2 ** (e|0)));
+  return Math.fround((j>>>0) * (2 ** (e|0)));
 }
 
 function h$stg_word32ToFloatzh(v) {
@@ -628,7 +614,7 @@ function h$log1p(x) {
 }
 
 function h$log1pf(x) {
-  return h$fround(Math.log1p(x));
+  return Math.fround(Math.log1p(x));
 }
 
 function h$expm1(x) {
@@ -636,5 +622,5 @@ function h$expm1(x) {
 }
 
 function h$expm1f(x) {
-  return h$fround(Math.expm1(x));
+  return Math.fround(Math.expm1(x));
 }
