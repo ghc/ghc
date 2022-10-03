@@ -128,7 +128,11 @@ test('conc017a', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
 test('conc019', extra_run_opts('+RTS -K16m -RTS'), compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
-test('conc021', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
+test('conc021',
+  [ omit_ways(['ghci']), exit_code(1)
+  , js_skip # foreign exports not supported yet
+  ],
+  compile_and_run, [''])
 test('conc022', normal, compile_and_run, [''])
 
 test('conc024', normal, compile_and_run, [''])
