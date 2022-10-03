@@ -609,6 +609,14 @@ function h$stg_doubleToWord64zh(v) {
   RETURN_UBX_TUP2(h,l);
 }
 
+function h$sqrt(x) {
+  return Math.sqrt(x);
+}
+
+function h$sqrtf(x) {
+  return Math.fround(Math.sqrt(x));
+}
+
 function h$log1p(x) {
   return Math.log1p(x);
 }
