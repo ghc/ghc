@@ -161,7 +161,10 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
-test('PopCnt', [omit_ways(['ghci']), js_skip], multi_compile_and_run,
+test('PopCnt',
+  [omit_ways(['ghci'])
+  , js_skip # use Cmm
+  ], multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
 test('T12059',
   [ js_skip # ByteArrays are always pinned with the JS backend
