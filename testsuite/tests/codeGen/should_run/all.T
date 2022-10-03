@@ -148,8 +148,8 @@ test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
-test('CmmSwitchTest32', unless(wordsize(32), skip), compile_and_run, [''])
-test('CmmSwitchTest64', unless(wordsize(64), skip), compile_and_run, [''])
+test('CmmSwitchTest32', [unless(wordsize(32), skip),js_skip], compile_and_run, [''])
+test('CmmSwitchTest64', [unless(wordsize(64), skip),js_skip], compile_and_run, [''])
 # Skipping WAY=ghci, because it is not broken.
 test('T10245', normal, compile_and_run, [''])
 test('T10246', normal, compile_and_run, [''])
