@@ -114,7 +114,9 @@ test('conc010', normal, compile_and_run, [''])
 
 # conc012(ghci) needs a smaller stack, or it takes forever
 test('conc012',
-     extra_run_opts('+RTS -K8m -RTS'),
+     [ extra_run_opts('+RTS -K8m -RTS')
+     , js_skip # no stack overflow detection with the JS backend (yet)
+     ],
      compile_and_run, [''])
 
 test('conc013', normal, compile_and_run, [''])
