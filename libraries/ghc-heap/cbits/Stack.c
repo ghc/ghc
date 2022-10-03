@@ -1,12 +1,28 @@
 #include "Rts.h"
 #include "rts/Messages.h"
+#include "rts/storage/ClosureTypes.h"
+#include "rts/storage/Closures.h"
 #include "rts/storage/InfoTables.h"
 
 // Only exists to make the stack_frame_sizeW macro available in Haskell code
 // (via FFI).
 StgWord stackFrameSizeW(StgClosure *frame) {
-  debugBelch("stackFrameSizeW - frame: %p - size %lu \n", frame, stack_frame_sizeW(frame));
   return stack_frame_sizeW(frame);
+}
+
+StgWord stackFrameSize(StgStack* stack, StgWord index){
+  return stackFrameSizeW(stack->sp + index);
+}
+
+StgStack* getUnderflowFrameStack(StgStack* stack, StgWord index){
+  StgClosure* frame = stack->sp + index;
+  const StgRetInfoTable *info  = get_ret_itbl((StgClosure *)frame);
+
+  if(info->i.type == UNDERFLOW_FRAME) {
+    return ((StgUnderflowFrame*) frame)->next_chunk;
+  } else {
+    return NULL;
+  }
 }
 
 // Only exists to make the get_itbl macro available in Haskell code (via FFI).

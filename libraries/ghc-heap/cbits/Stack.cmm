@@ -1,0 +1,71 @@
+#include "Cmm.h"
+
+#if SIZEOF_VOID_P == 4
+#define HALF_WORD_ bits16
+#elif SIZEOF_VOID_P == 8
+#define HALF_WORD_ bits32
+#else
+#error Unknown word size
+#endif
+
+advanceStackFrameIterzh (P_ stack, W_ index) {
+  P_ newStack;
+  W_ newIndex;
+  W_ hasNext;
+
+  W_ frameSize;
+  (frameSize) = ccall stackFrameSize(stack, index);
+
+  P_ nextClosurePtr;
+  nextClosurePtr = (StgStack_sp(stack) + WDS(index) + WDS(frameSize));
+
+  P_ stackBottom, stackArrayPtr;
+  stackArrayPtr = stack + SIZEOF_StgHeader + OFFSET_StgStack_stack;
+  HALF_WORD_ stackSize;
+  W_ stackSizeInBytes;
+  stackSize = StgStack_stack_size(stack);
+  stackSizeInBytes = WDS(TO_W_(stackSize));
+  stackBottom = stackSizeInBytes + stackArrayPtr;
+
+  if(nextClosurePtr < stackBottom) (likely: True) {
+    ccall debugBelch("advanceStackFrameIterzh - ordinary frame \n");
+    newStack = stack;
+    newIndex = index + frameSize;
+    hasNext = 1;
+  } else {
+    P_ underflowFrameStack;
+    (underflowFrameStack) = ccall getUnderflowFrameStack(stack, index);
+    if (underflowFrameStack == NULL) (likely: True) {
+      ccall debugBelch("advanceStackFrameIterzh - last frame \n");
+      newStack = NULL;
+      newIndex = NULL;
+      hasNext = NULL;
+    } else {
+      ccall debugBelch("advanceStackFrameIterzh - overflow frame \n");
+      newStack = underflowFrameStack;
+      newIndex = NULL;
+      hasNext = 1;
+    }
+  }
+
+  ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul\n", stack, newStack, frameSize, newIndex, hasNext);
+  return (newStack, newIndex, hasNext);
+}
+
+derefStackWordzh (P_ stack, W_ index) {
+  P_ sp;
+  sp = StgStack_sp(stack);
+
+  return (W_[sp + index]);
+}
+
+getInfoTableTypezh (P_ stack, W_ index) {
+    P_ p, info;
+    p = (StgStack_sp(stack) + WDS(index));
+    info  = %INFO_PTR(p);
+
+    W_ type;
+    type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
+    ccall debugBelch("getInfoTableTypezh - stack %p , index %ul, closure ptr p %p, info ptr %p, itbl type %ul\n", stack, index, p, info, type);
+    return (type);
+}

@@ -30,6 +30,7 @@ library
   ghc-options:      -Wall
   if !os(ghcjs)
     cmm-sources:      cbits/HeapPrim.cmm
+                      cbits/Stack.cmm
   c-sources:        cbits/Stack.c
 
   default-extensions: NoImplicitPrelude

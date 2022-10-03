@@ -545,10 +545,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
     ASSERT(sp <= spBottom);
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
-        debugBelch("printStackChunk - closure size : %lu , sp : %p \n", stack_frame_sizeW((StgClosure *)sp), sp);
-        debugBelch("printStackChunk - spBottom : %p\n", spBottom);
-        debugBelch("printStackChunk - sp : %p\n", sp);
         info = get_itbl((StgClosure *)sp);
+        debugBelch("printStackChunk - closure size : %lu , sp : %p, spBottom %p, info ptr %p, itbl type %ul \n", stack_frame_sizeW((StgClosure *)sp), sp, spBottom, info, info->type);
 
         switch (info->type) {
 
@@ -718,8 +716,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 void printStack( StgStack *stack )
 {
-    debugBelch("printStack - stack : %p\n", stack);
-    debugBelch("printStack - sp : %p\n", stack->sp);
+    debugBelch("printStack - stack %p, sp %p, size %ul, bottom %p\n", stack, stack->sp, stack->stack_size, stack->stack + stack->stack_size);
 
     printStackChunk( stack->sp, stack->stack + stack->stack_size );
 }
