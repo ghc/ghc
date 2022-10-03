@@ -50,7 +50,8 @@ cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
 runCmmLint :: OutputableP Platform a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
 runCmmLint platform l p =
    case unCL (l p) platform of
-     Left err -> Just (vcat [text "Cmm lint error:",
+     Left err -> Just (withPprStyle defaultDumpStyle $ vcat
+                            [text "Cmm lint error:",
                              nest 2 err,
                              text "Program was:",
                              nest 2 (pdoc platform p)])
