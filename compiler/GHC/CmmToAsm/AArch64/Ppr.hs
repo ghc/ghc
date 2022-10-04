@@ -195,7 +195,7 @@ pprLabelType' platform lbl =
     text "@object"
   where
     functionOkInfoTable = platformTablesNextToCode platform &&
-      isInfoTableLabel lbl && not (isConInfoTableLabel lbl)
+      isInfoTableLabel lbl && not (isCmmInfoTableLabel lbl) && not (isConInfoTableLabel lbl)
 
 -- this is called pprTypeAndSizeDecl in PPC.Ppr
 pprTypeDecl :: Platform -> CLabel -> SDoc

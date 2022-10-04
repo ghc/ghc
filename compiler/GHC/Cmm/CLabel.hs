@@ -108,6 +108,7 @@ module GHC.Cmm.CLabel (
         isLocalCLabel,
         mayRedirectTo,
         isInfoTableLabel,
+        isCmmInfoTableLabel,
         isConInfoTableLabel,
         isIdLabel,
         isTickyLabel,
@@ -794,7 +795,13 @@ isInfoTableLabel (IdLabel _ _ InfoTable)      = True
 isInfoTableLabel (IdLabel _ _ LocalInfoTable) = True
 isInfoTableLabel (IdLabel _ _ ConInfoTable {})   = True
 isInfoTableLabel (IdLabel _ _ BlockInfoTable) = True
+isInfoTableLabel (CmmLabel _ _ _ CmmInfo)     = True
 isInfoTableLabel _                            = False
+
+-- | Whether label points to an info table defined in Cmm
+isCmmInfoTableLabel :: CLabel -> Bool
+isCmmInfoTableLabel (CmmLabel _ _ _ CmmInfo) = True
+isCmmInfoTableLabel _ = False
 
 -- | Whether label is points to constructor info table
 isConInfoTableLabel :: CLabel -> Bool

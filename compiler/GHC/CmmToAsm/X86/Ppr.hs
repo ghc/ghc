@@ -254,7 +254,7 @@ pprLabelType' platform lbl =
     but mess up with the relocation. https://phabricator.haskell.org/D4730
     -}
     functionOkInfoTable = platformTablesNextToCode platform &&
-      isInfoTableLabel lbl && not (isConInfoTableLabel lbl)
+      isInfoTableLabel lbl && not (isCmmInfoTableLabel lbl) && not (isConInfoTableLabel lbl)
 
 
 pprTypeDecl :: Platform -> CLabel -> SDoc
