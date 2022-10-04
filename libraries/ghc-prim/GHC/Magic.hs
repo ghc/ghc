@@ -23,7 +23,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic ( inline, noinline, noupdate, lazy, oneShot, runRW# ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -60,6 +60,10 @@ inline x = x
 {-# NOINLINE noinline #-}
 noinline :: a -> a
 noinline x = x
+
+{-# NOINLINE noupdate #-}
+noupdate :: a -> a
+noupdate x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as @e@, but 'lazy' has a magical

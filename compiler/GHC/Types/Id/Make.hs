@@ -33,7 +33,7 @@ module GHC.Types.Id.Make (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, coerceId,
-        proxyHashId, noinlineId, noinlineIdName, nospecId, nospecIdName,
+        proxyHashId, noinlineId, noupdateId, noinlineIdName, nospecId, nospecIdName,
         coerceName, leftSectionName, rightSectionName,
     ) where
 
@@ -160,7 +160,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId, nospecId]
+magicIds = [lazyId, oneShotId, noinlineId, nospecId, noupdateId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1402,9 +1402,10 @@ leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSecti
 rightSectionName  = mkWiredInIdName gHC_PRIM  (fsLit "rightSection")   rightSectionKey    rightSectionId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName, nospecIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, nospecIdName, noupdateName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
+noupdateName      = mkWiredInIdName gHC_MAGIC (fsLit "noupdate")       noupdateKey        noupdateId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
 nospecIdName      = mkWiredInIdName gHC_MAGIC (fsLit "nospec")         nospecIdKey        nospecId
 
@@ -1476,6 +1477,12 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
 
 nospecId :: Id -- See Note [nospecId magic]
 nospecId = pcMiscPrelId nospecIdName ty info
+  where
+    info = noCafIdInfo
+    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+
+noupdateId :: Id
+noupdateId = pcMiscPrelId noupdateName ty info
   where
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)

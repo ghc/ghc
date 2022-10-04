@@ -543,7 +543,7 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
                    _      -> mkWildValBinder Many ty1
 
 mkCoreAppDs _ (Var f `App` Type _r) arg
-  | f `hasKey` noinlineIdKey   -- See Note [noinlineId magic] in GHC.Types.Id.Make
+  | f `hasKey` noinlineIdKey  || f `hasKey` noupdateKey -- See Note [noinlineId magic] in GHC.Types.Id.Make
   , (fun, args) <- collectArgs arg
   , not (null args)
   = (Var f `App` Type (exprType fun) `App` fun)

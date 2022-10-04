@@ -36,6 +36,7 @@ getStgToDo for_bytecode dflags =
     -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
     , optional Opt_StgLiftLams $ StgLiftLams $ initStgLiftConfig dflags
+    , mandatory StgNoupdate
     , runWhen for_bytecode StgBcPrep
     , optional Opt_StgStats StgStats
     ] where

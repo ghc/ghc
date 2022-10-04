@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -17,6 +17,7 @@ import GHC.Prelude hiding ((<*>))
 
 import {-# SOURCE #-} GHC.StgToCmm.Bind ( cgBind )
 
+import GHC.Types.Id.Make
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Env
@@ -72,6 +73,9 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 -- seq# a s ==> a
 -- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
+  cgIdApp a []
+
+cgExpr (StgApp ((== noupdateId) -> True) [StgVarArg a]) =
   cgIdApp a []
 
 -- dataToTag# :: a -> Int#

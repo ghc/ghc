@@ -7,7 +7,7 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, LambdaCase, NamedFieldPuns #-}
 
 module GHC.Stg.Pipeline
   ( StgPipelineOpts (..)
@@ -20,7 +20,6 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Stg.Syntax
-
 import GHC.Stg.Lint     ( lintStgTopBindings )
 import GHC.Stg.Stats    ( showStgStats )
 import GHC.Stg.FVs      ( depSortWithAnnotStgPgm )
@@ -32,6 +31,7 @@ import GHC.Unit.Module ( Module )
 
 import GHC.Utils.Error
 import GHC.Types.Var
+import GHC.Types.Id.Make
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -131,6 +131,11 @@ stg2stg logger extra_vars opts this_mod binds
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 
+          StgNoupdate -> do
+            let binds' = do_noupdate <$> binds
+            return binds'
+
+
     ppr_opts = stgPipeline_pprOpts opts
     dump_when flag header binds
       = putDumpFileMaybe logger flag header FormatSTG (pprStgTopBindings ppr_opts binds)
@@ -159,4 +164,34 @@ data StgToDo
   -- ^ Mandatory when compiling to bytecode
   | StgDoNothing
   -- ^ Useful for building up 'getStgToDo'
+  | StgNoupdate
   deriving (Show, Read, Eq, Ord)
+
+
+do_noupdate :: StgTopBinding -> StgTopBinding
+do_noupdate (StgTopLifted x) = StgTopLifted (do_noupdate_bind x)
+do_noupdate x = x
+
+
+do_noupdate_bind :: StgBinding -> StgBinding
+do_noupdate_bind (StgNonRec i rhs) = StgNonRec i (do_noupdate_rhs rhs)
+do_noupdate_bind (StgRec bs) = StgRec [ (i, do_noupdate_rhs rhs) | (i,rhs) <- bs]
+
+do_noupdate_rhs :: StgRhs -> StgRhs
+do_noupdate_rhs (StgRhsClosure x y Updatable [] body) = case do_noupdate_expr body of
+  (True, r) -> StgRhsClosure x y ReEntrant [] r
+  (_, r) -> (StgRhsClosure x y Updatable [] r)
+do_noupdate_rhs (StgRhsClosure x y upd_flag args body) = StgRhsClosure x y upd_flag args (snd $ do_noupdate_expr body)
+do_noupdate_rhs x = x
+
+do_noupdate_expr :: StgExpr -> (Bool, StgExpr)
+do_noupdate_expr = \case
+  StgApp (( == noupdateId) -> True) (StgVarArg i : rest)  -> (True, StgApp i rest)
+  StgLet x binds body -> StgLet x (do_noupdate_bind binds) <$> (do_noupdate_expr body)
+  StgTick ticks x -> StgTick ticks <$> do_noupdate_expr x
+  StgCase scrut y z alts -> (False, StgCase (snd $ do_noupdate_expr scrut) y z (do_noupdate_alt <$> alts))
+  StgLetNoEscape x binds body -> StgLetNoEscape x (do_noupdate_bind binds) <$> (do_noupdate_expr body)
+  x -> (False, x)
+
+do_noupdate_alt :: StgAlt -> StgAlt
+do_noupdate_alt x@GenStgAlt{alt_rhs} = x{ alt_rhs = snd $ do_noupdate_expr alt_rhs }

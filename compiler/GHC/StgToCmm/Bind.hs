@@ -20,6 +20,8 @@ import GHC.Core.Opt.Arity( isOneShotBndr )
 import GHC.Runtime.Heap.Layout
 import GHC.Unit.Module
 
+import GHC.Types.Id.Make
+
 import GHC.Stg.Syntax
 
 import GHC.Platform
@@ -59,6 +61,7 @@ import GHC.Types.Tickish ( tickishIsCode )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Trace
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
@@ -230,6 +233,9 @@ cgRhs id (StgRhsClosure fvs cc upd_flag args body)
 --              Non-constructor right hand sides
 ------------------------------------------------------------------------
 
+strip_ticks :: CgStgExpr -> CgStgExpr
+strip_ticks = stripStgTicksTopE (not . tickishIsCode)
+
 mkRhsClosure :: Profile
              -> Bool                            -- Omit AP Thunks to improve profiling
              -> Bool                            -- Lint tag inference checks
@@ -281,14 +287,13 @@ mkRhsClosure    profile _ _check_tags bndr _cc
                 upd_flag                -- Updatable thunk
                 []                      -- A thunk
                 expr
-  | let strip = stripStgTicksTopE (not . tickishIsCode)
-  , StgCase (StgApp scrutinee [{-no args-}])
+  | StgCase (StgApp scrutinee [{-no args-}])
          _   -- ignore bndr
          (AlgAlt _)
          [GenStgAlt{ alt_con   = DataAlt _
                    , alt_bndrs = params
-                   , alt_rhs   = sel_expr}] <- strip expr
-  , StgApp selectee [{-no args-}] <- strip sel_expr
+                   , alt_rhs   = sel_expr}] <- strip_ticks expr
+  , StgApp selectee [{-no args-}] <- strip_ticks sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets profile (addIdReps (assertNonVoidIds params))
