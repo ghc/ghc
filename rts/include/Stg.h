@@ -263,8 +263,8 @@ typedef StgFunPtr       F_;
 #define EB_(X)    extern const char X[]
 #define IB_(X)    static const char X[]
 /* static (non-heap) closures (requires alignment for pointer tagging): */
-#define EC_(X)    extern       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
-#define IC_(X)    static       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+#define EC_(X)    extern       StgWordArray (X) GNU_ATTRIBUTE(aligned (SIZEOF_VOID_P))
+#define IC_(X)    static       StgWordArray (X) GNU_ATTRIBUTE(aligned (SIZEOF_VOID_P))
 /* writable data (does not require alignment): */
 #define ERW_(X)   extern       StgWordArray (X)
 #define IRW_(X)   static       StgWordArray (X)
