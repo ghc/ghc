@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -ddump-cmm -ddump-stg-final #-}
+{-# OPTIONS_GHC -O2 -ddump-cmm -ddump-stg-final #-}
 import Debug.Trace
 import Control.Monad
 import GHC.Magic
@@ -19,6 +19,8 @@ main = do
   replicateM_ 2 $ updating_local
   putStrLn "evaluating a top level reentrant thunk 2 times:"
   replicateM_ 2 $ reentrant_local
+  let y = bar "dougrulz"
+  replicateM_ 2 $ print y
 
 
 
@@ -30,6 +32,16 @@ main = do
 updatingThunk :: IO Int
 updatingThunk = trace "updatingThunk" $ length . show <$> getCurrentTime
 
+{-# noinline foo #-}
+foo () = (trace "reentrantThunk" $ length . show <$> getCurrentTime)
+
 {-# noinline reentrantThunk #-}
 reentrantThunk :: IO Int
-reentrantThunk  = noupdate (trace "reentrantThunk" $ length . show <$> getCurrentTime)
+reentrantThunk  = noupdate foo ()
+
+
+{-# noinline bar #-}
+bar :: String -> Int
+bar s = let
+  x = noupdate (length s)
+  in x
