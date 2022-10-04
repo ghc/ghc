@@ -483,13 +483,13 @@ mask8 x = BAnd x (Int 0xFF)
 mask16 :: JExpr -> JExpr
 mask16 x = BAnd x (Int 0xFFFF)
 
--- | Sign-extend a 8-bit value
+-- | Sign-extend/narrow a 8-bit value
 signExtend8 :: JExpr -> JExpr
-signExtend8 x = (BAnd x (Int 0xFF) `BXor` 0x80) `Sub` 0x80
+signExtend8 x = (BAnd x (Int 0x7F  )) `Sub` (BAnd x (Int 0x80))
 
--- | Sign-extend a 16-bit value
+-- | Sign-extend/narrow a 16-bit value
 signExtend16 :: JExpr -> JExpr
-signExtend16 x = (BAnd x (Int 0xFFFF) `BXor` 0x8000) `Sub` 0x8000
+signExtend16 x = (BAnd x (Int 0x7FFF)) `Sub` (BAnd x (Int 0x8000))
 
 -- | Select a property 'prop', from and object 'obj'
 --
