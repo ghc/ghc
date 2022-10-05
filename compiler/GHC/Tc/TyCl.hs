@@ -35,7 +35,7 @@ import GHC.Driver.Config.HsToCore
 import GHC.Hs
 
 import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..)
-                           , mkTcRnUnknownMessage )
+                           , mkTcRnUnknownMessage, IllegalNewtypeReason (..) )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -4530,40 +4530,30 @@ checkValidDataCon dflags existential_ok tc con
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
 -- Further checks for the data constructor of a newtype
+-- You might wonder if we need to check for an unlifted newtype
+-- without -XUnliftedNewTypes, such as
+--   newtype C = MkC Int#
+-- But they are caught earlier, by GHC.Tc.Gen.HsType.checkDataKindSig
 checkNewDataCon con
-  = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
-              -- One argument
+  = do  { show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
 
-        ; unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-        ; let allowedArgType =
-                unlifted_newtypes || typeLevity_maybe (scaledThing arg_ty1) == Just Lifted
-        ; checkTc allowedArgType $ mkTcRnUnknownMessage $ mkPlainError noHints $ vcat
-          [ text "A newtype cannot have an unlifted argument type"
-          , text "Perhaps you intended to use UnliftedNewtypes"
-          ]
-        ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
-
-        ; let check_con what msg =
-               checkTc what $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                 (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+        ; checkTc (isSingleton arg_tys) $
+          TcRnIllegalNewtype con show_linear_types (DoesNotHaveSingleField $ length arg_tys)
 
         ; checkTc (ok_mult (scaledMult arg_ty1)) $
-          mkTcRnUnknownMessage $ mkPlainError noHints $ text "A newtype constructor must be linear"
+          TcRnIllegalNewtype con show_linear_types IsNonLinear
 
-        ; check_con (null eq_spec) $
-          text "A newtype constructor must have a return type of form T a1 ... an"
-                -- Return type is (T a b c)
+        ; checkTc (null eq_spec) $
+          TcRnIllegalNewtype con show_linear_types IsGADT
 
-        ; check_con (null theta) $
-          text "A newtype constructor cannot have a context in its type"
+        ; checkTc (null theta) $
+          TcRnIllegalNewtype con show_linear_types HasConstructorContext
 
-        ; check_con (null ex_tvs) $
-          text "A newtype constructor cannot have existential type variables"
-                -- No existentials
+        ; checkTc (null ex_tvs) $
+          TcRnIllegalNewtype con show_linear_types HasExistentialTyVar
 
-        ; checkTc (all ok_bang (dataConSrcBangs con))
-                  (newtypeStrictError con)
-                -- No strictness annotations
+        ; checkTc (all ok_bang (dataConSrcBangs con)) $
+          TcRnIllegalNewtype con show_linear_types HasStrictnessAnnotation
     }
   where
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -5333,18 +5323,6 @@ newtypeConError tycon n
   = mkTcRnUnknownMessage $ mkPlainError noHints $
     sep [text "A newtype must have exactly one constructor,",
          nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
-
-newtypeStrictError :: DataCon -> TcRnMessage
-newtypeStrictError con
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-  sep [text "A newtype constructor cannot have a strictness annotation,",
-         nest 2 $ text "but" <+> quotes (ppr con) <+> text "does"]
-
-newtypeFieldErr :: DataCon -> Int -> TcRnMessage
-newtypeFieldErr con_name n_flds
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [text "The constructor of a newtype must have exactly one field",
-         nest 2 $ text "but" <+> quotes (ppr con_name) <+> text "has" <+> speakN n_flds]
 
 badSigTyDecl :: Name -> TcRnMessage
 badSigTyDecl tc_name

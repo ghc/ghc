@@ -1000,6 +1000,40 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids feature
       -> mkSimpleDecorated $
         ppr feature <+> text "are not allowed in type data declarations."
+    TcRnIllegalNewtype con show_linear_types reason
+      -> mkSimpleDecorated $
+        vcat [msg, additional]
+        where
+          (msg,additional) =
+            case reason of
+              DoesNotHaveSingleField n_flds ->
+                (sep [
+                  text "A newtype constructor must have exactly one field",
+                  nest 2 $
+                    text "but" <+> quotes (ppr con) <+> text "has" <+> speakN n_flds
+                ],
+                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+              IsNonLinear ->
+                (text "A newtype constructor must be linear",
+                ppr con <+> dcolon <+> ppr (dataConDisplayType True con))
+              IsGADT ->
+                (text "A newtype must not be a GADT",
+                ppr con <+> dcolon <+> pprWithExplicitKindsWhen sneaky_eq_spec (ppr $ dataConDisplayType show_linear_types con))
+              HasConstructorContext ->
+                (text "A newtype constructor must not have a context in its type",
+                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+              HasExistentialTyVar ->
+                (text "A newtype constructor must not have existential type variables",
+                ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
+              HasStrictnessAnnotation ->
+                (text "A newtype constructor must not have a strictness annotation", empty)
+
+          -- Is there an EqSpec involving an invisible binder? If so, print the
+          -- error message with explicit kinds.
+          invisible_binders = filter isInvisibleTyConBinder (tyConBinders $ dataConTyCon con)
+          sneaky_eq_spec
+            = any (\eq -> any (( == eqSpecTyVar eq) . binderVar) invisible_binders)
+                $ dataConEqSpec con
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1333,6 +1367,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalTypeData
       -> ErrorWithoutFlag
     TcRnTypeDataForbids{}
+      -> ErrorWithoutFlag
+    TcRnIllegalNewtype{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -1670,9 +1706,10 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeData]
     TcRnTypeDataForbids{}
       -> noHints
+    TcRnIllegalNewtype{}
+      -> noHints
 
   diagnosticCode = constructorCode
-
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
 -- and so on.  The `and` stands for any `conjunction`, which is passed in.

@@ -13,6 +13,7 @@ module GHC.Tc.Errors.Types (
   , pprFixedRuntimeRepProvenance
   , ShadowedNameProvenance(..)
   , RecordFieldPart(..)
+  , IllegalNewtypeReason(..)
   , InjectivityErrReason(..)
   , HasKinds(..)
   , hasKinds
@@ -2288,6 +2289,34 @@ data TcRnMessage where
   TcRnNoExplicitAssocTypeOrDefaultDeclaration
             :: Name
             -> TcRnMessage
+  {-| TcRnIllegalNewtype is an error that occurs when a newtype:
+
+      * Does not have exactly one field, or
+      * is non-linear, or
+      * is a GADT, or
+      * has a context in its constructor's type, or
+      * has existential type variables in its constructor's type, or
+      * has strictness annotations.
+
+    Test cases:
+      testsuite/tests/gadt/T14719
+      testsuite/tests/indexed-types/should_fail/T14033
+      testsuite/tests/indexed-types/should_fail/T2334A
+      testsuite/tests/linear/should_fail/LinearGADTNewtype
+      testsuite/tests/parser/should_fail/readFail008
+      testsuite/tests/polykinds/T11459
+      testsuite/tests/typecheck/should_fail/T15523
+      testsuite/tests/typecheck/should_fail/T15796
+      testsuite/tests/typecheck/should_fail/T17955
+      testsuite/tests/typecheck/should_fail/T18891a
+      testsuite/tests/typecheck/should_fail/T21447
+      testsuite/tests/typecheck/should_fail/tcfail156
+  -}
+  TcRnIllegalNewtype
+            :: DataCon
+            -> Bool -- ^ True if linear types enabled
+            -> IllegalNewtypeReason
+            -> TcRnMessage
 
   {-| TcRnIllegalTypeData is an error that occurs when a @type data@
       declaration occurs without the TypeOperators extension.
@@ -2333,6 +2362,7 @@ instance Outputable TypeDataForbids where
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
+
 -- | Specifies which calling convention is unsupported on the current platform
 data UnsupportedCallConvention
   = StdCallConvUnsupported
@@ -2383,6 +2413,17 @@ pprFixedRuntimeRepProvenance :: FixedRuntimeRepProvenance -> SDoc
 pprFixedRuntimeRepProvenance FixedRuntimeRepDataConField = text "data constructor field"
 pprFixedRuntimeRepProvenance FixedRuntimeRepPatSynSigArg = text "pattern synonym argument"
 pprFixedRuntimeRepProvenance FixedRuntimeRepPatSynSigRes = text "pattern synonym scrutinee"
+
+-- | Why the particular illegal newtype error arose together with more
+-- information, if any.
+data IllegalNewtypeReason
+  = DoesNotHaveSingleField !Int
+  | IsNonLinear
+  | IsGADT
+  | HasConstructorContext
+  | HasExistentialTyVar
+  | HasStrictnessAnnotation
+  deriving Generic
 
 -- | Why the particular injectivity error arose together with more information,
 -- if any.

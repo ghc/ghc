@@ -1,13 +1,14 @@
 
-T2334A.hs:9:26: error:
-    • The constructor of a newtype must have exactly one field
-        but ‘F’ has two
+T2334A.hs:9:26: error: [GHC-23517]
+    • A newtype constructor must have exactly one field but ‘F’ has two
+      F :: () -> () -> F ()
     • In the definition of data constructor ‘F’
       In the newtype instance declaration for ‘F’
 
-T2334A.hs:10:27: error:
-    • The constructor of a newtype must have exactly one field
+T2334A.hs:10:27: error: [GHC-23517]
+    • A newtype constructor must have exactly one field
         but ‘H’ has none
+      H :: F Int
     • In the definition of data constructor ‘H’
       In the newtype instance declaration for ‘F’
 

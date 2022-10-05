@@ -468,6 +468,12 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNoExplicitAssocTypeOrDefaultDeclaration"   = 08585
   GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
   GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
+  GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
+  GhcDiagnosticCode "IsNonLinear"                                   = 38291
+  GhcDiagnosticCode "IsGADT"                                        = 89498
+  GhcDiagnosticCode "HasConstructorContext"                         = 17440
+  GhcDiagnosticCode "HasExistentialTyVar"                           = 07525
+  GhcDiagnosticCode "HasStrictnessAnnotation"                       = 04049
 
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394
@@ -587,6 +593,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnCannotDeriveInstance" = 'Just DeriveInstanceErrReason
   ConRecursInto "TcRnPragmaWarning"        = 'Just (WarningTxt GhcRn)
   ConRecursInto "TcRnNotInScope"           = 'Just NotInScopeError
+  ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason
 
     ------------------
     -- FFI errors
