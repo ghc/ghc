@@ -65,6 +65,8 @@ Other Prelude modules are much easier with fewer complex dependencies.
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -199,6 +201,37 @@ build = errorWithoutStackTrace "urk"
 foldr = errorWithoutStackTrace "urk"
 #endif
 
+-- | Uninhabited data type
+--
+-- @since 4.8.0.0
+data Void deriving
+  ( Eq      -- ^ @since 4.8.0.0
+  , Ord     -- ^ @since 4.8.0.0
+  )
+
+-- | Since 'Void' values logically don't exist, this witnesses the
+-- logical reasoning tool of \"ex falso quodlibet\".
+--
+-- >>> let x :: Either Void Int; x = Right 5
+-- >>> :{
+-- case x of
+--     Right r -> r
+--     Left l  -> absurd l
+-- :}
+-- 5
+--
+-- @since 4.8.0.0
+absurd :: Void -> a
+absurd a = case a of {}
+
+-- | If 'Void' is uninhabited then any 'Functor' that holds only
+-- values of type 'Void' is holding no values.
+-- It is implemented in terms of @fmap absurd@.
+--
+-- @since 4.8.0.0
+vacuous :: Functor f => f Void -> f a
+vacuous = fmap absurd
+
 infixr 6 <>
 
 -- | The class of semigroups (types with an associative binary operation).
@@ -327,6 +360,11 @@ instance Monoid [a] where
         {-# INLINE mconcat #-}
         mconcat xss = [x | xs <- xss, x <- xs]
 -- See Note: [List comprehensions and inlining]
+
+-- | @since 4.9.0.0
+instance Semigroup Void where
+    a <> _ = a
+    stimes _ a = a
 
 {-
 Note: [List comprehensions and inlining]

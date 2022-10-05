@@ -656,6 +656,12 @@ instance (Integral a, Read a) => Read (Ratio a) where
 -- Tuple instances of Read, up to size 15
 ------------------------------------------------------------------------
 
+-- | Reading a 'Void' value is always a parse error, considering
+-- 'Void' as a data type with no constructors.
+--
+-- @since 4.8.0.0
+deriving instance Read Void
+
 -- | @since 2.01
 instance Read () where
   readPrec =

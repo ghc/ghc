@@ -1187,6 +1187,9 @@ deriving instance Data Ordering
 -- | @since 4.0.0.0
 deriving instance (Data a, Data b) => Data (Either a b)
 
+-- | @since 4.8.0.0
+deriving instance Data Void
+
 -- | @since 4.0.0.0
 deriving instance Data ()
 

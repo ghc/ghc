@@ -746,7 +746,7 @@ import GHC.Types
 import GHC.Ix      ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
-                   , Semigroup(..), Monoid(..) )
+                   , Semigroup(..), Monoid(..), Void )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
@@ -1552,6 +1552,9 @@ data Meta = MetaData Symbol Symbol Symbol Bool
 --------------------------------------------------------------------------------
 -- Derived instances
 --------------------------------------------------------------------------------
+
+-- | @since 4.8.0.0
+deriving instance Generic Void
 
 -- | @since 4.6.0.0
 deriving instance Generic [a]

@@ -165,6 +165,9 @@ appPrec1 = I# 11#       -- appPrec + 1
 -- Simple Instances
 --------------------------------------------------------------
 
+-- | @since 4.8.0.0
+deriving instance Show Void
+
 -- | @since 2.01
 deriving instance Show ()
 

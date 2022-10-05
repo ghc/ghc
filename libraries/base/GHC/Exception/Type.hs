@@ -143,6 +143,9 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
+-- | @since 4.8.0.0
+instance Exception Void
+
 -- | @since 3.0
 instance Exception SomeException where
     toException se = se

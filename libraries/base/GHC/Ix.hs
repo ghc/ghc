@@ -273,6 +273,14 @@ instance Ix Ordering where -- as derived
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
 ----------------------------------------------------------------------
+-- | @since 4.8.0.0
+instance Ix Void where
+    range _     = []
+    index _     = absurd
+    inRange _   = absurd
+    rangeSize _ = 0
+
+----------------------------------------------------------------------
 -- | @since 2.01
 instance Ix () where
     {-# INLINE range #-}
