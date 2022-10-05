@@ -255,6 +255,8 @@ def req_dynamic_hs( name, opts ):
 def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
+    # JS backend doesn't provide an interpreter yet
+    js_skip(name, opts)
 
 def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:
