@@ -134,10 +134,6 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
   WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR bool pre (t : pre)
   WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR bool (t : pre) pre
 
-  WasmLift :: (pre' ~ (t : pre), post' ~ (t : post)) =>
-              WasmTypeTag t -> WasmIR bool pre post -> WasmIR bool pre' post'
-
-
 
 
 data BrTableInterval
