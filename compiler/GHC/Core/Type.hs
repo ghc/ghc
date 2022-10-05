@@ -260,7 +260,7 @@ import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
    ( charTy, naturalTy
    , typeSymbolKind, liftedTypeKind, unliftedTypeKind
-   , boxedRepDataConTyCon, constraintKind, zeroBitTypeKind
+   , constraintKind, zeroBitTypeKind
    , manyDataConTy, oneDataConTy
    , liftedRepTy, unliftedRepTy, zeroBitRepTy )
 
@@ -596,6 +596,8 @@ interfaces.  Notably this plays a role in tcTySigs in GHC.Tc.Gen.Bind.
 --
 -- @isTyConKeyApp_maybe key ty@ returns @Just tys@ iff
 -- the type @ty = T tys@, where T's unique = key
+-- key must not be `fUNTyConKey`; to test for functions, use `splitFunTy_maybe`.
+-- Thanks to this fact, we don't have to pattern match on `FunTy` here.
 isTyConKeyApp_maybe :: Unique -> Type -> Maybe [Type]
 isTyConKeyApp_maybe key ty
   | TyConApp tc args <- coreFullView ty
@@ -2313,8 +2315,11 @@ getRuntimeRep ty
 getLevity_maybe :: HasDebugCallStack => Type -> Maybe Type
 getLevity_maybe ty
   | Just rep <- getRuntimeRep_maybe ty
-  , Just (tc, [lev]) <- splitTyConApp_maybe rep
-  , tc == boxedRepDataConTyCon
+  -- Directly matching on TyConApp after expanding type synonyms
+  -- saves allocations compared to `splitTyConApp_maybe`. See #22254.
+  -- Given that this is a pretty hot function we make use of the fact
+  -- and use isTyConKeyApp_maybe instead.
+  , Just [lev] <- isTyConKeyApp_maybe boxedRepDataConKey rep
   = Just lev
   | otherwise
   = Nothing
