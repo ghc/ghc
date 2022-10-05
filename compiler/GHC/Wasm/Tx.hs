@@ -29,6 +29,13 @@ class Monad (codegen bool) => CG bool codegen where
 --  asInt :: WasmTypeTag t -> m ()   -- insist on the platofrm integer type
   booleanWasmTypeTag :: codegen bool (WasmTypeTag bool)
 
+newtype WasmExpr bool t = WasmExpr (forall pre . WarmIR bool pre (t : pre))
+
+tx' :: CG bool codegen
+       => CmmExpr
+       -> (forall t . WasmTypeTag t -> WasmIR bool pre (t : pre) -> codegen bool r)
+       -> codegen bool r
+
 tx :: CG bool codegen
    => CmmExpr
    -> (forall t . WasmTypeTag t -> WasmIR bool '[] (t : '[]) -> codegen bool r)
