@@ -1038,7 +1038,8 @@ genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> Type -> G (JStat, ExprResult)
 genPrimOp ctx op args t = do
   as <- concatMapM genArg args
   prof <- csProf <$> getSettings
+  bound <- csBoundsCheck <$> getSettings
   -- fixme: should we preserve/check the primreps?
-  return $ case genPrim prof t op (concatMap typex_expr $ ctxTarget ctx) as of
+  return $ case genPrim prof bound t op (concatMap typex_expr $ ctxTarget ctx) as of
              PrimInline s -> (s, ExprInline Nothing)
              PRPrimCall s -> (s, ExprCont)

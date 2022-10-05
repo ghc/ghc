@@ -22,6 +22,7 @@ initStgToJSConfig dflags = StgToJSConfig
   , csInlineAlloc     = False
   , csTraceRts        = False
   , csAssertRts       = False
+  , csBoundsCheck     = gopt Opt_DoBoundsChecking dflags
   , csDebugAlloc      = False
   , csTraceForeign    = False
   , csProf            = ways dflags `hasWay` WayProf
