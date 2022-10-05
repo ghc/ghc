@@ -228,7 +228,9 @@ test('T5423', cmm_src, makefile_test, ['T5423'])
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
-                 pre_cmd('$MAKE -s --no-print-directory T6006_setup') ],
+                 pre_cmd('$MAKE -s --no-print-directory T6006_setup'),
+                 js_skip
+                 ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which
                  # needs it.
@@ -405,7 +407,10 @@ test('T14702', [ ignore_stdout
                ]
                , compile_and_run, [''])
 
-test('T14900', normal, compile_and_run, ['-package ghc-compact'])
+test('T14900',
+  [ js_skip # Compact regions not supported by the JS backend yet
+  ], compile_and_run, ['-package ghc-compact'])
+
 test('InternalCounters', normal, makefile_test, ['InternalCounters'])
 test('alloccounter1', normal, compile_and_run,
   [
