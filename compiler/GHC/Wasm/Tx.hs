@@ -6,6 +6,7 @@
 
 module GHC.Wasm.Tx
   ( tx
+  , tx'
   , CG(..)
   )
 where
@@ -29,12 +30,31 @@ class Monad (codegen bool) => CG bool codegen where
 --  asInt :: WasmTypeTag t -> m ()   -- insist on the platofrm integer type
   booleanWasmTypeTag :: codegen bool (WasmTypeTag bool)
 
-newtype WasmExpr bool t = WasmExpr (forall pre . WarmIR bool pre (t : pre))
+newtype WasmExpr bool t =
+    WasmExpr (forall pre . WasmIR bool pre (t : pre))
+
+
 
 tx' :: CG bool codegen
        => CmmExpr
-       -> (forall t . WasmTypeTag t -> WasmIR bool pre (t : pre) -> codegen bool r)
+       -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
        -> codegen bool r
+
+tx' expr k =
+  case expr of
+--    CmmLit (CmmInt n w)   -> withIntWidthTag   w $ \tag -> k tag (WasmInt tag n)
+--    CmmLit (CmmFloat x w) -> withFloatWidthTag w $ \tag -> k tag (WasmFloat tag x)
+
+    CmmMachOp (MO_Add w) es -> wasmBinary' w es WasmAdd k
+--    CmmMachOp (MO_Sub w) es -> wasmBinary w es WasmSub k
+
+--    CmmMachOp (MO_S_Ge w) es -> wasmCompare w es WasmS_Ge k
+
+    CmmMachOp (MO_Not w) es -> wasmUnary' w es WasmNot k
+
+    _ -> panic "unimplemented"
+
+
 
 tx :: CG bool codegen
    => CmmExpr
@@ -106,9 +126,67 @@ binaryCPS [e1, e2] k =   -- would dearly love to use do notation here
       Nothing -> panic "ill-typed Cmm"
 binaryCPS _ _ = panic "wrong number of operands to binary operator in Cmm"
 
+binaryCPS'
+       :: forall bool codegen a . CG bool codegen
+       => [CmmExpr]
+       -> (forall t .  WasmTypeTag t
+                    -> WasmExpr bool t
+                    -> WasmExpr bool t
+                    -> codegen bool a)
+       -> codegen bool a
+
+binaryCPS' [e1, e2] k =   -- would dearly love to use do notation here
+    tx' e1 $ \tag1 code1 ->
+    tx' e2 $ \tag2 code2 ->
+    case tag1 `testEquality` tag2 of -- mandatory check
+      Just Refl -> k tag1 code1 code2
+      Nothing -> panic "ill-typed Cmm"
+binaryCPS' _ _ = panic "wrong number of operands to binary operator in Cmm"
+
 wasmUnary w [e] operator k =
     tx e $ \tag code -> checkTagWidth tag w $ k tag (code <> operator tag)
 wasmUnary _ _ _ _ = panic "wrong number of operands to unary operator in Cmm"
+
+
+wasmBinary' ::
+    CG bool codegen
+ => CT.Width
+ -> [CmmExpr]
+ -> (forall t stack . WasmTypeTag t -> WasmIR bool (t : t : stack) (t : stack))
+ -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
+ -> codegen bool r
+
+wasmBinary' w es operator k =
+    binaryCPS' es $ \tag code1 code2 ->
+        checkTagWidth tag w $    -- optional check
+        k tag (apply2 (operator tag) code1 code2)
+
+
+
+wasmUnary'  :: CG bool codegen
+           => CT.Width
+           -> [CmmExpr]
+           -> (forall t pre . WasmTypeTag t -> WasmIR bool (t : pre) (t : pre))
+           -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
+           -> codegen bool r
+
+wasmUnary' w [e] operator k =
+    tx' e $ \tag code -> checkTagWidth tag w $ k tag (apply1 (operator tag) code)
+wasmUnary' _ _ _ _ = panic "wrong number of operands to unary operator in Cmm"
+
+apply1 :: (forall stack . WasmIR bool (t : stack) (t' : stack))
+       -> WasmExpr bool t
+       -> WasmExpr bool t'
+apply1 operator (WasmExpr code) = WasmExpr (code <> operator)
+
+apply2 :: (forall stack . WasmIR bool (t2 : t1 : stack) (t : stack))
+       -> WasmExpr bool t1
+       -> WasmExpr bool t2
+       -> WasmExpr bool t
+apply2 operator (WasmExpr code1) (WasmExpr code2) =
+    WasmExpr (code1 <> code2 <> operator)
+
+
 
 ----------------------------------------------------------------
 
