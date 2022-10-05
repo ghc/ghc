@@ -1227,8 +1227,8 @@ genPrim prof ty op = case op of
   WhereFromOp                       -> unhandledPrimop op -- should be easily implementable with o.f.n
 
   SetThreadAllocationCounter        -> unhandledPrimop op
-  GetThreadLabelOp                  -> unhandledPrimop op
-  LabelThreadOp                     -> unhandledPrimop op -- \[] [t,la,lo] -> PrimInline $ t .^ "label" |= ValExpr (JList [la, lo])
+  GetThreadLabelOp                  -> \[r1, r2] [t] -> PrimInline $ appT [r1, r2] "h$getThreadLabel" [t]
+  LabelThreadOp                     -> \[] [t,l] -> PrimInline $ t .^ "label" |= l
 
 ------------------------------- Vector -----------------------------------------
 -- For now, vectors are unsupported on the JS backend. Simply put, they do not
