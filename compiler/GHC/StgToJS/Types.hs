@@ -86,6 +86,7 @@ data StgToJSConfig = StgToJSConfig
   , csInlineAlloc     :: !Bool
   , csTraceRts        :: !Bool
   , csAssertRts       :: !Bool
+  , csBoundsCheck     :: !Bool
   , csDebugAlloc      :: !Bool
   , csTraceForeign    :: !Bool
   , csProf            :: !Bool -- ^ Profiling enabled
