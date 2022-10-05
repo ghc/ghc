@@ -1436,3 +1436,11 @@ function h$pext64(src_b, src_a, mask_b, mask_a) {
  }
  RETURN_UBX_TUP2(dst_b, dst_a);
 }
+
+function h$getThreadLabel(t) {
+  if (t.label) {
+    RETURN_UBX_TUP2(1, t.label);
+  } else {
+    RETURN_UBX_TUP2(0, 0);
+  }
+}
