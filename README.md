@@ -53,19 +53,22 @@ For building library documentation, you'll need [Haddock][6].  To build
 the compiler documentation, you need [Sphinx](http://www.sphinx-doc.org/)
 and Xelatex (only for PDF output).
 
-**Quick start**: the following gives you a default build:
+**Quick start**: GHC is built using the [Hadrian build system](hadrian/README.md).
+The following gives you a default build:
 
     $ ./boot
     $ ./configure
-    $ make         # can also say 'make -jX' for X number of jobs
-    $ make install
+    $ hadrian/build         # can also say '-jX' for X number of jobs
 
   On Windows, you need an extra repository containing some build tools.
   These can be downloaded for you by configure. This only needs to be done once by running:
 
     $ ./configure --enable-tarballs-autodownload
 
-(NB: **Do you have multiple cores? Be sure to tell that to `make`!** This can
+  Additionally, on Windows, to run Hadrian you should run `hadrian/build.bat`
+  instead of `hadrian/build`.
+
+(NB: **Do you have multiple cores? Be sure to tell that to `hadrian`!** This can
 save you hours of build time depending on your system configuration, and is
 almost always a win regardless of how many cores you have. As a simple rule,
 you should have about N+1 jobs, where `N` is the amount of cores you have.)
