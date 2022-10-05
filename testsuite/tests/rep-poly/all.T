@@ -10,7 +10,7 @@ test('T14561b', normal, compile_fail, [''])
 test('T14765', normal, compile_fail, [''])
 test('T17360', normal, compile_fail, [''])
 test('T17817', normal, compile_fail, [''])
-test('T18170a', [extra_files(['T18170c.hs'])], multimod_compile, ['T18170a.hs', '-v0'])
+test('T18170a', [req_th,extra_files(['T18170c.hs'])], multimod_compile, ['T18170a.hs', '-v0'])
 test('T18170b', [extra_files(['T18170c.hs']), expect_broken(19893)], multimod_compile_fail, ['T18170b.hs', '-v0'])
 # T18170b isn't actually broken, but it causes a Core Lint error
 # even though the program is (correctly) rejected by the typechecker

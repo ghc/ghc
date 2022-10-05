@@ -9,5 +9,6 @@ def normalise_paths(s):
   return '\n'.join(res)
 
 
-test('T20604', [extra_files(['A.hs', 'A1.hs'])
+test('T20604', [ req_th
+               , extra_files(['A.hs', 'A1.hs'])
                , normalise_fun(normalise_paths)], makefile_test, [])

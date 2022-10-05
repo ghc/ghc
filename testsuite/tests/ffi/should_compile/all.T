@@ -36,7 +36,7 @@ test('T14125', normal, compile, [''])
 test(
     'cc017',
     # We need TH but can't load profiled dynamic objects
-    when(ghc_dynamic(), omit_ways(['profasm'])),
+    [req_th,when(ghc_dynamic(), omit_ways(['profasm']))],
     compile,
     [
         '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'
