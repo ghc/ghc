@@ -1,3 +1,8 @@
+# disable performance tests for the JS backend
+# .stats files aren't generated and the expected allocation metrics (e.g. "bytes
+# allocated") can't be reported
+setTestOpts(js_skip)
+
 # T12791 and T5835 test that GHC uses top-level instances in places where using
 # a locally given solution would produce worse code.
 # See Note [Solving from instances when interacting Dicts]
