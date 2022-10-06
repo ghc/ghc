@@ -737,6 +737,8 @@ def literate( name, opts ):
 
 def c_src( name, opts ):
     opts.c_src = True
+    # JS backend doesn't support C (yet)
+    js_skip(name, opts)
 
 def objc_src( name, opts ):
     opts.objc_src = True
