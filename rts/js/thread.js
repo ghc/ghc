@@ -1358,7 +1358,7 @@ function h$blockOnBlackhole(c) {
   TRACE_SCHEDULER("blackhole, blocking: " + h$collectProps(c));
   if(BLACKHOLE_TID(c) === h$currentThread) {
     TRACE_SCHEDULER("NonTermination");
-    return h$throw(h$baseZCControlziExceptionziBasezinonTermination, false); // is this an async exception?
+    return h$throw(h$baseZCControlziExceptionziBasezinonTermination, true);
   }
   TRACE_SCHEDULER("blackhole, blocking thread: " + h$threadString(h$currentThread));
   if(BLACKHOLE_QUEUE(c) === null) {
