@@ -41,7 +41,7 @@ module GHC.Core (
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
-        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, collectLets,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
@@ -1940,6 +1940,15 @@ flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []
 
+-- | We often want to strip off leading 'Let's before getting down to
+-- business. The inverse of 'mkLets'.
+collectLets :: Expr b -> ([Bind b], Expr b)
+collectLets expr
+  = go [] expr
+  where
+    go bs (Let b e) = go (b:bs) e
+    go bs e         = (reverse bs, e)
+
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',
 -- and 'collectTyAndValBinders'
@@ -1957,7 +1966,7 @@ collectBinders expr
   = go [] expr
   where
     go bs (Lam b e) = go (b:bs) e
-    go bs e          = (reverse bs, e)
+    go bs e         = (reverse bs, e)
 
 collectTyBinders expr
   = go [] expr

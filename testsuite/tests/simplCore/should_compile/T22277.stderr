@@ -1,0 +1,132 @@
+[1 of 1] Compiling T22277           ( T22277.hs, T22277.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 110, types: 49, coercions: 0, joins: 3/4}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T22277.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T22277.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T22277.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T22277.$trModule3 = GHC.Types.TrNameS T22277.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T22277.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T22277.$trModule2 = "T22277"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T22277.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T22277.$trModule1 = GHC.Types.TrNameS T22277.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T22277.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T22277.$trModule
+  = GHC.Types.Module T22277.$trModule3 T22277.$trModule1
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T22277.entry2 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T22277.entry2 = GHC.Types.I# 13#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T22277.entry1 :: Int
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+T22277.entry1 = GHC.Types.I# 24#
+
+-- RHS size: {terms: 89, types: 40, coercions: 0, joins: 3/4}
+entry :: Int -> Int
+[GblId,
+ Arity=1,
+ Str=<1P(SL)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 403 0}]
+entry
+  = \ (n :: Int) ->
+      case n of wild { GHC.Types.I# ds ->
+      join {
+        $w$sexit [InlPrag=[2], Dmd=LC(S,!P(L))] :: GHC.Prim.Int# -> Int
+        [LclId[JoinId(1)(Nothing)], Arity=1, Str=<L>]
+        $w$sexit (ww [OS=OneShot] :: GHC.Prim.Int#)
+          = join {
+              $j [Dmd=1C(1,!P(L))] :: [Int] -> Int
+              [LclId[JoinId(1)(Just [!])], Arity=1, Str=<1L>, Unf=OtherCon []]
+              $j (arg [OS=OneShot] :: [Int])
+                = case GHC.List.$wlenAcc
+                         @Int
+                         (GHC.List.reverse1
+                            @Int
+                            (GHC.List.reverse1
+                               @Int
+                               (GHC.List.reverse1
+                                  @Int
+                                  (GHC.List.reverse1 @Int arg (GHC.Types.[] @Int))
+                                  (GHC.Types.[] @Int))
+                               (GHC.Types.[] @Int))
+                            (GHC.Types.[] @Int))
+                         0#
+                  of ww1
+                  { __DEFAULT ->
+                  GHC.Types.I# (GHC.Prim.+# ww1 ds)
+                  } } in
+            case GHC.Prim.># 0# ww of {
+              __DEFAULT ->
+                letrec {
+                  go3 [Occ=LoopBreaker, Dmd=SC(S,L)] :: GHC.Prim.Int# -> [Int]
+                  [LclId, Arity=1, Str=<L>, Unf=OtherCon []]
+                  go3
+                    = \ (x :: GHC.Prim.Int#) ->
+                        GHC.Types.:
+                          @Int
+                          (GHC.Types.I# x)
+                          (case GHC.Prim.==# x ww of {
+                             __DEFAULT -> go3 (GHC.Prim.+# x 1#);
+                             1# -> GHC.Types.[] @Int
+                           }); } in
+                jump $j (go3 0#);
+              1# -> jump $j (GHC.Types.[] @Int)
+            } } in
+      joinrec {
+        $s$wg [Occ=LoopBreaker, Dmd=SC(S,C(1,C(1,!P(L))))]
+          :: Int -> Int -> GHC.Prim.Int# -> Int
+        [LclId[JoinId(3)(Nothing)],
+         Arity=3,
+         Str=<ML><A><L>,
+         Unf=OtherCon []]
+        $s$wg (sc :: Int) (sc1 :: Int) (sc2 :: GHC.Prim.Int#)
+          = case GHC.Prim.remInt# sc2 2# of {
+              __DEFAULT ->
+                case GHC.Prim.># sc2 43# of {
+                  __DEFAULT -> sc;
+                  1# -> jump $s$wg sc sc1 (GHC.Prim.-# sc2 1#)
+                };
+              0# -> jump $w$sexit sc2
+            }; } in
+      case ds of ds1 {
+        __DEFAULT -> jump $s$wg wild wild ds1;
+        0# -> jump $s$wg T22277.entry2 T22277.entry1 0#
+      }
+      }
+
+
+

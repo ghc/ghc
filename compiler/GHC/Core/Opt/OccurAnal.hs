@@ -829,6 +829,9 @@ global Id freshness) or analysis of unfoldings, say.
 There are multiple tickets that discuss loopification of join points in
 particular; see #13966, #14068, #14287 and #22227. Rest assured, there are
 regression tests T13966, T14287, T22227 (#14068 has no reproducer).
+
+SpecConstr doesn't much like the loopified form, though. Hence it implements
+Note [Denesting non-recursive let bindings].
 -}
 
 

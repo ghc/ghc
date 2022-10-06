@@ -273,6 +273,9 @@ test('T14152a', [extra_files(['T14152.hs']), pre_cmd('cp T14152.hs T14152a.hs'),
                 compile, ['-fno-exitification -ddump-simpl'])
 test('T13990', normal, compile, ['-dcore-lint -O'])
 test('T14650', normal, compile, ['-O2'])
+
+# SpecConstr should specialise `l` here:
+test('T14951', [expect_broken(14591), grep_errmsg(r'\$sl') ], compile, ['-O2 -dsuppress-uniques -ddump-simpl'])
 test('T14959', normal, compile, ['-O'])
 test('T14978',
      normal,
@@ -446,3 +449,5 @@ test('T22227', [grep_errmsg(r'call \S*tsum_info') ], compile, ['-O -dsuppress-un
 test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O -dno-typeable-binds -dsuppress-uniques'])
 # One module, T22097.hs, has OPTIONS_GHC -ddump-simpl
 test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-O -dno-typeable-binds -dsuppress-uniques'])
+# SpecConstr should be able to specialise `go` for the pair
+test('T22277', [grep_errmsg(r'\$s\$wgo') ], compile, ['-O2 -ddump-simpl -dsuppress-uniques'])
