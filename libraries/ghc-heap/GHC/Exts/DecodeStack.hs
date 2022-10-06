@@ -12,11 +12,12 @@
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
+import GHC.Exts.Heap (GenClosure(bitmap))
 
 #if MIN_VERSION_base(4,17,0)
 import Data.Bits
 import Foreign
-
+import System.IO.Unsafe
 import Prelude
 import GHC.Stack.CloneStack
 import GHC.Exts.Heap
@@ -43,6 +44,10 @@ type StackFrameIter# = (#
 
 data StackFrameIter = StackFrameIter StackFrameIter#
 
+-- TODO: Remove this instance (debug only)
+instance Show StackFrameIter where
+  show (StackFrameIter (# s#, i# #)) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show (W# i#)
+
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
 stackHead (StackSnapshot s) = StackFrameIter (# s , 0## #) -- GHC stacks are never empty
@@ -66,18 +71,38 @@ data BitmapEntry = BitmapEntry {
 
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
-toBitmapEntries sfi@(StackFrameIter(# s, i #) bitmap size = BitmapEntry {
+toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap size = BitmapEntry {
   closureFrame = sfi,
   isPrimitive = (bitmap .&. 1) == 0
-                                            } : toBitmapEntries (StackFrameIter (# s , i + 1 #)) (bitmap `shiftR` 1) (size - 1)
+                                            } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (size - 1)
+
+toBitmapPayload :: BitmapEntry -> BitmapPayload
+toBitmapPayload e | isPrimitive e = Primitive . toWord . closureFrame $ e
+      where
+        toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
+toBitmapPayload e = Closure . unsafePerformIO . toClosure . closureFrame $ e
+      where
+        toClosure (StackFrameIter (# s#, i# #)) =
+            case unpackClosureFromStackFrame# s# i# of
+                (# infoTableAddr, heapRep, pointersArray #) -> do
+                    let infoTablePtr = Ptr infoTableAddr
+                        ptrList = [case indexArray# pointersArray i of
+                                        (# ptr #) -> Box ptr
+                                    | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
+                                    ]
+
+                    getClosureDataFromHeapRep heapRep infoTablePtr ptrList
+
 
 unpackStackFrameIter :: StackFrameIter -> StackFrame
-unpackStackFrameIter (StackFrameIter (# s, i #)) =
+unpackStackFrameIter sfi@(StackFrameIter (# s, i #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s i)) of
      RET_BCO -> RetBCO
      RET_SMALL -> let (# bitmap#, size# #) = getSmallBitmap# s i
+                      bes = toBitmapEntries  (StackFrameIter (# s, plusWord# i 1## #))(W# bitmap#) (W# size#)
+                      payloads = map toBitmapPayload bes
                   in
-                    RetSmall None []
+                    RetSmall None payloads
      RET_BIG ->  RetBig []
      RET_FUN ->  RetFun
      UPDATE_FRAME ->  UpdateFrame
@@ -92,7 +117,9 @@ unpackStackFrameIter (StackFrameIter (# s, i #)) =
 -- TODO: Is the function type below needed? (Was proposed by Ben)
 -- derefStackPtr :: StackSnapshot# -> Int# -> a
 
-foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Int# -> Word#
+foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
 

@@ -72,18 +72,18 @@ getInfoTableTypezh (P_ stack, W_ index) {
 
 getSmallBitmapzh(P_ stack, W_ index) {
   P_ itbl;
-  itbl = %INFO_PTR(StgStack_sp(stack) + WDS(index));
+  itbl = %STD_INFO(%INFO_PTR(StgStack_sp(stack) + WDS(index)));
 
   W_ bitmap, size;
   (bitmap) = ccall getBitmapWord(itbl);
   (size) = ccall getBitmapSize(itbl);
 
-  ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul", bitmap, size);
+  ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
   return (bitmap, size);
 }
 
 unpackClosureFromStackFramezh(P_ stack, W_ index){
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(index));
-  return (stg_unpackClosurezh(closurePtr));
+  jump stg_unpackClosurezh(closurePtr);
 }

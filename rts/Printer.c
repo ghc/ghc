@@ -498,7 +498,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
     debugBelch("printSmallBitmap - payload %p\n", payload);
     debugBelch("printSmallBitmap - bitmap ");
     printBits(sizeof(StgWord), &bitmap);
-    debugBelch("printSmallBitmap - size %u\n", size);
+    debugBelch("printSmallBitmap - size %u, bitmap %ul\n", size, bitmap);
 
     uint32_t i;
 
