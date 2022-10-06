@@ -117,14 +117,16 @@ wasmNullaryInt, wasmNullaryFloat ::
    -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
    -> codegen bool r
 
+
 -- | Cmm unary operators of type `t -> t`
 
 wasmUnary  :: CG bool codegen
            => CT.Width
            -> [CmmExpr]
-           -> (forall t pre . WasmTypeTag t -> WasmIR bool (t : pre) (t : pre))
+           -> (forall t stack . WasmTypeTag t -> WasmIR bool (t : stack) (t : stack))
            -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
            -> codegen bool r
+
 
 -- | Cmm binary operators of type `t -> t -> t`
 
