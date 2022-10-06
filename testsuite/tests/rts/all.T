@@ -100,7 +100,9 @@ test('outofmem', [ when(opsys('darwin'), skip),
                    when(opsys('mingw32'), skip),
 		   normalise_errmsg_fun(remove_parenthesis)],
                  makefile_test, ['outofmem'])
-test('outofmem2', normal, makefile_test, ['outofmem2'])
+test('outofmem2',
+  [ js_skip # JS backend doesn't detect heap exhaustion
+  ], makefile_test, ['outofmem2'])
 
 test('T2047',
      [ignore_stdout,
