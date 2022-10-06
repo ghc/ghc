@@ -32,7 +32,7 @@ import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.Unfold
-import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars )
+import GHC.Core.FVs     ( exprsFreeVarsList, exprFreeVars, exprsFreeVars, exprSomeFreeVarsList )
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.DataCon
@@ -52,6 +52,7 @@ import GHC.Unit.Module.ModGuts
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..) )
+import GHC.Types.Var ( setIdDetails )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -80,10 +81,11 @@ import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad    ( zipWithM )
-import Data.List (nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
+import Data.List ( nubBy, sortBy, partition, dropWhileEnd, mapAccumL )
 import Data.Maybe( mapMaybe )
 import Data.Ord( comparing )
 import Data.Tuple
+import Data.Bifunctor ( first )
 
 {-
 -----------------------------------------------------
@@ -773,10 +775,21 @@ specConstrProgram guts
        ; return (guts { mg_binds = binds' }) }
 
 scTopBinds :: ScEnv -> [InBind] -> UniqSM (ScUsage, [OutBind])
-scTopBinds _env []     = return (nullUsage, [])
-scTopBinds env  (b:bs) = do { (usg, b', bs') <- scBind TopLevel env b $
-                                                (\env -> scTopBinds env bs)
-                            ; return (usg, b' ++ bs') }
+scTopBinds env bs = do
+  (usg, bs, ()) <- scBinds TopLevel env bs (\_env -> return (nullUsage, ()))
+  return (usg, bs)
+
+scBinds :: TopLevelFlag -> ScEnv -> [InBind]
+       -> (ScEnv -> UniqSM (ScUsage, a))   -- Specialise the scope of the bindings
+       -> UniqSM (ScUsage, [OutBind], a)
+scBinds _lvl env []     k = do
+  (usg, a) <- k env
+  return (usg, [], a)
+scBinds lvl  env (b:bs) k = do
+  (usg, b', (bs', a)) <- scBind lvl env b $ \env -> do
+    (usg, bs', a) <- scBinds lvl env bs k
+    return (usg, (bs',a))
+  return (usg, b' ++ bs', a)
 
 {-
 ************************************************************************
@@ -1017,6 +1030,9 @@ extendScInScope env qvars
         -- Extend the substitution
 extendScSubst :: ScEnv -> Var -> OutExpr -> ScEnv
 extendScSubst env var expr = env { sc_subst = extendSubst (sc_subst env) var expr }
+
+extendScSubstPre :: ScEnv -> Var -> InExpr -> ScEnv
+extendScSubstPre env var expr = extendScSubst env var (substExpr (sc_subst env) expr)
 
 extendScSubstList :: ScEnv -> [(Var,OutExpr)] -> ScEnv
 extendScSubstList env prs = env { sc_subst = extendSubstList (sc_subst env) prs }
@@ -1330,6 +1346,15 @@ creates specialised versions of functions.
 scBind :: TopLevelFlag -> ScEnv -> InBind
        -> (ScEnv -> UniqSM (ScUsage, a))   -- Specialise the scope of the binding
        -> UniqSM (ScUsage, [OutBind], a)
+scBind NotTopLevel env (NonRec bndr rhs) do_body
+  | Just (app, binds) <- denest_nonrec_let (getSubstInScope (sc_subst env)) bndr rhs
+    -- See Note [Denesting non-recursive let bindings]
+    -- We don't denest at the top-level, because we will extend the substitution
+    -- and top-level binders have already been put into scope and (had their
+    -- unfoldings!) substituted due to Note [Glomming], so we wouldn't be able
+    -- to discard the NonRec.
+  -- , pprTrace "denest" (ppr bndr <+> ppr app $$ ppr binds) True
+  = scBinds NotTopLevel env binds (\env -> do_body $ extendScSubstPre env bndr app)
 scBind top_lvl env (NonRec bndr rhs) do_body
   | isTyVar bndr         -- Type-lets may be created by doBeta
   = do { (final_usage, body') <- do_body (extendScSubst env bndr rhs)
@@ -1424,8 +1449,88 @@ scBind top_lvl env (Rec prs) do_body
 
     rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
 
-{- Note [Specialising local let bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- | Implements Note [Denesting non-recursive let bindings].
+--
+-- The call `denest_nonrec_let in_scope f (\xs -> let binds in g ys)` returns
+-- `Just (\xs -> g' ys, binds')`, where `g'` and `binds'` were stripped of their
+-- join-point-ness (if `f` was not a join point itself).
+-- The function returns `Nothing` if the code does not match.
+--
+-- The `InScopeSet` makes sure that `binds` do not shadow existing bindings
+-- that are used in ..., in which case this function will return `Nothing`, too.
+denest_nonrec_let :: InScopeSet -> InId -> InExpr -> Maybe (InExpr, [InBind])
+denest_nonrec_let in_scope f rhs
+  | (xs@(_:_),          body) <- collectBinders rhs
+  , (binds@(_:_), call) <- collectLets body
+  , (Var g, args)       <- collectArgs call
+  , let bndrs = bindersOfBinds binds
+  , (g', binds') <- need_zap_join_point_hood f g binds `orElse` (g, binds)
+  -- expensive tests last:
+  , bndrs `dont_shadow` in_scope     -- floating binds out may not shadow bindings already in scope
+  , args  `exprs_dont_mention` bndrs -- args may not mention binds
+  , binds `binds_dont_mention` xs    -- binds may not mention xs
+  = Just (mkLams xs $ mkApps (Var g') args, binds')
+  | otherwise
+  = Nothing
+  where
+    dont_shadow :: [Var] -> InScopeSet -> Bool
+    dont_shadow bndrs in_scope =
+      disjointVarSet (getInScopeVars in_scope) (mkVarSet bndrs)
+
+    exprs_dont_mention :: [CoreExpr] -> [Var] -> Bool
+    exprs_dont_mention exprs vs =
+      disjointVarSet (exprsFreeVars exprs) (mkVarSet vs)
+
+    binds_dont_mention :: [CoreBind] -> [Var] -> Bool
+    binds_dont_mention binds vs =
+      let some_var = head (bindersOfBinds binds)
+          vs_set   = mkVarSet vs
+      in null $ exprSomeFreeVarsList (`elemVarSet` vs_set) (mkLets binds (Var some_var))
+
+    need_zap_join_point_hood :: Id -> Id -> [CoreBind] -> Maybe (Id, [CoreBind])
+    need_zap_join_point_hood f g binds
+      | isJoinId f       = Nothing -- `f` and `g` share tail context
+      | not (isJoinId g) = Nothing -- `g` and thus `binds` never were joinpoints to begin with
+      | otherwise        = Just (mark_non_join g, map (map_binders mark_non_join) binds)
+
+    map_binders :: (b -> b) -> Bind b -> Bind b
+    map_binders f (NonRec b rhs) = NonRec (f b) rhs
+    map_binders f (Rec prs)      = Rec (map (first f) prs)
+
+    mark_non_join :: Id -> Id
+    mark_non_join id = case idDetails id of
+      JoinId _ Nothing          -> id `setIdDetails` VanillaId
+      JoinId _ (Just cbv_marks) -> id `setIdDetails` WorkerLikeId cbv_marks
+      _                         -> id
+
+{- Note [Denesting non-recursive let bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we see (local or at top-level)
+
+  f xs = let binds in g as;
+  rest
+
+where `xs` don't occur in `binds` and `as` do not mention `binds` and `xs` is
+not empty. It might be interesting to specialise `f` and `g` for call patterns
+in `rest`, but it is difficult to do it in this nested form, because
+
+  1. We only get to see `ScrutOcc`s on `g`, in its RHS
+  2. The interesting call patterns in `rest` apply only to `f` (hence `xs` non-empty)
+  3. Specialising `f` and `g` for those call patterns duplicates `binds` twice:
+     We keep one copy of `bind` in the original `f`, one copy of `bind` in `$sf`
+     and another specialised copy `$sbind` (containing `$sg`) in `$sf`.
+
+So for SpecConstr, we float out `binds` (removing potential join-point-ness)
+
+  binds;
+  rest[f:=\xs -> g as]
+
+Because now all call patterns of `f` directly apply to `g` and might match up
+with one of the `ScrutOcc`s in its RHS, while only needing a single duplicate of
+`bind`.
+
+Note [Specialising local let bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is not uncommon to find this
 
    let $j = \x. <blah> in ...$j True...$j True...
