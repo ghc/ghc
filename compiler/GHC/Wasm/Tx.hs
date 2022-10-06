@@ -7,7 +7,7 @@
 module GHC.Wasm.Tx
   ( tx
   , CG(..)
-  , WasmExpr(..)
+  , WasmExpr
   )
 
 where
@@ -19,41 +19,77 @@ import Data.Type.Equality
 import qualified GHC.Cmm.Type as CT
 import GHC.Cmm.Expr
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain (assert)
 import GHC.Wasm.IR
 
 ----------------------------------------------------------------
+---
+---     Overview
+---
+----------------------------------------------------------------
+--
+-- This module translates Cmm expressions to Wasm instructions while
+-- meeting the following goals:
+--   * Keep the code compact and readable
+--   * Use GADTs to track the stack types of the Wasm code
+--   * Check Cmm types only when necessary to prove type correctness
+--     of the generated code or when debugging GHC
+--
 
-newtype WasmExpr bool t =
-    WasmExpr (forall pre . WasmIR bool pre (t : pre))
 
-apply1 :: (forall stack . WasmIR bool (t : stack) (t' : stack))
-       -> WasmExpr bool t
-       -> WasmExpr bool t'
-apply1 operator (WasmExpr code) = WasmExpr (code <> operator)
 
-apply2 :: (forall stack . WasmIR bool (t2 : t1 : stack) (t : stack))
-       -> WasmExpr bool t1
-       -> WasmExpr bool t2
-       -> WasmExpr bool t
-apply2 operator (WasmExpr code1) (WasmExpr code2) =
-    WasmExpr (code1 <> code2 <> operator)
+----------------------------------------------------------------
+-- code-generation monad
+
+-- This class is a placeholder that expresses the only
+-- property used in the prototype: the platform Boolean
+-- type is discoverable.
+
+class Monad (codegen bool) => CG bool codegen where
+  booleanWasmTypeTag :: codegen bool (WasmTypeTag bool)
 
 ----------------------------------------------------------------
 
-class Monad (codegen bool) => CG bool codegen where
---  platformWordSize :: m Int
---  asType :: WasmTypeTag t -> m ()  -- check that type is consistent
---                                   -- with platform word size
---  asInt :: WasmTypeTag t -> m ()   -- insist on the platofrm integer type
-  booleanWasmTypeTag :: codegen bool (WasmTypeTag bool)
+-- Each Cmm expression is translated into a "WebAssembly expression of
+-- type t."  This is Wasm code that can push a value of type `t` onto
+-- *any* evaluation stack.
+
+type WasmExpr bool t = (forall stack . WasmIR bool stack (t : stack))
 
 
+-- At translation time, the target type `t` is not known.
+-- It can be defined by a tag, but we wish to avoid the bookkeeping
+-- associated with packing a tag and a translation into existentially
+-- quantified pair.  Instead, the translator uses continuation-passing
+-- style (CPS) to pass a tag and a translation to its continuation.
+-- This technique is recommended by Richard Eisenberg, Stitch: The
+-- Sound Type-Indexed Type Checker (Functional Pearl), Haskell
+-- Symposium 2020 (https://doi.org/10.1145/3406088.3409015).
 
 tx :: CG bool codegen
        => CmmExpr
-       -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
-       -> codegen bool r
-  -- combines translation with some type checking
+       -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool a)
+       -> codegen bool a
+  -- type `a` is the answer type of the continuation
+
+-- The translation is organized as follows:
+--
+--   * The main translation function `tx` dispatches on the form of a
+--     Cmm expression.
+--
+--   * For every different type of Cmm operator, `tx` calls a
+--     different auxiliary function: `wasmUnary`, `wasmBinary`,
+--     `wasmCompare`, and so on.
+--
+--     (Since every different type of Cmm operator generates
+--     intermediate Wasm code of different types, it seems sensible
+--     that each type of operator might require a Haskell translation
+--     function of a different type.  But it's a bit irksome.)
+--
+--   * Each auxiliary function calls back into `tx` to translate
+--     operands, if any, then composes the resulting code.
+--
+--  All functions are CPS.
 
 tx expr k =
   case expr of
@@ -70,6 +106,10 @@ tx expr k =
 
     _ -> panic "unimplemented"
 
+------ Types of all the translation functions
+
+-- | Cmm integer and floating-point literals (with zero operands)
+
 wasmNullaryInt, wasmNullaryFloat ::
       CG bool codegen
    => CT.Width
@@ -77,12 +117,16 @@ wasmNullaryInt, wasmNullaryFloat ::
    -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
    -> codegen bool r
 
+-- | Cmm unary operators of type `t -> t`
+
 wasmUnary  :: CG bool codegen
            => CT.Width
            -> [CmmExpr]
            -> (forall t pre . WasmTypeTag t -> WasmIR bool (t : pre) (t : pre))
            -> (forall t . WasmTypeTag t -> WasmExpr bool t -> codegen bool r)
            -> codegen bool r
+
+-- | Cmm binary operators of type `t -> t -> t`
 
 wasmBinary ::
     CG bool codegen
@@ -93,6 +137,8 @@ wasmBinary ::
  -> codegen bool r
 
 
+-- | Cmm binary operators of type `t -> t -> bool`
+
 wasmCompare ::
       forall bool codegen r . CG bool codegen
    => CT.Width
@@ -101,29 +147,29 @@ wasmCompare ::
    -> (WasmTypeTag bool -> WasmExpr bool bool -> codegen bool r)
    -> codegen bool r
 
-----------------------------------------------------------------
+---------- Implementations of the translation functions
 
 wasmNullaryInt w operator k =
-  withIntWidthTag w $ \tag -> k tag (WasmExpr $ operator tag)
+  withIntWidthTag w $ \tag -> k tag (operator tag)
 
 
 wasmNullaryFloat w operator k =
-  withFloatWidthTag w $ \tag -> k tag (WasmExpr $ operator tag)
+  withFloatWidthTag w $ \tag -> k tag (operator tag)
 
 wasmUnary w [e] operator k =
-    tx e $ \tag code -> checkTagWidth tag w $ k tag (apply1 (operator tag) code)
+    tx e $ \tag code -> assert (tag `hasWidth` w) $ k tag (code <> operator tag)
 wasmUnary _ _ _ _ = panic "wrong number of operands to unary operator in Cmm"
 
 wasmBinary w es operator k =
     binaryCPS es $ \tag code1 code2 ->
-        checkTagWidth tag w $    -- optional check
-        k tag (apply2 (operator tag) code1 code2)
+        assert (tag `hasWidth` w) $
+        k tag (code1 <> code2 <> operator tag)
 
 wasmCompare w es operator k =
     binaryCPS es $ \tag code1 code2 -> do
       bool <- booleanWasmTypeTag
-      checkTagWidth bool w $
-       k bool (apply2 (operator tag) code1 code2)
+      assert (bool `hasWidth` w) $
+       k bool (code1 <> code2 <> operator tag)
 
 binaryCPS
        :: forall bool codegen a . CG bool codegen
@@ -145,12 +191,12 @@ binaryCPS _ _ = panic "wrong number of operands to binary operator in Cmm"
 ----------------------------------------------------------------
 
 
-checkTagWidth :: WasmTypeTag t -> CT.Width -> a -> a
-checkTagWidth TagI32 CT.W32 a = a
-checkTagWidth TagF32 CT.W32 a = a
-checkTagWidth TagI64 CT.W64 a = a
-checkTagWidth TagF64 CT.W64 a = a
-checkTagWidth _ _ _ = panic "ill-typed Cmm (width mismatch)"
+hasWidth :: WasmTypeTag t -> CT.Width -> Bool
+hasWidth TagI32 CT.W32 = True
+hasWidth TagF32 CT.W32 = True
+hasWidth TagI64 CT.W64 = True
+hasWidth TagF64 CT.W64 = True
+hasWidth _ _ = False
 
 
 withIntWidthTag :: CT.Width -> (forall t . WasmTypeTag t -> a) -> a
