@@ -86,15 +86,20 @@ test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_wa
 
 test('T9379', normal, compile_and_run, [''])
 
-test('allocLimit1', exit_code(1), compile_and_run, [''])
-test('allocLimit2', normal, compile_and_run, [''])
+# Skip the allocLimit* tests with the JS backend as it doesn't support
+# setThreadAllocationCounter
+
+test('allocLimit1', [exit_code(1), js_skip], compile_and_run, [''])
+test('allocLimit2', js_skip, compile_and_run, [''])
 
 # The non-threaded RTS on Windows doesn't handle throwing exceptions at I/O
 # operations very well, and ends up duplicating the I/O, giving wrong results.
 test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
+                      js_skip,
                       exit_code(1) ], compile_and_run, [''])
 
 test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
+                      js_skip,
                       # ghci consumes part of set limit at startup
                       omit_ways(['ghci']) ],
                     compile_and_run, [''])
