@@ -142,6 +142,13 @@ def js_skip( name, opts ):
     if arch("js"):
         skip(name,opts)
 
+# expect broken for the JS backend
+def js_broken( bug: IssueNumber ):
+    if arch("js"):
+        return expect_broken(bug);
+    else:
+        return normal;
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
