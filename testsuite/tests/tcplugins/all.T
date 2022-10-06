@@ -1,3 +1,4 @@
+setTestOpts(js_broken(22261))
 
 # See NullaryPlugin.hs for a description of this plugin.
 test('TcPlugin_Nullary'
