@@ -97,6 +97,8 @@ test('outofmem', [ when(opsys('darwin'), skip),
                    # windows, to prevent absolute exhaustion of memory
                    # and subsequent termination (and failure) of unrelated
                    # tests.
+                   js_skip,
+                   # similarly for the JS backend
                    when(opsys('mingw32'), skip),
 		   normalise_errmsg_fun(remove_parenthesis)],
                  makefile_test, ['outofmem'])
