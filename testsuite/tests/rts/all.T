@@ -320,10 +320,10 @@ test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
 
 # 251 = RTS exit code for "out of memory"
-test('overflow1', [ exit_code(251), when(wordsize(32), expect_broken(15255)) ],
+test('overflow1', [ js_skip, exit_code(251), when(wordsize(32), expect_broken(15255)) ],
      compile_and_run, [''])
-test('overflow2', [ exit_code(251) ], compile_and_run, [''])
-test('overflow3', [ exit_code(251) ], compile_and_run, [''])
+test('overflow2', [ js_skip, exit_code(251) ], compile_and_run, [''])
+test('overflow3', [ js_skip, exit_code(251) ], compile_and_run, [''])
 
 def grep_stderr(pattern):
     def wrapper(cmd, pattern=pattern):
