@@ -107,7 +107,7 @@ module GHC.Utils.Ppr (
 
         -- ** GHC-specific rendering
         printDoc, printDoc_,
-        bufLeftRender -- performance hack
+        bufLeftRender, printLeftRender -- performance hack
 
   ) where
 

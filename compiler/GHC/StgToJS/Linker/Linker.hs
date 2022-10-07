@@ -57,7 +57,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
-import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
 import qualified GHC.Utils.Ppr as Ppr
 import GHC.Utils.CliOption
 import GHC.Utils.Monad
@@ -75,7 +74,6 @@ import qualified Data.ByteString.Char8    as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.ByteString.Lazy     as BL
 import Data.Function            (on)
-import Data.Int
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
 import Data.IORef
@@ -99,8 +97,9 @@ import System.Directory ( createDirectoryIfMissing
                         , getPermissions
                         )
 
-newtype LinkerStats = LinkerStats
-  { bytesPerModule :: Map Module Word64 -- ^ number of bytes linked per module
+data LinkerStats = LinkerStats
+  { bytesPerModule     :: !(Map Module Word64) -- ^ number of bytes linked per module
+  , packedMetaDataSize :: !Word64              -- ^ number of bytes for metadata
   }
 
 newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
@@ -163,8 +162,8 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
 
       -- LTO + rendering of JS code
       link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h -> do
-        (metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg h emptyCompactorState rts_wired_functions mods jsFiles
-        pure $ linkerStats metaSize stats
+        (_compactorState, stats) <- renderLinker lc_cfg cfg h emptyCompactorState rts_wired_functions mods jsFiles
+        pure stats
 
       -------------------------------------------------------------
 
@@ -181,7 +180,7 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
       -- dump stats
       unless (lcNoStats lc_cfg) $ do
         let statsFile = "out.stats"
-        writeFile (out </> statsFile) link_stats
+        writeFile (out </> statsFile) (renderLinkerStats link_stats)
 
       -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
@@ -307,7 +306,7 @@ renderLinker
   -> Set ExportedFun
   -> [ModuleCode] -- ^ linked code per module
   -> [FilePath]   -- ^ additional JS files
-  -> IO (Int64, CompactorState, LinkerStats)
+  -> IO (CompactorState, LinkerStats)
 renderLinker settings cfg h renamer_state rtsDeps mods jsFiles = do
 
   -- extract ModuleCode fields required to make a LinkedUnit
@@ -323,15 +322,13 @@ renderLinker settings cfg h renamer_state rtsDeps mods jsFiles = do
                                             (map code_to_linked_unit mods)
 
   let
-    doc_str          = renderStyle (Style
-                          { lineLength = 100
-                          , ribbonsPerLine = 1.5
-                          , mode = LeftMode
-                            -- Faster to write but uglier code.
-                            -- Use "PageMode False" to enable nicer code instead
-                          })
-    putBS       = B.hPut h
-    render_js x = BC.pack (doc_str (pretty x Ppr.<> Ppr.char '\n'))
+    putBS   = B.hPut h
+    putJS x = do
+      before <- hTell h
+      Ppr.printLeftRender h (pretty x)
+      hPutChar h '\n'
+      after <- hTell h
+      pure $! (after - before)
 
   ---------------------------------------------------------
   -- Pretty-print JavaScript code for all the dependencies.
@@ -342,16 +339,12 @@ renderLinker settings cfg h renamer_state rtsDeps mods jsFiles = do
 
   -- modules themselves
   mod_sizes <- forM (mods `zip` compacted) $ \(mod,compacted_mod) -> do
-    let !bs = render_js compacted_mod
-    putBS bs
-    let !mod_size = fromIntegral (B.length bs)
+    !mod_size <- fromIntegral <$> putJS compacted_mod
     let !mod_mod  = mc_module mod
-    pure $! (mod_mod, mod_size)
+    pure (mod_mod, mod_size)
 
   -- metadata
-  let meta_bs = render_js meta
-  let !meta_length = fromIntegral (B.length meta_bs)
-  putBS meta_bs
+  !meta_length <- fromIntegral <$> putJS meta
 
   -- exports
   mapM_ (putBS . mc_exports) mods
@@ -361,22 +354,18 @@ renderLinker settings cfg h renamer_state rtsDeps mods jsFiles = do
 
   -- stats
   let link_stats = LinkerStats
-        { bytesPerModule = M.fromList mod_sizes
+        { bytesPerModule     = M.fromList mod_sizes
+        , packedMetaDataSize = meta_length
         }
 
-  pure
-    ( meta_length
-    , renamer_state'
-    , link_stats
-    )
+  pure (renamer_state', link_stats)
 
 -- | Render linker stats
-linkerStats :: Int64         -- ^ code size of packed metadata
-            -> LinkerStats   -- ^ code size per module
-            -> String
-linkerStats meta s =
+renderLinkerStats :: LinkerStats -> String
+renderLinkerStats s =
   intercalate "\n\n" [meta_stats, package_stats, module_stats] <> "\n\n"
   where
+    meta = packedMetaDataSize s
     meta_stats = "number of modules: " <> show (length bytes_per_mod)
                  <> "\npacked metadata:   " <> show meta
 
