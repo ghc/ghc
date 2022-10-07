@@ -218,7 +218,6 @@ computeLinkDependencies
   -> (ExportedFun -> Bool)
   -> IO (Map Module (Deps, DepsLocation), [UnitId], Set LinkableUnit, Set ExportedFun, [FilePath])
 computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDeps isRootFun = do
-  env <- newGhcjsEnv
   (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
   let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
@@ -231,43 +230,18 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
 
   let (rts_wired_units, rts_wired_functions) = rtsDeps units
 
-  let ue_state = ue_units $ unit_env
-  let preload_units = preloadUnits (ue_units unit_env)
-
   -- all the units we want to link together, without their dependencies
-  let root_units = nub (preload_units ++ rts_wired_units ++ reverse objPkgs ++ reverse units)
+  let root_units = filter (/= mainUnitId)
+                   $ nub (rts_wired_units ++ reverse objPkgs ++ reverse units)
 
-  -- all the units we want to link together, including their dependencies
-  let all_units = transitive_units root_units
+  -- all the units we want to link together, including their dependencies,
+  -- preload units, and backpack instantiations
+  all_units_infos <- mayThrowUnitErr (preloadUnitsInfo' unit_env root_units)
 
-      -- compute transitive unit dependencies
-      transitive_units = reverse . transitive_units_ []
-      transitive_units_ xs = \case
-        []     -> xs
-        (u:us)
-          | u == mainUnitId -> transitive_units_ (u:xs) us
-          | otherwise       -> case lookupUnitId ue_state u of
-              Nothing -> unit_not_found u
-              Just d  ->
-                let deps         = unitDepends d
-                    is_new_dep x = x `notElem` xs
-                    new_deps     = filter is_new_dep deps
-                in case new_deps of
-                  []
-                    | u `elem` xs -> transitive_units_ xs us
-                    | otherwise   -> transitive_units_ (u:xs) us
-                  ds -> transitive_units_ xs     (ds ++ (u:us))
+  let all_units = fmap unitId all_units_infos
 
-      unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
-
-      mkPkgLibPaths :: UnitState -> [UnitId] -> [(UnitId, ([FilePath],[String]))]
-      mkPkgLibPaths u_st
-        = map (\k -> ( k
-                     , (getInstalledPackageLibDirs u_st k
-                     , getInstalledPackageHsLibs u_st k)
-                     ))
-
-  dep_archives <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
+  dep_archives <- getPackageArchives cfg unit_env all_units
+  env <- newGhcjsEnv
   (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env dep_archives
 
   when (logVerbAtLeast logger 2) $
@@ -394,11 +368,16 @@ renderLinkerStats s =
     module_stats = "code size per module (in bytes):\n\n" <> unlines (map (concatMap showMod) pkgMods)
 
 
-getPackageArchives :: StgToJSConfig -> [([FilePath],[String])] -> IO [FilePath]
-getPackageArchives cfg pkgs =
+getPackageArchives :: StgToJSConfig -> UnitEnv -> [UnitId] -> IO [FilePath]
+getPackageArchives cfg unit_env units =
   filterM doesFileExist [ p </> "lib" ++ l ++ profSuff <.> "a"
-                        | (paths, libs) <- pkgs, p <- paths, l <- libs ]
+                        | u <- units
+                        , p <- getInstalledPackageLibDirs ue_state u
+                        , l <- getInstalledPackageHsLibs  ue_state u
+                        ]
   where
+    ue_state = ue_units unit_env
+
     -- XXX the profiling library name is probably wrong now
     profSuff | csProf cfg = "_p"
              | otherwise  = ""
