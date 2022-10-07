@@ -58,6 +58,7 @@ import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
 import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
+import qualified GHC.Utils.Ppr as Ppr
 import GHC.Utils.CliOption
 import GHC.Utils.Monad
 
@@ -104,8 +105,7 @@ newtype LinkerStats = LinkerStats
 
 -- | result of a link pass
 data LinkResult = LinkResult
-  { linkOut         :: FilePath -> IO () -- ^ compiled Haskell code
-  , linkOutStats    :: LinkerStats       -- ^ statistics about generated code
+  { linkOutStats    :: LinkerStats       -- ^ statistics about generated code
   , linkOutMetaSize :: Int64             -- ^ size of packed metadata in generated code
   , linkForeignRefs :: [ForeignJSRef]    -- ^ foreign code references in compiled haskell code
   , linkLibAArch    :: [FilePath]        -- ^ library code to load from archives
@@ -161,9 +161,9 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
 
       -- link all Haskell code (program + dependencies) into out.js
       env <- newGhcjsEnv
-      link_res <- link' env lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles
-                    isRootFun extraStaticDeps
-      linkOut link_res (out </> "out" <.> "js")
+      link_res <- withBinaryFile (out </> "out.js") WriteMode $ \h -> do
+        link' env lc_cfg cfg logger unit_env h out include pkgs objFiles jsFiles
+                      isRootFun extraStaticDeps
 
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
@@ -211,6 +211,7 @@ link' :: GhcjsEnv
       -> StgToJSConfig
       -> Logger
       -> UnitEnv
+      -> Handle
       -> String                     -- ^ target (for progress message)
       -> [FilePath]                 -- ^ include path for home package
       -> [UnitId]                   -- ^ packages to link
@@ -219,7 +220,7 @@ link' :: GhcjsEnv
       -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
       -> Set ExportedFun            -- ^ extra symbols to link in
       -> IO LinkResult
-link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
+link' env lc_cfg cfg logger unit_env hdl target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
   = do
       let ue_state = ue_units $ unit_env
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
@@ -262,8 +263,8 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
 
           unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
 
-      (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
       pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
+      (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env pkgArchs
 
       when (logVerbAtLeast logger 2) $
         logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
@@ -284,11 +285,10 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
 
-      (outJs, metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg emptyCompactorState rts_wired_functions code jsFiles
+      (metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg hdl emptyCompactorState rts_wired_functions code jsFiles
 
       return $ LinkResult
-        { linkOut         = outJs
-        , linkOutStats    = stats
+        { linkOutStats    = stats
         , linkOutMetaSize = metaSize
         , linkForeignRefs = concatMap mc_frefs code
         , linkLibAArch    = pkgArchs
@@ -315,12 +315,13 @@ data ModuleCode = ModuleCode
 renderLinker
   :: JSLinkConfig
   -> StgToJSConfig
+  -> Handle
   -> CompactorState
   -> Set ExportedFun
   -> [ModuleCode] -- ^ linked code per module
   -> [FilePath]   -- ^ additional JS files
-  -> IO (FilePath -> IO (), Int64, CompactorState, LinkerStats)
-renderLinker settings cfg renamer_state rtsDeps code jsFiles = do
+  -> IO (Int64, CompactorState, LinkerStats)
+renderLinker settings cfg h renamer_state rtsDeps mods jsFiles = do
 
   -- extract ModuleCode fields required to make a LinkedUnit
   let code_to_linked_unit c = LinkedUnit
@@ -332,18 +333,9 @@ renderLinker settings cfg renamer_state rtsDeps code jsFiles = do
   -- call the compactor
   let (renamer_state', compacted, meta) = compact settings cfg renamer_state
                                             (map ((\(LexicalFastString f) -> f) . funSymbol) $ S.toList rtsDeps)
-                                            (map code_to_linked_unit code)
-
-  js_files_contents <- mconcat <$> mapM BL.readFile jsFiles
+                                            (map code_to_linked_unit mods)
 
   let
-    render_all fp = do
-      BL.writeFile fp (rendered_all <> js_files_contents)
-
-    -- render result into JS code
-    rendered_all     = mconcat [mconcat rendered_mods, rendered_meta, rendered_exports]
-    rendered_mods    = fmap render_js compacted
-    rendered_meta    = render_js meta
     doc_str          = renderStyle (Style
                           { lineLength = 100
                           , ribbonsPerLine = 1.5
@@ -351,19 +343,44 @@ renderLinker settings cfg renamer_state rtsDeps code jsFiles = do
                             -- Faster to write but uglier code.
                             -- Use "PageMode False" to enable nicer code instead
                           })
-    render_js x      = BL.fromChunks [BC.pack (doc_str (pretty x)), BC.pack "\n"]
-    rendered_exports = BL.fromChunks (map mc_exports code)
-    meta_length      = fromIntegral (BL.length rendered_meta)
-    -- make LinkerStats entry for the given ModuleCode.
-    -- For now, only associate generated code size in bytes to each module
-    mk_stat c b = (mc_module c, fromIntegral . BL.length $ b)
-    stats = LinkerStats $ M.fromList $ zipWith mk_stat code rendered_mods
+    putBS       = B.hPut h
+    render_js x = BC.pack (doc_str (pretty x Ppr.<> Ppr.char '\n'))
+
+  ---------------------------------------------------------
+  -- Pretty-print JavaScript code for all the dependencies.
+  --
+  -- We have to pretty-print at link time because we want to be able to perform
+  -- global link-time optimisations (e.g. renamings) on the whole generated JS
+  -- file.
+
+  -- modules themselves
+  mod_sizes <- forM (mods `zip` compacted) $ \(mod,compacted_mod) -> do
+    let !bs = render_js compacted_mod
+    putBS bs
+    let !mod_size = fromIntegral (B.length bs)
+    let !mod_mod  = mc_module mod
+    pure $! (mod_mod, mod_size)
+
+  -- metadata
+  let meta_bs = render_js meta
+  let !meta_length = fromIntegral (B.length meta_bs)
+  putBS meta_bs
+
+  -- exports
+  mapM_ (putBS . mc_exports) mods
+
+  -- explicit additional JS files
+  mapM_ (\i -> B.readFile i >>= putBS) jsFiles
+
+  -- stats
+  let link_stats = LinkerStats
+        { bytesPerModule = M.fromList mod_sizes
+        }
 
   pure
-    ( render_all
-    , meta_length
+    ( meta_length
     , renamer_state'
-    , stats
+    , link_stats
     )
 
 -- | Render linker stats
