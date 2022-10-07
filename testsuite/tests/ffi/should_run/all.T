@@ -86,7 +86,8 @@ test('ffi018_ghci',
      [extra_files(['ffi018.h']),
       only_ways(['ghci']),
       when(unregisterised(), fragile(16085)),
-      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup')],
+      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup'),
+      js_skip_csources],
      compile_and_run, ['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
@@ -227,7 +228,7 @@ test('IncallAffinity',
      compile_and_run,
      ['IncallAffinity_c.c -no-hs-main'])
 
-test('T19237', normal, compile_and_run, ['T19237_c.c'])
+test('T19237', js_skip_csources, compile_and_run, ['T19237_c.c'])
 
 test('T21305', [cmm_src,omit_ways(['ghci'])], multi_compile_and_run,
                  ['T21305', [('T21305_cmm.cmm', '')], ''])
