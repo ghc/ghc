@@ -292,7 +292,7 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
 
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
-  , mc_js_code  :: !JStat
+  , mc_js_code  :: JStat
   , mc_exports  :: !B.ByteString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
