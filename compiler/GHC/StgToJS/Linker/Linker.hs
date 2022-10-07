@@ -190,9 +190,11 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
         forM_ (linkLibAArch link_res) $ \archive_file -> do
           Ar.Archive entries <- Ar.loadAr archive_file
           forM_ entries $ \entry -> do
-            when (isJsArchiveEntry entry) $ do
-              B.hPut   h (Ar.filedata entry)
-              hPutChar h '\n'
+            case getJsArchiveEntry entry of
+              Nothing -> return ()
+              Just bs -> do
+                B.hPut   h bs
+                hPutChar h '\n'
 
       -- link everything together into all.js
       when (generateAllJs lc_cfg) $ do
@@ -408,18 +410,19 @@ getPackageArchives cfg pkgs =
     profSuff | csProf cfg = "_p"
              | otherwise  = ""
 
-{- | convenience: combine rts.js, lib.js, out.js to all.js that can be run
-     directly with node.js or SpiderMonkey jsshell
- -}
+
+-- | Combine rts.js, lib.js, out.js to all.js that can be run
+-- directly with node.js or SpiderMonkey jsshell
 combineFiles :: JSLinkConfig
              -> FilePath
              -> IO ()
 combineFiles cfg fp = do
-  files   <- mapM (B.readFile.(fp</>)) ["rts.js", "lib.js", "out.js"]
-  let runMain
-        | lcNoHsMain cfg = mempty
-        | otherwise      = runMainJS
-  writeBinaryFile (fp</>"all.js") (mconcat (files ++ [runMain]))
+  let files = map (fp </>) ["rts.js", "lib.js", "out.js"]
+  withBinaryFile (fp </> "all.js") WriteMode $ \h -> do
+    let cpy i = B.readFile i >>= B.hPut h
+    mapM_ cpy files
+    unless (lcNoHsMain cfg) $ do
+      B.hPut h runMainJS
 
 -- | write the index.html file that loads the program if it does not exit
 writeHtml
@@ -763,20 +766,30 @@ loadArchiveDeps' archives = do
               pure $ Just (deps, ArchiveFile ar_file)
 
 -- | Predicate to check that an entry in Ar is a JS source
-isJsArchiveEntry :: Ar.ArchiveEntry -> Bool
-isJsArchiveEntry entry = isJsBS (Ar.filedata entry)
+-- and to return it without its header
+getJsArchiveEntry :: Ar.ArchiveEntry -> Maybe B.ByteString
+getJsArchiveEntry entry = getJsBS (Ar.filedata entry)
 
 -- | Predicate to check that a file is a JS source
 isJsFile :: FilePath -> IO Bool
-isJsFile fp = isJsBS <$> B.readFile fp
+isJsFile fp = withBinaryFile fp ReadMode $ \h -> do
+  bs <- B.hGet h jsHeaderLength
+  pure (isJsBS bs)
 
 isJsBS :: B.ByteString -> Bool
-isJsBS bs = B.take (B.length jsHeader) bs == jsHeader
-  where
-    -- Header added to JS sources to discriminate them from other object files.
-    -- They all have .o extension but JS sources have this header.
-    jsHeader :: B.ByteString
-    jsHeader = "//JavaScript"
+isJsBS bs = isJust (getJsBS bs)
+
+-- | Get JS source with its header (if it's one)
+getJsBS :: B.ByteString -> Maybe B.ByteString
+getJsBS bs = B.stripPrefix jsHeader bs
+
+-- Header added to JS sources to discriminate them from other object files.
+-- They all have .o extension but JS sources have this header.
+jsHeader :: B.ByteString
+jsHeader = "//JavaScript"
+
+jsHeaderLength :: Int
+jsHeaderLength = B.length jsHeader
 
 
 
