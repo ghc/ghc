@@ -149,6 +149,10 @@ def js_broken( bug: IssueNumber ):
     else:
         return normal;
 
+# an alias to js_skip to note that these tests fail due to c-sources
+def js_skip_csources(name, opts):
+    js_skip(name,opts);
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
