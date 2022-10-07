@@ -32,7 +32,6 @@ import GHC.Platform.Host (hostPlatformArchOS)
 import           GHC.StgToJS.Linker.Types
 import           GHC.StgToJS.Linker.Utils
 import           GHC.StgToJS.Linker.Compactor
-import           GHC.StgToJS.Linker.Shims
 
 import           GHC.StgToJS.Rts.Rts
 
@@ -77,8 +76,6 @@ import           Data.Set                 (Set)
 import qualified Data.Set                 as S
 import           Data.Word
 
-import           GHC.Generics (Generic)
-
 import           System.FilePath ((<.>), (</>), dropExtension)
 import           System.Directory ( createDirectoryIfMissing
                                   , doesFileExist
@@ -92,7 +89,6 @@ import GHC.Driver.Session (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Module (moduleStableString)
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
-import GHC.Utils.TmpFs (TmpFs)
 import GHC.Utils.Binary
 import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
 import GHC.Utils.CliOption
@@ -110,11 +106,8 @@ data LinkResult = LinkResult
   , linkOutStats    :: LinkerStats       -- ^ statistics about generated code
   , linkOutMetaSize :: Int64             -- ^ size of packed metadata in generated code
   , linkForeignRefs :: [ForeignJSRef]    -- ^ foreign code references in compiled haskell code
-  , linkLibRTS      :: [FilePath]        -- ^ library code to load with the RTS
-  , linkLibA        :: [FilePath]        -- ^ library code to load after RTS
-  , linkLibAArch    :: [FilePath]        -- ^ library code to load from archives after RTS
-  , linkBase        :: Base              -- ^ base metadata to use if we want to link incrementally against this result
-  } deriving (Generic)
+  , linkLibAArch    :: [FilePath]        -- ^ library code to load from archives
+  }
 
 newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
 
@@ -126,33 +119,30 @@ jsLinkBinary
   -> StgToJSConfig
   -> [FilePath]
   -> Logger
-  -> TmpFs
   -> DynFlags
   -> UnitEnv
   -> [FilePath]
   -> [UnitId]
   -> IO ()
-jsLinkBinary lc_cfg cfg js_srcs logger tmpfs dflags u_env objs dep_pkgs = do
-  -- additional objects to link are passed as FileOption ldInputs...
-  let cmdline_objs = [ f | FileOption _ f <- ldInputs dflags ]
-  -- discriminate JavaScript sources from real object files.
-  (cmdline_js_srcs, cmdline_js_objs) <- partitionM isJsFile cmdline_objs
-  let
-      objs'    = map ObjFile (objs ++ cmdline_js_objs)
-      js_srcs' = js_srcs ++ cmdline_js_srcs
-      isRoot _ = True
-      exe      = jsExeFileName dflags
+jsLinkBinary lc_cfg cfg js_srcs logger dflags u_env objs dep_pkgs
+  | lcNoJSExecutables lc_cfg = return ()
+  | otherwise = do
+    -- additional objects to link are passed as FileOption ldInputs...
+    let cmdline_objs = [ f | FileOption _ f <- ldInputs dflags ]
+    -- discriminate JavaScript sources from real object files.
+    (cmdline_js_srcs, cmdline_js_objs) <- partitionM isJsFile cmdline_objs
+    let
+        objs'    = map ObjFile (objs ++ cmdline_js_objs)
+        js_srcs' = js_srcs ++ cmdline_js_srcs
+        isRoot _ = True
+        exe      = jsExeFileName dflags
 
-  env <- newGhcjsEnv
-  void $ link env lc_cfg cfg logger tmpfs dflags u_env exe mempty dep_pkgs objs' js_srcs' isRoot mempty
+    void $ link lc_cfg cfg logger u_env exe mempty dep_pkgs objs' js_srcs' isRoot mempty
 
 -- | link and write result to disk (jsexe directory)
-link :: GhcjsEnv
-     -> JSLinkConfig
+link :: JSLinkConfig
      -> StgToJSConfig
      -> Logger
-     -> TmpFs
-     -> DynFlags
      -> UnitEnv
      -> FilePath               -- ^ output file/directory
      -> [FilePath]             -- ^ include path for home package
@@ -162,57 +152,49 @@ link :: GhcjsEnv
      -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
      -> Set ExportedFun        -- ^ extra symbols to link in
      -> IO ()
-link env lc_cfg cfg logger tmpfs dflags unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps
-  | lcNoJSExecutables lc_cfg = return ()
-  | otherwise = do
+link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps = do
+
+      -- create output directory
+      createDirectoryIfMissing False out
+
+      -- link all Haskell code (program + dependencies) into out.js
+      env <- newGhcjsEnv
       link_res <- link' env lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles
                     isRootFun extraStaticDeps
-
-      let genBase = isJust (lcGenBase lc_cfg)
-          jsExt | genBase   = "base.js"
-                | otherwise = "js"
-      createDirectoryIfMissing False out
-      linkOut link_res (out </> "out" <.> jsExt)
+      linkOut link_res (out </> "out" <.> "js")
 
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
-        let frefsFile   = if genBase then "out.base.frefs" else "out.frefs"
+        let frefsFile  = "out.frefs"
             jsonFrefs  = mempty
 
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
         BL.writeFile (out </> frefsFile <.> "js")
                      ("h$checkForeignRefs(" <> jsonFrefs <> ");")
 
-        -- dump stats
-        unless (lcNoStats lc_cfg) $ do
-          let statsFile = if genBase then "out.base.stats" else "out.stats"
-          let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
-          writeFile (out </> statsFile) stats
+      -- dump stats
+      unless (lcNoStats lc_cfg) $ do
+        let statsFile = "out.stats"
+        let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
+        writeFile (out </> statsFile) stats
 
-        -- link with the RTS
-        unless (lcNoRts lc_cfg) $ do
-          BL.writeFile (out </> "rts.js") ( BLC.pack rtsDeclsText
-                                           <> BLC.pack (rtsText cfg))
+      -- link RTS into rts.js
+      unless (lcNoRts lc_cfg) $ do
+        BL.writeFile (out </> "rts.js") ( BLC.pack rtsDeclsText
+                                         <> BLC.pack (rtsText cfg))
 
-        let all_lib_js = linkLibA link_res
-        lla'    <- streamShims <$> readShimFiles logger tmpfs dflags unit_env all_lib_js
-        llarch' <- mapM readShimsArchive (linkLibAArch link_res)
-        let lib_js = BL.fromChunks $! llarch' ++ lla'
-        BL.writeFile (out </> "lib" <.> jsExt) lib_js
+      -- link dependencies' JS files into lib.js
+      llarch' <- mapM readShimsArchive (linkLibAArch link_res)
+      let lib_js = BL.fromChunks $! llarch'
+      BL.writeFile (out </> "lib.js") lib_js
 
-        if genBase
-          then panic "support for base bundle not implemented"
-            -- generateBase out (linkBase link_res)
-          else when (    not (lcOnlyOut lc_cfg)
-                      && not (lcNoRts   lc_cfg)
-                      && not (usingBase lc_cfg)
-                    )
-               $ do
-                 _ <- combineFiles lc_cfg out
-                 writeHtml    out
-                 writeRunMain out
-                 writeRunner lc_cfg out
-                 writeExterns out
+      -- link everything together into all.js
+      when (generateAllJs lc_cfg) $ do
+        _ <- combineFiles lc_cfg out
+        writeHtml    out
+        writeRunMain out
+        writeRunner lc_cfg out
+        writeExterns out
 
 readShimsArchive :: FilePath -> IO B.ByteString
 readShimsArchive ar_file = do
@@ -246,23 +228,13 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
       let ue_state = ue_units $ unit_env
       (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
-      let rootSelector | Just baseMod <- lcGenBase lc_cfg =
-                           \(ExportedFun  m _s) -> m == baseMod
-                       | otherwise = isRootFun
-          roots    = S.fromList . filter rootSelector $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
+      let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
           rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
           objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
       when (logVerbAtLeast logger 2) $ void $
-        compilationProgressMsg logger . text $
-          case lcGenBase lc_cfg of
-            Just baseMod -> "Linking base bundle " ++ target ++ " (" ++ moduleNameString (moduleName baseMod) ++ ")"
-            _            -> "Linking " ++ target ++ " (" ++ intercalate "," rootMods ++ ")"
-
-      base <- case lcUseBase lc_cfg of
-        NoBase        -> return emptyBase
-        BaseFile _file -> panic "support for base bundle not implemented" -- loadBase file
-        BaseState b   -> return b
+        compilationProgressMsg logger $ hcat
+          [ text "Linking ", text target, text " (", text (intercalate "," rootMods), char ')' ]
 
       let (rts_wired_units, rts_wired_functions) = rtsDeps pkgs
 
@@ -294,14 +266,8 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
 
           unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
 
-      let
-        -- units that weren't already linked in the base bundle
-        -- (or all of them, if no base bundle)
-        bundle_diff = filter (not . is_in_bundle) all_units
-        is_in_bundle uid = uid `elem` basePkgs base
-
       (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env =<< getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
-      pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state bundle_diff)
+      pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
 
       when (logVerbAtLeast logger 2) $
         logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
@@ -309,7 +275,7 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
       -- compute dependencies
       let dep_units      = all_units ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
           dep_map        = objDepsMap `M.union` archsDepsMap
-          excluded_units = baseUnits base -- already linked units
+          excluded_units = S.empty
           dep_fun_roots  = roots `S.union` rts_wired_functions `S.union` extraStaticDeps
           dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
 
@@ -322,19 +288,14 @@ link' env lc_cfg cfg logger unit_env target _include pkgs objFiles jsFiles isRoo
       -- retrieve code for dependencies
       code <- collectDeps dep_map dep_units all_deps
 
-      (outJs, metaSize, compactorState, stats) <- renderLinker lc_cfg cfg (baseCompactorState base) rts_wired_functions code jsFiles
-      let base'  = Base compactorState (nub $ basePkgs base ++ bundle_diff)
-                         (all_deps `S.union` baseUnits base)
+      (outJs, metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg emptyCompactorState rts_wired_functions code jsFiles
 
       return $ LinkResult
         { linkOut         = outJs
         , linkOutStats    = stats
         , linkOutMetaSize = metaSize
         , linkForeignRefs = concatMap mc_frefs code
-        , linkLibRTS      = [] -- (filter (`notElem` alreadyLinkedBefore) shimsBefore)
-        , linkLibA        = [] -- (filter (`notElem` alreadyLinkedAfter)  shimsAfter)
         , linkLibAArch    = pkgArchs
-        , linkBase        = base'
         }
   where
 

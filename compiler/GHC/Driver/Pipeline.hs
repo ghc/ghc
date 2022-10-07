@@ -451,7 +451,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
               let lc_cfg   = mempty
               let extra_js = mempty
               let cfg      = initStgToJSConfig dflags
-              jsLinkBinary lc_cfg cfg extra_js logger tmpfs dflags unit_env obj_files pkg_deps
+              jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
             | otherwise -> linkBinary logger tmpfs dflags unit_env obj_files pkg_deps
           LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
           LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
@@ -577,7 +577,7 @@ doLink hsc_env o_files = do
         let lc_cfg   = mempty
         let extra_js = mempty
         let cfg      = initStgToJSConfig dflags
-        jsLinkBinary lc_cfg cfg extra_js logger tmpfs dflags unit_env o_files []
+        jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env o_files []
       | otherwise -> linkBinary logger tmpfs dflags unit_env o_files []
     LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
     LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []
