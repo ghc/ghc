@@ -29,72 +29,74 @@ import Prelude
 
 import GHC.Platform.Host (hostPlatformArchOS)
 
-import           GHC.StgToJS.Linker.Types
-import           GHC.StgToJS.Linker.Utils
-import           GHC.StgToJS.Linker.Compactor
-
-import           GHC.StgToJS.Rts.Rts
-
-import           GHC.JS.Syntax
-
-import           GHC.StgToJS.Object
-import           GHC.StgToJS.Types hiding (LinkableUnit)
-import           GHC.StgToJS.UnitUtils
-import           GHC.StgToJS.Printer
-
-import qualified GHC.SysTools.Ar          as Ar
-import           GHC.Utils.Encoding
-import           GHC.Utils.Outputable hiding ((<>))
-import           GHC.Utils.Panic
-import           GHC.Unit.State
-import           GHC.Unit.Env
-import           GHC.Unit.Home
-import           GHC.Unit.Types
-import           GHC.Utils.Error
-import           GHC.Data.FastString
-
-import           Control.Concurrent.MVar
-import           Control.Monad
-
-import           Data.Array
-import qualified Data.ByteString          as B
-import qualified Data.ByteString.Char8    as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.ByteString.Lazy     as BL
-import           Data.Function            (on)
-import           Data.Int
-import           Data.IntSet              (IntSet)
-import qualified Data.IntSet              as IS
-import           Data.IORef
-import           Data.List  ( partition, nub, intercalate, group, sort
-                            , groupBy, intersperse
-                            )
-import           Data.Map.Strict          (Map)
-import qualified Data.Map.Strict          as M
-import           Data.Maybe
-import           Data.Set                 (Set)
-import qualified Data.Set                 as S
-import           Data.Word
-
-import           System.FilePath ((<.>), (</>), dropExtension)
-import           System.Directory ( createDirectoryIfMissing
-                                  , doesFileExist
-                                  , getCurrentDirectory
-                                  , Permissions(..)
-                                  , setPermissions
-                                  , getPermissions
-                                  )
+import GHC.JS.Syntax
 
 import GHC.Driver.Session (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
+
+import GHC.Linker.Static.Utils (exeFileName)
+
+import GHC.StgToJS.Linker.Types
+import GHC.StgToJS.Linker.Utils
+import GHC.StgToJS.Linker.Compactor
+import GHC.StgToJS.Rts.Rts
+import GHC.StgToJS.Object
+import GHC.StgToJS.Types hiding (LinkableUnit)
+import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Printer
+
+import GHC.Unit.State
+import GHC.Unit.Env
+import GHC.Unit.Home
+import GHC.Unit.Types
 import GHC.Unit.Module (moduleStableString)
+
+import GHC.Utils.Encoding
+import GHC.Utils.Outputable hiding ((<>))
+import GHC.Utils.Panic
+import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
 import GHC.Utils.Ppr (Style(..), renderStyle, Mode(..))
 import GHC.Utils.CliOption
 import GHC.Utils.Monad
 
-import GHC.Linker.Static.Utils (exeFileName)
+import qualified GHC.SysTools.Ar          as Ar
+
+import GHC.Data.FastString
+
+import Control.Concurrent.MVar
+import Control.Monad
+
+import Data.Array
+import qualified Data.ByteString          as B
+import qualified Data.ByteString.Char8    as BC
+import qualified Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.ByteString.Lazy     as BL
+import Data.Function            (on)
+import Data.Int
+import Data.IntSet              (IntSet)
+import qualified Data.IntSet              as IS
+import Data.IORef
+import Data.List  ( partition, nub, intercalate, group, sort
+                  , groupBy, intersperse
+                  )
+import Data.Map.Strict          (Map)
+import qualified Data.Map.Strict          as M
+import Data.Maybe
+import Data.Set                 (Set)
+import qualified Data.Set                 as S
+import Data.Word
+
+import System.IO
+import System.FilePath ((<.>), (</>), dropExtension)
+import System.Directory ( createDirectoryIfMissing
+                        , doesFileExist
+                        , getCurrentDirectory
+                        , Permissions(..)
+                        , setPermissions
+                        , getPermissions
+                        )
 
 newtype LinkerStats = LinkerStats
   { bytesPerModule :: Map Module Word64 -- ^ number of bytes linked per module
@@ -178,15 +180,19 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
         let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
         writeFile (out </> statsFile) stats
 
-      -- link RTS into rts.js
+      -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
         BL.writeFile (out </> "rts.js") ( BLC.pack rtsDeclsText
                                          <> BLC.pack (rtsText cfg))
 
       -- link dependencies' JS files into lib.js
-      llarch' <- mapM readShimsArchive (linkLibAArch link_res)
-      let lib_js = BL.fromChunks $! llarch'
-      BL.writeFile (out </> "lib.js") lib_js
+      withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
+        forM_ (linkLibAArch link_res) $ \archive_file -> do
+          Ar.Archive entries <- Ar.loadAr archive_file
+          forM_ entries $ \entry -> do
+            when (isJsArchiveEntry entry) $ do
+              B.hPut   h (Ar.filedata entry)
+              hPutChar h '\n'
 
       -- link everything together into all.js
       when (generateAllJs lc_cfg) $ do
@@ -195,18 +201,6 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
         writeRunMain out
         writeRunner lc_cfg out
         writeExterns out
-
-readShimsArchive :: FilePath -> IO B.ByteString
-readShimsArchive ar_file = do
-  (Ar.Archive entries) <- Ar.loadAr ar_file
-  jsdata <- catMaybes <$> mapM readEntry entries
-  return (B.intercalate "\n" jsdata)
-    where
-      readEntry :: Ar.ArchiveEntry -> IO (Maybe B.ByteString)
-      readEntry ar_entry
-        | isJsArchiveEntry ar_entry = pure $ Just (Ar.filedata ar_entry)
-        | otherwise = pure Nothing
-
 
 
 -- | link in memory
