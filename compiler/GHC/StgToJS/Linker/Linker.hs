@@ -103,14 +103,6 @@ newtype LinkerStats = LinkerStats
   { bytesPerModule :: Map Module Word64 -- ^ number of bytes linked per module
   }
 
--- | result of a link pass
-data LinkResult = LinkResult
-  { linkOutStats    :: LinkerStats       -- ^ statistics about generated code
-  , linkOutMetaSize :: Int64             -- ^ size of packed metadata in generated code
-  , linkForeignRefs :: [ForeignJSRef]    -- ^ foreign code references in compiled haskell code
-  , linkLibAArch    :: [FilePath]        -- ^ library code to load from archives
-  }
-
 newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.Archive) }
 
 emptyArchiveState :: IO ArchiveState
@@ -154,21 +146,33 @@ link :: JSLinkConfig
      -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
      -> Set ExportedFun        -- ^ extra symbols to link in
      -> IO ()
-link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extraStaticDeps = do
+link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun extraStaticDeps = do
 
       -- create output directory
       createDirectoryIfMissing False out
 
+      -------------------------------------------------------------
       -- link all Haskell code (program + dependencies) into out.js
-      env <- newGhcjsEnv
-      link_res <- withBinaryFile (out </> "out.js") WriteMode $ \h -> do
-        link' env lc_cfg cfg logger unit_env h out include pkgs objFiles jsFiles
-                      isRootFun extraStaticDeps
+
+      -- compute dependencies
+      (dep_map, dep_units, all_deps, rts_wired_functions, dep_archives)
+        <- computeLinkDependencies cfg logger out unit_env units objFiles extraStaticDeps isRootFun
+
+      -- retrieve code for dependencies
+      mods <- collectDeps dep_map dep_units all_deps
+
+      -- LTO + rendering of JS code
+      link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h -> do
+        (metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg h emptyCompactorState rts_wired_functions mods jsFiles
+        pure $ linkerStats metaSize stats
+
+      -------------------------------------------------------------
 
       -- dump foreign references file (.frefs)
       unless (lcOnlyOut lc_cfg) $ do
         let frefsFile  = "out.frefs"
-            jsonFrefs  = mempty
+            -- frefs      = concatMap mc_frefs mods
+            jsonFrefs  = mempty -- FIXME: toJson frefs
 
         BL.writeFile (out </> frefsFile <.> "json") jsonFrefs
         BL.writeFile (out </> frefsFile <.> "js")
@@ -177,8 +181,7 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
       -- dump stats
       unless (lcNoStats lc_cfg) $ do
         let statsFile = "out.stats"
-        let stats = linkerStats (linkOutMetaSize link_res) (linkOutStats link_res)
-        writeFile (out </> statsFile) stats
+        writeFile (out </> statsFile) link_stats
 
       -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
@@ -187,7 +190,7 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
 
       -- link dependencies' JS files into lib.js
       withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
-        forM_ (linkLibAArch link_res) $ \archive_file -> do
+        forM_ dep_archives $ \archive_file -> do
           Ar.Archive entries <- Ar.loadAr archive_file
           forM_ entries $ \entry -> do
             case getJsArchiveEntry entry of
@@ -205,102 +208,86 @@ link lc_cfg cfg logger unit_env out include pkgs objFiles jsFiles isRootFun extr
         writeExterns out
 
 
--- | link in memory
-link' :: GhcjsEnv
-      -> JSLinkConfig
-      -> StgToJSConfig
-      -> Logger
-      -> UnitEnv
-      -> Handle
-      -> String                     -- ^ target (for progress message)
-      -> [FilePath]                 -- ^ include path for home package
-      -> [UnitId]                   -- ^ packages to link
-      -> [LinkedObj]                -- ^ the object files we're linking
-      -> [FilePath]                 -- ^ extra js files to include
-      -> (ExportedFun -> Bool)      -- ^ functions from the objects to use as roots (include all their deps)
-      -> Set ExportedFun            -- ^ extra symbols to link in
-      -> IO LinkResult
-link' env lc_cfg cfg logger unit_env hdl target _include pkgs objFiles jsFiles isRootFun extraStaticDeps
-  = do
-      let ue_state = ue_units $ unit_env
-      (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
+computeLinkDependencies
+  :: StgToJSConfig
+  -> Logger
+  -> String
+  -> UnitEnv
+  -> [UnitId]
+  -> [LinkedObj]
+  -> Set ExportedFun
+  -> (ExportedFun -> Bool)
+  -> IO (Map Module (Deps, DepsLocation), [UnitId], Set LinkableUnit, Set ExportedFun, [FilePath])
+computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDeps isRootFun = do
+  env <- newGhcjsEnv
+  (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
-      let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
-          rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
-          objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
+  let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
+      rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
+      objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
-      when (logVerbAtLeast logger 2) $ void $
-        compilationProgressMsg logger $ hcat
-          [ text "Linking ", text target, text " (", text (intercalate "," rootMods), char ')' ]
+  when (logVerbAtLeast logger 2) $ void $
+    compilationProgressMsg logger $ hcat
+      [ text "Linking ", text target, text " (", text (intercalate "," rootMods), char ')' ]
 
-      let (rts_wired_units, rts_wired_functions) = rtsDeps pkgs
+  let (rts_wired_units, rts_wired_functions) = rtsDeps units
 
-      let preload_units = preloadUnits (ue_units unit_env)
+  let ue_state = ue_units $ unit_env
+  let preload_units = preloadUnits (ue_units unit_env)
 
-      -- all the units we want to link together, without their dependencies
-      let root_units = nub (preload_units ++ rts_wired_units ++ reverse objPkgs ++ reverse pkgs)
+  -- all the units we want to link together, without their dependencies
+  let root_units = nub (preload_units ++ rts_wired_units ++ reverse objPkgs ++ reverse units)
 
-      -- all the units we want to link together, including their dependencies
-      let all_units = transitive_units root_units
+  -- all the units we want to link together, including their dependencies
+  let all_units = transitive_units root_units
 
-          -- compute transitive unit dependencies
-          transitive_units = reverse . transitive_units_ []
-          transitive_units_ xs = \case
-            []     -> xs
-            (u:us)
-              | u == mainUnitId -> transitive_units_ (u:xs) us
-              | otherwise       -> case lookupUnitId ue_state u of
-                  Nothing -> unit_not_found u
-                  Just d  ->
-                    let deps         = unitDepends d
-                        is_new_dep x = x `notElem` xs
-                        new_deps     = filter is_new_dep deps
-                    in case new_deps of
-                      []
-                        | u `elem` xs -> transitive_units_ xs us
-                        | otherwise   -> transitive_units_ (u:xs) us
-                      ds -> transitive_units_ xs     (ds ++ (u:us))
+      -- compute transitive unit dependencies
+      transitive_units = reverse . transitive_units_ []
+      transitive_units_ xs = \case
+        []     -> xs
+        (u:us)
+          | u == mainUnitId -> transitive_units_ (u:xs) us
+          | otherwise       -> case lookupUnitId ue_state u of
+              Nothing -> unit_not_found u
+              Just d  ->
+                let deps         = unitDepends d
+                    is_new_dep x = x `notElem` xs
+                    new_deps     = filter is_new_dep deps
+                in case new_deps of
+                  []
+                    | u `elem` xs -> transitive_units_ xs us
+                    | otherwise   -> transitive_units_ (u:xs) us
+                  ds -> transitive_units_ xs     (ds ++ (u:us))
 
-          unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
+      unit_not_found u = throwGhcException (CmdLineError ("unknown unit: " ++ unpackFS (unitIdFS u)))
 
-      pkgArchs <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
-      (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env pkgArchs
+      mkPkgLibPaths :: UnitState -> [UnitId] -> [(UnitId, ([FilePath],[String]))]
+      mkPkgLibPaths u_st
+        = map (\k -> ( k
+                     , (getInstalledPackageLibDirs u_st k
+                     , getInstalledPackageHsLibs u_st k)
+                     ))
 
-      when (logVerbAtLeast logger 2) $
-        logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text pkgArchs))
+  dep_archives <- getPackageArchives cfg (map snd $ mkPkgLibPaths ue_state all_units)
+  (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env dep_archives
 
-      -- compute dependencies
-      let dep_units      = all_units ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
-          dep_map        = objDepsMap `M.union` archsDepsMap
-          excluded_units = S.empty
-          dep_fun_roots  = roots `S.union` rts_wired_functions `S.union` extraStaticDeps
-          dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
+  when (logVerbAtLeast logger 2) $
+    logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text dep_archives))
 
-      all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
+  -- compute dependencies
+  let dep_units      = all_units ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
+      dep_map        = objDepsMap `M.union` archsDepsMap
+      excluded_units = S.empty
+      dep_fun_roots  = roots `S.union` rts_wired_functions `S.union` extraStaticDeps
+      dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
 
-      when (logVerbAtLeast logger 2) $
-        logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
-        -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
+  all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
 
-      -- retrieve code for dependencies
-      code <- collectDeps dep_map dep_units all_deps
+  when (logVerbAtLeast logger 2) $
+    logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
+    -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
 
-      (metaSize, _compactorState, stats) <- renderLinker lc_cfg cfg hdl emptyCompactorState rts_wired_functions code jsFiles
-
-      return $ LinkResult
-        { linkOutStats    = stats
-        , linkOutMetaSize = metaSize
-        , linkForeignRefs = concatMap mc_frefs code
-        , linkLibAArch    = pkgArchs
-        }
-  where
-
-    mkPkgLibPaths :: UnitState -> [UnitId] -> [(UnitId, ([FilePath],[String]))]
-    mkPkgLibPaths u_st
-      = map (\k -> ( k
-                   , (getInstalledPackageLibDirs u_st k
-                   , getInstalledPackageHsLibs u_st k)
-                   ))
+  return (dep_map, dep_units, all_deps, rts_wired_functions, dep_archives)
 
 
 data ModuleCode = ModuleCode
