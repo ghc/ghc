@@ -218,6 +218,7 @@ computeLinkDependencies
   -> (ExportedFun -> Bool)
   -> IO (Map Module (Deps, DepsLocation), [UnitId], Set LinkableUnit, Set ExportedFun, [FilePath])
 computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDeps isRootFun = do
+
   (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
   let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
@@ -232,7 +233,8 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
 
   -- all the units we want to link together, without their dependencies
   let root_units = filter (/= mainUnitId)
-                   $ nub (rts_wired_units ++ reverse objPkgs ++ reverse units)
+                   $ nub
+                   $ rts_wired_units ++ reverse objPkgs ++ reverse units
 
   -- all the units we want to link together, including their dependencies,
   -- preload units, and backpack instantiations
@@ -701,7 +703,7 @@ mkJsSymbol mod s = mkFastString $ mconcat
 -- | read all dependency data from the to-be-linked files
 loadObjDeps :: [LinkedObj] -- ^ object files to link
             -> IO (Map Module (Deps, DepsLocation), [LinkableUnit])
-loadObjDeps objs = prepareLoadedDeps <$> mapM readDepsFile' objs
+loadObjDeps objs = (prepareLoadedDeps . catMaybes) <$> mapM readDepsFromObj objs
 
 -- | Load dependencies for the Linker from Ar
 loadArchiveDeps :: GhcjsEnv
@@ -779,11 +781,12 @@ requiredUnits d = map (depsModule d,) (IS.toList $ depsRequired d)
 
 -- | read dependencies from an object that might have already been into memory
 -- pulls in all Deps from an archive
-readDepsFile' :: LinkedObj -> IO (Deps, DepsLocation)
-readDepsFile' = \case
+readDepsFromObj :: LinkedObj -> IO (Maybe (Deps, DepsLocation))
+readDepsFromObj = \case
   ObjLoaded name obj -> do
     let !deps = objDeps obj
-    pure (deps,InMemory name obj)
+    pure $ Just (deps,InMemory name obj)
   ObjFile file -> do
-    deps <- readObjectDeps file
-    pure (deps,ObjectFile file)
+    readObjectDeps file >>= \case
+      Nothing   -> pure Nothing
+      Just deps -> pure $ Just (deps,ObjectFile file)
