@@ -318,7 +318,7 @@ data ObjUnit = ObjUnit
   { oiSymbols  :: ![FastString]   -- ^ toplevel symbols (stored in index)
   , oiClInfo   :: ![ClosureInfo]  -- ^ closure information of all closures in block
   , oiStatic   :: ![StaticInfo]   -- ^ static closure data
-  , oiStat     :: !JStat          -- ^ the code
+  , oiStat     :: JStat           -- ^ the code
   , oiRaw      :: !BS.ByteString  -- ^ raw JS code
   , oiFExports :: ![ExpFun]
   , oiFImports :: ![ForeignJSRef]

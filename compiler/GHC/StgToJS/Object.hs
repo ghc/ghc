@@ -168,7 +168,7 @@ putObjUnit :: BinHandle -> ObjUnit -> IO ()
 putObjUnit bh (ObjUnit _syms b c d e f g) = do
     put_ bh b
     put_ bh c
-    put_ bh d
+    lazyPut bh d
     put_ bh e
     put_ bh f
     put_ bh g
@@ -179,11 +179,19 @@ getObjUnit :: [FastString] -> BinHandle -> IO ObjUnit
 getObjUnit syms bh = do
     b <- get bh
     c <- get bh
-    d <- get bh
+    d <- lazyGet bh
     e <- get bh
     f <- get bh
     g <- get bh
-    pure (ObjUnit syms b c d e f g)
+    pure $ ObjUnit
+      { oiSymbols  = syms
+      , oiClInfo   = b
+      , oiStatic   = c
+      , oiStat     = d
+      , oiRaw      = e
+      , oiFExports = f
+      , oiFImports = g
+      }
 
 
 -- | A tag that determines the kind of payload in the .o file. See
