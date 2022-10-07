@@ -101,18 +101,20 @@ byteArrayToList arr = go 0
 -- | Create a 'ByteArray' from a list of a known length. If the length
 --   of the list does not match the given length, this throws an exception.
 byteArrayFromListN :: Int -> [Word8] -> ByteArray
-byteArrayFromListN n ys = runST $ do
+byteArrayFromListN n ys
+  | n >= 0 = runST $ do
     marr <- newByteArray n
     let go !ix [] = if ix == n
           then return ()
-          else error $ "Data.Array.Byte.byteArrayFromListN: list length less than specified size"
+          else errorWithoutStackTrace $ "Data.Array.Byte.byteArrayFromListN: list length less than specified size"
         go !ix (x : xs) = if ix < n
           then do
             writeByteArray marr ix x
             go (ix + 1) xs
-          else error $ "Data.Array.Byte.byteArrayFromListN: list length greater than specified size"
+          else errorWithoutStackTrace $ "Data.Array.Byte.byteArrayFromListN: list length greater than specified size"
     go 0 ys
     unsafeFreezeByteArray marr
+  | otherwise = errorWithoutStackTrace "Data.Array.Byte.ByteArrayFromListN: specified size is negative"
 
 -- | Copy a slice of an immutable byte array to a mutable byte array.
 --
