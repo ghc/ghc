@@ -90,7 +90,6 @@ import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 
 import GHC.Utils.Binary hiding (SymbolTable)
 import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
-import GHC.Utils.Panic
 import GHC.Utils.Monad (mapMaybeM)
 
 -- | An object file
@@ -304,26 +303,27 @@ getObjectBody bh0 mod_name = do
     }
 
 -- | Parse object
-getObject :: BinHandle -> IO Object
+getObject :: BinHandle -> IO (Maybe Object)
 getObject bh = do
   getObjectHeader bh >>= \case
-    Left err       -> panic ("getObject: " ++ err)
-    Right mod_name -> getObjectBody bh mod_name
+    Left _err      -> pure Nothing
+    Right mod_name -> Just <$> getObjectBody bh mod_name
 
 -- | Read object from file
 --
 -- The object is still in memory after this (see objHandle).
-readObject :: FilePath -> IO Object
+readObject :: FilePath -> IO (Maybe Object)
 readObject file = do
   bh <- readBinMem file
   getObject bh
 
 -- | Reads only the part necessary to get the dependencies
-readObjectDeps :: FilePath -> IO Deps
+readObjectDeps :: FilePath -> IO (Maybe Deps)
 readObjectDeps file = do
   bh <- readBinMem file
-  obj <- getObject bh
-  pure $! objDeps obj
+  getObject bh >>= \case
+    Just obj -> pure $! Just $! objDeps obj
+    Nothing  -> pure Nothing
 
 -- | Get units in the object file, using the given filtering function
 getObjectUnits :: Object -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
@@ -339,8 +339,9 @@ getObjectUnits obj pred = mapMaybeM read_entry (zip (objIndex obj) [0..])
 -- | Read units in the object file, using the given filtering function
 readObjectUnits :: FilePath -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
 readObjectUnits file pred = do
-  obj <- readObject file
-  getObjectUnits obj pred
+  readObject file >>= \case
+    Nothing  -> pure []
+    Just obj -> getObjectUnits obj pred
 
 
 --------------------------------------------------------------------------------
