@@ -256,7 +256,8 @@ StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
 
 StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
-
+    debugBelch("heap_view_closurePtrs : closure %p, printObj ", closure);
+    printObj(closure);
     StgWord size = heap_view_closureSize(closure);
 
     // First collect all pointers here, with the comfortable memory bound

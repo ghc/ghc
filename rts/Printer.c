@@ -491,6 +491,8 @@ void printBits(size_t const size, void const * const ptr)
     debugBelch("\n");
 }
 
+StgPtr origSp = NULL;
+
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
                     uint32_t size )
@@ -503,13 +505,15 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,
     uint32_t i;
 
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
+        debugBelch("printSmallBitmap - index %ld\n", &payload[i] - origSp);
         debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
         if ((bitmap & 1) == 0) {
+            debugBelch("closure - ");
             printPtr((P_)payload[i]);
             debugBelch(" -- ");
             printObj((StgClosure*) payload[i]);
         } else {
-            debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
+            debugBelch("primitive - Word# %" FMT_Word "\n", (W_)payload[i]);
         }
     }
 }
@@ -524,29 +528,35 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
     i = 0;
     for (bmp=0; i < size; bmp++) {
         StgWord bitmap = large_bitmap->bitmap[bmp];
+        debugBelch("printLargeBitmap - bitmap no %ul, bits ", bmp);
+        printBits(sizeof(StgWord), &bitmap);
         j = 0;
         for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
             debugBelch("   stk[%" FMT_Word "] (%p) = ", (W_)(spBottom-(payload+i)), payload+i);
             if ((bitmap & 1) == 0) {
+                debugBelch("closure - ");
                 printPtr((P_)payload[i]);
                 debugBelch(" -- ");
                 printObj((StgClosure*) payload[i]);
             } else {
-                debugBelch("Word# %" FMT_Word "\n", (W_)payload[i]);
+                debugBelch("primitive - Word# %" FMT_Word "\n", (W_)payload[i]);
             }
         }
     }
 }
 
+
 void
 printStackChunk( StgPtr sp, StgPtr spBottom )
 {
     const StgInfoTable *info;
+    origSp = sp;
 
     ASSERT(sp <= spBottom);
     for (; sp < spBottom; sp += stack_frame_sizeW((StgClosure *)sp)) {
         info = get_itbl((StgClosure *)sp);
         debugBelch("printStackChunk - closure size : %lu , sp : %p, spBottom %p, info ptr %p, itbl type %ul \n", stack_frame_sizeW((StgClosure *)sp), sp, spBottom, info, info->type);
+        debugBelch("printStackChunk - index: %ld \n", sp - origSp);
 
         switch (info->type) {
 

@@ -69,14 +69,16 @@ wordsToBitmapEntries _ [] 0 = []
 wordsToBitmapEntries _ [] i = error $ "Invalid state: Empty list, size " ++ show i
 wordsToBitmapEntries _ l 0 = error $ "Invalid state: Size 0, list " ++ show l
 wordsToBitmapEntries sfi (b:bs) size =
-    let entries = toBitmapEntries sfi b size
-        mbLastEntry = (listToMaybe . reverse) entries
-        mbLastFrame = fmap closureFrame mbLastEntry
-    in
-      case mbLastFrame of
-        Just (StackFrameIter (# s'#, i'# #)) ->
-          entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord size)
-        Nothing -> error "This should never happen! Recursion ended not in base case."
+  trace ("wordsToBitmapEntries - b " ++ show b ++ ", size " ++ show size)
+    (let  entries = toBitmapEntries sfi b (min size (fromIntegral wORD_SIZE_IN_BITS))
+          mbLastEntry = (listToMaybe . reverse) entries
+          mbLastFrame = fmap closureFrame mbLastEntry
+      in
+        case mbLastFrame of
+          Just (StackFrameIter (# s'#, i'# #)) ->
+            entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord size)
+          Nothing -> error "This should never happen! Recursion ended not in base case."
+    )
   where
     subtractDecodedBitmapWord :: Word -> Word
     subtractDecodedBitmapWord size = fromIntegral $ max 0 ((fromIntegral size) - wORD_SIZE_IN_BITS)
@@ -84,9 +86,9 @@ wordsToBitmapEntries sfi (b:bs) size =
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
 toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap size = BitmapEntry {
-  closureFrame = sfi,
-  isPrimitive = (bitmap .&. 1) == 0
-                                            } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (size - 1)
+    closureFrame = sfi,
+    isPrimitive = (bitmap .&. 1) /= 0
+  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (size - 1)
 
 toBitmapPayload :: BitmapEntry -> BitmapPayload
 toBitmapPayload e | isPrimitive e = Primitive . toWord . closureFrame $ e
@@ -112,13 +114,13 @@ unpackStackFrameIter (StackFrameIter (# s#, i# #)) =
      RET_BCO -> RetBCO
      RET_SMALL -> let !(# bitmap#, size# #) = getSmallBitmap# s# i#
                       bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #))(W# bitmap#) (W# size#)
-                      payloads = map toBitmapPayload bes
+                      payloads = map toBitmapPayload (trace ("bes " ++ show bes) bes)
                   in
                     RetSmall None payloads
      RET_BIG -> let !(# bitmapArray#, size# #) = getLargeBitmap# s# i#
                     bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-                    bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #)) bitmapWords (trace ("XXX size " ++ show (W# size#))(W# size#))
-                    payloads = map toBitmapPayload bes
+                    bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
+                    payloads = map toBitmapPayload (trace ("unpackStackFrameIter - lenght " ++ show (length bes) ++ ", " ++ show bes ) bes)
                 in
                   RetBig payloads
      RET_FUN ->  RetFun
