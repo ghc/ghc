@@ -1,3 +1,4 @@
+#include "MachDeps.h"
 #include "Rts.h"
 #include "rts/Messages.h"
 #include "rts/storage/ClosureTypes.h"
@@ -91,6 +92,31 @@ StgWord getBitmapWord(StgInfoTable *info){
   StgWord bitmapWord = BITMAP_BITS(bitmap);
   debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
   return bitmapWord;
+}
+
+StgWord getLargeBitmapSize(StgInfoTable *info){
+  StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
+  return bitmap->size;
+}
+
+#define ROUNDUP_BITS_TO_WDS(n) (((n) + WORD_SIZE_IN_BITS - 1) / WORD_SIZE_IN_BITS )
+
+// Copied from Cmm.h
+#define SIZEOF_W  SIZEOF_VOID_P
+#define WDS(n) ((n)*SIZEOF_W)
+
+StgArrBytes* getLargeBitmaps(Capability *cap, StgInfoTable *info){
+  StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
+  StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
+  StgArrBytes* array = allocate(cap, sizeofW(StgArrBytes) + neededWords);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
+
+  for(int i = 0; i < neededWords; i++) {
+    array->payload[i] = bitmap->bitmap[i];
+  }
+
+  return array;
 }
 
 StgLargeBitmap* getLargeBitmapPtr(const StgInfoTable *info) {

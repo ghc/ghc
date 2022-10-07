@@ -87,3 +87,16 @@ unpackClosureFromStackFramezh(P_ stack, W_ index){
   closurePtr = (StgStack_sp(stack) + WDS(index));
   jump stg_unpackClosurezh(closurePtr);
 }
+
+getLargeBitmapzh(P_ stack, W_ index){
+  P_ itbl, stgArrBytes;
+  W_ size;
+  itbl = %STD_INFO(%INFO_PTR(StgStack_sp(stack) + WDS(index)));
+
+  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), itbl);
+  (size) = ccall getLargeBitmapSize(itbl);
+
+  ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
+
+  return (stgArrBytes, size);
+}

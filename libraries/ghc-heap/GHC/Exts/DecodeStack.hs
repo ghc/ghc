@@ -9,31 +9,24 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
-import GHC.Exts.Heap (GenClosure(bitmap))
+import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 
 #if MIN_VERSION_base(4,17,0)
+import Data.Maybe
 import Data.Bits
 import Foreign
 import System.IO.Unsafe
 import Prelude
 import GHC.Stack.CloneStack
 import GHC.Exts.Heap
-import GHC.Ptr
 import Debug.Trace
 import GHC.Exts
-import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
-import Numeric
 import qualified GHC.Exts.Heap.Closures as CL
-import GHC.Exts.Heap.StackFFI as StackFFI
-import Data.Bits
 
-import GHC.Exts.Heap (Closure)
-import GHC.Exts.Heap.StackFFI (bitsInWord)
-import GHC.Exts.Heap.Closures (closureSize)
-import System.Mem (performMajorGC)
 
 type StackFrameIter# = (#
                           -- | StgStack
@@ -46,7 +39,7 @@ data StackFrameIter = StackFrameIter StackFrameIter#
 
 -- TODO: Remove this instance (debug only)
 instance Show StackFrameIter where
-  show (StackFrameIter (# s#, i# #)) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show (W# i#)
+  show (StackFrameIter (# _, i# #)) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show (W# i#)
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
@@ -56,11 +49,13 @@ foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSna
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
-advanceStackFrameIter (StackFrameIter (# s, i #)) = let (# s', i', hasNext #) = advanceStackFrameIter# s i in
+advanceStackFrameIter (StackFrameIter (# s, i #)) = let !(# s', i', hasNext #) = advanceStackFrameIter# s i in
   if (I# hasNext) > 0 then Just $ StackFrameIter (# s', i' #)
   else Nothing
 
 foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
 foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
@@ -68,6 +63,23 @@ data BitmapEntry = BitmapEntry {
     closureFrame :: StackFrameIter,
     isPrimitive :: Bool
   } deriving (Show)
+
+wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [BitmapEntry]
+wordsToBitmapEntries _ [] 0 = []
+wordsToBitmapEntries _ [] i = error $ "Invalid state: Empty list, size " ++ show i
+wordsToBitmapEntries _ l 0 = error $ "Invalid state: Size 0, list " ++ show l
+wordsToBitmapEntries sfi (b:bs) size =
+    let entries = toBitmapEntries sfi b size
+        mbLastEntry = (listToMaybe . reverse) entries
+        mbLastFrame = fmap closureFrame mbLastEntry
+    in
+      case mbLastFrame of
+        Just (StackFrameIter (# s'#, i'# #)) ->
+          entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord size)
+        Nothing -> error "This should never happen! Recursion ended not in base case."
+  where
+    subtractDecodedBitmapWord :: Word -> Word
+    subtractDecodedBitmapWord size = fromIntegral $ max 0 ((fromIntegral size) - wORD_SIZE_IN_BITS)
 
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
@@ -95,15 +107,20 @@ toBitmapPayload e = Closure . unsafePerformIO . toClosure . closureFrame $ e
 
 
 unpackStackFrameIter :: StackFrameIter -> StackFrame
-unpackStackFrameIter sfi@(StackFrameIter (# s, i #)) =
-  case (toEnum . fromIntegral) (W# (getInfoTableType# s i)) of
+unpackStackFrameIter (StackFrameIter (# s#, i# #)) =
+  case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
      RET_BCO -> RetBCO
-     RET_SMALL -> let (# bitmap#, size# #) = getSmallBitmap# s i
-                      bes = toBitmapEntries  (StackFrameIter (# s, plusWord# i 1## #))(W# bitmap#) (W# size#)
+     RET_SMALL -> let !(# bitmap#, size# #) = getSmallBitmap# s# i#
+                      bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #))(W# bitmap#) (W# size#)
                       payloads = map toBitmapPayload bes
                   in
                     RetSmall None payloads
-     RET_BIG ->  RetBig []
+     RET_BIG -> let !(# bitmapArray#, size# #) = getLargeBitmap# s# i#
+                    bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
+                    bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #)) bitmapWords (trace ("XXX size " ++ show (W# size#))(W# size#))
+                    payloads = map toBitmapPayload bes
+                in
+                  RetBig payloads
      RET_FUN ->  RetFun
      UPDATE_FRAME ->  UpdateFrame
      CATCH_FRAME ->  CatchFrame
@@ -113,6 +130,27 @@ unpackStackFrameIter sfi@(StackFrameIter (# s, i #)) =
      CATCH_RETRY_FRAME ->  CatchRetryFrame
      CATCH_STM_FRAME ->  CatchStmFrame
      x -> error $ "Unexpected closure type on stack: " ++ show x
+
+-- | Right-fold over the elements of a 'ByteArray'.
+-- Copied from `primitive`
+foldrByteArray :: forall b. (Word# -> b -> b) -> b -> ByteArray# -> b
+{-# INLINE foldrByteArray #-}
+foldrByteArray f z arr = go 0
+  where
+    go i
+      | i < maxI  = f (indexWordArray# arr (toInt# i)) (go (i + 1))
+      | otherwise = z
+    maxI = sizeofByteArray arr `quot` sizeOf (undefined :: Word)
+
+-- | Size of the byte array in bytes.
+-- Copied from `primitive`
+sizeofByteArray :: ByteArray# -> Int
+{-# INLINE sizeofByteArray #-}
+sizeofByteArray arr# = I# (sizeofByteArray# arr#)
+
+-- | Unbox 'Int#' from 'Int'
+toInt# :: Int -> Int#
+toInt# (I# i) = i
 
 -- TODO: Is the function type below needed? (Was proposed by Ben)
 -- derefStackPtr :: StackSnapshot# -> Int# -> a
