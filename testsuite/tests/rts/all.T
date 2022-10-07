@@ -245,7 +245,7 @@ test('T7037', [], makefile_test, ['T7037'])
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
 
-test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
+test('T7040', [omit_ways(['ghci']), js_skip_csources], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
@@ -362,7 +362,7 @@ test('T9839_05',
 test('T10590', [ignore_stderr, when(opsys('mingw32'), skip)], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
-test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), js_skip_csources ],
                compile_and_run, ['T10904lib.c'])
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
@@ -457,10 +457,10 @@ test('keep-cafs',
 
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
-test('T11829', [ check_errmsg("This is a test") ], compile_and_run,
+test('T11829', [ check_errmsg("This is a test"), js_skip_csources], compile_and_run,
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
-test('T16514', normal, compile_and_run, ['T16514_c.c'])
+test('T16514', js_skip_csources, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',

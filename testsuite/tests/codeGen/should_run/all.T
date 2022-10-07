@@ -211,7 +211,7 @@ test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 
 test('T17920', cmm_src, compile_and_run, [''])
-test('T18527', normal, compile_and_run, ['T18527FFI.c'])
+test('T18527', js_skip_csources, compile_and_run, ['T18527FFI.c'])
 test('T19149', only_ways('sanity'), compile_and_run, ['T19149_c.c'])
 test('T20275', normal, compile_and_run, [''])
 
