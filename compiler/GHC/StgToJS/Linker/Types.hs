@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- for Ident's Binary instance
 
@@ -19,27 +20,28 @@
 
 module GHC.StgToJS.Linker.Types where
 
-import           GHC.JS.Syntax
-import           GHC.StgToJS.Object
-import           GHC.StgToJS.Types (ClosureInfo, StaticInfo)
+import GHC.JS.Syntax
+import GHC.StgToJS.Object
+import GHC.StgToJS.Types (ClosureInfo, StaticInfo)
 
-import           GHC.Unit.Types
-import           GHC.Data.FastString
-import           GHC.Types.Unique.Map
+import GHC.Unit.Types
+import GHC.Data.FastString
+import GHC.Types.Unique.Map
+import GHC.Utils.Outputable (hsep,Outputable(..),text,ppr)
 
-import           Control.Monad
+import Control.Monad
 
-import           Data.Array
-import           Data.ByteString      (ByteString)
-import           Data.Map.Strict      (Map)
-import qualified Data.Map.Strict      as M
-import           Data.Set             (Set)
+import Data.Array
+import Data.ByteString      (ByteString)
+import Data.Map.Strict      (Map)
+import qualified Data.Map.Strict as M
+import Data.Set             (Set)
 
-import           Control.Concurrent.MVar
+import Control.Concurrent.MVar
 
-import           System.IO
+import System.IO
 
-import           Prelude
+import Prelude
 
 -- | return a list of fresh @Ident@
 newLocals :: [Ident]
@@ -342,6 +344,11 @@ data LinkedUnit = LinkedUnit
 data LinkedObj
   = ObjFile   FilePath      -- ^ load from this file
   | ObjLoaded String Object -- ^ already loaded: description and payload
+
+instance Outputable LinkedObj where
+  ppr = \case
+    ObjFile fp    -> hsep [text "ObjFile", text fp]
+    ObjLoaded s o -> hsep [text "ObjLoaded", text s, ppr (objModuleName o)]
 
 data GhcjsEnv = GhcjsEnv
   { linkerArchiveDeps :: MVar (Map (Set FilePath)

@@ -225,9 +225,13 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
       rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
       objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
-  when (logVerbAtLeast logger 2) $ void $
+  when (logVerbAtLeast logger 2) $ void $ do
     compilationProgressMsg logger $ hcat
       [ text "Linking ", text target, text " (", text (intercalate "," rootMods), char ')' ]
+    compilationProgressMsg logger $ hcat
+      [ text "objDepsMap ", ppr objDepsMap ]
+    compilationProgressMsg logger $ hcat
+      [ text "objFiles ", ppr objFiles ]
 
   let (rts_wired_units, rts_wired_functions) = rtsDeps units
 
