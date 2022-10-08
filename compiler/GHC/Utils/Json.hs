@@ -14,6 +14,7 @@ data JsonDoc where
   JSBool :: Bool -> JsonDoc
   JSInt  :: Int  -> JsonDoc
   JSString :: String -> JsonDoc
+    -- ^ The 'String' is unescaped
   JSArray :: [JsonDoc] -> JsonDoc
   JSObject :: [(String, JsonDoc)] -> JsonDoc
 
@@ -57,7 +58,7 @@ class ToJson a where
   json :: a -> JsonDoc
 
 instance ToJson String where
-  json = JSString . escapeJsonString
+  json = JSString
 
 instance ToJson Int where
   json = JSInt
