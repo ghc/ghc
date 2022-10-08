@@ -6,15 +6,10 @@
 #include "rts/storage/Closures.h"
 #include "rts/storage/InfoTables.h"
 
-// Only exists to make the stack_frame_sizeW macro available in Haskell code
-// (via FFI).
-StgWord stackFrameSizeW(StgClosure *frame) {
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(frame));
-  return stack_frame_sizeW(frame);
-}
-
 StgWord stackFrameSize(StgStack* stack, StgWord index){
-  return stackFrameSizeW(stack->sp + index);
+  StgClosure* c = (StgClosure *) stack->sp + index;
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  return stack_frame_sizeW(c);
 }
 
 StgStack* getUnderflowFrameStack(StgStack* stack, StgWord index){
