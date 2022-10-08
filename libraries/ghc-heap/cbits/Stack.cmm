@@ -71,12 +71,13 @@ getInfoTableTypezh (P_ stack, W_ index) {
 }
 
 getSmallBitmapzh(P_ stack, W_ index) {
-  P_ itbl;
-  itbl = %STD_INFO(%INFO_PTR(StgStack_sp(stack) + WDS(index)));
+  P_ c;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ bitmap, size;
-  (bitmap) = ccall getBitmapWord(itbl);
-  (size) = ccall getBitmapSize(itbl);
+  (bitmap) = ccall getBitmapWord(c);
+  (size) = ccall getBitmapSize(c);
 
   ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
   return (bitmap, size);
@@ -90,12 +91,13 @@ unpackClosureFromStackFramezh(P_ stack, W_ index){
 }
 
 getLargeBitmapzh(P_ stack, W_ index){
-  P_ itbl, stgArrBytes;
+  P_ c, stgArrBytes;
   W_ size;
-  itbl = %STD_INFO(%INFO_PTR(StgStack_sp(stack) + WDS(index)));
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), itbl);
-  (size) = ccall getLargeBitmapSize(itbl);
+  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
+  (size) = ccall getLargeBitmapSize(c);
 
   ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
 

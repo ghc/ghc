@@ -1,6 +1,7 @@
 #include "MachDeps.h"
 #include "Rts.h"
 #include "rts/Messages.h"
+#include "rts/Types.h"
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/Closures.h"
 #include "rts/storage/InfoTables.h"
@@ -8,6 +9,7 @@
 // Only exists to make the stack_frame_sizeW macro available in Haskell code
 // (via FFI).
 StgWord stackFrameSizeW(StgClosure *frame) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(frame));
   return stack_frame_sizeW(frame);
 }
 
@@ -17,6 +19,7 @@ StgWord stackFrameSize(StgStack* stack, StgWord index){
 
 StgStack* getUnderflowFrameStack(StgStack* stack, StgWord index){
   StgClosure* frame = stack->sp + index;
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(frame));
   const StgRetInfoTable *info  = get_ret_itbl((StgClosure *)frame);
 
   if(info->i.type == UNDERFLOW_FRAME) {
@@ -28,6 +31,7 @@ StgStack* getUnderflowFrameStack(StgStack* stack, StgWord index){
 
 // Only exists to make the get_itbl macro available in Haskell code (via FFI).
 const StgInfoTable *getItbl(StgClosure *closure) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
   // printObj(closure);
   return get_itbl(closure);
 };
@@ -80,13 +84,19 @@ StgWord getSpecialRetSmall(StgPtr sp) {
 }
 
 // TODO: Consider to use HSC
-StgWord getBitmapSize(StgInfoTable *info){
+StgWord getBitmapSize(StgClosure *c){
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  StgInfoTable* info = get_itbl(c);
   StgWord bitmap = info->layout.bitmap;
   return BITMAP_SIZE(bitmap);
 }
 
 // TODO: Consider to use HSC
-StgWord getBitmapWord(StgInfoTable *info){
+StgWord getBitmapWord(StgClosure *c){
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  StgInfoTable* info = get_itbl(c);
   StgWord bitmap = info->layout.bitmap;
   debugBelch("getBitmapWord - bitmap : %lu \n", bitmap);
   StgWord bitmapWord = BITMAP_BITS(bitmap);
@@ -94,7 +104,10 @@ StgWord getBitmapWord(StgInfoTable *info){
   return bitmapWord;
 }
 
-StgWord getLargeBitmapSize(StgInfoTable *info){
+StgWord getLargeBitmapSize(StgClosure *c){
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  StgInfoTable* info = get_itbl(c);
   StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
   return bitmap->size;
 }
@@ -105,7 +118,10 @@ StgWord getLargeBitmapSize(StgInfoTable *info){
 #define SIZEOF_W  SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
-StgArrBytes* getLargeBitmaps(Capability *cap, StgInfoTable *info){
+StgArrBytes* getLargeBitmaps(Capability *cap, StgClosure *c){
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  StgInfoTable* info = get_itbl(c);
   StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes* array = allocate(cap, sizeofW(StgArrBytes) + neededWords);
