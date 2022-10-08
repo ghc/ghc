@@ -39,6 +39,7 @@ void memInventory (bool show);
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 
+void checkSTACK (StgStack *stack);
 #include "EndPrivate.h"
 
 #endif /* DEBUG */

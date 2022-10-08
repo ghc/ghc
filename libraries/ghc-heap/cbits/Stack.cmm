@@ -53,6 +53,7 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     P_ nextClosure;
     nextClosure = StgStack_sp(stack) + WDS(index);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
+    ccall checkSTACK(stack);
   }
 
   // ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
