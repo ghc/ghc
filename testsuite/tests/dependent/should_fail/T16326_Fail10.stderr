@@ -2,6 +2,6 @@
 T16326_Fail10.hs:12:18: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall a -> a -> a
-      (GHC does not yet support this)
     • In the type signature for ‘x’: forall a -> a -> a
       When checking the rewrite rule "flurmp"
+    Suggested fix: Perhaps you intended to use RequiredTypeArguments

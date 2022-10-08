@@ -564,6 +564,10 @@ rnExpr (ArithSeq _ _ seq)
            else
             return (ArithSeq noExtField Nothing new_seq, fvs) }
 
+rnExpr (HsEmbTy _ toktype ty)
+  = do { (ty', fvs) <- rnHsWcType HsTypeCtx ty
+       ; return (HsEmbTy noExtField toktype ty', fvs) }
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2301,6 +2305,11 @@ isStrictPattern (L loc pat) =
     NPat{}          -> True
     NPlusKPat{}     -> True
     SplicePat{}     -> True
+
+    -- The behavior of this case is unimportant, as GHC will throw an error shortly
+    -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
+    EmbTyPat{}  -> False
+
     XPat ext        -> case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
       GhcPs -> dataConCantHappen ext

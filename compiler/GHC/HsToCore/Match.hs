@@ -1265,6 +1265,7 @@ patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
+patGroup _ EmbTyPat{} = PgAny
 patGroup platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
   ExpansionPat _ p -> patGroup platform p

@@ -183,7 +183,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
-    mk_ctxt res_ty env = mkFunTysMsg env herald (reverse arg_tys_so_far)
+    mk_ctxt res_ty env = mkFunTysMsg env herald [Anon t visArgTypeLike | t <- reverse arg_tys_so_far]
                                      res_ty n_val_args_in_call
     (n_val_args_in_call, arg_tys_so_far) = err_info
 
@@ -376,7 +376,7 @@ matchExpectedFunTys :: forall a.
                     -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType      -- Skolemised
-                    -> ([Scaled ExpSigmaTypeFRR] -> ExpRhoType -> TcM a)
+                    -> ([ExpPatType] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (wrap, _)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
@@ -386,11 +386,11 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
-    -- Skolemise any foralls /before/ the zero-arg case
+    -- Skolemise any /invisible/ foralls /before/ the zero-arg case
     -- so that we guarantee to return a rho-type
     go acc_arg_tys n ty
-      | (tvs, theta, _) <- tcSplitSigmaTy ty
-      , not (null tvs && null theta)
+      | (tvs, theta, _) <- tcSplitSigmaTy ty  -- Invisible binders only!
+      , not (null tvs && null theta)          -- Visible ones handled below
       = do { (wrap_gen, (wrap_res, result)) <- tcTopSkolemise ctx ty $ \ty' ->
                                                go acc_arg_tys n ty'
            ; return (wrap_gen <.> wrap_res, result) }
@@ -404,11 +404,22 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- coreView ty = go acc_arg_tys n ty'
 
+    -- Decompose /visible/ (forall a -> blah), to give an ExpForAllPat
+    -- NB: invisible binders are handled by tcSplitSigmaTy/tcTopSkolemise above
+    -- NB: visible foralls "count" for the Arity argument; they correspond
+    --     to syntactically visible patterns in the source program
+    -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
+    go acc_arg_tys n ty
+      | Just (Bndr tv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+      , Required <- vis
+      = let init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
+        in goVdq init_subst acc_arg_tys n ty tv ty'
+
     go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
         do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
-           ; (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
+           ; (wrap_res, result) <- go ((ExpFunPatTy $ Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; let wrap_arg = mkWpCastN arg_co
                  fun_wrap = mkWpFun wrap_arg wrap_res (Scaled mult arg_ty) res_ty
@@ -439,13 +450,24 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
                           defer acc_arg_tys n (mkCheckExpType ty)
 
+    goVdq subst acc_arg_tys n expected_ty tv ty =
+      do { rec { (subst', [tv']) <- tcInstSkolTyVarsX skol_info subst [tv]
+               ; let tv_prs = [(tyVarName tv, tv')]
+               ; skol_info <- mkSkolemInfo (SigSkol ctx expected_ty tv_prs) }
+         ; let ty' = substTy subst' ty
+         ; (ev_binds, (wrap_res, result)) <-
+              checkConstraints (getSkolemInfo skol_info) [tv'] [] $
+              go (ExpForAllPatTy tv' : acc_arg_tys) (n - 1) ty'
+         ; let wrap_gen = mkWpVisTyLam tv' ty' <.> mkWpLet ev_binds
+         ; return (wrap_gen <.> wrap_res, result) }
+
     ------------
-    defer :: [Scaled ExpSigmaTypeFRR] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
+    defer :: [ExpPatType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
       = do { let last_acc_arg_pos = length acc_arg_tys
            ; more_arg_tys <- mapM new_exp_arg_ty [last_acc_arg_pos + 1 .. last_acc_arg_pos + n]
            ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
+           ; result       <- thing_inside (reverse acc_arg_tys ++ map ExpFunPatTy more_arg_tys) res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkScaledFunTys more_arg_tys res_ty
@@ -459,30 +481,40 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                  <*> newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaTypeFRR] -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
+    mk_ctxt :: [ExpPatType] -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
-        arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) $
-                   reverse arg_tys
+        arg_tys' = map prepare_arg_ty (reverse arg_tys)
+        prepare_arg_ty (ExpFunPatTy (Scaled u v)) = Anon (Scaled u (checkingExpType "matchExpectedFunTys" v)) visArgTypeLike
+        prepare_arg_ty (ExpForAllPatTy tv)        = Named (Bndr tv Required)
             -- this is safe b/c we're called from "go"
 
 mkFunTysMsg :: TidyEnv
             -> ExpectedFunTyOrigin
-            -> [Scaled TcType] -> TcType -> Arity
+            -> [PiTyBinder]     -- only visible quantifiers `t1 -> t2` and `forall (x :: t1) -> t2`
+            -> TcType
+            -> Arity
             -> ZonkM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
-  = do { (env', fun_rho) <- zonkTidyTcType env $
-                            mkScaledFunTys arg_tys res_ty
+  = do { (env', fun_ty) <- zonkTidyTcType env $
+                           mkPiTys arg_tys res_ty
 
-       ; let (all_arg_tys, _) = splitFunTys fun_rho
+       ; let (all_arg_tys, _) =
+                -- No invisible quantifiers here (neither `ctx => t` nor `forall x. t`)
+                -- because `mkFunTysMsg` never gets those as input in the first place,
+                -- so there is no need to filter them out.
+                splitPiTys fun_ty
+
+             -- `all_arg_tys` contains visible quantifiers only, so their number matches
+             -- the number of arguments that the user needs to pass to the function.
              n_fun_args = length all_arg_tys
 
              msg | n_val_args_in_call <= n_fun_args  -- Enough args, in the end
                  = text "In the result of a function call"
                  | otherwise
                  = hang (full_herald <> comma)
-                      2 (sep [ text "but its type" <+> quotes (pprType fun_rho)
+                      2 (sep [ text "but its type" <+> quotes (pprType fun_ty)
                              , if n_fun_args == 0 then text "has none"
                                else text "has only" <+> speakN n_fun_args])
 

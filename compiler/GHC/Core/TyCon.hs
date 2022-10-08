@@ -599,10 +599,11 @@ So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
   - but changing Anon/Required to Specified
 
 The last part about Required->Specified comes from this:
-  data T k (a:k) b = MkT (a b)
-Here k is Required in T's kind, but we don't have Required binders in
-the PiTyBinders for a term (see Note [No Required PiTyBinder in terms]
-in GHC.Core.TyCo.Rep), so we change it to Specified when making MkT's PiTyBinders
+  data T k (a :: k) b = MkT (a b)
+Here k is Required in T's kind, but we didn't have Required binders in
+types of terms before the advent of the new, experimental RequiredTypeArguments
+extension. So we historically changed Required to Specified when making MkT's PiTyBinders
+and now continue to do so to avoid a breaking change.
 -}
 
 

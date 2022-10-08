@@ -581,6 +581,10 @@ isOkNoBindPattern (L _ pat) =
           ConPat _ _ cpd  -> any lpatternContainsSplice (hsConPatArgs cpd)
           XPat (HsPatExpanded _orig new) -> patternContainsSplice new
 
+          -- The behavior of this case is unimportant, as GHC will throw an error shortly
+          -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
+          EmbTyPat{} -> True
+
 {- Note [Pattern bindings that bind no variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally, we want to warn about pattern bindings like

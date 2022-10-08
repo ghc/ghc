@@ -447,6 +447,7 @@ type family XStatic         x
 type family XTick           x
 type family XBinTick        x
 type family XPragE          x
+type family XEmbTy          x
 type family XXExpr          x
 
 -- -------------------------------------
@@ -606,6 +607,7 @@ type family XLitPat      x
 type family XNPat        x
 type family XNPlusKPat   x
 type family XSigPat      x
+type family XEmbTyPat    x
 type family XCoPat       x
 type family XXPat        x
 type family XHsFieldBind x

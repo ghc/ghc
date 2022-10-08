@@ -234,6 +234,7 @@ pprExp _ (GetFieldE e f) = pprExp appPrec e <> text ('.': f)
 pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) $ toList xs
 pprExp _ (TypedBracketE e) = text "[||" <> ppr e <> text "||]"
 pprExp _ (TypedSpliceE e) = text "$$" <> pprExp appPrec e
+pprExp i (TypeE t) = parensIf (i > noPrec) $ text "type" <+> ppr t
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)
@@ -385,6 +386,7 @@ pprPat _ (RecP nm fs)
 pprPat _ (ListP ps) = brackets (commaSep ps)
 pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
+pprPat _ (TypeP t) = parens $ text "type" <+> ppr t
 
 ------------------------------
 instance Ppr Dec where

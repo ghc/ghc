@@ -435,11 +435,10 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalInstance reason ->
       mkSimpleDecorated $ pprIllegalInstance reason
     TcRnVDQInTermType mb_ty
-      -> mkSimpleDecorated $ vcat
-           [ case mb_ty of
+      -> mkSimpleDecorated $
+             case mb_ty of
                Nothing -> main_msg
                Just ty -> hang (main_msg <> char ':') 2 (pprType ty)
-           , text "(GHC does not yet support this)" ]
       where
         main_msg =
           text "Illegal visible, dependent quantification" <+>
@@ -1230,6 +1229,25 @@ instance Diagnostic TcRnMessage where
     TcRnMissingRoleAnnotation name roles -> mkSimpleDecorated $
       hang (text "Missing role annotation" <> colon)
          2 (text "type role" <+> ppr name <+> hsep (map ppr roles))
+
+    TcRnIllformedTypePattern p
+      -> mkSimpleDecorated $
+          hang (text "Ill-formed type pattern:") 2 (ppr p) $$
+          text "Expected a type pattern introduced with the"
+            <+> quotes (text "type") <+> text "keyword."
+    TcRnIllegalTypePattern
+      -> mkSimpleDecorated $
+          text "Illegal type pattern." $$
+          text "A type pattern must be checked against a visible forall."
+    TcRnIllformedTypeArgument e
+      -> mkSimpleDecorated $
+          hang (text "Ill-formed type argument:") 2 (ppr e) $$
+          text "Expected a type expression introduced with the"
+            <+> quotes (text "type") <+> text "keyword."
+    TcRnIllegalTypeExpr
+      -> mkSimpleDecorated $
+          text "Illegal type expression." $$
+          text "A type expression must be used to instantiate a visible forall."
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -2418,6 +2436,14 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnImplicitRhsQuantification
     TcRnPatersonCondFailure{}
       -> ErrorWithoutFlag
+    TcRnIllformedTypePattern{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTypePattern{}
+      -> ErrorWithoutFlag
+    TcRnIllformedTypeArgument{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTypeExpr{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2537,8 +2563,9 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnForAllEscapeError{}
       -> noHints
-    TcRnVDQInTermType{}
-      -> noHints
+    TcRnVDQInTermType mb_ty
+      | isJust mb_ty -> [suggestExtension LangExt.RequiredTypeArguments]
+      | otherwise    -> []
     TcRnBadQuantPredHead{}
       -> noHints
     TcRnIllegalTupleConstraint{}
@@ -3061,6 +3088,14 @@ instance Diagnostic TcRnMessage where
       -> [SuggestBindTyVarOnLhs (unLoc kv)]
     TcRnPatersonCondFailure{}
       -> [suggestExtension LangExt.UndecidableInstances]
+    TcRnIllformedTypePattern{}
+      -> noHints
+    TcRnIllegalTypePattern{}
+      -> noHints
+    TcRnIllformedTypeArgument{}
+      -> noHints
+    TcRnIllegalTypeExpr{}
+      -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode

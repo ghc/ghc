@@ -1666,6 +1666,9 @@ repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
 repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel . unLoc) xs)
+repE (HsEmbTy _ _ t) = do
+  t1 <- repLTy (hswc_body t)
+  rep2 typeEName [unC t1]
 repE (XExpr (HsExpanded orig_expr ds_expr))
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
@@ -2123,6 +2126,8 @@ repP p@(NPat _ (L _ l) (Just _) _)
 repP (SigPat _ p t) = do { p' <- repLP p
                          ; t' <- repLTy (hsPatSigType t)
                          ; repPsig p' t' }
+repP (EmbTyPat _ _ t) = do { t' <- repLTy (hstp_body t)
+                           ; repPtype t' }
 repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice n
 repP p@(SplicePat (HsUntypedSpliceTop _ _) _) = pprPanic "repP: top level splice" (ppr p)
 repP other = notHandled (ThExoticPattern other)
@@ -2378,6 +2383,9 @@ repPview (MkC e) (MkC p) = rep2 viewPName [e,p]
 
 repPsig :: Core (M TH.Pat) -> Core (M TH.Type) -> MetaM (Core (M TH.Pat))
 repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
+
+repPtype :: Core (M TH.Type) -> MetaM (Core (M TH.Pat))
+repPtype (MkC t) = rep2 typePName [t]
 
 --------------- Expressions -----------------
 repVarOrCon :: Name -> Core TH.Name -> MetaM (Core (M TH.Exp))

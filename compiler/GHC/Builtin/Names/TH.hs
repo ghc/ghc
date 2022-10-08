@@ -47,6 +47,7 @@ templateHaskellNames = [
     litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName,
     conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName,
+    typePName,
     -- FieldPat
     fieldPatName,
     -- Match
@@ -61,6 +62,7 @@ templateHaskellNames = [
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName,
+    typeEName,
     -- FieldExp
     fieldExpName,
     -- Body
@@ -268,7 +270,7 @@ charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName, conPName,
     infixPName, tildePName, bangPName, asPName, wildPName, recPName, listPName,
-    sigPName, viewPName :: Name
+    sigPName, viewPName, typePName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
@@ -284,6 +286,7 @@ recPName   = libFun (fsLit "recP")   recPIdKey
 listPName  = libFun (fsLit "listP")  listPIdKey
 sigPName   = libFun (fsLit "sigP")   sigPIdKey
 viewPName  = libFun (fsLit "viewP")  viewPIdKey
+typePName  = libFun (fsLit "typeP")  typePIdKey
 
 -- type FieldPat = ...
 fieldPatName :: Name
@@ -302,7 +305,7 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, lamCasesEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName, getFieldEName, projectionEName :: Name
+    labelEName, implicitParamVarEName, getFieldEName, projectionEName, typeEName :: Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -343,6 +346,7 @@ labelEName            = libFun (fsLit "labelE")            labelEIdKey
 implicitParamVarEName = libFun (fsLit "implicitParamVarE") implicitParamVarEIdKey
 getFieldEName         = libFun (fsLit "getFieldE")         getFieldEIdKey
 projectionEName       = libFun (fsLit "projectionE")       projectionEIdKey
+typeEName             = libFun (fsLit "typeE")             typeEIdKey
 
 -- type FieldExp = ...
 fieldExpName :: Name
@@ -808,7 +812,7 @@ liftStringIdKey     = mkPreludeMiscIdUnique 230
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, unboxedSumPIdKey, conPIdKey,
   infixPIdKey, tildePIdKey, bangPIdKey, asPIdKey, wildPIdKey, recPIdKey,
-  listPIdKey, sigPIdKey, viewPIdKey :: Unique
+  listPIdKey, sigPIdKey, viewPIdKey, typePIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 240
 varPIdKey         = mkPreludeMiscIdUnique 241
 tupPIdKey         = mkPreludeMiscIdUnique 242
@@ -824,6 +828,7 @@ recPIdKey         = mkPreludeMiscIdUnique 251
 listPIdKey        = mkPreludeMiscIdUnique 252
 sigPIdKey         = mkPreludeMiscIdUnique 253
 viewPIdKey        = mkPreludeMiscIdUnique 254
+typePIdKey        = mkPreludeMiscIdUnique 255
 
 -- type FieldPat = ...
 fieldPatIdKey :: Unique
@@ -846,7 +851,7 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey, staticEIdKey,
     unboundVarEIdKey, labelEIdKey, implicitParamVarEIdKey, mdoEIdKey,
-    getFieldEIdKey, projectionEIdKey :: Unique
+    getFieldEIdKey, projectionEIdKey, typeEIdKey :: Unique
 varEIdKey              = mkPreludeMiscIdUnique 270
 conEIdKey              = mkPreludeMiscIdUnique 271
 litEIdKey              = mkPreludeMiscIdUnique 272
@@ -883,28 +888,29 @@ implicitParamVarEIdKey = mkPreludeMiscIdUnique 302
 mdoEIdKey              = mkPreludeMiscIdUnique 303
 getFieldEIdKey         = mkPreludeMiscIdUnique 304
 projectionEIdKey       = mkPreludeMiscIdUnique 305
+typeEIdKey             = mkPreludeMiscIdUnique 306
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
-fieldExpIdKey       = mkPreludeMiscIdUnique 306
+fieldExpIdKey       = mkPreludeMiscIdUnique 307
 
 -- data Body = ...
 guardedBIdKey, normalBIdKey :: Unique
-guardedBIdKey     = mkPreludeMiscIdUnique 307
-normalBIdKey      = mkPreludeMiscIdUnique 308
+guardedBIdKey     = mkPreludeMiscIdUnique 308
+normalBIdKey      = mkPreludeMiscIdUnique 309
 
 -- data Guard = ...
 normalGEIdKey, patGEIdKey :: Unique
-normalGEIdKey     = mkPreludeMiscIdUnique 309
-patGEIdKey        = mkPreludeMiscIdUnique 310
+normalGEIdKey     = mkPreludeMiscIdUnique 310
+patGEIdKey        = mkPreludeMiscIdUnique 311
 
 -- data Stmt = ...
 bindSIdKey, letSIdKey, noBindSIdKey, parSIdKey, recSIdKey :: Unique
-bindSIdKey       = mkPreludeMiscIdUnique 311
-letSIdKey        = mkPreludeMiscIdUnique 312
-noBindSIdKey     = mkPreludeMiscIdUnique 313
-parSIdKey        = mkPreludeMiscIdUnique 314
-recSIdKey        = mkPreludeMiscIdUnique 315
+bindSIdKey       = mkPreludeMiscIdUnique 312
+letSIdKey        = mkPreludeMiscIdUnique 313
+noBindSIdKey     = mkPreludeMiscIdUnique 314
+parSIdKey        = mkPreludeMiscIdUnique 315
+recSIdKey        = mkPreludeMiscIdUnique 316
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,

@@ -2,5 +2,5 @@
 T17687.hs:5:6: error: [GHC-51580]
     • Illegal visible, dependent quantification in the type of a term:
         forall a -> a -> a
-      (GHC does not yet support this)
     • In the type signature: x :: forall a -> a -> a
+    Suggested fix: Perhaps you intended to use RequiredTypeArguments

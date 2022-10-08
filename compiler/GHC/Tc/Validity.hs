@@ -993,7 +993,8 @@ checkConstraintsOK ve theta ty
 
 checkVdqOK :: ValidityEnv -> [TyVarBinder] -> Type -> TcM ()
 checkVdqOK ve tvbs ty = do
-  checkTcM (vdqAllowed ctxt || no_vdq)
+  required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+  checkTcM (required_type_arguments || vdqAllowed ctxt || no_vdq)
            (env, TcRnVDQInTermType (Just (tidyType env ty)))
   where
     no_vdq = all (isInvisibleForAllTyFlag . binderFlag) tvbs

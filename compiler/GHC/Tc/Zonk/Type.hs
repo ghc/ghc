@@ -1064,6 +1064,8 @@ zonkExpr (HsStatic (fvs, ty) expr)
   = do new_ty <- zonkTcTypeToTypeX ty
        HsStatic (fvs, new_ty) <$> zonkLExpr expr
 
+zonkExpr (HsEmbTy x _ _) = dataConCantHappen x
+
 zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
   = runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->
     do new_expr <- zonkExpr expr
@@ -1576,6 +1578,10 @@ zonk_pat (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; ty'   <- noBinders $ zonkTcTypeToTypeX ty
         ; n'    <- zonkIdBndrX n
         ; return (NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
+
+zonk_pat (EmbTyPat ty toktype tp)
+  = do { ty' <- noBinders $ zonkTcTypeToTypeX ty
+       ; return (EmbTyPat ty' toktype tp) }
 
 zonk_pat (XPat ext) = case ext of
   { ExpansionPat orig pat->

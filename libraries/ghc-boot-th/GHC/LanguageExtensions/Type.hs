@@ -77,6 +77,7 @@ data Extension
    | InstanceSigs
    | ApplicativeDo
    | LinearTypes
+   | RequiredTypeArguments    -- Visible forall (VDQ) in types of terms
 
    | StandaloneDeriving
    | DeriveDataTypeable

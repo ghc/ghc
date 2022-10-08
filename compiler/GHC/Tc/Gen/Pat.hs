@@ -104,7 +104,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
 -----------------
 tcPats :: HsMatchContext GhcTc
        -> [LPat GhcRn]             -- ^ atterns
-       -> [Scaled ExpSigmaTypeFRR] -- ^ types of the patterns
+       -> [ExpPatType]             -- ^ types of the patterns
        -> TcM a                    -- ^ checker for the body
        -> TcM ([LPat GhcTc], a)
 
@@ -120,7 +120,7 @@ tcPats :: HsMatchContext GhcTc
 --   4. Check that no existentials escape
 
 tcPats ctxt pats pat_tys thing_inside
-  = tc_lpats pat_tys penv pats thing_inside
+  = tc_tt_lpats pat_tys penv pats thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
@@ -350,6 +350,14 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
+tc_tt_lpat :: ExpPatType
+           -> Checker (LPat GhcRn) (LPat GhcTc)
+tc_tt_lpat pat_ty penv (L span pat) thing_inside
+  = setSrcSpanA span $
+    do  { (pat', res) <- maybeWrapPatCtxt pat (tc_tt_pat pat_ty penv pat)
+                                          thing_inside
+        ; return (L span pat', res) }
+
 tc_lpats :: [Scaled ExpSigmaTypeFRR]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
@@ -358,10 +366,38 @@ tc_lpats tys penv pats
                penv
                (zipEqual "tc_lpats" pats tys)
 
+tc_tt_lpats :: [ExpPatType] -> Checker [LPat GhcRn] [LPat GhcTc]
+tc_tt_lpats tys penv pats
+  = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
+    tcMultiple (\ penv' (p,t) -> tc_tt_lpat t penv' p)
+               penv
+               (zipEqual "tc_tt_lpats" pats tys)
+
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper
 checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin ManyTy (scaledMult pat_ty)
+
+tc_tt_pat
+        :: ExpPatType
+        -- ^ Fully refined result type
+        -> Checker (Pat GhcRn) (Pat GhcTc)
+        -- ^ Translated pattern
+tc_tt_pat pat_ty penv (ParPat x lpar pat rpar) thing_inside = do
+        { (pat', res) <- tc_tt_lpat pat_ty penv pat thing_inside
+        ; return (ParPat x lpar pat' rpar, res) }
+tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
+tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
+
+tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
+tc_forall_pat _ (EmbTyPat _ toktype tp, tv) thing_inside
+  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat tp (varType tv)
+       ; _ <- unifyType Nothing arg_ty (mkTyVarTy tv)
+       ; result <- tcExtendNameTyVarEnv sig_wcs $
+                   tcExtendNameTyVarEnv sig_ibs $
+                   thing_inside
+       ; return (EmbTyPat arg_ty toktype tp, result) }
+tc_forall_pat _ (pat, _) _ = failWith $ TcRnIllformedTypePattern pat
 
 tc_pat  :: Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type
@@ -701,6 +737,8 @@ AST is used for the subtraction operation.
       ; tc_pat pat_ty penv pat thing_inside }
 
   SplicePat (HsUntypedSpliceNested _) _ -> panic "tc_pat: nested splice in splice pat"
+
+  EmbTyPat _ _ _ -> failWith TcRnIllegalTypePattern
 
   XPat (HsPatExpanded lpat rpat) -> do
     { (rpat', res) <- tc_pat pat_ty penv rpat thing_inside

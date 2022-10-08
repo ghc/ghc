@@ -380,6 +380,12 @@ type instance XStatic        GhcTc = (NameSet, Type)
   -- Free variables and type of expression, this is stored for convenience as wiring in
   -- StaticPtr is a bit tricky (see #20150)
 
+type instance XEmbTy         GhcPs = NoExtField
+type instance XEmbTy         GhcRn = NoExtField
+type instance XEmbTy         GhcTc = DataConCantHappen
+  -- A free-standing HsEmbTy is an error.
+  -- Valid usages are immediately desugared into Type.
+
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))))] = SrcSpanAnnL
@@ -702,6 +708,9 @@ ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
 ppr_expr (HsStatic _ e)
   = hsep [text "static", ppr e]
 
+ppr_expr (HsEmbTy _ _ ty)
+  = hsep [text "type", ppr ty]
+
 ppr_expr (XExpr x) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> ppr x
@@ -843,6 +852,7 @@ hsExprNeedsParens prec = go
     go (HsRecSel{})                   = False
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
+    go (HsEmbTy{})                    = prec > topPrec
     go (XExpr x) = case ghcPass @p of
                      GhcTc -> go_x_tc x
                      GhcRn -> go_x_rn x

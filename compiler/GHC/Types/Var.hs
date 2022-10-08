@@ -920,8 +920,7 @@ This table summarises the visibility rules:
 |  tvis = Inferred:            f :: forall {a}. type    Arg not allowed:  f
                                f :: forall {co}. type   Arg not allowed:  f
 |  tvis = Specified:           f :: forall a. type      Arg optional:     f  or  f @Int
-|  tvis = Required:            T :: forall k -> type    Arg required:     T *
-|    This last form is illegal in terms: See Note [No Required PiTyBinder in terms]
+|  tvis = Required:            f :: forall k -> type    Arg required:     f (type Int)
 |
 | Bndr k cvis :: TyConBinder, in the TyConBinders of a TyCon
 |  cvis :: TyConBndrVis
@@ -952,22 +951,28 @@ This table summarises the visibility rules:
      f3 :: forall a. a -> a; f3 x = x
   So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
 
+* Required.  Function defn, with signature (explicit forall):
+     f4 :: forall a -> a -> a; f4 (type _) x = x
+  So f4 gets the type f4 :: forall a -> a -> a, with 'a' Required
+  This is the experimental RequiredTypeArguments extension,
+  see GHC Proposal #281 "Visible forall in types of terms"
+
 * Inferred.  Function defn, with signature (explicit forall), marked as inferred:
-     f4 :: forall {a}. a -> a; f4 x = x
-  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
+     f5 :: forall {a}. a -> a; f5 x = x
+  So f5 gets the type f5 :: forall {a}. a -> a, with 'a' Inferred
   It's Inferred because the user marked it as such, even though it does appear
-  in the user-written signature for f4
+  in the user-written signature for f5
 
 * Inferred/Specified.  Function signature with inferred kind polymorphism.
-     f5 :: a b -> Int
-  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
+     f6 :: a b -> Int
+  So 'f6' gets the type f6 :: forall {k} (a :: k -> Type) (b :: k). a b -> Int
   Here 'k' is Inferred (it's not mentioned in the type),
   but 'a' and 'b' are Specified.
 
 * Specified.  Function signature with explicit kind polymorphism
-     f6 :: a (b :: k) -> Int
+     f7 :: a (b :: k) -> Int
   This time 'k' is Specified, because it is mentioned explicitly,
-  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+  so we get f7 :: forall (k :: Type) (a :: k -> Type) (b :: k). a b -> Int
 
 * Similarly pattern synonyms:
   Inferred - from inferred types (e.g. no pattern type signature)
@@ -1027,7 +1032,7 @@ See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
                const :: forall a b. a -> b -> a
 
  Inferred: like Specified, but every binder is written in braces:
-               f :: forall {k} (a:k). S k a -> Int
+               f :: forall {k} (a :: k). S k a -> Int
 
  Required: binders are put between `forall` and `->`:
               T :: forall k -> *
@@ -1039,19 +1044,6 @@ See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
 
 * Inferred variables correspond to "generalized" variables from the
   Visible Type Applications paper (ESOP'16).
-
-Note [No Required PiTyBinder in terms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't allow Required foralls for term variables, including pattern
-synonyms and data constructors.  Why?  Because then an application
-would need a /compulsory/ type argument (possibly without an "@"?),
-thus (f Int); and we don't have concrete syntax for that.
-
-We could change this decision, but Required, Named PiTyBinders are rare
-anyway.  (Most are Anons.)
-
-However the type of a term can (just about) have a required quantifier;
-see Note [Required quantifiers in the type of a term] in GHC.Tc.Gen.Expr.
 -}
 
 

@@ -1164,6 +1164,8 @@ cvtl e = wrapLA (cvt e)
                               ; return $ HsTypedSplice (noAnn, noAnn) e' }
     cvt (TypedBracketE e) = do { e' <- cvtl e
                                ; return $ HsTypedBracket noAnn e' }
+    cvt (TypeE t) = do { t' <- cvtType t
+                       ; return $ HsEmbTy noExtField noHsTok (mkHsWildCardBndrs t') }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:
@@ -1480,6 +1482,8 @@ cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
                             ; return $ SigPat noAnn p' (mkHsPatSigType noAnn t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
                             ; return $ ViewPat noAnn e' p'}
+cvtp (TypeP t)         = do { t' <- cvtType t
+                            ; return $ EmbTyPat noExtField noHsTok (mkHsTyPat noAnn t') }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

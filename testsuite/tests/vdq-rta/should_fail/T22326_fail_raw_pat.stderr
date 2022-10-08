@@ -1,0 +1,5 @@
+
+T22326_fail_raw_pat.hs:7:3: error: [GHC-88754]
+    • Ill-formed type pattern: x
+      Expected a type pattern introduced with the ‘type’ keyword.
+    • In an equation for ‘f’: f x = ()

@@ -33,7 +33,7 @@ module Language.Haskell.TH.Lib (
     -- *** Patterns
         litP, varP, tupP, unboxedTupP, unboxedSumP, conP, uInfixP, parensP,
         infixP, tildeP, bangP, asP, wildP, recP,
-        listP, sigP, viewP,
+        listP, sigP, viewP, typeP,
         fieldPat,
 
     -- *** Pattern Guards
@@ -44,7 +44,7 @@ module Language.Haskell.TH.Lib (
         appE, appTypeE, uInfixE, parensE, infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE,
         multiIfE, letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE,
-        fieldExp, getFieldE, projectionE, typedSpliceE, typedBracketE,
+        fieldExp, getFieldE, projectionE, typedSpliceE, typedBracketE, typeE,
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,
 

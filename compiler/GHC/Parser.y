@@ -2738,6 +2738,11 @@ exp   :: { ECP }
         | infixexp %shift       { $1 }
         | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
 
+        -- Embed types into expressions and patterns for required type arguments
+        | 'type' atype
+                {% do { requireExplicitNamespaces (getLoc $1)
+                      ; return $ ECP $ mkHsEmbTyPV (comb2 $1 (reLoc $>)) (hsTok $1) $2 } }
+
 infixexp :: { ECP }
         : exp10 { $1 }
         | infixexp qop exp10p    -- See Note [Pragmas and operator fixity]

@@ -4027,6 +4027,77 @@ data TcRnMessage where
   -}
   TcRnImplicitRhsQuantification :: LocatedN RdrName -> TcRnMessage
 
+  {-| TcRnIllformedTypePattern is an error raised when the pattern
+      corresponding to a required type argument (visible forall)
+      does not have a form that can be interpreted as a type pattern.
+
+      At the moment, only patterns constructed using the @type@ keyword
+      are considered well-formed, but this restriction will be relaxed
+      when part 2 of GHC Proposal #281 is implemented.
+
+      Example:
+
+        vfun :: forall (a :: k) -> ()
+        vfun x = ()
+        --   ^
+        --  expected `type x` instead of `x`
+
+      Test cases:
+          T22326_fail_raw_pat
+  -}
+  TcRnIllformedTypePattern :: !(Pat GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalTypePattern is an error raised when a pattern constructed
+      with the @type@ keyword occurs in a position that does not correspond
+      to a required type argument (visible forall).
+
+      Example:
+
+        case x of
+          (type _) -> True     -- the (type _) pattern is illegal here
+          _        -> False
+
+      Test cases:
+        T22326_fail_ado
+        T22326_fail_caseof
+  -}
+  TcRnIllegalTypePattern :: TcRnMessage
+
+  {-| TcRnIllformedTypeArgument is an error raised when an argument
+      that specifies a required type argument (instantiates a visible forall)
+      does not have a form that can be interpreted as a type argument.
+
+      At the moment, only expressions constructed using the @type@ keyword
+      are considered well-formed, but this restriction will be relaxed
+      when part 2 of GHC Proposal #281 is implemented.
+
+      Example:
+
+        vfun :: forall (a :: k) -> ()
+        x = vfun Int
+        --       ^^^
+        --  expected `type Int` instead of `Int`
+
+      Test cases:
+        T22326_fail_raw_arg
+  -}
+  TcRnIllformedTypeArgument :: !(LHsExpr GhcRn) -> TcRnMessage
+
+  {-| TcRnIllegalTypeExpr is an error raised when an expression constructed
+      with the @type@ keyword occurs in a position that does not correspond
+      to a required type argument (visible forall).
+
+      Example:
+
+        xtop = type Int                  -- not a function argument
+        xarg = length (type Int)         -- `length` does not expect a required type argument
+
+      Test cases:
+        T22326_fail_app
+        T22326_fail_top
+  -}
+  TcRnIllegalTypeExpr :: TcRnMessage
+
   deriving Generic
 
 

@@ -33,6 +33,8 @@ module GHC.Tc.Utils.TcType (
   mkCheckExpType,
   checkingExpType_maybe, checkingExpType,
 
+  ExpPatType(..),
+
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
   --------------------------------
@@ -457,6 +459,15 @@ checkingExpType_maybe (Infer {}) = Nothing
 checkingExpType :: String -> ExpType -> TcType
 checkingExpType _   (Check ty) = ty
 checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
+
+-- Expected type of a pattern in a lambda or a function left-hand side.
+data ExpPatType =
+    ExpFunPatTy    (Scaled ExpSigmaTypeFRR)   -- the type A of a function A -> B
+  | ExpForAllPatTy TcTyVar                    -- the binder (a::A) of forall (a::A) -> B
+
+instance Outputable ExpPatType where
+  ppr (ExpFunPatTy t) = ppr t
+  ppr (ExpForAllPatTy tv) = text "forall" <+> ppr tv
 
 {- *********************************************************************
 *                                                                      *

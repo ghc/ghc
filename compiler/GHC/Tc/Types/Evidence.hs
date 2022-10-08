@@ -7,7 +7,7 @@ module GHC.Tc.Types.Evidence (
 
   -- * HsWrapper
   HsWrapper(..),
-  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
+  (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams, mkWpVisTyLam,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
@@ -257,6 +257,21 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
+
+-- Construct a type lambda and cast its type
+-- from `forall tv. res` to `forall tv -> res`.
+--
+-- (\ @tv -> e )
+--    `cast` (forall (tv[spec]~[req] :: <*>_N). <res>_R       -- ForAllCo is the evidence that...
+--              :: (forall tv. res) ~R# (forall tv -> res))   -- invisible and visible foralls are representationally equal
+--
+mkWpVisTyLam :: TyVar -> Type -> HsWrapper
+mkWpVisTyLam tv res =
+  WpCast (mkForAllCo tv coreTyLamForAllTyFlag Required kind_co body_co)
+  <.> WpTyLam tv
+  where
+    kind_co = mkNomReflCo (varType tv)
+    body_co = mkRepReflCo res
 
 mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids

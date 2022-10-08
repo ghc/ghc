@@ -5,6 +5,9 @@
   * The kind of `Code` was changed from `forall r. (Type -> Type) -> TYPE r -> Type`
     to `(Type -> Type) -> forall r. TYPE r -> Type`. This enables higher-kinded usage.
 
+  * Extend `Pat` with `TypeP` and `Exp` with `TypeE`,
+    introduce functions `typeP` and `typeE` (GHC Proposal #281).
+
 ## 2.21.0.0
 
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of

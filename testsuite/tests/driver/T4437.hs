@@ -53,7 +53,5 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Unsafe",
                                "Trustworthy",
                                "MonadFailDesugaring",
-                               "MonoPatBinds",
-                               -- https://github.com/haskell/cabal/pull/8521
-                               "RequiredTypeArguments"
+                               "MonoPatBinds"
                               ]

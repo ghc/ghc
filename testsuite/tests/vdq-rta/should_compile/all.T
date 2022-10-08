@@ -1,0 +1,15 @@
+setTestOpts(normalise_version('base','ghc-prim'))
+
+test('T22326_idv', normal, compile, [''])
+test('T22326_typeRep', normal, compile, [''])
+test('T22326_sizeOf', normal, compile, [''])
+test('T22326_symbolVal', normal, compile, [''])
+test('T22326_noext', extra_files(['T22326_noext_def.hs']), multimod_compile, ['T22326_noext', '-v0'])
+test('T22326_callStack', normal, compile, [''])
+test('T22326_sig', normal, compile, [''])
+test('T17792_vdq', normal, compile, [''])
+test('T14158_vdq', normal, compile, [''])
+test('WithSpineVDQ_LintErr', normal, compile, [''])
+
+test('T22326_th_dump1', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T22326_th_pprint1', req_th, compile, [''])
