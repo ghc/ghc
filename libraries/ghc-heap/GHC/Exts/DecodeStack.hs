@@ -13,16 +13,16 @@
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack where
-import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 
 #if MIN_VERSION_base(4,17,0)
+import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import Data.Maybe
 import Data.Bits
 import Foreign
 import System.IO.Unsafe
 import Prelude
 import GHC.Stack.CloneStack
-import GHC.Exts.Heap
+import GHC.Exts.Heap hiding (bitmap, size)
 import Debug.Trace
 import GHC.Exts
 import qualified GHC.Exts.Heap.Closures as CL
@@ -206,13 +206,16 @@ data StackFrame =
   deriving (Show)
 
 #if defined(DEBUG)
-foreign import ccall "belchStack" belchStack :: StackSnapshot# -> IO ()
+foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
+
+belchStack :: StackSnapshot -> IO ()
+belchStack (StackSnapshot s#) = belchStack s#
 #endif
 
 decodeStack :: StackSnapshot -> IO [StackFrame]
-decodeStack s@(StackSnapshot s#) = do
+decodeStack s = do
 #if defined(DEBUG)
-  belchStack s#
+  belchStack s
 #endif
   pure $ decodeStack' s
 
