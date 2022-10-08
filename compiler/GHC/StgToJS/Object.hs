@@ -89,7 +89,7 @@ import GHC.Types.Unique.Map
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 
 import GHC.Utils.Binary hiding (SymbolTable)
-import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text)
+import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text, hsep)
 import GHC.Utils.Monad (mapMaybeM)
 
 -- | An object file
@@ -133,6 +133,12 @@ data DepsLocation
   = ObjectFile  FilePath       -- ^ In an object file at path
   | ArchiveFile FilePath       -- ^ In a Ar file at path
   | InMemory    String Object  -- ^ In memory
+
+instance Outputable DepsLocation where
+  ppr = \case
+    ObjectFile fp  -> hsep [text "ObjectFile", text fp]
+    ArchiveFile fp -> hsep [text "ArchiveFile", text fp]
+    InMemory s o   -> hsep [text "InMemory", text s, ppr (objModuleName o)]
 
 data BlockDeps = BlockDeps
   { blockBlockDeps       :: [Int]         -- ^ dependencies on blocks in this object
