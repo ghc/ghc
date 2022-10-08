@@ -3,11 +3,18 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, StandaloneKindSignatures, PolyKinds #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 module GHC.Wasm.Tx
   ( tx
   , CG(..)
   , WasmExpr
+
+  , WasmExprs
+  , txs
+
+  , call
   )
 
 where
@@ -18,9 +25,12 @@ import Data.Type.Equality
 
 import qualified GHC.Cmm.Type as CT
 import GHC.Cmm.Expr
+import GHC.Cmm.Node
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain (assert)
 import GHC.Wasm.IR
+
+import GHC.Cmm.Dataflow.Block
 
 ----------------------------------------------------------------
 ---
@@ -210,3 +220,31 @@ withFloatWidthTag :: CT.Width -> (forall t . WasmTypeTag t -> a) -> a
 withFloatWidthTag CT.W32 k = k TagF32
 withFloatWidthTag CT.W64 k = k TagF64
 withFloatWidthTag w _ = panic $ "width " ++ show w ++ " not supported on wasm target"
+
+
+----------------------------------------------------------------
+-- new and experimental
+
+type WasmExprs bool ts = (forall stack . WasmIR bool stack (RevAppend ts stack))
+
+txs :: CG bool codegen
+       => [CmmExpr]
+       -> (forall ts . TypeList ts -> WasmExprs bool ts -> codegen bool a)
+       -> codegen bool a
+txs [] k = k TypeListNil WasmNop
+txs (e:es) k = -- first expression is oldest on stack
+  txs es $ \ts codes ->
+    tx e $ \t code ->
+      k (TypeListCons t ts) (code <> codes)
+
+type WasmAction bool = (forall stack . WasmIR bool stack stack)
+
+call :: CG bool codegen
+     => CmmNode O O
+     -> (WasmAction bool -> codegen bool a)
+     -> codegen bool a
+call (CmmUnsafeForeignCall _target [] arguments) k =
+    -- ran out of time to deal with result registers
+    txs arguments $ \ts codes ->
+      k (codes <> WasmCallNoResults ts)
+call _ _ = panic "more cases needed"

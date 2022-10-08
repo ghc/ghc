@@ -2,15 +2,19 @@
 {-# LANGUAGE DataKinds, GADTs, RankNTypes, TypeOperators, KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeFamilies, StandaloneKindSignatures, PolyKinds #-}
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE UndecidableInstances #-} -- for RevAppend
 
 module GHC.Wasm.IR
   ( WasmIR(..), (<>), pattern WasmIf32, wasmReturn
   , BrTableInterval(..), inclusiveInterval
   , brTableLimit
 
+
   , WasmType(..), WasmTypeTag(..)
   , TypeList(..)
+  , RevAppend
   , WasmFunctionType(..)
 
   , SymName(..)
@@ -129,10 +133,21 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
 
   -----
 
-  WasmCCall :: SymName -> WasmIR bool pre post -- completely untyped
+--  WasmCCall :: SymName -> WasmIR bool pre post -- completely untyped
   WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR bool (t : pre) pre
   WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR bool pre (t : pre)
   WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR bool (t : pre) pre
+
+  WasmCallNoResults :: TypeList ts -> WasmIR bool (RevAppend ts stack) stack
+
+  WasmNop :: WasmIR bool stack stack -- translation of empty list of expressions
+
+type RevAppend :: forall a. [a] -> [a] -> [a]
+type family RevAppend xs ys where
+  RevAppend '[]    ys = ys
+  RevAppend (x:xs) ys = RevAppend xs (x : ys)
+
+
 
 
 
