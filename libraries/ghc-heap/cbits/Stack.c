@@ -78,7 +78,6 @@ StgWord getSpecialRetSmall(StgPtr sp) {
   }
 }
 
-// TODO: Consider to use HSC
 StgWord getBitmapSize(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
@@ -87,7 +86,6 @@ StgWord getBitmapSize(StgClosure *c){
   return BITMAP_SIZE(bitmap);
 }
 
-// TODO: Consider to use HSC
 StgWord getBitmapWord(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
@@ -128,10 +126,6 @@ StgArrBytes* getLargeBitmaps(Capability *cap, StgClosure *c){
   }
 
   return array;
-}
-
-StgLargeBitmap* getLargeBitmapPtr(const StgInfoTable *info) {
-  return GET_LARGE_BITMAP(info);
 }
 
 #if defined(DEBUG)
