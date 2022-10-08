@@ -365,6 +365,8 @@ dsExpr (ExplicitSum types alt arity expr)
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
+dsExpr (HsEmbTy x _ _) = dataConCantHappen x
+
 dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [discrim]) matches

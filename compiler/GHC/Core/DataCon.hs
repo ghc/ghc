@@ -572,12 +572,10 @@ data DataCon
 
 
 {- Note [TyVarBinders in DataCons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For the TyVarBinders in a DataCon and PatSyn:
-
- * Each argument flag is Inferred or Specified.
-   None are Required. (A DataCon is a term-level function; see
-   Note [No Required PiTyBinder in terms] in GHC.Core.TyCo.Rep.)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For the TyVarBinders in a DataCon and PatSyn,
+each argument flag is either Inferred or Specified, never Required.
+Lifting this restriction is tracked at #18389 (DataCon) and #23704 (PatSyn).
 
 Why do we need the TyVarBinders, rather than just the TyVars?  So that
 we can construct the right type for the DataCon with its foralls

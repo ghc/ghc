@@ -1,0 +1,3 @@
+
+T22326_fail_notInScope.hs:6:5: error: [GHC-88464]
+    Variable not in scope: notInScope

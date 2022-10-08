@@ -1,0 +1,10 @@
+
+T22326_fail_caseof.hs:9:6: error: [GHC-70206]
+    • Illegal type pattern.
+      A type pattern must be checked against a visible forall.
+    • In the pattern: type _
+      In a case alternative: (type _) -> True
+      In the expression:
+        case x of
+          (type _) -> True
+          _ -> False

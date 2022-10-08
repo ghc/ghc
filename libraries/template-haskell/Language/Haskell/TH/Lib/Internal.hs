@@ -160,6 +160,9 @@ sigP :: Quote m => m Pat -> m Type -> m Pat
 sigP p t = do p' <- p
               t' <- t
               pure (SigP p' t')
+typeP :: Quote m => m Type -> m Pat
+typeP t = do t' <- t
+             pure (TypeP t')
 viewP :: Quote m => m Exp -> m Pat -> m Pat
 viewP e p = do e' <- e
                p' <- p
@@ -401,6 +404,8 @@ fromThenToE :: Quote m => m Exp -> m Exp -> m Exp -> m Exp
 fromThenToE x y z = do { a <- x; b <- y; c <- z;
                          pure (ArithSeqE (FromThenToR a b c)) }
 
+typeE :: Quote m => m Type -> m Exp
+typeE = fmap TypeE
 
 -------------------------------------------------------------------------------
 -- *   Dec

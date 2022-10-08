@@ -123,6 +123,7 @@ desugarPat x pat = case pat of
   AsPat _ (L _ y) _ p -> (mkPmLetVar y x ++) <$> desugarLPat y p
 
   SigPat _ p _ty -> desugarLPat x p
+  EmbTyPat _ _ _ -> pure []
 
   XPat ext -> case ext of
 

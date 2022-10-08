@@ -597,6 +597,11 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     -- go1: fun_ty is not filled-in instantiation variable
     --      ('go' dealt with that case)
 
+    -- Handle out-of-scope functions gracefully
+    go1 delta acc so_far fun_ty (arg : rest_args)
+      | fun_is_out_of_scope, looks_like_type_arg arg   -- See Note [VTA for out-of-scope functions]
+      = go delta acc so_far fun_ty rest_args
+
     -- Rule IALL from Fig 4 of the QL paper
     -- c.f. GHC.Tc.Utils.Instantiate.topInstantiate
     go1 delta acc so_far fun_ty args
@@ -630,6 +635,14 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                 -- Going around again means we deal easily with
                 -- nested  forall a. Eq a => forall b. Show b => blah
 
+    -- Rule ITVDQ from the GHC Proposal #281
+    go1 delta acc so_far fun_ty ((EValArg { eva_arg = ValArg arg }) : rest_args)
+      | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
+      , binderFlag tvb == Required
+      = do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
+           ; let wrap = mkWpTyApps [ty_arg]
+           ; go delta (addArgWrap wrap acc) so_far inst_body rest_args }
+
     -- Rule IRESULT from Fig 4 of the QL paper
     go1 delta acc _ fun_ty []
        = do { traceTc "tcInstFun:ret" (ppr fun_ty)
@@ -644,10 +657,6 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
     -- Rule ITYARG from Fig 4 of the QL paper
     go1 delta acc so_far fun_ty ( ETypeArg { eva_ctxt = ctxt, eva_at = at, eva_hs_ty = hs_ty }
                                 : rest_args )
-      | fun_is_out_of_scope   -- See Note [VTA for out-of-scope functions]
-      = go delta acc so_far fun_ty rest_args
-
-      | otherwise
       = do { (ty_arg, inst_ty) <- tcVTA fun_conc_tvs fun_ty hs_ty
            ; let arg' = ETypeArg { eva_ctxt = ctxt, eva_at = at, eva_hs_ty = hs_ty, eva_ty = ty_arg }
            ; go delta (arg' : acc) so_far inst_ty rest_args }
@@ -727,6 +736,31 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                        : addArgWrap wrap acc
           ; go delta' acc' (arg_ty:so_far) res_ty rest_args }
 
+-- Is the argument supposed to instantiate a forall?
+--
+-- In other words, given a function application `fn arg`,
+-- can we look at the `arg` and conclude that `fn :: forall x. t`
+-- or `fn :: forall x -> t`?
+--
+-- This is a conservative heuristic that returns `False` for "don't know".
+-- Used to improve error messages only.
+-- See Note [VTA for out-of-scope functions].
+looks_like_type_arg :: HsExprArg 'TcpRn -> Bool
+looks_like_type_arg ETypeArg{} =
+  -- The argument is clearly supposed to instantiate an invisible forall,
+  -- i.e. when we see `f @a`, we expect `f :: forall x. t`.
+  True
+looks_like_type_arg EValArg{ eva_arg = ValArg (L _ e) } =
+  -- Check if the argument is supposed to instantiate a visible forall,
+  -- i.e. when we see `f (type Int)`, we expect `f :: forall x -> t`,
+  --      but not if we see `f True`.
+  -- We can't say for sure though. Part 2 of GHC Proposal #281 allows
+  -- type arguments without the `type` qualifier, so `f True` could
+  -- instantiate `forall (b :: Bool) -> t`.
+  case stripParensHsExpr e of
+    HsEmbTy _ _ _ -> True
+    _             -> False
+looks_like_type_arg _ = False
 
 addArgCtxt :: AppCtxt -> LHsExpr GhcRn
            -> TcM a -> TcM a
@@ -757,6 +791,7 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
 *                                                                      *
 ********************************************************************* -}
 
+-- See Note [Visible type application and abstraction]
 tcVTA :: ConcreteTyVars
          -- ^ Type variables that must be instantiated to concrete types.
          --
@@ -770,9 +805,28 @@ tcVTA :: ConcreteTyVars
 tcVTA conc_tvs fun_ty hs_ty
   | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , binderFlag tvb == Specified
-    -- It really can't be Inferred, because we've just
-    -- instantiated those. But, oddly, it might just be Required.
-    -- See Note [Required quantifiers in the type of a term]
+  = do { tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
+
+  | otherwise
+  = do { (_, fun_ty) <- liftZonkM $ zonkTidyTcType emptyTidyEnv fun_ty
+       ; failWith $ TcRnInvalidTypeApplication fun_ty hs_ty }
+
+-- See Note [Visible type application and abstraction]
+tcVDQ :: ConcreteTyVars              -- See Note [Representation-polymorphism checking built-ins]
+      -> (ForAllTyBinder, TcType)    -- Function type
+      -> LHsExpr GhcRn               -- Argument type
+      -> TcM (TcType, TcType)
+tcVDQ conc_tvs (tvb, inner_ty) arg
+  = do { hs_ty <- case stripParensLHsExpr arg of
+           L _ (HsEmbTy _ _ hs_ty) -> return hs_ty
+           e -> failWith $ TcRnIllformedTypeArgument e
+       ; tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
+
+tc_inst_forall_arg :: ConcreteTyVars            -- See Note [Representation-polymorphism checking built-ins]
+                   -> (ForAllTyBinder, TcType)  -- Function type
+                   -> LHsWcType GhcRn           -- Argument type
+                   -> TcM (TcType, TcType)
+tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
   = do { let tv   = binderVar tvb
              kind = tyVarKind tv
              tv_nm   = tyVarName tv
@@ -805,40 +859,260 @@ tcVTA conc_tvs fun_ty hs_ty
        ; inner_ty <- liftZonkM $ zonkTcType inner_ty
              -- See Note [Visible type application zonk]
 
-       ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
+       ; let fun_ty    = mkForAllTy tvb inner_ty
+             in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
                          --     substitution is kind-respecting
-       ; traceTc "VTA" (vcat [ text "fun_ty" <+> ppr fun_ty
-                             , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
-                             , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
-                                             <+> debugPprType (typeKind ty_arg)
-                             , text "inner_ty" <+> debugPprType inner_ty
-                             , text "insted_ty" <+> debugPprType insted_ty ])
+
+       ; traceTc "tc_inst_forall_arg (VTA/VDQ)" (
+                  vcat [ text "fun_ty" <+> ppr fun_ty
+                       , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
+                       , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
+                                       <+> debugPprType (typeKind ty_arg)
+                       , text "inner_ty" <+> debugPprType inner_ty
+                       , text "insted_ty" <+> debugPprType insted_ty ])
        ; return (ty_arg, insted_ty) }
 
-  | otherwise
-  = do { (_, fun_ty) <- liftZonkM $ zonkTidyTcType emptyTidyEnv fun_ty
-       ; failWith $ TcRnInvalidTypeApplication fun_ty hs_ty }
+{- Note [Visible type application and abstraction]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC supports the types
+    forall {a}.  a -> t     -- ForAllTyFlag is Inferred
+    forall  a.   a -> t     -- ForAllTyFlag is Specified
+    forall  a -> a -> t     -- ForAllTyFlag is Required
 
-{- Note [Required quantifiers in the type of a term]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#15859)
+The design of type abstraction and type application for those types has gradually
+evolved over time, and is based on the following papers and proposals:
+  - "Visible Type Application"
+    https://richarde.dev/papers/2016/type-app/visible-type-app.pdf
+  - "Type Variables in Patterns"
+    https://richarde.dev/papers/2018/pat-tyvars/pat-tyvars.pdf
+  - "Modern Scoped Type Variables"
+    https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0448-type-variable-scoping.rst
+  - "Visible forall in types of terms"
+    https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst
 
-  data A k :: k -> Type      -- A      :: forall k -> k -> Type
-  type KindOf (a :: k) = k   -- KindOf :: forall k. k -> Type
-  a = (undefined :: KindOf A) @Int
+Here we offer an overview of the design mixed with commentary on the
+implementation status. The proposals have not been fully implemented at the
+time of writing this Note (see "not implemented" in the rest of this Note).
 
-With ImpredicativeTypes (thin ice, I know), we instantiate
-KindOf at type (forall k -> k -> Type), so
-  KindOf A = forall k -> k -> Type
-whose first argument is Required
+Now consider functions
+    fi :: forall {a}. a -> t     -- Inferred:  type argument cannot be supplied
+    fs :: forall a. a -> t       -- Specified: type argument may    be supplied
+    fr :: forall a -> a -> t     -- Required:  type argument must   be supplied
 
-We want to reject this type application to Int, but in earlier
-GHCs we had an ASSERT that Required could not occur here.
+At a call site we may have calls looking like this
+    fi             True  -- Inferred: no visible type argument
+    fs             True  -- Specified: type argument omitted
+    fs      @Bool  True  -- Specified: type argument supplied
+    fr (type Bool) True  -- Required: type argument is compulsory, `type` qualifier used
+    fr       Bool  True  -- Required: type argument is compulsory, `type` qualifier omitted (NB: not implemented)
 
-The ice is thin; c.f. Note [No Required PiTyBinder in terms]
-in GHC.Core.TyCo.Rep.
+At definition sites we may have type /patterns/ to abstract over type variables
+   fi           x       = rhs   -- Inferred: no type pattern
+   fs           x       = rhs   -- Specified: type pattern omitted
+   fs @a       (x :: a) = rhs   -- Specified: type pattern supplied (NB: not implemented)
+   fr (type a) (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier used
+   fr a        (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier omitted (NB: not implemented)
+
+Type patterns in lambdas work the same way as they do in a function LHS
+   fs = \           x       -> rhs   -- Specified: type pattern omitted
+   fs = \ @a       (x :: a) -> rhs   -- Specified: type pattern supplied (NB: not implemented)
+   fr = \ (type a) (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier used
+   fr = \ a        (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier omitted (NB: not implemented)
+
+Type patterns may also occur in a constructor pattern. Consider the following data declaration
+   data T where
+     MkTI :: forall {a}. Show a => a -> T   -- Inferred
+     MkTS :: forall a.   Show a => a -> T   -- Specified
+     MkTR :: forall a -> Show a => a -> T   -- Required  (NB: not implemented)
+
+Matching on its constructors may look like this
+   f (MkTI           x)       = rhs  -- Inferred: no type pattern
+   f (MkTS           x)       = rhs  -- Specified: type pattern omitted
+   f (MkTS @a       (x :: a)) = rhs  -- Specified: type pattern supplied
+   f (MkTR (type a) (x :: a)) = rhs  -- Required: type pattern is compulsory, `type` qualifier used    (NB: not implemented)
+   f (MkTR a        (x :: a)) = rhs  -- Required: type pattern is compulsory, `type` qualifier omitted (NB: not implemented)
+
+The moving parts are as follows:
+  (abbreviations used: "c.o." = "constructor of")
+
+Syntax of types
+---------------
+* The types are all initially represented with HsForAllTy (c.o. HsType).
+  The binders are in the (hst_tele :: HsForAllTelescope pass) field of the HsForAllTy
+  At this stage, we have
+      forall {a}. t    -- HsForAllInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
+      forall a. t      -- HsForAllInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
+      forall a -> t    -- HsForAllVis (c.o. HsForAllTelescope)
+
+* By the time we get to checking applications/abstractions (e.g. GHC.Tc.Gen.App)
+  the types have been kind-checked (e.g. by tcLHsType) into ForAllTy (c.o. Type).
+  At this stage, we have:
+      forall {a}. t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
+      forall a. t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
+      forall a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
+
+Syntax of applications in HsExpr
+--------------------------------
+* We represent type applications in HsExpr like this (ignoring parameterisation)
+    data HsExpr = HsApp HsExpr HsExpr      -- (f True)    (plain function application)
+                | HsAppType HsExpr HsType  -- (f @True)   (function application with `@`)
+                | HsEmbTy HsType           -- (type Int)  (embed a type into an expression with `type`)
+                | ...
+
+* So (f @ty) is represented, just as you might expect:
+    HsAppType f ty
+
+* But (f (type ty)) is represented by:
+    HsApp f (HsEmbTy ty)
+
+  Why the difference?  Because we /also/ need to express these /nested/ uses of `type`:
+
+      g (Maybe (type Int))               -- valid for g :: forall (a :: Type) -> t     (NB. not implemented)
+      g (Either (type Int) (type Bool))  -- valid for g :: forall (a :: Type) -> t     (NB. not implemented)
+
+  This nesting makes `type` rather different from `@`. Remember, the HsEmbTy mainly just
+  switches namespace, and is subject to the term-to-type transformation.
+
+Syntax of abstractions in Pat
+-----------------------------
+* Type patterns are represented in Pat roughly like this
+     data Pat = ConPat   ConLike [HsTyPat] [Pat]  -- (Con @tp1 @tp2 p1 p2)  (constructor pattern)
+              | EmbTyPat HsTyPat                  -- (type tp)              (embed a type into a pattern with `type`)
+              | ...
+     data HsTyPat = HsTP LHsType
+  (In ConPat, the type and term arguments are actually inside HsConPatDetails.)
+
+  * Similar to HsAppType in HsExpr, the [HsTyPat] in ConPat is used just for @ty arguments
+  * Similar to HsEmbTy   in HsExpr, EmbTyPat lets you embed a type in a pattern
+
+* Examples:
+      \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and HsConPatTyArg (c.o. HsConPatTyArg)
+      \ (type a) (x :: a)  -> rhs    -- EmbTyPat (c.o. Pat)
+      \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)   (NB. not implemented)
+      \ @a       (x :: a)  -> rhs    -- to be decided       (NB. not implemented)
+
+* A HsTyPat is not necessarily a plain variable. At the very least,
+  we support kind signatures and wildcards:
+      \ (type _)           -> rhs
+      \ (type (b :: Bool)) -> rhs
+      \ (type (_ :: Bool)) -> rhs
+  But in constructor patterns we also support full-on types
+      \ (P @(a -> Either b c)) -> rhs
+  All these forms are represented with HsTP (c.o. HsTyPat).
+
+Renaming type applications
+--------------------------
+rnExpr delegates renaming of type arguments to rnHsWcType if possible:
+    f @t        -- HsAppType,         t is renamed with rnHsWcType
+    f (type t)  -- HsApp and HsEmbTy, t is renamed with rnHsWcType
+
+But what about:
+    f t         -- HsApp, no HsEmbTy      (NB. not implemented)
+We simply rename `t` as a term using a recursive call to rnExpr; in particular,
+the type of `f` does not affect name resolution (Lexical Scoping Principle).
+We will later convert `t` from a `HsExpr` to a `Type`, see "Typechecking type
+applications" later in this Note. The details are spelled out in the "Resolved
+Syntax Tree" and "T2T-Mapping" sections of GHC Proposal #281.
+
+Renaming type abstractions
+--------------------------
+rnPat delegates renaming of type arguments to rnHsTyPat if possible:
+  f (P @t)   = rhs  -- ConPat,   t is renamed with rnHsTyPat
+  f (type t) = rhs  -- EmbTyPat, t is renamed with rnHsTyPat
+
+But what about:
+  f t = rhs   -- VarPat
+The solution is as before (see previous section), mutatis mutandis.
+Rename `t` as a pattern using a recursive call to `rnPat`, convert it
+to a type pattern later.
+
+One particularly prickly issue is that of implicit quantification. Consider:
+
+  f :: forall a -> ...
+  f t = ...   -- binding site of `t`
+    where
+      g :: t -> t   -- use site of `t` or a fresh variable?
+      g = ...
+
+Does the signature of `g` refer to `t` bound in `f`, or is it a fresh,
+implicitly quantified variable? This is normally controlled by
+ScopedTypeVariables, but in this example the renamer can't tell `t` from a term
+variable.  Only later (in the type checker) will we find out that it stands for
+the forall-bound type variable `a`.  So when RequiredTypeArguments is in effect,
+we change implicit quantification to take term variables into account; that is,
+we do not implicitly quantify the signature of `g` to `g :: forall t. t->t`
+because of the term-level `t` that is in scope. (NB. not implemented)
+See Note [Term variable capture and implicit quantification].
+
+Typechecking type applications
+------------------------------
+Type applications are checked alongside ordinary function applications
+in tcInstFun.
+
+First of all, we assume that the function type is known (i.e. not a metavariable)
+and contains a `forall`. Consider:
+  f :: forall a. a -> a
+  f x = const x (f @Int 5)
+If the type signature is removed, the definition results in an error:
+  Cannot apply expression of type ‘t1’
+  to a visible type argument ‘Int’
+
+The same principle applies to required type arguments:
+  f :: forall a -> a -> a
+  f (type a) x = const x (f (type Int) 5)
+If the type signature is removed, the error is:
+  Illegal type pattern.
+  A type pattern must be checked against a visible forall.
+
+When the type of the function is known and contains a `forall`, all we need to
+do is instantiate the forall-bound variable with the supplied type argument.
+This is done by tcVTA (if Specified) and tcVDQ (if Required).
+
+tcVDQ unwraps the HsEmbTy and uses the type contained within it.  Crucially, in
+tcVDQ we know that we are expecting a type argument.  This means that we can
+support
+    f (Maybe Int)   -- HsApp, no HsEmbTy      (NB. not implemented)
+The type argument (Maybe Int) is represented as an HsExpr, but tcVDQ can easily
+convert it to HsType.  This conversion is called the "T2T-Mapping" in GHC
+Proposal #281.
+
+Typechecking type abstractions
+------------------------------
+Type abstractions are checked alongside ordinary patterns in GHC.Tc.Gen.Pat.tcPats.
+One of its inputs is a list of ExpPatType that has two constructors
+  * ExpFunPatTy    ...   -- the type A of a function A -> B
+  * ExpForAllPatTy ...   -- the binder (a::A) of forall (a::A) -> B
+so when we are checking
+  f :: forall a b -> a -> b -> ...
+  f (type a) (type b) (x :: a) (y :: b) = ...
+our expected pattern types are
+  [ ExpForAllPatTy ...      -- forall a ->
+  , ExpForAllPatTy ...      -- forall b ->
+  , ExpFunPatTy    ...      -- a ->
+  , ExpFunPatTy    ...      -- b ->
+  ]
+
+The [ExpPatType] is initially constructed by GHC.Tc.Utils.Unify.matchExpectedFunTys,
+by decomposing the type signature for `f` in our example.  If we are given a
+definition
+   g (type a) = ...
+we never /infer/ a type g :: forall a -> blah.  We can only /check/
+explicit type abstractions in terms.
+
+The [ExpPatType] allows us to use different code paths for type abstractions
+and ordinary patterns:
+  * tc_pat :: Scaled ExpSigmaTypeFRR -> Checker (Pat GhcRn) (Pat GhcTc)
+  * tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
+
+tc_forall_pat unwraps the EmbTyPat and uses the type pattern contained
+within it. This is another spot where the "T2T-Mapping" can take place.
+This would allow us to support
+  f a (x :: a) = rhs    -- no EmbTyPat    (NB. not implemented)
+
+Type patterns in constructor patterns are handled in with tcConTyArg.
+Both tc_forall_pat and tcConTyArg delegate most of the work to tcHsTyPat.
 
 Note [VTA for out-of-scope functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -861,13 +1135,18 @@ give its type.
 
 Fortunately in tcInstFun we still have access to the function, so we
 can check if it is a HsUnboundVar.  We use this info to simply skip
-over any visible type arguments.  We've already inferred the type of
-the function (in tcInferAppHead), so we'll /already/ have emitted a
+over any visible type arguments.  We'll /already/ have emitted a
 Hole constraint; failing preserves that constraint.
 
 We do /not/ want to fail altogether in this case (via failM) because
 that may abandon an entire instance decl, which (in the presence of
 -fdefer-type-errors) leads to leading to #17792.
+
+What about required type arguments?  Suppose we see
+    f (type Int)
+where `f` is out of scope.  Then again we don't want to crash because f's
+type (which will be just a fresh unification variable) isn't a visible forall.
+Instead we just skip the `(type Int)` argument, as before.
 
 Downside: the typechecked term has lost its visible type arguments; we
 don't even kind-check them.  But let's jump that bridge if we come to

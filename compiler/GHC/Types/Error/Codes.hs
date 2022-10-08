@@ -624,6 +624,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "HasConstructorContext"                         = 17440
   GhcDiagnosticCode "HasExistentialTyVar"                           = 07525
   GhcDiagnosticCode "HasStrictnessAnnotation"                       = 04049
+  GhcDiagnosticCode "TcRnIllformedTypePattern"                      = 88754
+  GhcDiagnosticCode "TcRnIllegalTypePattern"                        = 70206
+  GhcDiagnosticCode "TcRnIllformedTypeArgument"                     = 29092
+  GhcDiagnosticCode "TcRnIllegalTypeExpr"                           = 35499
 
   -- TcRnBadRecordUpdate
   GhcDiagnosticCode "NoConstructorHasAllFields"                     = 14392

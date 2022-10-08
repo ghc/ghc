@@ -80,6 +80,7 @@ import GHC.Types.SrcLoc
 import Control.Monad
 import Control.Arrow ( second )
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (mapMaybe)
 
 {-
 ************************************************************************
@@ -106,7 +107,7 @@ tcMatchesFun fun_name matches exp_ty
            -- sensible location.        Note: we have to do this odd
            -- ann-grabbing, because we don't always have annotations in
            -- hand when we call tcMatchesFun...
-          traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
+          traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty $$ ppr arity)
         ; checkArgCounts what matches
 
         ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
@@ -139,7 +140,7 @@ tcMatchesFun fun_name matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (AnnoBody body) =>
+tcMatchesCase :: (AnnoBody body, Outputable (body GhcTc)) =>
                 TcMatchCtxt body      -- ^ Case context
              -> Scaled TcSigmaTypeFRR -- ^ Type of scrutinee
              -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
@@ -149,7 +150,7 @@ tcMatchesCase :: (AnnoBody body) =>
                 -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt (Scaled scrut_mult scrut_ty) matches res_ty
-  = tcMatches ctxt [Scaled scrut_mult (mkCheckExpType scrut_ty)] res_ty matches
+  = tcMatches ctxt [ExpFunPatTy (Scaled scrut_mult (mkCheckExpType scrut_ty))] res_ty matches
 
 tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify
               -> TcMatchCtxt HsExpr
@@ -209,8 +210,9 @@ type AnnoBody body
     )
 
 -- | Type-check a MatchGroup.
-tcMatches :: (AnnoBody body ) => TcMatchCtxt body
-          -> [Scaled ExpSigmaTypeFRR] -- ^ Expected pattern types.
+tcMatches :: (AnnoBody body, Outputable (body GhcTc)) =>
+             TcMatchCtxt body
+          -> [ExpPatType]             -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
           -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -222,7 +224,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
     -- when in inference mode, so we must do it ourselves,
     -- here, using expTypeToType
   = do { tcEmitBindingUsage bottomUE
-       ; pat_tys <- mapM scaledExpTypeToType pat_tys
+       ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty  <- expTypeToType rhs_ty
        ; return (MG { mg_alts = L l []
                     , mg_ext = MatchGroupTc pat_tys rhs_ty origin
@@ -232,15 +234,23 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
-       ; pat_tys  <- mapM readScaledExpType pat_tys
+       ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty   <- readExpType rhs_ty
+       ; traceTc "tcMatches" (ppr matches' $$ ppr pat_tys $$ ppr rhs_ty)
        ; return (MG { mg_alts   = L l matches'
                     , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
                     }) }
+  where
+    -- We filter out foralls because we have no use for them in HsToCore.
+    filter_out_forall_pat_tys :: [ExpPatType] -> [Scaled ExpSigmaTypeFRR]
+    filter_out_forall_pat_tys = mapMaybe match_fun_pat_ty
+      where
+        match_fun_pat_ty (ExpFunPatTy t)  = Just t
+        match_fun_pat_ty ExpForAllPatTy{} = Nothing
 
 -------------
 tcMatch :: (AnnoBody body) => TcMatchCtxt body
-        -> [Scaled ExpSigmaType]        -- Expected pattern types
+        -> [ExpPatType]          -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
         -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
@@ -254,7 +264,8 @@ tcMatch ctxt pat_tys rhs_ty match
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noAnn
-                           , m_ctxt = mc_what ctxt, m_pats = pats'
+                           , m_ctxt = mc_what ctxt
+                           , m_pats = filter_out_type_pats pats'
                            , m_grhss = grhss' }) }
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
@@ -263,6 +274,14 @@ tcMatch ctxt pat_tys rhs_ty match
         = case mc_what ctxt of
             LambdaExpr -> thing_inside
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
+
+    -- We filter out type patterns because we have no use for them in HsToCore.
+    -- Type variable bindings have already been converted to HsWrappers.
+    filter_out_type_pats :: [LPat GhcTc] -> [LPat GhcTc]
+    filter_out_type_pats = filterByList (map is_fun_pat_ty pat_tys)
+      where
+        is_fun_pat_ty ExpFunPatTy{}    = True
+        is_fun_pat_ty ExpForAllPatTy{} = False
 
 -------------
 tcGRHSs :: AnnoBody body

@@ -2656,6 +2656,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsProc an _ _)              = fromAnn an
   getAnnotationEntry (HsStatic an _)              = fromAnn an
   getAnnotationEntry (HsPragE{})                  = NoEntryVal
+  getAnnotationEntry (HsEmbTy{})                  = NoEntryVal
 
   setAnnotationAnchor a@(HsVar{})              _ _s = a
   setAnnotationAnchor (HsUnboundVar an a)    anc cs = (HsUnboundVar (setAnchorEpa an anc cs) a)
@@ -2694,6 +2695,7 @@ instance ExactPrint (HsExpr GhcPs) where
   setAnnotationAnchor (HsProc an a b)         anc cs = (HsProc (setAnchorEpa an anc cs) a b)
   setAnnotationAnchor (HsStatic an a)         anc cs = (HsStatic (setAnchorEpa an anc cs) a)
   setAnnotationAnchor a@(HsPragE{})            _ _s = a
+  setAnnotationAnchor a@(HsEmbTy{})            _ _s = a
 
   exact (HsVar x n) = do
     n' <- markAnnotated n
@@ -4559,6 +4561,7 @@ instance ExactPrint (Pat GhcPs) where
   getAnnotationEntry (NPat an _ _ _)          = fromAnn an
   getAnnotationEntry (NPlusKPat an _ _ _ _ _) = fromAnn an
   getAnnotationEntry (SigPat an _ _)          = fromAnn an
+  getAnnotationEntry (EmbTyPat _ _ _)         = NoEntryVal
 
   setAnnotationAnchor a@(WildPat _)              _ _s = a
   setAnnotationAnchor a@(VarPat _ _)             _ _s = a
@@ -4576,6 +4579,7 @@ instance ExactPrint (Pat GhcPs) where
   setAnnotationAnchor (NPat an a b c)          anc cs = (NPat (setAnchorEpa an anc cs) a b c)
   setAnnotationAnchor (NPlusKPat an a b c d e) anc cs = (NPlusKPat (setAnchorEpa an anc cs) a b c d e)
   setAnnotationAnchor (SigPat an a b)          anc cs = (SigPat (setAnchorEpa an anc cs) a b)
+  setAnnotationAnchor a@(EmbTyPat _ _ _)          _ _s = a
 
   exact (WildPat w) = do
     anchor <- getAnchorU
@@ -4664,6 +4668,11 @@ instance ExactPrint (Pat GhcPs) where
     an0 <- markEpAnnL an lidl AnnDcolon
     sig' <- markAnnotated sig
     return (SigPat an0 pat' sig')
+
+  exact (EmbTyPat x toktype tp) = do
+    toktype' <- markToken toktype
+    tp' <- markAnnotated tp
+    return (EmbTyPat x toktype' tp')
 
 -- ---------------------------------------------------------------------
 

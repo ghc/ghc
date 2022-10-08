@@ -633,6 +633,10 @@ rnPatAndThen mk (SplicePat _ splice)
            (rn_splice, HsUntypedSpliceNested splice_name) -> return (SplicePat (HsUntypedSpliceNested splice_name) rn_splice) -- Splice was nested and thus already renamed
        }
 
+rnPatAndThen _ (EmbTyPat _ toktype tp)
+  = do { tp' <- rnHsTyPat HsTypePatCtx tp
+       ; return (EmbTyPat noExtField toktype tp') }
+
 --------------------
 rnConPatAndThen :: NameMaker
                 -> LocatedN RdrName    -- the constructor

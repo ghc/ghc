@@ -1073,6 +1073,10 @@ tcPatToExpr args pat = go pat
         | otherwise                 = return $ HsOverLit noAnn n
     go1 (SplicePat (HsUntypedSpliceTop _ pat) _) = go1 pat
     go1 (SplicePat (HsUntypedSpliceNested _) _)  = panic "tcPatToExpr: invalid nested splice"
+    go1 (EmbTyPat _ toktype tp) = return $ HsEmbTy noExtField toktype (hstp_to_hswc tp)
+      where hstp_to_hswc :: HsTyPat GhcRn -> LHsWcType GhcRn
+            hstp_to_hswc (HsTP { hstp_ext = HsTPRn { hstp_nwcs = wcs }, hstp_body = hs_ty })
+                        = HsWC { hswc_ext = wcs, hswc_body = hs_ty }
     go1 (XPat (HsPatExpanded _ pat))= go1 pat
 
     -- See Note [Invertible view patterns]

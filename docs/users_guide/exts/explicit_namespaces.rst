@@ -11,7 +11,7 @@ Explicit namespaces in import/export
     :implied by: :extension:`TypeOperators`, :extension:`TypeFamilies`
     :since: 7.6.1
 
-    Enable use of explicit namespaces in module export lists.
+    Enable use of explicit namespaces in module export lists, patterns, and expressions.
 
 In an import or export list, such as ::
 
@@ -41,3 +41,11 @@ In addition, with :extension:`PatternSynonyms` you can prefix the name of a
 data constructor in an import or export list with the keyword
 ``pattern``, to allow the import or export of a data constructor without
 its parent type constructor (see :ref:`patsyn-impexp`).
+
+Furthermore, :extension:`ExplicitNamespaces` permits the use of the ``type``
+keyword in patterns and expressions::
+
+  f (type t) x = ...       -- in a pattern
+  r = f (type Integer) 10  -- in an expression
+
+This is used in conjunction with :extension:`RequiredTypeArguments`.

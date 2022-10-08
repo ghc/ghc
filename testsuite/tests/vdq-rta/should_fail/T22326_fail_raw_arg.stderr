@@ -1,0 +1,6 @@
+
+T22326_fail_raw_arg.hs:9:5: error: [GHC-29092]
+    • Ill-formed type argument: \ _ -> _
+      Expected a type expression introduced with the ‘type’ keyword.
+    • In the expression: f (\ _ -> _)
+      In an equation for ‘x’: x = f (\ _ -> _)

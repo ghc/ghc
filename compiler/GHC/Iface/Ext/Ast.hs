@@ -1027,6 +1027,9 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
                            sig
             HieRn -> pure []
         ]
+      EmbTyPat _ _ tp ->
+        [ toHie $ TS (ResolvedScopes [scope, pscope]) tp
+        ]
       XPat e ->
         case hiePass @p of
           HieRn -> case e of
@@ -1198,6 +1201,9 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsStatic _ expr ->
         [ toHie expr
+        ]
+      HsEmbTy _ _ ty ->
+        [ toHie $ TS (ResolvedScopes []) ty
         ]
       HsTypedBracket xbracket b -> case hiePass @p of
         HieRn ->

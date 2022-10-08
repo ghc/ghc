@@ -63,6 +63,7 @@ hsPatType (ConPat { pat_con = lcon
 hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
+hsPatType (EmbTyPat ty _ _)             = typeKind ty
 hsPatType (XPat ext) =
   case ext of
     CoPat _ _ ty       -> ty
@@ -142,6 +143,7 @@ hsExprType (HsUntypedSplice ext _) = dataConCantHappen ext
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e
+hsExprType (HsEmbTy x _ _) = dataConCantHappen x
 hsExprType (XExpr (WrapExpr (HsWrap wrap e))) = hsWrapperType wrap $ hsExprType e
 hsExprType (XExpr (ExpansionExpr (HsExpanded _ tc_e))) = hsExprType tc_e
 hsExprType (XExpr (ConLikeTc con _ _)) = conLikeType con

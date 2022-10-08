@@ -6,6 +6,18 @@ Version 9.10.1
 Language
 ~~~~~~~~
 
+- Part 1 of GHC Proposal `#281
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_
+  "Visible forall in types of terms" has been implemented.
+  The following code is now accepted by GHC::
+
+    idv :: forall a -> a -> a
+    idv (type a) (x :: a) = x
+
+    x = idv (type Int) 42
+
+  This feature is guarded behind :extension:`RequiredTypeArguments` and :extension:`ExplicitNamespaces`.
+
 Compiler
 ~~~~~~~~
 
@@ -29,6 +41,10 @@ Runtime system
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Extend ``Pat`` with ``TypeP`` and ``Exp`` with ``TypeE``,
+  introduce functions ``typeP`` and ``typeE`` (Template Haskell support for GHC Proposal `#281
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`_).
 
 Included libraries
 ~~~~~~~~~~~~~~~~~~

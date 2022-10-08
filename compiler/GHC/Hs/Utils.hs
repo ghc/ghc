@@ -1233,11 +1233,15 @@ collect_pat flag pat bndrs = case pat of
   NPat {}               -> bndrs
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
   SigPat _ pat sig      -> case flag of
-    CollVarTyVarBinders -> collect_lpat flag pat bndrs
-                            ++ collectPatSigBndrs sig
-    _                   -> collect_lpat flag pat bndrs
+    CollNoDictBinders   -> collect_lpat flag pat bndrs
+    CollWithDictBinders -> collect_lpat flag pat bndrs
+    CollVarTyVarBinders -> collect_lpat flag pat bndrs ++ collectPatSigBndrs sig
   XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
+  EmbTyPat _ _ tp       -> case flag of
+    CollNoDictBinders   -> bndrs
+    CollWithDictBinders -> bndrs
+    CollVarTyVarBinders -> collectTyPatBndrs tp ++ bndrs
   -- See Note [Dictionary binders in ConPatOut]
   ConPat {pat_args=ps}  -> case flag of
     CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
