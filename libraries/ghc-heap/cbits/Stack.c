@@ -13,7 +13,7 @@ StgWord stackFrameSize(StgStack* stack, StgWord index){
 }
 
 StgStack* getUnderflowFrameStack(StgStack* stack, StgWord index){
-  StgClosure* frame = stack->sp + index;
+  StgClosure* frame = (StgClosure *) stack->sp + index;
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(frame));
   const StgRetInfoTable *info  = get_ret_itbl((StgClosure *)frame);
 
@@ -82,7 +82,7 @@ StgWord getSpecialRetSmall(StgPtr sp) {
 StgWord getBitmapSize(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  StgInfoTable* info = get_itbl(c);
+  const StgInfoTable* info = get_itbl(c);
   StgWord bitmap = info->layout.bitmap;
   return BITMAP_SIZE(bitmap);
 }
@@ -91,18 +91,18 @@ StgWord getBitmapSize(StgClosure *c){
 StgWord getBitmapWord(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  StgInfoTable* info = get_itbl(c);
+  const StgInfoTable* info = get_itbl(c);
   StgWord bitmap = info->layout.bitmap;
-  debugBelch("getBitmapWord - bitmap : %lu \n", bitmap);
+  // debugBelch("getBitmapWord - bitmap : %lu \n", bitmap);
   StgWord bitmapWord = BITMAP_BITS(bitmap);
-  debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
+  // debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
   return bitmapWord;
 }
 
 StgWord getLargeBitmapSize(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  StgInfoTable* info = get_itbl(c);
+  const StgInfoTable* info = get_itbl(c);
   StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
   return bitmap->size;
 }
@@ -116,10 +116,10 @@ StgWord getLargeBitmapSize(StgClosure *c){
 StgArrBytes* getLargeBitmaps(Capability *cap, StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  StgInfoTable* info = get_itbl(c);
+  const StgInfoTable* info = get_itbl(c);
   StgLargeBitmap* bitmap = GET_LARGE_BITMAP(info);
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
-  StgArrBytes* array = allocate(cap, sizeofW(StgArrBytes) + neededWords);
+  StgArrBytes* array = (StgArrBytes *) allocate(cap, sizeofW(StgArrBytes) + neededWords);
   SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
   array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 

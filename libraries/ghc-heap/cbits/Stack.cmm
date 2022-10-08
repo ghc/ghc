@@ -55,7 +55,7 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
   }
 
-  ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
+  // ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
   return (newStack, newIndex, hasNext);
 }
 
@@ -74,7 +74,7 @@ getInfoTableTypezh (P_ stack, W_ index) {
 
     W_ type;
     type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
-    ccall debugBelch("getInfoTableTypezh - stack %p , index %ul, closure ptr p %p, info ptr %p, itbl type %ul\n", stack, index, p, info, type);
+    // ccall debugBelch("getInfoTableTypezh - stack %p , index %ul, closure ptr p %p, info ptr %p, itbl type %ul\n", stack, index, p, info, type);
     return (type);
 }
 
@@ -87,7 +87,7 @@ getSmallBitmapzh(P_ stack, W_ index) {
   (bitmap) = ccall getBitmapWord(c);
   (size) = ccall getBitmapSize(c);
 
-  ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
+  // ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
   return (bitmap, size);
 }
 
@@ -107,7 +107,7 @@ getLargeBitmapzh(P_ stack, W_ index){
   (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
   (size) = ccall getLargeBitmapSize(c);
 
-  ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
+  // ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
 
   return (stgArrBytes, size);
 }
