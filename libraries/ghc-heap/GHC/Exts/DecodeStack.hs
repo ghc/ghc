@@ -57,7 +57,7 @@ foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> 
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
-foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
+foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word#, Word# #)
 
 data BitmapEntry = BitmapEntry {
     closureFrame :: StackFrameIter,
@@ -110,11 +110,12 @@ unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter (StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
      RET_BCO -> RetBCO
-     RET_SMALL -> let !(# bitmap#, size# #) = getSmallBitmap# s# i#
+     RET_SMALL -> let !(# bitmap#, size#, special# #) = getSmallBitmap# s# i#
                       bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #))(W# bitmap#) (W# size#)
                       payloads = map toBitmapPayload bes
+                      special = (toEnum . fromInteger . toInteger) (W# special#)
                   in
-                    RetSmall None payloads
+                    RetSmall special payloads
      RET_BIG -> let !(# bitmapArray#, size# #) = getLargeBitmap# s# i#
                     bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
                     bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
@@ -167,6 +168,7 @@ instance Show BitmapPayload where
 
 -- TODO There are likely more. See MiscClosures.h
 data SpecialRetSmall =
+  -- TODO: Shoudn't `None` be better `Maybe ...`
   None |
   ApV |
   ApF |

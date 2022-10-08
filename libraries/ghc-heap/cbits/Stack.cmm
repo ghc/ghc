@@ -83,12 +83,13 @@ getSmallBitmapzh(P_ stack, W_ index) {
   c = StgStack_sp(stack) + WDS(index);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  W_ bitmap, size;
+  W_ bitmap, size, specialType;
   (bitmap) = ccall getBitmapWord(c);
   (size) = ccall getBitmapSize(c);
+  (specialType) = ccall getSpecialRetSmall(c);
 
   // ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
-  return (bitmap, size);
+  return (bitmap, size, specialType);
 }
 
 unpackClosureFromStackFramezh(P_ stack, W_ index){

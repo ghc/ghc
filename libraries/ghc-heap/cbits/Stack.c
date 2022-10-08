@@ -31,8 +31,9 @@ const StgInfoTable *getItbl(StgClosure *closure) {
   return get_itbl(closure);
 };
 
-StgWord getSpecialRetSmall(StgPtr sp) {
-  StgWord c = *sp;
+StgWord getSpecialRetSmall(StgClosure *closure) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
+  StgWord c = *(StgWord*)closure;
   if (c == (StgWord)&stg_ap_v_info) {
     return 1;
   } else if (c == (StgWord)&stg_ap_f_info) {
