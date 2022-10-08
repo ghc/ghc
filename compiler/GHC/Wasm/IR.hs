@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds, GADTs, RankNTypes, TypeOperators, KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -5,16 +6,18 @@
 {-# LANGUAGE TypeFamilies, StandaloneKindSignatures, PolyKinds #-}
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- for RevAppend
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 module GHC.Wasm.IR
   ( WasmIR(..), (<>), pattern WasmIf32, wasmReturn
   , BrTableInterval(..), inclusiveInterval
   , brTableLimit
+  , WasmLocal(..)
 
 
   , WasmType(..), WasmTypeTag(..)
   , TypeList(..)
-  , RevAppend
+  , RevAppend, Reverse
   , WasmFunctionType(..)
 
   , SymName(..)
@@ -24,6 +27,7 @@ where
 import GHC.Prelude
 
 import Data.Kind
+import Data.String
 import Data.Type.Equality
 
 
@@ -88,6 +92,9 @@ data WasmFunctionType pre post =
 -- WebAssembly stack when the code runs, and `post` represents
 -- the state of the stack on completion.
 
+newtype WasmLocal = WasmLocal Int
+
+
 data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
 
   WasmPush  :: WasmTypeTag t -> WasmIR bool stack (t ': stack) -> WasmIR bool stack (t ': stack)
@@ -134,18 +141,35 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
   -----
 
 --  WasmCCall :: SymName -> WasmIR bool pre post -- completely untyped
-  WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR bool (t : pre) pre
-  WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR bool pre (t : pre)
-  WasmLocalSet :: WasmTypeTag t -> Int -> WasmIR bool (t : pre) pre
+--  WasmGlobalSet :: WasmTypeTag t -> SymName -> WasmIR bool (t : pre) pre
+--  WasmLocalGet :: WasmTypeTag t -> Int -> WasmIR bool pre (t : pre)
 
-  WasmCallNoResults :: TypeList ts -> WasmIR bool (RevAppend ts stack) stack
+  WasmSetLocal :: WasmTypeTag t -> WasmLocal -> WasmIR bool (t : pre) pre
+
+  WasmCall :: TypeList argtys
+           -> TypeList restys
+           -> SymName
+           -> WasmIR bool (RevAppend argtys '[]) (RevAppend restys '[])
+
+  WasmCallIndirect
+      :: WasmTypeTag t -- type of function value on stack
+      -> TypeList argtys
+      -> TypeList restys
+            -- call target hasn't been added yet
+      -> WasmIR bool (t : RevAppend argtys '[]) (RevAppend restys '[])
 
   WasmNop :: WasmIR bool stack stack -- translation of empty list of expressions
+
 
 type RevAppend :: forall a. [a] -> [a] -> [a]
 type family RevAppend xs ys where
   RevAppend '[]    ys = ys
   RevAppend (x:xs) ys = RevAppend xs (x : ys)
+
+type Reverse :: forall a . [a] -> [a]
+type family Reverse xs where
+  Reverse xs = RevAppend xs '[]
+
 
 
 
@@ -201,3 +225,5 @@ wasmReturn tag e = WasmPush tag e `WasmSeq` WasmReturnTop tag
 
 
 newtype SymName = SymName FastString
+  deriving (Eq, IsString, Show) via FastString -- , Uniquable
+  deriving (Ord) via LexicalFastString
