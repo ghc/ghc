@@ -97,7 +97,18 @@ unpackClosureFromStackFramezh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime;
   closurePtr = (StgStack_sp(stack) + WDS(index));
   closurePtrPrime = P_[closurePtr];
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
   jump stg_unpackClosurezh(closurePtrPrime);
+}
+
+unpackUpdateeFromUpdateFramezh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, updateePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  updateePtr = StgUpdateFrame_updatee(closurePtr);
+  // ccall debugBelch("unpackUpdateeFromUpdateFramezh - frame %p, updateePtr %p\n", closurePtr, updateePtr);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(updateePtr));
+  jump stg_unpackClosurezh(updateePtr);
 }
 
 getLargeBitmapzh(P_ stack, W_ index){

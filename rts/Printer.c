@@ -260,6 +260,7 @@ printClosure( const StgClosure *obj )
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = (StgUpdateFrame*)obj;
+            debugBelch("printObj - frame %p, indirectee %p\n", u, u->updatee);
             debugBelch("%s(", info_update_frame(obj));
             printPtr((StgPtr)GET_INFO((StgClosure *)u));
             debugBelch(",");

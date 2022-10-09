@@ -92,22 +92,24 @@ toBitmapPayload :: BitmapEntry -> BitmapPayload
 toBitmapPayload e | isPrimitive e = Primitive . toWord . closureFrame $ e
       where
         toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
-toBitmapPayload e = Closure . unsafePerformIO . toClosure . closureFrame $ e
-      where
-        toClosure (StackFrameIter (# s#, i# #)) =
-            case unpackClosureFromStackFrame# s# i# of
-                (# infoTableAddr, heapRep, pointersArray #) -> do
-                    let infoTablePtr = Ptr infoTableAddr
-                        ptrList = [case indexArray# pointersArray i of
-                                        (# ptr #) -> Box ptr
-                                    | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
-                                    ]
+toBitmapPayload e = Closure . toClosure unpackClosureFromStackFrame# . closureFrame $ e
 
-                    getClosureDataFromHeapRep heapRep infoTablePtr ptrList
+-- TODO: Get rid of unsafePerformIO
+toClosure :: (StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> CL.Closure
+toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
+  case f# s# i# of
+      (# infoTableAddr, heapRep, pointersArray #) -> do
+          let infoTablePtr = Ptr infoTableAddr
+              ptrList = [case indexArray# pointersArray i of
+                              (# ptr #) -> Box ptr
+                          | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
+                          ]
+
+          getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
 
 unpackStackFrameIter :: StackFrameIter -> StackFrame
-unpackStackFrameIter (StackFrameIter (# s#, i# #)) =
+unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
      RET_BCO -> RetBCO
      RET_SMALL -> let !(# bitmap#, size#, special# #) = getSmallBitmap# s# i#
@@ -123,7 +125,8 @@ unpackStackFrameIter (StackFrameIter (# s#, i# #)) =
                 in
                   RetBig payloads
      RET_FUN ->  RetFun
-     UPDATE_FRAME ->  UpdateFrame
+     -- TODO: Decode update frame type
+     UPDATE_FRAME ->  UpdateFrame NormalUpdateFrame (toClosure unpackUpdateeFromUpdateFrame# sfi)
      CATCH_FRAME ->  CatchFrame
      UNDERFLOW_FRAME ->  UnderflowFrame
      STOP_FRAME ->  StopFrame
@@ -158,6 +161,8 @@ toInt# (I# i) = i
 
 foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
+foreign import prim "unpackUpdateeFromUpdateFramezh" unpackUpdateeFromUpdateFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
@@ -191,8 +196,14 @@ data SpecialRetSmall =
   RestoreCCCSEval
   deriving (Enum, Eq,Show)
 
+data UpdateFrameType =
+  NormalUpdateFrame |
+  BhUpdateFrame |
+  MarkedUpdateFrame
+  deriving (Show)
+
 data StackFrame =
-  UpdateFrame |
+  UpdateFrame UpdateFrameType CL.Closure |
   CatchFrame |
   CatchStmFrame |
   CatchRetryFrame |
