@@ -93,6 +93,20 @@ getSmallBitmapzh(P_ stack, W_ index) {
   return (bitmap, size, specialType);
 }
 
+getLargeBitmapzh(P_ stack, W_ index){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
+  (size) = ccall getLargeBitmapSize(c);
+
+  // ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
+
+  return (stgArrBytes, size);
+}
+
 unpackClosureFromStackFramezh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime;
   closurePtr = (StgStack_sp(stack) + WDS(index));
@@ -111,16 +125,12 @@ unpackUpdateeFromUpdateFramezh(P_ stack, W_ index){
   jump stg_unpackClosurezh(updateePtr);
 }
 
-getLargeBitmapzh(P_ stack, W_ index){
-  P_ c, stgArrBytes;
-  W_ size;
+getUpdateFrameTypezh(P_ stack, W_ index){
+  P_ c;
   c = StgStack_sp(stack) + WDS(index);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
-  (size) = ccall getLargeBitmapSize(c);
-
-  // ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
-
-  return (stgArrBytes, size);
+  W_ type;
+  (type) = ccall getUpdateFrameType(c);
+  return (type);
 }

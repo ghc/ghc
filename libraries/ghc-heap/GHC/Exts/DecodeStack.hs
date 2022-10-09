@@ -126,7 +126,11 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                   RetBig payloads
      RET_FUN ->  RetFun
      -- TODO: Decode update frame type
-     UPDATE_FRAME ->  UpdateFrame NormalUpdateFrame (toClosure unpackUpdateeFromUpdateFrame# sfi)
+     UPDATE_FRAME -> let
+        c = toClosure unpackUpdateeFromUpdateFrame# sfi
+        !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
+       in
+        UpdateFrame t c
      CATCH_FRAME ->  CatchFrame
      UNDERFLOW_FRAME ->  UnderflowFrame
      STOP_FRAME ->  StopFrame
@@ -165,6 +169,8 @@ foreign import prim "unpackUpdateeFromUpdateFramezh" unpackUpdateeFromUpdateFram
 
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
+foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
+
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
 instance Show BitmapPayload where
@@ -194,13 +200,13 @@ data SpecialRetSmall =
   RetL |
   RestoreCCCS |
   RestoreCCCSEval
-  deriving (Enum, Eq,Show)
+  deriving (Enum, Eq, Show)
 
 data UpdateFrameType =
   NormalUpdateFrame |
   BhUpdateFrame |
   MarkedUpdateFrame
-  deriving (Show)
+  deriving (Enum, Eq, Show)
 
 data StackFrame =
   UpdateFrame UpdateFrameType CL.Closure |

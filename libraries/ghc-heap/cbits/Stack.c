@@ -79,6 +79,23 @@ StgWord getSpecialRetSmall(StgClosure *closure) {
   }
 }
 
+StgWord getUpdateFrameType(StgClosure* c) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  const StgInfoTable* info = c->header.info;
+  if (info == &stg_upd_frame_info) {
+      return 0;
+  } else if (info == &stg_bh_upd_frame_info) {
+      return 1;
+  } else if (info == &stg_marked_upd_frame_info) {
+      return 2;
+  } else {
+    // Cannot do more than warn and exit.
+    errorBelch("Cannot decide Update Frame type for info table %p closure %p.", info, c);
+    stg_exit(EXIT_INTERNAL_ERROR);
+  }
+}
+
 StgWord getBitmapSize(StgClosure *c){
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 

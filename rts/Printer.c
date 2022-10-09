@@ -465,6 +465,7 @@ const char *info_update_frame(const StgClosure *closure)
     // it pointing to the code or struct members when compiling with
     // TABLES_NEXT_TO_CODE.
     const StgInfoTable *info = closure->header.info;
+    debugBelch("info_update_frame - closure %p, info %p\n", closure, info);
     if (info == &stg_upd_frame_info) {
         return "NORMAL_UPDATE_FRAME";
     } else if (info == &stg_bh_upd_frame_info) {
