@@ -801,8 +801,8 @@ iterate'FB c f x0 = go x0
 
 -- | 'repeat' @x@ is an infinite list, with @x@ the value of every element.
 --
--- >>> take 20 $ repeat 17
---[17,17,17,17,17,17,17,17,17...
+-- >>> repeat 17
+-- [17,17,17,17,17,17,17,17,17...
 repeat :: a -> [a]
 {-# INLINE [0] repeat #-}
 -- The pragma just gives the rules more chance to fire
@@ -839,9 +839,9 @@ replicate n x           =  take n (repeat x)
 --
 -- >>> cycle []
 -- *** Exception: Prelude.cycle: empty list
--- >>> take 20 $ cycle [42]
+-- >>> cycle [42]
 -- [42,42,42,42,42,42,42,42,42,42...
--- >>> take 20 $ cycle [2, 5, 7]
+-- >>> cycle [2, 5, 7]
 -- [2,5,7,2,5,7,2,5,7,2,5,7...
 cycle                   :: HasCallStack => [a] -> [a]
 cycle []                = errorEmptyList "cycle"
@@ -1284,6 +1284,7 @@ notElem x (y:ys)=  x /= y && notElem x ys
 
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
 -- list.
+-- For the result to be 'Nothing', the list must be finite.
 --
 -- >>> lookup 2 []
 -- Nothing
@@ -1291,6 +1292,7 @@ notElem x (y:ys)=  x /= y && notElem x ys
 -- Nothing
 -- >>> lookup 2 [(1, "first"), (2, "second"), (3, "third")]
 -- Just "second"
+--
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
 lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
@@ -1349,8 +1351,8 @@ concat = foldr (++) []
 -- >>> ['a', 'b', 'c'] !! (-1)
 -- *** Exception: Prelude.!!: negative index
 --
--- WARNING: This function is partial. You can use <'atMay'
--- https://hackage.haskell.org/package/safe-0.3.19/docs/Safe.html#v:atMay>
+-- WARNING: This function is partial. You can use
+-- <https://hackage.haskell.org/package/safe/docs/Safe.html#v:atMay atMay>
 -- instead.
 #if defined(USE_REPORT_PRELUDE)
 (!!)                    :: [a] -> Int -> a

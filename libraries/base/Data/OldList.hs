@@ -266,6 +266,7 @@ stripPrefix _ _ = Nothing
 -- | The 'elemIndex' function returns the index of the first element
 -- in the given list which is equal (by '==') to the query element,
 -- or 'Nothing' if there is no such element.
+-- For the result to be 'Nothing', the list must be finite.
 --
 -- >>> elemIndex 4 [0..]
 -- Just 4
@@ -283,6 +284,7 @@ elemIndices x xs = findIndices (x==) xs -- arity 2 so that we don't get a PAP; #
 -- | The 'find' function takes a predicate and a list and returns the
 -- first element in the list matching the predicate, or 'Nothing' if
 -- there is no such element.
+-- For the result to be 'Nothing', the list must be finite.
 --
 -- >>> find (> 4) [1..]
 -- Just 5
@@ -295,6 +297,7 @@ find p          = listToMaybe . filter p
 -- | The 'findIndex' function takes a predicate and a list and returns
 -- the index of the first element in the list satisfying the predicate,
 -- or 'Nothing' if there is no such element.
+-- For the result to be 'Nothing', the list must be finite.
 --
 -- >>> findIndex isSpace "Hello World!"
 -- Just 5
@@ -325,23 +328,41 @@ findIndices p ls = build $ \c n ->
 --
 -- >>> "Hello" `isPrefixOf` "Hello World!"
 -- True
---
 -- >>> "Hello" `isPrefixOf` "Wello Horld!"
 -- False
+--
+-- For the result to be 'True', the first list must be finite;
+-- 'False', however, results from any mismatch:
+--
+-- >>> [0..] `isPrefixOf` [1..]
+-- False
+-- >>> [0..] `isPrefixOf` [0..99]
+-- False
+-- >>> [0..99] `isPrefixOf` [0..]
+-- True
+-- >>> [0..] `isPrefixOf` [0..]
+-- * Hangs forever *
+--
 isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool
 isPrefixOf [] _         =  True
 isPrefixOf _  []        =  False
 isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 
 -- | The 'isSuffixOf' function takes two lists and returns 'True' iff
--- the first list is a suffix of the second. The second list must be
--- finite.
+-- the first list is a suffix of the second.
 --
 -- >>> "ld!" `isSuffixOf` "Hello World!"
 -- True
---
 -- >>> "World" `isSuffixOf` "Hello World!"
 -- False
+--
+-- The second list must be finite; however the first list may be infinite:
+--
+-- >>> [0..] `isSuffixOf` [0..99]
+-- False
+-- >>> [0..99] `isSuffixOf` [0..]
+-- * Hangs forever *
+--
 isSuffixOf              :: (Eq a) => [a] -> [a] -> Bool
 ns `isSuffixOf` hs      = maybe False id $ do
       delta <- dropLengthMaybe ns hs
@@ -383,9 +404,19 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 --
 -- >>> isInfixOf "Haskell" "I really like Haskell."
 -- True
---
 -- >>> isInfixOf "Ial" "I really like Haskell."
 -- False
+--
+-- For the result to be 'True', the first list must be finite;
+-- for the result to be 'False', the second list must be finite:
+--
+-- >>> [20..50] `isInfixOf` [0..]
+-- True
+-- >>> [0..] `isInfixOf` [20..50]
+-- False
+-- >>> [0..] `isInfixOf` [0..]
+-- * Hangs forever *
+--
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
@@ -396,6 +427,12 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 --
 -- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
 -- [1,2,3,4,5]
+--
+-- If the order of outputs does not matter and there exists @instance Ord a@,
+-- it's faster to use
+-- 'map' @Data.List.NonEmpty.@'Data.List.NonEmpty.head' . @Data.List.NonEmpty.@'Data.List.NonEmpty.group' . 'sort',
+-- which takes only \(\mathcal{O}(n \log n)\) time.
+--
 nub                     :: (Eq a) => [a] -> [a]
 nub                     =  nubBy (==)
 
@@ -454,56 +491,103 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 -- | The '\\' function is list difference (non-associative).
 -- In the result of @xs@ '\\' @ys@, the first occurrence of each element of
 -- @ys@ in turn (if any) has been removed from @xs@.  Thus
---
--- > (xs ++ ys) \\ xs == ys.
+-- @(xs ++ ys) \\\\ xs == ys@.
 --
 -- >>> "Hello World!" \\ "ell W"
 -- "Hoorld!"
 --
 -- It is a special case of 'deleteFirstsBy', which allows the programmer
 -- to supply their own equality test.
-
+--
+-- The second list must be finite, but the first may be infinite.
+--
+-- >>> take 5 ([0..] \\ [2..4])
+-- [0,1,5,6,7]
+-- >>> take 5 ([0..] \\ [2..])
+-- * Hangs forever *
+--
 (\\)                    :: (Eq a) => [a] -> [a] -> [a]
 (\\)                    =  foldl (flip delete)
 
 -- | The 'union' function returns the list union of the two lists.
+-- It is a special case of 'unionBy', which allows the programmer to supply
+-- their own equality test.
 -- For example,
 --
 -- >>> "dog" `union` "cow"
 -- "dogcw"
 --
--- Duplicates, and elements of the first list, are removed from the
--- the second list, but if the first list contains duplicates, so will
--- the result.
--- It is a special case of 'unionBy', which allows the programmer to supply
--- their own equality test.
-
+-- If equal elements are present in both lists, an element from the first list
+-- will be used. If the second list contains equal elements, only the first one
+-- will be retained:
+--
+-- >>> import Data.Semigroup
+-- >>> union [Arg () "dog"] [Arg () "cow"]
+-- [Arg () "dog"]
+-- >>> union [] [Arg () "dog", Arg () "cow"]
+-- [Arg () "dog"]
+--
+-- However if the first list contains duplicates, so will
+-- the result:
+--
+-- >>> "coot" `union` "duck"
+-- "cootduk"
+-- >>> "duck" `union` "coot"
+-- "duckot"
+--
+-- 'union' is productive even if both arguments are infinite.
+--
 union                   :: (Eq a) => [a] -> [a] -> [a]
 union                   = unionBy (==)
 
 -- | The 'unionBy' function is the non-overloaded version of 'union'.
+-- Both arguments may be infinite.
+--
 unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 
 -- | The 'intersect' function takes the list intersection of two lists.
+-- It is a special case of 'intersectBy', which allows the programmer to
+-- supply their own equality test.
 -- For example,
 --
 -- >>> [1,2,3,4] `intersect` [2,4,6,8]
 -- [2,4]
 --
--- If the first list contains duplicates, so will the result.
+-- If equal elements are present in both lists, an element from the first list
+-- will be used, and all duplicates from the second list quashed:
 --
--- >>> [1,2,2,3,4] `intersect` [6,4,4,2]
--- [2,2,4]
+-- >>> import Data.Semigroup
+-- >>> intersect [Arg () "dog"] [Arg () "cow", Arg () "cat"]
+-- [Arg () "dog"]
 --
--- It is a special case of 'intersectBy', which allows the programmer to
--- supply their own equality test. If the element is found in both the first
--- and the second list, the element from the first list will be used.
-
+-- However if the first list contains duplicates, so will the result.
+--
+-- >>> "coot" `intersect` "heron"
+-- "oo"
+-- >>> "heron" `intersect` "coot"
+-- "o"
+--
+-- If the second list is infinite, 'intersect' either hangs
+-- or returns its first argument in full. Otherwise if the first list
+-- is infinite, 'intersect' might be productive:
+--
+-- >>> intersect [100..] [0..]
+-- [100,101,102,103...
+-- >>> intersect [0] [1..]
+-- * Hangs forever *
+-- >>> intersect [1..] [0]
+-- * Hangs forever *
+-- >>> intersect (cycle [1..3]) [2]
+-- [2,2,2,2...
+--
 intersect               :: (Eq a) => [a] -> [a] -> [a]
 intersect               =  intersectBy (==)
 
 -- | The 'intersectBy' function is the non-overloaded version of 'intersect'.
+-- It is productive for infinite arguments only if the first one
+-- is a subset of the second.
+--
 intersectBy             :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 intersectBy _  [] _     =  []
 intersectBy _  _  []    =  []
@@ -547,6 +631,12 @@ intercalate xs xss = concat (intersperse xs xss)
 --
 -- >>> transpose [[10,11],[20],[],[30,31,32]]
 -- [[10,20,30],[11,31],[32]]
+--
+-- For this reason the outer list must be finite; otherwise 'transpose' hangs:
+--
+-- >>> transpose (repeat [])
+-- * Hangs forever *
+--
 transpose :: [[a]] -> [[a]]
 transpose [] = []
 transpose ([] : xss) = transpose xss
@@ -681,7 +771,8 @@ insertBy cmp x ys@(y:ys')
      GT -> y : insertBy cmp x ys'
      _  -> x : ys
 
--- | The 'maximumBy' function takes a comparison function and a list
+-- | The 'maximumBy' function is the non-overloaded version of 'maximum',
+-- which takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
 --
@@ -697,7 +788,8 @@ maximumBy cmp xs        =  foldl1 maxBy xs
                                        GT -> x
                                        _  -> y
 
--- | The 'minimumBy' function takes a comparison function and a list
+-- | The 'minimumBy' function is the non-overloaded version of 'minimum',
+-- which takes a comparison function and a list
 -- and returns the least element of the list by the comparison function.
 -- The list must be finite and non-empty.
 --
@@ -1045,23 +1137,42 @@ unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 
 -- | The 'deleteFirstsBy' function takes a predicate and two lists and
 -- returns the first list with the first occurrence of each element of
--- the second list removed.
+-- the second list removed. This is the non-overloaded version of '(\\)'.
+--
+-- The second list must be finite, but the first may be infinite.
+--
 deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
--- each sublist in the result contains only equal elements.  For example,
+-- each sublist in the result is non-empty and all elements are equal
+-- to the first one.  For example,
 --
 -- >>> group "Mississippi"
 -- ["M","i","ss","i","ss","i","pp","i"]
 --
--- It is a special case of 'groupBy', which allows the programmer to supply
+-- 'group' is a special case of 'groupBy', which allows the programmer to supply
 -- their own equality test.
+--
+-- It's often preferable to use @Data.List.NonEmpty.@'Data.List.NonEmpty.group',
+-- which provides type-level guarantees of non-emptiness of inner lists.
+--
 group                   :: Eq a => [a] -> [[a]]
 group                   =  groupBy (==)
 
 -- | The 'groupBy' function is the non-overloaded version of 'group'.
+--
+-- When a supplied relation is not transitive, it is important
+-- to remember that equality is checked against the first element in the group,
+-- not against the nearest neighbour:
+--
+-- >>> groupBy (\a b -> b - a < 5) [0..19]
+-- [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]]
+--
+-- It's often preferable to use @Data.List.NonEmpty.@'Data.List.NonEmpty.groupBy',
+-- which provides type-level guarantees of non-emptiness of inner lists.
+--
 groupBy                 :: (a -> a -> Bool) -> [a] -> [[a]]
 groupBy _  []           =  []
 groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
@@ -1078,6 +1189,10 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 --
 -- In particular,
 -- @inits _|_ = [] : _|_@
+--
+-- 'inits' is semantically equivalent to @'map' 'reverse' . 'scanl' ('flip' (:)) []@,
+-- but under the hood uses a queue to amortize costs of 'reverse'.
+--
 inits                   :: [a] -> [[a]]
 inits                   = map toListSB . scanl' snocSB emptySB
 {-# NOINLINE inits #-}
@@ -1106,6 +1221,12 @@ tails lst               =  build (\c n ->
 --
 -- >>> subsequences "abc"
 -- ["","a","b","ab","c","ac","bc","abc"]
+--
+-- This function is productive on infinite inputs:
+--
+-- >>> take 8 $ subsequences ['a'..]
+-- ["","a","b","ab","c","ac","bc","abc"]
+--
 subsequences            :: [a] -> [[a]]
 subsequences xs         =  [] : nonEmptySubsequences xs
 
@@ -1124,7 +1245,23 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 --
 -- >>> permutations "abc"
 -- ["abc","bac","cba","bca","cab","acb"]
+--
+-- This function is productive on infinite inputs:
+--
+-- >>> take 6 $ map (take 3) $ permutations ['a'..]
+-- ["abc","bac","cba","bca","cab","acb"]
+--
+-- Note that the order of permutations is not lexicographic.
+-- It satisfies the following property:
+--
+-- > map (take n) (take (product [1..n]) (permutations ([1..n] ++ undefined))) == permutations [1..n]
+--
 permutations            :: [a] -> [[a]]
+-- See https://stackoverflow.com/questions/24484348/what-does-this-list-permutations-implementation-in-haskell-exactly-do/24564307#24564307
+-- for the analysis of this rather cryptic implementation.
+-- Related discussions:
+-- * https://mail.haskell.org/pipermail/haskell-cafe/2021-December/134920.html
+-- * https://mail.haskell.org/pipermail/libraries/2007-December/008788.html
 permutations xs0        =  xs0 : perms xs0 []
   where
     perms []     _  = []
@@ -1147,12 +1284,22 @@ permutations xs0        =  xs0 : perms xs0 []
 --
 -- >>> sort [1,6,4,3,2,5]
 -- [1,2,3,4,5,6]
+--
+-- The argument must be finite.
+--
 sort :: (Ord a) => [a] -> [a]
 
 -- | The 'sortBy' function is the non-overloaded version of 'sort'.
+-- The argument must be finite.
 --
 -- >>> sortBy (\(a,_) (b,_) -> compare a b) [(2, "world"), (4, "!"), (1, "Hello")]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
+--
+-- The supplied comparison relation is supposed to be reflexive and antisymmetric,
+-- otherwise, e. g., for @\_ _ -> GT@, the ordered list simply does not exist.
+-- The relation is also expected to be transitive: if it is not then 'sortBy'
+-- might fail to find an ordered permutation, even if it exists.
+--
 sortBy :: (a -> a -> Ordering) -> [a] -> [a]
 
 #if defined(USE_REPORT_PRELUDE)
@@ -1310,16 +1457,18 @@ rqpart cmp x (y:ys) rle rgt r =
 #endif /* USE_REPORT_PRELUDE */
 
 -- | Sort a list by comparing the results of a key function applied to each
--- element.  @sortOn f@ is equivalent to @sortBy (comparing f)@, but has the
+-- element.  @'sortOn' f@ is equivalent to @'sortBy' ('comparing' f)@, but has the
 -- performance advantage of only evaluating @f@ once for each element in the
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
--- Schwartzian transform.
+-- <https://en.wikipedia.org/wiki/Schwartzian_transform Schwartzian transform>.
 --
 -- Elements are arranged from lowest to highest, keeping duplicates in
 -- the order they appeared in the input.
 --
 -- >>> sortOn fst [(2, "world"), (4, "!"), (1, "Hello")]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
+--
+-- The argument must be finite.
 --
 -- @since 4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
@@ -1397,35 +1546,29 @@ unfoldr f b0 = build (\c n ->
 -- Functions on strings
 
 -- | Splits the argument into a list of /lines/ stripped of their terminating
--- @\n@ characters.  The @\n@ terminator is optional in a final non-empty
+-- @\\n@ characters.  The @\\n@ terminator is optional in a final non-empty
 -- line of the argument string.
 --
 -- For example:
 --
 -- >>> lines ""           -- empty input contains no lines
 -- []
---
 -- >>> lines "\n"         -- single empty line
 -- [""]
---
 -- >>> lines "one"        -- single unterminated line
 -- ["one"]
---
 -- >>> lines "one\n"      -- single non-empty line
 -- ["one"]
---
 -- >>> lines "one\n\n"    -- second line is empty
 -- ["one",""]
---
 -- >>> lines "one\ntwo"   -- second line is unterminated
 -- ["one","two"]
---
 -- >>> lines "one\ntwo\n" -- two non-empty lines
 -- ["one","two"]
 --
--- When the argument string is empty, or ends in a @\n@ character, it can be
+-- When the argument string is empty, or ends in a @\\n@ character, it can be
 -- recovered by passing the result of 'lines' to the 'unlines' function.
--- Otherwise, 'unlines' appends the missing terminating @\n@.  This makes
+-- Otherwise, 'unlines' appends the missing terminating @\\n@.  This makes
 -- @unlines . lines@ /idempotent/:
 --
 -- > (unlines . lines) . (unlines . lines) = (unlines . lines)
@@ -1443,15 +1586,13 @@ lines s                 =  cons (case break (== '\n') s of
   where
     cons ~(h, t)        =  h : t
 
--- | Appends a @\n@ character to each input string, then concatenates the
--- results. Equivalent to @'foldMap' (\s -> s '++' "\n")@.
+-- | Appends a @\\n@ character to each input string, then concatenates the
+-- results. Equivalent to @'foldMap' (\s -> s '++' "\\n")@.
 --
 -- >>> unlines ["Hello", "World", "!"]
 -- "Hello\nWorld\n!\n"
 --
--- = Note
---
--- @'unlines' '.' 'lines' '/=' 'id'@ when the input is not @\n@-terminated:
+-- Note that @'unlines' '.' 'lines' '/=' 'id'@ when the input is not @\\n@-terminated:
 --
 -- >>> unlines . lines $ "foo\nbar"
 -- "foo\nbar\n"
@@ -1466,10 +1607,14 @@ unlines (l:ls) = l ++ '\n' : unlines ls
 #endif
 
 -- | 'words' breaks a string up into a list of words, which were delimited
--- by white space.
+-- by white space (as defined by 'isSpace'). This function trims any white spaces
+-- at the beginning and at the end.
 --
 -- >>> words "Lorem ipsum\ndolor"
 -- ["Lorem","ipsum","dolor"]
+-- >>> words " foo bar "
+-- ["foo","bar"]
+--
 words                   :: String -> [String]
 {-# NOINLINE [1] words #-}
 words s                 =  case dropWhile {-partain:Char.-}isSpace s of
@@ -1491,11 +1636,18 @@ wordsFB c n = go
              s' -> w `c` go s''
                    where (w, s'') = break isSpace s'
 
--- | 'unwords' is an inverse operation to 'words'.
--- It joins words with separating spaces.
+-- | 'unwords' joins words with separating spaces (U+0020 SPACE).
 --
 -- >>> unwords ["Lorem", "ipsum", "dolor"]
 -- "Lorem ipsum dolor"
+--
+-- 'unwords' is neither left nor right inverse of 'words':
+--
+-- >>> words (unwords [" "])
+-- []
+-- >>> unwords (words "foo\nbar")
+-- "foo bar"
+--
 unwords                 :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
 unwords []              =  ""

@@ -229,14 +229,23 @@ import GHC.Base ( Bool(..), Eq((==)), otherwise )
 --
 -- @since 4.8.0.0
 --
--- ==== __Examples__
---
 -- >>> isSubsequenceOf "GHC" "The Glorious Haskell Compiler"
 -- True
 -- >>> isSubsequenceOf ['a','d'..'z'] ['a'..'z']
 -- True
 -- >>> isSubsequenceOf [1..10] [10,9..0]
 -- False
+--
+-- For the result to be 'True', the first list must be finite;
+-- for the result to be 'False', the second list must be finite:
+--
+-- >>> [0,2..10] `isSubsequenceOf` [0..]
+-- True
+-- >>> [0..] `isSubsequenceOf` [0,2..10]
+-- False
+-- >>> [0,2..] `isSubsequenceOf` [0..]
+-- * Hangs forever*
+--
 isSubsequenceOf :: (Eq a) => [a] -> [a] -> Bool
 isSubsequenceOf []    _                    = True
 isSubsequenceOf _     []                   = False
