@@ -96,8 +96,8 @@ module GHC.Parser.PostProcess (
         warnStarIsType,
         warnPrepositiveQualifiedModule,
         failOpFewArgs,
-        failOpNotEnabledImportQualifiedPost,
-        failOpImportQualifiedTwice,
+        failNotEnabledImportQualifiedPost,
+        failImportQualifiedTwice,
 
         SumOrTuple (..),
 
@@ -1133,13 +1133,13 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failOpNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failOpImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
@@ -2873,12 +2873,12 @@ warnPrepositiveQualifiedModule :: SrcSpan -> P ()
 warnPrepositiveQualifiedModule span =
   addPsMessage span PsWarnImportPreQualified
 
-failOpNotEnabledImportQualifiedPost :: SrcSpan -> P ()
-failOpNotEnabledImportQualifiedPost loc =
+failNotEnabledImportQualifiedPost :: SrcSpan -> P ()
+failNotEnabledImportQualifiedPost loc =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrImportPostQualified
 
-failOpImportQualifiedTwice :: SrcSpan -> P ()
-failOpImportQualifiedTwice loc =
+failImportQualifiedTwice :: SrcSpan -> P ()
+failImportQualifiedTwice loc =
   addError $ mkPlainErrorMsgEnvelope loc $ PsErrImportQualifiedTwice
 
 warnStarIsType :: SrcSpan -> P ()
