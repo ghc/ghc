@@ -134,3 +134,23 @@ getUpdateFrameTypezh(P_ stack, W_ index){
   (type) = ccall getUpdateFrameType(c);
   return (type);
 }
+
+unpackHandlerFromCatchFramezh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, handlerPtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  handlerPtr = StgCatchFrame_handler(closurePtr);
+  // ccall debugBelch("unpackUpdateeFromUpdateFramezh - frame %p, updateePtr %p\n", closurePtr, updateePtr);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(handlerPtr));
+  jump stg_unpackClosurezh(handlerPtr);
+}
+
+getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, updateePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+
+  W_ exceptions_blocked;
+  exceptions_blocked = StgCatchFrame_exceptions_blocked(closurePtr);
+  return (exceptions_blocked);
+}

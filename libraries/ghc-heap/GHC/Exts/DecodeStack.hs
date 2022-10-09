@@ -131,7 +131,11 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
        in
         UpdateFrame t c
-     CATCH_FRAME ->  CatchFrame
+     CATCH_FRAME -> let
+        c = toClosure unpackHandlerFromCatchFrame# sfi
+        exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
+       in
+        CatchFrame exceptionsBlocked c
      UNDERFLOW_FRAME ->  UnderflowFrame
      STOP_FRAME ->  StopFrame
      ATOMICALLY_FRAME ->  AtomicallyFrame
@@ -170,6 +174,10 @@ foreign import prim "unpackUpdateeFromUpdateFramezh" unpackUpdateeFromUpdateFram
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "unpackHandlerFromCatchFramezh" unpackHandlerFromCatchFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
@@ -210,7 +218,7 @@ data UpdateFrameType =
 
 data StackFrame =
   UpdateFrame UpdateFrameType CL.Closure |
-  CatchFrame |
+  CatchFrame Word CL.Closure |
   CatchStmFrame |
   CatchRetryFrame |
   AtomicallyFrame |
