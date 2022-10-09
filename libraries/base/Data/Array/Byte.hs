@@ -205,6 +205,7 @@ instance Eq (MutableByteArray s) where
 -- | Non-lexicographic ordering. This compares the lengths of
 -- the byte arrays first and uses a lexicographic ordering if
 -- the lengths are equal. Subject to change between major versions.
+--
 -- @since 4.17.0.0
 instance Ord ByteArray where
   ba1@(ByteArray ba1#) `compare` ba2@(ByteArray ba2#)
