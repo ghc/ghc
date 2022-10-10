@@ -881,7 +881,7 @@ data SpecConstrOpts = SpecConstrOpts
 
   , sc_count     :: !(Maybe Int)
   -- ^ Max # of specialisations for any one function. Nothing => no limit.
-  -- See Note [Avoiding exponential blowup].
+  -- See Note [Avoiding exponential blowup] and decreaseSpecCount
 
   , sc_recursive :: !Int
   -- ^ Max # of specialisations over recursive type. Stops
@@ -1098,16 +1098,20 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
 
 decreaseSpecCount :: ScEnv -> Int -> ScEnv
 -- See Note [Avoiding exponential blowup]
-decreaseSpecCount env n_specs
+decreaseSpecCount env _n_specs
   = env { sc_force = False   -- See Note [Forcing specialisation]
-        , sc_opts = (sc_opts env)
-            { sc_count = case sc_count $ sc_opts env of
-                       Nothing -> Nothing
-                       Just n  -> Just $! (n `div` (n_specs + 1))
+        , sc_opts = opts { sc_count = case sc_count opts of
+                             Nothing -> Nothing
+                             Just n  -> Just $! dec n
             }
         }
-        -- The "+1" takes account of the original function;
-        -- See Note [Avoiding exponential blowup]
+  where
+    opts  = sc_opts env
+    dec n = n `div` 2  -- See Note [Avoiding exponential blowup]
+
+    -- Or:   n `div` (n_specs + 1)
+    -- See the historical note part of Note [Avoiding exponential blowup]
+    -- The "+1" takes account of the original function;
 
 ---------------------------------------------------
 -- See Note [Forcing specialisation]
@@ -1183,9 +1187,20 @@ we can specialise $j2, and similarly $j3.  Even if we make just *one*
 specialisation of each, because we also have the original we'll get 2^n
 copies of $j3, which is not good.
 
-So when recursively specialising we divide the sc_count by the number of
-copies we are making at this level, including the original.
+So when recursively specialising we divide the sc_count (the maximum
+number of specialisations, in the ScEnv) by two.  You might think that
+gives us n*(n/2)*(n/4)... copies of the innnermost thing, which is
+still exponential the depth.  But we use integer division, rounding
+down, so if the starting sc_count is 3, we'll get 3 -> 1 -> 0, and
+stop.  In fact, simply subtracting 1 would be good enough, for the same
+reason.
 
+Historical note: in the past we divided by (n_specs+1), where n_specs
+is the number of specialisations at this level; but that gets us down
+to zero jolly quickly, which I found led to some regressions.  (An
+example is nofib/spectral/fibheaps, the getMin' function inside the
+outer function $sfibToList, which has several interesting call
+patterns.)
 
 ************************************************************************
 *                                                                      *
@@ -1794,16 +1809,19 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
   , not (null arg_bndrs)                         -- Only specialise functions
   , Just all_calls <- lookupVarEnv bind_calls fn -- Some calls to it
   = -- pprTrace "specialise entry {" (ppr fn <+> ppr all_calls) $
-    do  { (boring_call, new_pats) <- callsToNewPats env fn spec_info arg_occs all_calls
+    do  { (boring_call, pats_discarded, new_pats)
+             <- callsToNewPats env fn spec_info arg_occs all_calls
 
         ; let n_pats = length new_pats
---        ; if (not (null new_pats) || isJust mb_unspec) then
---            pprTrace "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
---                                        , text "mb_unspec" <+> ppr (isJust mb_unspec)
---                                        , text "arg_occs" <+> ppr arg_occs
---                                        , text "good pats" <+> ppr new_pats])  $
---               return ()
---          else return ()
+--        ; when (not (null new_pats) || isJust mb_unspec) $
+--          pprTraceM "specialise" (vcat [ ppr fn <+> text "with" <+> int n_pats <+> text "good patterns"
+--                                       , text "boring_call:" <+> ppr boring_call
+--                                       , text "pats_discarded:" <+> ppr pats_discarded
+--                                       , text "old spec_count" <+> ppr spec_count
+--                                       , text "spec count limit" <+> ppr (sc_count (sc_opts env))
+--                                       , text "mb_unspec" <+> ppr (isJust mb_unspec)
+--                                       , text "arg_occs" <+> ppr arg_occs
+--                                       , text "new_pats" <+> ppr new_pats])
 
         ; let spec_env = decreaseSpecCount env n_pats
         ; (spec_usgs, new_specs) <- mapAndUnzipM (spec_one spec_env fn arg_bndrs body)
@@ -1812,7 +1830,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
 
         ; let spec_usg = combineUsages spec_usgs
 
-              unspec_rhs_needed = boring_call || isExportedId fn
+              unspec_rhs_needed = pats_discarded || boring_call || isExportedId fn
 
               -- If there were any boring calls among the seeds (= all_calls), then those
               -- calls will call the un-specialised function.  So we should use the seeds
@@ -1823,15 +1841,14 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                                -> (spec_usg `combineUsage` rhs_usg, Nothing)
                   _            -> (spec_usg,                      mb_unspec)
 
---        ; pprTrace "specialise return }"
---             (vcat [ ppr fn
---                   , text "boring_call:" <+> ppr boring_call
---                   , text "new calls:" <+> ppr (scu_calls new_usg)]) $
---          return ()
+--        ; pprTraceM "specialise return }" $
+--          vcat [ ppr fn
+--               , text "unspec_rhs_needed:" <+> ppr unspec_rhs_needed
+--               , text "new calls:" <+> ppr (scu_calls new_usg)]
 
-          ; return (new_usg, SI { si_specs     = new_specs ++ specs
-                                , si_n_specs   = spec_count + n_pats
-                                , si_mb_unspec = mb_unspec' }) }
+        ; return (new_usg, SI { si_specs     = new_specs ++ specs
+                              , si_n_specs   = spec_count + n_pats
+                              , si_mb_unspec = mb_unspec' }) }
 
   | otherwise  -- No calls, inactive, or not a function
                -- Behave as if there was a single, boring call
@@ -1874,7 +1891,9 @@ spec_one :: ScEnv
 
 spec_one env fn arg_bndrs body (call_pat, rule_number)
   | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
-  = do  { spec_uniq <- getUniqueM
+  = do  { -- pprTraceM "spec_one {" (ppr fn <+> ppr pats)
+
+        ; spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
                                        (arg_bndrs `zip` pats)
               (body_env, extra_bndrs) = extendBndrs env1 (dropList pats arg_bndrs)
@@ -1899,9 +1918,6 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
         -- Specialise the body
         -- ; pprTraceM "body_subst_for" $ ppr (spec_occ) $$ ppr (sc_subst body_env)
         ; (spec_usg, spec_body) <- scExpr body_env body
-
---      ; pprTrace "done spec_one }" (ppr fn $$ ppr (scu_calls spec_usg)) $
---        return ()
 
                 -- And build the results
         ; (qvars', pats') <- generaliseDictPats qvars pats
@@ -1946,21 +1962,22 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                                   fn_name qvars' pats' rule_rhs
                            -- See Note [Transfer activation]
 
-        -- ; pprTraceM "spec_one {" (vcat [ text "function:" <+> ppr fn <+> braces (ppr (idUnique fn))
-        --                               , text "sc_count:" <+> ppr (sc_count env)
-        --                               , text "pats:" <+> ppr pats
-        --                               , text "call_pat:" <+> ppr call_pat
-        --                               , text "-->" <+> ppr spec_name
-        --                               , text "bndrs" <+> ppr arg_bndrs
-        --                               , text "extra_bndrs" <+> ppr extra_bndrs
-        --                               , text "cbv_args" <+> ppr cbv_args
-        --                               , text "spec_lam_args" <+> ppr spec_lam_args
-        --                               , text "spec_call_args" <+> ppr spec_call_args
-        --                               , text "rule_rhs" <+> ppr rule_rhs
-        --                               , text "adds_void_worker_arg" <+> ppr add_void_arg
-        --                               , text "body" <+> ppr body
-        --                               , text "spec_rhs" <+> ppr spec_rhs
-        --                               , text "how_bound" <+> ppr (sc_how_bound env) ])
+--        ; pprTraceM "spec_one end }" $
+--          vcat [ text "function:" <+> ppr fn <+> braces (ppr (idUnique fn))
+--               , text "pats:" <+> ppr pats
+--               , text "call_pat:" <+> ppr call_pat
+--               , text "-->" <+> ppr spec_name
+--               , text "bndrs" <+> ppr arg_bndrs
+--               , text "extra_bndrs" <+> ppr extra_bndrs
+--               , text "cbv_args" <+> ppr cbv_args
+--               , text "spec_lam_args" <+> ppr spec_lam_args
+--               , text "spec_call_args" <+> ppr spec_call_args
+--               , text "rule_rhs" <+> ppr rule_rhs
+--               , text "adds_void_worker_arg" <+> ppr add_void_arg
+----               , text "body" <+> ppr body
+----               , text "spec_rhs" <+> ppr spec_rhs
+----               , text "how_bound" <+> ppr (sc_how_bound env) ]
+--               ]
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule
                                , os_id = spec_id
                                , os_rhs = spec_rhs }) }
@@ -2330,7 +2347,9 @@ instance Outputable CallPat where
 callsToNewPats :: ScEnv -> Id
                -> SpecInfo
                -> [ArgOcc] -> [Call]
-               -> UniqSM (Bool, [CallPat])
+               -> UniqSM ( Bool        -- At least one boring call
+                         , Bool        -- Patterns were discarded
+                         , [CallPat] ) -- Patterns to specialise
 -- Result has no duplicate patterns,
 -- nor ones mentioned in si_specs (hence "new" patterns)
 -- Bool indicates that there was at least one boring pattern
@@ -2362,12 +2381,11 @@ callsToNewPats env fn spec_info@(SI { si_specs = done_specs }) bndr_occs calls
                 -- Discard specialisations if there are too many of them
               (pats_were_discarded, trimmed_pats) = trim_pats env fn spec_info small_pats
 
---        ; pprTrace "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
---                                       , text "done_specs:" <+> ppr (map os_pat done_specs)
---                                       , text "good_pats:" <+> ppr good_pats ]) $
---          return ()
+--        ; pprTraceM "callsToPats" (vcat [ text "calls to" <+> ppr fn <> colon <+> ppr calls
+--                                        , text "done_specs:" <+> ppr (map os_pat done_specs)
+--                                        , text "trimmed_pats:" <+> ppr trimmed_pats ])
 
-        ; return (have_boring_call || pats_were_discarded, trimmed_pats) }
+        ; return (have_boring_call, pats_were_discarded, trimmed_pats) }
           -- If any of the calls does not give rise to a specialisation, either
           -- because it is boring, or because there are too many specialisations,
           -- return a flag to say so, so that we know to keep the original function.
@@ -2476,29 +2494,29 @@ callToPats env bndr_occs call@(Call fn args con_env)
               sanitise id   = updateIdTypeAndMult expandTypeSynonyms id
                 -- See Note [Free type variables of the qvar types]
 
-              -- Bad coercion variables: see Note [SpecConstr and casts]
-              bad_covars :: CoVarSet
+
+        -- Check for bad coercion variables: see Note [SpecConstr and casts]
+        ; let bad_covars :: CoVarSet
               bad_covars = mapUnionVarSet get_bad_covars pats
               get_bad_covars :: CoreArg -> CoVarSet
               get_bad_covars (Type ty) = filterVarSet bad_covar (tyCoVarsOfType ty)
               get_bad_covars _         = emptyVarSet
               bad_covar v = isId v && not (is_in_scope v)
 
-        ; -- pprTrace "callToPats"  (ppr args $$ ppr bndr_occs) $
-          warnPprTrace (not (isEmptyVarSet bad_covars))
+        ; warnPprTrace (not (isEmptyVarSet bad_covars))
               "SpecConstr: bad covars"
               (ppr bad_covars $$ ppr call) $
+
           if interesting && isEmptyVarSet bad_covars
-          then do
-              -- pprTraceM "callToPatsOut" (
-              --         text "fn:" <+> ppr fn $$
-              --         text "args:" <+> ppr args $$
-              --         text "in_scope:" <+> ppr in_scope $$
-              --         -- text "in_scope:" <+> ppr in_scope $$
-              --         text "pat_fvs:" <+> ppr pat_fvs
-              --       )
-              --   ppr (CP { cp_qvars = qvars', cp_args = pats })) >>
-              return (Just (CP { cp_qvars = qvars', cp_args = pats, cp_strict_args = concat cbv_ids }))
+          then do { let cp_res = CP { cp_qvars = qvars', cp_args = pats
+                                    , cp_strict_args = concat cbv_ids }
+--                  ; pprTraceM "callToPatsOut" $
+--                    vcat [ text "fn:" <+> ppr fn
+--                         , text "args:" <+> ppr args
+--                         , text "bndr_occs:" <+> ppr bndr_occs
+--                         , text "pat_fvs:" <+> ppr pat_fvs
+--                         , text "cp_res:" <+> ppr cp_res ]
+                  ; return (Just cp_res) }
           else return Nothing }
 
     -- argToPat takes an actual argument, and returns an abstracted
