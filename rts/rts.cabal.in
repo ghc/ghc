@@ -481,6 +481,7 @@ library
 
       cmm-sources: Apply.cmm
                    Compact.cmm
+                   ContinuationOps.cmm
                    Exception.cmm
                    HeapStackCheck.cmm
                    PrimOps.cmm
@@ -497,7 +498,7 @@ library
       else
         -- Use GHC's native adjustors
         if arch(i386)
-          asm-sources: AdjustorAsm.S
+          asm-sources: adjustor/Nativei386Asm.S
           c-sources: adjustor/Nativei386.c
         if arch(x86_64)
           if os(mingw32)
@@ -525,6 +526,7 @@ library
                  CloneStack.c
                  ClosureFlags.c
                  ClosureSize.c
+                 Continuation.c
                  Disassembler.c
                  FileLock.c
                  ForeignExports.c
