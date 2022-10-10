@@ -346,6 +346,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         return output_fn
 
 
+-- | Embed .js files into .o files
 runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runJsPhase pipe_env hsc_env input_fn = do
         let dflags     = hsc_dflags   hsc_env

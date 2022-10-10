@@ -18,7 +18,6 @@ import GHC.StgToJS.CodeGen
 --
 -- Tail calls: translated code is tail call optimized through a trampoline,
 -- since JavaScript implementations don't always support tail calls.
---  TODO: add GHCJS optimizer for this to be true
 --
 -- JavaScript ASTs are then optimized. A dataflow analysis is performed and then
 -- dead code and redundant assignments are removed.

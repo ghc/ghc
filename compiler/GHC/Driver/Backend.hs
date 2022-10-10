@@ -280,19 +280,7 @@ llvmBackend = Named LLVM
 
 -- | The JavaScript Backend
 --
--- Compiles Stg code to JS, the relies on the
--- JS toolchain to produce workable code.
---
--- Notable points are:
--- 1. The JS backend /does not/ rely on GHC's native RTS or linker.
--- 2. Instead, the JS backend writes its own RTS. This RTS is split between
--- Haskell (see "GHC.StgToJS.Rts") and JavaScript (see "js" directory in root of
--- GHC project).
--- 3. "Linking" in the JS backend is not actually linking, rather it is merging
--- JS concrete syntax with static guarentees that all symbols used are defined
--- before their call sites (see "GHC.StgToJS.Linker").
---
--- See "GHC.StgToJS"
+-- See documentation in GHC.StgToJS
 jsBackend = Named JavaScript
 
 -- | Via-C ("unregisterised") backend.
