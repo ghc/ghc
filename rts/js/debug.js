@@ -73,7 +73,7 @@ function h$debugAlloc_init_internal() {
     };
 
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
       try {
         // the 'weak' package provides the same functionality, but segfaults
         // try this first
@@ -237,7 +237,7 @@ var h$debug = {};
 
 function h$loadDebugTools() {
   function load(m, p) {
-    if(h$isNode) {
+    if(h$isNode()) {
       try {
         var t = require(m);
         h$debug[p] = t;
@@ -247,7 +247,7 @@ function h$loadDebugTools() {
   load('gc-stats', 'gcStats');
   load('v8-natives', 'v8');
   var t;
-  if(h$isNode) {
+  if(h$isNode()) {
     try {
       t = require('gc-stats');
       h$debug.gcStats = t;

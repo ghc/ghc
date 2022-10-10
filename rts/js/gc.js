@@ -175,7 +175,7 @@ function h$gc(t) {
 #ifndef GHCJS_BROWSER
     // fixme, should enable again later when proper CAF management
     // and retention of the standard handles in GHCJSi work
-    if(h$isGHCJSi) return;
+    if(h$isGHCJSi()) return;
 #endif
 
     if(h$currentThread !== null) throw "h$gc: GC can only be run when no thread is running";

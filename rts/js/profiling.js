@@ -27,7 +27,7 @@ var h$registerCC = null, h$registerCCS = null, h$setCCS = null;
 var h$runProf = function(f) {
     f();
 }
-if(h$isNode) {
+if(h$isNode()) {
     (function() {
 	try {
             var p = require('ghcjs-profiling');
