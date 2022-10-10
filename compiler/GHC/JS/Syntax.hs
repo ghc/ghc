@@ -37,9 +37,9 @@
 --
 -- * Strategy
 --
---     Nothing fancy in this module, this is a classicdeeply embeded AST for JS.
---     We define numerous ADTs and pattern synonyms to make pattern matching and
---     constructing ASTs easier.
+--     Nothing fancy in this module, this is a classic deeply embeded AST for
+--     JS. We define numerous ADTs and pattern synonyms to make pattern matching
+--     and constructing ASTs easier.
 --
 --
 -- * Consumers
