@@ -1476,7 +1476,7 @@ boundsChecked False _ _ r = r
 boundsChecked True  xs i r =
   ifS ((i .<. xs .^ "length") .&&. (i .>=. zero_))
     r
-    (returnS $ app "h$throwJSException" [ValExpr $ JStr "Array out of bounds"])
+    (returnS $ app "h$exitProcess" [Int 134])
 
 -- e|0 (32 bit signed integer truncation) required because of JS numbers. e|0
 -- converts e to an Int32. Note that e|0 _is still a Double_ because JavaScript.
