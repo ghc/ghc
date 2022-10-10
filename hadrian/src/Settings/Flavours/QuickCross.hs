@@ -1,4 +1,4 @@
-module Settings.Flavours.QuickCross (quickCrossFlavour, quickJsFlavour) where
+module Settings.Flavours.QuickCross (quickCrossFlavour, quickJsFlavour, perfJsFlavour) where
 
 import qualified Data.Set as Set
 
@@ -16,7 +16,15 @@ quickJsFlavour = defaultFlavour
     , rtsWays     = pure $ Set.singleton vanilla
     }
 
--- Same as quickCrossArgs (until it bitrots) but don't enable -fllvm
+perfJsFlavour :: Flavour
+perfJsFlavour = defaultFlavour
+    { name        = "perf-js"
+    , args        = defaultBuilderArgs <> perfJsArgs <> defaultPackageArgs
+    , dynamicGhcPrograms = pure False
+    , libraryWays = pure $ Set.singleton vanilla
+    , rtsWays     = pure $ Set.singleton vanilla
+    }
+
 quickJsArgs :: Args
 quickJsArgs = sourceArgs SourceArgs
     { hsDefault  = mconcat $
@@ -27,6 +35,14 @@ quickJsArgs = sourceArgs SourceArgs
     , hsGhc      = mconcat
                    [ stage0 ? arg "-O"
                    , stage1 ? mconcat [ arg "-O0" ] ] }
+
+perfJsArgs :: Args
+perfJsArgs = sourceArgs SourceArgs
+    { hsDefault  = mconcat [ arg "-O2", arg "-H64m"]
+    , hsLibrary  = arg "-O2"
+    , hsCompiler = arg "-O2"
+    , hsGhc      = arg "-O2"
+    }
 
 -- Please update doc/flavours.md when changing this file.
 quickCrossFlavour :: Flavour
