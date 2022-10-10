@@ -1,3 +1,5 @@
+setTestOpts(js_skip) # the JS backend doesn't detect overflows
+
 # some numbers like "(1 MB)" would still remain.
 # but let's just assume the actual difference in bytes
 # is too small to have an effect on the rounded megabyte value.
