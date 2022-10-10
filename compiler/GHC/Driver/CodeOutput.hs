@@ -226,7 +226,7 @@ outputLlvm logger llvm_config dflags filenm cmm_stream = do
 ************************************************************************
 -}
 outputJS :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
-outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. You should never reach here!"
+outputJS _ _ _ _ _ = pgmError $ "codeOutput: Hit JavaScript case. We should never reach here!"
                               ++ "\nThe JS backend should shortcircuit to StgToJS after Stg."
                               ++ "\nIf you reached this point then you've somehow made it to Cmm!"
 
