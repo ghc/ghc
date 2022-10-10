@@ -2573,6 +2573,30 @@ primop  RaiseOp "raise#" GenPrimOp
    out_of_line = True
    can_fail = True
 
+primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
+   (# #) -> p
+   with
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
+   out_of_line = True
+   can_fail = True
+   code_size = { primOpCodeSizeForeignCall }
+
+primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
+   (# #) -> p
+   with
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
+   out_of_line = True
+   can_fail = True
+   code_size = { primOpCodeSizeForeignCall }
+
+primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
+   (# #) -> p
+   with
+   strictness  = { \ _arity -> mkClosedDmdSig [topDmd] botDiv }
+   out_of_line = True
+   can_fail = True
+   code_size = { primOpCodeSizeForeignCall }
+
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    v -> State# RealWorld -> (# State# RealWorld, p #)
    with

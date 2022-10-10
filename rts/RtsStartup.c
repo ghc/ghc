@@ -203,6 +203,9 @@ static void initBuiltinGcRoots(void)
     getStablePtr((StgPtr)cannotCompactPinned_closure);
     getStablePtr((StgPtr)cannotCompactMutable_closure);
     getStablePtr((StgPtr)nestedAtomically_closure);
+    getStablePtr((StgPtr)underflowException_closure);
+    getStablePtr((StgPtr)overflowException_closure);
+    getStablePtr((StgPtr)divZeroException_closure);
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)interruptIOManager_closure);
@@ -220,9 +223,6 @@ static void initBuiltinGcRoots(void)
      * GHC.Core.Make.mkExceptionId.
      */
     getStablePtr((StgPtr)absentSumFieldError_closure);
-    getStablePtr((StgPtr)raiseUnderflowException_closure);
-    getStablePtr((StgPtr)raiseOverflowException_closure);
-    getStablePtr((StgPtr)raiseDivZeroException_closure);
 }
 
 void

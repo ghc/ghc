@@ -1,9 +1,6 @@
-{-# LANGUAGE GHCForeignImportPrim #-}
-{-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE EmptyCase #-}
 
 -- | Primitive exceptions.
 --
@@ -16,7 +13,7 @@ module GHC.Prim.Exception
 where
 
 import GHC.Prim
-import GHC.Magic
+import GHC.Types ()
 
 default () -- Double and Integer aren't available yet
 
@@ -31,25 +28,14 @@ default () -- Double and Integer aren't available yet
 --
 -- See also: Note [Wired-in exceptions are not CAFfy] in GHC.Core.Make.
 
-foreign import prim "stg_raiseOverflowzh" raiseOverflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
-foreign import prim "stg_raiseUnderflowzh" raiseUnderflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
-foreign import prim "stg_raiseDivZZerozh" raiseDivZero# :: State# RealWorld -> (# State# RealWorld, (# #) #)
-
--- We give a bottoming demand signature to 'raiseOverflow', 'raiseUnderflow' and
--- 'raiseDivZero' in "GHC.Core.Make". NOINLINE pragmas are necessary because if
--- we ever inlined them we would lose that information.
-
 -- | Raise 'GHC.Exception.Type.overflowException'
 raiseOverflow :: a
-{-# NOINLINE raiseOverflow #-}
-raiseOverflow = runRW# (\s -> case raiseOverflow# s of (# _, _ #) -> let x = x in x)
+raiseOverflow = raiseOverflow# (# #)
 
 -- | Raise 'GHC.Exception.Type.underflowException'
 raiseUnderflow :: a
-{-# NOINLINE raiseUnderflow #-}
-raiseUnderflow = runRW# (\s -> case raiseUnderflow# s of (# _, _ #) -> let x = x in x)
+raiseUnderflow = raiseUnderflow# (# #)
 
 -- | Raise 'GHC.Exception.Type.divZeroException'
 raiseDivZero :: a
-{-# NOINLINE raiseDivZero #-}
-raiseDivZero = runRW# (\s -> case raiseDivZero# s of (# _, _ #) -> let x = x in x)
+raiseDivZero = raiseDivZero# (# #)
