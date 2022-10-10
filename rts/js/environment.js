@@ -74,78 +74,95 @@ function h$collectProps(o) {
 
 // load the command line arguments in h$programArgs
 // the first element is the program name
-var h$programArgs;
-#ifdef GHCJS_BROWSER
-h$programArgs = [ "a.js" ];
-#else
-if(h$isNode) {
-    h$programArgs = process.argv.slice(1);
-} else if(h$isJvm) {
-    h$programArgs = h$getGlobal(this).arguments.slice(0);
-    h$programArgs.unshift("a.js");
-} else if(h$isJsShell && typeof h$getGlobal(this).scriptArgs !== 'undefined') {
-    h$programArgs = h$getGlobal(this).scriptArgs.slice(0);
-    h$programArgs.unshift("a.js");
-} else if((h$isJsShell || h$isJsCore) && typeof h$getGlobal(this).arguments !== 'undefined') {
-    h$programArgs = h$getGlobal(this).arguments.slice(0);
-    h$programArgs.unshift("a.js");
-} else {
-    h$programArgs = [ "a.js" ];
-}
-#endif
+var h$programArgs_;
+var h$rtsArgs_;
 
-//filter RTS arguments
-var h$rtsArgs = [];
-{
-    var prog_args = [];
-    var rts_args = [];
-    var in_rts = false;
-    var i = 0;
-    for(i=0;i<h$programArgs.length;i++) {
-        var a = h$programArgs[i];
-        // The '--RTS' argument disables all future
-        // +RTS ... -RTS processing.
-        if (a === "--RTS") {
-            break;
-        }
-        // The '--' argument is passed through to the program, but
-        // disables all further +RTS ... -RTS processing.
-        else if (a === "--") {
-            break;
-        }
-        else if (a === "+RTS") {
-            in_rts = true;
-        }
-        else if (a === "-RTS") {
-            in_rts = false;
-        }
-        else if (in_rts) {
-            rts_args.push(a);
-        }
-        else {
-            prog_args.push(a);
-        }
-    }
-    // process remaining program arguments
-    for (;i<h$programArgs.length;i++) {
-        prog_args.push(h$programArgs[i]);
-    }
-    //set global variables
-    h$programArgs = prog_args;
-    h$rtsArgs     = rts_args;
+function h$programArgs() {
+  if (!h$programArgs_) {
+    h$initArgs();
+  }
+  return h$programArgs_;
+}
+
+function h$rtsArgs() {
+  if (!h$rtsArgs_) {
+    h$initArgs();
+  }
+  return h$rtsArgs_;
+}
+
+function h$initArgs() {
+  #ifdef GHCJS_BROWSER
+  h$programArgs_ = [ "a.js" ];
+  #else
+  if(h$isNode()) {
+      h$programArgs_ = process.argv.slice(1);
+  } else if(h$isJvm()) {
+      h$programArgs_ = h$getGlobal(this).arguments.slice(0);
+      h$programArgs_.unshift("a.js");
+  } else if(h$isJsShell() && typeof h$getGlobal(this).scriptArgs !== 'undefined') {
+      h$programArgs_ = h$getGlobal(this).scriptArgs.slice(0);
+      h$programArgs_.unshift("a.js");
+  } else if((h$isJsShell() || h$isJsCore()) && typeof h$getGlobal(this).arguments !== 'undefined') {
+      h$programArgs_ = h$getGlobal(this).arguments.slice(0);
+      h$programArgs_.unshift("a.js");
+  } else {
+      h$programArgs_ = [ "a.js" ];
+  }
+  #endif
+
+  //filter RTS arguments
+  {
+      var prog_args = [];
+      var rts_args = [];
+      var in_rts = false;
+      var i = 0;
+      for(i=0;i<h$programArgs_.length;i++) {
+          var a = h$programArgs_[i];
+          // The '--RTS' argument disables all future
+          // +RTS ... -RTS processing.
+          if (a === "--RTS") {
+              break;
+          }
+          // The '--' argument is passed through to the program, but
+          // disables all further +RTS ... -RTS processing.
+          else if (a === "--") {
+              break;
+          }
+          else if (a === "+RTS") {
+              in_rts = true;
+          }
+          else if (a === "-RTS") {
+              in_rts = false;
+          }
+          else if (in_rts) {
+              rts_args.push(a);
+          }
+          else {
+              prog_args.push(a);
+          }
+      }
+      // process remaining program arguments
+      for (;i<h$programArgs_.length;i++) {
+          prog_args.push(h$programArgs_[i]);
+      }
+      //set global variables
+      h$programArgs_ = prog_args;
+      h$rtsArgs_     = rts_args;
+  }
 }
 
 function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
   TRACE_ENV("getProgArgV");
-  var c = h$programArgs.length;
+  var c = h$programArgs().length;
   if(c === 0) {
     argc_v.dv.setInt32(argc_off, 0, true);
   } else {
     argc_v.dv.setInt32(argc_off, c, true);
     var argv = h$newByteArray(4*c);
     argv.arr = [];
-    for(var i=0;i<h$programArgs.length;i++) {
-      argv.arr[4*i] = [ h$encodeUtf8(h$programArgs[i]), 0 ];
+    for(var i=0;i<h$programArgs().length;i++) {
+      argv.arr[4*i] = [ h$encodeUtf8(h$programArgs()[i]), 0 ];
     }
     if(!argv_v.arr) { argv_v.arr = []; }
     argv_v.arr[argv_off] = [argv, 0];
@@ -159,12 +176,12 @@ function h$setProgArgv(n, ptr_d, ptr_o) {
     var arg = h$decodeUtf8z(p[0], p[1]);
     args.push(arg);
   }
-  h$programArgs = args;
+  h$programArgs() = args;
 }
 
 function h$getpid() {
 #ifndef GHCJS_BROWSER
-  if(h$isNode) return process.id;
+  if(h$isNode()) return process.id;
 #endif
   return 0;
 }
@@ -177,7 +194,7 @@ var h$fakeCpuTime = 1.0;
 
 function h$getCPUTime() {
 #ifndef GHCJS_BROWSER
-if(h$isNode) {
+if(h$isNode()) {
   var t = process.cpuUsage();
   var cput = t.user + t.system;
   TRACE_ENV("getCPUTime: " + cput);
@@ -194,7 +211,7 @@ if(h$isNode) {
 function h$__hscore_environ() {
     TRACE_ENV("hscore_environ");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         var env = [], i;
         for(i in process.env) {
           var envv = i + '=' + process.env[i];
@@ -219,7 +236,7 @@ function h$__hsbase_unsetenv(name, name_off) {
 function h$getenv(name, name_off) {
     TRACE_ENV("getenv");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         var n = h$decodeUtf8z(name, name_off);
         TRACE_ENV("getenv (node): " + n);
         if(typeof process.env[n] !== 'undefined') {
@@ -240,7 +257,7 @@ function h$setenv(name, name_off, val, val_off, overwrite) {
     return -1;
   }
 #ifndef GHCJS_BROWSER
-  if(h$isNode) {
+  if(h$isNode()) {
     if(overwrite || typeof process.env[n] !== 'undefined') process.env[n] = v;
   }
 #endif
@@ -255,7 +272,7 @@ function h$unsetenv(name, name_off) {
     return -1;
   }
 #ifndef GHCJS_BROWSER
-  if(h$isNode) delete process.env[n];
+  if(h$isNode()) delete process.env[n];
 #endif
   return 0;
 }
@@ -275,12 +292,12 @@ function h$putenv(str, str_off) {
   TRACE_ENV("putenv: " + x);
   if(i === -1) { // remove the value
     TRACE_ENV("putenv unset: " + x);
-    if(h$isNode) delete process.env[x];
+    if(h$isNode()) delete process.env[x];
   } else { // set the value
     var name = x.substring(0, i)
     var val = x.substring(i+1);
     TRACE_ENV("putenv set: " + name + " -> " + val);
-    if(h$isNode) process.env[name] = val;
+    if(h$isNode()) process.env[name] = val;
   }
 #endif
   return 0;
@@ -303,7 +320,7 @@ function h$append_prog_name(str) {
   }
 
   // only works for node for now
-  if(h$isNode) {
+  if(h$isNode()) {
     return basename(process.argv[1]) + ": " + str;
   }
 
@@ -326,15 +343,15 @@ function h$errorMsg(pat) {
     str = str.replace(/%s/, arguments[i]);
   }
 #ifndef GHCJS_BROWSER
-  if(h$isGHCJSi) {
+  if(h$isGHCJSi()) {
     // ignore message
-  } else if(h$isNode) {
+  } else if(h$isNode()) {
     process.stderr.write(str);
-  } else if (h$isJsShell && typeof printErr !== 'undefined') {
+  } else if (h$isJsShell() && typeof printErr !== 'undefined') {
     if(str.length) printErr(stripTrailingNewline(str));
-  } else if (h$isJsShell && typeof putstr !== 'undefined') {
+  } else if (h$isJsShell() && typeof putstr !== 'undefined') {
     putstr(str);
-  } else if (h$isJsCore) {
+  } else if (h$isJsCore()) {
     if(str.length) {
 	if(h$base_stderrLeftover.val !== null) {
 	    debug(h$base_stderrLeftover.val + stripTrailingNewline(str));

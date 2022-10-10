@@ -13,17 +13,41 @@
    more platforms should be added here in the future
 */
 #ifndef GHCJS_BROWSER
-var h$isNode    = false; // runtime is node.js
-var h$isJvm     = false; // runtime is JVM
-var h$isJsShell = false; // runtime is SpiderMonkey jsshell
-var h$isJsCore  = false; // runtime is JavaScriptCore jsc
-var h$isBrowser = false; // running in browser or everything else
+var h$isNode_    = false; // runtime is node.js
+var h$isJvm_     = false; // runtime is JVM
+var h$isJsShell_ = false; // runtime is SpiderMonkey jsshell
+var h$isJsCore_  = false; // runtime is JavaScriptCore jsc
+var h$isBrowser_ = false; // running in browser or everything else
 
-var h$isGHCJSi  = false; // Code is GHCJSi (browser or node)
+var h$isGHCJSi_  = false; // Code is GHCJSi (browser or node)
+
+function h$isNode() {
+  return h$isNode_;
+}
+
+function h$isJvm() {
+  return h$isJvm_;
+}
+
+function h$isJsShell() {
+  return h$isJsShell_;
+}
+
+function h$isJsCore() {
+  return h$isJsCore_;
+}
+
+function h$isBrowser() {
+  return h$isBrowser_;
+}
+
+function h$isGHCJSi() {
+  return h$isGHCJSi_;
+}
 
 // load all required node.js modules
 if(typeof process !== 'undefined' && (typeof h$TH !== 'undefined' || (typeof require !== 'undefined' && typeof module !== 'undefined' && module.exports))) {
-    h$isNode = true;
+    h$isNode_ = true;
     // we have to use these names for the closure compiler externs to work
     var fs            = require('fs');
     var path          = require('path');
@@ -53,22 +77,22 @@ if(typeof process !== 'undefined' && (typeof h$TH !== 'undefined' || (typeof req
     }
     var h$processConstants = h$getProcessConstants();
 } else if(typeof Java !== 'undefined') {
-    h$isJvm = true;
+    h$isJvm_ = true;
     this.console = {
       log: function(s) {
         java.lang.System.out.print(s);
       }
     };
 } else if(typeof snarf !== 'undefined' && typeof print !== 'undefined' && typeof quit !== 'undefined') {
-    h$isJsShell = true;
+    h$isJsShell_ = true;
     this.console = { log: this.print };
 } else if(typeof numberOfDFGCompiles !== 'undefined' && typeof jscStack !== 'undefined') {
-    h$isJsCore = true;
+    h$isJsCore_ = true;
 } else {
-    h$isBrowser = true;
+    h$isBrowser_ = true;
 }
 if(typeof global !== 'undefined' && global.h$GHCJSi) {
-  h$isGHCJSi = true;
+  h$isGHCJSi_ = true;
 }
 #endif
 

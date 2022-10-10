@@ -15,7 +15,7 @@ function h$logIO() { h$log.apply(h$log, arguments); }
 function h$base_access(file, file_off, mode, c) {
     TRACE_IO("base_access");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.stat(fd, function(err, fs) {
             if(err) {
                 h$handleErrnoC(err, -1, 0, c);
@@ -31,7 +31,7 @@ function h$base_access(file, file_off, mode, c) {
 function h$base_chmod(file, file_off, mode, c) {
     TRACE_IO("base_chmod");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.chmod(h$decodeUtf8z(file, file_off), mode, function(err) {
             h$handleErrnoC(err, -1, 0, c);
         });
@@ -110,7 +110,7 @@ function h$base_dup2(fd, new_fd, c) {
 function h$base_fstat(fd, stat, stat_off, c) {
     TRACE_IO("base_stat");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.fstat(fd, function(err, fs) {
             if(err) {
                 h$handleErrnoC(err, -1, 0, c);
@@ -175,7 +175,7 @@ function h$long_from_number(f,c) {
 function h$base_lseek(fd, pos_h, pos_l, whence, c) {
     TRACE_IO("base_lseek");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         var p = CLOSEST_FLOAT_NUMBER(pos_h,pos_l);
         var o = h$base_fds[fd];
         if(!o) {
@@ -219,7 +219,7 @@ function h$base_lseek(fd, pos_h, pos_l, whence, c) {
 function h$base_lstat(file, file_off, stat, stat_off, c) {
     TRACE_IO("base_lstat");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.lstat(h$decodeUtf8z(file, file_off), function(err, fs) {
             if(err) {
                 h$handleErrnoC(err, -1, 0, c);
@@ -234,7 +234,7 @@ function h$base_lstat(file, file_off, stat, stat_off, c) {
 }
 function h$base_open(file, file_off, how, mode, c) {
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         var flags, off;
         var fp   = h$decodeUtf8z(file, file_off);
         TRACE_IO("base_open: " + fp);
@@ -294,7 +294,7 @@ function h$base_read(fd, buf, buf_off, n, c) {
 function h$base_stat(file, file_off, stat, stat_off, c) {
     TRACE_IO("base_stat");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.stat(h$decodeUtf8z(file, file_off), function(err, fs) {
             if(err) {
                 h$handleErrnoC(err, -1, 0, c);
@@ -310,7 +310,7 @@ function h$base_stat(file, file_off, stat, stat_off, c) {
 function h$base_umask(mode) {
     TRACE_IO("base_umask: " + mode);
 #ifndef GHCJS_BROWSER
-    if(h$isNode) return process.umask(mode);
+    if(h$isNode()) return process.umask(mode);
 #endif
     return 0;
 }
@@ -337,7 +337,7 @@ function h$base_write(fd, buf, buf_off, n, c) {
 function h$base_ftruncate(fd, pos_h, pos_l, c) {
     TRACE_IO("base_ftruncate");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.ftruncate(fd, CLOSEST_FLOAT_NUMBER(pos_h,pos_l), function(err) {
             h$handleErrnoC(err, -1, 0, c);
         });
@@ -348,7 +348,7 @@ function h$base_ftruncate(fd, pos_h, pos_l, c) {
 function h$base_unlink(file, file_off, c) {
     TRACE_IO("base_unlink");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.unlink(h$decodeUtf8z(file, file_off), function(err) {
             h$handleErrnoC(err, -1, 0, c);
         });
@@ -359,14 +359,14 @@ function h$base_unlink(file, file_off, c) {
 function h$base_getpid() {
     TRACE_IO("base_getpid");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) return process.pid;
+    if(h$isNode()) return process.pid;
 #endif
     return 0;
 }
 function h$base_link(file1, file1_off, file2, file2_off, c) {
     TRACE_IO("base_link");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.link(h$decodeUtf8z(file1, file1_off), h$decodeUtf8z(file2, file2_off), function(err) {
             h$handleErrnoC(err, -1, 0, c);
         });
@@ -398,7 +398,7 @@ function h$base_tcsetattr(attr, val, termios, termios_off) {
 function h$base_utime(file, file_off, timbuf, timbuf_off, c) {
     TRACE_IO("base_utime");
 #ifndef GHCJS_BROWSER
-    if(h$isNode) {
+    if(h$isNode()) {
         h$fs.fstat(h$decodeUtf8z(file, file_off), function(err, fs) {
             if(err) {
                 h$handleErrnoC(err, 0, -1, c); // fixme
@@ -588,7 +588,7 @@ var h$base_process_stdin = function() {
     c.processing = false;
 }
 
-if(h$isNode) {
+if(h$isNode()) {
     h$base_closeFile = function(fd, fdo, c) {
         TRACE_IO("base_closeFile: " + fd + " (" + fdo.fd + ")");
         var real_fd = typeof fdo.fd === 'number' ? fdo.fd : fd;
@@ -677,7 +677,7 @@ if(h$isNode) {
     h$base_isattyStdout = function() { return process.stdout.isTTY; };
     h$base_isattyStderr = function() { return process.stderr.isTTY; };
 
-} else if (h$isJsShell) {
+} else if (h$isJsShell()) {
     h$base_readStdin = function(fd, fdo, buf, buf_offset, n, c) {
         c(0);
     }
@@ -759,8 +759,8 @@ var h$base_fds = [h$base_stdin_fd, h$base_stdout_fd, h$base_stderr_fd];
 function h$shutdownHaskellAndExit(code, fast) {
 #ifndef GHCJS_BROWSER
 #ifdef GHCJS_LOG_BUFFER
-    if(h$isNode) console.log(h$logBuffer);
-    if(h$isJsShell || h$isJsCore) print(h$logBuffer);
+    if(h$isNode()) console.log(h$logBuffer);
+    if(h$isJsShell() || h$isJsCore) print(h$logBuffer);
 #endif
 #endif
     h$exitProcess(code);
