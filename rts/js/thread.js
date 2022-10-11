@@ -240,11 +240,15 @@ function h$killThread(t, ex) {
       return h$stack ? h$stack[h$sp] : null;
     } else {
       t.excep.push([h$currentThread,ex]);
-      h$currentThread.interruptible = true;
-      h$sp += 2;
-      h$stack[h$sp-1] = h$r1;
-      h$stack[h$sp] = h$return;
-      return h$blockThread(h$currentThread,t,null);
+      if(h$currentThread) {
+        h$currentThread.interruptible = true;
+        h$sp += 2;
+        h$stack[h$sp-1] = h$r1;
+        h$stack[h$sp] = h$return;
+        return h$blockThread(h$currentThread,t,null);
+      } else {
+        return null;
+      }
     }
   }
 }
