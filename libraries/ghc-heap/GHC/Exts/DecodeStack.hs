@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+#if MIN_VERSION_base(4,17,0)
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
@@ -12,9 +13,12 @@
 {-# LANGUAGE BangPatterns #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
-module GHC.Exts.DecodeStack where
+module GHC.Exts.DecodeStack (
+  StackFrame(..),
+  BitmapPayload(..),
+  decodeStack
+                            ) where
 
-#if MIN_VERSION_base(4,17,0)
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import Data.Maybe
 import Data.Bits
@@ -233,7 +237,7 @@ data StackFrame =
   UnderflowFrame { nextChunk:: StackSnapshot } |
   StopFrame |
   RetSmall SpecialRetSmall [BitmapPayload] |
-  RetBig [BitmapPayload] |
+  RetBig { payload :: [BitmapPayload] } |
   RetFun |
   RetBCO
   deriving (Show)
@@ -259,4 +263,6 @@ decodeStack' s = unpackStackFrameIter (stackHead s) : go (advanceStackFrameIter 
     go Nothing = []
     go (Just sfi) = unpackStackFrameIter sfi : go (advanceStackFrameIter sfi)
 
+#else
+module GHC.Exts.DecodeStack where
 #endif

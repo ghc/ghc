@@ -62,15 +62,20 @@ test('decode_cloned_stack',
      [only_ways(['normal'])],
      compile_and_run, ['-debug -optc-g -g'])
 
-# TODO: Are debug flags needed here?
-test('decode_cloned_stack_big_ret',
-     [only_ways(['normal'])],
-     compile_and_run, ['-debug -optc-g -g -DDEBUG'])
+test('stack_big_ret',
+     [
+        extra_files(['TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+     ],
+     compile_and_run,
+     [''])
 
 # Options:
 #   - `-kc512B -kb64B`: Make stack chunk size small to provoke underflow stack frames.
 test('stack_underflow',
      [
+        extra_files(['TestUtils.hs']),
          extra_run_opts('+RTS -kc512B -kb64B -RTS'),
          ignore_stdout,
          ignore_stderr
