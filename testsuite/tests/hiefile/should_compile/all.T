@@ -16,6 +16,7 @@ test('hie007',       normal,                   compile, ['-fno-code -fwrite-ide-
 test('hie008',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie009',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('hie010',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
+test('hie011',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('CPP',          normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('Constructors', normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])
 test('Scopes',       normal,                   compile, ['-fno-code -fwrite-ide-info -fvalidate-ide-info'])

@@ -133,9 +133,9 @@ hsExprType (HsTypedBracket   (HsBracketTc _ ty _wrap _pending) _) = ty
 hsExprType (HsUntypedBracket (HsBracketTc _ ty _wrap _pending) _) = ty
 hsExprType e@(HsSpliceE{}) = pprPanic "hsExprType: Unexpected HsSpliceE"
                                       (ppr e)
-                                      -- Typed splices should have been eliminated during zonking, but we
-                                      -- can't use `dataConCantHappen` since they are still present before
-                                      -- than in the typechecked AST.
+                               -- Typed splices should have been eliminated during zonking, but we
+                               -- can't use `dataConCantHappen` since they are still present before
+                               -- than in the typechecked AST
 hsExprType (HsProc _ _ lcmd_top) = lhsCmdTopType lcmd_top
 hsExprType (HsStatic (_, ty) _s) = ty
 hsExprType (HsPragE _ _ e) = lhsExprType e

@@ -744,6 +744,9 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
+        -- By this point all splices are lifted into splice environments so
+        -- the remaining HsSpliceE in the syntax tree contain bogus information.
+        HsSpliceE {} -> Nothing
         XExpr (ExpansionExpr (HsExpanded (HsGetField _ _ _) e)) -> Just (hsExprType e) -- for record-dot-syntax
         XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
         XExpr (HsTick _ e) -> computeLType e
@@ -1873,10 +1876,10 @@ instance ToHie (HsQuote a) where
   toHie _ = pure []
 
 instance ToHie PendingRnSplice where
-  toHie _ = pure []
+  toHie (PendingRnSplice _ _ e) = toHie e
 
 instance ToHie PendingTcSplice where
-  toHie _ = pure []
+  toHie (PendingTcSplice _ e) = toHie e
 
 instance ToHie (LBooleanFormula (LocatedN Name)) where
   toHie (L span form) = concatM $ makeNode form (locA span) : case form of
