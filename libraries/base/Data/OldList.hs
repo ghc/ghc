@@ -1246,6 +1246,9 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 -- >>> permutations "abc"
 -- ["abc","bac","cba","bca","cab","acb"]
 --
+-- The 'permutations' function is maximally lazy:
+-- for each @n@, the value of @'permutations' xs@ starts with those permutations
+-- that permute @'take' n xs@ and keep @'drop' n xs@.
 -- This function is productive on infinite inputs:
 --
 -- >>> take 6 $ map (take 3) $ permutations ['a'..]
