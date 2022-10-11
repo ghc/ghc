@@ -47,6 +47,7 @@ import GHC.Utils.Error
 import Data.Maybe
 import GHC.CmmToLlvm.Mangler
 import GHC.SysTools
+import GHC.SysTools.Cpp
 import GHC.Utils.Panic.Plain
 import System.Directory
 import System.FilePath
@@ -59,7 +60,6 @@ import GHC.Data.Maybe
 import GHC.Iface.Make
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
-import qualified GHC.JS.Parser.Header as JSHeader
 import GHC.Data.StringBuffer
 import GHC.Types.SourceError
 import GHC.Unit.Finder
@@ -74,14 +74,13 @@ import GHC.Settings
 import System.IO
 import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
-import Data.Version
 import GHC.Utils.Panic
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
 import GHC.SysTools.Cpp
-import GHC.StgToJS.Object (isJsObjectFile)
+import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
@@ -349,56 +348,14 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 -- | Embed .js files into .o files
 runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runJsPhase pipe_env hsc_env input_fn = do
-        let dflags     = hsc_dflags   hsc_env
-        let logger     = hsc_logger   hsc_env
-        let tmpfs      = hsc_tmpfs    hsc_env
-        let unit_env   = hsc_unit_env hsc_env
+  let dflags     = hsc_dflags   hsc_env
+  let logger     = hsc_logger   hsc_env
+  let tmpfs      = hsc_tmpfs    hsc_env
+  let unit_env   = hsc_unit_env hsc_env
 
-        output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-
-        -- if the input filename is the same as the output, then we've probably
-        -- generated the object ourselves, we leave the file alone
-        when (input_fn /= output_fn) $ do
-
-          -- the header lets the linker recognize processed JavaScript files
-          -- But don't add JavaScript header to object files!
-
-          is_js_obj <- if True
-                        then pure False
-                        else isJsObjectFile input_fn
-                        -- FIXME (Sylvain 2022-09): this call makes the
-                        -- testsuite go into a loop, I don't know why yet!
-                        -- Disabling it for now.
-
-          if is_js_obj
-            then copyWithHeader "" input_fn output_fn
-            else do
-              -- header appended to JS files stored as .o to recognize them.
-              let header = "//JavaScript\n"
-              jsFileNeedsCpp input_fn >>= \case
-                False -> copyWithHeader header input_fn output_fn
-                True  -> do
-                  -- run CPP on the input JS file
-                  tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
-                  doCpp logger
-                          tmpfs
-                          dflags
-                          unit_env
-                          (CppOpts
-                              { cppUseCc = True
-                              , cppLinePragmas = False
-                              })
-                          []
-                          input_fn
-                          tmp_fn
-                  copyWithHeader header tmp_fn output_fn
-
-        return output_fn
-
-jsFileNeedsCpp :: FilePath -> IO Bool
-jsFileNeedsCpp fn = do
-  opts <- JSHeader.getOptionsFromJsFile fn
-  pure (JSHeader.CPP `elem` opts)
+  output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+  embedJsFile logger dflags tmpfs unit_env input_fn output_fn
+  return output_fn
 
 
 applyAssemblerInfoGetter
@@ -1171,36 +1128,6 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
       text "    Call hs_init_ghc() from your main() function to set these options.")
   linkDynLib logger tmpfs dflags unit_env o_files dep_units
 
-
-
--- ---------------------------------------------------------------------------
--- Macros (cribbed from Cabal)
-
-generatePackageVersionMacros :: [UnitInfo] -> String
-generatePackageVersionMacros pkgs = concat
-  -- Do not add any C-style comments. See #3389.
-  [ generateMacros "" pkgname version
-  | pkg <- pkgs
-  , let version = unitPackageVersion pkg
-        pkgname = map fixchar (unitPackageNameString pkg)
-  ]
-
-fixchar :: Char -> Char
-fixchar '-' = '_'
-fixchar c   = c
-
-generateMacros :: String -> String -> Version -> String
-generateMacros prefix name version =
-  concat
-  ["#define ", prefix, "VERSION_",name," ",show (showVersion version),"\n"
-  ,"#define MIN_", prefix, "VERSION_",name,"(major1,major2,minor) (\\\n"
-  ,"  (major1) <  ",major1," || \\\n"
-  ,"  (major1) == ",major1," && (major2) <  ",major2," || \\\n"
-  ,"  (major1) == ",major1," && (major2) == ",major2," && (minor) <= ",minor,")"
-  ,"\n\n"
-  ]
-  where
-    (major1:major2:minor:_) = map show (versionBranch version ++ repeat 0)
 
 
 -- -----------------------------------------------------------------------------

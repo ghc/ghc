@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 // JS Objects stuff
 
 function h$isFloat (n) {

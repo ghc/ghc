@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 #ifdef GHCJS_TRACE_ENV
 function h$logEnv() { h$log.apply(h$log,arguments); }
 #define TRACE_ENV(args...) h$logEnv(args)

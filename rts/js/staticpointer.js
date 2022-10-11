@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 // static pointers
 var h$static_pointer_table      = null;
 var h$static_pointer_table_keys = null;

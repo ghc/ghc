@@ -231,4 +231,3 @@ offsetIncludePaths :: DynFlags -> IncludeSpecs -> IncludeSpecs
 offsetIncludePaths dflags (IncludeSpecs incs quotes impl) =
      let go = map (augmentByWorkingDirectory dflags)
      in IncludeSpecs (go incs) (go quotes) (go impl)
-

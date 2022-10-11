@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 // preemptive threading support
 
 // run gc when this much time has passed (ms)

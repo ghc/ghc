@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 #ifdef GHCJS_TRACE_HSCORE
 function h$logHscore() { h$log.apply(h$log,arguments); }
 #define TRACE_HSCORE(args...) h$logHscore(args)

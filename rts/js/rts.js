@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 var h$start = new Date();
 
 function h$rts_eval(action, unbox) {

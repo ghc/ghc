@@ -1,8 +1,6 @@
 //#OPTIONS: CPP
 // #define GHCJS_TRACE_ARITH 1
 
-#include <js/rts.h>
-
 #ifdef GHCJS_TRACE_ARITH
 function h$logArith() { h$log.apply(h$log,arguments); }
 #define TRACE_ARITH(args...) h$logArith(args)
