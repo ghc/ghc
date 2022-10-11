@@ -84,6 +84,7 @@ library
         js/enum.js
         js/environment.js
         js/gc.js
+        js/globals.js
         js/goog.js
         js/hscore.js
         js/md5.js

@@ -39,6 +39,7 @@ function h$setErrno(e) {
   var es = e.toString();
   var getErr = function() {
       if(es.indexOf('ENOTDIR') !== -1)      return CONST_ENOTDIR;
+      if(es.indexOf('EISDIR') !== -1)       return CONST_EISDIR;
       if(es.indexOf('ENOENT') !== -1)       return CONST_ENOENT;
       if(es.indexOf('EEXIST') !== -1)       return CONST_EEXIST;
       if(es.indexOf('ENETUNREACH') !== -1)  return CONST_EINVAL; // fixme
@@ -61,6 +62,7 @@ var h$errorStrs =  { CONST_E2BIG:   "Argument list too long"
                    , CONST_EINVAL:  "Invalid argument"
                    , CONST_EBADF:   "Bad file descriptor"
                    , CONST_ENOTDIR: "Not a directory"
+                   , CONST_EISDIR:  "Illegal operation on a directory"
                    , CONST_ENOENT:  "No such file or directory"
                    , CONST_EPERM:   "Operation not permitted"
                    , CONST_EEXIST:  "File exists"
