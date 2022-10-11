@@ -1,8 +1,6 @@
 //#OPTIONS: CPP
 #include "HsBaseConfig.h"
 
-#include <js/rts.h>
-
 // #define GHCJS_TRACE_IO 1
 
 #ifdef GHCJS_TRACE_IO

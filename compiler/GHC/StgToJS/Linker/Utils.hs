@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE MultiWayIf  #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.StgToJS.Linker.Utils
@@ -15,13 +16,20 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToJS.Linker.Utils where
+module GHC.StgToJS.Linker.Utils
+  ( getOptionsFromJsFile
+  , JSOption(..)
+  , jsExeFileName
+  , getInstalledPackageLibDirs
+  , getInstalledPackageHsLibs
+  , commonCppDefs
+  )
+where
 
 import           System.FilePath
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as Char8
 import           Data.ByteString (ByteString)
-import           System.IO (withBinaryFile, IOMode(WriteMode))
 
 import          GHC.Driver.Session
 import          GHC.Settings.Config (cProjectVersion)
@@ -36,6 +44,10 @@ import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
 import System.Directory (createDirectoryIfMissing)
+import System.IO
+import Data.Char (isSpace)
+import qualified Data.ByteString as B
+import qualified Control.Exception as Exception
 
 -- | Given a FilePath and payload, write a file to disk creating any directories
 -- along the way if needed.
@@ -144,24 +156,6 @@ genCommonCppDefs profiling = mconcat
   , if profiling
       then "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
       else "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
-
-  -- GHC.Integer.GMP.Internals
-  , "#define IS_INTEGER_S(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziSzh_con_e)\n"
-  , "#define IS_INTEGER_Jp(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziJpzh_con_e)\n"
-  , "#define IS_INTEGER_Jn(cl) ((cl).f === h$integerzmwiredzminZCGHCziIntegerziTypeziJnzh_con_e)\n"
-  , "#define INTEGER_S_DATA(cl) ((cl).d1)\n"
-  , "#define INTEGER_J_DATA(cl) ((cl).d1)\n"
-  , if profiling
-      then mconcat
-        [ "#define MK_INTEGER_S(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziSzh_con_e, (iii), h$CCS_SYSTEM));\n"
-        , "#define MK_INTEGER_Jp(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziJpzh_con_e, (iii), h$CCS_SYSTEM));\n"
-        , "#define MK_INTEGER_Jn(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziJnzh_con_e, (iii), h$CCS_SYSTEM));\n"
-        ]
-      else mconcat
-        [ "#define MK_INTEGER_S(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziSzh_con_e, (iii)));\n"
-        , "#define MK_INTEGER_Jp(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziJpzh_con_e, (iii)));\n"
-        , "#define MK_INTEGER_Jn(iii) (h$c1(h$integerzmwiredzminZCGHCziIntegerziTypeziJnzh_con_e, (iii)));\n"
-        ]
 
   -- Data.Maybe.Maybe
   , "#define HS_NOTHING h$baseZCGHCziMaybeziNothing\n"
@@ -297,3 +291,38 @@ jsExeFileName dflags
     dropPrefix prefix xs
       | prefix `isPrefixOf` xs = drop (length prefix) xs
       | otherwise              = xs
+
+
+-- | Parse option pragma in JS file
+getOptionsFromJsFile :: FilePath      -- ^ Input file
+                     -> IO [JSOption] -- ^ Parsed options, if any.
+getOptionsFromJsFile filename
+    = Exception.bracket
+              (openBinaryFile filename ReadMode)
+              hClose
+              getJsOptions
+
+data JSOption = CPP deriving (Eq, Ord)
+
+getJsOptions :: Handle -> IO [JSOption]
+getJsOptions handle = do
+  hSetEncoding handle utf8
+  prefix' <- B.hGet handle prefixLen
+  if prefix == prefix'
+  then parseJsOptions <$> hGetLine handle
+  else pure []
+ where
+  prefix :: B.ByteString
+  prefix = "//#OPTIONS:"
+  prefixLen = B.length prefix
+
+parseJsOptions :: String -> [JSOption]
+parseJsOptions xs = go xs
+  where
+    trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+    go [] = []
+    go xs = let (tok, rest) = break (== ',') xs
+                tok' = trim tok
+                rest' = drop 1 rest
+            in  if | tok' == "CPP" -> CPP : go rest'
+                   | otherwise     -> go rest'

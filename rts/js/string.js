@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 // encode a string constant
 function h$str(s) {
   var enc = null;

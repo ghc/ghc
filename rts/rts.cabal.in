@@ -107,8 +107,6 @@ library
                         stg/MachRegs.h
                         stg/MachRegsForHost.h
                         stg/Types.h
-                        js/rts.h
-                        js/constants.h
 
     else
       -- If we are using an in-tree libffi then we must declare it as a bundled

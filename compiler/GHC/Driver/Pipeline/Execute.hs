@@ -47,6 +47,7 @@ import GHC.Utils.Error
 import Data.Maybe
 import GHC.CmmToLlvm.Mangler
 import GHC.SysTools
+import GHC.SysTools.Cpp
 import GHC.Utils.Panic.Plain
 import System.Directory
 import System.FilePath
@@ -59,7 +60,6 @@ import GHC.Data.Maybe
 import GHC.Iface.Make
 import GHC.Driver.Config.Parser
 import GHC.Parser.Header
-import qualified GHC.JS.Parser.Header as JSHeader
 import GHC.Data.StringBuffer
 import GHC.Types.SourceError
 import GHC.Unit.Finder
@@ -67,21 +67,19 @@ import GHC.Runtime.Loader
 import Data.IORef
 import GHC.Types.Name.Env
 import GHC.Platform.Ways
-import GHC.Platform.ArchOS
 import GHC.Driver.LlvmConfigCache (readLlvmConfigCache)
-import GHC.CmmToLlvm.Config (llvmVersionList, LlvmTarget (..), LlvmConfig (..))
+import GHC.CmmToLlvm.Config (LlvmTarget (..), LlvmConfig (..))
 import {-# SOURCE #-} GHC.Driver.Pipeline (compileForeign, compileEmptyStub)
 import GHC.Settings
 import System.IO
 import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
-import Data.Version
 import GHC.Utils.Panic
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
-import GHC.StgToJS.Object (isJsObjectFile)
+import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
 import GHC.Unit.Home.ModInfo
@@ -350,56 +348,14 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 -- | Embed .js files into .o files
 runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runJsPhase pipe_env hsc_env input_fn = do
-        let dflags     = hsc_dflags   hsc_env
-        let logger     = hsc_logger   hsc_env
-        let tmpfs      = hsc_tmpfs    hsc_env
-        let unit_env   = hsc_unit_env hsc_env
+  let dflags     = hsc_dflags   hsc_env
+  let logger     = hsc_logger   hsc_env
+  let tmpfs      = hsc_tmpfs    hsc_env
+  let unit_env   = hsc_unit_env hsc_env
 
-        output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-
-        -- if the input filename is the same as the output, then we've probably
-        -- generated the object ourselves, we leave the file alone
-        when (input_fn /= output_fn) $ do
-
-          -- the header lets the linker recognize processed JavaScript files
-          -- But don't add JavaScript header to object files!
-
-          is_js_obj <- if True
-                        then pure False
-                        else isJsObjectFile input_fn
-                        -- FIXME (Sylvain 2022-09): this call makes the
-                        -- testsuite go into a loop, I don't know why yet!
-                        -- Disabling it for now.
-
-          if is_js_obj
-            then copyWithHeader "" input_fn output_fn
-            else do
-              -- header appended to JS files stored as .o to recognize them.
-              let header = "//JavaScript\n"
-              jsFileNeedsCpp input_fn >>= \case
-                False -> copyWithHeader header input_fn output_fn
-                True  -> do
-                  -- run CPP on the input JS file
-                  tmp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
-                  doCpp logger
-                          tmpfs
-                          dflags
-                          unit_env
-                          (CppOpts
-                              { cppUseCc = True
-                              , cppLinePragmas = False
-                              })
-                          []
-                          input_fn
-                          tmp_fn
-                  copyWithHeader header tmp_fn output_fn
-
-        return output_fn
-
-jsFileNeedsCpp :: FilePath -> IO Bool
-jsFileNeedsCpp fn = do
-  opts <- JSHeader.getOptionsFromJsFile fn
-  pure (JSHeader.CPP `elem` opts)
+  output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
+  embedJsFile logger dflags tmpfs unit_env input_fn output_fn
+  return output_fn
 
 
 applyAssemblerInfoGetter
@@ -1026,153 +982,6 @@ llvmOptions llvm_config dflags =
                 _           -> ""
 
 
--- Note [Filepaths and Multiple Home Units]
-offsetIncludePaths :: DynFlags -> IncludeSpecs -> IncludeSpecs
-offsetIncludePaths dflags (IncludeSpecs incs quotes impl) =
-     let go = map (augmentByWorkingDirectory dflags)
-     in IncludeSpecs (go incs) (go quotes) (go impl)
--- -----------------------------------------------------------------------------
--- Running CPP
-
-data CppOpts = CppOpts
-  { cppUseCc       :: !Bool -- ^ Use "cc -E" as preprocessor, otherwise use "cpp"
-  , cppLinePragmas :: !Bool -- ^ Enable generation of LINE pragmas
-  }
-
--- | Run CPP
---
--- UnitEnv is needed to compute MIN_VERSION macros
-doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> [Option] -> FilePath -> FilePath -> IO ()
-doCpp logger tmpfs dflags unit_env opts extra_opts input_fn output_fn = do
-    let hscpp_opts = picPOpts dflags
-    let cmdline_include_paths = offsetIncludePaths dflags (includePaths dflags)
-    let unit_state = ue_units unit_env
-    pkg_include_dirs <- mayThrowUnitErr
-                        (collectIncludeDirs <$> preloadUnitsInfo unit_env)
-    -- MP: This is not quite right, the headers which are supposed to be installed in
-    -- the package might not be the same as the provided include paths, but it's a close
-    -- enough approximation for things to work. A proper solution would be to have to declare which paths should
-    -- be propagated to dependent packages.
-    let home_pkg_deps =
-         [homeUnitEnv_dflags . ue_findHomeUnitEnv uid $ unit_env | uid <- ue_transitiveHomeDeps (ue_currentUnit unit_env) unit_env]
-        dep_pkg_extra_inputs = [offsetIncludePaths fs (includePaths fs) | fs <- home_pkg_deps]
-
-    let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
-          (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs
-                                                    ++ concatMap includePathsGlobal dep_pkg_extra_inputs)
-    let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
-          (includePathsQuote cmdline_include_paths ++
-           includePathsQuoteImplicit cmdline_include_paths)
-    let include_paths = include_paths_quote ++ include_paths_global
-
-    let verbFlags = getVerbFlags dflags
-
-    let cpp_prog args
-          | cppUseCc opts = GHC.SysTools.runCc Nothing logger tmpfs dflags
-                                               (GHC.SysTools.Option "-E" : args)
-          | otherwise     = GHC.SysTools.runCpp logger dflags args
-
-    let platform   = targetPlatform dflags
-        targetArch = stringEncodeArch $ platformArch platform
-        targetOS = stringEncodeOS $ platformOS platform
-        isWindows = platformOS platform == OSMinGW32
-    let target_defs =
-          [ "-D" ++ HOST_OS     ++ "_BUILD_OS",
-            "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH",
-            "-D" ++ targetOS    ++ "_HOST_OS",
-            "-D" ++ targetArch  ++ "_HOST_ARCH" ]
-        -- remember, in code we *compile*, the HOST is the same our TARGET,
-        -- and BUILD is the same as our HOST.
-
-    let io_manager_defs =
-          [ "-D__IO_MANAGER_WINIO__=1" | isWindows ] ++
-          [ "-D__IO_MANAGER_MIO__=1"               ]
-
-    let sse_defs =
-          [ "-D__SSE__"      | isSseEnabled      platform ] ++
-          [ "-D__SSE2__"     | isSse2Enabled     platform ] ++
-          [ "-D__SSE4_2__"   | isSse4_2Enabled   dflags ]
-
-    let avx_defs =
-          [ "-D__AVX__"      | isAvxEnabled      dflags ] ++
-          [ "-D__AVX2__"     | isAvx2Enabled     dflags ] ++
-          [ "-D__AVX512CD__" | isAvx512cdEnabled dflags ] ++
-          [ "-D__AVX512ER__" | isAvx512erEnabled dflags ] ++
-          [ "-D__AVX512F__"  | isAvx512fEnabled  dflags ] ++
-          [ "-D__AVX512PF__" | isAvx512pfEnabled dflags ]
-
-    backend_defs <- applyCDefs (backendCDefs $ backend dflags) logger dflags
-
-    let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
-    -- Default CPP defines in Haskell source
-    ghcVersionH <- getGhcVersionPathName dflags unit_env
-    let hsSourceCppOpts = [ "-include", ghcVersionH ]
-
-    -- MIN_VERSION macros
-    let uids = explicitUnits unit_state
-        pkgs = mapMaybe (lookupUnit unit_state . fst) uids
-    mb_macro_include <-
-        if not (null pkgs) && gopt Opt_VersionMacros dflags
-            then do macro_stub <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "h"
-                    writeFile macro_stub (generatePackageVersionMacros pkgs)
-                    -- Include version macros for every *exposed* package.
-                    -- Without -hide-all-packages and with a package database
-                    -- size of 1000 packages, it takes cpp an estimated 2
-                    -- milliseconds to process this file. See #10970
-                    -- comment 8.
-                    return [GHC.SysTools.FileOption "-include" macro_stub]
-            else return []
-
-    let line_pragmas
-          | cppLinePragmas opts = [] -- on by default
-          | otherwise           = [GHC.SysTools.Option "-P"] -- disable LINE markers
-
-    cpp_prog       (   map GHC.SysTools.Option verbFlags
-                    ++ map GHC.SysTools.Option include_paths
-                    ++ map GHC.SysTools.Option hsSourceCppOpts
-                    ++ map GHC.SysTools.Option target_defs
-                    ++ map GHC.SysTools.Option backend_defs
-                    ++ map GHC.SysTools.Option th_defs
-                    ++ map GHC.SysTools.Option hscpp_opts
-                    ++ map GHC.SysTools.Option sse_defs
-                    ++ map GHC.SysTools.Option avx_defs
-                    ++ map GHC.SysTools.Option io_manager_defs
-                    ++ mb_macro_include
-                    ++ extra_opts
-                    ++ line_pragmas
-        -- Set the language mode to assembler-with-cpp when preprocessing. This
-        -- alleviates some of the C99 macro rules relating to whitespace and the hash
-        -- operator, which we tend to abuse. Clang in particular is not very happy
-        -- about this.
-                    ++ [ GHC.SysTools.Option     "-x"
-                       , GHC.SysTools.Option     "assembler-with-cpp"
-                       , GHC.SysTools.Option     input_fn
-        -- We hackily use Option instead of FileOption here, so that the file
-        -- name is not back-slashed on Windows.  cpp is capable of
-        -- dealing with / in filenames, so it works fine.  Furthermore
-        -- if we put in backslashes, cpp outputs #line directives
-        -- with *double* backslashes.   And that in turn means that
-        -- our error messages get double backslashes in them.
-        -- In due course we should arrange that the lexer deals
-        -- with these \\ escapes properly.
-                       , GHC.SysTools.Option     "-o"
-                       , GHC.SysTools.FileOption "" output_fn
-                       ])
-
-applyCDefs :: DefunctionalizedCDefs -> Logger -> DynFlags -> IO [String]
-applyCDefs NoCDefs _ _ = return []
-applyCDefs LlvmCDefs logger dflags = do
-    llvmVer <- figureLlvmVersion logger dflags
-    return $ case fmap llvmVersionList llvmVer of
-               Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
-               Just (m:n:_) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
-               _ -> []
-  where
-    format (major, minor)
-      | minor >= 100 = error "backendCDefs: Unsupported minor version"
-      | otherwise = show (100 * major + minor :: Int) -- Contract is Int
-
-
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase
 hscPostBackendPhase HsBootFile _    =  StopLn
@@ -1323,36 +1132,6 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
 
 
 
--- ---------------------------------------------------------------------------
--- Macros (cribbed from Cabal)
-
-generatePackageVersionMacros :: [UnitInfo] -> String
-generatePackageVersionMacros pkgs = concat
-  -- Do not add any C-style comments. See #3389.
-  [ generateMacros "" pkgname version
-  | pkg <- pkgs
-  , let version = unitPackageVersion pkg
-        pkgname = map fixchar (unitPackageNameString pkg)
-  ]
-
-fixchar :: Char -> Char
-fixchar '-' = '_'
-fixchar c   = c
-
-generateMacros :: String -> String -> Version -> String
-generateMacros prefix name version =
-  concat
-  ["#define ", prefix, "VERSION_",name," ",show (showVersion version),"\n"
-  ,"#define MIN_", prefix, "VERSION_",name,"(major1,major2,minor) (\\\n"
-  ,"  (major1) <  ",major1," || \\\n"
-  ,"  (major1) == ",major1," && (major2) <  ",major2," || \\\n"
-  ,"  (major1) == ",major1," && (major2) == ",major2," && (minor) <= ",minor,")"
-  ,"\n\n"
-  ]
-  where
-    (major1:major2:minor:_) = map show (versionBranch version ++ repeat 0)
-
-
 -- -----------------------------------------------------------------------------
 -- Misc.
 
@@ -1362,22 +1141,6 @@ touchObjectFile :: Logger -> DynFlags -> FilePath -> IO ()
 touchObjectFile logger dflags path = do
   createDirectoryIfMissing True $ takeDirectory path
   GHC.SysTools.touch logger dflags "Touching object file" path
-
--- | Find out path to @ghcversion.h@ file
-getGhcVersionPathName :: DynFlags -> UnitEnv -> IO FilePath
-getGhcVersionPathName dflags unit_env = do
-  candidates <- case ghcVersionFile dflags of
-    Just path -> return [path]
-    Nothing -> do
-        ps <- mayThrowUnitErr (preloadUnitsInfo' unit_env [rtsUnitId])
-        return ((</> "ghcversion.h") <$> collectIncludeDirs ps)
-
-  found <- filterM doesFileExist candidates
-  case found of
-      []    -> throwGhcExceptionIO (InstallationError
-                                    ("ghcversion.h missing; tried: "
-                                      ++ intercalate ", " candidates))
-      (x:_) -> return x
 
 -- Note [-fPIC for assembler]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~

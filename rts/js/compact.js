@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 #ifdef GHCJS_TRACE_COMPACT
 function h$logCompact() { h$log.apply(h$log,arguments); }
 #define TRACE_COMPACT(args...) h$logCompact(args)

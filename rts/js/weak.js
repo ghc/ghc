@@ -1,7 +1,5 @@
 //#OPTIONS: CPP
 
-#include <js/rts.h>
-
 // weak reference support
 
 var h$weakPointerList = [];

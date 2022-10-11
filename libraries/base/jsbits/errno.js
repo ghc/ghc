@@ -1,8 +1,6 @@
 //#OPTIONS: CPP
 
 #include "HsBaseConfig.h"
-#include <js/rts.h>
-
 
 #ifdef GHCJS_TRACE_ERRNO
 function h$logErrno() { h$log.apply(h$log,arguments); }

@@ -960,7 +960,7 @@ Such a function may be applied in one of two ways:
     applyCDefs :: DefunctionalizedCDefs -> Logger -> DynFlags -> IO [String]
     @
 
-    Function `applyCDefs` is defined in module "GHC.Driver.Pipeline.Execute".
+    Function `applyCDefs` is defined in module "GHC.SysTools.Cpp".
 
 I don't love this solution, but defunctionalization is a standard
 thing, and it makes the meanings of the enumeration values clear.

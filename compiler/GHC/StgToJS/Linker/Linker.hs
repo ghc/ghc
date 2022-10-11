@@ -22,6 +22,7 @@
 
 module GHC.StgToJS.Linker.Linker
   ( jsLinkBinary
+  , embedJsFile
   )
 where
 
@@ -33,6 +34,8 @@ import GHC.JS.Syntax
 
 import GHC.Driver.Session (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
+import GHC.SysTools.Cpp
+import GHC.SysTools
 
 import GHC.Linker.Static.Utils (exeFileName)
 
@@ -58,8 +61,8 @@ import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
 import GHC.Utils.Binary
 import qualified GHC.Utils.Ppr as Ppr
-import GHC.Utils.CliOption
 import GHC.Utils.Monad
+import GHC.Utils.TmpFs
 
 import qualified GHC.SysTools.Ar          as Ar
 
@@ -794,3 +797,70 @@ readDepsFromObj = \case
     readObjectDeps file >>= \case
       Nothing   -> pure Nothing
       Just deps -> pure $ Just (deps,ObjectFile file)
+
+
+-- | Embed a JS file into a .o file
+--
+-- The JS file is merely copied into a .o file with an additional header
+-- ("//Javascript") in order to be recognized later on.
+--
+-- JS files may contain option pragmas of the form: //#OPTIONS:
+-- For now, only the CPP option is supported. If the CPP option is set, we
+-- append some common CPP definitions to the file and call cpp on it.
+embedJsFile :: Logger -> DynFlags -> TmpFs -> UnitEnv -> FilePath -> FilePath -> IO ()
+embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
+  let profiling  = False -- FIXME: add support for profiling way
+
+  -- if the input filename is the same as the output, then we've probably
+  -- generated the object ourselves, we leave the file alone
+  when (input_fn /= output_fn) $ do
+
+    -- the header lets the linker recognize processed JavaScript files
+    -- But don't add JavaScript header to object files!
+
+    is_js_obj <- if True
+                  then pure False
+                  else isJsObjectFile input_fn
+                  -- FIXME (Sylvain 2022-09): this call makes the
+                  -- testsuite go into a loop, I don't know why yet!
+                  -- Disabling it for now.
+
+    if is_js_obj
+      then copyWithHeader "" input_fn output_fn
+      else do
+        -- header appended to JS files stored as .o to recognize them.
+        let header = "//JavaScript\n"
+        jsFileNeedsCpp input_fn >>= \case
+          False -> copyWithHeader header input_fn output_fn
+          True  -> do
+
+            -- append common CPP definitions to the .js file.
+            -- They define macros that avoid directly wiring zencoded names
+            -- in RTS JS files
+            pp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+            payload <- B.readFile input_fn
+            B.writeFile pp_fn (commonCppDefs profiling <> payload)
+
+            -- run CPP on the input JS file
+            js_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+            let
+              cpp_opts = CppOpts
+                { cppUseCc       = True
+                , cppLinePragmas = False -- LINE pragmas aren't JS compatible
+                }
+              extra_opts = []
+            doCpp logger
+                    tmpfs
+                    dflags
+                    unit_env
+                    cpp_opts
+                    extra_opts
+                    pp_fn
+                    js_fn
+            -- add header to recognize the object as a JS file
+            copyWithHeader header js_fn output_fn
+
+jsFileNeedsCpp :: FilePath -> IO Bool
+jsFileNeedsCpp fn = do
+  opts <- getOptionsFromJsFile fn
+  pure (CPP `elem` opts)

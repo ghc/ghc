@@ -520,7 +520,6 @@ Library
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.Transform
-        GHC.JS.Parser.Header
         GHC.Linker
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj
@@ -667,11 +666,11 @@ Library
         GHC.StgToJS.Linker.Linker
         GHC.StgToJS.Linker.Types
         GHC.StgToJS.Linker.Utils
-        GHC.StgToJS.Linker.Shims
         GHC.Stg.Unarise
         GHC.SysTools
         GHC.SysTools.Ar
         GHC.SysTools.BaseDir
+        GHC.SysTools.Cpp
         GHC.SysTools.Elf
         GHC.SysTools.Info
         GHC.SysTools.Process
