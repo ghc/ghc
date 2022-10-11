@@ -41,6 +41,9 @@ data StackFrameIter = StackFrameIter StackFrameIter#
 instance Show StackFrameIter where
   show (StackFrameIter (# _, i# #)) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show (W# i#)
 
+instance Show StackSnapshot where
+  show _ = "StackSnapshot _"
+
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
 stackHead (StackSnapshot s) = StackFrameIter (# s , 0## #) -- GHC stacks are never empty
@@ -136,7 +139,10 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
        in
         CatchFrame exceptionsBlocked c
-     UNDERFLOW_FRAME ->  UnderflowFrame
+     UNDERFLOW_FRAME -> let
+          nextChunk# = getUnderflowFrameNextChunk# s# i#
+        in
+          UnderflowFrame (StackSnapshot nextChunk#)
      STOP_FRAME ->  StopFrame
      ATOMICALLY_FRAME ->  AtomicallyFrame
      CATCH_RETRY_FRAME ->  CatchRetryFrame
@@ -178,6 +184,8 @@ foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot#
 foreign import prim "unpackHandlerFromCatchFramezh" unpackHandlerFromCatchFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
@@ -222,7 +230,7 @@ data StackFrame =
   CatchStmFrame |
   CatchRetryFrame |
   AtomicallyFrame |
-  UnderflowFrame |
+  UnderflowFrame { nextChunk:: StackSnapshot } |
   StopFrame |
   RetSmall SpecialRetSmall [BitmapPayload] |
   RetBig [BitmapPayload] |

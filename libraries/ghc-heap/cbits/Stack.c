@@ -147,8 +147,12 @@ StgArrBytes* getLargeBitmaps(Capability *cap, StgClosure *c){
 }
 
 #if defined(DEBUG)
-extern void        printStack ( StgStack *stack );
+extern void printStack (StgStack *stack);
 void belchStack(StgStack* stack){
   printStack(stack);
 }
 #endif
+
+StgStack* getUnderflowFrameNextChunk(StgUnderflowFrame* frame){
+  return frame->next_chunk;
+}

@@ -28,7 +28,7 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
   stackBottom = stackSizeInBytes + stackArrayPtr;
 
   if(nextClosurePtr < stackBottom) (likely: True) {
-    ccall debugBelch("advanceStackFrameIterzh - ordinary frame \n");
+    // ccall debugBelch("advanceStackFrameIterzh - ordinary frame \n");
     newStack = stack;
     newIndex = index + frameSize;
     hasNext = 1;
@@ -36,12 +36,12 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     P_ underflowFrameStack;
     (underflowFrameStack) = ccall getUnderflowFrameStack(stack, index);
     if (underflowFrameStack == NULL) (likely: True) {
-      ccall debugBelch("advanceStackFrameIterzh - last frame \n");
+      // ccall debugBelch("advanceStackFrameIterzh - last frame \n");
       newStack = NULL;
       newIndex = NULL;
       hasNext = NULL;
     } else {
-      ccall debugBelch("advanceStackFrameIterzh - overflow frame \n");
+      // ccall debugBelch("advanceStackFrameIterzh - underflow frame \n");
       newStack = underflowFrameStack;
       newIndex = NULL;
       hasNext = 1;
@@ -49,12 +49,14 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
   }
 
   // TODO: Execute this block only in -DDEBUG
+#if DEBUG
   if(hasNext > 0) {
     P_ nextClosure;
     nextClosure = StgStack_sp(stack) + WDS(index);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
     ccall checkSTACK(stack);
   }
+#endif
 
   // ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
   return (newStack, newIndex, hasNext);
@@ -153,4 +155,15 @@ getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
   W_ exceptions_blocked;
   exceptions_blocked = StgCatchFrame_exceptions_blocked(closurePtr);
   return (exceptions_blocked);
+}
+
+getUnderflowFrameNextChunkzh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, updateePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOURE_PTR(closurePtr));
+
+  P_ next_chunk;
+  (next_chunk) = ccall getUnderflowFrameNextChunk(closurePtr);
+  ASSERT(LOOKS_LIKE_CLOURE_PTR(next_chunk));
+  return (next_chunk);
 }
