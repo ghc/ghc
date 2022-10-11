@@ -73,6 +73,9 @@ module GHC.Utils.Binary
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
    putDictionary, getDictionary, putFS,
+
+   -- * Newtype wrappers
+   BinSpan(..), BinSrcSpan(..), BinLocated(..)
   ) where
 
 import GHC.Prelude
@@ -1285,18 +1288,23 @@ instance Binary ModuleName where
 --             fs <- get bh
 --             return (StringLiteral st fs Nothing)
 
-instance Binary a => Binary (Located a) where
-    put_ bh (L l x) = do
-            put_ bh l
+newtype BinLocated a = BinLocated { unBinLocated :: Located a }
+
+instance Binary a => Binary (BinLocated a) where
+    put_ bh (BinLocated (L l x)) = do
+            put_ bh $ BinSrcSpan l
             put_ bh x
 
     get bh = do
-            l <- get bh
+            l <- unBinSrcSpan <$> get bh
             x <- get bh
-            return (L l x)
+            return $ BinLocated (L l x)
 
-instance Binary RealSrcSpan where
-  put_ bh ss = do
+newtype BinSpan = BinSpan { unBinSpan :: RealSrcSpan }
+
+-- See Note [Source Location Wrappers]
+instance Binary BinSpan where
+  put_ bh (BinSpan ss) = do
             put_ bh (srcSpanFile ss)
             put_ bh (srcSpanStartLine ss)
             put_ bh (srcSpanStartCol ss)
@@ -1309,8 +1317,8 @@ instance Binary RealSrcSpan where
             sc <- get bh
             el <- get bh
             ec <- get bh
-            return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
-                                  (mkRealSrcLoc f el ec))
+            return $ BinSpan (mkRealSrcSpan (mkRealSrcLoc f sl sc)
+                                            (mkRealSrcLoc f el ec))
 
 instance Binary UnhelpfulSpanReason where
   put_ bh r = case r of
@@ -1329,24 +1337,44 @@ instance Binary UnhelpfulSpanReason where
       3 -> return UnhelpfulGenerated
       _ -> UnhelpfulOther <$> get bh
 
-instance Binary SrcSpan where
-  put_ bh (RealSrcSpan ss _sb) = do
+newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
+
+-- See Note [Source Location Wrappers]
+instance Binary BinSrcSpan where
+  put_ bh (BinSrcSpan (RealSrcSpan ss _sb)) = do
           putByte bh 0
           -- BufSpan doesn't ever get serialised because the positions depend
           -- on build location.
-          put_ bh ss
+          put_ bh $ BinSpan ss
 
-  put_ bh (UnhelpfulSpan s) = do
+  put_ bh (BinSrcSpan (UnhelpfulSpan s)) = do
           putByte bh 1
           put_ bh s
 
   get bh = do
           h <- getByte bh
           case h of
-            0 -> do ss <- get bh
-                    return (RealSrcSpan ss Strict.Nothing)
+            0 -> do BinSpan ss <- get bh
+                    return $ BinSrcSpan (RealSrcSpan ss Strict.Nothing)
             _ -> do s <- get bh
-                    return (UnhelpfulSpan s)
+                    return $ BinSrcSpan (UnhelpfulSpan s)
+
+
+{-
+Note [Source Location Wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Source locations are banned from interface files, to
+prevent filepaths affecting interface hashes.
+
+Unfortunately, we can't remove all binary instances,
+as they're used to serialise .hie files, and we don't
+want to break binary compatibility.
+
+To this end, the Bin[Src]Span newtypes wrappers were
+introduced to prevent accidentally serialising a
+source location as part of a larger structure.
+-}
 
 --------------------------------------------------------------------------------
 -- Instances for the containers package

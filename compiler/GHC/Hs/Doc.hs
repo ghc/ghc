@@ -85,9 +85,9 @@ instance Outputable a => Outputable (WithHsDocIdentifiers a pass) where
 instance Binary a => Binary (WithHsDocIdentifiers a GhcRn) where
   put_ bh (WithHsDocIdentifiers s ids) = do
     put_ bh s
-    put_ bh ids
+    put_ bh $ BinLocated <$> ids
   get bh =
-    liftA2 WithHsDocIdentifiers (get bh) (get bh)
+    liftA2 WithHsDocIdentifiers (get bh) (fmap unBinLocated <$> get bh)
 
 -- | Extract a mapping from the lexed identifiers to the names they may
 -- correspond to.

@@ -95,7 +95,6 @@ import GHC.Data.FastString
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString
-import GHC.Utils.Binary
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
@@ -1248,17 +1247,6 @@ instance Outputable AnnSortKey where
 
 instance Outputable IsUnicodeSyntax where
   ppr = text . show
-
-instance Binary a => Binary (LocatedL a) where
-  -- We do not serialise the annotations
-    put_ bh (L l x) = do
-            put_ bh (locA l)
-            put_ bh x
-
-    get bh = do
-            l <- get bh
-            x <- get bh
-            return (L (noAnnSrcSpan l) x)
 
 instance (Outputable a) => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l

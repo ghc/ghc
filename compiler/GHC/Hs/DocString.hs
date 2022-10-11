@@ -75,19 +75,19 @@ instance Binary HsDocString where
     MultiLineDocString dec xs -> do
       putByte bh 0
       put_ bh dec
-      put_ bh xs
+      put_ bh $ BinLocated <$> xs
     NestedDocString dec x -> do
       putByte bh 1
       put_ bh dec
-      put_ bh x
+      put_ bh $ BinLocated x
     GeneratedDocString x -> do
       putByte bh 2
       put_ bh x
   get bh = do
     tag <- getByte bh
     case tag of
-      0 -> MultiLineDocString <$> get bh <*> get bh
-      1 -> NestedDocString <$> get bh <*> get bh
+      0 -> MultiLineDocString <$> get bh <*> (fmap unBinLocated <$> get bh)
+      1 -> NestedDocString <$> get bh <*> (unBinLocated <$> get bh)
       2 -> GeneratedDocString <$> get bh
       t -> fail $ "HsDocString: invalid tag " ++ show t
 

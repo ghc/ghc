@@ -339,10 +339,10 @@ fromHieName nc hie_name = do
 putHieName :: BinHandle -> HieName -> IO ()
 putHieName bh (ExternalName mod occ span) = do
   putByte bh 0
-  put_ bh (mod, occ, span)
+  put_ bh (mod, occ, BinSrcSpan span)
 putHieName bh (LocalName occName span) = do
   putByte bh 1
-  put_ bh (occName, span)
+  put_ bh (occName, BinSrcSpan span)
 putHieName bh (KnownKeyName uniq) = do
   putByte bh 2
   put_ bh $ unpkUnique uniq
@@ -353,10 +353,10 @@ getHieName bh = do
   case t of
     0 -> do
       (modu, occ, span) <- get bh
-      return $ ExternalName modu occ span
+      return $ ExternalName modu occ $ unBinSrcSpan span
     1 -> do
       (occ, span) <- get bh
-      return $ LocalName occ span
+      return $ LocalName occ $ unBinSrcSpan span
     2 -> do
       (c,i) <- get bh
       return $ KnownKeyName $ mkUnique c i
