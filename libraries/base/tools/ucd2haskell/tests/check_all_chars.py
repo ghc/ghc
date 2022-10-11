@@ -10,6 +10,15 @@ from operator import methodcaller
 def parse_codepoint(s: str, base=16):
     return chr(int(s, base))
 
+def parse_bool(s: str):
+    match(s):
+        case "True":
+            return True
+        case "False":
+            return False
+        case _:
+            raise ValueError(s)
+
 def general_category(c: str):
     match(unicodedata.category(c)):
         case "Lu":
@@ -107,6 +116,11 @@ def check_case_mapping(case_mapping: str, char: str, raw_expected: str, verbosit
             f"“{expected}” (1 char)."
         )
 
+def check_case_predicate(case_predicate: str, char: str, raw_expected: str, verbosity: int):
+    got = methodcaller(case_predicate)(char)
+    expected = parse_bool(raw_expected)
+    check(got == expected, (char, got, expected))
+
 if __name__ == "__main__":
 
     parser = make_parser()
@@ -125,10 +139,12 @@ if __name__ == "__main__":
         next(fp)
         reader = csv.reader(fp)
         for row in reader:
-            raw_code, gc, raw_lower, raw_upper, raw_title = row
+            raw_code, gc, raw_lower, raw_upper, raw_title, raw_islower, raw_isupper = row
             char = parse_codepoint(raw_code)
             codepoint = f"U+{raw_code.upper():0>4}"
             check(gc == general_category(char), (char, gc, general_category(char)))
             check_case_mapping("lower", char, raw_lower, verbosity)
             check_case_mapping("upper", char, raw_upper, verbosity)
             check_case_mapping("title", char, raw_title, verbosity)
+            check_case_predicate("islower", char, raw_islower, verbosity)
+            check_case_predicate("isupper", char, raw_isupper, verbosity)

@@ -12,6 +12,7 @@ VERIFY_CHECKSUM=y
 
 # Filename:checksum
 FILES="\
+  ucd/DerivedCoreProperties.txt:d367290bc0867e6b484c68370530bdd1a08b6b32404601b8c7accaf83e05628d \
   ucd/UnicodeData.txt:806e9aed65037197f1ec85e12be6e8cd870fc5608b4de0fffd990f689f376a73"
 
 # Download the files
@@ -58,10 +59,10 @@ run_generator() {
     # Compile and run ucd2haskell
     cabal run exe:ucd2haskell -- \
           --input "$SCRIPT_DIR/ucd/" \
-          --output "$GHC_MODULE_PATH/" 
-        # [NOTE] disabled generaor
-        #   --core-prop Uppercase \
-        #   --core-prop Lowercase \
+          --output "$GHC_MODULE_PATH/" \
+          --core-prop Uppercase \
+          --core-prop Lowercase
+        # [NOTE] disabled generator
         #   --core-prop Alphabetic 
         #   --core-prop White_Space \
         #   --core-prop ID_Start \

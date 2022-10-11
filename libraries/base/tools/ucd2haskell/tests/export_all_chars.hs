@@ -26,7 +26,7 @@ main = do
 
 -- | File header
 header :: String
-header = "Char,General Category,Lower Case,Upper Case,Title Case"
+header = "Char,General Category,Lower Case,Upper Case,Title Case,isLowerCase,isUpperCase"
 
 -- | Convert a character to its (short) hexadecimal Unicode codepoint.
 mkCodePointHex :: Char -> String
@@ -43,4 +43,8 @@ addEntry c = do
   putChar ','
   putStr (mkCodePointHex (toUpper c))
   putChar ','
-  putStrLn (mkCodePointHex (toTitle c))
+  putStr (mkCodePointHex (toTitle c))
+  putChar ','
+  putStr (show (isLowerCase c))
+  putChar ','
+  putStrLn (show (isUpperCase c))

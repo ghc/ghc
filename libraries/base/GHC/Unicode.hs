@@ -24,8 +24,8 @@ module GHC.Unicode (
         GeneralCategory (..), generalCategory,
         isAscii, isLatin1, isControl,
         isAsciiUpper, isAsciiLower,
-        isPrint, isSpace,  isUpper,
-        isLower, isAlpha,  isDigit,
+        isPrint, isSpace, isUpper, isUpperCase,
+        isLower, isLowerCase, isAlpha, isDigit,
         isOctDigit, isHexDigit, isAlphaNum,
         isPunctuation, isSymbol,
         toUpper, toLower, toTitle
@@ -37,6 +37,7 @@ import GHC.Enum ( Enum (..), Bounded (..) )
 import GHC.Ix ( Ix (..) )
 import GHC.Num
 import GHC.Unicode.Internal.Version
+import qualified GHC.Unicode.Internal.Char.DerivedCoreProperties as DCP
 import qualified GHC.Unicode.Internal.Char.UnicodeData.GeneralCategory as GC
 import qualified GHC.Unicode.Internal.Char.UnicodeData.SimpleLowerCaseMapping as C
 import qualified GHC.Unicode.Internal.Char.UnicodeData.SimpleTitleCaseMapping as C
@@ -236,17 +237,67 @@ isSpace c
 -- | Selects upper-case or title-case alphabetic Unicode characters (letters).
 -- Title case is used by a small number of letter ligatures like the
 -- single-character form of /Lj/.
+--
+-- __Note:__ this predicate does /not/ work for letter-like characters such as:
+-- @\'Ⓐ\'@ (@U+24B6@ circled Latin capital letter A) and
+-- @\'Ⅳ\'@ (@U+2163@ Roman numeral four). This is due to selecting only
+-- characters with the 'GeneralCategory' 'UppercaseLetter' or 'TitlecaseLetter'.
+--
+-- See 'isUpperCase' for a more intuitive predicate. Note that
+-- unlike 'isUpperCase', 'isUpper' does select /title-case/ characters such as
+-- @\'ǅ\'@ (@U+01C5@ Latin capital letter d with small letter z with caron) or
+-- @\'ᾯ\'@ (@U+1FAF@ Greek capital letter omega with dasia and perispomeni and
+-- prosgegrammeni).
 isUpper                 :: Char -> Bool
 isUpper c = case generalCategory c of
         UppercaseLetter -> True
         TitlecaseLetter -> True
         _               -> False
 
+-- | Selects upper-case Unicode letter-like characters.
+--
+-- __Note:__ this predicate selects characters with the Unicode property
+-- @Uppercase@, which include letter-like characters such as:
+-- @\'Ⓐ\'@ (@U+24B6@ circled Latin capital letter A) and
+-- @\'Ⅳ\'@ (@U+2163@ Roman numeral four).
+--
+-- See 'isUpper' for the legacy predicate. Note that
+-- unlike 'isUpperCase', 'isUpper' does select /title-case/ characters such as
+-- @\'ǅ\'@ (@U+01C5@ Latin capital letter d with small letter z with caron) or
+-- @\'ᾯ\'@ (@U+1FAF@ Greek capital letter omega with dasia and perispomeni and
+-- prosgegrammeni).
+--
+-- @since 4.18.0.0
+{-# INLINE isUpperCase #-}
+isUpperCase             :: Char -> Bool
+isUpperCase = DCP.isUppercase
+
 -- | Selects lower-case alphabetic Unicode characters (letters).
+--
+-- __Note:__ this predicate does /not/ work for letter-like characters such as:
+-- @\'ⓐ\'@ (@U+24D0@ circled Latin small letter a) and
+-- @\'ⅳ\'@ (@U+2173@ small Roman numeral four). This is due to selecting only
+-- characters with the 'GeneralCategory' 'LowercaseLetter'.
+--
+-- See 'isLowerCase' for a more intuitive predicate.
 isLower                 :: Char -> Bool
 isLower c = case generalCategory c of
         LowercaseLetter -> True
         _               -> False
+
+-- | Selects lower-case Unicode letter-like characters.
+--
+-- __Note:__ this predicate selects characters with the Unicode property
+-- @Lowercase@, which includes letter-like characters such as:
+-- @\'ⓐ\'@ (@U+24D0@ circled Latin small letter a) and
+-- @\'ⅳ\'@ (@U+2173@ small Roman numeral four).
+--
+-- See 'isLower' for the legacy predicate.
+--
+-- @since 4.18.0.0
+{-# INLINE isLowerCase #-}
+isLowerCase             :: Char -> Bool
+isLowerCase = DCP.isLowercase
 
 -- | Selects alphabetic Unicode characters (lower-case, upper-case and
 -- title-case letters, plus letters of caseless scripts and modifiers letters).

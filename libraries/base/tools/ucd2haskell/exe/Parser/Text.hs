@@ -22,12 +22,12 @@ module Parser.Text (genModules) where
 import Control.Exception (catch, IOException)
 import Control.Monad (void)
 import Control.Monad.IO.Class (MonadIO(liftIO))
--- import Data.Bits (Bits(..)) [NOTE] Used by disabled generator
+import Data.Bits (Bits(..))
 import Data.Word (Word8)
-import Data.Char (chr, ord {-, isSpace-})
+import Data.Char (chr, ord, isSpace)
 import Data.Functor ((<&>))
 import Data.Function ((&))
--- import Data.List (unfoldr, intersperse) [NOTE] Used by disabled generator
+import Data.List (intersperse, unfoldr)
 import Data.List.Split (splitWhen)
 import Numeric (showHex)
 import Streamly.Data.Fold (Fold)
@@ -132,7 +132,6 @@ readCodePointM :: String -> Maybe Char
 readCodePointM "" = Nothing
 readCodePointM u  = Just (readCodePoint u)
 
-{- [NOTE] Used by disabled generator
 genSignature :: String -> String
 genSignature = (<> " :: Char -> Bool")
 
@@ -189,7 +188,6 @@ bitMapToAddrLiteral bs cs = foldr encode cs (unfoldr mkChunks bs)
 
     toByte :: [Bool] -> Int
     toByte xs = sum $ map (\i -> if xs !! i then 1 `shiftL` i else 0) [0..7]
--}
 
 genEnumBitmap ::
   forall a. (Bounded a, Enum a, Show a) =>
@@ -642,8 +640,6 @@ genSimpleCaseMappingModule moduleName funcName field =
 
     showHexChar c = showHex (ord c)
 
-{- [NOTE] Disabled generator
-
 genCorePropertiesModule ::
        Monad m => String -> (String -> Bool) -> Fold m (String, [Int]) String
 genCorePropertiesModule moduleName isProp =
@@ -674,7 +670,6 @@ genCorePropertiesModule moduleName isProp =
         , "import GHC.Unicode.Internal.Bits (lookupBit64)"
         , ""
         ]
--}
 
 {- [NOTE] Disabled generator
 genUnicode002TestResults :: Monad m => Fold m DetailedChar String
@@ -778,8 +773,6 @@ genUnicode002TestResults = done <$> Fold.foldl' step initial
 -- Parsing property files
 -------------------------------------------------------------------------------
 
-{- [NOTE] Used by disabled generator
-
 type PropertyLine = (String, [Int])
 
 trim :: String -> String
@@ -826,7 +819,6 @@ parsePropertyLines =
     Stream.splitOn isDivider
         $ Fold.lmap parsePropertyLine
         $ Fold.foldl' combinePropertyLines emptyPropertyLine
--}
 
 -- | A range entry in @UnicodeData.txt@.
 data UnicodeDataRange
@@ -1014,7 +1006,7 @@ runGenerator indir file transformLines outdir recipes =
     combinedFld = void $ Fold.distribute generatedFolds
 
 genModules :: String -> String -> [String] -> IO ()
-genModules indir outdir _props = do
+genModules indir outdir props = do
     genUnicodeVersion outdir
 
     -- [NOTE] Disabled generator
@@ -1060,13 +1052,12 @@ genModules indir outdir _props = do
     --     outdir
     --     [ uncurry ModuleRecipe propList ]
 
-    -- [NOTE] Disabled generator
-    -- runGenerator
-    --     indir
-    --     "DerivedCoreProperties.txt"
-    --     parsePropertyLines
-    --     outdir
-    --     [ uncurry ModuleRecipe derivedCoreProperties ]
+    runGenerator
+        indir
+        "DerivedCoreProperties.txt"
+        parsePropertyLines
+        outdir
+        [ uncurry ModuleRecipe derivedCoreProperties ]
 
     where
 
@@ -1075,10 +1066,9 @@ genModules indir outdir _props = do
     --     ("GHC.Unicode.Internal.Char.PropList"
     --     , (`genCorePropertiesModule` (`elem` props)))
 
-    -- [NOTE] Disabled generator
-    -- derivedCoreProperties =
-    --     ("GHC.Unicode.Internal.Char.DerivedCoreProperties"
-    --     , (`genCorePropertiesModule` (`elem` props)))
+    derivedCoreProperties =
+        ("GHC.Unicode.Internal.Char.DerivedCoreProperties"
+        , (`genCorePropertiesModule` (`elem` props)))
 
     -- [NOTE] Disabled generator
     -- compositions exc non0 =

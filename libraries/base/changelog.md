@@ -30,6 +30,10 @@
     for the related discussion,
     as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
   * Update to [Unicode 15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
+  * Add standard Unicode case predicates `isUpperCase` and `isLowerCase` to
+    `GHC.Unicode` and `Data.Char`. These predicates use the standard Unicode 
+    case properties and are more intuitive than `isUpper` and `isLower`. See 
+    [CLC proposal #90](https://github.com/haskell/core-libraries-committee/issues/90).
   * Add `Eq` and `Ord` instances for `Generically1`.
   * Relax instances for Functor combinators; put superclass on Class1 and Class2
     to make non-breaking. See [CLC

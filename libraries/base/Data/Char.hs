@@ -6,7 +6,7 @@
 -- Module      :  Data.Char
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  stable
 -- Portability :  portable
@@ -24,7 +24,7 @@ module Data.Char
     -- punctuation, symbols, separators (including spaces) and others
     -- (including control characters).
     , isControl, isSpace
-    , isLower, isUpper, isAlpha, isAlphaNum, isPrint
+    , isLower, isLowerCase, isUpper, isUpperCase, isAlpha, isAlphaNum, isPrint
     , isDigit, isOctDigit, isHexDigit
     , isLetter, isMark, isNumber, isPunctuation, isSymbol, isSeparator
 
