@@ -136,67 +136,16 @@ void resurrectThreads (StgTSO *);
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
  * ASSUMES: cap->running_task is the current task.
  */
-EXTERN_INLINE void
-appendToRunQueue (Capability *cap, StgTSO *tso);
-
-EXTERN_INLINE void
-appendToRunQueue (Capability *cap, StgTSO *tso)
-{
-    ASSERT(tso->_link == END_TSO_QUEUE);
-    if (cap->run_queue_hd == END_TSO_QUEUE) {
-        cap->run_queue_hd = tso;
-        tso->block_info.prev = END_TSO_QUEUE;
-    } else {
-        setTSOLink(cap, cap->run_queue_tl, tso);
-        setTSOPrev(cap, tso, cap->run_queue_tl);
-    }
-    cap->run_queue_tl = tso;
-    cap->n_run_queue++;
-}
+void appendToRunQueue (Capability *cap, StgTSO *tso);
 
 /* Push a thread on the beginning of the run queue.
  * ASSUMES: cap->running_task is the current task.
  */
-EXTERN_INLINE void
-pushOnRunQueue (Capability *cap, StgTSO *tso);
-
-EXTERN_INLINE void
-pushOnRunQueue (Capability *cap, StgTSO *tso)
-{
-    setTSOLink(cap, tso, cap->run_queue_hd);
-    tso->block_info.prev = END_TSO_QUEUE;
-    if (cap->run_queue_hd != END_TSO_QUEUE) {
-        setTSOPrev(cap, cap->run_queue_hd, tso);
-    }
-    cap->run_queue_hd = tso;
-    if (cap->run_queue_tl == END_TSO_QUEUE) {
-        cap->run_queue_tl = tso;
-    }
-    cap->n_run_queue++;
-}
+void pushOnRunQueue (Capability *cap, StgTSO *tso);
 
 /* Pop the first thread off the runnable queue.
  */
-INLINE_HEADER StgTSO *
-popRunQueue (Capability *cap)
-{
-    ASSERT(cap->n_run_queue > 0);
-    StgTSO *t = cap->run_queue_hd;
-    ASSERT(t != END_TSO_QUEUE);
-    cap->run_queue_hd = t->_link;
-
-    StgTSO *link = RELAXED_LOAD(&t->_link);
-    if (link != END_TSO_QUEUE) {
-        link->block_info.prev = END_TSO_QUEUE;
-    }
-    RELAXED_STORE(&t->_link, END_TSO_QUEUE); // no write barrier req'd
-
-    if (cap->run_queue_hd == END_TSO_QUEUE) {
-        cap->run_queue_tl = END_TSO_QUEUE;
-    }
-    cap->n_run_queue--;
-    return t;
-}
+StgTSO *popRunQueue (Capability *cap);
 
 INLINE_HEADER StgTSO *
 peekRunQueue (Capability *cap)
