@@ -1007,7 +1007,7 @@ function h$shrinkMutableByteArray(a, n) {
   }
 }
 
-function h$shrinkMutableArray(a, n) {
+function h$shrinkMutableCharArray(a, n) {
   a.length = n;
 }
 
