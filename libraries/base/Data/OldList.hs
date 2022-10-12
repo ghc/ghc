@@ -1249,6 +1249,7 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 -- The 'permutations' function is maximally lazy:
 -- for each @n@, the value of @'permutations' xs@ starts with those permutations
 -- that permute @'take' n xs@ and keep @'drop' n xs@.
+--
 -- This function is productive on infinite inputs:
 --
 -- >>> take 6 $ map (take 3) $ permutations ['a'..]
@@ -1259,21 +1260,25 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 --
 -- > map (take n) (take (product [1..n]) (permutations ([1..n] ++ undefined))) == permutations [1..n]
 --
-permutations            :: [a] -> [[a]]
+permutations :: [a] -> [[a]]
 -- See https://stackoverflow.com/questions/24484348/what-does-this-list-permutations-implementation-in-haskell-exactly-do/24564307#24564307
 -- for the analysis of this rather cryptic implementation.
 -- Related discussions:
 -- * https://mail.haskell.org/pipermail/haskell-cafe/2021-December/134920.html
 -- * https://mail.haskell.org/pipermail/libraries/2007-December/008788.html
-permutations xs0        =  xs0 : perms xs0 []
+permutations xs0 = xs0 : perms xs0 []
   where
+    perms :: forall a. [a] -> [a] -> [[a]]
     perms []     _  = []
     perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
-      where interleave    xs     r = let (_,zs) = interleave' id xs r in zs
-            interleave' _ []     r = (ts, r)
-            interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
-                                     in  (y:us, f (t:y:us) : zs)
+      where
+        interleave :: [a] -> [[a]] -> [[a]]
+        interleave xs r = let (_,zs) = interleave' id xs r in zs
 
+        interleave' :: ([a] -> b) -> [a] -> [b] -> ([a], [b])
+        interleave' _ []     r = (ts, r)
+        interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
+                                 in  (y:us, f (t:y:us) : zs)
 
 ------------------------------------------------------------------------------
 -- Quick Sort algorithm taken from HBC's QSort library.
