@@ -39,6 +39,7 @@ import GHC.Types.ForeignCall
 
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
+import GHC.Data.FastMutInt
 
 import qualified Data.Map  as M
 import qualified Data.Set  as S
@@ -48,18 +49,20 @@ import Data.Function
 import GHC.Types.Unique.DSet
 
 runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
-runG config m unfloat action = State.evalStateT action (initState config m unfloat)
+runG config m unfloat action = State.evalStateT action =<< initState config m unfloat
 
-initState :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> GenState
-initState config m unfloat = GenState
-  { gsSettings  = config
-  , gsModule    = m
-  , gsId        = 1
-  , gsIdents    = emptyIdCache
-  , gsUnfloated = unfloat
-  , gsGroup     = defaultGenGroupState
-  , gsGlobal    = []
-  }
+initState :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> IO GenState
+initState config m unfloat = do
+  id_gen <- newFastMutInt 1
+  pure $ GenState
+    { gsSettings  = config
+    , gsModule    = m
+    , gsId        = id_gen
+    , gsIdents    = emptyIdCache
+    , gsUnfloated = unfloat
+    , gsGroup     = defaultGenGroupState
+    , gsGlobal    = []
+    }
 
 
 modifyGroup :: (GenGroupState -> GenGroupState) -> G ()

@@ -53,8 +53,10 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Utils.Encoding (zEncodeString)
 import GHC.Data.FastString
+import GHC.Data.FastMutInt
 
 import Control.Monad
+import Control.Monad.IO.Class
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map  as M
 import Data.Maybe
@@ -62,8 +64,12 @@ import Data.Maybe
 -- | Get fresh unique number
 freshUnique :: G Int
 freshUnique = do
-  State.modify (\s -> s { gsId = gsId s + 1})
-  State.gets gsId
+  id_gen <- State.gets gsId
+  liftIO $ do
+    -- no need for atomicFetchAdd as we don't use threads in G
+    v <- readFastMutInt id_gen
+    writeFastMutInt id_gen (v+1)
+    pure v
 
 -- | Get fresh local Ident of the form: h$$unit:module_uniq
 freshIdent :: G Ident

@@ -39,6 +39,7 @@ import Control.Monad.Trans.State.Strict
 import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
 
 import GHC.Data.FastString
+import GHC.Data.FastMutInt
 
 import GHC.Unit.Module
 
@@ -55,9 +56,9 @@ type G = StateT GenState IO
 
 -- | The JS code generator state
 data GenState = GenState
-  { gsSettings  :: StgToJSConfig          -- ^ codegen settings, read-only
+  { gsSettings  :: !StgToJSConfig         -- ^ codegen settings, read-only
   , gsModule    :: !Module                -- ^ current module
-  , gsId        :: !Int                   -- ^ unique number for the id generator
+  , gsId        :: {-# UNPACK #-} !FastMutInt -- ^ unique number for the id generator
   , gsIdents    :: !IdCache               -- ^ hash consing for identifiers from a Unique
   , gsUnfloated :: !(UniqFM Id CgStgExpr) -- ^ unfloated arguments
   , gsGroup     :: GenGroupState          -- ^ state for the current binding group
@@ -159,7 +160,6 @@ instance ToJExpr CIStatic where
 data VarType
   = PtrV     -- ^ pointer = reference to heap object (closure object)
   | VoidV    -- ^ no fields
-  -- | FloatV   -- one field -- no single precision supported
   | DoubleV  -- ^ A Double: one field
   | IntV     -- ^ An Int (32bit because JS): one field
   | LongV    -- ^ A Long: two fields one for the upper 32bits, one for the lower (NB: JS is little endian)
