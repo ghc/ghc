@@ -240,9 +240,9 @@ stg_shrinkSmallMutableArrayzh ( gcptr mba, W_ new_size )
      p = mba + SIZEOF_StgSmallMutArrPtrs + WDS(new_size);
      end = mba + SIZEOF_StgSmallMutArrPtrs + WDS(StgSmallMutArrPtrs_ptrs(mba));
 again:
-     ccall updateRemembSetPushClosure_(BaseReg "ptr",
-                                       W_[p] "ptr");
      if (p < end) {
+       ccall updateRemembSetPushClosure_(BaseReg "ptr",
+                                         W_[p] "ptr");
        p = p + SIZEOF_W;
        goto again;
      }
