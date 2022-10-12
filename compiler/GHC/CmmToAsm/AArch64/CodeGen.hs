@@ -664,10 +664,11 @@ getRegister' config plat expr
         -- See Note [Signed arithmetic on AArch64].
         negate code w reg = do
             let w' = opRegWidth w
+            (reg', code_sx) <- signExtendReg w w' reg
             return $ Any (intFormat w) $ \dst ->
                 code `appOL`
-                signExtendReg w w' reg `snocOL`
-                NEG (OpReg w' dst) (OpReg w' reg) `appOL`
+                code_sx `snocOL`
+                NEG (OpReg w' dst) (OpReg w' reg') `appOL`
                 truncateReg w' w dst
 
         ss_conv from to reg code =
@@ -817,15 +818,17 @@ getRegister' config plat expr
               -- should be performed.
               let w' = opRegWidth w
                   signExt r
-                    | not is_signed  = nilOL
+                    | not is_signed  = return (r, nilOL)
                     | otherwise      = signExtendReg w w' r
+              (reg_x_sx, code_x_sx) <- signExt reg_x
+              (reg_y_sx, code_y_sx) <- signExt reg_y
               return $ Any (intFormat w) $ \dst ->
                   code_x `appOL`
                   code_y `appOL`
                   -- sign-extend both operands
-                  signExt reg_x `appOL`
-                  signExt reg_y `appOL`
-                  op (OpReg w' dst) (OpReg w' reg_x) (OpReg w' reg_y) `appOL`
+                  code_x_sx `appOL`
+                  code_y_sx `appOL`
+                  op (OpReg w' dst) (OpReg w' reg_x_sx) (OpReg w' reg_y_sx) `appOL`
                   truncateReg w' w dst -- truncate back to the operand's original width
 
           floatOp w op = do
@@ -1021,16 +1024,21 @@ getRegister' config plat expr
 
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
-signExtendReg :: Width -> Width -> Reg -> OrdList Instr
+signExtendReg :: Width -> Width -> Reg -> NatM (Reg, OrdList Instr)
 signExtendReg w w' r =
     case w of
-      W64 -> nilOL
+      W64 -> noop
       W32
-        | w' == W32 -> nilOL
-        | otherwise -> unitOL $ SXTH (OpReg w' r) (OpReg w' r)
-      W16           -> unitOL $ SXTH (OpReg w' r) (OpReg w' r)
-      W8            -> unitOL $ SXTB (OpReg w' r) (OpReg w' r)
+        | w' == W32 -> noop
+        | otherwise -> extend SXTH
+      W16           -> extend SXTH
+      W8            -> extend SXTB
       _             -> panic "intOp"
+  where
+    noop = return (r, nilOL)
+    extend instr = do
+        r' <- getNewRegNat II64
+        return (r', unitOL $ instr (OpReg w' r') (OpReg w' r))
 
 -- | Instructions to truncate the value in the given register from width @w@
 -- down to width @w'@.
