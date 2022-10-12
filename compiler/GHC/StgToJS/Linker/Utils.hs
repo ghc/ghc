@@ -32,7 +32,6 @@ import qualified Data.ByteString.Char8 as Char8
 import           Data.ByteString (ByteString)
 
 import          GHC.Driver.Session
-import          GHC.Settings.Config (cProjectVersion)
 
 import          GHC.Data.ShortText
 import          GHC.Unit.State
@@ -43,24 +42,9 @@ import          GHC.StgToJS.Types
 import           Prelude
 import GHC.Platform
 import Data.List (isPrefixOf)
-import System.Directory (createDirectoryIfMissing)
 import System.IO
 import Data.Char (isSpace)
-import qualified Data.ByteString as B
 import qualified Control.Exception as Exception
-
--- | Given a FilePath and payload, write a file to disk creating any directories
--- along the way if needed.
-writeBinaryFile :: FilePath -> ByteString -> IO ()
-writeBinaryFile file bs = do
-  createDirectoryIfMissing True (takeDirectory file)
-  withBinaryFile file WriteMode $ \h -> mapM_ (B.hPut h) (chunks bs)
-  where
-    -- split the ByteString into a nonempty list of chunks of at most 1GiB
-    chunks :: ByteString -> [ByteString]
-    chunks b =
-      let (b1, b2) = B.splitAt 1073741824 b
-      in  b1 : if B.null b1 then [] else chunks b2
 
 -- | Retrieve library directories provided by the @UnitId@ in @UnitState@
 getInstalledPackageLibDirs :: UnitState -> UnitId -> [FilePath]
@@ -69,10 +53,6 @@ getInstalledPackageLibDirs us = fmap unpack . maybe mempty unitLibraryDirs . loo
 -- | Retrieve the names of the libraries provided by @UnitId@
 getInstalledPackageHsLibs :: UnitState -> UnitId -> [String]
 getInstalledPackageHsLibs us = fmap unpack . maybe mempty unitLibraries . lookupUnitId us
-
--- | A constant holding the compiler version
-getCompilerVersion :: String
-getCompilerVersion = cProjectVersion
 
 -- | A constant holding the JavaScript executable Filename extension
 jsexeExtension :: String
