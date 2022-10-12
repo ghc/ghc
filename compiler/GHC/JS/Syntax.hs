@@ -85,8 +85,6 @@ module GHC.JS.Syntax
   , pseudoSaturate
   -- * Utility
   , SaneDouble(..)
-  -- * Keywords
-  , isJsKeyword
   ) where
 
 import GHC.Prelude
@@ -94,7 +92,6 @@ import GHC.Prelude
 import Control.DeepSeq
 
 import Data.Function
-import qualified Data.Set as Set
 import Data.Data
 import Data.Word
 import qualified Data.Semigroup as Semigroup
@@ -391,26 +388,3 @@ newtype Ident = TxtI { itxt :: FastString }
 
 instance Ord Ident where
   compare (TxtI fs1) (TxtI fs2) = lexicalCompareFS fs1 fs2
-
---------------------------------------------------------------------------------
---                            JS Keywords
---------------------------------------------------------------------------------
--- | The set of Javascript keywords
-jsKeywords :: Set.Set Ident
-jsKeywords = Set.fromList $ TxtI <$>
-           [ "break", "case", "catch", "continue", "debugger"
-           , "default", "delete", "do", "else", "finally", "for"
-           , "function", "if", "in", "instanceof", "new", "return"
-           , "switch", "this", "throw", "try", "typeof", "var", "void"
-           , "while", "with"
-           , "class", "enum", "export", "extends", "import", "super"
-           , "const"
-           , "implements", "interface", "let", "package", "private"
-           , "protected"
-           , "public", "static", "yield"
-           , "null", "true", "false"
-           ]
-
--- | Predicate which checks if input 'Ident' is a JS keyword or not.
-isJsKeyword :: Ident -> Bool
-isJsKeyword = flip Set.member jsKeywords

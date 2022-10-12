@@ -43,21 +43,15 @@ import System.IO
 
 import Prelude
 
--- | return a list of fresh @Ident@
+-- | Return a list of fresh local @Ident@
+--
+-- Prefix them with 'h$$' such that these will be compacted by the compactor.
 newLocals :: [Ident]
-newLocals = filter (not . isJsKeyword) $
-            map (TxtI . mkFastString) $
-            map (:[]) chars0 ++ concatMap mkIdents [1..]
+newLocals = mkIdents 0
   where
-    mkIdents n = [c0:cs | c0 <- chars0, cs <- replicateM n chars]
-    chars0 = ['a'..'z']++['A'..'Z']
-    chars = chars0++['0'..'9']
-
--- | Rename @newLocals@ to 'h$$' such that these will be compacted by the
--- compactor.
-renamedVars :: [Ident]
-renamedVars = map (\(TxtI xs) -> TxtI ("h$$"<>xs)) newLocals
-
+    mkIdent s  = TxtI (mkFastString ("h$$" <> s))
+    mkIdents n = [mkIdent (c0:cs) | c0 <- chars, cs <- replicateM n chars] ++ mkIdents (n+1)
+    chars      = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
 
 --------------------------------------------------------------------------------
 -- CompactorState
@@ -91,7 +85,7 @@ data StringTable = StringTable
 
 -- | The empty @CompactorState@
 emptyCompactorState :: CompactorState
-emptyCompactorState = CompactorState renamedVars
+emptyCompactorState = CompactorState newLocals
                                      mempty
                                      mempty
                                      0
@@ -120,14 +114,6 @@ entries :: Functor f
         -> f CompactorState
 entries f cs = fmap (\x -> cs { csEntries = x }) (f $ csEntries cs)
 {-# INLINE entries #-}
-
--- | Update @csIdentSupply@ in @CompactorState@
-identSupply :: Functor f
-            => ([Ident] -> f [Ident])
-            -> CompactorState
-            -> f CompactorState
-identSupply f cs = fmap (\x -> cs { csIdentSupply = x }) (f $ csIdentSupply cs)
-{-# INLINE identSupply #-}
 
 -- | Update @csLabels@ in @CompactorState@
 labels :: Functor f
