@@ -58,7 +58,7 @@ newLocals = mkIdents 0
 --------------------------------------------------------------------------------
 
 data CompactorState = CompactorState
-  { csIdentSupply   :: [Ident]                     -- ^ ident supply for new names
+  { csIdentSupply   :: ![Ident]                    -- ^ ident supply for new names
   , csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
   , csEntries       :: !(UniqMap FastString Int)   -- ^ entry functions (these get listed in the metadata init
                                                    -- array)
