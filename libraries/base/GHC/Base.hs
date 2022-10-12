@@ -162,10 +162,6 @@ resulting in:
   Failed to load interface for ‘GHC.Num.Integer’
     There are files missing in the ‘ghc-bignum’ package,
 
-Note that this is only a problem with the make-based build system. Hadrian
-doesn't interleave compilation of modules from separate packages and respects
-the dependency between `base` and `ghc-bignum`.
-
 To ensure that GHC.Num.Integer is there, we must ensure that there is a visible
 dependency on GHC.Num.Integer from every module in base.  We make GHC.Base
 depend on GHC.Num.Integer; and everything else either depends on GHC.Base,
