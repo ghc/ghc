@@ -25,9 +25,6 @@ module GHC.JS.Transform
   , composOpM
   , composOpM_
   , composOpFold
-  -- * Hygienic transformation
-  , withHygiene
-  , scopify
   )
 where
 
@@ -35,15 +32,12 @@ import GHC.Prelude
 
 import GHC.JS.Syntax
 
-import qualified Data.Map as M
-import Text.Read (readMaybe)
 import Data.Functor.Identity
 import Control.Monad
 import Data.Bifunctor
 
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Panic
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
 import GHC.Types.Unique.DSet
@@ -80,7 +74,7 @@ mapIdent f = (map_expr, map_stat)
       UnsatVal v2 -> ValExpr $ UnsatVal v2
 
     map_stat s = case s of
-      DeclStat{}            -> s
+      DeclStat i e          -> DeclStat i (fmap map_expr e)
       ReturnStat e          -> ReturnStat (map_expr e)
       IfStat     e s1 s2    -> IfStat (map_expr e) (map_stat s1) (map_stat s2)
       WhileStat  b e s2     -> WhileStat b (map_expr e) (map_stat s2)
@@ -99,7 +93,7 @@ mapIdent f = (map_expr, map_stat)
 {-# INLINE identsS #-}
 identsS :: JStat -> UniqDSet Ident
 identsS = \case
-  DeclStat i         -> unitUniqDSet i
+  DeclStat i e       -> unitUniqDSet i `unionUniqDSets` maybe emptyUniqDSet identsE e
   ReturnStat e       -> identsE e
   IfStat e s1 s2     -> identsE e `unionUniqDSets` identsS s1 `unionUniqDSets` identsS s2
   WhileStat _ e s    -> identsE e `unionUniqDSets` identsS s
@@ -206,7 +200,7 @@ jmcompos ret app f' v =
     case v of
      JMGId _ -> ret v
      JMGStat v' -> ret JMGStat `app` case v' of
-           DeclStat i -> ret DeclStat `app` f i
+           DeclStat i e -> ret DeclStat `app` f i `app` mapMaybeM' f e
            ReturnStat i -> ret ReturnStat `app` f i
            IfStat e s s' -> ret IfStat `app` f e `app` f s `app` f s'
            WhileStat b e s -> ret (WhileStat b) `app` f e `app` f s
@@ -249,6 +243,10 @@ jmcompos ret app f' v =
   where
     mapM' :: forall a. (a -> m a) -> [a] -> m [a]
     mapM' g = foldr (app . app (ret (:)) . g) (ret [])
+    mapMaybeM' :: forall a. (a -> m a) -> Maybe a -> m (Maybe a)
+    mapMaybeM' g = \case
+      Nothing -> ret Nothing
+      Just a  -> app (ret Just) (g a)
     f :: forall b. JMacro b => b -> m b
     f x = ret jfromGADT `app` f' (jtoGADT x)
 
@@ -270,104 +268,3 @@ jsSaturate_ e = IS $ jfromGADT <$> go (jtoGADT e)
                JMGExpr (UnsatExpr  us) -> go =<< (JMGExpr <$> runIdentSupply us)
                JMGVal  (UnsatVal   us) -> go =<< (JMGVal  <$> runIdentSupply us)
                _ -> composOpM go v
-
-{--------------------------------------------------------------------
-  Transformation
---------------------------------------------------------------------}
-
--- doesn't apply to unsaturated bits
-jsReplace_ :: JMacro a => [(Ident, Ident)] -> a -> a
-jsReplace_ xs e = jfromGADT $ go (jtoGADT e)
-    where
-      go :: forall a. JMGadt a -> JMGadt a
-      go v = case v of
-                   JMGId i -> maybe v JMGId (M.lookup i mp)
-                   _ -> composOp go v
-      mp = M.fromList xs
-
--- only works on fully saturated things
-jsUnsat_ :: JMacro a => [Ident] -> a -> IdentSupply a
-jsUnsat_ xs e = IS $ do
-  (idents,is') <- splitAt (length xs) <$> get
-  put is'
-  return $ jsReplace_ (zip xs idents) e
-
--- | Apply a transformation to a fully saturated syntax tree,
--- taking care to return any free variables back to their free state
--- following the transformation. As the transformation preserves
--- free variables, it is hygienic.
-withHygiene ::  JMacro a => (a -> a) -> a -> a
-withHygiene f x = jfromGADT $ case jtoGADT x of
-  JMGExpr z -> JMGExpr $ UnsatExpr $ inScope z
-  JMGStat z -> JMGStat $ UnsatBlock $ inScope z
-  JMGVal  z -> JMGVal $ UnsatVal $ inScope z
-  JMGId _ -> jtoGADT $ f x
-  where
-      inScope z = IS $ do
-          ti <- get
-          case ti of
-            ((TxtI a):b) -> do
-              put b
-              return $ withHygiene_ a f z
-            _ -> error "withHygiene: empty list"
-
-withHygiene_ :: JMacro a => FastString -> (a -> a) -> a -> a
-withHygiene_ un f x = jfromGADT $ case jtoGADT x of
-  JMGStat _ -> jtoGADT $ UnsatBlock (jsUnsat_ is' x'')
-  JMGExpr _ -> jtoGADT $ UnsatExpr (jsUnsat_ is' x'')
-  JMGVal  _ -> jtoGADT $ UnsatVal (jsUnsat_ is' x'')
-  JMGId _ -> jtoGADT $ f x
-  where
-      (x',l) = case runState (runIdentSupply $ jsSaturate_ x) is of
-        (_ , [])         -> panic "withHygiene: empty ident list"
-        (x', TxtI l : _) -> (x',l)
-      is' = take lastVal is
-      x'' = f x'
-      lastVal = case readMaybe (reverse . takeWhile (/= '_') . reverse . unpackFS $ l) of
-        Nothing -> panic ("inSat" ++ unpackFS un)
-        Just r  -> r :: Int
-      is = newIdentSupply $ Just (mkFastString "inSat" `mappend` un)
-
--- | Takes a fully saturated expression and transforms it to use unique
--- variables that respect scope.
-scopify :: JStat -> JStat
-scopify x = evalState (jfromGADT <$> go (jtoGADT x)) (newIdentSupply Nothing)
-    where
-    go :: forall a. JMGadt a -> State [Ident] (JMGadt a)
-    go = \case
-      JMGStat (BlockStat ss) -> JMGStat . BlockStat <$>
-                                blocks ss
-          where blocks [] = return []
-                blocks (DeclStat (TxtI i) : xs)
-                  | ('!':'!':rs) <- unpackFS i
-                  = (DeclStat (TxtI (mkFastString rs)):) <$> blocks xs
-                  | ('!':rs) <- unpackFS i
-                  = (DeclStat (TxtI $ mkFastString rs):) <$> blocks xs
-                  | otherwise = do
-                     xx <- get
-                     case xx of
-                       (newI:st) -> do
-                         put st
-                         rest <- blocks xs
-                         return $ [DeclStat newI `mappend` jsReplace_ [(TxtI i, newI)] (BlockStat rest)]
-                       _ -> error "scopify: empty list"
-                blocks (x':xs) = (jfromGADT <$> go (jtoGADT x')) <:> blocks xs
-                (<:>) = liftM2 (:)
-      JMGStat (TryStat s (TxtI i) s1 s2) -> do
-             xx <- get
-             case xx of
-               (newI:st) -> do
-                 put st
-                 t <- jfromGADT <$> go (jtoGADT s)
-                 c <- jfromGADT <$> go (jtoGADT s1)
-                 f <- jfromGADT <$> go (jtoGADT s2)
-                 return . JMGStat . TryStat t newI (jsReplace_ [(TxtI i, newI)] c) $ f
-               _ -> error "scopify: empty list"
-      JMGExpr (ValExpr (JFunc is s)) -> do
-               st <- get
-               let (newIs,newSt) = splitAt (length is) st
-               put newSt
-               rest <- jfromGADT <$> go (jtoGADT s)
-               return . JMGExpr . ValExpr $ JFunc newIs $ (jsReplace_ $ zip is newIs) rest
-      v -> composOpM go v
-

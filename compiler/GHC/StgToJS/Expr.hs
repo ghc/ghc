@@ -259,7 +259,7 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
   args' <- concatMapM genArg args
   ac    <- allocCon ii con cc args'
   emitToplevel (ei ||= toJExpr (JFunc []
-    (mconcat [DeclStat ii, p, ac, r1 |= toJExpr ii, returnStack])))
+    (mconcat [decl ii, p, ac, r1 |= toJExpr ii, returnStack])))
 
 -- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
@@ -427,7 +427,7 @@ loadLiveFun l = do
                ]
   where
         loadLiveVar d n v = let ident = TxtI (dataFieldName n)
-                            in  DeclStat v `mappend` (toJExpr v |= SelExpr d ident)
+                            in  v ||= SelExpr d ident
 
 -- | Pop a let-no-escape frame off the stack
 popLneFrame :: Bool -> Int -> ExprCtx -> G JStat
@@ -541,7 +541,7 @@ allocCls dynMiddle xs = do
     toCl (i, StgRhsCon cc con _mui _ticjs [a]) | isUnboxableCon con = do
       ii <- identForId i
       ac <- allocCon ii con cc =<< genArg a
-      pure (Left (DeclStat ii <> ac))
+      pure (Left (decl ii <> ac))
 
     -- dynamics
     toCl (i, StgRhsCon cc con _mu _ticks ar) =
@@ -581,15 +581,13 @@ genCase ctx bnd e at alts l
                                      (pprStgExpr panicStgPprOpts e)
 
       (aj, ar) <- genAlts (ctxAssertEvaluated bnd ctx) bnd at d alts
-      (declCCS,saveCCS,restoreCCS) <- ifProfilingM $ do
+      (saveCCS,restoreCCS) <- ifProfilingM $ do
         ccsVar <- freshIdent
-        pure ( DeclStat ccsVar
-             , toJExpr ccsVar |= toJExpr jCurrentCCS
+        pure ( ccsVar ||= toJExpr jCurrentCCS
              , toJExpr jCurrentCCS |= toJExpr ccsVar
              )
       return ( mconcat
-          [ declCCS
-          , mconcat (map DeclStat bndi)
+          [ mconcat (map decl bndi)
           , saveCCS
           , ej
           , restoreCCS
@@ -977,13 +975,16 @@ allocDynAll haveDecl middle cls = do
   let
     middle' = fromMaybe mempty middle
 
+    decl_maybe i e
+      | haveDecl  = toJExpr i |= e
+      | otherwise = i ||= e
+
     makeObjs :: G JStat
     makeObjs =
       fmap mconcat $ forM cls $ \(i,f,_,cc) -> do
       ccs <- maybeToList <$> costCentreStackLbl cc
       pure $ mconcat
-        [ dec i
-        , toJExpr i |= if csInlineAlloc settings
+        [ decl_maybe i $ if csInlineAlloc settings
             then ValExpr (jhFromList $ [ (closureEntry_ , f)
                                        , (closureField1_, null_)
                                        , (closureField2_, null_)
@@ -1022,8 +1023,6 @@ allocDynAll haveDecl middle cls = do
     fillFun [] = null_
     fillFun es = ApplExpr (allocData (length es)) es
 
-    dec i | haveDecl  = DeclStat i
-          | otherwise = mempty
     checkObjs | csAssertRts settings  = mconcat $
                 map (\(i,_,_,_) -> ApplStat (ValExpr (JVar (TxtI "h$checkObj"))) [toJExpr i]) cls
               | otherwise = mempty
