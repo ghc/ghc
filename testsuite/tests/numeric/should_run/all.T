@@ -79,3 +79,4 @@ test('IntegerToFloat', normal, compile_and_run, [''])
 
 test('T20291', normal, compile_and_run, [''])
 test('T22282', normal, compile_and_run, [''])
+test('foundation', normal, compile_and_run, ['-O -package transformers'])
