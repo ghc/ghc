@@ -117,8 +117,7 @@ parseFFIPatternA True True pat t es as  = do
             , ReturnStat $ ApplExpr (var "h$takeMVar") [toJExpr x .^ "mv"]
             ])
           (mconcat
-            [ DeclStat d
-            , toJExpr d |= toJExpr x .^ "mv"
+            [ d ||= toJExpr x .^ "mv"
             , copyResult (toJExpr d)
             ])
     ]

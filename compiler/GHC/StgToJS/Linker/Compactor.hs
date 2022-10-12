@@ -156,7 +156,7 @@ staticDeclStat :: StaticInfo -> JStat
 staticDeclStat (StaticInfo global_name static_value _) = decl
   where
     global_ident = TxtI global_name
-    decl_init v  = DeclStat global_ident `mappend` (toJExpr global_ident |= v)
+    decl_init v  = global_ident ||= v
     decl_no_init = appS "h$di" [toJExpr global_ident]
 
     decl = case static_value of
@@ -299,9 +299,7 @@ renderBuildFunctions normalBfs cycleBreakerBfs =
           body = ReturnStat $ ApplExpr (ValExpr (JVar (TxtI $ cbName n)))
                                        (map (ValExpr . JVar) args)
           bfn = bfName bf
-      in  DeclStat (TxtI bfn) <>
-          AssignStat (ValExpr (JVar (TxtI bfn)))
-                     (ValExpr (JFunc args body))
+      in  (TxtI bfn) ||= (ValExpr (JFunc args body))
     cycleBr2 = renderCbr $ \bf n -> renderBuildFunction (bf { bfName = cbName n })
 
 data BuildFunction = BuildFunction
@@ -369,7 +367,7 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
 
     removeDecls :: UniqSet FastString -> JStat -> JStat
     removeDecls t (BlockStat ss) = BlockStat (map (removeDecls t) ss)
-    removeDecls t (DeclStat (TxtI i))
+    removeDecls t (DeclStat (TxtI i) _)
       | elementOfUniqSet i t = mempty
     removeDecls _ s = s
 
@@ -408,9 +406,7 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
                    -> JStat
                    -> JStat
     createFunction _i idx g args body =
-      DeclStat bi <>
-      AssignStat (ValExpr (JVar bi))
-                 (ValExpr (JFunc bargs bbody))
+      bi ||= ValExpr (JFunc bargs bbody)
       where
         ng    = length g
         bi    = buildFunId idx
@@ -425,9 +421,7 @@ rewriteBodies globals idx1 idx2 input = (bfsNormal, bfsCycleBreaker, input')
 
 renderBuildFunction :: BuildFunction -> JStat
 renderBuildFunction (BuildFunction i bfid deps _nargs) =
-  DeclStat (TxtI i) <>
-  AssignStat (ValExpr (JVar (TxtI i)))
-             (ApplExpr (ValExpr (JVar bfid)) (map (ValExpr . JVar . TxtI) deps))
+  (TxtI i) ||= (ApplExpr (ValExpr (JVar bfid)) (map (ValExpr . JVar . TxtI) deps))
 
 dedupeBody :: Int -> Int -> Bool
 dedupeBody n size
@@ -447,9 +441,9 @@ findGlobals globals stat = filter isGlobal . map itxt . uniqDSetToList $ identsS
     isGlobal i = elementOfUniqSet i globals && not (elementOfUniqSet i locals)
 
 findLocals :: JStat -> [FastString]
-findLocals (BlockStat ss)      = concatMap findLocals ss
-findLocals (DeclStat (TxtI i)) = [i]
-findLocals _                   = []
+findLocals (BlockStat ss)        = concatMap findLocals ss
+findLocals (DeclStat (TxtI i) _) = [i]
+findLocals _                     = []
 
 
 data HashIdx = HashIdx (UniqMap FastString Hash) (Map Hash FastString)
@@ -492,12 +486,12 @@ dedupeStat :: HashIdx -> JStat -> JStat
 dedupeStat hi = go
   where
     go (BlockStat ss) = BlockStat (map go ss)
-    go s@(DeclStat (TxtI i))
+    go s@(DeclStat (TxtI i) _)
       | not (isCanon hi i) = mempty
-      | otherwise                              = s
+      | otherwise          = s
     go (AssignStat v@(ValExpr (JVar (TxtI i))) e)
       | not (isCanon hi i) = mempty
-      | otherwise                              = AssignStat v (identsE' (toCanonI hi) e)
+      | otherwise          = AssignStat v (identsE' (toCanonI hi) e)
     -- rewrite identifiers in e
     go s = identsS' (toCanonI hi) s
 
@@ -806,7 +800,7 @@ identsV' f (JFunc args s) = JFunc (fmap f args) (identsS' f s)
 identsV' _ UnsatVal{}     = error "identsV': UnsatVal"
 
 identsS' :: (Ident -> Ident) -> JStat -> JStat
-identsS' f (DeclStat i)         = DeclStat       $! f i
+identsS' f (DeclStat i e)       = DeclStat       (f i) e
 identsS' f (ReturnStat e)       = ReturnStat     $! identsE' f e
 identsS' f (IfStat e s1 s2)     = IfStat         (identsE' f e) (identsS' f s1) (identsS' f s2)
 identsS' f (WhileStat b e s)    = WhileStat b    (identsE' f e) (identsS' f s)

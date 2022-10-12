@@ -112,7 +112,8 @@ defRenderJsS r = \case
                      $$ mbElse
         where mbElse | y == BlockStat []  = PP.empty
                      | otherwise = hangBrace (text "else") (jsToDocR r y)
-  DeclStat x          -> text "var" <+> jsToDocR r x
+  DeclStat x Nothing  -> text "var" <+> jsToDocR r x
+  DeclStat x (Just e) -> text "var" <+> jsToDocR r x <+> char '=' <+> jsToDocR r e
   WhileStat False p b -> hangBrace (text "while" <> parens (jsToDocR r p)) (jsToDocR r b)
   WhileStat True  p b -> (hangBrace (text "do") (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
   UnsatBlock e        -> jsToDocR r $ pseudoSaturate e

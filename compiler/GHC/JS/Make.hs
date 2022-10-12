@@ -266,7 +266,7 @@ jVar :: ToSat a => a -> JStat
 jVar f = UnsatBlock . IS $ do
            (block, is) <- runIdentSupply $ toSat_ f []
            let addDecls (BlockStat ss) =
-                  BlockStat $ map DeclStat is ++ ss
+                  BlockStat $ map decl is ++ ss
                addDecls x = x
            return $ addDecls block
 
@@ -278,14 +278,14 @@ jForIn :: ToSat a => JExpr -> (JExpr -> a)  -> JStat
 jForIn e f = UnsatBlock . IS $ do
                (block, is) <- runIdentSupply $ toSat_ f []
                let i = List.head is
-               return $ DeclStat i `mappend` ForInStat False i e block
+               return $ decl i `mappend` ForInStat False i e block
 
 -- | As with "jForIn" but creating a \"for each in\" statement.
 jForEachIn :: ToSat a => JExpr -> (JExpr -> a) -> JStat
 jForEachIn e f = UnsatBlock . IS $ do
                (block, is) <- runIdentSupply $ toSat_ f []
                let i = List.head is
-               return $ DeclStat i `mappend` ForInStat True i e block
+               return $ decl i `mappend` ForInStat True i e block
 
 -- | As with "jForIn" but creating a \"for each in\" statement.
 jTryCatchFinally :: (ToSat a) => JStat -> a -> JStat -> JStat
@@ -311,7 +311,7 @@ jFor before p after b = BlockStat [before, WhileStat False (toJExpr p) b']
 
 -- | construct a js declaration with the given identifier
 decl :: Ident -> JStat
-decl i = DeclStat i
+decl i = DeclStat i Nothing
 
 -- | The empty JS HashMap
 jhEmpty :: M.Map k JExpr
@@ -508,7 +508,7 @@ infixl 8 .^
 --
 -- > foo |= expr ==> var foo; foo = expr;
 (||=) :: Ident -> JExpr -> JStat
-i ||= ex = DeclStat i `mappend` (toJExpr i |= ex)
+i ||= ex = DeclStat i (Just ex)
 
 infixl 2 ||=, |=
 

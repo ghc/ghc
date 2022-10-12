@@ -141,7 +141,7 @@ instance Show a => Show (IdentSupply a) where
 -- Reference](https://tc39.es/ecma262/#sec-ecmascript-language-statements-and-declarations)
 -- for details
 data JStat
-  = DeclStat   Ident                         -- ^ Variable declarations: var foo
+  = DeclStat   !Ident !(Maybe JExpr)         -- ^ Variable declarations: var foo [= e]
   | ReturnStat JExpr                         -- ^ Return
   | IfStat     JExpr JStat JStat             -- ^ If
   | WhileStat  Bool JExpr JStat              -- ^ While, bool is "do" when True

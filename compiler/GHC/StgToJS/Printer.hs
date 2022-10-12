@@ -81,13 +81,26 @@ prettyBlock r xs = vcat $ map addSemi (prettyBlock' r xs)
 
 -- recognize common patterns in a block and convert them to more idiomatic/concise javascript
 prettyBlock' :: RenderJs -> [JStat] -> [Doc]
+-- return/...
+prettyBlock' r ( x@(ReturnStat _)
+               : xs
+               )
+      | not (null xs)
+      = prettyBlock' r [x]
+-- declare/assign
+prettyBlock' r ( (DeclStat i Nothing)
+               : (AssignStat (ValExpr (JVar i')) v)
+               : xs
+               )
+      | i == i'
+      = prettyBlock' r (DeclStat i (Just v) : xs)
+
 -- resugar for loops with/without var declaration
-prettyBlock' r ( (DeclStat i)
-              : (AssignStat (ValExpr (JVar i')) v0)
-              : (WhileStat False p (BlockStat bs))
-              : xs
-              )
-     | i == i' && not (null flat) && isForUpdStat (last flat)
+prettyBlock' r ( (DeclStat i (Just v0))
+               : (WhileStat False p (BlockStat bs))
+               : xs
+               )
+     | not (null flat) && isForUpdStat (last flat)
      = mkFor r True i v0 p (last flat) (init flat) : prettyBlock' r xs
         where
           flat = flattenBlocks bs
@@ -101,20 +114,12 @@ prettyBlock' r ( (AssignStat (ValExpr (JVar i)) v0)
           flat = flattenBlocks bs
 
 -- global function (does not preserve semantics but works for GHCJS)
-prettyBlock' r ( (DeclStat i)
-               : (AssignStat (ValExpr (JVar i')) (ValExpr (JFunc is b)))
+prettyBlock' r ( (DeclStat i (Just (ValExpr (JFunc is b))))
                : xs
                )
-      | i == i' = (hangBrace (text "function" <+> jsToDocR r i <> parens (fsep . punctuate comma . map (jsToDocR r) $ is))
+      = (hangBrace (text "function" <+> jsToDocR r i <> parens (fsep . punctuate comma . map (jsToDocR r) $ is))
                              (jsToDocR r b)
                   ) : prettyBlock' r xs
--- declare/assign
-prettyBlock' r ( (DeclStat i)
-               : (AssignStat (ValExpr (JVar i')) v)
-               : xs
-               )
-      | i == i' = (text "var" <+> jsToDocR r i <+> char '=' <+> jsToDocR r v) : prettyBlock' r xs
-
 -- modify/assign operators
 prettyBlock' r ( (AssignStat (ValExpr (JVar i)) (InfixExpr AddOp (ValExpr (JVar i')) (ValExpr (JInt 1))))
                : xs

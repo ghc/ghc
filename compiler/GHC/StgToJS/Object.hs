@@ -404,7 +404,7 @@ instance Binary ExpFun where
   get bh                        = ExpFun <$> get bh <*> get bh <*> get bh
 
 instance Binary JStat where
-  put_ bh (DeclStat i)         = putByte bh 1  >> put_ bh i
+  put_ bh (DeclStat i e)       = putByte bh 1  >> put_ bh i >> put_ bh e
   put_ bh (ReturnStat e)       = putByte bh 2  >> put_ bh e
   put_ bh (IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
   put_ bh (WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
@@ -420,7 +420,7 @@ instance Binary JStat where
   put_ bh (BreakStat ml)       = putByte bh 13 >> put_ bh ml
   put_ bh (ContinueStat ml)    = putByte bh 14 >> put_ bh ml
   get bh = getByte bh >>= \case
-    1  -> DeclStat     <$> get bh
+    1  -> DeclStat     <$> get bh <*> get bh
     2  -> ReturnStat   <$> get bh
     3  -> IfStat       <$> get bh <*> get bh <*> get bh
     4  -> WhileStat    <$> get bh <*> get bh <*> get bh

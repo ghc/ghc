@@ -225,6 +225,6 @@ varForDataConWorker d = varForDataConEntryId (dataConWorkId d)
 declVarsForId :: Id -> G JStat
 declVarsForId  i = case typeSize (idType i) of
   0 -> return mempty
-  1 -> DeclStat <$> identForId i
-  s -> mconcat <$> mapM (\n -> DeclStat <$> identForIdN i n) [1..s]
+  1 -> decl <$> identForId i
+  s -> mconcat <$> mapM (\n -> decl <$> identForIdN i n) [1..s]
 
