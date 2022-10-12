@@ -76,3 +76,4 @@ test('T18515', normal, compile_and_run, [''])
 test('T18604', normal, compile_and_run, [''])
 
 test('IntegerToFloat', normal, compile_and_run, [''])
+test('T22282', normal, compile_and_run, [''])
