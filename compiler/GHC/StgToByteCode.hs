@@ -1107,8 +1107,8 @@ layoutTuple profile start_off arg_ty reps =
 usePlainReturn :: Type -> Bool
 usePlainReturn t
   | isUnboxedTupleType t || isUnboxedSumType t = False
-  | otherwise = typePrimRep t == [LiftedRep] ||
-                (typePrimRep t == [UnliftedRep] && isAlgType t)
+  | otherwise = typePrimRep t == [BoxedRep Lifted] ||
+                (typePrimRep t == [BoxedRep Unlifted] && isAlgType t)
 
 {- Note [unboxed tuple bytecodes and tuple_BCO]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1451,8 +1451,7 @@ primRepToFFIType platform r
      AddrRep     -> FFIPointer
      FloatRep    -> FFIFloat
      DoubleRep   -> FFIDouble
-     LiftedRep   -> FFIPointer
-     UnliftedRep -> FFIPointer
+     BoxedRep _  -> FFIPointer
      _           -> pprPanic "primRepToFFIType" (ppr r)
   where
     (signed_word, unsigned_word) = case platformWordSize platform of
@@ -1477,8 +1476,7 @@ mkDummyLiteral platform pr
         AddrRep     -> LitNullAddr
         DoubleRep   -> LitDouble 0
         FloatRep    -> LitFloat 0
-        LiftedRep   -> LitNullAddr
-        UnliftedRep -> LitNullAddr
+        BoxedRep _  -> LitNullAddr
         _         -> pprPanic "mkDummyLiteral" (ppr pr)
 
 

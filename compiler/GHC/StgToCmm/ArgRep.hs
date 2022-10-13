@@ -69,8 +69,7 @@ argRepString V64 = "V64"
 toArgRep :: Platform -> PrimRep -> ArgRep
 toArgRep platform rep = case rep of
    VoidRep           -> V
-   LiftedRep         -> P
-   UnliftedRep       -> P
+   BoxedRep _        -> P
    IntRep            -> N
    WordRep           -> N
    Int8Rep           -> N  -- Gets widened to native word width for calls

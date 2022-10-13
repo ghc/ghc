@@ -1943,7 +1943,7 @@ isKindLevel KindLevel = True
 data Levity
   = Lifted
   | Unlifted
-  deriving Eq
+  deriving (Data, Eq, Ord, Show)
 
 instance Outputable Levity where
   ppr Lifted   = text "Lifted"

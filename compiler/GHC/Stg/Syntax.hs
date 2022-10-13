@@ -74,6 +74,7 @@ import Data.ByteString ( ByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import GHC.Core.DataCon
+import GHC.Types.Basic       ( Levity(..) )
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Name        ( isDynLinkName )
@@ -165,10 +166,10 @@ isDllConApp platform ext_dyn_refs this_mod con args
 --
 -- The coercion argument here gets VoidRep
 isAddrRep :: PrimRep -> Bool
-isAddrRep AddrRep     = True
-isAddrRep LiftedRep   = True
-isAddrRep UnliftedRep = True
-isAddrRep _           = False
+isAddrRep AddrRep             = True
+isAddrRep (BoxedRep Lifted)   = True
+isAddrRep (BoxedRep Unlifted) = True
+isAddrRep _                   = False
 
 -- | Type of an @StgArg@
 --

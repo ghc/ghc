@@ -1629,8 +1629,7 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 -- "GHC.Types.RepType" and Note [VoidRep] in "GHC.Types.RepType".
 data PrimRep
   = VoidRep
-  | LiftedRep
-  | UnliftedRep   -- ^ Unlifted pointer
+  | BoxedRep Levity
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
   | Int32Rep      -- ^ Signed, 32-bit value
@@ -1668,8 +1667,8 @@ instance Outputable PrimElemRep where
 
 instance Binary PrimRep where
   put_ bh VoidRep        = putByte bh 0
-  put_ bh LiftedRep      = putByte bh 1
-  put_ bh UnliftedRep    = putByte bh 2
+  put_ bh (BoxedRep Lifted)   = putByte bh 1
+  put_ bh (BoxedRep Unlifted) = putByte bh 2
   put_ bh Int8Rep        = putByte bh 3
   put_ bh Int16Rep       = putByte bh 4
   put_ bh Int32Rep       = putByte bh 5
@@ -1688,8 +1687,8 @@ instance Binary PrimRep where
     h <- getByte bh
     case h of
       0  -> pure VoidRep
-      1  -> pure LiftedRep
-      2  -> pure UnliftedRep
+      1  -> pure (BoxedRep Lifted)
+      2  -> pure (BoxedRep Unlifted)
       3  -> pure Int8Rep
       4  -> pure Int16Rep
       5  -> pure Int32Rep
@@ -1715,9 +1714,8 @@ isVoidRep VoidRep = True
 isVoidRep _other  = False
 
 isGcPtrRep :: PrimRep -> Bool
-isGcPtrRep LiftedRep   = True
-isGcPtrRep UnliftedRep = True
-isGcPtrRep _           = False
+isGcPtrRep (BoxedRep _) = True
+isGcPtrRep _            = False
 
 -- A PrimRep is compatible with another iff one can be coerced to the other.
 -- See Note [Bad unsafe coercion] in GHC.Core.Lint for when are two types coercible.
@@ -1758,10 +1756,9 @@ primRepSizeB platform = \case
    FloatRep         -> fLOAT_SIZE
    DoubleRep        -> dOUBLE_SIZE
    AddrRep          -> platformWordSizeInBytes platform
-   LiftedRep        -> platformWordSizeInBytes platform
-   UnliftedRep      -> platformWordSizeInBytes platform
+   BoxedRep _       -> platformWordSizeInBytes platform
    VoidRep          -> 0
-   (VecRep len rep) -> len * primElemRepSizeB platform rep
+   VecRep len rep   -> len * primElemRepSizeB platform rep
 
 primElemRepSizeB :: Platform -> PrimElemRep -> Int
 primElemRepSizeB platform = primRepSizeB platform . primElemRepToPrimRep

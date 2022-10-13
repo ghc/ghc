@@ -29,7 +29,7 @@ module GHC.Types.RepType
 
 import GHC.Prelude
 
-import GHC.Types.Basic (Arity, RepArity)
+import GHC.Types.Basic (Arity, RepArity, Levity(..))
 import GHC.Core.DataCon
 import GHC.Builtin.Names
 import GHC.Core.Coercion
@@ -310,27 +310,27 @@ typeSlotTy ty
   = Just (primRepSlot (typePrimRep1 ty))
 
 primRepSlot :: PrimRep -> SlotTy
-primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")
-primRepSlot LiftedRep   = PtrLiftedSlot
-primRepSlot UnliftedRep = PtrUnliftedSlot
-primRepSlot IntRep      = WordSlot
-primRepSlot Int8Rep     = WordSlot
-primRepSlot Int16Rep    = WordSlot
-primRepSlot Int32Rep    = WordSlot
-primRepSlot Int64Rep    = Word64Slot
-primRepSlot WordRep     = WordSlot
-primRepSlot Word8Rep    = WordSlot
-primRepSlot Word16Rep   = WordSlot
-primRepSlot Word32Rep   = WordSlot
-primRepSlot Word64Rep   = Word64Slot
-primRepSlot AddrRep     = WordSlot
-primRepSlot FloatRep    = FloatSlot
-primRepSlot DoubleRep   = DoubleSlot
-primRepSlot VecRep{}    = pprPanic "primRepSlot" (text "No slot for VecRep")
+primRepSlot VoidRep             = pprPanic "primRepSlot" (text "No slot for VoidRep")
+primRepSlot (BoxedRep Lifted)   = PtrLiftedSlot
+primRepSlot (BoxedRep Unlifted) = PtrUnliftedSlot
+primRepSlot IntRep              = WordSlot
+primRepSlot Int8Rep             = WordSlot
+primRepSlot Int16Rep            = WordSlot
+primRepSlot Int32Rep            = WordSlot
+primRepSlot Int64Rep            = Word64Slot
+primRepSlot WordRep             = WordSlot
+primRepSlot Word8Rep            = WordSlot
+primRepSlot Word16Rep           = WordSlot
+primRepSlot Word32Rep           = WordSlot
+primRepSlot Word64Rep           = Word64Slot
+primRepSlot AddrRep             = WordSlot
+primRepSlot FloatRep            = FloatSlot
+primRepSlot DoubleRep           = DoubleSlot
+primRepSlot VecRep{}            = pprPanic "primRepSlot" (text "No slot for VecRep")
 
 slotPrimRep :: SlotTy -> PrimRep
-slotPrimRep PtrLiftedSlot   = LiftedRep
-slotPrimRep PtrUnliftedSlot = UnliftedRep
+slotPrimRep PtrLiftedSlot   = BoxedRep Lifted
+slotPrimRep PtrUnliftedSlot = BoxedRep Unlifted
 slotPrimRep Word64Slot      = Word64Rep
 slotPrimRep WordSlot        = WordRep
 slotPrimRep DoubleSlot      = DoubleRep
@@ -391,11 +391,10 @@ needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep
-  = VoidRep       -- See Note [VoidRep]
-  | LiftedRep     -- ^ Lifted pointer
-  | UnliftedRep   -- ^ Unlifted pointer
-  | Int8Rep       -- ^ Signed, 8-bit value
-  | Int16Rep      -- ^ Signed, 16-bit value
+  = VoidRep         -- See Note [VoidRep]
+  | BoxedRep Levity -- ^ A pointer to a boxed value
+  | Int8Rep         -- ^ Signed, 8-bit value
+  | Int16Rep        -- ^ Signed, 16-bit value
   ...etc...
   | VecRep Int PrimElemRep  -- ^ SIMD fixed-width vector
 
@@ -633,23 +632,23 @@ runtimeRepPrimRep_maybe rr_ty
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 primRepToRuntimeRep :: PrimRep -> RuntimeRepType
 primRepToRuntimeRep rep = case rep of
-  VoidRep       -> zeroBitRepTy
-  LiftedRep     -> liftedRepTy
-  UnliftedRep   -> unliftedRepTy
-  IntRep        -> intRepDataConTy
-  Int8Rep       -> int8RepDataConTy
-  Int16Rep      -> int16RepDataConTy
-  Int32Rep      -> int32RepDataConTy
-  Int64Rep      -> int64RepDataConTy
-  WordRep       -> wordRepDataConTy
-  Word8Rep      -> word8RepDataConTy
-  Word16Rep     -> word16RepDataConTy
-  Word32Rep     -> word32RepDataConTy
-  Word64Rep     -> word64RepDataConTy
-  AddrRep       -> addrRepDataConTy
-  FloatRep      -> floatRepDataConTy
-  DoubleRep     -> doubleRepDataConTy
-  VecRep n elem -> TyConApp vecRepDataConTyCon [n', elem']
+  VoidRep           -> zeroBitRepTy
+  BoxedRep Lifted   -> liftedRepTy
+  BoxedRep Unlifted -> unliftedRepTy
+  IntRep            -> intRepDataConTy
+  Int8Rep           -> int8RepDataConTy
+  Int16Rep          -> int16RepDataConTy
+  Int32Rep          -> int32RepDataConTy
+  Int64Rep          -> int64RepDataConTy
+  WordRep           -> wordRepDataConTy
+  Word8Rep          -> word8RepDataConTy
+  Word16Rep         -> word16RepDataConTy
+  Word32Rep         -> word32RepDataConTy
+  Word64Rep         -> word64RepDataConTy
+  AddrRep           -> addrRepDataConTy
+  FloatRep          -> floatRepDataConTy
+  DoubleRep         -> doubleRepDataConTy
+  VecRep n elem     -> TyConApp vecRepDataConTyCon [n', elem']
     where
       n' = case n of
         2  -> vec2DataConTy
@@ -687,7 +686,7 @@ mightBeFunTy :: Type -> Bool
 -- AK: It would be nice to figure out and document the difference
 -- between this and isFunTy at some point.
 mightBeFunTy ty
-  | [LiftedRep] <- typePrimRep ty
+  | [BoxedRep Lifted] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc
   = False

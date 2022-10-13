@@ -1620,10 +1620,12 @@ boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [lev]
-      = case tyConRuntimeRepInfo (tyConAppTyCon lev) of
-          LiftedInfo -> [LiftedRep]
-          UnliftedInfo -> [UnliftedRep]
-          _ -> pprPanic "boxedRepDataCon" (ppr lev)
+      = [BoxedRep lev']
+      where
+        lev' = case tyConRuntimeRepInfo (tyConAppTyCon lev) of
+          LiftedInfo -> Lifted
+          UnliftedInfo -> Unlifted
+          _ -> pprPanic "boxedRepDataCon(levity polymorphic)" (ppr lev)
     prim_rep_fun args
       = pprPanic "boxedRepDataCon" (ppr args)
 

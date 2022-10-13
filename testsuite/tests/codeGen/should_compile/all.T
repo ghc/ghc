@@ -112,4 +112,4 @@ test('T21710a', [ unless(tables_next_to_code(), skip) , when(wordsize(32), skip)
                 , only_ways(['optasm'])
                 , grep_errmsg('(call)',[1]) ]
                 , compile, ['-ddump-cmm -dno-typeable-binds'])
-test('T22291', expect_broken(22291), compile, [''])
+test('T22291', normal, compile, [''])
