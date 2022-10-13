@@ -222,6 +222,7 @@ function h$stmCatchRetry(a,b) {
 
 function h$catchStm(a,handler) {
     h$p4(h$currentThread.transaction, h$currentThread.mask, handler, h$catchStm_e);
+    h$currentThread.transaction = new h$Transaction(handler, h$currentThread.transaction);
     h$r1 = a;
     return h$ap_1_0_fast();
 }
