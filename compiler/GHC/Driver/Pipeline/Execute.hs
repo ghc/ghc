@@ -345,7 +345,34 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         return output_fn
 
 
--- | Embed .js files into .o files
+-- Note [JS Backend .o file procedure ]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The JS backend breaks some of the assumptions on file generation order
+-- because it directly produces .o files. This violation breaks some of the
+-- assumptions on file timestamps, particularly in the postHsc phase. The
+-- postHsc phase for the JS backend is performed in 'runJsPhase'. Consider
+-- what the NCG does:
+--
+-- With other NCG backends we have the following order:
+-- 1. The backend produces a .s file
+-- 2. Then we write the interface file, .hi
+-- 3. Then we generate a .o file in a postHsc phase (calling the asm phase etc.)
+--
+-- For the JS Backend this order is different
+-- 1. The JS Backend _directly_ produces .o files (via
+--    'GHC.StgToJS.Linker.Linker.embedJsFile')
+-- 2. Then we write the interface file. Notice that this breaks the ordering
+-- of .hi > .o (step 2 and step 3 in the NCG above).
+--
+-- This violation results in timestamp checks which pass on the NCG but fail
+-- in the JS backend. In particular, checks that compare 'ms_obj_date', and
+-- 'ms_iface_date' in 'GHC.Unit.Module.ModSummary'.
+--
+-- Thus to fix this ordering we touch the object files we generated earlier
+-- to ensure these timestamps abide by the proper ordering.
+
+-- | Run the JS Backend postHsc phase.
 runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
 runJsPhase pipe_env hsc_env input_fn = do
   let dflags     = hsc_dflags   hsc_env
@@ -354,7 +381,16 @@ runJsPhase pipe_env hsc_env input_fn = do
   let unit_env   = hsc_unit_env hsc_env
 
   output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-  embedJsFile logger dflags tmpfs unit_env input_fn output_fn
+
+  -- if the input filename is the same as the output, then we've probably
+  -- generated the object ourselves. In this case, we touch the object file to
+  -- ensure the timestamp is refreshed, see Note [ JS Backend .o Files ]. If
+  -- they are not the same then we embed the .js file into a .o file with the
+  -- addition of a header
+  if (input_fn /= output_fn)
+    then embedJsFile logger dflags tmpfs unit_env input_fn output_fn
+    else touchObjectFile logger dflags output_fn
+
   return output_fn
 
 
