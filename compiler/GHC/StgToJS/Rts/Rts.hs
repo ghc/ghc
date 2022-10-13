@@ -674,7 +674,9 @@ rts' s =
                          <> appS "h$stmCommitTransaction" []
                          <> returnS (stack .! sp))
           , closure (ClosureInfo "h$catchStm_e" (CIRegs 0 [PtrV]) "STM catch" (CILayoutFixed 3 [ObjV,PtrV,ObjV]) CIStackFrame mempty)
-                       (adjSpN' 4 <> returnS (stack .! sp))
+                       (adjSpN' 4
+                       <> appS "h$stmCommitTransaction" []
+                       <> returnS (stack .! sp))
           , closure (ClosureInfo "h$stmResumeRetry_e" (CIRegs 0 [PtrV]) "resume retry" (CILayoutFixed 0 []) CIStackFrame mempty)
                         (jVar $ \blocked ->
                             mconcat [ jwhenS (stack .! (sp - 2) .!==. var "h$atomically_e")
