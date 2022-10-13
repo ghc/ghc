@@ -18,7 +18,7 @@ lvl = "OpaqueNoSpecConstr.hs:(10,1)-(11,39)|function loop"#
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
 lvl1 :: ()
-[GblId, Str=b, Cpr=b]
+[GblId, Str={0e->1C1(!A)}, Cpr=b]
 lvl1 = Control.Exception.Base.patError @GHC.Types.LiftedRep @() lvl
 
 Rec {
@@ -170,3 +170,6 @@ OpaqueNoSpecConstr.$tc'SPEC2
       OpaqueNoSpecConstr.$tc'SPEC5
       0#
       OpaqueNoSpecConstr.$tc'SPEC1
+
+
+

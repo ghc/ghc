@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 39, types: 29, coercions: 0, joins: 0/0}
+  = {terms: 35, types: 27, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Lib.$trModule4 :: GHC.Prim.Addr#
@@ -38,42 +38,40 @@ Lib.$trModule :: GHC.Types.Module
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Lib.$trModule = GHC.Types.Module Lib.$trModule3 Lib.$trModule1
 
--- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Lib.$wfoo [InlPrag=NOINLINE]
   :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
-[GblId, Arity=2, Str=<L><L>, Unf=OtherCon []]
-Lib.$wfoo
-  = \ (ww_sF3 :: GHC.Prim.Int#) (ww1_sF9 :: GHC.Prim.Int#) ->
-      GHC.Prim.+# ww_sF3 ww1_sF9
+[GblId, Arity=2, Str=<L><L> {92F->1C1(C1(L))}, Unf=OtherCon []]
+Lib.$wfoo = GHC.Prim.+#
 
 -- RHS size: {terms: 18, types: 14, coercions: 0, joins: 0/0}
 foo [InlPrag=[final]] :: (Int, Int) -> Int -> Int
 [GblId,
  Arity=2,
- Str=<1!P(1!L,A)><1!L>,
+ Str=<1!P(1!P(L),A)><1!P(L)> {92F->1C1(C1(L))},
  Cpr=1,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (ds_sEZ [Occ=Once1!] :: (Int, Int))
-                 (z_sF7 [Occ=Once1!] :: Int) ->
-                 case ds_sEZ of { (ww_sF1 [Occ=Once1!], _ [Occ=Dead]) ->
-                 case ww_sF1 of { GHC.Types.I# ww2_sF3 [Occ=Once1] ->
-                 case z_sF7 of { GHC.Types.I# ww3_sF9 [Occ=Once1] ->
-                 case Lib.$wfoo ww2_sF3 ww3_sF9 of ww4_sFe [Occ=Once1]
+         Tmpl= \ (ds_sEG [Occ=Once1!] :: (Int, Int))
+                 (z_sEO [Occ=Once1!] :: Int) ->
+                 case ds_sEG of { (ww_sEI [Occ=Once1!], _ [Occ=Dead]) ->
+                 case ww_sEI of { GHC.Types.I# ww2_sEK [Occ=Once1] ->
+                 case z_sEO of { GHC.Types.I# ww3_sEQ [Occ=Once1] ->
+                 case Lib.$wfoo ww2_sEK ww3_sEQ of ww4_sEV [Occ=Once1]
                  { __DEFAULT ->
-                 GHC.Types.I# ww4_sFe
+                 GHC.Types.I# ww4_sEV
                  }
                  }
                  }
                  }}]
 foo
-  = \ (ds_sEZ :: (Int, Int)) (z_sF7 :: Int) ->
-      case ds_sEZ of { (ww_sF1, ww1_sF5) ->
-      case ww_sF1 of { GHC.Types.I# ww2_sF3 ->
-      case z_sF7 of { GHC.Types.I# ww3_sF9 ->
-      case Lib.$wfoo ww2_sF3 ww3_sF9 of ww4_sFe { __DEFAULT ->
-      GHC.Types.I# ww4_sFe
+  = \ (ds_sEG :: (Int, Int)) (z_sEO :: Int) ->
+      case ds_sEG of { (ww_sEI, ww1_sEM) ->
+      case ww_sEI of { GHC.Types.I# ww2_sEK ->
+      case z_sEO of { GHC.Types.I# ww3_sEQ ->
+      case Lib.$wfoo ww2_sEK ww3_sEQ of ww4_sEV { __DEFAULT ->
+      GHC.Types.I# ww4_sEV
       }
       }
       }

@@ -6,7 +6,7 @@ Noinline01.f [InlPrag=INLINE (sat-args=1)]
     \r [eta] GHC.Types.True [];
 
 Noinline01.g :: GHC.Types.Bool
-[GblId] =
+[GblId, Str={021->1C1(C1(L))}] =
     \u [] Noinline01.f GHC.Types.False;
 
 Noinline01.$trModule4 :: GHC.Prim.Addr#

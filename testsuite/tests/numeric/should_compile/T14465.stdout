@@ -54,7 +54,7 @@ M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
 -- RHS size: {terms: 1, types: 1, coercions: 0, joins: 0/0}
 minusOne :: Natural
 [GblId,
- Str=b,
+ Str={0t->1L},
  Cpr=b,
  Unf=Unf{Src=<vanilla>, TopLvl=True,
          Value=False, ConLike=False, WorkFree=True, Expandable=True,

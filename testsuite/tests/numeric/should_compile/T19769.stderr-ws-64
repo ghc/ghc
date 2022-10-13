@@ -1,23 +1,23 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 74, types: 64, coercions: 0, joins: 0/0}
+  = {terms: 54, types: 54, coercions: 0, joins: 0/0}
 
-wi8 = \ x -> word8ToInt8# x
+wi8 = word8ToInt8#
 
-wi16 = \ x -> word16ToInt16# x
+wi16 = word16ToInt16#
 
-wi32 = \ x -> word32ToInt32# x
+wi32 = word32ToInt32#
 
-wi64 = \ x -> word64ToInt64# x
+wi64 = word64ToInt64#
 
-iw8 = \ x -> int8ToWord8# x
+iw8 = int8ToWord8#
 
-iw16 = \ x -> int16ToWord16# x
+iw16 = int16ToWord16#
 
-iw32 = \ x -> int32ToWord32# x
+iw32 = int32ToWord32#
 
-iw64 = \ x -> int64ToWord64# x
+iw64 = int64ToWord64#
 
 i8 = \ x -> x
 
@@ -43,9 +43,9 @@ wiw64 = w64
 
 iwi64 = i64
 
-ww64i = \ x -> word2Int# x
+ww64i = word2Int#
 
-ii64w = \ x -> int2Word# x
+ii64w = int2Word#
 
 
 

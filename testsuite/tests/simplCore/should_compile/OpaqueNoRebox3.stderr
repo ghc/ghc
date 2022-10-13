@@ -44,7 +44,7 @@ OpaqueNoRebox3.$trModule
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 f [InlPrag=OPAQUE] :: Int -> Int
-[GblId, Arity=1, Str=<1L>, Unf=OtherCon []]
+[GblId, Arity=1, Str=<1L> {92F->1C1(C1(L))}, Unf=OtherCon []]
 f = \ (x :: Int) ->
       case x of { GHC.Types.I# ipv -> GHC.Types.I# (GHC.Prim.+# ipv 1#) }
 
@@ -132,7 +132,10 @@ lvl13
 Rec {
 -- RHS size: {terms: 50, types: 13, coercions: 0, joins: 1/1}
 g [Occ=LoopBreaker] :: Bool -> Bool -> Bool -> Int -> Int
-[GblId, Arity=4, Str=<SL><SL><L><1L>, Unf=OtherCon []]
+[GblId,
+ Arity=4,
+ Str=<SL><SL><L><1L> {92F->SCS(C1(L))},
+ Unf=OtherCon []]
 g = \ (w :: Bool) (w1 :: Bool) (w2 :: Bool) (p :: Int) ->
       join {
         fail_ [Dmd=M!P(L)] :: Int
