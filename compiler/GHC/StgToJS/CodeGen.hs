@@ -296,9 +296,9 @@ genToplevelConEntry i rhs = case rhs of
 
 genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStat
 genSetConInfo i d l {- srt -} = do
-  ei@(TxtI eii) <- identForDataConEntryId i
+  ei <- identForDataConEntryId i
   sr <- genStaticRefs l
-  emitClosureInfo $ ClosureInfo eii
+  emitClosureInfo $ ClosureInfo ei
                                 (CIRegs 0 [PtrV])
                                 (mkFastString $ renderWithContext defaultSDocContext (ppr d))
                                 (fixedLayout $ map uTypeVt fields)
@@ -352,7 +352,7 @@ genToplevelRhs i rhs = case rhs of
                if et == CIThunk
                  then enterCostCentreThunk
                  else enterCostCentreFun cc
-    emitClosureInfo (ClosureInfo eidt
+    emitClosureInfo (ClosureInfo eid
                                  regs
                                  idt
                                  (fixedLayout $ map (uTypeVt . idType) lids)

@@ -98,7 +98,7 @@ data StgToJSConfig = StgToJSConfig
 
 -- | Information relevenat to code generation for closures.
 data ClosureInfo = ClosureInfo
-  { ciVar     :: FastString -- ^ object being infod
+  { ciVar     :: Ident      -- ^ object being infod
   , ciRegs    :: CIRegs     -- ^ size of the payload (in number of JS values)
   , ciName    :: FastString -- ^ friendly name for printing
   , ciLayout  :: CILayout   -- ^ heap/stack layout of the object

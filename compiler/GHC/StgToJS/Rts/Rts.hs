@@ -392,35 +392,32 @@ rts' s =
           , TxtI "h$vt_arr"    ||= toJExpr ArrV
           , TxtI "h$bh"        ||= jLam (bhStats s True)
           , TxtI "h$bh_lne"    ||= jLam (\x frameSize -> bhLneStats s x frameSize)
-          , closure (ClosureInfo "h$blackhole" (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIBlackhole mempty)
+          , closure (ClosureInfo (TxtI "h$blackhole") (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIBlackhole mempty)
                (appS "throw" [jString "oops: entered black hole"])
-          , closure (ClosureInfo "h$blackholeTrap" (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$blackholeTrap") (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIThunk mempty)
                (appS "throw" [jString "oops: entered multiple times"])
-          , closure (ClosureInfo "h$done" (CIRegs 0 [PtrV]) "done" (CILayoutUnknown 0) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$done") (CIRegs 0 [PtrV]) "done" (CILayoutUnknown 0) CIStackFrame mempty)
                (appS "h$finishThread" [var "h$currentThread"] <> returnS (var "h$reschedule"))
-          , closure (ClosureInfo "h$doneMain_e" (CIRegs 0 [PtrV]) "doneMain" (CILayoutUnknown 0) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$doneMain_e") (CIRegs 0 [PtrV]) "doneMain" (CILayoutUnknown 0) CIStackFrame mempty)
                (returnS (var "h$doneMain"))
-          , conClosure "h$false_e" "GHC.Types.False" (CILayoutFixed 0 []) 1
-          , conClosure "h$true_e"  "GHC.Types.True"  (CILayoutFixed 0 []) 2
-          , conClosure "h$integerzmwiredzminZCGHCziIntegerziTypeziSzh_con_e" "GHC.Integer.Type.S#" (CILayoutFixed 1 [IntV]) 1
-          , conClosure "h$integerzmwiredzminZCGHCziIntegerziTypeziJpzh_con_e" "GHC.Integer.Type.Jp#" (CILayoutFixed 1 [ObjV]) 2
-          , conClosure "h$integerzmwiredzminZCGHCziIntegerziTypeziJnzh_con_e" "GHC.Integer.Type.Jn#" (CILayoutFixed 1 [ObjV]) 3
+          , conClosure (TxtI "h$false_e") "GHC.Types.False" (CILayoutFixed 0 []) 1
+          , conClosure (TxtI "h$true_e" ) "GHC.Types.True"  (CILayoutFixed 0 []) 2
           -- generic data constructor with 1 non-heapobj field
-          , conClosure "h$data1_e" "data1" (CILayoutFixed 1 [ObjV]) 1
+          , conClosure (TxtI "h$data1_e") "data1" (CILayoutFixed 1 [ObjV]) 1
           -- generic data constructor with 2 non-heapobj fields
-          , conClosure "h$data2_e" "data2" (CILayoutFixed 2 [ObjV,ObjV]) 1
-          , closure (ClosureInfo "h$noop_e" (CIRegs 1 [PtrV]) "no-op IO ()" (CILayoutFixed 0 []) (CIFun 1 0) mempty)
+          , conClosure (TxtI "h$data2_e") "data2" (CILayoutFixed 2 [ObjV,ObjV]) 1
+          , closure (ClosureInfo (TxtI "h$noop_e") (CIRegs 1 [PtrV]) "no-op IO ()" (CILayoutFixed 0 []) (CIFun 1 0) mempty)
                (returnS (stack .! sp))
             <> (TxtI "h$noop" ||= ApplExpr (var "h$c0") (var "h$noop_e" : [jSystemCCS | csProf s]))
-          , closure (ClosureInfo "h$catch_e" (CIRegs 0 [PtrV]) "exception handler" (CILayoutFixed 2 [PtrV,IntV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$catch_e") (CIRegs 0 [PtrV]) "exception handler" (CILayoutFixed 2 [PtrV,IntV]) CIStackFrame mempty)
                (adjSpN' 3 <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$dataToTag_e" (CIRegs 0 [PtrV]) "data to tag" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$dataToTag_e") (CIRegs 0 [PtrV]) "data to tag" (CILayoutFixed 0 []) CIStackFrame mempty)
                 $ mconcat [ r1 |= if_ (r1 .===. true_) 1 (if_ (typeof r1 .===. jTyObject) (r1 .^ "f" .^ "a" - 1) 0)
                           , adjSpN' 1
                           , returnS (stack .! sp)
                           ]
           -- function application to one argument
-          , closure (ClosureInfo "h$ap1_e" (CIRegs 0 [PtrV]) "apply1" (CILayoutFixed 2 [PtrV, PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$ap1_e") (CIRegs 0 [PtrV]) "apply1" (CILayoutFixed 2 [PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 ->
                    mconcat [ d1 |= closureField1 r1
                            , d2 |= closureField2 r1
@@ -431,7 +428,7 @@ rts' s =
                            , returnS (app "h$ap_1_1_fast" [])
                            ])
           -- function application to two arguments
-          , closure (ClosureInfo "h$ap2_e" (CIRegs 0 [PtrV]) "apply2" (CILayoutFixed 3 [PtrV, PtrV, PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$ap2_e") (CIRegs 0 [PtrV]) "apply2" (CILayoutFixed 3 [PtrV, PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 d3 ->
                    mconcat [ d1 |= closureField1 r1
                            , d2 |= closureField2 r1 .^ "d1"
@@ -444,7 +441,7 @@ rts' s =
                            , returnS (app "h$ap_2_2_fast" [])
                            ])
           -- function application to three arguments
-          , closure (ClosureInfo "h$ap3_e" (CIRegs 0 [PtrV]) "apply3" (CILayoutFixed 4 [PtrV, PtrV, PtrV, PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$ap3_e") (CIRegs 0 [PtrV]) "apply3" (CILayoutFixed 4 [PtrV, PtrV, PtrV, PtrV]) CIThunk mempty)
                (jVar $ \d1 d2 d3 d4 ->
                    mconcat [ d1 |= closureField1 r1
                            , d2 |= closureField2 r1 .^ "d1"
@@ -458,7 +455,7 @@ rts' s =
                            , returnS (app "h$ap_3_3_fast" [])
                            ])
           -- select first field
-          , closure (ClosureInfo "h$select1_e" (CIRegs 0 [PtrV]) "select1" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$select1_e") (CIRegs 0 [PtrV]) "select1" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                (jVar $ \t ->
                    mconcat [ t |= closureField1 r1
                            , adjSp' 3
@@ -471,13 +468,13 @@ rts' s =
                            , r1 |= t
                            , returnS (app "h$ap_0_0_fast" [])
                            ])
-          , closure (ClosureInfo "h$select1_ret" (CIRegs 0 [PtrV]) "select1ret" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$select1_ret") (CIRegs 0 [PtrV]) "select1ret" (CILayoutFixed 0 []) CIStackFrame mempty)
                ((r1 |= closureField1 r1)
                 <> adjSpN' 1
                 <> returnS (app "h$ap_0_0_fast" [])
                )
           -- select second field of a two-field constructor
-          , closure (ClosureInfo "h$select2_e" (CIRegs 0 [PtrV]) "select2" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$select2_e") (CIRegs 0 [PtrV]) "select2" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                (jVar $ \t ->
                    mconcat [t |= closureField1 r1
                            , adjSp' 3
@@ -491,22 +488,22 @@ rts' s =
                            , returnS (app "h$ap_0_0_fast" [])
                            ]
                   )
-          , closure (ClosureInfo "h$select2_ret" (CIRegs 0 [PtrV]) "select2ret" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$select2_ret") (CIRegs 0 [PtrV]) "select2ret" (CILayoutFixed 0 []) CIStackFrame mempty)
                         $ mconcat [ r1 |= closureField2 r1
                                   , adjSpN' 1
                                   , returnS (app "h$ap_0_0_fast" [])
                                   ]
-          , closure (ClosureInfo "h$keepAlive_e" (CIRegs 0 [PtrV]) "keepAlive" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$keepAlive_e") (CIRegs 0 [PtrV]) "keepAlive" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                     (mconcat [ adjSpN' 2
                              , returnS (stack .! sp)
                              ]
                     )
           -- a thunk that just raises a synchronous exception
-          , closure (ClosureInfo "h$raise_e" (CIRegs 0 [PtrV]) "h$raise_e" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$raise_e") (CIRegs 0 [PtrV]) "h$raise_e" (CILayoutFixed 0 []) CIThunk mempty)
                (returnS (app "h$throw" [closureField1 r1, false_]))
-          , closure (ClosureInfo "h$raiseAsync_e" (CIRegs 0 [PtrV]) "h$raiseAsync_e" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$raiseAsync_e") (CIRegs 0 [PtrV]) "h$raiseAsync_e" (CILayoutFixed 0 []) CIThunk mempty)
                (returnS  (app "h$throw" [closureField1 r1, true_]))
-          , closure (ClosureInfo "h$raiseAsync_frame" (CIRegs 0 []) "h$raiseAsync_frame" (CILayoutFixed 1 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$raiseAsync_frame") (CIRegs 0 []) "h$raiseAsync_frame" (CILayoutFixed 1 []) CIStackFrame mempty)
                (jVar $ \ex ->
                    mconcat [ ex |= stack .! (sp - 1)
                            , adjSpN' 2
@@ -516,19 +513,19 @@ rts' s =
              add this to the stack if you want the outermost result
              to always be reduced to whnf, and not an ind
           -}
-          , closure (ClosureInfo "h$reduce" (CIRegs 0 [PtrV]) "h$reduce" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$reduce") (CIRegs 0 [PtrV]) "h$reduce" (CILayoutFixed 0 []) CIStackFrame mempty)
                (ifS (isThunk r1)
                     (returnS (r1 .^ "f"))
                     (adjSpN' 1 <> returnS (stack .! sp))
                )
           , rtsApply s
           , closureTypes
-          , closure (ClosureInfo "h$runio_e" (CIRegs 0 [PtrV]) "runio" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$runio_e") (CIRegs 0 [PtrV]) "runio" (CILayoutFixed 1 [PtrV]) CIThunk mempty)
                         $ mconcat [ r1 |= closureField1 r1
                                   , stack .! PreInc sp |= var "h$ap_1_0"
                                   , returnS (var "h$ap_1_0")
                                   ]
-          , closure (ClosureInfo "h$flushStdout_e" (CIRegs 0 []) "flushStdout" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$flushStdout_e") (CIRegs 0 []) "flushStdout" (CILayoutFixed 0 []) CIThunk mempty)
                         $ mconcat [ r1 |= var "h$baseZCGHCziIOziHandlezihFlush"
                                   , r2 |= var "h$baseZCGHCziIOziHandleziFDzistdout"
                                   , returnS (app "h$ap_1_1_fast" [])
@@ -536,7 +533,7 @@ rts' s =
           , TxtI "h$flushStdout" ||= app "h$static_thunk" [var "h$flushStdout_e"]
           -- the scheduler pushes this frame when suspending a thread that
           -- has not called h$reschedule explicitly
-          , closure (ClosureInfo "h$restoreThread" (CIRegs 0 []) "restoreThread" CILayoutVariable CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$restoreThread") (CIRegs 0 []) "restoreThread" CILayoutVariable CIStackFrame mempty)
                 (jVar $ \f frameSize nregs ->
                     mconcat [f |= stack .! (sp - 2)
                             , frameSize |= stack .! (sp - 1)
@@ -547,12 +544,12 @@ rts' s =
                             , returnS f
                             ])
           -- return a closure in the stack frame to the next thing on the stack
-          , closure (ClosureInfo "h$return" (CIRegs 0 []) "return" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$return") (CIRegs 0 []) "return" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                 ((r1 |= stack .! (sp - 1))
                  <> adjSpN' 2
                  <> returnS (stack .! sp))
           --  return a function in the stack frame for the next call
-          , closure (ClosureInfo "h$returnf" (CIRegs 0 [PtrV]) "returnf" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$returnf") (CIRegs 0 [PtrV]) "returnf" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
                 (jVar $ \r ->
                     mconcat [ r |= stack .! (sp - 1)
                             , adjSpN' 2
@@ -561,10 +558,10 @@ rts' s =
           -- return this function when the scheduler needs to come into action
           -- (yield, delay etc), returning thread needs to push all relevant
           -- registers to stack frame, thread will be resumed by calling the stack top
-          , closure (ClosureInfo "h$reschedule" (CIRegs 0 []) "reschedule" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$reschedule") (CIRegs 0 []) "reschedule" (CILayoutFixed 0 []) CIThunk mempty)
                 (returnS $ var "h$reschedule")
           -- debug thing, insert on stack to dump current result, should be boxed
-          , closure (ClosureInfo "h$dumpRes" (CIRegs 0 [PtrV]) "dumpRes" (CILayoutFixed 1 [ObjV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$dumpRes") (CIRegs 0 [PtrV]) "dumpRes" (CILayoutFixed 1 [ObjV]) CIThunk mempty)
                 (jVar $ \re ->
                     mconcat [ appS "h$log" [jString "h$dumpRes result: " + stack .! (sp-1)]
                             , appS "h$log" [r1]
@@ -584,7 +581,7 @@ rts' s =
                             , r1 |= null_
                             , returnS (stack .! sp)
                             ])
-          , closure (ClosureInfo "h$resume_e" (CIRegs 0 [PtrV]) "resume" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$resume_e") (CIRegs 0 [PtrV]) "resume" (CILayoutFixed 0 []) CIThunk mempty)
                   (jVar $ \ss ->
                       mconcat [ss |= closureField1 r1
                               , updateThunk' s
@@ -594,52 +591,52 @@ rts' s =
                               , r1 |= null_
                               , returnS (stack .! sp)
                               ])
-          , closure (ClosureInfo "h$unmaskFrame" (CIRegs 0 [PtrV]) "unmask" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$unmaskFrame") (CIRegs 0 [PtrV]) "unmask" (CILayoutFixed 0 []) CIStackFrame mempty)
                ((var "h$currentThread" .^ "mask" |= 0)
                 <> adjSpN' 1
                 -- back to scheduler to give us async exception if pending
                 <> ifS (var "h$currentThread" .^ "excep" .^ "length" .>. 0)
                     (push' s [r1, var "h$return"] <> returnS (var "h$reschedule"))
                     (returnS (stack .! sp)))
-          , closure (ClosureInfo "h$maskFrame" (CIRegs 0 [PtrV]) "mask" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$maskFrame") (CIRegs 0 [PtrV]) "mask" (CILayoutFixed 0 []) CIStackFrame mempty)
                 ((var "h$currentThread" .^ "mask" |= 2)
                  <> adjSpN' 1
                  <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$maskUnintFrame" (CIRegs 0 [PtrV]) "maskUnint" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$maskUnintFrame") (CIRegs 0 [PtrV]) "maskUnint" (CILayoutFixed 0 []) CIStackFrame mempty)
                 ((var "h$currentThread" .^ "mask" |= 1)
                  <> adjSpN' 1
                  <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$unboxFFIResult" (CIRegs 0 [PtrV]) "unboxFFI" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$unboxFFIResult") (CIRegs 0 [PtrV]) "unboxFFI" (CILayoutFixed 0 []) CIStackFrame mempty)
                (jVar $ \d ->
                    mconcat [d |= closureField1 r1
                            , loop 0 (.<. d .^ "length") (\i -> appS "h$setReg" [i + 1, d .! i] <> postIncrS i)
                            , adjSpN' 1
                            , returnS (stack .! sp)
                            ])
-          , closure (ClosureInfo "h$unbox_e" (CIRegs 0 [PtrV]) "unboxed value" (CILayoutFixed 1 [DoubleV]) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$unbox_e") (CIRegs 0 [PtrV]) "unboxed value" (CILayoutFixed 1 [DoubleV]) CIThunk mempty)
                ((r1 |= closureField1 r1) <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$retryInterrupted" (CIRegs 0 [ObjV]) "retry interrupted operation" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$retryInterrupted") (CIRegs 0 [ObjV]) "retry interrupted operation" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
                (jVar $ \a ->
                    mconcat [ a |= stack .! (sp - 1)
                            , adjSpN' 2
                            , returnS (ApplExpr (a .! 0 .^ "apply") [var "this", ApplExpr (a .^ "slice") [1]])
                            ])
-          , closure (ClosureInfo "h$atomically_e" (CIRegs 0 [PtrV]) "atomic operation" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$atomically_e") (CIRegs 0 [PtrV]) "atomic operation" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                (ifS (app "h$stmValidateTransaction" [])
                     (appS "h$stmCommitTransaction" []
                      <> adjSpN' 2
                      <> returnS (stack .! sp))
                     (returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])))
 
-          , closure (ClosureInfo "h$stmCatchRetry_e" (CIRegs 0 [PtrV]) "catch retry" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$stmCatchRetry_e") (CIRegs 0 [PtrV]) "catch retry" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                         (adjSpN' 2
                          <> appS "h$stmCommitTransaction" []
                          <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$catchStm_e" (CIRegs 0 [PtrV]) "STM catch" (CILayoutFixed 3 [ObjV,PtrV,ObjV]) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$catchStm_e") (CIRegs 0 [PtrV]) "STM catch" (CILayoutFixed 3 [ObjV,PtrV,ObjV]) CIStackFrame mempty)
                        (adjSpN' 4
                        <> appS "h$stmCommitTransaction" []
                        <> returnS (stack .! sp))
-          , closure (ClosureInfo "h$stmResumeRetry_e" (CIRegs 0 [PtrV]) "resume retry" (CILayoutFixed 0 []) CIStackFrame mempty)
+          , closure (ClosureInfo (TxtI "h$stmResumeRetry_e") (CIRegs 0 [PtrV]) "resume retry" (CILayoutFixed 0 []) CIStackFrame mempty)
                         (jVar $ \blocked ->
                             mconcat [ jwhenS (stack .! (sp - 2) .!==. var "h$atomically_e")
                                                  (appS "throw" [jString "h$stmResumeRetry_e: unexpected value on stack"])
@@ -648,7 +645,7 @@ rts' s =
                                     , appS "h$stmRemoveBlockedThread" [blocked, var "h$currentThread"]
                                     , returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])
                                     ])
-          , closure (ClosureInfo "h$lazy_e" (CIRegs 0 [PtrV]) "generic lazy value" (CILayoutFixed 0 []) CIThunk mempty)
+          , closure (ClosureInfo (TxtI "h$lazy_e") (CIRegs 0 [PtrV]) "generic lazy value" (CILayoutFixed 0 []) CIThunk mempty)
                         (jVar $ \x ->
                             mconcat [x |= ApplExpr (closureField1 r1) []
                                     , appS "h$bh" []
@@ -657,7 +654,7 @@ rts' s =
                                     , returnS (stack .! sp)
                                     ])
           -- Top-level statements to generate only in profiling mode
-          , profStat s (closure (ClosureInfo "h$setCcs_e" (CIRegs 0 [PtrV]) "set cost centre stack" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
+          , profStat s (closure (ClosureInfo (TxtI "h$setCcs_e") (CIRegs 0 [PtrV]) "set cost centre stack" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
                         (appS "h$restoreCCS" [ stack .! (sp - 1)]
                          <> adjSpN' 2
                          <> returnS (stack .! sp)))

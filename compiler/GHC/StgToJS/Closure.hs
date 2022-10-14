@@ -49,7 +49,7 @@ closureInfoStat debug (ClosureInfo obj rs name layout ctype srefs)
 
 
 setObjInfoL :: Bool        -- ^ debug: output symbol names
-            -> FastString  -- ^ the object name
+            -> Ident       -- ^ the object name
             -> CIRegs      -- ^ things in registers
             -> CILayout    -- ^ layout of the object
             -> ClosureType -- ^ closure type
@@ -70,7 +70,7 @@ setObjInfoL debug obj rs layout t n a
           CILayoutFixed _ fs   -> toTypeList fs
 
 setObjInfo :: Bool        -- ^ debug: output all symbol names
-           -> FastString  -- ^ the thing to modify
+           -> Ident       -- ^ the thing to modify
            -> ClosureType -- ^ closure type
            -> FastString  -- ^ object name, for printing
            -> [Int]       -- ^ list of item types in the object, if known (free variables, datacon fields)
@@ -80,7 +80,7 @@ setObjInfo :: Bool        -- ^ debug: output all symbol names
            -> CIStatic    -- ^ static refs
            -> JStat
 setObjInfo debug obj t name fields a size regs static
-   | debug     = appS "h$setObjInfo" [ var obj
+   | debug     = appS "h$setObjInfo" [ toJExpr obj
                                      , toJExpr t
                                      , toJExpr name
                                      , toJExpr fields
@@ -89,7 +89,7 @@ setObjInfo debug obj t name fields a size regs static
                                      , toJExpr (regTag regs)
                                      , toJExpr static
                                      ]
-   | otherwise = appS "h$o" [ var obj
+   | otherwise = appS "h$o" [ toJExpr obj
                             , toJExpr t
                             , toJExpr a
                             , toJExpr size
@@ -105,9 +105,9 @@ setObjInfo debug obj t name fields a size regs static
 closure :: ClosureInfo -- ^ object being info'd see @ciVar@ in @ClosureInfo@
         -> JStat       -- ^ rhs
         -> JStat
-closure ci body = (TxtI (ciVar ci) ||= jLam body) `mappend` closureInfoStat False ci
+closure ci body = (ciVar ci ||= jLam body) `mappend` closureInfoStat False ci
 
-conClosure :: FastString -> FastString -> CILayout -> Int -> JStat
+conClosure :: Ident -> FastString -> CILayout -> Int -> JStat
 conClosure symbol name layout constr =
   closure (ClosureInfo symbol (CIRegs 0 [PtrV]) name layout (CICon constr) mempty)
           (returnS (stack .! sp))
