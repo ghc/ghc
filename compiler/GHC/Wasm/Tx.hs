@@ -346,16 +346,17 @@ node' _ _ = panic "`node'` is just a demo; only a few cases are implemented"
 
 -- | Given a call target and a list of result registers, call a
 -- given continuation with an augmented call and a sequence of pops.
--- The `mid` stack is the original stack plus all the results pushed
--- by the call.  The `pre` stack is the state of the stack before the
+-- The `pre` stack is the state of the stack before the
 -- first argument is pushed, which is also the state of the stack
 -- after the last results is popped.
 
 addCallResults :: CG bool codegen
                => WasmCall bool pre pre
                -> [LocalReg]
-               -> (forall stack mid .
-                   WasmCall bool stack mid -> WasmIR bool mid stack -> codegen bool a)
+               -> (forall stack stack_with_results .
+                     WasmCall bool stack stack_with_results ->
+                     WasmIR bool stack_with_results stack ->
+                     codegen bool a)
                -> codegen bool a
 
 addCallResults target [] k = k target WasmNop
@@ -365,27 +366,22 @@ addCallResults target (reg:regs) k =
       k (WasmCallAddResult t call) (WasmSetLocal t x <> pops)
 
 -- | Given a call that has its result types but not its argument
--- types, and a sequence of pops, and a list of actual parameters
--- (expressions), call a given continuation with a sequence of pushes,
--- an augmented call, and a sequence of pops.  As before, the `mid`
--- stack is the original stack plus all the results pushed by the
--- call.
+-- types, and a list of actual parameters (expressions), call a given
+-- continuation with a sequence of pushes and an augmented call.
 
 addCallArguments :: CG bool codegen
-                 => [CmmExpr]
-                 -> WasmCall bool stack mid
-                 -> WasmIR bool mid stack
-                 -> (forall stack stack_with_args stack_with_results .
+                 => WasmCall bool stack stack_with_results
+                 -> [CmmExpr]
+                 -> (forall stack_with_args .
                        WasmIR   bool stack              stack_with_args ->
                        WasmCall bool stack_with_args    stack_with_results ->
-                       WasmIR   bool stack_with_results stack ->
                        codegen bool a)
                  -> codegen bool a
-addCallArguments [] call pops k = k WasmNop call pops
-addCallArguments (e : es) call pops k =
-  addCallArguments es call pops $ \ pushes call pops ->
+addCallArguments call [] k = k WasmNop call
+addCallArguments call (e : es) k =
+  addCallArguments call es $ \ pushes call ->
     expr e $ \t push ->
-      k (pushes <> push) (WasmCallAddArg t call) pops
+      k (pushes <> push) (WasmCallAddArg t call)
 
 -- | Given a call's target, its actual parameters, and its results
 -- registers, translate the call into a sequence of Wasm instructions,
@@ -399,7 +395,7 @@ call :: CG bool codegen
      -> codegen bool a
 call target es regs k =
   addCallResults (WasmCallDirect target) regs $ \call pops ->
-    addCallArguments es call pops $ \ pushes call pops ->
+    addCallArguments call es $ \ pushes call ->
       k $ pushes <> WasmCall' call <> pops
 
 
