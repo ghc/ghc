@@ -18,21 +18,23 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToJS.Linker.Types where
+module GHC.StgToJS.Linker.Types
+  ( GhcjsEnv (..)
+  , newGhcjsEnv
+  , JSLinkConfig (..)
+  , generateAllJs
+  , LinkedObj (..)
+  , LinkableUnit
+  )
+where
 
-import GHC.JS.Syntax
 import GHC.StgToJS.Object
-import GHC.StgToJS.Types (ClosureInfo, StaticInfo)
 
 import GHC.Unit.Types
-import GHC.Data.FastString
-import GHC.Types.Unique.Map
 import GHC.Utils.Outputable (hsep,Outputable(..),text,ppr)
 
 import Control.Monad
 
-import Data.Array
-import Data.ByteString      (ByteString)
 import Data.Map.Strict      (Map)
 import qualified Data.Map.Strict as M
 import Data.Set             (Set)
@@ -44,216 +46,25 @@ import System.IO
 import Prelude
 
 --------------------------------------------------------------------------------
--- CompactorState
---------------------------------------------------------------------------------
-
-data CompactorState = CompactorState
-  { csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
-  , csEntries       :: !(UniqMap FastString Int)   -- ^ entry functions (these get listed in the metadata init
-                                                   -- array)
-  , csNumEntries    :: !Int
-  , csStatics       :: !(UniqMap FastString Int)   -- ^ mapping of global closure -> index in current block,
-                                                   -- for static initialisation
-  , csNumStatics    :: !Int                        -- ^ number of static entries
-  , csLabels        :: !(UniqMap FastString Int)   -- ^ non-Haskell JS labels
-  , csNumLabels     :: !Int                        -- ^ number of labels
-  , csParentEntries :: !(UniqMap FastString Int)   -- ^ entry functions we're not linking, offset where parent
-                                                   -- gets [0..n], grandparent [n+1..k] etc
-  , csParentStatics :: !(UniqMap FastString Int)   -- ^ objects we're not linking in base bundle
-  , csParentLabels  :: !(UniqMap FastString Int)   -- ^ non-Haskell JS labels in parent
-  , csStringTable   :: !StringTable
-  }
-
--- | A Table of Strings representing @Ident@s and their payloads in
--- @CompactorState@
-data StringTable = StringTable
-  { stTableIdents :: !(Array Int FastString)                -- ^ An array of table identifiers, used in the compactor
-  , stOffsets     :: !(M.Map ByteString (Int, Int))         -- ^ content of the table
-  , stIdents      :: !(UniqMap FastString (Either Int Int)) -- ^ identifiers in the table
-  }
-
--- | The empty @CompactorState@
-emptyCompactorState :: CompactorState
-emptyCompactorState = CompactorState
-  { csNameMap       = mempty
-  , csEntries       = mempty
-  , csNumEntries    = 0
-  , csStatics       = mempty
-  , csNumStatics    = 0
-  , csLabels        = mempty
-  , csNumLabels     = 0
-  , csParentEntries = mempty
-  , csParentStatics = mempty
-  , csParentLabels  = mempty
-  , csStringTable   = emptyStringTable
-  }
-
--- | The empty @StringTable@
-emptyStringTable :: StringTable
-emptyStringTable = StringTable (listArray (0,-1) []) M.empty emptyUniqMap
-
-
---------------------------------------------------------------------------------
--- CompactorState helper functors
---------------------------------------------------------------------------------
-
--- | Update @csEntries@ in @CompactorState@
-entries :: Functor f
-        => (UniqMap FastString Int -> f (UniqMap FastString Int))
-        -> CompactorState
-        -> f CompactorState
-entries f cs = fmap (\x -> cs { csEntries = x }) (f $ csEntries cs)
-{-# INLINE entries #-}
-
--- | Update @csLabels@ in @CompactorState@
-labels :: Functor f
-       => (UniqMap FastString Int -> f (UniqMap FastString Int))
-       -> CompactorState
-       -> f CompactorState
-labels f cs = fmap (\x -> cs { csLabels = x }) (f $ csLabels cs)
-{-# INLINE labels #-}
-
--- | Update @csNameMap@ in @CompactorState@
-nameMap :: Functor f
-        => (UniqMap FastString Ident -> f (UniqMap FastString Ident))
-        -> CompactorState
-        -> f CompactorState
-nameMap f cs = fmap (\x -> cs { csNameMap = x }) (f $ csNameMap cs)
-{-# INLINE nameMap #-}
-
--- | Update @csNumEntries@ in @CompactorState@
-numEntries :: Functor f
-           => (Int -> f Int)
-           -> CompactorState
-           -> f CompactorState
-numEntries f cs = fmap (\x -> cs { csNumEntries = x }) (f $ csNumEntries cs)
-{-# INLINE numEntries #-}
-
--- | Update @csNumLabels@ in @CompactorState@
-numLabels :: Functor f
-          => (Int -> f Int)
-          -> CompactorState
-          -> f CompactorState
-numLabels f cs = fmap (\x -> cs { csNumLabels = x }) (f $ csNumLabels cs)
-{-# INLINE numLabels #-}
-
--- | Update @csNumStatics@ in @CompactorState@
-numStatics :: Functor f
-           => (Int -> f Int)
-           -> CompactorState
-           -> f CompactorState
-numStatics f cs = fmap (\x -> cs { csNumStatics = x }) (f $ csNumStatics cs)
-{-# INLINE numStatics #-}
-
--- | Update @csParentEntries@ in @CompactorState@
-parentEntries :: Functor f
-              => (UniqMap FastString Int -> f (UniqMap FastString Int))
-              -> CompactorState
-              -> f CompactorState
-parentEntries f cs = fmap (\x -> cs { csParentEntries = x }) (f $ csParentEntries cs)
-{-# INLINE parentEntries #-}
-
--- | Update @csParentLabels@ in @CompactorState@
-parentLabels :: Functor f
-             => (UniqMap FastString Int -> f (UniqMap FastString Int))
-             -> CompactorState
-             -> f CompactorState
-parentLabels f cs = fmap (\x -> cs { csParentLabels = x }) (f $ csParentLabels cs)
-{-# INLINE parentLabels #-}
-
--- | Update @csParentStatics@ in @CompactorState@
-parentStatics :: Functor f
-              => (UniqMap FastString Int -> f (UniqMap FastString Int))
-              -> CompactorState
-              -> f CompactorState
-parentStatics f cs = fmap (\x -> cs { csParentStatics = x }) (f $ csParentStatics cs)
-{-# INLINE parentStatics #-}
-
--- | Update @csStatics@ in @CompactorState@
-statics :: Functor f
-        => (UniqMap FastString Int -> f (UniqMap FastString Int))
-        -> CompactorState
-        -> f CompactorState
-statics f cs = fmap (\x -> cs { csStatics = x }) (f $ csStatics cs)
-{-# INLINE statics #-}
-
--- | Update @csStringTable@ in @CompactorState@
-stringTable :: Functor f
-            => (StringTable -> f StringTable)
-            -> CompactorState
-            -> f CompactorState
-stringTable f cs = fmap (\x -> cs { csStringTable = x }) (f $ csStringTable cs)
-{-# INLINE stringTable #-}
-
-
---------------------------------------------------------------------------------
--- CompactorState Insertions
---------------------------------------------------------------------------------
-
--- | Given a static entry, add the entry to @CompactorState@
-addStaticEntry :: FastString        -- ^ The static entry to add
-               -> CompactorState    -- ^ the old state
-               -> CompactorState    -- ^ the new state
-addStaticEntry new cs =
-  -- check if we have seen new before
-  let cur_statics = csStatics cs
-      go          = lookupUniqMap cur_statics new >> lookupUniqMap (csParentStatics cs) new
-  in case go of
-    Just _  -> cs                      -- we have so return
-    Nothing -> let cnt = csNumStatics cs -- we haven't so do the business
-                   newStatics = addToUniqMap cur_statics new cnt
-                   newCnt = cnt + 1
-               in cs {csStatics = newStatics, csNumStatics = newCnt}
-
--- | Given an entry function, add the entry function to @CompactorState@
-addEntry :: FastString        -- ^ The entry function to add
-         -> CompactorState    -- ^ the old state
-         -> CompactorState    -- ^ the new state
-addEntry new cs =
-  let cur_entries = csEntries cs
-      go          = lookupUniqMap cur_entries new >> lookupUniqMap (csParentEntries cs) new
-  in case go of
-    Just _  -> cs
-    Nothing -> let cnt = csNumEntries cs
-                   newEntries = addToUniqMap cur_entries new cnt
-                   newCnt = cnt + 1
-               in cs {csEntries = newEntries, csNumEntries = newCnt}
-
--- | Given a label, add the label to @CompactorState@
-addLabel :: FastString        -- ^ The label to add
-         -> CompactorState    -- ^ the old state
-         -> CompactorState    -- ^ the new state
-addLabel new cs =
-  let cur_lbls = csLabels cs
-      go       = lookupUniqMap cur_lbls new >> lookupUniqMap (csParentLabels cs) new
-  in case go of
-    Just _  -> cs
-    Nothing -> let cnt = csNumLabels cs
-                   newLabels = addToUniqMap cur_lbls new cnt
-                   newCnt = cnt + 1
-               in cs {csEntries = newLabels, csNumLabels = newCnt}
-
---------------------------------------------------------------------------------
 -- Linker Config
 --------------------------------------------------------------------------------
 
-data JSLinkConfig =
-  JSLinkConfig { lcNativeExecutables  :: Bool
-               , lcNativeToo          :: Bool
-               , lcBuildRunner        :: Bool
-               , lcNoJSExecutables    :: Bool
-               , lcNoHsMain           :: Bool
-               , lcStripProgram       :: Maybe FilePath
-               , lcLogCommandLine     :: Maybe FilePath
-               , lcGhc                :: Maybe FilePath
-               , lcOnlyOut            :: Bool
-               , lcNoRts              :: Bool
-               , lcNoStats            :: Bool
-               , lcLinkJsLib          :: Maybe String
-               , lcJsLibOutputDir     :: Maybe FilePath
-               , lcJsLibSrcs          :: [FilePath]
-               , lcDedupe             :: Bool
-               }
+data JSLinkConfig = JSLinkConfig
+  { lcNativeExecutables  :: Bool
+  , lcNativeToo          :: Bool
+  , lcBuildRunner        :: Bool
+  , lcNoJSExecutables    :: Bool
+  , lcNoHsMain           :: Bool
+  , lcStripProgram       :: Maybe FilePath
+  , lcLogCommandLine     :: Maybe FilePath
+  , lcGhc                :: Maybe FilePath
+  , lcOnlyOut            :: Bool
+  , lcNoRts              :: Bool
+  , lcNoStats            :: Bool
+  , lcLinkJsLib          :: Maybe String
+  , lcJsLibOutputDir     :: Maybe FilePath
+  , lcJsLibSrcs          :: [FilePath]
+  }
 
 -- | we generate a runnable all.js only if we link a complete application,
 --   no incremental linking and no skipped parts
@@ -276,7 +87,6 @@ instance Monoid JSLinkConfig where
             , lcLinkJsLib          = Nothing
             , lcJsLibOutputDir     = Nothing
             , lcJsLibSrcs          = mempty
-            , lcDedupe             = False
             }
 
 instance Semigroup JSLinkConfig where
@@ -298,7 +108,6 @@ instance Semigroup JSLinkConfig where
             , lcLinkJsLib          = comb (<>) lcLinkJsLib
             , lcJsLibOutputDir     = comb (<>) lcJsLibOutputDir
             , lcJsLibSrcs          = comb (<>) lcJsLibSrcs
-            , lcDedupe             = comb (||) lcDedupe
             }
 
 --------------------------------------------------------------------------------
@@ -308,13 +117,6 @@ instance Semigroup JSLinkConfig where
 -- | A @LinkableUnit@ is a pair of a module and the index of the block in the
 -- object file
 type LinkableUnit = (Module, Int)
-
--- | A @LinkedUnit@ is a payload of JS code with its closures and any static info.
-data LinkedUnit = LinkedUnit
-  { lu_js_code  :: !JStat
-  , lu_closures :: ![ClosureInfo]
-  , lu_statics  :: ![StaticInfo]
-  }
 
 -- | An object file that's either already in memory (with name) or on disk
 data LinkedObj

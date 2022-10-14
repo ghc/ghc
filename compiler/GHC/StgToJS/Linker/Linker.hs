@@ -50,8 +50,6 @@ import GHC.StgToJS.Printer
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
 
-import GHC.Types.Unique.Map
-
 import GHC.Unit.State
 import GHC.Unit.Env
 import GHC.Unit.Home
@@ -67,9 +65,6 @@ import GHC.Utils.Binary
 import qualified GHC.Utils.Ppr as Ppr
 import GHC.Utils.Monad
 import GHC.Utils.TmpFs
-import GHC.Utils.Misc
-import GHC.Utils.Monad.State.Strict (State, runState)
-import qualified GHC.Utils.Monad.State.Strict as State
 
 import qualified GHC.SysTools.Ar          as Ar
 
@@ -172,9 +167,8 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
       mods <- collectDeps dep_map dep_units all_deps
 
       -- LTO + rendering of JS code
-      link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h -> do
-        (_compactorState, stats) <- renderLinker cfg h emptyCompactorState mods jsFiles
-        pure stats
+      link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h ->
+        renderLinker h mods jsFiles
 
       -------------------------------------------------------------
 
@@ -280,33 +274,36 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
   return (dep_map, dep_units, all_deps, rts_wired_functions, dep_archives)
 
 
+-- | Compiled module
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
-  , mc_js_code  :: JStat
+  , mc_js_code  :: !JStat
   , mc_exports  :: !B.ByteString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
   , mc_frefs    :: ![ForeignJSRef]
   }
 
+-- | ModuleCode after link with other modules.
+--
+-- It contains less information than ModuleCode because they have been commoned
+-- up into global "metadata" for the whole link.
+data CompactedModuleCode = CompactedModuleCode
+  { cmc_module  :: !Module
+  , cmc_js_code :: !JStat
+  , cmc_exports :: !B.ByteString        -- ^ rendered exports
+  }
+
+-- | Link modules and pretty-print them into the given Handle
 renderLinker
-  :: StgToJSConfig
-  -> Handle
-  -> CompactorState
+  :: Handle
   -> [ModuleCode] -- ^ linked code per module
   -> [FilePath]   -- ^ additional JS files
-  -> IO (CompactorState, LinkerStats)
-renderLinker cfg h renamer_state mods jsFiles = do
+  -> IO LinkerStats
+renderLinker h mods jsFiles = do
 
-  -- extract ModuleCode fields required to make a LinkedUnit
-  let code_to_linked_unit c = LinkedUnit
-        { lu_js_code  = mc_js_code c
-        , lu_closures = mc_closures c
-        , lu_statics  = mc_statics c
-        }
-
-  -- call the compactor
-  let (renamer_state', compacted, meta) = rename cfg renamer_state (map code_to_linked_unit mods)
+  -- link modules
+  let (compacted_mods, meta) = linkModules mods
 
   let
     putBS   = B.hPut h
@@ -325,16 +322,16 @@ renderLinker cfg h renamer_state mods jsFiles = do
   -- file.
 
   -- modules themselves
-  mod_sizes <- forM (mods `zip` compacted) $ \(mod,compacted_mod) -> do
-    !mod_size <- fromIntegral <$> putJS compacted_mod
-    let !mod_mod  = mc_module mod
+  mod_sizes <- forM compacted_mods $ \m -> do
+    !mod_size <- fromIntegral <$> putJS (cmc_js_code m)
+    let !mod_mod  = cmc_module m
     pure (mod_mod, mod_size)
 
-  -- metadata
+  -- commoned up metadata
   !meta_length <- fromIntegral <$> putJS meta
 
-  -- exports
-  mapM_ (putBS . mc_exports) mods
+  -- module exports
+  mapM_ (putBS . cmc_exports) compacted_mods
 
   -- explicit additional JS files
   mapM_ (\i -> B.readFile i >>= putBS) jsFiles
@@ -345,7 +342,7 @@ renderLinker cfg h renamer_state mods jsFiles = do
         , packedMetaDataSize = meta_length
         }
 
-  pure (renamer_state', link_stats)
+  pure link_stats
 
 -- | Render linker stats
 renderLinkerStats :: LinkerStats -> String
@@ -865,96 +862,68 @@ jsFileNeedsCpp fn = do
   opts <- getOptionsFromJsFile fn
   pure (CPP `elem` opts)
 
-rename :: StgToJSConfig
-       -> CompactorState
-       -> [LinkedUnit]
-       -> (CompactorState, [JStat], JStat)
-rename cfg cs0 input0
-  = renameInternals cfg cs0 input0
-
-renameInternals :: HasDebugCallStack
-                => StgToJSConfig
-                -> CompactorState
-                -> [LinkedUnit]
-                -> (CompactorState, [JStat], JStat)
-renameInternals cfg cs0 stats0a = (cs, stats, meta)
+-- | Link module codes.
+--
+-- Performs link time optimizations and produces one JStat per module plus some
+-- commoned up initialization code.
+linkModules :: [ModuleCode] -> ([CompactedModuleCode], JStat)
+linkModules mods = (compact_mods, meta)
   where
-    (stbs, stats0) = (mempty, stats0a)
-    ((stats, meta), cs) = runState renamed cs0
+    compact_mods = map compact mods
 
-    renamed :: State CompactorState ([JStat], JStat)
-    renamed
+    -- here GHCJS used to:
+    --  - deduplicate declarations
+    --  - rename local variables into shorter ones
+    --  - compress initialization data
+    -- but we haven't ported it (yet).
 
-      | True = do
-        cs <- State.get
-        let renamedStats = map (identsS' (lookupRenamed cs) . lu_js_code) stats0
-            statics      = map (renameStaticInfo cs)  $
-                               concatMap lu_statics stats0
-            infos        = map (renameClosureInfo cs) $
-                               concatMap lu_closures stats0
+    compact m = CompactedModuleCode
+      { cmc_js_code = mc_js_code m
+      , cmc_module  = mc_module m
+      , cmc_exports = mc_exports m
+      }
+
+    statics = concatMap mc_statics  mods
+    infos   = concatMap mc_closures mods
+    meta = mconcat
             -- render metadata as individual statements
-            meta = mconcat (map staticDeclStat statics) <>
-                   identsS' (lookupRenamed cs) stbs <>
-                   mconcat (map (staticInitStat $ csProf cfg) statics) <>
-                   mconcat (map (closureInfoStat True) infos)
-        return (renamedStats, meta)
+            [ mconcat (map staticDeclStat statics)
+            , mconcat (map staticInitStat statics)
+            , mconcat (map (closureInfoStat True) infos)
+            ]
 
-lookupRenamed :: CompactorState -> Ident -> Ident
-lookupRenamed cs i@(TxtI t) =
-  fromMaybe i (lookupUniqMap (csNameMap cs) t)
-
--- | rename a compactor info entry according to the compactor state (no new renamings are added)
-renameClosureInfo :: CompactorState
-                  -> ClosureInfo
-                  -> ClosureInfo
-renameClosureInfo cs (ClosureInfo v rs n l t s)  =
-  ClosureInfo (renameV v) rs n l t (f s)
-    where
-      renameV t = maybe t itxt (lookupUniqMap m t)
-      m                   = csNameMap cs
-      f (CIStaticRefs rs) = CIStaticRefs (map renameV rs)
-
--- | rename a static info entry according to the compactor state (no new renamings are added)
-renameStaticInfo :: CompactorState
-                 -> StaticInfo
-                 -> StaticInfo
-renameStaticInfo cs = staticIdents renameIdent
-  where
-    renameIdent t = maybe t itxt (lookupUniqMap (csNameMap cs) t)
-
--- | initialize a global object. all global objects have to be declared (staticInfoDecl) first
---   (this is only used with -debug, normal init would go through the static data table)
-staticInitStat :: Bool         -- ^ profiling enabled
-               -> StaticInfo
-               -> JStat
-staticInitStat _prof (StaticInfo i sv cc) =
+-- | Initialize a global object.
+--
+-- All global objects have to be declared (staticInfoDecl) first.
+staticInitStat :: StaticInfo -> JStat
+staticInitStat (StaticInfo i sv mcc) =
   case sv of
-    StaticData con args -> appS "h$sti" ([var i, var con, jsStaticArgs args] ++ ccArg)
-    StaticFun  f   args -> appS "h$sti" ([var i, var f, jsStaticArgs args] ++ ccArg)
-    StaticList args mt   ->
-      appS "h$stl" ([var i, jsStaticArgs args, toJExpr $ maybe null_ (toJExpr . TxtI) mt] ++ ccArg)
-    StaticThunk (Just (f,args)) ->
-      appS "h$stc" ([var i, var f, jsStaticArgs args] ++ ccArg)
-    _                    -> mempty
+    StaticData con args         -> appS "h$sti" $ add_cc_arg
+                                    [ var i
+                                    , var con
+                                    , jsStaticArgs args
+                                    ]
+    StaticFun  f   args         -> appS "h$sti" $ add_cc_arg
+                                    [ var i
+                                    , var f
+                                    , jsStaticArgs args
+                                    ]
+    StaticList args mt          -> appS "h$stl" $ add_cc_arg
+                                    [ var i
+                                    , jsStaticArgs args
+                                    , toJExpr $ maybe null_ (toJExpr . TxtI) mt
+                                    ]
+    StaticThunk (Just (f,args)) -> appS "h$stc" $ add_cc_arg
+                                    [ var i
+                                    , var f
+                                    , jsStaticArgs args
+                                    ]
+    _                           -> mempty
   where
-    ccArg = maybeToList (fmap toJExpr cc)
-
-staticIdents :: (FastString -> FastString)
-             -> StaticInfo
-             -> StaticInfo
-staticIdents f (StaticInfo i v cc) = StaticInfo (f i) (staticIdentsV f v) cc
-
-staticIdentsV ::(FastString -> FastString) -> StaticVal -> StaticVal
-staticIdentsV f (StaticFun i args) = StaticFun (f i) (staticIdentsA f <$> args)
-staticIdentsV f (StaticThunk (Just (i, args))) = StaticThunk . Just $
-                                                 (f i, staticIdentsA f <$> args)
-staticIdentsV f (StaticData con args) = StaticData (f con) (staticIdentsA f <$> args)
-staticIdentsV f (StaticList xs t)              = StaticList (staticIdentsA f <$> xs) (f <$> t)
-staticIdentsV _ x                              = x
-
-staticIdentsA :: (FastString -> FastString) -> StaticArg -> StaticArg
-staticIdentsA f (StaticObjArg t) = StaticObjArg $! f t
-staticIdentsA _ x = x
+    -- add optional cost-center argument
+    add_cc_arg as = case mcc of
+      Nothing -> as
+      Just cc -> as ++ [toJExpr cc]
 
 -- | declare and do first-pass init of a global object (create JS object for heap objects)
 staticDeclStat :: StaticInfo -> JStat
@@ -977,42 +946,3 @@ staticDeclStat (StaticInfo global_name static_value _) = decl
       StaticUnboxedStringOffset {} -> 0
 
     to_byte_list = JList . map (Int . fromIntegral) . BS.unpack
-
-identsE' :: (Ident -> Ident) -> JExpr -> JExpr
-identsE' f (ValExpr v)         = ValExpr     $! identsV' f v
-identsE' f (SelExpr e i)       = SelExpr     (identsE' f e) i -- do not rename properties
-identsE' f (IdxExpr e1 e2)     = IdxExpr     (identsE' f e1) (identsE' f e2)
-identsE' f (InfixExpr s e1 e2) = InfixExpr s  (identsE' f e1) (identsE' f e2)
-identsE' f (UOpExpr o e)       = UOpExpr o   $! identsE' f e
-identsE' f (IfExpr e1 e2 e3)   = IfExpr      (identsE' f e1) (identsE' f e2) (identsE' f e3)
-identsE' f (ApplExpr e es)     = ApplExpr    (identsE' f e)  (identsE' f <$> es)
-identsE' _ UnsatExpr{}         = error "identsE': UnsatExpr"
-
-identsV' :: (Ident -> Ident) -> JVal -> JVal
-identsV' f (JVar i)       = JVar  $! f i
-identsV' f (JList xs)     = JList $! (fmap . identsE') f xs
-identsV' _ d@JDouble{}    = d
-identsV' _ i@JInt{}       = i
-identsV' _ s@JStr{}       = s
-identsV' _ r@JRegEx{}     = r
-identsV' f (JHash m)      = JHash $! (fmap . identsE') f m
-identsV' f (JFunc args s) = JFunc (fmap f args) (identsS' f s)
-identsV' _ UnsatVal{}     = error "identsV': UnsatVal"
-
-identsS' :: (Ident -> Ident) -> JStat -> JStat
-identsS' f (DeclStat i e)       = DeclStat       (f i) e
-identsS' f (ReturnStat e)       = ReturnStat     $! identsE' f e
-identsS' f (IfStat e s1 s2)     = IfStat         (identsE' f e) (identsS' f s1) (identsS' f s2)
-identsS' f (WhileStat b e s)    = WhileStat b    (identsE' f e) (identsS' f s)
-identsS' f (ForInStat b i e s)  = ForInStat b    (f i) (identsE' f e) (identsS' f s)
-identsS' f (SwitchStat e xs s)  = SwitchStat     (identsE' f e) (fmap (traverseCase f) xs) (identsS' f s)
-  where traverseCase g (e,s) = (identsE' g e, identsS' g s)
-identsS' f (TryStat s1 i s2 s3) = TryStat     (identsS' f s1) (f i) (identsS' f s2) (identsS' f s3)
-identsS' f (BlockStat xs)       = BlockStat   $! identsS' f <$> xs
-identsS' f (ApplStat e es)      = ApplStat    (identsE' f e) (identsE' f <$> es)
-identsS' f (UOpStat op e)       = UOpStat op  $! identsE' f e
-identsS' f (AssignStat e1 e2)   = AssignStat  (identsE' f e1) (identsE' f e2)
-identsS' _ UnsatBlock{}         = error "identsS': UnsatBlock"
-identsS' f (LabelStat l s)      = LabelStat l $! identsS' f s
-identsS' _ b@BreakStat{}        = b
-identsS' _ c@ContinueStat{}     = c
