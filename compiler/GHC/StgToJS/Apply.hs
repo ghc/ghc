@@ -482,7 +482,7 @@ genericStackApply cfg = closure info body
 
     -- info table for h$ap_gen
     info = ClosureInfo
-      { ciVar     = "h$ap_gen"
+      { ciVar     = TxtI "h$ap_gen"
       , ciRegs    = CIRegs 0 [PtrV] -- closure to apply to
       , ciName    = "h$ap_gen"
       , ciLayout  = CILayoutVariable
@@ -720,8 +720,8 @@ stackApply s fun_name nargs nvars =
     then closure info0 body0
     else closure info body
   where
-    info  = ClosureInfo fun_name (CIRegs 0 [PtrV]) fun_name (CILayoutUnknown nvars) CIStackFrame mempty
-    info0 = ClosureInfo fun_name (CIRegs 0 [PtrV]) fun_name (CILayoutFixed 0 [])    CIStackFrame mempty
+    info  = ClosureInfo (TxtI fun_name) (CIRegs 0 [PtrV]) fun_name (CILayoutUnknown nvars) CIStackFrame mempty
+    info0 = ClosureInfo (TxtI fun_name) (CIRegs 0 [PtrV]) fun_name (CILayoutFixed 0 [])    CIStackFrame mempty
 
     body0 = adjSpN' 1 <> enter s r1
 
@@ -905,7 +905,7 @@ enter s ex = jVar \c ->
 updates :: StgToJSConfig -> JStat
 updates s = BlockStat
   [ closure
-      (ClosureInfo "h$upd_frame" (CIRegs 0 [PtrV]) "h$upd_frame" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+      (ClosureInfo (TxtI "h$upd_frame") (CIRegs 0 [PtrV]) "h$upd_frame" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
       $ jVar \updatee waiters ss si sir ->
             let unbox_closure = Closure
                   { clEntry  = var "h$unbox_e"
@@ -952,7 +952,7 @@ updates s = BlockStat
                ]
 
    , closure
-      (ClosureInfo "h$upd_frame_lne" (CIRegs 0 [PtrV]) "h$upd_frame_lne" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
+      (ClosureInfo (TxtI "h$upd_frame_lne") (CIRegs 0 [PtrV]) "h$upd_frame_lne" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
       $ jVar \updateePos ->
           [ updateePos |= stack .! (sp - 1)
           , (stack .! updateePos |= r1)
@@ -991,7 +991,7 @@ selectors s =
           , returnS (sel r)
           ]
       , closure
-        (ClosureInfo entryName (CIRegs 0 [PtrV]) ("select " <> name) (CILayoutFixed 1 [PtrV]) CIThunk mempty)
+        (ClosureInfo (TxtI entryName) (CIRegs 0 [PtrV]) ("select " <> name) (CILayoutFixed 1 [PtrV]) CIThunk mempty)
         (jVar \tgt ->
           [ tgt |= closureField1 r1
           , traceRts s (toJExpr ("selector entry: " <> name <> " for ") + (tgt .^ "alloc"))
@@ -1002,7 +1002,7 @@ selectors s =
               (returnS (app "h$e" [sel tgt]))
           ])
       , closure
-        (ClosureInfo frameName (CIRegs 0 [PtrV]) ("select " <> name <> " frame") (CILayoutFixed 0 []) CIStackFrame mempty)
+        (ClosureInfo (TxtI frameName) (CIRegs 0 [PtrV]) ("select " <> name <> " frame") (CILayoutFixed 0 []) CIStackFrame mempty)
         $ mconcat [ traceRts s (toJExpr ("selector frame: " <> name))
                   , postDecrS sp
                   , returnS (app "h$e" [sel r1])
@@ -1054,8 +1054,9 @@ specPapIdents = listArray (0,numSpecPap) $ map (TxtI . mkFastString . ("h$pap_"+
 pap :: StgToJSConfig
     -> Int
     -> JStat
-pap s r = closure (ClosureInfo funcName CIRegsUnknown funcName (CILayoutUnknown (r+2)) CIPap mempty) body
+pap s r = closure (ClosureInfo funcIdent CIRegsUnknown funcName (CILayoutUnknown (r+2)) CIPap mempty) body
   where
+    funcIdent = TxtI funcName
     funcName = mkFastString ("h$pap_" ++ show r)
 
     body = jVar \c d f extra ->
@@ -1081,7 +1082,7 @@ pap s r = closure (ClosureInfo funcName CIRegsUnknown funcName (CILayoutUnknown 
 -- Construct a generic PAP
 papGen :: StgToJSConfig -> JStat
 papGen cfg =
-   closure (ClosureInfo funcName CIRegsUnknown funcName CILayoutVariable CIPap mempty)
+   closure (ClosureInfo funcIdent CIRegsUnknown funcName CILayoutVariable CIPap mempty)
            (jVar \c f d pr or r ->
               [ c |= closureField1 r1
               , d |= closureField2 r1
@@ -1102,6 +1103,7 @@ papGen cfg =
 
 
   where
+    funcIdent = TxtI funcName
     funcName = "h$pap_gen"
     loadOwnArgs d r =
       let prop n = d .^ ("d" <> mkFastString (show $ n+1))

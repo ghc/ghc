@@ -238,11 +238,11 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
          | otherwise = mempty
   lvs  <- popLneFrame True payloadSize ctx
   body <- genBody ctx i R1 args body
-  ei@(TxtI eii)   <- identForEntryId i
+  ei@(TxtI eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
   let f = JFunc [] (bh <> lvs <> body)
   emitClosureInfo $
-    ClosureInfo eii
+    ClosureInfo ei
                 (CIRegs 0 $ concatMap idVt args)
                 (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
                 (fixedLayout . reverse $
@@ -277,7 +277,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = res
                then enterCostCentreThunk
                else enterCostCentreFun cc
   sr <- genStaticRefsRhs rhs
-  emitClosureInfo $ ClosureInfo eii
+  emitClosureInfo $ ClosureInfo ei
                                 (CIRegs 0 $ PtrV : concatMap idVt args)
                                 (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
                                 (fixedLayout $ map (uTypeVt . idType) live)
@@ -631,7 +631,7 @@ genRet ctx e at as l = freshIdent >>= f
       sr       <- genStaticRefs l -- srt
       prof     <- profiling
       emitClosureInfo $
-        ClosureInfo ri
+        ClosureInfo r
                     (CIRegs 0 altRegs)
                     ri
                     (fixedLayout . reverse $
