@@ -383,7 +383,7 @@ instance Show SaneDouble where
 
 -- | A newtype wrapper around 'FastString' for JS identifiers.
 newtype Ident = TxtI { itxt :: FastString }
- deriving stock   (Show, Typeable, Eq, Generic)
+ deriving stock   (Show, Eq)
  deriving newtype (Uniquable)
 
 instance Ord Ident where
