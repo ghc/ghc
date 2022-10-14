@@ -115,7 +115,7 @@ primRepCmmType platform = \case
    AddrRep          -> bWord platform
    FloatRep         -> f32
    DoubleRep        -> f64
-   (VecRep len rep) -> vec len (primElemRepCmmType rep)
+   VecRep len rep   -> vec len (primElemRepCmmType rep)
 
 slotCmmType :: Platform -> SlotTy -> CmmType
 slotCmmType platform = \case
@@ -125,6 +125,7 @@ slotCmmType platform = \case
    Word64Slot      -> b64
    FloatSlot       -> f32
    DoubleSlot      -> f64
+   VecSlot l e     -> vec l (primElemRepCmmType e)
 
 primElemRepCmmType :: PrimElemRep -> CmmType
 primElemRepCmmType Int8ElemRep   = b8
