@@ -129,7 +129,7 @@ function h$initInfoTables ( depth      // depth in the base chain
                           , infoMeta   // packed info
                           , infoStatic
                           ) {
-  TRACE_META("decoding info tables");
+  TRACE_META("decoding info tables")
   var n, i, j, o, pos = 0, info;
   function code(c) {
     if(c < 34) return c - 32;
@@ -139,7 +139,7 @@ function h$initInfoTables ( depth      // depth in the base chain
   function next() {
     var c = info.charCodeAt(pos);
     if(c < 124) {
-      TRACE_META("pos: " + pos + " decoded: " + code(c));
+      TRACE_META("pos: " + pos + " decoded: " + code(c))
       pos++;
       return code(c);
     }
@@ -147,7 +147,7 @@ function h$initInfoTables ( depth      // depth in the base chain
       pos+=3;
       var r =  90 + 90 * code(info.charCodeAt(pos-2))
                   + code(info.charCodeAt(pos-1));
-      TRACE_META("pos: " + (pos-3) + " decoded: " + r);
+      TRACE_META("pos: " + (pos-3) + " decoded: " + r)
       return r;
     }
     if(c === 125) {
@@ -155,7 +155,7 @@ function h$initInfoTables ( depth      // depth in the base chain
       var r = 8190 + 8100 * code(info.charCodeAt(pos-3))
                    + 90 * code(info.charCodeAt(pos-2))
                    + code(info.charCodeAt(pos-1));
-      TRACE_META("pos: " + (pos-4) + " decoded: " + r);
+      TRACE_META("pos: " + (pos-4) + " decoded: " + r)
       return r;
     }
     throw ("h$initInfoTables: invalid code in info table: " + c + " at " + pos)
@@ -173,7 +173,7 @@ function h$initInfoTables ( depth      // depth in the base chain
         } else {
             r = n - 12;
         }
-        TRACE_META("decoded int: " + r);
+        TRACE_META("decoded int: " + r)
         return r;
     }
     function nextSignificand() {
@@ -190,7 +190,7 @@ function h$initInfoTables ( depth      // depth in the base chain
         } else {
             r = n - 12;
         }
-        TRACE_META("decoded significand:" + r);
+        TRACE_META("decoded significand:" + r)
         return r;
     }
     function nextEntry(o) { return nextIndexed("nextEntry", h$entriesStack, o); }
@@ -212,25 +212,25 @@ function h$initInfoTables ( depth      // depth in the base chain
         var isString = false;
         switch(o) {
         case 0:
-            TRACE_META("bool arg: false");
+            TRACE_META("bool arg: false")
             return false;
         case 1:
-            TRACE_META("bool arg: true");
+            TRACE_META("bool arg: true")
             return true;
         case 2:
-            TRACE_META("int constant: 0");
+            TRACE_META("int constant: 0")
             return 0;
         case 3:
-            TRACE_META("int constant: 1");
+            TRACE_META("int constant: 1")
             return 1;
         case 4:
-            TRACE_META("int arg");
+            TRACE_META("int arg")
             return nextInt();
         case 5:
-            TRACE_META("literal arg: null");
+            TRACE_META("literal arg: null")
             return null;
         case 6:
-            TRACE_META("double arg");
+            TRACE_META("double arg")
             n = next();
             switch(n) {
             case 0:
@@ -258,11 +258,11 @@ function h$initInfoTables ( depth      // depth in the base chain
                 return nextSignificand() * Math.pow(2, n1);
             }
         case 7:
-            TRACE_META("string arg");
+            TRACE_META("string arg")
             isString = true;
             // no break, strings are null temrinated UTF8 encoded binary with
         case 8:
-            TRACE_META("binary arg");
+            TRACE_META("binary arg")
             n = next();
             var ba = h$newByteArray(isString ? (n+1) : n);
             var b8 = ba.u8;
@@ -308,7 +308,7 @@ function h$initInfoTables ( depth      // depth in the base chain
             }
             return h$init_closure(c, args);
         default:
-            TRACE_META("object arg: " + (o-11));
+            TRACE_META("object arg: " + (o-11))
             return nextObj(o-11);
         }
     }
@@ -370,20 +370,20 @@ function h$initInfoTables ( depth      // depth in the base chain
     info = infoStatic;
     pos = 0;
     for(i=0;i<objects.length;i++) {
-      TRACE_META("start iteration");
+      TRACE_META("start iteration")
       o = objects[i];
         // traceMetaObjBefore(o);
       var nx = next();
-      TRACE_META("static init object: " + i + " tag: " + nx);
+      TRACE_META("static init object: " + i + " tag: " + nx)
       switch(nx) {
       case 0:  // no init, could be a primitive value (still in the list since others might reference it)
           // h$log("zero init");
           break;
       case 1: // staticfun
           o.f = nextEntry();
-        TRACE_META("staticFun");
+        TRACE_META("staticFun")
         n = next();
-        TRACE_META("args: " + n);
+        TRACE_META("args: " + n)
         if(n === 0) {
           o.d1 = null;
           o.d2 = null;
@@ -401,10 +401,10 @@ function h$initInfoTables ( depth      // depth in the base chain
 
           break;
       case 2:  // staticThunk
-          TRACE_META("staticThunk");
+          TRACE_META("staticThunk")
         o.f = nextEntry();
         n = next();
-        TRACE_META("args: " + n);
+        TRACE_META("args: " + n)
         if(n === 0) {
           o.d1 = null;
           o.d2 = null;
@@ -422,19 +422,19 @@ function h$initInfoTables ( depth      // depth in the base chain
           h$addCAF(o);
           break;
       case 3: // staticPrim false, no init
-          TRACE_META("staticBool false");
+          TRACE_META("staticBool false")
           break;
       case 4: // staticPrim true, no init
-          TRACE_META("staticBool true");
+          TRACE_META("staticBool true")
           break;
       case 5:
-          TRACE_META("staticInt");
+          TRACE_META("staticInt")
           break;
       case 6: // staticString
-          TRACE_META("staticDouble");
+          TRACE_META("staticDouble")
           break;
       case 7: // staticBin
-          TRACE_META("staticBin: error unused");
+          TRACE_META("staticBin: error unused")
           n = next();
           var b = h$newByteArray(n);
           for(j=0;j>n;j++) {
@@ -442,15 +442,15 @@ function h$initInfoTables ( depth      // depth in the base chain
           }
           break;
       case 8: // staticEmptyList
-          TRACE_META("staticEmptyList");
+          TRACE_META("staticEmptyList")
           o.f = HS_NIL_CON;
           break;
       case 9: // staticList
-          TRACE_META("staticList");
+          TRACE_META("staticList")
           n = next();
           var hasTail = next();
           var c = (hasTail === 1) ? nextObj() : HS_NIL;
-          TRACE_META("list length: " + n);
+          TRACE_META("list length: " + n)
           while(n--) {
               c = MK_CONS(nextArg(), c);
           }
@@ -459,51 +459,51 @@ function h$initInfoTables ( depth      // depth in the base chain
           o.d2 = c.d2;
           break;
       case 10:  // staticData n args
-          TRACE_META("staticData");
+          TRACE_META("staticData")
           n = next();
-          TRACE_META("args: " + n);
+          TRACE_META("args: " + n)
           o.f = nextEntry();
           for(j=0;j<n;j++) {
               h$setField(o, j, nextArg());
           }
           break;
       case 11: // staticData 0 args
-          TRACE_META("staticData0");
+          TRACE_META("staticData0")
           o.f = nextEntry();
           break;
       case 12: // staticData 1 args
-          TRACE_META("staticData1");
+          TRACE_META("staticData1")
           o.f  = nextEntry();
           o.d1 = nextArg();
           break;
       case 13: // staticData 2 args
-          TRACE_META("staticData2");
+          TRACE_META("staticData2")
           o.f  = nextEntry();
           o.d1 = nextArg();
           o.d2 = nextArg();
           break;
       case 14: // staticData 3 args
-          TRACE_META("staticData3");
+          TRACE_META("staticData3")
           o.f  = nextEntry();
           o.d1 = nextArg();
           // should be the correct order
           o.d2 = { d1: nextArg(), d2: nextArg()};
           break;
       case 15: // staticData 4 args
-          TRACE_META("staticData4");
+          TRACE_META("staticData4")
           o.f  = nextEntry();
           o.d1 = nextArg();
           // should be the correct order
           o.d2 = { d1: nextArg(), d2: nextArg(), d3: nextArg() };
           break;
       case 16: // staticData 5 args
-          TRACE_META("staticData5");
+          TRACE_META("staticData5")
           o.f  = nextEntry();
           o.d1 = nextArg();
           o.d2 = { d1: nextArg(), d2: nextArg(), d3: nextArg(), d4: nextArg() };
           break;
       case 17: // staticData 6 args
-          TRACE_META("staticData6");
+          TRACE_META("staticData6")
           o.f  = nextEntry();
           o.d1 = nextArg();
           o.d2 = { d1: nextArg(), d2: nextArg(), d3: nextArg(), d4: nextArg(), d5: nextArg() };

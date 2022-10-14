@@ -159,8 +159,8 @@ function h$gcQuick(t) {
 #ifdef GHCJS_TRACE_GC
     var time = Date.now() - start;
     h$gcTime += time;
-    TRACE_GC("time (quick): " + time + "ms");
-    TRACE_GC("time (total): " + h$gcTime + "ms");
+    TRACE_GC("time (quick): " + time + "ms")
+    TRACE_GC("time (total): " + h$gcTime + "ms")
 #endif
 }
 
@@ -181,10 +181,10 @@ function h$gc(t) {
     if(h$currentThread !== null) throw "h$gc: GC can only be run when no thread is running";
 #ifdef GHCJS_TRACE_GC
     h$marked = 0;
-    TRACE_GC("gc: " + (t!==null?h$threadString(t):"null"));
+    TRACE_GC("gc: " + (t!==null?h$threadString(t):"null"))
     var start = Date.now();
 #endif
-    TRACE_GC("full gc of thread " + h$threadString(t));
+    TRACE_GC("full gc of thread " + h$threadString(t))
     h$resetRegisters();
     h$resetResultVars();
     h$gcMark = 5-h$gcMark;
@@ -194,7 +194,7 @@ function h$gc(t) {
       var a = h$extensibleRetentionRoots[i](h$gcMark);
       if(a) h$follow(a, a.length-1);
     }
-    TRACE_GC("scanning threads, runnable: " + h$threads.length() + " blocked: " + h$blocked.size() + " t: " + t);
+    TRACE_GC("scanning threads, runnable: " + h$threads.length() + " blocked: " + h$blocked.size() + " t: " + t)
 
     // mark al runnable threads and the running thread
     if(t !== null) {
@@ -218,11 +218,11 @@ function h$gc(t) {
         }
 	h$resetThread(nt);
     }
-    TRACE_GC("scanning permanent retention roots");
+    TRACE_GC("scanning permanent retention roots")
     iter = h$extraRoots.iter();
     while((nt = iter.next()) !== null) h$follow(nt.root);
 
-    TRACE_GC("scanning stable pointers");
+    TRACE_GC("scanning stable pointers")
     for(i=0;i<h$stablePtrData.length;i++) {
       if(h$stablePtrData[i]) h$follow(h$stablePtrData[i]);
     }
@@ -241,9 +241,9 @@ function h$gc(t) {
 #ifdef GHCJS_TRACE_GC
     var time = now - start;
     h$gcTime += time;
-    TRACE_GC("time: " + time + "ms");
-    TRACE_GC("time (total): " + h$gcTime + "ms");
-    TRACE_GC("marked objects: " + h$marked);
+    TRACE_GC("time: " + time + "ms")
+    TRACE_GC("time (total): " + h$gcTime + "ms")
+    TRACE_GC("marked objects: " + h$marked)
 #endif
     h$debugAlloc_verifyReachability(h$gcMark);
 }
@@ -280,7 +280,7 @@ function h$markRetained() {
       or its finalizer, and move the weak pointer object to a new list
     */
     do {
-        TRACE_GC("mark retained iteration 1/2");
+        TRACE_GC("mark retained iteration 1/2")
         marked = false;
 
         for (i = 0; i < h$weakPointerList.length; ++i) {
@@ -329,14 +329,14 @@ function h$markRetained() {
             continue;
         }
 
-        TRACE_GC("mark retained iteration 2/2");
+        TRACE_GC("mark retained iteration 2/2")
         if(w.val !== null) {
             w.val = null;
         }
 
         if(w.finalizer !== null) {
             if(!IS_MARKED(w.finalizer)) {
-                TRACE_GC("following finalizer");
+                TRACE_GC("following finalizer")
                 h$follow(w.finalizer);
             }
             toFinalize.push(w);
@@ -356,7 +356,7 @@ function h$markRetained() {
 
 function h$markThread(t) {
     var mark = h$gcMark;
-    TRACE_GC("marking thread: " + h$threadString(t));
+    TRACE_GC("marking thread: " + h$threadString(t))
     if(IS_MARKED(t)) return;
     h$follow(t);
 }
@@ -387,7 +387,7 @@ function h$follow(obj, sp) {
 #ifdef GHCJS_TRACE_GC
     var start = Date.now();
 #endif
-    TRACE_GC("following");
+    TRACE_GC("following")
     var work, mark = h$gcMark;
     if(typeof sp === 'number') {
         work = obj.slice(0, sp+1);
@@ -397,26 +397,26 @@ function h$follow(obj, sp) {
         w = 1;
     }
     while(w > 0) {
-        TRACE_GC("work length: " + work.length + " w: " + w);
+        TRACE_GC("work length: " + work.length + " w: " + w)
         c = work[--w];
-        TRACE_GC("[" + work.length + "] mark step: " + typeof c);
+        TRACE_GC("[" + work.length + "] mark step: " + typeof c)
 #ifdef GHCJS_TRACE_GC
         if(typeof c === 'object') {
             if(c !== null) {
-                TRACE_GC("object: " + c.toString());
-                TRACE_GC("object props: " + h$collectProps(c));
-                TRACE_GC("object mark: " + c.m + " (" + typeof(c.m) + ") (current: " + mark + ")");
+                TRACE_GC("object: " + c.toString())
+                TRACE_GC("object props: " + h$collectProps(c))
+                TRACE_GC("object mark: " + c.m + " (" + typeof(c.m) + ") (current: " + mark + ")")
             } else {
-                TRACE_GC("object: " + c);
+                TRACE_GC("object: " + c)
             }
         }
 #endif
         if(c !== null && c !== undefined && typeof c === 'object' && ((typeof c.m === 'number' && (c.m&3) !== mark) || (typeof c.m === 'object' && c.m !== null && typeof c.m.m === 'number' && (c.m.m&3) !== mark))) {
             var doMark = false;
             var cf = c.f;
-            TRACE_GC("first accepted");
+            TRACE_GC("first accepted")
             if(typeof cf === 'function' && (typeof c.m === 'number' || typeof c.m === 'object')) {
-                TRACE_GC("marking heap object: " + c.f.n + " size: " + c.f.size);
+                TRACE_GC("marking heap object: " + c.f.n + " size: " + c.f.size)
                 // only change the two least significant bits for heap objects
                 MARK_OBJ(c);
                 // dynamic references
@@ -440,16 +440,16 @@ function h$follow(obj, sp) {
                 // static references
                 var s = cf.s;
                 if(s !== null) {
-                    TRACE_GC("adding static marks");
+                    TRACE_GC("adding static marks")
                     for(var i=0;i<s.length;i++) ADDW(s[i]);
                 }
             } else if(typeof c.len === 'number' && c.buf instanceof ArrayBuffer) {
-                TRACE_GC("marking ByteArray");
+                TRACE_GC("marking ByteArray")
                 MARK_OBJ(c);
             } else if(c instanceof h$Weak) {
                 MARK_OBJ(c);
             } else if(c instanceof h$MVar) {
-                TRACE_GC("marking MVar");
+                TRACE_GC("marking MVar")
                 MARK_OBJ(c);
                 iter = c.writers.iter();
                 while((ii = iter()) !== null) {
@@ -467,11 +467,11 @@ function h$follow(obj, sp) {
 		}
                 if(c.val !== null && !IS_MARKED(c.val)) ADDW(c.val);
             } else if(c instanceof h$MutVar) {
-                TRACE_GC("marking MutVar");
+                TRACE_GC("marking MutVar")
                 MARK_OBJ(c);
                 ADDW(c.val);
             } else if(c instanceof h$TVar) {
-                TRACE_GC("marking TVar");
+                TRACE_GC("marking TVar")
                 MARK_OBJ(c);
                 ADDW(c.val);
 		iter = c.blocked.iter();
@@ -485,7 +485,7 @@ function h$follow(obj, sp) {
 		    }
 		}
             } else if(c instanceof h$Thread) {
-                TRACE_GC("marking Thread");
+                TRACE_GC("marking Thread")
                 MARK_OBJ(c);
                 if(c.stack) {
                     for(i=c.sp;i>=0;i--) {
@@ -498,7 +498,7 @@ function h$follow(obj, sp) {
             } else if(c instanceof h$Transaction) {
                 // - the accessed TVar values don't need to be marked
                 // - parents are also on the stack, so they should've been marked already
-                TRACE_GC("marking STM transaction");
+                TRACE_GC("marking STM transaction")
                 MARK_OBJ(c);
                 for(i=c.invariants.length-1;i>=0;i--) {
 		    ADDW(c.invariants[i].action);
@@ -511,7 +511,7 @@ function h$follow(obj, sp) {
             } else if(c instanceof Array && c.__ghcjsArray) {
 		// only for Haskell arrays with lifted values
                 MARK_OBJ(c);
-                TRACE_GC("marking array");
+                TRACE_GC("marking array")
                 for(i=0;i<c.length;i++) {
                     var x = c[i];
                     if(typeof x === 'object' && x !== null && !IS_MARKED(x)) {
@@ -519,7 +519,7 @@ function h$follow(obj, sp) {
 		    }
                 }
             } else if(typeof c === 'object') {
-                TRACE_GC("extensible retention marking");
+                TRACE_GC("extensible retention marking")
 #ifdef GHCJS_TRACE_GC_UNKNOWN
                 var extensibleMatched = false;
 #endif
@@ -538,13 +538,13 @@ function h$follow(obj, sp) {
                 }
 #ifdef GHCJS_TRACE_GC_UNKNOWN
                 if(!extensibleMatched) {
-                    TRACE_GC("unknown object: " + h$collectProps(c));
+                    TRACE_GC("unknown object: " + h$collectProps(c))
                 }
 #endif
             } // otherwise: not an object, no followable values
         }
     }
-    TRACE_GC("h$follow: " + (Date.now()-start) + "ms");
+    TRACE_GC("h$follow: " + (Date.now()-start) + "ms")
 }
 
 // resetThread clears the stack above the stack pointer
@@ -564,7 +564,7 @@ function h$resetThread(t) {
             stack[i] = null;
         }
     }
-    TRACE_GC("h$resetThread: " + (Date.now()-start) + "ms");
+    TRACE_GC("h$resetThread: " + (Date.now()-start) + "ms")
 }
 
 /*
@@ -574,7 +574,7 @@ function h$resetThread(t) {
    All woken up threads are marked.
  */
 function h$resolveDeadlocks() {
-    TRACE_GC("resolving deadlocks");
+    TRACE_GC("resolving deadlocks")
     var kill, t, iter, bo, mark = h$gcMark;
     do {
         h$markWeaks();
@@ -626,13 +626,13 @@ function h$finalizeCAFs() {
         if(c.m & 3 !== mark) {
             var cr = h$CAFsReset[i];
             if(c.f !== cr[0]) { // has been updated, reset it
-                TRACE_GC("resetting CAF: " + cr.n);
+                TRACE_GC("resetting CAF: " + cr.n)
                 c.f = cr[0];
                 c.d1 = cr[1];
                 c.d2 = cr[2];
             }
         }
     }
-    TRACE_GC("h$finalizeCAFs: " + (Date.now()-start) + "ms");
+    TRACE_GC("h$finalizeCAFs: " + (Date.now()-start) + "ms")
 }
 
