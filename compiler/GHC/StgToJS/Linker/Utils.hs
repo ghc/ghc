@@ -47,12 +47,12 @@ import Data.Char (isSpace)
 import qualified Control.Exception as Exception
 
 -- | Retrieve library directories provided by the @UnitId@ in @UnitState@
-getInstalledPackageLibDirs :: UnitState -> UnitId -> [FilePath]
-getInstalledPackageLibDirs us = fmap unpack . maybe mempty unitLibraryDirs . lookupUnitId us
+getInstalledPackageLibDirs :: UnitState -> UnitId -> [ShortText]
+getInstalledPackageLibDirs us = maybe mempty unitLibraryDirs . lookupUnitId us
 
 -- | Retrieve the names of the libraries provided by @UnitId@
-getInstalledPackageHsLibs :: UnitState -> UnitId -> [String]
-getInstalledPackageHsLibs us = fmap unpack . maybe mempty unitLibraries . lookupUnitId us
+getInstalledPackageHsLibs :: UnitState -> UnitId -> [ShortText]
+getInstalledPackageHsLibs us = maybe mempty unitLibraries . lookupUnitId us
 
 -- | A constant holding the JavaScript executable Filename extension
 jsexeExtension :: String

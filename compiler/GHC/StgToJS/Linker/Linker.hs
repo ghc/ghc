@@ -70,6 +70,7 @@ import GHC.Types.Unique.Set
 
 import qualified GHC.SysTools.Ar          as Ar
 
+import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
 
 import Control.Concurrent.MVar
@@ -382,7 +383,7 @@ renderLinkerStats s =
 
 getPackageArchives :: StgToJSConfig -> UnitEnv -> [UnitId] -> IO [FilePath]
 getPackageArchives cfg unit_env units =
-  filterM doesFileExist [ p </> "lib" ++ l ++ profSuff <.> "a"
+  filterM doesFileExist [ ST.unpack p </> "lib" ++ ST.unpack l ++ profSuff <.> "a"
                         | u <- units
                         , p <- getInstalledPackageLibDirs ue_state u
                         , l <- getInstalledPackageHsLibs  ue_state u
