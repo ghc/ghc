@@ -49,6 +49,7 @@ import GHC.JS.Make
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Utils.Encoding (zEncodeString)
@@ -158,9 +159,9 @@ cachedIdentForId i mi id_type = do
 
   when (update_global_cache) $ do
     GlobalIdCache gidc <- getGlobalIdCache
-    case M.lookup ident gidc of
-      Nothing -> setGlobalIdCache $ GlobalIdCache (M.insert ident (key, i) gidc)
-      Just _  -> pure ()
+    case elemUFM ident gidc of
+      False -> setGlobalIdCache $ GlobalIdCache (addToUFM gidc ident (key, i))
+      True  -> pure ()
 
   pure ident
 

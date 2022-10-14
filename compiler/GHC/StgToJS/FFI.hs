@@ -28,6 +28,7 @@ import GHC.StgToJS.Ids
 import GHC.Types.RepType
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.FM
 
 import GHC.Stg.Syntax
 
@@ -45,7 +46,6 @@ import Data.Char
 import Data.Monoid
 import Data.Maybe
 import qualified Data.List as L
-import qualified Data.Map as M
 import Control.Monad
 import Control.Applicative
 import qualified Text.ParserCombinators.ReadP as P
@@ -147,7 +147,7 @@ parseFFIPattern' callback javascriptCc pat t ret args
         Right expr | not async && length tgt < 2 -> do
           (statPre, ap) <- argPlaceholders javascriptCc args
           let rp  = resultPlaceholders async t ret
-              env = M.fromList (rp ++ ap)
+              env = addListToUFM emptyUFM (rp ++ ap)
           if length tgt == 1
             then return $ statPre <> (mapStatIdent (replaceIdent env) (var "$r" |= expr))
             else return $ statPre <> (mapStatIdent (replaceIdent env) (toStat expr))
@@ -159,7 +159,7 @@ parseFFIPattern' callback javascriptCc pat t ret args
             let rp = resultPlaceholders async t ret
             let cp = callbackPlaceholders callback
             (statPre, ap) <- argPlaceholders javascriptCc args
-            let env = M.fromList (rp ++ ap ++ cp)
+            let env = addListToUFM emptyUFM (rp ++ ap ++ cp)
             return $ statPre <> (mapStatIdent (replaceIdent env) stat) -- fixme trace?
   where
     async = isJust callback
@@ -186,9 +186,10 @@ parseFFIPattern' callback javascriptCc pat t ret args
         where f' = toJExpr (TxtI $ mkFastString f)
     copyResult rs = mconcat $ zipWith (\t r -> toJExpr r |= toJExpr t) (enumFrom Ret1) rs
     p e = error ("Parse error in FFI pattern: " ++ pat ++ "\n" ++ e)
-    replaceIdent :: M.Map Ident JExpr -> Ident -> JExpr
+
+    replaceIdent :: UniqFM Ident JExpr -> Ident -> JExpr
     replaceIdent env i
-      | isFFIPlaceholder i = fromMaybe err (M.lookup i env)
+      | isFFIPlaceholder i = fromMaybe err (lookupUFM env i)
       | otherwise = ValExpr (JVar i)
         where
           (TxtI i') = i
