@@ -25,7 +25,7 @@ function h$hs_quotWord64(h1,l1,h2,l2) {
   var a = W64(h1,l1);
   var b = W64(h2,l2);
   var r = BigInt.asUintN(64, a / b);
-  TRACE_ARITH("Word64: " + a + " / " + b + " ==> " + r);
+  TRACE_ARITH("Word64: " + a + " / " + b + " ==> " + r)
   RETURN_W64(r);
 }
 
@@ -33,7 +33,7 @@ function h$hs_remWord64(h1,l1,h2,l2) {
   var a = W64(h1,l1);
   var b = W64(h2,l2);
   var r = BigInt.asUintN(64, a % b);
-  TRACE_ARITH("Word64: " + a + " % " + b + " ==> " + r);
+  TRACE_ARITH("Word64: " + a + " % " + b + " ==> " + r)
   RETURN_W64(r);
 }
 
@@ -41,7 +41,7 @@ function h$hs_timesWord64(h1,l1,h2,l2) {
   var a = W64(h1,l1);
   var b = W64(h2,l2);
   var r = BigInt.asUintN(64, a * b);
-  TRACE_ARITH("Word64: " + a + " * " + b + " ==> " + r);
+  TRACE_ARITH("Word64: " + a + " * " + b + " ==> " + r)
   RETURN_W64(r);
 }
 
@@ -49,7 +49,7 @@ function h$hs_minusWord64(h1,l1,h2,l2) {
   var a = (BigInt(h1) << BigInt(32)) | BigInt(l1>>>0);
   var b = (BigInt(h2) << BigInt(32)) | BigInt(l2>>>0);
   var r = BigInt.asUintN(64, a - b);
-  TRACE_ARITH("Word64: " + a + " - " + b + " ==> " + r);
+  TRACE_ARITH("Word64: " + a + " - " + b + " ==> " + r)
   RETURN_W64(r);
 }
 
@@ -57,7 +57,7 @@ function h$hs_plusWord64(h1,l1,h2,l2) {
   var a = W64(h1,l1);
   var b = W64(h2,l2);
   var r = BigInt.asUintN(64, a + b);
-  TRACE_ARITH("Word64: " + a + " + " + b + " ==> " + r);
+  TRACE_ARITH("Word64: " + a + " + " + b + " ==> " + r)
   RETURN_W64(r);
 }
 
@@ -65,7 +65,7 @@ function h$hs_timesInt64(h1,l1,h2,l2) {
   var a = I64(h1,l1);
   var b = I64(h2,l2);
   var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r);
+  TRACE_ARITH("Int64: " + a + " * " + b + " ==> " + r)
   RETURN_I64(r);
 }
 
@@ -73,7 +73,7 @@ function h$hs_quotInt64(h1,l1,h2,l2) {
   var a = I64(h1,l1);
   var b = I64(h2,l2);
   var r = BigInt.asIntN(64, a / b);
-  TRACE_ARITH("Int64: " + a + " / " + b + " ==> " + r);
+  TRACE_ARITH("Int64: " + a + " / " + b + " ==> " + r)
   RETURN_I64(r);
 }
 
@@ -81,7 +81,7 @@ function h$hs_remInt64(h1,l1,h2,l2) {
   var a = I64(h1,l1);
   var b = I64(h2,l2);
   var r = BigInt.asIntN(64, a % b);
-  TRACE_ARITH("Int64: " + a + " % " + b + " ==> " + r);
+  TRACE_ARITH("Int64: " + a + " % " + b + " ==> " + r)
   RETURN_I64(r);
 }
 
@@ -89,7 +89,7 @@ function h$hs_plusInt64(h1,l1,h2,l2) {
   var a = I64(h1,l1);
   var b = I64(h2,l2);
   var r = BigInt.asIntN(64, a + b);
-  TRACE_ARITH("Int64: " + a + " + " + b + " ==> " + r);
+  TRACE_ARITH("Int64: " + a + " + " + b + " ==> " + r)
   RETURN_I64(r);
 }
 
@@ -97,7 +97,7 @@ function h$hs_minusInt64(h1,l1,h2,l2) {
   var a = I64(h1,l1);
   var b = I64(h2,l2);
   var r = BigInt.asIntN(64, a - b);
-  TRACE_ARITH("Int64: " + a + " - " + b + " ==> " + r);
+  TRACE_ARITH("Int64: " + a + " - " + b + " ==> " + r)
   RETURN_I64(r);
 }
 
@@ -118,8 +118,7 @@ function h$hs_uncheckedShiftLWord64(h,l,n) {
     rh = UN(l << (n - 32));
     rl = 0;
   }
-
-  TRACE_ARITH("Word64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl));
+  TRACE_ARITH("Word64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl))
   RETURN_UBX_TUP2(rh,rl);
 }
 
@@ -140,7 +139,7 @@ function h$hs_uncheckedShiftRWord64(h,l,n) {
     rh = 0;
     rl = h >>> (n-32);
   }
-  TRACE_ARITH("Word64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl));
+  TRACE_ARITH("Word64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl))
   RETURN_UBX_TUP2(rh,rl);
 }
 
@@ -161,8 +160,7 @@ function h$hs_uncheckedShiftLLInt64(h,l,n) {
     rh = l << (n - 32);
     rl = 0;
   }
-
-  TRACE_ARITH("Int64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl));
+  TRACE_ARITH("Int64: " + W64(h,l) + " << " + n + " ==> " + W64(rh,rl))
   RETURN_UBX_TUP2(rh,rl);
 }
 
@@ -180,8 +178,7 @@ function h$hs_uncheckedShiftRAInt64(h,l,n) {
     rh = h >= 0 ? 0 : -1;
     rl = UN(h >> (n - 32));
   }
-
-  TRACE_ARITH("Int64: " + W64(h,l) + " >> " + n + " ==> " + W64(rh,rl));
+  TRACE_ARITH("Int64: " + W64(h,l) + " >> " + n + " ==> " + W64(rh,rl))
   RETURN_UBX_TUP2(rh,rl);
 }
 
@@ -202,8 +199,7 @@ function h$hs_uncheckedShiftRLInt64(h,l,n) {
     rh = 0;
     rl = h >>> (n-32);
   }
-
-  TRACE_ARITH("Int64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl));
+  TRACE_ARITH("Int64: " + W64(h,l) + " >>> " + n + " ==> " + W64(rh,rl))
   RETURN_UBX_TUP2(rh,rl);
 }
 
@@ -216,7 +212,7 @@ function h$hs_timesInt2(l1,l2) {
   var a = I32(l1);
   var b = I32(l2);
   var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int32: " + a + " * " + b + " ==> " + r + " (Int64)");
+  TRACE_ARITH("Int32: " + a + " * " + b + " ==> " + r + " (Int64)")
 
   var rh = I64h(r);
   var rl = I64l(r)|0;
@@ -229,7 +225,7 @@ function h$mulWord32(l1,l2) {
   var a = W32(l1);
   var b = W32(l2);
   var r = BigInt.asUintN(32, a * b);
-  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r);
+  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r)
   RETURN_W32(r);
 }
 
@@ -237,7 +233,7 @@ function h$mul2Word32(l1,l2) {
   var a = W32(l1);
   var b = W32(l2);
   var r = BigInt.asUintN(64, a * b);
-  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r + " (Word64)");
+  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r + " (Word64)")
   RETURN_W64(r);
 }
 
@@ -245,7 +241,7 @@ function h$quotWord32(n,d) {
   var a = W32(n);
   var b = W32(d);
   var r = BigInt.asUintN(32, a / b);
-  TRACE_ARITH("Word32: " + a + " / " + b + " ==> " + r);
+  TRACE_ARITH("Word32: " + a + " / " + b + " ==> " + r)
   RETURN_W32(r);
 }
 
@@ -253,7 +249,7 @@ function h$remWord32(n,d) {
   var a = W32(n);
   var b = W32(d);
   var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " % " + b + " ==> " + r);
+  TRACE_ARITH("Word32: " + a + " % " + b + " ==> " + r)
   RETURN_W32(r);
 }
 
@@ -262,7 +258,7 @@ function h$quotRemWord32(n,d) {
   var b = W32(d);
   var q = BigInt.asUintN(32, a / b);
   var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " `quotRem` " + b + " ==> (" + q + ", " + r + ")");
+  TRACE_ARITH("Word32: " + a + " `quotRem` " + b + " ==> (" + q + ", " + r + ")")
   RETURN_UBX_TUP2(Number(q),Number(r));
 }
 
@@ -271,7 +267,7 @@ function h$quotRem2Word32(nh,nl,d) {
   var b = W32(d);
   var q = BigInt.asUintN(32, a / b);
   var r = BigInt.asUintN(32, a % b);
-  TRACE_ARITH("Word32: " + a + " `quotRem2` " + b + " ==> (" + q + ", " + r + ")");
+  TRACE_ARITH("Word32: " + a + " `quotRem2` " + b + " ==> (" + q + ", " + r + ")")
   RETURN_UBX_TUP2(Number(q),Number(r));
 }
 
@@ -279,17 +275,17 @@ function h$wordAdd2(l1,l2) {
   var a = W32(l1);
   var b = W32(l2);
   var r = BigInt.asUintN(64, a + b);
-  TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + r + " (Word64)");
+  TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + r + " (Word64)")
   RETURN_W64(r);
 }
 
 function h$isDoubleNegativeZero(d) {
-  TRACE_ARITH("isDoubleNegativeZero: " + d);
+  TRACE_ARITH("isDoubleNegativeZero: " + d)
   return (d===0 && (1/d) === -Infinity) ? 1 : 0;
 }
 
 function h$isFloatNegativeZero(d) {
-  TRACE_ARITH("isFloatNegativeZero: " + d);
+  TRACE_ARITH("isFloatNegativeZero: " + d)
   return (d===0 && (1/d) === -Infinity) ? 1 : 0;
 }
 
@@ -340,7 +336,7 @@ var h$convertWord   = new Uint32Array(h$convertBuffer);
 h$convertFloat[0] = 0.75;
 
 function h$decodeFloatInt(d) {
-    TRACE_ARITH("decodeFloatInt: " + d);
+    TRACE_ARITH("decodeFloatInt: " + d)
     if(isNaN(d)) {
         RETURN_UBX_TUP2(-12582912, 105);
     }
@@ -351,29 +347,29 @@ function h$decodeFloatInt(d) {
     var s   = i&8388607;
     if(exp === 0) { // zero or denormal
         if(s === 0) {
-            TRACE_ARITH("decodeFloatInt s: 0 e: 0");
+            TRACE_ARITH("decodeFloatInt s: 0 e: 0")
             RETURN_UBX_TUP2(0, 0);
         } else {
             h$convertFloat[0] = d*8388608; // put d in the normal range (~ shift left 23 bits)
             i = h$convertInt[0];
             s = (i&8388607) | 8388608;
             e = ((i >> 23) & 0xff) - 173; // take into account normalization above (150+23)
-            TRACE_ARITH("decodeFloatInt s: " + (sgn * s) +  " e: " + e);
+            TRACE_ARITH("decodeFloatInt s: " + (sgn * s) +  " e: " + e)
             RETURN_UBX_TUP2(sgn*s, e)
         }
     } else {
-      TRACE_ARITH("decodeFloatInt s: " + (sgn * (s|8388608)) +  " e: " + (exp-150));
+      TRACE_ARITH("decodeFloatInt s: " + (sgn * (s|8388608)) +  " e: " + (exp-150))
       RETURN_UBX_TUP2(sgn * (s|8388608), exp - 150);
     }
 }
 
 function h$decodeDouble2Int(d) {
-    TRACE_ARITH("decodeDouble2Int: " + d);
+    TRACE_ARITH("decodeDouble2Int: " + d)
     if(isNaN(d)) {
 	RETURN_UBX_TUP4(1, -1572864, 0, 972);
     }
     h$convertDouble[0] = d;
-  TRACE_ARITH("decodeDouble2Int binary: " + h$convertInt[0].toString(2) + " " + h$convertInt[1].toString(2));
+  TRACE_ARITH("decodeDouble2Int binary: " + h$convertInt[0].toString(2) + " " + h$convertInt[1].toString(2))
     var i1 = h$convertInt[1];
     var ret1, ret2 = h$convertInt[0], ret3;
     var exp = (i1&2146435072)>>>20;
@@ -392,7 +388,7 @@ function h$decodeDouble2Int(d) {
     ret3 = exp-1075;
     ret1 = (i1&1048575)|1048576;
   }
-    TRACE_ARITH("decodeDouble2Int: exp: " + ret3 + " significand: " + ret1 + " " + ret2);
+    TRACE_ARITH("decodeDouble2Int: exp: " + ret3 + " significand: " + ret1 + " " + ret2)
     RETURN_UBX_TUP4(i1<0?-1:1,ret1,ret2,ret3);
 }
 
@@ -527,7 +523,7 @@ function h$ctz64(x1,x2) {
 }
 
 function h$decodeDoubleInt64(d) {
-  TRACE_ARITH("decodeDoubleInt64: " + d);
+  TRACE_ARITH("decodeDoubleInt64: " + d)
   if(isNaN(d)) {
     RETURN_UBX_TUP3(972, -1572864, 0);
   }
