@@ -174,7 +174,7 @@ function h$setProgArgv(n, ptr_d, ptr_o) {
     var arg = h$decodeUtf8z(p[0], p[1]);
     args.push(arg);
   }
-  h$programArgs() = args;
+  h$programArgs_ = args;
 }
 
 function h$getpid() {
