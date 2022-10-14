@@ -32,7 +32,6 @@
 
 module GHC.StgToJS.Linker.Compactor
   ( compact
-  , packStrings
   ) where
 
 
@@ -71,20 +70,6 @@ import           GHC.StgToJS.Arg
 import Prelude
 import GHC.Utils.Encoding
 
-
-{- create a single string initializer for all StaticUnboxedString references
-   in the code, and rewrite all references to point to it
-
-   if incremental linking is used, each increment gets its own packed string
-   blob. if a string value already exists in an earlier blob it is not added
-   again
- -}
-packStrings :: HasDebugCallStack
-            => JSLinkConfig
-            -> CompactorState
-            -> [LinkedUnit]
-            -> (CompactorState, [LinkedUnit])
-packStrings _settings _cstate _code = panic "Compactor.packstrings not yet implemented!"
 
 renameInternals :: HasDebugCallStack
                 => JSLinkConfig
