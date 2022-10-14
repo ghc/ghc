@@ -66,6 +66,8 @@ import qualified GHC.Utils.Ppr as Ppr
 import GHC.Utils.Monad
 import GHC.Utils.TmpFs
 
+import GHC.Types.Unique.Set
+
 import qualified GHC.SysTools.Ar          as Ar
 
 import GHC.Data.FastString
@@ -877,14 +879,16 @@ linkModules mods = (compact_mods, meta)
     --  - rename local variables into shorter ones
     --  - compress initialization data
     -- but we haven't ported it (yet).
-
     compact m = CompactedModuleCode
       { cmc_js_code = mc_js_code m
       , cmc_module  = mc_module m
       , cmc_exports = mc_exports m
       }
 
-    statics = concatMap mc_statics  mods
+    -- common up statics: different bindings may reference the same statics, we
+    -- filter them here to initialize them once
+    statics = nubStaticInfo (concatMap mc_statics mods)
+
     infos   = concatMap mc_closures mods
     meta = mconcat
             -- render metadata as individual statements
@@ -892,6 +896,20 @@ linkModules mods = (compact_mods, meta)
             , mconcat (map staticInitStat statics)
             , mconcat (map (closureInfoStat True) infos)
             ]
+
+-- | Only keep a single StaticInfo with a given name
+nubStaticInfo :: [StaticInfo] -> [StaticInfo]
+nubStaticInfo = go emptyUniqSet
+  where
+    go us = \case
+      []     -> []
+      (x:xs) ->
+        -- only match on siVar. There is no reason for the initializing value to
+        -- be different for the same global name.
+        let name = siVar x
+        in if elementOfUniqSet name us
+          then go us xs
+          else x : go (addOneToUniqSet us name) xs
 
 -- | Initialize a global object.
 --
