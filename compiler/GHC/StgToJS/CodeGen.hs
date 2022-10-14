@@ -332,8 +332,10 @@ genToplevelRhs i rhs = case rhs of
     eid@(TxtI eidt) <- identForEntryId i
     (TxtI idt)   <- identForId i
     body <- genBody (initExprCtx i) i R2 args body
-    (lidents, lids) <- unzip <$> liftToGlobal (jsSaturate (Just "ghcjs_tmp_sat_") body)
-    let lidents' = map (\(TxtI t) -> t) lidents
+    global_occs <- globalOccs (jsSaturate (Just "ghcjs_tmp_sat_") body)
+    let lidents = map global_ident global_occs
+    let lids    = map global_id    global_occs
+    let lidents' = map identFS lidents
     CIStaticRefs sr0 <- genStaticRefsRhs rhs
     let sri = filter (`notElem` lidents') sr0
         sr   = CIStaticRefs sri

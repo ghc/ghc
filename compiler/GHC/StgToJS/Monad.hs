@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | JS codegen state monad
 module GHC.StgToJS.Monad
@@ -13,9 +14,10 @@ module GHC.StgToJS.Monad
   , emitForeign
   , assertRtsStat
   , getSettings
-  , liftToGlobal
+  , globalOccs
   , setGlobalIdCache
   , getGlobalIdCache
+  , GlobalOcc(..)
   -- * Group
   , modifyGroup
   , resetGroup
@@ -44,9 +46,6 @@ import GHC.Data.FastMutInt
 import qualified Data.Map  as M
 import qualified Data.Set  as S
 import qualified Data.List as L
-import Data.Function
-
-import GHC.Types.Unique.DSet
 
 runG :: StgToJSConfig -> Module -> UniqFM Id CgStgExpr -> G a -> IO a
 runG config m unfloat action = State.evalStateT action =<< initState config m unfloat
@@ -133,7 +132,7 @@ defaultGenGroupState :: GenGroupState
 defaultGenGroupState = GenGroupState [] [] [] [] 0 S.empty emptyGlobalIdCache []
 
 emptyGlobalIdCache :: GlobalIdCache
-emptyGlobalIdCache = GlobalIdCache M.empty
+emptyGlobalIdCache = GlobalIdCache emptyUFM
 
 emptyIdCache :: IdCache
 emptyIdCache = IdCache M.empty
@@ -155,17 +154,32 @@ setGlobalIdCache :: GlobalIdCache -> G ()
 setGlobalIdCache v = State.modify (\s -> s { gsGroup = (gsGroup s) { ggsGlobalIdCache = v}})
 
 
-liftToGlobal :: JStat -> G [(Ident, Id)]
-liftToGlobal jst = do
-  GlobalIdCache gidc <- getGlobalIdCache
-  let sids  = filterUniqDSet (`M.member` gidc) (identsS jst)
-      cnt   = M.fromListWith (+) (map (,(1::Integer)) $ uniqDSetToList sids)
-      sids' = L.sortBy (compare `on` (cnt M.!)) (nub' $ uniqDSetToList sids)
-  pure $ map (\s -> (s, snd $ gidc M.! s)) sids'
+data GlobalOcc = GlobalOcc
+  { global_ident :: !Ident
+  , global_id    :: !Id
+  , global_count :: !Word
+  }
 
-nub' :: (Ord a, Eq a) => [a] -> [a]
-nub' xs = go S.empty xs
-  where
-    go _ []     = []
-    go s (x:xs) | S.member x s = go s xs
-                | otherwise    = x : go (S.insert x s) xs
+-- | Return number of occurrences of every global id used in the given JStat.
+-- Sort by increasing occurrence count.
+globalOccs :: JStat -> G [GlobalOcc]
+globalOccs jst = do
+  GlobalIdCache gidc <- getGlobalIdCache
+  -- build a map form Ident Unique to (Ident, Id, Count)
+  let
+    cmp_cnt g1 g2 = compare (global_count g1) (global_count g2)
+    inc g1 g2 = g1 { global_count = global_count g1 + global_count g2 }
+    go gids = \case
+        []     -> -- return global Ids used locally sorted by increased use
+                  L.sortBy cmp_cnt $ nonDetEltsUFM gids
+        (i:is) ->
+          -- check if the Id is global
+          case lookupUFM gidc i of
+            Nothing       -> go gids is
+            Just (_k,gid) ->
+              -- add it to the list of already found global ids. Increasing
+              -- count by 1
+              let g = GlobalOcc i gid 1
+              in go (addToUFM_C inc gids i g) is
+
+  pure $ go emptyUFM (identsS jst)

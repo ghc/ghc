@@ -216,7 +216,7 @@ instance Ord OtherSymb where
 newtype IdCache = IdCache (M.Map IdKey Ident)
 
 -- | The global Identifier Cache
-newtype GlobalIdCache = GlobalIdCache (M.Map Ident (IdKey, Id))
+newtype GlobalIdCache = GlobalIdCache (UniqFM Ident (IdKey, Id))
 
 -- | A Stack Slot is either known or unknown. We avoid maybe here for more
 -- strictness.
