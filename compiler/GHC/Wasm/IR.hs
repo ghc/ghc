@@ -17,13 +17,17 @@ module GHC.Wasm.IR
 
   , WasmType(..), WasmTypeTag(..)
   , TypeList(..)
-  , RevAppend, Reverse
   , WasmFunctionType(..)
+
+  , RevAppend, Reverse
+  , revappTags, reverseTags
+
 
   , SymName(..)
 
-  , WasmCallWithResults(..)
+  , WasmCall(..)
   , wasmCallResultTypesReversed
+  , wasmCallArgTypesReversed
   )
 where
 
@@ -153,8 +157,12 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
            -> TypeList restys
            -> SymName
            -> WasmIR bool (RevAppend argtys '[]) (RevAppend restys '[])
+        -- if '[] is generalized to a variable, then the type fails
+        -- the ambiguity check (RevAppend is non-injective)
 
-  WasmCall' :: WasmCallWithResults bool pre post -> WasmIR bool pre post
+  WasmCall' :: WasmCall bool pre post -> WasmIR bool pre post
+
+
 
   WasmCallIndirect
       :: WasmTypeTag t -- type of function value on stack
@@ -165,18 +173,30 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
 
   WasmNop :: WasmIR bool stack stack -- translation of empty list of expressions
 
-data WasmCallWithResults :: WasmType -> [WasmType] -> [WasmType] -> Type where
-  WasmCallNoResults :: SymName -> WasmCallWithResults bool stack stack
+data WasmCall :: WasmType -> [WasmType] -> [WasmType] -> Type where
+  WasmCallDirect    :: SymName -> WasmCall bool stack stack
   WasmCallAddResult :: WasmTypeTag t
-                    -> WasmCallWithResults bool pre post
-                    -> WasmCallWithResults bool pre (t : post)
+                    -> WasmCall bool pre post
+                    -> WasmCall bool pre (t : post)
+  WasmCallAddArg    :: WasmTypeTag t
+                    -> WasmCall bool pre post
+                    -> WasmCall bool (t : pre) post
 
-wasmCallResultTypesReversed :: WasmCallWithResults bool pre post
+wasmCallResultTypesReversed :: WasmCall bool pre post
                     -> (forall ts . TypeList ts -> a)
                     -> a
-wasmCallResultTypesReversed (WasmCallNoResults _) k = k TypeListNil
+wasmCallResultTypesReversed (WasmCallDirect _) k = k TypeListNil
+wasmCallResultTypesReversed (WasmCallAddArg _ call) k = wasmCallResultTypesReversed call k
 wasmCallResultTypesReversed (WasmCallAddResult t call) k =
   wasmCallResultTypesReversed call $ \ ts -> k (TypeListCons t ts)
+
+wasmCallArgTypesReversed :: WasmCall bool pre post
+                    -> (forall ts . TypeList ts -> a)
+                    -> a
+wasmCallArgTypesReversed (WasmCallDirect _) k = k TypeListNil
+wasmCallArgTypesReversed (WasmCallAddResult _ call) k = wasmCallArgTypesReversed call k
+wasmCallArgTypesReversed (WasmCallAddArg t call) k =
+  wasmCallArgTypesReversed call $ \ ts -> k (TypeListCons t ts)
 
 
 data WasmLocals :: [WasmType] -> Type where
@@ -193,7 +213,12 @@ type family Reverse xs where
   Reverse xs = RevAppend xs '[]
 
 
+revappTags :: TypeList ts -> TypeList us -> TypeList (RevAppend ts us)
+revappTags TypeListNil ys = ys
+revappTags (TypeListCons t ts) ys = revappTags ts (TypeListCons t ys)
 
+reverseTags :: TypeList ts -> TypeList (Reverse ts)
+reverseTags ts = revappTags ts TypeListNil
 
 
 

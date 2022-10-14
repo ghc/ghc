@@ -15,15 +15,15 @@ module GHC.Wasm.Tx
   , exprs
 
   , node
+  , node'
 
   , setLocals
   , WasmLocal(..)
 
   , WasmAction, WasmTopAction
 
-  , revappTags
-
-  , txCallResults
+  , addCallResults
+  , addCallArguments
 
   )
 
@@ -134,9 +134,22 @@ expr expr k =
     CmmMachOp (MO_S_Ge w) es -> wasmCompare w es WasmS_Ge k
 
 
-    _ -> panic "unimplemented"
+    _ -> panic "`expr` is just a demo; only a few cases are implemented"
 
------- Types of all the translation functions
+
+-- | Translate a list of Cmm expressions
+exprs :: CG bool codegen
+       => [CmmExpr]
+       -> (forall ts . TypeList ts -> WasmExprs bool ts -> codegen bool a)
+       -> codegen bool a
+exprs [] k = k TypeListNil WasmNop
+exprs (e:es) k = -- first expression is oldest on stack
+  exprs es $ \ts codes ->
+    expr e $ \t code ->
+      k (TypeListCons t ts) (code <> codes)
+
+
+------ Types of all the other translation functions
 
 -- | Cmm integer and floating-point literals (with zero operands)
 
@@ -183,7 +196,6 @@ wasmCompare ::
 
 wasmNullaryInt w operator k =
   withIntWidthTag w $ \tag -> k tag (operator tag)
-
 
 wasmNullaryFloat w operator k =
   withFloatWidthTag w $ \tag -> k tag (operator tag)
@@ -242,40 +254,51 @@ withFloatWidthTag CT.W64 k = k TagF64
 withFloatWidthTag w _ = panic $ "width " ++ show w ++ " not supported on wasm target"
 
 
-----------------------------------------------------------------
--- new and experimental
+---------------------------------------------------------------
+--
+-- two different prototypes for calling unsafe C functions
 
-type WasmExprs bool ts = (forall stack . WasmIR bool stack (RevAppend ts stack))
 
--- | Translate a list of Cmm expressions
-exprs :: CG bool codegen
-       => [CmmExpr]
-       -> (forall ts . TypeList ts -> WasmExprs bool ts -> codegen bool a)
-       -> codegen bool a
-exprs [] k = k TypeListNil WasmNop
-exprs (e:es) k = -- first expression is oldest on stack
-  exprs es $ \ts codes ->
-    expr e $ \t code ->
-      k (TypeListCons t ts) (code <> codes)
+-- Prototype 1: Call instruction is limited to empty stack, but
+-- the representation of calls is relatively simple
 
-type WasmAction bool = (forall stack . WasmIR bool stack stack)
-type WasmTopAction bool = (WasmIR bool '[] '[])
+
+-- more special cases of the IR:
+
+type WasmExprs bool ts = forall stack . WasmIR bool stack (RevAppend ts stack)
+
+type WasmAction    bool = forall stack . WasmIR bool stack stack
+type WasmTopAction bool = WasmIR bool '[] '[]
+
 
 -- | Translate an open-open Cmm node (action)
 
 node :: CG bool codegen
      => CmmNode O O
      -> (WasmTopAction bool -> codegen bool a)
-           -- using WasmAction here, I can't get the code to typecheck
+           -- has to be WasmTopAction, not WasmAction, because the
+           -- type of the WasmCall instruction would be ambiguous otherwise
            -- (non-injectivity of RevAppend)
      -> codegen bool a
 node (CmmUnsafeForeignCall (ForeignTarget target _cconv) results arguments) k =
-    -- ran out of time to deal with result registers
     exprs arguments $ \argtys arg_codes ->
       localRegs results $ \restys xs ->
         wasmCall argtys restys target $ \code ->
           k (arg_codes <> code <> setLocals restys xs)
-node _ _ = panic "more cases needed"
+node _ _ = panic "`node` is just a demo; only a few cases are implemented"
+
+
+-- | use the CG monad to find the types and locations of local registers
+
+localRegs :: CG bool codegen
+      => [LocalReg]
+      -> (forall ts . TypeList ts -> [WasmLocal] -> codegen bool a)
+      -> codegen bool a
+localRegs [] k = k TypeListNil []
+localRegs (r:rs) k =
+  localRegs rs $ \ts xs ->
+    cpsLocalReg r $ \t x ->
+      k (TypeListCons t ts) (x:xs)
 
 -- | Generate a Wasm call to a Cmm expression
 wasmCall :: CG bool codegen
@@ -294,41 +317,95 @@ wasmCall argtypes restypes e k =
 setLocals :: TypeList ts -> [WasmLocal] -> WasmIR bool (RevAppend ts stack) stack
 setLocals TypeListNil [] = WasmNop
 setLocals (TypeListCons t ts) (x:xs) = setLocals ts xs <> WasmSetLocal t x
-setLocals _ _ = panic "this can't happen -- rewrite code to make it obvious?"
+setLocals _ _ =
+    panic "this can't happen -- rewrite code to make it obvious to the type checker?"
 
 
--- | use the CG monad to find the types and locations of local registers
-localRegs :: CG bool codegen
-      => [LocalReg]
-      -> (forall ts . TypeList ts -> [WasmLocal] -> codegen bool a)
+
+----------------------------------------------------------------
+--
+-- Prototype 2: Call instruction has a more complicated
+-- representation, but it has a fully general type which is
+-- established by the translation.
+
+node' :: CG bool codegen
+      => CmmNode O O
+      -> (forall stack . WasmIR bool stack stack -> codegen bool a)
       -> codegen bool a
-localRegs [] k = k TypeListNil []
-localRegs (r:rs) k =
-  localRegs rs $ \ts xs ->
-    cpsLocalReg r $ \t x ->
-      k (TypeListCons t ts) (x:xs)
+node' (CmmUnsafeForeignCall (ForeignTarget target _cconv) results arguments) k =
+  case target of
+    CmmLit (CmmLabel callee) -> call (symNameFromCLabel callee) arguments results k
+    _ -> panic "indirect calls aren't implemented yet"
+node' _ _ = panic "`node'` is just a demo; only a few cases are implemented"
 
-revappTags :: TypeList ts -> TypeList us -> TypeList (RevAppend ts us)
-revappTags TypeListNil ys = ys
-revappTags (TypeListCons t ts) ys = revappTags ts (TypeListCons t ys)
+-- Here's the idea: start with a "bare" call, then build up the call's
+-- argument types and result types incrementally.  As each result type
+-- is accumulated, the code that pops the result is accumulated as
+-- well.  Likewise the argument types.  This one-for-one matching is
+-- what enables the code to typecheck.
+
+-- | Given a call target and a list of result registers, call a
+-- given continuation with an augmented call and a sequence of pops.
+-- The `mid` stack is the original stack plus all the results pushed
+-- by the call.  The `pre` stack is the state of the stack before the
+-- first argument is pushed, which is also the state of the stack
+-- after the last results is popped.
+
+addCallResults :: CG bool codegen
+               => WasmCall bool pre pre
+               -> [LocalReg]
+               -> (forall stack mid .
+                   WasmCall bool stack mid -> WasmIR bool mid stack -> codegen bool a)
+               -> codegen bool a
+
+addCallResults target [] k = k target WasmNop
+addCallResults target (reg:regs) k =
+  cpsLocalReg reg $ \t x ->
+    addCallResults target regs $ \call pops ->
+      k (WasmCallAddResult t call) (WasmSetLocal t x <> pops)
+
+-- | Given a call that has its result types but not its argument
+-- types, and a sequence of pops, and a list of actual parameters
+-- (expressions), call a given continuation with a sequence of pushes,
+-- an augmented call, and a sequence of pops.  As before, the `mid`
+-- stack is the original stack plus all the results pushed by the
+-- call.
+
+addCallArguments :: CG bool codegen
+                 => [CmmExpr]
+                 -> WasmCall bool stack mid
+                 -> WasmIR bool mid stack
+                 -> (forall stack stack_with_args stack_with_results .
+                       WasmIR   bool stack              stack_with_args ->
+                       WasmCall bool stack_with_args    stack_with_results ->
+                       WasmIR   bool stack_with_results stack ->
+                       codegen bool a)
+                 -> codegen bool a
+addCallArguments [] call pops k = k WasmNop call pops
+addCallArguments (e : es) call pops k =
+  addCallArguments es call pops $ \ pushes call pops ->
+    expr e $ \t push ->
+      k (pushes <> push) (WasmCallAddArg t call) pops
+
+-- | Given a call's target, its actual parameters, and its results
+-- registers, translate the call into a sequence of Wasm instructions,
+-- ultimately leaving the stack unchanged.  (CPS as usual.)
+
+call :: CG bool codegen
+     => SymName
+     -> [CmmExpr]
+     -> [LocalReg]
+     -> (forall stack . WasmIR bool stack stack -> codegen bool a)
+     -> codegen bool a
+call target es regs k =
+  addCallResults (WasmCallDirect target) regs $ \call pops ->
+    addCallArguments es call pops $ \ pushes call pops ->
+      k $ pushes <> WasmCall' call <> pops
 
 
+----------------------------------------------------------------
 symNameFromCLabel :: CLabel -> SymName
 symNameFromCLabel lbl =
   fromString $
     showSDocOneLine defaultSDocContext {sdocStyle = PprCode AsmStyle} $
       pprCLabel genericPlatform AsmStyle lbl
-
-
-txCallResults :: CG bool codegen
-       => SymName
-       -> [LocalReg]
-       -> (forall stack mid .
-           WasmCallWithResults bool stack mid -> WasmIR bool mid stack -> codegen bool a)
-       -> codegen bool a
-
-txCallResults target [] k = k (WasmCallNoResults target) (WasmNop)
-txCallResults target (reg:regs) k =
-    cpsLocalReg reg $ \t x ->
-        txCallResults target regs $ \call pops ->
-            k (WasmCallAddResult t call) (WasmSetLocal t x <> pops)
