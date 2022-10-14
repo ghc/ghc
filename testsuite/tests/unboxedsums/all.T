@@ -36,5 +36,6 @@ test('T20858b', [extra_files(['T20858.hs'])
               , ghci_script, ['T20858b.script'])
 test('T20859', normal, compile, [''])
 
-test('T22187',[only_ways(llvm_ways), expect_broken(22296)],compile,[''])
-test('T22187_run',[only_ways(llvm_ways), expect_broken(22296)],compile_and_run,[''])
+test('T22187',[only_ways(llvm_ways)],compile,[''])
+test('T22187_run',[only_ways(llvm_ways)],compile_and_run,[''])
+
