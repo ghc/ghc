@@ -32,7 +32,6 @@
 
 module GHC.StgToJS.Linker.Compactor
   ( compact
-  , debugShowStat
   , packStrings
   ) where
 
@@ -72,14 +71,6 @@ import           GHC.StgToJS.Arg
 import Prelude
 import GHC.Utils.Encoding
 
-
-debugShowStat :: (JStat, [ClosureInfo], [StaticInfo]) -> String
-debugShowStat (_s, cis, sis) =
-  "closures:\n" ++
-  unlines (map show cis) ++
-  "\nstatics:" ++
-  unlines (map show sis) ++
-  "\n\n"
 
 {- create a single string initializer for all StaticUnboxedString references
    in the code, and rewrite all references to point to it
