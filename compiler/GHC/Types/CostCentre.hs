@@ -3,7 +3,9 @@ module GHC.Types.CostCentre (
         CostCentre(..), CcName, CCFlavour(..),
                 -- All abstract except to friend: ParseIface.y
 
+        pprCostCentre,
         CostCentreStack,
+        pprCostCentreStack,
         CollectedCCs, emptyCollectedCCs, collectCC,
         currentCCS, dontCareCCS,
         isCurrentCCS,
@@ -236,10 +238,14 @@ mkSingletonCCS cc = SingletonCCS cc
 -- expression.
 
 instance Outputable CostCentreStack where
-  ppr CurrentCCS        = text "CCCS"
-  ppr DontCareCCS       = text "CCS_DONT_CARE"
-  ppr (SingletonCCS cc) = ppr cc <> text "_ccs"
+  ppr = pprCostCentreStack
 
+pprCostCentreStack :: IsLine doc => CostCentreStack -> doc
+pprCostCentreStack CurrentCCS        = text "CCCS"
+pprCostCentreStack DontCareCCS       = text "CCS_DONT_CARE"
+pprCostCentreStack (SingletonCCS cc) = pprCostCentre cc <> text "_ccs"
+{-# SPECIALISE pprCostCentreStack :: CostCentreStack -> SDoc #-}
+{-# SPECIALISE pprCostCentreStack :: CostCentreStack -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -----------------------------------------------------------------------------
 -- Printing Cost Centres
@@ -256,10 +262,15 @@ instance Outputable CostCentreStack where
 -- by costCentreName.
 
 instance Outputable CostCentre where
-  ppr cc = getPprStyle $ \ sty ->
-           if codeStyle sty
-           then ppCostCentreLbl cc
-           else text (costCentreUserName cc)
+  ppr = pprCostCentre
+
+pprCostCentre :: IsLine doc => CostCentre -> doc
+pprCostCentre cc = docWithContext $ \ sty ->
+  if codeStyle (sdocStyle sty)
+  then ppCostCentreLbl cc
+  else text (costCentreUserName cc)
+{-# SPECIALISE pprCostCentre :: CostCentre -> SDoc #-}
+{-# SPECIALISE pprCostCentre :: CostCentre -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- Printing in Core
 pprCostCentreCore :: CostCentre -> SDoc
@@ -284,26 +295,32 @@ pprIdxCore 0 = empty
 pprIdxCore idx = whenPprDebug $ ppr idx
 
 -- Printing as a C label
-ppCostCentreLbl :: CostCentre -> SDoc
-ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
+ppCostCentreLbl :: IsLine doc => CostCentre -> doc
+ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = pprModule m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_flavour = f, cc_name = n, cc_mod = m})
-  = ppr m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
+  = pprModule m <> char '_' <> ztext (zEncodeFS n) <> char '_' <>
         ppFlavourLblComponent f <> text "_cc"
+{-# SPECIALISE ppCostCentreLbl :: CostCentre -> SDoc #-}
+{-# SPECIALISE ppCostCentreLbl :: CostCentre -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- ^ Print the flavour component of a C label
-ppFlavourLblComponent :: CCFlavour -> SDoc
+ppFlavourLblComponent :: IsLine doc => CCFlavour -> doc
 ppFlavourLblComponent CafCC = text "CAF"
 ppFlavourLblComponent (ExprCC i) = text "EXPR" <> ppIdxLblComponent i
 ppFlavourLblComponent (DeclCC i) = text "DECL" <> ppIdxLblComponent i
 ppFlavourLblComponent (HpcCC i)  = text "HPC"  <> ppIdxLblComponent i
 ppFlavourLblComponent (LateCC i) = text "LATECC" <> ppIdxLblComponent i
+{-# SPECIALISE ppFlavourLblComponent :: CCFlavour -> SDoc #-}
+{-# SPECIALISE ppFlavourLblComponent :: CCFlavour -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- ^ Print the flavour index component of a C label
-ppIdxLblComponent :: CostCentreIndex -> SDoc
+ppIdxLblComponent :: IsLine doc => CostCentreIndex -> doc
 ppIdxLblComponent n =
   case unCostCentreIndex n of
     0 -> empty
-    n -> ppr n
+    n -> int n
+{-# SPECIALISE ppIdxLblComponent :: CostCentreIndex -> SDoc #-}
+{-# SPECIALISE ppIdxLblComponent :: CostCentreIndex -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- This is the name to go in the user-displayed string,
 -- recorded in the cost centre declaration

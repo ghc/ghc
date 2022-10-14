@@ -2,6 +2,7 @@ module TestUtils
   ( readTestHie
   , render
   , text
+  , SDoc
   , DynFlags
   , module GHC.Iface.Ext.Types
   , module GHC.Iface.Ext.Utils
@@ -13,7 +14,8 @@ import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
-import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, text)
+import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, SDoc )
+import qualified GHC.Utils.Outputable as O
 import GHC.Iface.Ext.Binary
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -39,3 +41,6 @@ readTestHie fp = do
 
 render :: Outputable a => DynFlags -> a -> String
 render df = renderWithContext (initSDocContext df defaultUserStyle) . ppr
+
+text :: String -> SDoc
+text = O.text -- SDoc-only version

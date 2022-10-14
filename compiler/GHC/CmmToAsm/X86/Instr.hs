@@ -67,6 +67,7 @@ import GHC.Types.Basic (Alignment)
 import GHC.Cmm.DebugBlock (UnwindTable)
 
 import Data.Maybe       (fromMaybe)
+import GHC.Data.FastString (FastString)
 
 -- Format of an x86/x86_64 memory address, in bytes.
 --
@@ -170,7 +171,7 @@ bit precision.
 
 data Instr
         -- comment pseudo-op
-        = COMMENT SDoc
+        = COMMENT FastString
 
         -- location pseudo-op (file, line, col, name)
         | LOCATION Int Int Int String

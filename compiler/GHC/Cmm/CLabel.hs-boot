@@ -5,5 +5,5 @@ import GHC.Platform
 
 data CLabel
 
-pprCLabel :: Platform -> LabelStyle -> CLabel -> SDoc
+pprCLabel :: IsLine doc => Platform -> LabelStyle -> CLabel -> doc
 

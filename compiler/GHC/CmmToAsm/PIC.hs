@@ -532,11 +532,11 @@ gotLabel
 --
 -- We don't need to declare any offset tables.
 -- However, for PIC on x86, we need a small helper function.
-pprGotDeclaration :: NCGConfig -> SDoc
+pprGotDeclaration :: NCGConfig -> HDoc
 pprGotDeclaration config = case (arch,os) of
    (ArchX86, OSDarwin)
         | ncgPIC config
-        -> vcat [
+        -> lines_ [
                 text ".section __TEXT,__textcoal_nt,coalesced,no_toc",
                 text ".weak_definition ___i686.get_pc_thunk.ax",
                 text ".private_extern ___i686.get_pc_thunk.ax",
@@ -548,26 +548,26 @@ pprGotDeclaration config = case (arch,os) of
 
    -- Emit XCOFF TOC section
    (_, OSAIX)
-        -> vcat $ [ text ".toc"
-                  , text ".tc ghc_toc_table[TC],.LCTOC1"
-                  , text ".csect ghc_toc_table[RW]"
-                    -- See Note [.LCTOC1 in PPC PIC code]
-                  , text ".set .LCTOC1,$+0x8000"
-                  ]
+        -> lines_ $ [ text ".toc"
+                    , text ".tc ghc_toc_table[TC],.LCTOC1"
+                    , text ".csect ghc_toc_table[RW]"
+                      -- See Note [.LCTOC1 in PPC PIC code]
+                    , text ".set .LCTOC1,$+0x8000"
+                    ]
 
 
    -- PPC 64 ELF v1 needs a Table Of Contents (TOC)
    (ArchPPC_64 ELF_V1, _)
-        -> text ".section \".toc\",\"aw\""
+        -> line $ text ".section \".toc\",\"aw\""
 
    -- In ELF v2 we also need to tell the assembler that we want ABI
    -- version 2. This would normally be done at the top of the file
    -- right after a file directive, but I could not figure out how
    -- to do that.
    (ArchPPC_64 ELF_V2, _)
-        -> vcat [ text ".abiversion 2",
-                  text ".section \".toc\",\"aw\""
-                ]
+        -> lines_ [ text ".abiversion 2",
+                    text ".section \".toc\",\"aw\""
+                  ]
 
    (arch, os)
         | osElfTarget os
@@ -577,7 +577,7 @@ pprGotDeclaration config = case (arch,os) of
 
         | osElfTarget os
         , arch /= ArchPPC_64 ELF_V1 && arch /= ArchPPC_64 ELF_V2
-        -> vcat [
+        -> lines_ [
                 -- See Note [.LCTOC1 in PPC PIC code]
                 text ".section \".got2\",\"aw\"",
                 text ".LCTOC1 = .+32768" ]
@@ -595,15 +595,16 @@ pprGotDeclaration config = case (arch,os) of
 -- and one for non-PIC.
 --
 
-pprImportedSymbol :: NCGConfig -> CLabel -> SDoc
+pprImportedSymbol :: NCGConfig -> CLabel -> HDoc
 pprImportedSymbol config importedLbl = case (arch,os) of
+
    (ArchX86, OSDarwin)
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> if not pic
              then
-              vcat [
+              lines_ [
                   text ".symbol_stub",
-                  text "L" <> ppr_lbl lbl <> text "$stub:",
+                  (text "L" <> ppr_lbl lbl <> text "$stub:"),
                       text "\t.indirect_symbol" <+> ppr_lbl lbl,
                       text "\tjmp *L" <> ppr_lbl lbl
                           <> text "$lazy_ptr",
@@ -614,7 +615,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                       text "\tjmp dyld_stub_binding_helper"
               ]
              else
-              vcat [
+              lines_ [
                   text ".section __TEXT,__picsymbolstub2,"
                       <> text "symbol_stubs,pure_instructions,25",
                   text "L" <> ppr_lbl lbl <> text "$stub:",
@@ -631,7 +632,8 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                       text "\tpushl %eax",
                       text "\tjmp dyld_stub_binding_helper"
               ]
-           $+$ vcat [        text ".section __DATA, __la_sym_ptr"
+           $$ lines_ [
+                text ".section __DATA, __la_sym_ptr"
                     <> (if pic then int 2 else int 3)
                     <> text ",lazy_symbol_pointers",
                 text "L" <> ppr_lbl lbl <> text "$lazy_ptr:",
@@ -640,7 +642,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                     <> text "$stub_binder"]
 
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
-        -> vcat [
+        -> lines_ [
                 text ".non_lazy_symbol_pointer",
                 char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
                 text "\t.indirect_symbol" <+> ppr_lbl lbl,
@@ -667,7 +669,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
 
    (_, OSAIX) -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
-              -> vcat [
+              -> lines_ [
                    text "LC.." <> ppr_lbl lbl <> char ':',
                    text "\t.long" <+> ppr_lbl lbl ]
             _ -> empty
@@ -700,12 +702,11 @@ pprImportedSymbol config importedLbl = case (arch,os) of
    -- When needImportedSymbols is defined,
    -- the NCG will keep track of all DynamicLinkerLabels it uses
    -- and output each of them using pprImportedSymbol.
-
    (ArchPPC_64 _, _)
         | osElfTarget os
         -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
-              -> vcat [
+              -> lines_ [
                    text ".LC_" <> ppr_lbl lbl <> char ':',
                    text "\t.quad" <+> ppr_lbl lbl ]
             _ -> empty
@@ -718,7 +719,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
                          W64 -> text "\t.quad"
                          _ -> panic "Unknown wordRep in pprImportedSymbol"
 
-                 in vcat [
+                 in lines_ [
                       text ".section \".got2\", \"aw\"",
                       text ".LC_" <> ppr_lbl lbl <> char ':',
                       symbolSize <+> ppr_lbl lbl ]
@@ -729,6 +730,7 @@ pprImportedSymbol config importedLbl = case (arch,os) of
    _ -> panic "PIC.pprImportedSymbol: no match"
  where
    platform = ncgPlatform config
+   ppr_lbl :: CLabel -> HLine
    ppr_lbl  = pprAsmLabel   platform
    arch     = platformArch  platform
    os       = platformOS    platform

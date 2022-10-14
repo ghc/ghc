@@ -15,6 +15,7 @@ import GHC.Utils.Outputable (SDoc)
 import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
+import GHC.Data.FastString
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
@@ -160,4 +161,4 @@ class Instruction instr where
         pprInstr :: Platform -> instr -> SDoc
 
         -- Create a comment instruction
-        mkComment :: SDoc -> [instr]
+        mkComment :: FastString -> [instr]

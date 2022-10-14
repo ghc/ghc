@@ -144,17 +144,29 @@ dW_OP_call_frame_cfa = 0x9c
 
 -- * Dwarf section declarations
 dwarfInfoSection, dwarfAbbrevSection, dwarfLineSection,
-  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: Platform -> SDoc
+  dwarfFrameSection, dwarfGhcSection, dwarfARangesSection :: IsDoc doc => Platform -> doc
 dwarfInfoSection    platform = dwarfSection platform "info"
 dwarfAbbrevSection  platform = dwarfSection platform "abbrev"
 dwarfLineSection    platform = dwarfSection platform "line"
 dwarfFrameSection   platform = dwarfSection platform "frame"
 dwarfGhcSection     platform = dwarfSection platform "ghc"
 dwarfARangesSection platform = dwarfSection platform "aranges"
+{-# SPECIALIZE dwarfInfoSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfInfoSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfAbbrevSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfAbbrevSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfLineSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfLineSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfFrameSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfFrameSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfGhcSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfGhcSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfARangesSection :: Platform -> SDoc #-}
+{-# SPECIALIZE dwarfARangesSection :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-dwarfSection :: Platform -> String -> SDoc
+dwarfSection :: IsDoc doc => Platform -> String -> doc
 dwarfSection platform name =
-  case platformOS platform of
+  line $ case platformOS platform of
     os | osElfTarget os
        -> text "\t.section .debug_" <> text name <> text ",\"\","
           <> sectionType platform "progbits"
@@ -162,13 +174,24 @@ dwarfSection platform name =
        -> text "\t.section __DWARF,__debug_" <> text name <> text ",regular,debug"
        | otherwise
        -> text "\t.section .debug_" <> text name <> text ",\"dr\""
+{-# SPECIALIZE dwarfSection :: Platform -> String -> SDoc #-}
+{-# SPECIALIZE dwarfSection :: Platform -> String -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+
 
 -- * Dwarf section labels
-dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: SDoc
+dwarfInfoLabel, dwarfAbbrevLabel, dwarfLineLabel, dwarfFrameLabel :: IsLine doc => doc
 dwarfInfoLabel   = text ".Lsection_info"
 dwarfAbbrevLabel = text ".Lsection_abbrev"
 dwarfLineLabel   = text ".Lsection_line"
 dwarfFrameLabel  = text ".Lsection_frame"
+{-# SPECIALIZE dwarfInfoLabel :: SDoc #-}
+{-# SPECIALIZE dwarfInfoLabel :: HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfAbbrevLabel :: SDoc #-}
+{-# SPECIALIZE dwarfAbbrevLabel :: HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfLineLabel :: SDoc #-}
+{-# SPECIALIZE dwarfLineLabel :: HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE dwarfFrameLabel :: SDoc #-}
+{-# SPECIALIZE dwarfFrameLabel :: HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Mapping of registers to DWARF register numbers
 dwarfRegNo :: Platform -> Reg -> Word8

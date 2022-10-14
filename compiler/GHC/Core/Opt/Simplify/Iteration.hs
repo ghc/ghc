@@ -3276,6 +3276,7 @@ addEvals _scrut con vs = go vs the_strs
         where
           ppr_with_length list
             = ppr list <+> parens (text "length =" <+> ppr (length list))
+          strdisp :: StrictnessMark -> SDoc
           strdisp MarkedStrict = text "MarkedStrict"
           strdisp NotMarkedStrict = text "NotMarkedStrict"
 

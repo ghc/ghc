@@ -12,6 +12,7 @@ module GHC.Cmm.Reg
     , localRegType
       -- * Global registers
     , GlobalReg(..), isArgReg, globalRegType
+    , pprGlobalReg
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
     , node, baseReg
@@ -296,7 +297,7 @@ instance Outputable GlobalReg where
 instance OutputableP env GlobalReg where
     pdoc _ = ppr
 
-pprGlobalReg :: GlobalReg -> SDoc
+pprGlobalReg :: IsLine doc => GlobalReg -> doc
 pprGlobalReg gr
     = case gr of
         VanillaReg n _ -> char 'R' <> int n
@@ -324,6 +325,8 @@ pprGlobalReg gr
         GCFun          -> text "stg_gc_fun"
         BaseReg        -> text "BaseReg"
         PicBaseReg     -> text "PicBaseReg"
+{-# SPECIALIZE pprGlobalReg :: GlobalReg -> SDoc #-}
+{-# SPECIALIZE pprGlobalReg :: GlobalReg -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- convenient aliases

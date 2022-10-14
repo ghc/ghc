@@ -67,7 +67,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique         ( Unique )
 import GHC.Unit.Module
 
-import GHC.Utils.Outputable (SDoc, ppr)
+import GHC.Utils.Outputable (SDoc, HDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
 import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
@@ -84,7 +84,9 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
     -- | 'Module' is only for printing internal labels. See Note [Internal proc
     -- labels] in CLabel.
-    pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
+    pprNatCmmDeclS            :: NatCmmDecl statics instr -> SDoc,
+    pprNatCmmDeclH            :: NatCmmDecl statics instr -> HDoc,
+        -- see Note [pprNatCmmDeclS and pprNatCmmDeclH]
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr
@@ -102,6 +104,38 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
     }
+
+{- Note [pprNatCmmDeclS and pprNatCmmDeclH]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each NcgImpl provides two implementations of its CmmDecl printer, pprNatCmmDeclS
+and pprNatCmmDeclH, which are specialized to SDoc and HDoc, respectively
+(see Note [SDoc versus HDoc] in GHC.Utils.Outputable). These are both internally
+implemented as a single, polymorphic function, but they need to be stored using
+monomorphic types to ensure the specialized versions are used, which is
+essential for performance (see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable).
+
+One might wonder why we bother with pprNatCmmDeclS and SDoc at all, since we
+have a perfectly serviceable HDoc-based implementation that is more efficient.
+However, it turns out we benefit from keeping both, for two (related) reasons:
+
+  1. Although we absolutely want to take care to use pprNatCmmDeclH for actual
+     code generation (the improved performance there is why we have HDoc at
+     all!), we also sometimes print assembly for debug dumps, when requested via
+     -ddump-asm. In this case, it’s more convenient to produce an SDoc, which
+     can be concatenated with other SDocs for consistency with the general-
+     purpose dump file infrastructure.
+
+  2. Some debug information is sometimes useful to include in -ddump-asm that is
+     neither necessary nor useful in normal code generation, and it turns out to
+     be tricky to format neatly using the one-line-at-a-time model of HLine/HDoc.
+
+Therefore, we provide both pprNatCmmDeclS and pprNatCmmDeclH, and we sometimes
+include additional information in the SDoc variant using dualDoc
+(see Note [dualLine and dualDoc] in GHC.Utils.Outputable). However, it is
+absolutely *critical* that pprNatCmmDeclS is not actually used unless -ddump-asm
+is provided, as that would rather defeat the whole point. (Fortunately, the
+difference in allocations between the two implementations is so vast that such a
+mistake would readily show up in performance tests). -}
 
 data NatM_State
         = NatM_State {

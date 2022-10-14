@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TypeApplications           #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -115,7 +116,7 @@ instance Outputable TupleInfo where
   ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
                       text "stack" <+> ppr tupleNativeStackSize <+>
                       text "regs"  <+>
-                      ppr (map (text.show) $ regSetToList tupleRegs) <>
+                      ppr (map (text @SDoc . show) $ regSetToList tupleRegs) <>
                       char '>'
 
 voidTupleInfo :: TupleInfo

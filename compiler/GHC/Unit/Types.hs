@@ -50,6 +50,7 @@ module GHC.Unit.Types
    , stableUnitCmp
    , unitIsDefinite
    , isHoleUnit
+   , pprUnit
 
      -- * Unit Ids
    , unitIdString
@@ -162,19 +163,24 @@ instance Outputable InstantiatedModule where
   ppr = pprInstantiatedModule
 
 instance Outputable InstantiatedUnit where
-    ppr uid =
+  ppr = pprInstantiatedUnit
+
+pprInstantiatedUnit :: IsLine doc => InstantiatedUnit -> doc
+pprInstantiatedUnit uid =
       -- getPprStyle $ \sty ->
-      ppr cid <>
+      pprUnitId cid <>
         (if not (null insts) -- pprIf
           then
             brackets (hcat
                 (punctuate comma $
-                    [ ppr modname <> text "=" <> pprModule m
+                    [ pprModuleName modname <> text "=" <> pprModule m
                     | (modname, m) <- insts]))
           else empty)
      where
       cid   = instUnitInstanceOf uid
       insts = instUnitInsts uid
+{-# SPECIALIZE pprInstantiatedUnit :: InstantiatedUnit -> SDoc #-}
+{-# SPECIALIZE pprInstantiatedUnit :: InstantiatedUnit -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Class for types that are used as unit identifiers (UnitKey, UnitId, Unit)
 --
@@ -195,8 +201,8 @@ instance IsUnitId u => IsUnitId (GenUnit u) where
    unitFS (RealUnit (Definite x)) = unitFS x
    unitFS HoleUnit                = holeFS
 
-pprModule :: Module -> SDoc
-pprModule mod@(Module p n)  = getPprStyle doc
+pprModule :: IsLine doc => Module -> doc
+pprModule mod@(Module p n) = docWithContext (doc . sdocStyle)
  where
   doc sty
     | codeStyle sty =
@@ -207,10 +213,11 @@ pprModule mod@(Module p n)  = getPprStyle doc
     | qualModule sty mod =
         case p of
           HoleUnit -> angleBrackets (pprModuleName n)
-          _        -> ppr p <> char ':' <> pprModuleName n
+          _        -> pprUnit p <> char ':' <> pprModuleName n
     | otherwise =
         pprModuleName n
-
+{-# SPECIALIZE pprModule :: Module -> SDoc #-}
+{-# SPECIALIZE pprModule :: Module -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 pprInstantiatedModule :: InstantiatedModule -> SDoc
 pprInstantiatedModule (Module uid m) =
@@ -344,10 +351,12 @@ stableUnitCmp p1 p2 = unitFS p1 `lexicalCompareFS` unitFS p2
 instance Outputable Unit where
    ppr pk = pprUnit pk
 
-pprUnit :: Unit -> SDoc
-pprUnit (RealUnit uid) = ppr uid
-pprUnit (VirtUnit uid) = ppr uid
+pprUnit :: IsLine doc => Unit -> doc
+pprUnit (RealUnit (Definite d)) = pprUnitId d
+pprUnit (VirtUnit uid) = pprInstantiatedUnit uid
 pprUnit HoleUnit       = ftext holeFS
+{-# SPECIALIZE pprUnit :: Unit -> SDoc #-}
+{-# SPECIALIZE pprUnit :: Unit -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 instance Show Unit where
     show = unitString
@@ -523,8 +532,14 @@ instance Uniquable UnitId where
     getUnique = getUnique . unitIdFS
 
 instance Outputable UnitId where
-    ppr (UnitId fs) = sdocOption sdocUnitIdForUser ($ fs) -- see Note [Pretty-printing UnitId]
-                                                          -- in "GHC.Unit"
+    ppr = pprUnitId
+
+pprUnitId :: IsLine doc => UnitId -> doc
+pprUnitId (UnitId fs) = dualLine (sdocOption sdocUnitIdForUser ($ fs)) (ftext fs)
+                        -- see Note [Pretty-printing UnitId] in GHC.Unit
+                        -- also see Note [dualLine and dualDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE pprUnitId :: UnitId -> SDoc #-}
+{-# SPECIALIZE pprUnitId :: UnitId -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | A 'DefUnitId' is an 'UnitId' with the invariant that
 -- it only refers to a definite library; i.e., one we have generated

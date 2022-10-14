@@ -326,7 +326,7 @@ stmtToInstrs bid stmt = do
        -> genForeignCall target result_regs args bid
 
     _ -> (,Nothing) <$> case stmt of
-      CmmComment s   -> return (unitOL (COMMENT $ ftext s))
+      CmmComment s   -> return (unitOL (COMMENT s))
       CmmTick {}     -> return nilOL
 
       CmmUnwind regs -> do

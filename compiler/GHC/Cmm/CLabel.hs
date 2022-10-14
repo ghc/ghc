@@ -307,12 +307,14 @@ data ModuleLabelKind
     | MLK_IPEBuffer
     deriving (Eq, Ord)
 
-instance Outputable ModuleLabelKind where
-    ppr MLK_InitializerArray = text "init_arr"
-    ppr (MLK_Initializer s)  = text ("init__" ++ s)
-    ppr MLK_FinalizerArray   = text "fini_arr"
-    ppr (MLK_Finalizer s)    = text ("fini__" ++ s)
-    ppr MLK_IPEBuffer        = text "ipe_buf"
+pprModuleLabelKind :: IsLine doc => ModuleLabelKind -> doc
+pprModuleLabelKind MLK_InitializerArray = text "init_arr"
+pprModuleLabelKind (MLK_Initializer s)  = text ("init__" ++ s)
+pprModuleLabelKind MLK_FinalizerArray   = text "fini_arr"
+pprModuleLabelKind (MLK_Finalizer s)    = text ("fini__" ++ s)
+pprModuleLabelKind MLK_IPEBuffer        = text "ipe_buf"
+{-# SPECIALIZE pprModuleLabelKind :: ModuleLabelKind -> SDoc #-}
+{-# SPECIALIZE pprModuleLabelKind :: ModuleLabelKind -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -1416,7 +1418,7 @@ allocation.  Take care if you want to remove them!
 
 -}
 
-pprAsmLabel :: Platform -> CLabel -> SDoc
+pprAsmLabel :: IsLine doc => Platform -> CLabel -> doc
 pprAsmLabel platform lbl = pprCLabel platform AsmStyle lbl
 
 instance OutputableP Platform CLabel where
@@ -1426,19 +1428,19 @@ instance OutputableP Platform CLabel where
                           PprDump{} -> pprCLabel platform CStyle lbl
                           _         -> pprPanic "Labels in code should be printed with pprCLabel" (pprCLabel platform CStyle lbl)
 
-pprCLabel :: Platform -> LabelStyle -> CLabel -> SDoc
+pprCLabel :: forall doc. IsLine doc => Platform -> LabelStyle -> CLabel -> doc
 pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
   let
     !use_leading_underscores = platformLeadingUnderscore platform
 
     -- some platform (e.g. Darwin) require a leading "_" for exported asm
     -- symbols
-    maybe_underscore :: SDoc -> SDoc
+    maybe_underscore :: doc -> doc
     maybe_underscore doc = case sty of
       AsmStyle | use_leading_underscores -> pp_cSEP <> doc
       _                                  -> doc
 
-    tempLabelPrefixOrUnderscore :: SDoc
+    tempLabelPrefixOrUnderscore :: doc
     tempLabelPrefixOrUnderscore = case sty of
       AsmStyle -> asmTempLabelPrefix platform
       CStyle   -> char '_'
@@ -1490,14 +1492,14 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
 
    IdLabel name _cafs flavor -> case sty of
-      AsmStyle -> maybe_underscore $ internalNamePrefix <> ppr name <> ppIdFlavor flavor
+      AsmStyle -> maybe_underscore $ internalNamePrefix <> pprName name <> ppIdFlavor flavor
                    where
                       isRandomGenerated = not (isExternalName name)
                       internalNamePrefix =
                          if isRandomGenerated
                             then asmTempLabelPrefix platform
                             else empty
-      CStyle   -> ppr name <> ppIdFlavor flavor
+      CStyle   -> pprName name <> ppIdFlavor flavor
 
    SRTLabel u
       -> maybe_underscore $ tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
@@ -1534,7 +1536,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
                                  ]
 
    RtsLabel (RtsPrimOp primop)
-      -> maybe_underscore $ text "stg_" <> ppr primop
+      -> maybe_underscore $ text "stg_" <> pprPrimOp primop
 
    RtsLabel (RtsSlowFastTickyCtr pat)
       -> maybe_underscore $ text "SLOW_CALL_fast_" <> text pat <> text "_ctr"
@@ -1552,12 +1554,12 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
                             -- with a letter so the label will be legal assembly code.
 
    HpcTicksLabel mod
-      -> maybe_underscore $ text "_hpc_tickboxes_"  <> ppr mod <> text "_hpc"
+      -> maybe_underscore $ text "_hpc_tickboxes_"  <> pprModule mod <> text "_hpc"
 
-   CC_Label cc   -> maybe_underscore $ ppr cc
-   CCS_Label ccs -> maybe_underscore $ ppr ccs
-   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform CStyle l <> text "_" <> ppr m <> text "_ipe")
-   ModuleLabel mod kind        -> maybe_underscore $ ppr mod <> text "_" <> ppr kind
+   CC_Label cc   -> maybe_underscore $ pprCostCentre cc
+   CCS_Label ccs -> maybe_underscore $ pprCostCentreStack ccs
+   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform CStyle l <> text "_" <> pprModule m <> text "_ipe")
+   ModuleLabel mod kind        -> maybe_underscore $ pprModule mod <> text "_" <> pprModuleLabelKind kind
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs
    CmmLabel _ _ fs CmmData     -> maybe_underscore $ ftext fs
@@ -1567,6 +1569,8 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
    CmmLabel _ _ fs CmmRetInfo  -> maybe_underscore $ ftext fs <> text "_info"
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
+{-# SPECIALIZE pprCLabel :: Platform -> LabelStyle -> CLabel -> SDoc #-}
+{-# SPECIALIZE pprCLabel :: Platform -> LabelStyle -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- Note [Internal proc labels]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1587,21 +1591,24 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 -- | Generate a label for a procedure internal to a module (if
 -- 'Opt_ExposeAllSymbols' is enabled).
 -- See Note [Internal proc labels].
-ppInternalProcLabel :: Module     -- ^ the current module
+ppInternalProcLabel :: IsLine doc
+                    => Module     -- ^ the current module
                     -> CLabel
-                    -> Maybe SDoc -- ^ the internal proc label
+                    -> Maybe doc -- ^ the internal proc label
 ppInternalProcLabel this_mod (IdLabel nm _ flavour)
   | isInternalName nm
   = Just
-     $ text "_" <> ppr this_mod
+     $ text "_" <> pprModule this_mod
     <> char '_'
     <> ztext (zEncodeFS (occNameFS (occName nm)))
     <> char '_'
     <> pprUniqueAlways (getUnique nm)
     <> ppIdFlavor flavour
 ppInternalProcLabel _ _ = Nothing
+{-# SPECIALIZE ppInternalProcLabel :: Module -> CLabel -> Maybe SDoc #-}
+{-# SPECIALIZE ppInternalProcLabel :: Module -> CLabel -> Maybe HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-ppIdFlavor :: IdLabelInfo -> SDoc
+ppIdFlavor :: IsLine doc => IdLabelInfo -> doc
 ppIdFlavor x = pp_cSEP <> case x of
    Closure          -> text "closure"
    InfoTable        -> text "info"
@@ -1612,22 +1619,22 @@ ppIdFlavor x = pp_cSEP <> case x of
    IdTickyInfo TickyRednCounts
       -> text "ct"
    IdTickyInfo (TickyInferedTag unique)
-      -> text "ct_inf_tag" <> char '_' <> ppr unique
+      -> text "ct_inf_tag" <> char '_' <> pprUniqueAlways unique
    ConEntry loc      ->
       case loc of
         DefinitionSite -> text "con_entry"
         UsageSite m n ->
-          ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_entry"
+          pprModule m <> pp_cSEP <> int n <> pp_cSEP <> text "con_entry"
    ConInfoTable k   ->
     case k of
       DefinitionSite -> text "con_info"
       UsageSite m n ->
-        ppr m <> pp_cSEP <> ppr n <> pp_cSEP <> text "con_info"
+        pprModule m <> pp_cSEP <> int n <> pp_cSEP <> text "con_info"
    ClosureTable     -> text "closure_tbl"
    Bytes            -> text "bytes"
    BlockInfoTable   -> text "info"
 
-pp_cSEP :: SDoc
+pp_cSEP :: IsLine doc => doc
 pp_cSEP = char '_'
 
 
@@ -1641,13 +1648,13 @@ instance Outputable ForeignLabelSource where
 -- -----------------------------------------------------------------------------
 -- Machine-dependent knowledge about labels.
 
-asmTempLabelPrefix :: Platform -> SDoc  -- for formatting labels
+asmTempLabelPrefix :: IsLine doc => Platform -> doc  -- for formatting labels
 asmTempLabelPrefix !platform = case platformOS platform of
     OSDarwin -> text "L"
     OSAIX    -> text "__L" -- follow IBM XL C's convention
     _        -> text ".L"
 
-pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> SDoc -> SDoc
+pprDynamicLinkerAsmLabel :: IsLine doc => Platform -> DynamicLinkerLabelInfo -> doc -> doc
 pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
     case platformOS platform of
       OSDarwin
