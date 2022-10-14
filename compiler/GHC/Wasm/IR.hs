@@ -21,6 +21,9 @@ module GHC.Wasm.IR
   , WasmFunctionType(..)
 
   , SymName(..)
+
+  , WasmCallWithResults(..)
+  , wasmCallResultTypesReversed
   )
 where
 
@@ -151,6 +154,8 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
            -> SymName
            -> WasmIR bool (RevAppend argtys '[]) (RevAppend restys '[])
 
+  WasmCall' :: WasmCallWithResults bool pre post -> WasmIR bool pre post
+
   WasmCallIndirect
       :: WasmTypeTag t -- type of function value on stack
       -> TypeList argtys
@@ -160,6 +165,23 @@ data WasmIR :: WasmType -> [WasmType] -> [WasmType] -> Type where
 
   WasmNop :: WasmIR bool stack stack -- translation of empty list of expressions
 
+data WasmCallWithResults :: WasmType -> [WasmType] -> [WasmType] -> Type where
+  WasmCallNoResults :: SymName -> WasmCallWithResults bool stack stack
+  WasmCallAddResult :: WasmTypeTag t
+                    -> WasmCallWithResults bool pre post
+                    -> WasmCallWithResults bool pre (t : post)
+
+wasmCallResultTypesReversed :: WasmCallWithResults bool pre post
+                    -> (forall ts . TypeList ts -> a)
+                    -> a
+wasmCallResultTypesReversed (WasmCallNoResults _) k = k TypeListNil
+wasmCallResultTypesReversed (WasmCallAddResult t call) k =
+  wasmCallResultTypesReversed call $ \ ts -> k (TypeListCons t ts)
+
+
+data WasmLocals :: [WasmType] -> Type where
+  WasmNoLocals :: WasmLocals '[]
+  WasmPopLocal :: WasmTypeTag t -> WasmLocal -> WasmLocals ts -> WasmLocals (t : ts)
 
 type RevAppend :: forall a. [a] -> [a] -> [a]
 type family RevAppend xs ys where

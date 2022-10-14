@@ -20,6 +20,11 @@ module GHC.Wasm.Tx
   , WasmLocal(..)
 
   , WasmAction, WasmTopAction
+
+  , revappTags
+
+  , txCallResults
+
   )
 
 where
@@ -31,7 +36,7 @@ import Data.Type.Equality
 
 import qualified GHC.Cmm.Type as CT
 import GHC.Cmm.CLabel
-    import GHC.Cmm.Expr hiding (node)
+import GHC.Cmm.Expr hiding (node)
 import GHC.Cmm.Node
 import GHC.Platform
 import GHC.Utils.Outputable hiding ((<>))
@@ -303,6 +308,9 @@ localRegs (r:rs) k =
     cpsLocalReg r $ \t x ->
       k (TypeListCons t ts) (x:xs)
 
+revappTags :: TypeList ts -> TypeList us -> TypeList (RevAppend ts us)
+revappTags TypeListNil ys = ys
+revappTags (TypeListCons t ts) ys = revappTags ts (TypeListCons t ys)
 
 
 symNameFromCLabel :: CLabel -> SymName
@@ -310,3 +318,17 @@ symNameFromCLabel lbl =
   fromString $
     showSDocOneLine defaultSDocContext {sdocStyle = PprCode AsmStyle} $
       pprCLabel genericPlatform AsmStyle lbl
+
+
+txCallResults :: CG bool codegen
+       => SymName
+       -> [LocalReg]
+       -> (forall stack mid .
+           WasmCallWithResults bool stack mid -> WasmIR bool mid stack -> codegen bool a)
+       -> codegen bool a
+
+txCallResults target [] k = k (WasmCallNoResults target) (WasmNop)
+txCallResults target (reg:regs) k =
+    cpsLocalReg reg $ \t x ->
+        txCallResults target regs $ \call pops ->
+            k (WasmCallAddResult t call) (WasmSetLocal t x <> pops)
