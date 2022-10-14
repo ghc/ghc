@@ -565,11 +565,12 @@ extractDeps ar_state units deps loc =
   where
     mod           = depsModule deps
     newline       = BC.pack "\n"
-    unlines'      = intersperse newline . map oiRaw
+    mk_exports    = mconcat . intersperse newline . filter (not . BS.null) . map oiRaw
+    mk_js_code    = mconcat . map oiStat
     collectCode l = ModuleCode
                       { mc_module   = mod
-                      , mc_js_code  = mconcat (map oiStat l)
-                      , mc_exports  = mconcat (unlines' l)
+                      , mc_js_code  = mk_js_code l
+                      , mc_exports  = mk_exports l
                       , mc_closures = concatMap oiClInfo l
                       , mc_statics  = concatMap oiStatic l
                       , mc_frefs    = concatMap oiFImports l
