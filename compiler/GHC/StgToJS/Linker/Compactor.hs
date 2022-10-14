@@ -34,8 +34,6 @@ module GHC.StgToJS.Linker.Compactor
   ( compact
   , debugShowStat
   , packStrings
-  , staticInfoArgs
-  , staticValArgs
   ) where
 
 
@@ -206,16 +204,6 @@ staticIdentsV _ x                              = x
 staticIdentsA :: (FastString -> FastString) -> StaticArg -> StaticArg
 staticIdentsA f (StaticObjArg t) = StaticObjArg $! f t
 staticIdentsA _ x = x
-
-staticInfoArgs :: Applicative f => (StaticArg -> f StaticArg) -> StaticInfo -> f StaticInfo
-staticInfoArgs f (StaticInfo si sv sa) = StaticInfo si <$> staticValArgs f sv <*> pure sa
-
-staticValArgs :: Applicative f => (StaticArg -> f StaticArg) -> StaticVal -> f StaticVal
-staticValArgs f (StaticFun fn as) = StaticFun fn <$> traverse f as
-staticValArgs f (StaticThunk (Just (t, as))) = StaticThunk . Just . (t,) <$> traverse f as
-staticValArgs f (StaticData c as) = StaticData c <$> traverse f as
-staticValArgs f (StaticList as mt) = StaticList <$> traverse f as <*> pure mt
-staticValArgs _ x = pure x
 
 compact :: JSLinkConfig
         -> StgToJSConfig
