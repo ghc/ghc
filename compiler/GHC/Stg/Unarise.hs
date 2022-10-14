@@ -391,7 +391,6 @@ import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Stg.Utils
 import GHC.Core.Type
@@ -401,6 +400,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Utils.Misc
 import GHC.Types.Var.Env
+import GHC.Types.RepType
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)
@@ -848,7 +848,7 @@ castArgRename ops in_arg rhs =
 
 -- Construct a case binder used when casting sums, of a given type and unique.
 mkCastVar :: Unique -> Type -> Id
-mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq ManyTy ty
+mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq Many ty
 
 mkCast :: StgArg -> PrimOp -> OutId -> Type -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_ty in_rhs =
@@ -952,6 +952,8 @@ ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
 ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
+ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish vec_rep)
+  where vec_rep = primRepToRuntimeRep (VecRep n e)
 
 --------------------------------------------------------------------------------
 

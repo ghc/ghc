@@ -45,3 +45,6 @@ test('ManyUbxSums',
      ['ManyUbxSums',
         [('ManyUbxSums_Addr.hs','')]
         , '-v0 -dstg-lint -dcmm-lint'])
+
+test('T22187',[only_ways(llvm_ways), expect_broken(22296)],compile,[''])
+test('T22187_run',[only_ways(llvm_ways), expect_broken(22296)],compile_and_run,[''])
