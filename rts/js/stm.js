@@ -25,23 +25,14 @@ function h$Transaction(o, parent) {
     this.tvars         = new h$Map();
     // h$TVar -> h$LocalTVar, all local tvars accessed anywhere in the transaction
     this.accessed      = parent===null?new h$Map():parent.accessed;
-    // nonnull while running a check, contains read variables in this part of the transaction
-    this.checkRead     = parent===null?null:parent.checkRead;
     this.parent        = parent;
     this.state         = h$stmTransactionActive;
-    this.invariants    = []; // invariants added in this transaction
     this.m             = 0;  // gc mark
 #ifdef GHCJS_DEBUG_ALLOC
     h$debugAlloc_notifyAlloc(this);
 #endif
 }
 
-var h$stmInvariantN = 0;
-/** @constructor */
-function h$StmInvariant(a) {
-    this.action = a;
-    this._key = ++h$stmInvariantN;
-}
 /** @constructor */
 function h$WrittenTVar(tv,v) {
     this.tvar = tv;
@@ -54,7 +45,6 @@ function h$TVar(v) {
     TRACE_STM("creating TVar, value: " + h$collectProps(v));
     this.val        = v;           // current value
     this.blocked    = new h$Set(); // threads that get woken up if this TVar is updated
-    this.invariants = null;        // invariants that use this TVar (h$Set)
     this.m          = 0;           // gc mark
     this._key       = ++h$TVarN;   // for storing in h$Map/h$Set
 #ifdef GHCJS_DEBUG_ALLOC
@@ -70,12 +60,6 @@ function h$TVarsWaiting(s) {
 #endif
 }
 
-/** @constructor */
-function h$LocalInvariant(o) {
-  this.action = o;
-  this.dependencies = new h$Set();
-}
-
 // local view of a TVar
 /** @constructor */
 function h$LocalTVar(v) {
@@ -86,7 +70,7 @@ function h$LocalTVar(v) {
 }
 
 function h$atomically(o) {
-  h$p3(o, h$atomically_e, h$checkInvariants_e);
+  h$p2(o, h$atomically_e);
   return h$stmStartTransaction(o);
 }
 
@@ -96,20 +80,6 @@ function h$stmStartTransaction(o) {
   h$currentThread.transaction = t;
   h$r1 = o;
   return h$ap_1_0_fast();
-}
-
-function h$stmUpdateInvariantDependencies(inv) {
-    var ii, iter = h$currentThread.transaction.checkRead.iter();
-    if(inv instanceof h$LocalInvariant) {
-        while((ii = iter.next()) !== null) inv.dependencies.add(ii);
-    } else {
-        while((ii = iter.next()) !== null) h$stmAddTVarInvariant(ii, inv);
-    }
-}
-
-function h$stmAddTVarInvariant(tv, inv) {
-    if(tv.invariants === null) tv.invariants = new h$Set();
-    tv.invariants.add(inv);
 }
 
 // commit current transaction,
@@ -131,15 +101,10 @@ function h$stmCommitTransaction() {
 	    h$stmRemoveBlockedThread(thread.blockedOn, thread);
             h$wakeupThread(thread);
 	}
-	// commit our new invariants
-        for(var j=0;j<t.invariants.length;j++) {
-            h$stmCommitInvariant(t.invariants[j]);
-        }
     } else { // commit subtransaction
         TRACE_STM("committing subtransaction");
         var tpvs = t.parent.tvars;
         while((wtv = i.nextVal()) !== null) tpvs.put(wtv.tvar, wtv);
-        t.parent.invariants = t.parent.invariants.concat(t.invariants);
     }
     h$currentThread.transaction = t.parent;
 }
@@ -154,13 +119,6 @@ function h$stmValidateTransaction() {
 
 function h$stmAbortTransaction() {
   h$currentThread.transaction = h$currentThread.transaction.parent;
-}
-
-
-// add an invariant
-function h$stmCheck(o) {
-  h$currentThread.transaction.invariants.push(new h$LocalInvariant(o));
-  return false;
 }
 
 function h$stmRetry() {
@@ -250,9 +208,6 @@ function h$sameTVar(tv1, tv2) {
 // get the local value of the TVar in the transaction t
 // tvar is added to the read set
 function h$readLocalTVar(t, tv) {
-  if(t.checkRead !== null) {
-    t.checkRead.add(tv);
-  }
   var t0 = t;
   while(t0 !== null) {
     var v = t0.tvars.get(tv);
@@ -282,27 +237,6 @@ function h$setLocalTVar(t, tv, v) {
     }
 }
 
-function h$stmCheckInvariants() {
-    var t = h$currentThread.transaction;
-    function addCheck(inv) {
-        h$p5(inv, h$stmCheckInvariantResult_e, t, inv, h$stmCheckInvariantStart_e);
-    }
-    h$p2(h$r1, h$return);
-    var wtv, i = t.tvars.iter();
-    while((wtv = i.nextVal()) !== null) {
-        TRACE_STM("h$stmCheckInvariants: checking: " + h$collectProps(wtv));
-        var ii = wtv.tvar.invariants;
-        if(ii) {
-            var iv, iii = ii.iter();
-            while((iv = iii.next()) !== null) addCheck(iv);
-        }
-    }
-    for(var j=0;j<t.invariants.length;j++) {
-        addCheck(t.invariants[j]);
-    }
-    return h$stack[h$sp];
-}
-
 function h$stmCommitTVar(tv, v, threads) {
     TRACE_STM("committing tvar: " + tv._key + " " + (v === tv.val));
     if(v !== tv.val) {
@@ -318,13 +252,5 @@ function h$stmRemoveBlockedThread(s, thread) {
     var tv, i = s.tvars.iter();
     while((tv = i.next()) !== null) {
         tv.blocked.remove(thread);
-    }
-}
-
-function h$stmCommitInvariant(localInv) {
-    var inv = new h$StmInvariant(localInv.action);
-    var dep, i = localInv.dependencies.iter();
-    while((dep = i.next()) !== null) {
-        h$stmAddTVarInvariant(dep, inv);
     }
 }

@@ -629,46 +629,8 @@ rts' s =
                     (appS "h$stmCommitTransaction" []
                      <> adjSpN' 2
                      <> returnS (stack .! sp))
-                    (push' s [var "h$checkInvariants_e"]
-                     <> returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])))
-          , closure (ClosureInfo "h$checkInvariants_e" (CIRegs 0 [PtrV]) "check transaction invariants" (CILayoutFixed 0 []) CIStackFrame mempty)
-               (adjSpN' 1
-                <> returnS (app "h$stmCheckInvariants" []))
-          , closure (ClosureInfo "h$stmCheckInvariantStart_e" (CIRegs 0 []) "start checking invariant" (CILayoutFixed 2 [ObjV, RtsObjV]) CIStackFrame mempty)
-                        (jVar $ \t inv m t1 ->
-                            mconcat [ t   |= stack .! (sp - 2)
-                                    , inv |= stack .! (sp - 1)
-                                    , m   |= var "h$currentThread" .^ "mask"
-                                    , adjSpN' 3
-                                    , t1  |= UOpExpr NewOp (app "h$Transaction" [inv .^ "action", t])
-                                    , t1 .^ "checkRead" |= UOpExpr NewOp (app "h$Set" [])
-                                    , var "h$currentTread" .^ "transaction" |= t1
-                                    , push' s [t1, m, var "h$stmInvariantViolatedHandler", var "h$catchStm_e"]
-                                    , r1  |= inv .^ "action"
-                                    , returnS (app "h$ap_1_0_fast" [])
-                                    ])
-          , closure (ClosureInfo "h$stmCheckInvariantResult_e" (CIRegs 0 [PtrV]) "finish checking invariant" (CILayoutFixed 1 [ObjV]) CIStackFrame mempty)
-                        (jVar $ \inv ->
-                            mconcat [ inv |= stack .! (sp -1)
-                                    , adjSpN' 2
-                                    , appS "h$stmUpdateInvariantDependencies" [inv]
-                                    , appS "h$stmAbortTransaction" []
-                                    , returnS (stack .! sp)
-                                    ])
+                    (returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])))
 
-          -- update invariant TVar dependencies and rethrow exception
-          -- handler must be pushed above h$stmCheckInvariantResult_e frame
-          , closure (ClosureInfo "h$stmInvariantViolatedHandler_e" (CIRegs 0 [PtrV]) "finish checking invariant" (CILayoutFixed 0 []) (CIFun 2 1) mempty)
-                        (jVar $ \inv ->
-                            mconcat [ jwhenS (stack .! sp .===. var "h$stmCheckInvariantResult_e")
-                                                (appS "throw" [jString "h$stmInvariantViolatedHandler_e: unexpected value on stack"])
-                                    , inv |= stack .! (sp - 2)
-                                    , adjSpN' 2
-                                    , appS "h$stmUpdateInvariantDependencies" []
-                                    , appS "h$stmAbortTransaction" []
-                                    , returnS (app "h$throw" [r2, false_])
-                                    ])
-          , TxtI "h$stmInvariantViolatedHandler" ||= app "h$c" (var "h$stmInvariantViolatedHandler_e" : [jSystemCCS | csProf s])
           , closure (ClosureInfo "h$stmCatchRetry_e" (CIRegs 0 [PtrV]) "catch retry" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                         (adjSpN' 2
                          <> appS "h$stmCommitTransaction" []
@@ -683,7 +645,6 @@ rts' s =
                                                  (appS "throw" [jString "h$stmResumeRetry_e: unexpected value on stack"])
                                     , blocked |= stack .! (sp - 1)
                                     , adjSpN' 2
-                                    , push' s [var "h$checkInvariants_e"]
                                     , appS "h$stmRemoveBlockedThread" [blocked, var "h$currentThread"]
                                     , returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])
                                     ])
