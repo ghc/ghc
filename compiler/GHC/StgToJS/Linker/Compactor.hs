@@ -32,7 +32,6 @@
 
 module GHC.StgToJS.Linker.Compactor
   ( compact
-  , collectGlobals
   , debugShowStat
   , packStrings
   , staticInfoArgs
@@ -75,11 +74,6 @@ import           GHC.StgToJS.Arg
 import Prelude
 import GHC.Utils.Encoding
 
-
--- | collect global objects (data / CAFs). rename them and add them to the table
-collectGlobals :: [StaticInfo]
-               -> State CompactorState ()
-collectGlobals = mapM_ (\(StaticInfo i _ _) -> renameObj i)
 
 debugShowStat :: (JStat, [ClosureInfo], [StaticInfo]) -> String
 debugShowStat (_s, cis, sis) =
@@ -173,41 +167,9 @@ staticDeclStat (StaticInfo global_name static_value _) = decl
 
     to_byte_list = JList . map (Int . fromIntegral) . BS.unpack
 
--- | rename a heap object, which means adding it to the
---  static init table in addition to the renamer
-renameObj :: FastString
-          -> State CompactorState FastString
-renameObj xs = do
-  (TxtI xs') <- renameVar (TxtI xs)               -- added to the renamer
-  modify (addStaticEntry xs') -- and now the table
-  return xs'
-
 lookupRenamed :: CompactorState -> Ident -> Ident
 lookupRenamed cs i@(TxtI t) =
   fromMaybe i (lookupUniqMap (csNameMap cs) t)
-
-renameVar :: Ident                      -- ^ text identifier to rename
-          -> State CompactorState Ident -- ^ the updated renamer state and the new ident
-renameVar i@(TxtI t)
-  | "h$$" `List.isPrefixOf` unpackFS t = do
-      m <- gets csNameMap
-      case lookupUniqMap m t of
-        Just r  -> return r
-        Nothing -> do
-          y <- newIdent
-          let add_var cs' = cs' {csNameMap = addToUniqMap (csNameMap cs') t y}
-          modify add_var
-          return y
-  | otherwise = return i
-
-newIdent :: State CompactorState Ident
-newIdent = do
-  yys <- gets csIdentSupply
-  case yys of
-    (y:ys) -> do
-      modify (\cs -> cs {csIdentSupply = ys})
-      return y
-    _ -> error "newIdent: empty list"
 
 -- | rename a compactor info entry according to the compactor state (no new renamings are added)
 renameClosureInfo :: CompactorState
