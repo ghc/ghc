@@ -34,8 +34,7 @@ module GHC.Core.Utils (
         altsAreExhaustive, etaExpansionTick,
 
         -- * Equality
-        cheapEqExpr, cheapEqExpr', eqExpr,
-        diffBinds,
+        cheapEqExpr, cheapEqExpr', diffBinds,
 
         -- * Manipulating data constructors and types
         exprToType,
@@ -79,7 +78,6 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
-import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey )
 import GHC.Builtin.PrimOps
@@ -2120,12 +2118,6 @@ cheapEqExpr' ignoreTick e1 e2
     go _ _ = False
 
 
-
-eqExpr :: InScopeSet -> CoreExpr -> CoreExpr -> Bool
--- Compares for equality, modulo alpha
--- TODO: remove eqExpr once GHC 9.4 is released
-eqExpr _ = eqCoreExpr
-{-# DEPRECATED eqExpr "Use 'GHC.Core.Map.Expr.eqCoreExpr', 'eqExpr' will be removed in GHC 9.6" #-}
 
 -- Used by diffBinds, which is itself only used in GHC.Core.Lint.lintAnnots
 eqTickish :: RnEnv2 -> CoreTickish -> CoreTickish -> Bool

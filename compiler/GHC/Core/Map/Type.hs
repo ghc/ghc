@@ -211,10 +211,10 @@ However, the odds that we have two expressions that are identical save for the
 'Type'/'Constraint' distinction are low. (Not impossible to do. But doubtful
 anyone has ever done so in the history of Haskell.)
 
-And it's actually all OK: 'eqExpr' is conservative: if `eqExpr e1 e2` returns
+And it's actually all OK: 'eqCoreExpr' is conservative: if `eqCoreExpr e1 e2` returns
 'True', thne it must be that `e1` behaves identically to `e2` in all contexts.
-But if `eqExpr e1 e2` returns 'False', then we learn nothing. The use of
-'tcView' where we expect 'coreView' means 'eqExpr' returns 'False' bit more
+But if `eqCoreExpr e1 e2` returns 'False', then we learn nothing. The use of
+'tcView' where we expect 'coreView' means 'eqCoreExpr' returns 'False' bit more
 often that it should. This might, say, stop a `RULE` from firing or CSE from
 optimizing an expression. Stopping `RULE` firing is good actually: `RULES` are
 written in Haskell, where `Type /= Constraint`. Stopping CSE is unfortunate,
