@@ -3832,9 +3832,9 @@ section "SIMD Vectors"
   [<Int8,Int8#,16>,<Int16,Int16#,8>,<Int32,Int32#,4>,<Int64,Int64#,2> \
   ,<Int8,Int8#,32>,<Int16,Int16#,16>,<Int32,Int32#,8>,<Int64,Int64#,4> \
   ,<Int8,Int8#,64>,<Int16,Int16#,32>,<Int32,Int32#,16>,<Int64,Int64#,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,Word32#,16>,<Word64,Word64#,8> \
+  ,<Word8,Word8#,16>,<Word16,Word16#,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
+  ,<Word8,Word8#,32>,<Word16,Word16#,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
+  ,<Word8,Word8#,64>,<Word16,Word16#,32>,<Word32,Word32#,16>,<Word64,Word64#,8> \
   ,<Float,Float#,4>,<Double,Double#,2> \
   ,<Float,Float#,8>,<Double,Double#,4> \
   ,<Float,Float#,16>,<Double,Double#,8>]
@@ -3856,9 +3856,9 @@ section "SIMD Vectors"
   [<Int8,Int8#,16>,<Int16,Int16#,8>,<Int32,Int32#,4>,<Int64,Int64#,2> \
   ,<Int8,Int8#,32>,<Int16,Int16#,16>,<Int32,Int32#,8>,<Int64,Int64#,4> \
   ,<Int8,Int8#,64>,<Int16,Int16#,32>,<Int32,Int32#,16>,<Int64,Int64#,8> \
-  ,<Word8,Word#,16>,<Word16,Word#,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
-  ,<Word8,Word#,32>,<Word16,Word#,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
-  ,<Word8,Word#,64>,<Word16,Word#,32>,<Word32,Word32#,16>,<Word64,Word64#,8>]
+  ,<Word8,Word8#,16>,<Word16,Word16#,8>,<Word32,Word32#,4>,<Word64,Word64#,2> \
+  ,<Word8,Word8#,32>,<Word16,Word16#,16>,<Word32,Word32#,8>,<Word64,Word64#,4> \
+  ,<Word8,Word8#,64>,<Word16,Word16#,32>,<Word32,Word32#,16>,<Word64,Word64#,8>]
 
 primtype VECTOR
    with llvm_only = True
