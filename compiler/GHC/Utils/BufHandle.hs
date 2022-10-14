@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 --
@@ -37,6 +38,10 @@ import Foreign
 import Foreign.C.String
 import System.IO
 
+-- for RULES
+import GHC.Exts (unpackCString#, unpackNBytes#, Int(..))
+import GHC.Ptr (Ptr(..))
+
 -- -----------------------------------------------------------------------------
 
 data BufHandle = BufHandle {-#UNPACK#-}!(Ptr Word8)
@@ -61,6 +66,22 @@ bPutChar b@(BufHandle buf r hdl) !c = do
                 bPutChar b c
         else do pokeElemOff buf i (fromIntegral (ord c) :: Word8)
                 writeFastMutInt r (i+1)
+
+-- Equivalent of the text/str, text/unpackNBytes#, text/[] rules
+-- in GHC.Utils.Ppr.
+{-# RULES "hdoc/str"
+    forall a h. bPutStr h (unpackCString# a) = bPutPtrString h (mkPtrString# a)
+  #-}
+{-# RULES "hdoc/unpackNBytes#"
+    forall p n h. bPutStr h (unpackNBytes# p n) = bPutPtrString h (PtrString (Ptr p) (I# n))
+  #-}
+{-# RULES "hdoc/[]#"
+    forall h. bPutStr h [] = return ()
+  #-}
+
+{-# NOINLINE [0] bPutStr #-}  -- Give the RULE a chance to fire
+                              -- It must wait till after phase 1 when
+                              -- the unpackCString first is manifested
 
 bPutStr :: BufHandle -> String -> IO ()
 bPutStr (BufHandle buf r hdl) !str = do

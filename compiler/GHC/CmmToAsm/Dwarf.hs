@@ -26,50 +26,47 @@ import Data.List        ( sortBy )
 import Data.Ord         ( comparing )
 import qualified Data.Map as Map
 import System.FilePath
-import System.Directory ( getCurrentDirectory )
 
 import qualified GHC.Cmm.Dataflow.Label as H
 import qualified GHC.Cmm.Dataflow.Collections as H
 
 -- | Generate DWARF/debug information
-dwarfGen :: NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock]
-            -> IO (SDoc, UniqSupply)
-dwarfGen _      _      us []     = return (empty, us)
-dwarfGen config modLoc us blocks = do
+dwarfGen :: IsDoc doc => String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock]
+            -> (doc, UniqSupply)
+dwarfGen _        _      _      us []     = (empty, us)
+dwarfGen compPath config modLoc us blocks =
   let platform = ncgPlatform config
 
-  -- Convert debug data structures to DWARF info records
-  let procs = debugSplitProcs blocks
+      -- Convert debug data structures to DWARF info records
+      procs = debugSplitProcs blocks
       stripBlocks dbg
         | ncgDwarfStripBlockInfo config = dbg { dblBlocks = [] }
         | otherwise                     = dbg
-  compPath <- getCurrentDirectory
-  let lowLabel = dblCLabel $ head procs
+      lowLabel = dblCLabel $ head procs
       highLabel = mkAsmTempProcEndLabel $ dblCLabel $ last procs
       dwarfUnit = DwarfCompileUnit
         { dwChildren = map (procToDwarf config) (map stripBlocks procs)
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
-        , dwLowLabel = pprAsmLabel platform lowLabel
-        , dwHighLabel = pprAsmLabel platform highLabel
-        , dwLineLabel = dwarfLineLabel
+        , dwLowLabel = lowLabel
+        , dwHighLabel = highLabel
         }
 
-  -- Check whether we have any source code information, so we do not
-  -- end up writing a pointer to an empty .debug_line section
-  -- (dsymutil on Mac Os gets confused by this).
-  let haveSrcIn blk = isJust (dblSourceTick blk) && isJust (dblPosition blk)
+      -- Check whether we have any source code information, so we do not
+      -- end up writing a pointer to an empty .debug_line section
+      -- (dsymutil on Mac Os gets confused by this).
+      haveSrcIn blk = isJust (dblSourceTick blk) && isJust (dblPosition blk)
                       || any haveSrcIn (dblBlocks blk)
       haveSrc = any haveSrcIn procs
 
   -- .debug_abbrev section: Declare the format we're using
-  let abbrevSct = pprAbbrevDecls platform haveSrc
+      abbrevSct = pprAbbrevDecls platform haveSrc
 
   -- .debug_info section: Information records on procedures and blocks
-  let -- unique to identify start and end compilation unit .debug_inf
+      -- unique to identify start and end compilation unit .debug_inf
       (unitU, us') = takeUniqFromSupply us
-      infoSct = vcat [ dwarfInfoLabel <> colon
+      infoSct = vcat [ line (dwarfInfoLabel <> colon)
                      , dwarfInfoSection platform
                      , compileUnitHeader platform unitU
                      , pprDwarfInfo platform haveSrc dwarfUnit
@@ -78,21 +75,23 @@ dwarfGen config modLoc us blocks = do
 
   -- .debug_line section: Generated mainly by the assembler, but we
   -- need to label it
-  let lineSct = dwarfLineSection platform $$
-                dwarfLineLabel <> colon
+      lineSct = dwarfLineSection platform $$
+                line (dwarfLineLabel <> colon)
 
   -- .debug_frame section: Information about the layout of the GHC stack
-  let (framesU, us'') = takeUniqFromSupply us'
+      (framesU, us'') = takeUniqFromSupply us'
       frameSct = dwarfFrameSection platform $$
-                 dwarfFrameLabel <> colon $$
+                 line (dwarfFrameLabel <> colon) $$
                  pprDwarfFrame platform (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
-  let aranges' | ncgSplitSections config = map mkDwarfARange procs
+      aranges' | ncgSplitSections config = map mkDwarfARange procs
                | otherwise               = [DwarfARange lowLabel highLabel]
-  let aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
+      aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
-  return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+  in (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock] -> (SDoc, UniqSupply) #-}
+{-# SPECIALIZE dwarfGen :: String -> NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock] -> (HDoc, UniqSupply) #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Build an address range entry for one proc.
 -- With split sections, each proc needs its own entry, since they may get
@@ -106,24 +105,24 @@ mkDwarfARange proc = DwarfARange lbl end
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
-compileUnitHeader :: Platform -> Unique -> SDoc
+compileUnitHeader :: IsDoc doc => Platform -> Unique -> doc
 compileUnitHeader platform unitU =
   let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
       length = pprAsmLabel platform (mkAsmTempEndLabel cuLabel) <> char '-' <> pprAsmLabel platform cuLabel
                <> text "-4"       -- length of initialLength field
-  in vcat [ pprAsmLabel platform cuLabel <> colon
-          , text "\t.long " <> length  -- compilation unit size
+  in vcat [ line (pprAsmLabel platform cuLabel <> colon)
+          , line (text "\t.long " <> length)  -- compilation unit size
           , pprHalf 3                          -- DWARF version
           , sectionOffset platform dwarfAbbrevLabel dwarfAbbrevLabel
                                                -- abbrevs offset
-          , text "\t.byte " <> ppr (platformWordSizeInBytes platform) -- word size
+          , line (text "\t.byte " <> int (platformWordSizeInBytes platform)) -- word size
           ]
 
 -- | Compilation unit footer, mainly establishing size of debug sections
-compileUnitFooter :: Platform -> Unique -> SDoc
+compileUnitFooter :: IsDoc doc => Platform -> Unique -> doc
 compileUnitFooter platform unitU =
   let cuEndLabel = mkAsmTempEndLabel $ mkAsmTempLabel unitU
-  in pprAsmLabel platform cuEndLabel <> colon
+  in line (pprAsmLabel platform cuEndLabel <> colon)
 
 -- | Splits the blocks by procedures. In the result all nested blocks
 -- will come from the same procedure as the top-level block. See

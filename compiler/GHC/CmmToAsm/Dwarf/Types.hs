@@ -59,9 +59,8 @@ data DwarfInfo
                      , dwName :: String
                      , dwProducer :: String
                      , dwCompDir :: String
-                     , dwLowLabel :: SDoc
-                     , dwHighLabel :: SDoc
-                     , dwLineLabel :: SDoc }
+                     , dwLowLabel :: CLabel
+                     , dwHighLabel :: CLabel }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
                     , dwName :: String
                     , dwLabel :: CLabel
@@ -88,13 +87,13 @@ data DwarfAbbrev
   deriving (Eq, Enum)
 
 -- | Generate assembly for the given abbreviation code
-pprAbbrev :: DwarfAbbrev -> SDoc
+pprAbbrev :: IsDoc doc => DwarfAbbrev -> doc
 pprAbbrev = pprLEBWord . fromIntegral . fromEnum
 
 -- | Abbreviation declaration. This explains the binary encoding we
 -- use for representing 'DwarfInfo'. Be aware that this must be updated
 -- along with 'pprDwarfInfo'.
-pprAbbrevDecls :: Platform -> Bool -> SDoc
+pprAbbrevDecls :: IsDoc doc => Platform -> Bool -> doc
 pprAbbrevDecls platform haveDebugLine =
   let mkAbbrev abbr tag chld flds =
         let fld (tag, form) = pprLEBWord tag $$ pprLEBWord form
@@ -111,7 +110,7 @@ pprAbbrevDecls platform haveDebugLine =
            , (dW_AT_frame_base, dW_FORM_block1)
            ]
   in dwarfAbbrevSection platform $$
-     dwarfAbbrevLabel <> colon $$
+     line (dwarfAbbrevLabel <> colon) $$
      mkAbbrev DwAbbrCompileUnit dW_TAG_compile_unit dW_CHILDREN_yes
        ([(dW_AT_name,     dW_FORM_string)
        , (dW_AT_producer, dW_FORM_string)
@@ -144,9 +143,11 @@ pprAbbrevDecls platform haveDebugLine =
        , (dW_AT_ghc_span_end_col, dW_FORM_data2)
        ] $$
      pprByte 0
+{-# SPECIALIZE pprAbbrevDecls :: Platform -> Bool -> SDoc #-}
+{-# SPECIALIZE pprAbbrevDecls :: Platform -> Bool -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Generate assembly for DWARF data
-pprDwarfInfo :: Platform -> Bool -> DwarfInfo -> SDoc
+pprDwarfInfo :: IsDoc doc => Platform -> Bool -> DwarfInfo -> doc
 pprDwarfInfo platform haveSrc d
   = case d of
       DwarfCompileUnit {}  -> hasChildren
@@ -159,9 +160,11 @@ pprDwarfInfo platform haveSrc d
         vcat (map (pprDwarfInfo platform haveSrc) (dwChildren d)) $$
         pprDwarfInfoClose
     noChildren = pprDwarfInfoOpen platform haveSrc d
+{-# SPECIALIZE pprDwarfInfo :: Platform -> Bool -> DwarfInfo -> SDoc #-}
+{-# SPECIALIZE pprDwarfInfo :: Platform -> Bool -> DwarfInfo -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Print a CLabel name in a ".stringz \"LABEL\""
-pprLabelString :: Platform -> CLabel -> SDoc
+pprLabelString :: IsDoc doc => Platform -> CLabel -> doc
 pprLabelString platform label =
    pprString'                  -- we don't need to escape the string as labels don't contain exotic characters
     $ pprCLabel platform label -- pretty-print as C label (foreign labels may be printed differently in Asm)
@@ -169,22 +172,22 @@ pprLabelString platform label =
 -- | Prints assembler data corresponding to DWARF info records. Note
 -- that the binary format of this is parameterized in @abbrevDecls@ and
 -- has to be kept in synch.
-pprDwarfInfoOpen :: Platform -> Bool -> DwarfInfo -> SDoc
+pprDwarfInfoOpen :: IsDoc doc => Platform -> Bool -> DwarfInfo -> doc
 pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowLabel
-                                           highLabel lineLbl) =
+                                           highLabel) =
   pprAbbrev DwAbbrCompileUnit
   $$ pprString name
   $$ pprString producer
   $$ pprData4 dW_LANG_Haskell
   $$ pprString compDir
      -- Offset due to Note [Info Offset]
-  $$ pprWord platform (lowLabel <> text "-1")
-  $$ pprWord platform highLabel
+  $$ pprWord platform (pprAsmLabel platform lowLabel <> text "-1")
+  $$ pprWord platform (pprAsmLabel platform highLabel)
   $$ if haveSrc
-     then sectionOffset platform lineLbl dwarfLineLabel
+     then sectionOffset platform dwarfLineLabel dwarfLineLabel
      else empty
 pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
-  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
+  line (pprAsmLabel platform (mkAsmTempDieLabel label) <> colon)
   $$ pprAbbrev abbrev
   $$ pprString name
   $$ pprLabelString platform label
@@ -201,11 +204,11 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
     parentValue = maybe empty pprParentDie parent
     pprParentDie sym = sectionOffset platform (pprAsmLabel platform sym) dwarfInfoLabel
 pprDwarfInfoOpen platform _ (DwarfBlock _ label Nothing) =
-  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
+  line (pprAsmLabel platform (mkAsmTempDieLabel label) <> colon)
   $$ pprAbbrev DwAbbrBlockWithoutCode
   $$ pprLabelString platform label
 pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) =
-  pprAsmLabel platform (mkAsmTempDieLabel label) <> colon
+  line (pprAsmLabel platform (mkAsmTempDieLabel label) <> colon)
   $$ pprAbbrev DwAbbrBlock
   $$ pprLabelString platform label
   $$ pprWord platform (pprAsmLabel platform marker)
@@ -219,7 +222,7 @@ pprDwarfInfoOpen _ _ (DwarfSrcNote ss) =
   $$ pprHalf (fromIntegral $ srcSpanEndCol ss)
 
 -- | Close a DWARF info record with children
-pprDwarfInfoClose :: SDoc
+pprDwarfInfoClose :: IsDoc doc => doc
 pprDwarfInfoClose = pprAbbrev DwAbbrNull
 
 -- | A DWARF address range. This is used by the debugger to quickly locate
@@ -233,7 +236,7 @@ data DwarfARange
 
 -- | Print assembler directives corresponding to a DWARF @.debug_aranges@
 -- address table entry.
-pprDwarfARanges :: Platform -> [DwarfARange] -> Unique -> SDoc
+pprDwarfARanges :: IsDoc doc => Platform -> [DwarfARange] -> Unique -> doc
 pprDwarfARanges platform arngs unitU =
   let wordSize = platformWordSizeInBytes platform
       paddingSize = 4 :: Int
@@ -243,7 +246,7 @@ pprDwarfARanges platform arngs unitU =
       pad n = vcat $ replicate n $ pprByte 0
       -- Fix for #17428
       initialLength = 8 + paddingSize + (1 + length arngs) * 2 * wordSize
-  in pprDwWord (ppr initialLength)
+  in pprDwWord (int initialLength)
      $$ pprHalf 2
      $$ sectionOffset platform (pprAsmLabel platform $ mkAsmTempLabel $ unitU) dwarfInfoLabel
      $$ pprByte (fromIntegral wordSize)
@@ -254,8 +257,10 @@ pprDwarfARanges platform arngs unitU =
      -- terminus
      $$ pprWord platform (char '0')
      $$ pprWord platform (char '0')
+{-# SPECIALIZE pprDwarfARanges :: Platform -> [DwarfARange] -> Unique -> SDoc #-}
+{-# SPECIALIZE pprDwarfARanges :: Platform -> [DwarfARange] -> Unique -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-pprDwarfARange :: Platform -> DwarfARange -> SDoc
+pprDwarfARange :: IsDoc doc => Platform -> DwarfARange -> doc
 pprDwarfARange platform arng =
     -- Offset due to Note [Info Offset].
     pprWord platform (pprAsmLabel platform (dwArngStartLabel arng) <> text "-1")
@@ -299,7 +304,7 @@ instance OutputableP Platform DwarfFrameBlock where
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that establishes general call frame
 -- parameters and the default stack layout.
-pprDwarfFrame :: Platform -> DwarfFrame -> SDoc
+pprDwarfFrame :: forall doc. IsDoc doc => Platform -> DwarfFrame -> doc
 pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
   = let cieStartLabel= mkAsmTempDerivedLabel cieLabel (fsLit "_start")
         cieEndLabel = mkAsmTempEndLabel cieLabel
@@ -307,7 +312,7 @@ pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCiePro
         spReg       = dwarfGlobalRegNo platform Sp
         retReg      = dwarfReturnRegNo platform
         wordSize    = platformWordSizeInBytes platform
-        pprInit :: (GlobalReg, Maybe UnwindExpr) -> SDoc
+        pprInit :: (GlobalReg, Maybe UnwindExpr) -> doc
         pprInit (g, uw) = pprSetUnwind platform g (Nothing, uw)
 
         -- Preserve C stack pointer: This necessary to override that default
@@ -316,9 +321,9 @@ pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCiePro
           ArchX86    -> pprByte dW_CFA_same_value $$ pprLEBWord 4
           ArchX86_64 -> pprByte dW_CFA_same_value $$ pprLEBWord 7
           _          -> empty
-    in vcat [ pprAsmLabel platform cieLabel <> colon
+    in vcat [ line (pprAsmLabel platform cieLabel <> colon)
             , pprData4' length -- Length of CIE
-            , pprAsmLabel platform cieStartLabel <> colon
+            , line (pprAsmLabel platform cieStartLabel <> colon)
             , pprData4' (text "-1")
                                -- Common Information Entry marker (-1 = 0xf..f)
             , pprByte 3        -- CIE version (we require DWARF 3)
@@ -346,23 +351,25 @@ pprDwarfFrame platform DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCiePro
             , pprLEBWord 0
             ] $$
        wordAlign platform $$
-       pprAsmLabel platform cieEndLabel <> colon $$
+       line (pprAsmLabel platform cieEndLabel <> colon) $$
        -- Procedure unwind tables
        vcat (map (pprFrameProc platform cieLabel cieInit) procs)
+{-# SPECIALIZE pprDwarfFrame :: Platform -> DwarfFrame -> SDoc #-}
+{-# SPECIALIZE pprDwarfFrame :: Platform -> DwarfFrame -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Writes a "Frame Description Entry" for a procedure. This consists
 -- mainly of referencing the CIE and writing state machine
 -- instructions to describe how the frame base (CFA) changes.
-pprFrameProc :: Platform -> CLabel -> UnwindTable -> DwarfFrameProc -> SDoc
+pprFrameProc :: IsDoc doc => Platform -> CLabel -> UnwindTable -> DwarfFrameProc -> doc
 pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
   = let fdeLabel    = mkAsmTempDerivedLabel procLbl (fsLit "_fde")
         fdeEndLabel = mkAsmTempDerivedLabel procLbl (fsLit "_fde_end")
         procEnd     = mkAsmTempProcEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see Note [Info Offset]
-    in vcat [ whenPprDebug $ text "# Unwinding for" <+> pprAsmLabel platform procLbl <> colon
+    in vcat [ whenPprDebug $ line $ text "# Unwinding for" <+> pprAsmLabel platform procLbl <> colon
             , pprData4' (pprAsmLabel platform fdeEndLabel <> char '-' <> pprAsmLabel platform fdeLabel)
-            , pprAsmLabel platform fdeLabel <> colon
+            , line (pprAsmLabel platform fdeLabel <> colon)
             , pprData4' (pprAsmLabel platform frameLbl <> char '-' <> dwarfFrameLabel)    -- Reference to CIE
             , pprWord platform (pprAsmLabel platform procLbl <> ifInfo "-1") -- Code pointer
             , pprWord platform (pprAsmLabel platform procEnd <> char '-' <>
@@ -370,17 +377,17 @@ pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
             ] $$
        vcat (S.evalState (mapM (pprFrameBlock platform) blocks) initUw) $$
        wordAlign platform $$
-       pprAsmLabel platform fdeEndLabel <> colon
+       line (pprAsmLabel platform fdeEndLabel <> colon)
 
 -- | Generates unwind information for a block. We only generate
 -- instructions where unwind information actually changes. This small
 -- optimisations saves a lot of space, as subsequent blocks often have
 -- the same unwind information.
-pprFrameBlock :: Platform -> DwarfFrameBlock -> S.State UnwindTable SDoc
+pprFrameBlock :: forall doc. IsDoc doc => Platform -> DwarfFrameBlock -> S.State UnwindTable doc
 pprFrameBlock platform (DwarfFrameBlock hasInfo uws0) =
     vcat <$> zipWithM pprFrameDecl (True : repeat False) uws0
   where
-    pprFrameDecl :: Bool -> UnwindPoint -> S.State UnwindTable SDoc
+    pprFrameDecl :: Bool -> UnwindPoint -> S.State UnwindTable doc
     pprFrameDecl firstDecl (UnwindPoint lbl uws) = S.state $ \oldUws ->
         let -- Did a register's unwind expression change?
             isChanged :: GlobalReg -> Maybe UnwindExpr
@@ -450,12 +457,12 @@ dwarfGlobalRegNo p reg = maybe 0 (dwarfRegNo p . RegReal) $ globalRegMaybe p reg
 -- | Generate code for setting the unwind information for a register,
 -- optimized using its known old value in the table. Note that "Sp" is
 -- special: We see it as synonym for the CFA.
-pprSetUnwind :: Platform
+pprSetUnwind :: IsDoc doc => Platform
              -> GlobalReg
                 -- ^ the register to produce an unwinding table entry for
              -> (Maybe UnwindExpr, Maybe UnwindExpr)
                 -- ^ the old and new values of the register
-             -> SDoc
+             -> doc
 pprSetUnwind plat g  (_, Nothing)
   = pprUndefUnwind plat g
 pprSetUnwind _    Sp (Just (UwReg s _), Just (UwReg s' o')) | s == s'
@@ -495,13 +502,13 @@ pprSetUnwind plat g  (_, Just uw)
 
 -- | Print the register number of the given 'GlobalReg' as an unsigned LEB128
 -- encoded number.
-pprLEBRegNo :: Platform -> GlobalReg -> SDoc
+pprLEBRegNo :: IsDoc doc => Platform -> GlobalReg -> doc
 pprLEBRegNo plat = pprLEBWord . fromIntegral . dwarfGlobalRegNo plat
 
 -- | Generates a DWARF expression for the given unwind expression. If
 -- @spIsCFA@ is true, we see @Sp@ as the frame base CFA where it gets
 -- mentioned.
-pprUnwindExpr :: Platform -> Bool -> UnwindExpr -> SDoc
+pprUnwindExpr :: IsDoc doc => Platform -> Bool -> UnwindExpr -> doc
 pprUnwindExpr platform spIsCFA expr
   = let pprE (UwConst i)
           | i >= 0 && i < 32 = pprByte (dW_OP_lit0 + fromIntegral i)
@@ -517,84 +524,100 @@ pprUnwindExpr platform spIsCFA expr
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
-    in text "\t.uleb128 2f-1f" $$ -- DW_FORM_block length
+    in line (text "\t.uleb128 2f-1f") $$ -- DW_FORM_block length
        -- computed as the difference of the following local labels 2: and 1:
-       text "1:" $$
+       line (text "1:") $$
        pprE expr $$
-       text "2:"
+       line (text "2:")
 
 -- | Generate code for re-setting the unwind information for a
 -- register to @undefined@
-pprUndefUnwind :: Platform -> GlobalReg -> SDoc
+pprUndefUnwind :: IsDoc doc => Platform -> GlobalReg -> doc
 pprUndefUnwind plat g  = pprByte dW_CFA_undefined $$
                          pprLEBRegNo plat g
 
 
 -- | Align assembly at (machine) word boundary
-wordAlign :: Platform -> SDoc
+wordAlign :: IsDoc doc => Platform -> doc
 wordAlign plat =
-  text "\t.align " <> case platformOS plat of
+  line $ text "\t.align " <> case platformOS plat of
     OSDarwin -> case platformWordSize plat of
       PW8 -> char '3'
       PW4 -> char '2'
-    _other   -> ppr (platformWordSizeInBytes plat)
+    _other   -> int (platformWordSizeInBytes plat)
+{-# SPECIALIZE wordAlign :: Platform -> SDoc #-}
+{-# SPECIALIZE wordAlign :: Platform -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Assembly for a single byte of constant DWARF data
-pprByte :: Word8 -> SDoc
-pprByte x = text "\t.byte " <> ppr (fromIntegral x :: Word)
+pprByte :: IsDoc doc => Word8 -> doc
+pprByte x = line $ text "\t.byte " <> integer (fromIntegral x)
+{-# SPECIALIZE pprByte :: Word8 -> SDoc #-}
+{-# SPECIALIZE pprByte :: Word8 -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Assembly for a two-byte constant integer
-pprHalf :: Word16 -> SDoc
-pprHalf x = text "\t.short" <+> ppr (fromIntegral x :: Word)
+pprHalf :: IsDoc doc => Word16 -> doc
+pprHalf x = line $ text "\t.short" <+> integer (fromIntegral x)
+{-# SPECIALIZE pprHalf :: Word16 -> SDoc #-}
+{-# SPECIALIZE pprHalf :: Word16 -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Assembly for a constant DWARF flag
-pprFlag :: Bool -> SDoc
+pprFlag :: IsDoc doc => Bool -> doc
 pprFlag f = pprByte (if f then 0xff else 0x00)
 
 -- | Assembly for 4 bytes of dynamic DWARF data
-pprData4' :: SDoc -> SDoc
-pprData4' x = text "\t.long " <> x
+pprData4' :: IsDoc doc => Line doc -> doc
+pprData4' x = line (text "\t.long " <> x)
+{-# SPECIALIZE pprData4' :: SDoc -> SDoc #-}
+{-# SPECIALIZE pprData4' :: HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Assembly for 4 bytes of constant DWARF data
-pprData4 :: Word -> SDoc
-pprData4 = pprData4' . ppr
+pprData4 :: IsDoc doc => Word -> doc
+pprData4 = pprData4' . integer . fromIntegral
 
 -- | Assembly for a DWARF word of dynamic data. This means 32 bit, as
 -- we are generating 32 bit DWARF.
-pprDwWord :: SDoc -> SDoc
+pprDwWord :: IsDoc doc => Line doc -> doc
 pprDwWord = pprData4'
+{-# SPECIALIZE pprDwWord :: SDoc -> SDoc #-}
+{-# SPECIALIZE pprDwWord :: HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Assembly for a machine word of dynamic data. Depends on the
 -- architecture we are currently generating code for.
-pprWord :: Platform -> SDoc -> SDoc
+pprWord :: IsDoc doc => Platform -> Line doc -> doc
 pprWord plat s =
-  case platformWordSize plat of
+  line $ case platformWordSize plat of
     PW4 -> text "\t.long " <> s
     PW8 -> text "\t.quad " <> s
+{-# SPECIALIZE pprWord :: Platform -> SDoc -> SDoc #-}
+{-# SPECIALIZE pprWord :: Platform -> HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Prints a number in "little endian base 128" format. The idea is
 -- to optimize for small numbers by stopping once all further bytes
 -- would be 0. The highest bit in every byte signals whether there
 -- are further bytes to read.
-pprLEBWord :: Word -> SDoc
+pprLEBWord :: IsDoc doc => Word -> doc
 pprLEBWord x | x < 128   = pprByte (fromIntegral x)
              | otherwise = pprByte (fromIntegral $ 128 .|. (x .&. 127)) $$
                            pprLEBWord (x `shiftR` 7)
+{-# SPECIALIZE pprLEBWord :: Word -> SDoc #-}
+{-# SPECIALIZE pprLEBWord :: Word -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Same as @pprLEBWord@, but for a signed number
-pprLEBInt :: Int -> SDoc
+pprLEBInt :: IsDoc doc => Int -> doc
 pprLEBInt x | x >= -64 && x < 64
                         = pprByte (fromIntegral (x .&. 127))
             | otherwise = pprByte (fromIntegral $ 128 .|. (x .&. 127)) $$
                           pprLEBInt (x `shiftR` 7)
+{-# SPECIALIZE pprLEBInt :: Int -> SDoc #-}
+{-# SPECIALIZE pprLEBInt :: Int -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Generates a dynamic null-terminated string. If required the
 -- caller needs to make sure that the string is escaped properly.
-pprString' :: SDoc -> SDoc
-pprString' str = text "\t.asciz \"" <> str <> char '"'
+pprString' :: IsDoc doc => Line doc -> doc
+pprString' str = line (text "\t.asciz \"" <> str <> char '"')
 
 -- | Generate a string constant. We take care to escape the string.
-pprString :: String -> SDoc
+pprString :: IsDoc doc => String -> doc
 pprString str
   = pprString' $ hcat $ map escapeChar $
     if str `lengthIs` utf8EncodedLength str
@@ -602,7 +625,7 @@ pprString str
     else map (chr . fromIntegral) $ BS.unpack $ utf8EncodeByteString str
 
 -- | Escape a single non-unicode character
-escapeChar :: Char -> SDoc
+escapeChar :: IsLine doc => Char -> doc
 escapeChar '\\' = text "\\\\"
 escapeChar '\"' = text "\\\""
 escapeChar '\n' = text "\\n"
@@ -621,9 +644,11 @@ escapeChar c
 -- us to just reference the target directly, and will figure out on
 -- their own that we actually need an offset. Finally, Windows has
 -- a special directive to refer to relative offsets. Fun.
-sectionOffset :: Platform -> SDoc -> SDoc -> SDoc
+sectionOffset :: IsDoc doc => Platform -> Line doc -> Line doc -> doc
 sectionOffset plat target section =
   case platformOS plat of
     OSDarwin  -> pprDwWord (target <> char '-' <> section)
-    OSMinGW32 -> text "\t.secrel32 " <> target
+    OSMinGW32 -> line (text "\t.secrel32 " <> target)
     _other    -> pprDwWord target
+{-# SPECIALIZE sectionOffset :: Platform -> SDoc -> SDoc -> SDoc #-}
+{-# SPECIALIZE sectionOffset :: Platform -> HLine -> HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable

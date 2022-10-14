@@ -1,5 +1,6 @@
 -- | Foreign export stubs
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE TypeApplications #-}
 module GHC.Types.ForeignStubs
    ( ForeignStubs (..)
    , CHeader(..)
@@ -68,10 +69,10 @@ newtype CHeader = CHeader { getCHeader :: SDoc }
 
 instance Monoid CHeader where
   mempty = CHeader empty
-  mconcat = coerce vcat
+  mconcat = coerce (vcat @SDoc)
 
 instance Semigroup CHeader where
-    (<>) = coerce ($$)
+    (<>) = coerce (($$) @SDoc)
 
 -- | Foreign export stubs
 data ForeignStubs

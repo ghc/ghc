@@ -11,6 +11,7 @@ module GHC.Builtin.PrimOps (
         primOpType, primOpSig, primOpResultType,
         primOpTag, maxPrimOpTag, primOpOcc,
         primOpWrapperId,
+        pprPrimOp,
 
         tagToEnumKey,
 
@@ -788,8 +789,10 @@ compare_fun_ty ty = mkVisFunTysMany [ty, ty] intPrimTy
 
 -- Output stuff:
 
-pprPrimOp  :: PrimOp -> SDoc
+pprPrimOp  :: IsLine doc => PrimOp -> doc
 pprPrimOp other_op = pprOccName (primOpOcc other_op)
+{-# SPECIALIZE pprPrimOp :: PrimOp -> SDoc #-}
+{-# SPECIALIZE pprPrimOp :: PrimOp -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 {-
 ************************************************************************

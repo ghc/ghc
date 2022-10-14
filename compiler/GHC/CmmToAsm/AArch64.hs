@@ -11,6 +11,7 @@ import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Types
+import GHC.Utils.Outputable (ftext)
 
 import qualified GHC.CmmToAsm.AArch64.Instr   as AArch64
 import qualified GHC.CmmToAsm.AArch64.Ppr     as AArch64
@@ -28,7 +29,8 @@ ncgAArch64 config
        ,canShortcut               = AArch64.canShortcut
        ,shortcutStatics           = AArch64.shortcutStatics
        ,shortcutJump              = AArch64.shortcutJump
-       ,pprNatCmmDecl             = AArch64.pprNatCmmDecl config
+       ,pprNatCmmDeclS            = AArch64.pprNatCmmDecl config
+       ,pprNatCmmDeclH            = AArch64.pprNatCmmDecl config
        ,maxSpillSlots             = AArch64.maxSpillSlots config
        ,allocatableRegs           = AArch64.allocatableRegs platform
        ,ncgAllocMoreStack         = AArch64.allocMoreStack platform
@@ -55,5 +57,5 @@ instance Instruction AArch64.Instr where
         mkJumpInstr             = AArch64.mkJumpInstr
         mkStackAllocInstr       = AArch64.mkStackAllocInstr
         mkStackDeallocInstr     = AArch64.mkStackDeallocInstr
-        mkComment               = pure . AArch64.COMMENT
+        mkComment               = pure . AArch64.COMMENT . ftext
         pprInstr                = AArch64.pprInstr

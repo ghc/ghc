@@ -162,7 +162,7 @@ stmtToInstrs stmt = do
   config <- getConfig
   platform <- getPlatform
   case stmt of
-    CmmComment s   -> return (unitOL (COMMENT $ ftext s))
+    CmmComment s   -> return (unitOL (COMMENT s))
     CmmTick {}     -> return nilOL
     CmmUnwind {}   -> return nilOL
 

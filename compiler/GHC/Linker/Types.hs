@@ -5,7 +5,7 @@
 -- (c) The University of Glasgow 2019
 --
 -----------------------------------------------------------------------------
-
+{-# LANGUAGE TypeApplications #-}
 module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
@@ -254,7 +254,7 @@ data LibrarySpec
    | Framework String   -- Only used for darwin, but does no harm
 
 instance Outputable LibrarySpec where
-  ppr (Objects objs) = text "Objects" <+> ppr (map text objs)
+  ppr (Objects objs) = text "Objects" <+> ppr (map (text @SDoc) objs)
   ppr (Archive a) = text "Archive" <+> text a
   ppr (DLL s) = text "DLL" <+> text s
   ppr (DLLPath f) = text "DLLPath" <+> text f

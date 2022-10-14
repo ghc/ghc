@@ -171,7 +171,7 @@ bit precision.
 
 data Instr
         -- comment pseudo-op
-        = COMMENT SDoc
+        = COMMENT FastString
 
         -- location pseudo-op (file, line, col, name)
         | LOCATION Int Int Int String

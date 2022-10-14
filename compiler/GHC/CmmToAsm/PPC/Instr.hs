@@ -52,7 +52,6 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.CLabel
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
@@ -60,6 +59,7 @@ import GHC.Types.Unique.Supply
 
 import Data.Foldable (toList)
 import qualified Data.List.NonEmpty as NE
+import GHC.Data.FastString (FastString)
 import Data.Maybe (fromMaybe)
 
 
@@ -179,7 +179,7 @@ data RI
 
 data Instr
     -- comment pseudo-op
-    = COMMENT SDoc
+    = COMMENT FastString
 
     -- location pseudo-op (file, line, col, name)
     | LOCATION Int Int Int String

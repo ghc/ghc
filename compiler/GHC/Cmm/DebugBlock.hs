@@ -29,7 +29,8 @@ module GHC.Cmm.DebugBlock (
 
   -- * Unwinding information
   UnwindTable, UnwindPoint(..),
-  UnwindExpr(..), toUnwindExpr
+  UnwindExpr(..), toUnwindExpr,
+  pprUnwindTable
   ) where
 
 import GHC.Prelude
@@ -38,6 +39,7 @@ import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
+import GHC.Cmm.Reg ( pprGlobalReg )
 import GHC.Cmm.Utils
 import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Unit.Module
@@ -522,10 +524,18 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
 instance OutputableP Platform UnwindExpr where
   pdoc = pprUnwindExpr 0
 
-pprUnwindExpr :: Rational -> Platform -> UnwindExpr -> SDoc
+pprUnwindTable :: IsLine doc => Platform -> UnwindTable -> doc
+pprUnwindTable platform u = brackets (fsep (punctuate comma (map print_entry (Map.toList u))))
+  where print_entry (reg, Nothing) =
+          parens (sep [pprGlobalReg reg, text "Nothing"])
+        print_entry (reg, Just x)  =
+          parens (sep [pprGlobalReg reg, text "Just" <+> pprUnwindExpr 0 platform x])
+  -- Follow instance Outputable (Map.Map GlobalReg (Maybe UnwindExpr))
+
+pprUnwindExpr :: IsLine doc => Rational -> Platform -> UnwindExpr -> doc
 pprUnwindExpr p env = \case
   UwConst i     -> int i
-  UwReg g 0     -> ppr g
+  UwReg g 0     -> pprGlobalReg g
   UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
   UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
   UwLabel l     -> pprAsmLabel env l
@@ -536,6 +546,8 @@ pprUnwindExpr p env = \case
   UwTimes e0 e1
    | p <= 1     -> pprUnwindExpr 2 env e0 <> char '*' <> pprUnwindExpr 2 env e1
   other         -> parens (pprUnwindExpr 0 env other)
+{-# SPECIALIZE pprUnwindExpr :: Rational -> Platform -> UnwindExpr -> SDoc #-}
+{-# SPECIALIZE pprUnwindExpr :: Rational -> Platform -> UnwindExpr -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as

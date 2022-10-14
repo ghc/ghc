@@ -281,13 +281,15 @@ showUnique uniq
   = case unpkUnique uniq of
       (tag, u) -> tag : iToBase62 u
 
-pprUniqueAlways :: Unique -> SDoc
+pprUniqueAlways :: IsLine doc => Unique -> doc
 -- The "always" means regardless of -dsuppress-uniques
 -- It replaces the old pprUnique to remind callers that
 -- they should consider whether they want to consult
 -- Opt_SuppressUniques
 pprUniqueAlways u
   = text (showUnique u)
+{-# SPECIALIZE pprUniqueAlways :: Unique -> SDoc #-}
+{-# SPECIALIZE pprUniqueAlways :: Unique -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 instance Outputable Unique where
     ppr = pprUniqueAlways

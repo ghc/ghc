@@ -12,9 +12,10 @@ import GHC.Platform
 import GHC.Utils.Outputable
 
 -- | Generate a section type (e.g. @\@progbits@). See #13937.
-sectionType :: Platform -- ^ Target platform
+sectionType :: IsLine doc
+            => Platform -- ^ Target platform
             -> String   -- ^ section type
-            -> SDoc     -- ^ pretty assembler fragment
+            -> doc      -- ^ pretty assembler fragment
 sectionType platform ty =
     case platformArch platform of
       ArchARM{} -> char '%' <> text ty
