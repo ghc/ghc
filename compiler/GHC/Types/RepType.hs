@@ -286,7 +286,7 @@ layoutUbxSum sum_slots0 arg_slots0 =
 --
 -- TODO(michalt): We should probably introduce `SlotTy`s for 8-/16-/32-bit
 -- values, so that we can pack things more tightly.
-data SlotTy = PtrLiftedSlot | PtrUnliftedSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
+data SlotTy = PtrLiftedSlot | PtrUnliftedSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot | VecSlot Int PrimElemRep
   deriving (Eq, Ord)
     -- Constructor order is important! If slot A could fit into slot B
     -- then slot A must occur first.  E.g.  FloatSlot before DoubleSlot
@@ -301,6 +301,7 @@ instance Outputable SlotTy where
   ppr WordSlot        = text "WordSlot"
   ppr DoubleSlot      = text "DoubleSlot"
   ppr FloatSlot       = text "FloatSlot"
+  ppr (VecSlot n e)   = text "VecSlot" <+> ppr n <+> ppr e
 
 typeSlotTy :: UnaryType -> Maybe SlotTy
 typeSlotTy ty
@@ -326,7 +327,7 @@ primRepSlot Word64Rep   = Word64Slot
 primRepSlot AddrRep     = WordSlot
 primRepSlot FloatRep    = FloatSlot
 primRepSlot DoubleRep   = DoubleSlot
-primRepSlot VecRep{}    = pprPanic "primRepSlot" (text "No slot for VecRep")
+primRepSlot (VecRep n e) = VecSlot n e
 
 slotPrimRep :: SlotTy -> PrimRep
 slotPrimRep PtrLiftedSlot   = LiftedRep
@@ -335,6 +336,7 @@ slotPrimRep Word64Slot      = Word64Rep
 slotPrimRep WordSlot        = WordRep
 slotPrimRep DoubleSlot      = DoubleRep
 slotPrimRep FloatSlot       = FloatRep
+slotPrimRep (VecSlot n e)   = VecRep n e
 
 -- | Returns the bigger type if one fits into the other. (commutative)
 --

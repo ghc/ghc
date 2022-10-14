@@ -694,6 +694,8 @@ ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
 ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
 ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
+ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish vec_rep)
+  where vec_rep = primRepToRuntimeRep (VecRep n e)
 
 --------------------------------------------------------------------------------
 

@@ -67,6 +67,7 @@ module GHC.Types.Literal
 import GHC.Prelude
 
 import GHC.Builtin.Types.Prim
+import GHC.Core.TyCo.Rep ( RuntimeRepType )
 import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -131,7 +132,7 @@ data Literal
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
 
-  | LitRubbish Type             -- ^ A nonsense value of the given
+  | LitRubbish RuntimeRepType   -- ^ A nonsense value of the given
                                 -- representation. See Note [Rubbish literals].
                                 --
                                 -- The Type argument, rr, is of kind RuntimeRep.
