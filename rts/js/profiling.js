@@ -8,13 +8,13 @@ function assert(condition, message) {
         console.trace(message || "Assertion failed");
     }
 }
-#define ASSERT(args...) assert(args)
+#define ASSERT(args...) { assert(args); }
 #else
 #define ASSERT(args...)
 #endif
 
 #ifdef GHCJS_TRACE_PROF
-#define TRACE(args...) h$log(args)
+#define TRACE(args...) { h$log(args); }
 #else
 #define TRACE(args...)
 #endif
@@ -64,7 +64,7 @@ var h$ccsList = [];
 var h$CCUnique = 0;
 /** @constructor */
 function h$CC(label, module, srcloc, isCaf) {
-  //TRACE("h$CC(", label, ", ", module, ", ", srcloc, ", ", isCaf, ")");
+  //TRACE("h$CC(", label, ", ", module, ", ", srcloc, ", ", isCaf, ")")
   this.label     = label;
   this.module    = module;
   this.srcloc    = srcloc;
@@ -80,7 +80,7 @@ function h$CC(label, module, srcloc, isCaf) {
 var h$CCSUnique = 0;
 /** @constructor */
 function h$CCS(parent, cc) {
-  //TRACE("h$mkCCS(", parent, cc, ")");
+  //TRACE("h$mkCCS(", parent, cc, ")")
   if (parent !== null && parent.consed.has(cc)) {
     return (parent.consed.get(cc));
   }
@@ -152,7 +152,7 @@ function h$ccsString(ccs) {
 #endif
 
 function h$pushRestoreCCS() {
-    TRACE("push restoreccs:" + h$ccsString(h$currentThread.ccs));
+    TRACE("push restoreccs:" + h$ccsString(h$currentThread.ccs))
     if(h$stack[h$sp] !== h$setCcs_e) {
         h$sp += 2;
         h$stack[h$sp-1] = h$currentThread.ccs;
@@ -161,15 +161,15 @@ function h$pushRestoreCCS() {
 }
 
 function h$restoreCCS(ccs) {
-    TRACE("restoreccs from:", h$ccsString(h$currentThread.ccs));
-    TRACE("             to:", h$ccsString(ccs));
+    TRACE("restoreccs from:", h$ccsString(h$currentThread.ccs))
+    TRACE("             to:", h$ccsString(ccs))
     h$currentThread.ccs = ccs;
     h$reportCurrentCcs();
 }
 
 function h$enterThunkCCS(ccsthunk) {
-  ASSERT(ccsthunk !== null && ccsthunk !== undefined, "ccsthunk is null or undefined");
-  TRACE("entering ccsthunk:", h$ccsString(ccsthunk));
+  ASSERT(ccsthunk !== null && ccsthunk !== undefined, "ccsthunk is null or undefined")
+  TRACE("entering ccsthunk:", h$ccsString(ccsthunk))
   h$currentThread.ccs = ccsthunk;
   h$reportCurrentCcs();
 }
@@ -177,10 +177,10 @@ function h$enterThunkCCS(ccsthunk) {
 function h$enterFunCCS(ccsapp, // stack at call site
                        ccsfn   // stack of function
                        ) {
-  ASSERT(ccsapp !== null && ccsapp !== undefined, "ccsapp is null or undefined");
-  ASSERT(ccsfn  !== null && ccsfn  !== undefined, "ccsfn is null or undefined");
-  TRACE("ccsapp:", h$ccsString(ccsapp));
-  TRACE("ccsfn:", h$ccsString(ccsfn));
+  ASSERT(ccsapp !== null && ccsapp !== undefined, "ccsapp is null or undefined")
+  ASSERT(ccsfn  !== null && ccsfn  !== undefined, "ccsfn is null or undefined")
+  TRACE("ccsapp:", h$ccsString(ccsapp))
+  TRACE("ccsfn:", h$ccsString(ccsfn))
 
   // common case 1: both stacks are the same
   if (ccsapp === ccsfn) {
@@ -243,22 +243,22 @@ function h$appendCCS(ccs1, ccs2) {
 
 function h$enterFunCurShorter(ccsapp, ccsfn, n) {
   if (n === 0) {
-    ASSERT(ccsapp.length === ccsfn.length, "ccsapp.length !== ccsfn.length");
+    ASSERT(ccsapp.length === ccsfn.length, "ccsapp.length !== ccsfn.length")
     return h$enterFunEqualStacks(ccsapp, ccsapp, ccsfn);
   } else {
-    ASSERT(ccsfn.depth > ccsapp.depth, "ccsfn.depth <= ccsapp.depth");
+    ASSERT(ccsfn.depth > ccsapp.depth, "ccsfn.depth <= ccsapp.depth")
     return h$pushCostCentre(h$enterFunCurShorter(ccsapp, ccsfn.prevStack, n-1), ccsfn.cc);
   }
 }
 
 function h$enterFunEqualStacks(ccs0, ccsapp, ccsfn) {
-  ASSERT(ccsapp.depth === ccsfn.depth, "ccsapp.depth !== ccsfn.depth");
+  ASSERT(ccsapp.depth === ccsfn.depth, "ccsapp.depth !== ccsfn.depth")
   if (ccsapp === ccsfn) return ccs0;
   return h$pushCostCentre(h$enterFunEqualStacks(ccs0, ccsapp.prevStack, ccsfn.prevStack), ccsfn.cc);
 }
 
 function h$pushCostCentre(ccs, cc) {
-  TRACE("pushing cost centre", cc.label, "to", h$ccsString(ccs));
+  TRACE("pushing cost centre", cc.label, "to", h$ccsString(ccs))
   if (ccs === null) {
     // when is ccs null?
     return new h$CCS(ccs, cc);
@@ -297,7 +297,7 @@ var h$ccsrcloc_offset    = 12; // cc->srcloc
 
 function h$buildCCPtr(o) {
   // last used offset is 12, so we need to allocate 20 bytes
-  ASSERT(o !== null);
+  ASSERT(o !== null)
   var cc = h$newByteArray(20);
 #ifdef GHCJS_TRACE_PROF
   cc.myTag = "cc pointer";
@@ -310,7 +310,7 @@ function h$buildCCPtr(o) {
 }
 
 function h$buildCCSPtr(o) {
-  ASSERT(o !== null);
+  ASSERT(o !== null)
   // last used offset is 8, allocate 16 bytes
   var ccs = h$newByteArray(16);
 #ifdef GHCJS_TRACE_PROF
