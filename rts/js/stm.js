@@ -19,7 +19,7 @@ var h$stmTransactionActive = 0;
 var h$stmTransactionWaiting = 4;
 /** @constructor */
 function h$Transaction(o, parent) {
-    TRACE_STM("h$Transaction: " + o + " -> " + parent);
+    TRACE_STM("h$Transaction: " + o + " -> " + parent)
     this.action        = o;
     // h$TVar -> h$WrittenTVar, transaction-local changed values
     this.tvars         = new h$Map();
@@ -42,7 +42,7 @@ function h$WrittenTVar(tv,v) {
 var h$TVarN = 0;
 /** @constructor */
 function h$TVar(v) {
-    TRACE_STM("creating TVar, value: " + h$collectProps(v));
+    TRACE_STM("creating TVar, value: " + h$collectProps(v))
     this.val        = v;           // current value
     this.blocked    = new h$Set(); // threads that get woken up if this TVar is updated
     this.m          = 0;           // gc mark
@@ -63,7 +63,7 @@ function h$TVarsWaiting(s) {
 // local view of a TVar
 /** @constructor */
 function h$LocalTVar(v) {
-  TRACE_STM("creating TVar view for: " + h$collectProps(v));
+  TRACE_STM("creating TVar view for: " + h$collectProps(v))
   this.readVal = v.val;  // the value when read from environment
   this.val     = v.val;  // the current uncommitted value
   this.tvar    = v;
@@ -75,7 +75,7 @@ function h$atomically(o) {
 }
 
 function h$stmStartTransaction(o) {
-  TRACE_STM("starting transaction: " + h$collectProps(o));
+  TRACE_STM("starting transaction: " + h$collectProps(o))
   var t = new h$Transaction(o, null);
   h$currentThread.transaction = t;
   h$r1 = o;
@@ -89,7 +89,7 @@ function h$stmCommitTransaction() {
     var tvs    = t.tvars;
     var wtv, i = tvs.iter();
     if(t.parent === null) { // top-level commit
-        TRACE_STM("committing top-level transaction");
+        TRACE_STM("committing top-level transaction")
 	// write new value to TVars and collect blocked threads
         var thread, threadi, blockedThreads = new h$Set();
         while((wtv = i.nextVal()) !== null) {
@@ -102,7 +102,7 @@ function h$stmCommitTransaction() {
             h$wakeupThread(thread);
 	}
     } else { // commit subtransaction
-        TRACE_STM("committing subtransaction");
+        TRACE_STM("committing subtransaction")
         var tpvs = t.parent.tvars;
         while((wtv = i.nextVal()) !== null) tpvs.put(wtv.tvar, wtv);
     }
@@ -161,7 +161,7 @@ function h$stmSuspendRetry() {
     var tv, i = h$currentThread.transaction.accessed.iter();
     var tvs = new h$Set();
     while((tv = i.next()) !== null) {
-        TRACE_STM("h$stmSuspendRetry, accessed: " + h$collectProps(tv));
+        TRACE_STM("h$stmSuspendRetry, accessed: " + h$collectProps(tv))
         tv.blocked.add(h$currentThread);
         tvs.add(tv);
     }
@@ -212,17 +212,17 @@ function h$readLocalTVar(t, tv) {
   while(t0 !== null) {
     var v = t0.tvars.get(tv);
     if(v !== null) {
-      TRACE_STM("h$readLocalTVar: found locally modified value: " + h$collectProps(v));
+      TRACE_STM("h$readLocalTVar: found locally modified value: " + h$collectProps(v))
       return v.val;
     }
     t0 = t0.parent;
   }
   var lv = t.accessed.get(tv);
   if(lv !== null) {
-    TRACE_STM("h$readLocalTVar: found TVar value: " + h$collectProps(lv));
+    TRACE_STM("h$readLocalTVar: found TVar value: " + h$collectProps(lv))
     return lv.val;
   } else {
-    TRACE_STM("h$readLocalTVar: TVar value not found, adding: " + h$collectProps(tv));
+    TRACE_STM("h$readLocalTVar: TVar value not found, adding: " + h$collectProps(tv))
     t.accessed.put(tv, new h$LocalTVar(tv));
     return tv.val;
   }
@@ -238,7 +238,7 @@ function h$setLocalTVar(t, tv, v) {
 }
 
 function h$stmCommitTVar(tv, v, threads) {
-    TRACE_STM("committing tvar: " + tv._key + " " + (v === tv.val));
+    TRACE_STM("committing tvar: " + tv._key + " " + (v === tv.val))
     if(v !== tv.val) {
         var thr, iter = tv.blocked.iter();
         while((thr = iter.next()) !== null) threads.add(thr);

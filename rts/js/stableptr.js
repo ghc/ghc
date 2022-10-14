@@ -20,13 +20,13 @@ var h$stablePtrN    = 1;
 var h$stablePtrFree = [];
 
 function h$makeStablePtr(v) {
-  TRACE_STABLEPTR("makeStablePtr");
+  TRACE_STABLEPTR("makeStablePtr")
   if(!v) return 0;
   var slot = h$stablePtrFree.pop();
   if(slot === undefined) {
     slot = h$stablePtrN++;
   }
-  TRACE_STABLEPTR("  -> slot:" + slot);
+  TRACE_STABLEPTR("  -> slot:" + slot)
   h$stablePtrData[slot] = v;
   return slot << 2;
 }
@@ -59,7 +59,7 @@ function h$deRefStablePtr(stable_o) {
 
 function h$hs_free_stable_ptr(stable_d, stable_o) {
   var slot = stable_o >> 2;
-  TRACE_STABLEPTR("hs_free_stable_ptr");
+  TRACE_STABLEPTR("hs_free_stable_ptr")
   if(h$stablePtrData[slot] !== null) {
     h$stablePtrData[slot] = null;
     h$stablePtrFree.push(slot);
@@ -68,8 +68,8 @@ function h$hs_free_stable_ptr(stable_d, stable_o) {
 
 // not strictly stableptr, but we make it work only for stable pointers
 function h$addrToAny(addr_v, addr_o) {
-  TRACE_STABLEPTR("addrToAny");
-  TRACE_STABLEPTR(addr_v === h$stablePtrBuf);
+  TRACE_STABLEPTR("addrToAny")
+  TRACE_STABLEPTR(addr_v === h$stablePtrBuf)
   var slot = addr_o >> 2;
   return h$stablePtrData[slot];
 }

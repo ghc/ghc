@@ -151,7 +151,7 @@ function h$initArgs() {
 }
 
 function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
-  TRACE_ENV("getProgArgV");
+  TRACE_ENV("getProgArgV")
   var c = h$programArgs().length;
   if(c === 0) {
     argc_v.dv.setInt32(argc_off, 0, true);
@@ -195,25 +195,25 @@ function h$getCPUTime() {
 if(h$isNode()) {
   var t = process.cpuUsage();
   var cput = t.user + t.system;
-  TRACE_ENV("getCPUTime: " + cput);
+  TRACE_ENV("getCPUTime: " + cput)
   return cput;
 }
 #endif
   // XXX this allows more testsuites to run
   //     but I don't really like returning a fake value here
-  TRACE_ENV("getCPUTime: returning fake value");
+  TRACE_ENV("getCPUTime: returning fake value")
   return ++h$fakeCpuTime;
   return -1;
 }
 
 function h$__hscore_environ() {
-    TRACE_ENV("hscore_environ");
+    TRACE_ENV("hscore_environ")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var env = [], i;
         for(i in process.env) {
           var envv = i + '=' + process.env[i];
-          TRACE_ENV("hscore_environ: " + envv);
+          TRACE_ENV("hscore_environ: " + envv)
           env.push(envv);
         }
         if(env.length === 0) return null;
@@ -232,13 +232,13 @@ function h$__hsbase_unsetenv(name, name_off) {
 }
 
 function h$getenv(name, name_off) {
-    TRACE_ENV("getenv");
+    TRACE_ENV("getenv")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var n = h$decodeUtf8z(name, name_off);
-        TRACE_ENV("getenv (node): " + n);
+        TRACE_ENV("getenv (node): " + n)
         if(typeof process.env[n] !== 'undefined') {
-            TRACE_ENV("getenv (node): " + n + " -> " + process.env[n]);
+            TRACE_ENV("getenv (node): " + n + " -> " + process.env[n])
             RETURN_UBX_TUP2(h$encodeUtf8(process.env[n]), 0);
         }
     }
@@ -249,7 +249,7 @@ function h$getenv(name, name_off) {
 function h$setenv(name, name_off, val, val_off, overwrite) {
   var n = h$decodeUtf8z(name, name_off);
   var v = h$decodeUtf8z(val, val_off);
-  TRACE_ENV("setenv: " + n + " -> " + v);
+  TRACE_ENV("setenv: " + n + " -> " + v)
   if(n.indexOf('=') !== -1) {
     h$setErrno("EINVAL");
     return -1;
@@ -264,7 +264,7 @@ function h$setenv(name, name_off, val, val_off, overwrite) {
 
 function h$unsetenv(name, name_off) {
   var n = h$decodeUtf8z(name, name_off);
-  TRACE_ENV("unsetenv: " + n);
+  TRACE_ENV("unsetenv: " + n)
   if(n.indexOf('=') !== -1) {
     h$setErrno("EINVAL");
     return -1;
@@ -287,14 +287,14 @@ function h$putenv(str, str_off) {
 #ifndef GHCJS_BROWSER
   var x = h$decodeUtf8z(str, str_off);
   var i = x.indexOf('=');
-  TRACE_ENV("putenv: " + x);
+  TRACE_ENV("putenv: " + x)
   if(i === -1) { // remove the value
-    TRACE_ENV("putenv unset: " + x);
+    TRACE_ENV("putenv unset: " + x)
     if(h$isNode()) delete process.env[x];
   } else { // set the value
     var name = x.substring(0, i)
     var val = x.substring(i+1);
-    TRACE_ENV("putenv set: " + name + " -> " + val);
+    TRACE_ENV("putenv set: " + name + " -> " + val)
     if(h$isNode()) process.env[name] = val;
   }
 #endif
