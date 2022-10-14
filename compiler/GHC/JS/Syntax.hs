@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
@@ -57,6 +57,7 @@ module GHC.JS.Syntax
   , JOp(..)
   , JUOp(..)
   , Ident(..)
+  , identFS
   , JsLabel
   -- * pattern synonyms over JS operators
   , pattern New
@@ -386,5 +387,6 @@ newtype Ident = TxtI { itxt :: FastString }
  deriving stock   (Show, Eq)
  deriving newtype (Uniquable)
 
-instance Ord Ident where
-  compare (TxtI fs1) (TxtI fs2) = lexicalCompareFS fs1 fs2
+identFS :: Ident -> FastString
+identFS = \case
+  TxtI fs -> fs
