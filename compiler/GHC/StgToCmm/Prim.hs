@@ -853,7 +853,7 @@ emitPrimOp cfg primop =
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility cfg vcat n w
-    doVecPackOp (vecElemInjectCast platform vcat w) ty zeros (replicate n e) res
+    doVecPackOp ty zeros (replicate n e) res
    where
     zeros :: CmmExpr
     zeros = CmmLit $ CmmVec (replicate n zero)
@@ -871,7 +871,7 @@ emitPrimOp cfg primop =
     checkVecCompatibility cfg vcat n w
     when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
-    doVecPackOp (vecElemInjectCast platform vcat w) ty zeros es res
+    doVecPackOp ty zeros es res
    where
     zeros :: CmmExpr
     zeros = CmmLit $ CmmVec (replicate n zero)
@@ -889,14 +889,14 @@ emitPrimOp cfg primop =
     checkVecCompatibility cfg vcat n w
     when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
-    doVecUnpackOp (vecElemProjectCast platform vcat w) ty arg res
+    doVecUnpackOp ty arg res
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
 
   (VecInsertOp vcat n w) -> \[v,e,i] -> opIntoRegs $ \[res] -> do
     checkVecCompatibility cfg vcat n w
-    doVecInsertOp (vecElemInjectCast platform vcat w) ty v e i res
+    doVecInsertOp ty v e i res
    where
     ty :: CmmType
     ty = vecVmmType vcat n w
@@ -2247,32 +2247,8 @@ vecCmmCat IntVec   = cmmBits
 vecCmmCat WordVec  = cmmBits
 vecCmmCat FloatVec = cmmFloat
 
-vecElemInjectCast :: Platform -> PrimOpVecCat -> Width -> Maybe MachOp
-vecElemInjectCast _        FloatVec _   =  Nothing
-vecElemInjectCast platform   IntVec   W8  =  Just (mo_WordTo8  platform)
-vecElemInjectCast platform   IntVec   W16 =  Just (mo_WordTo16 platform)
-vecElemInjectCast platform   IntVec   W32 =  Just (mo_WordTo32 platform)
-vecElemInjectCast _        IntVec   W64 =  Nothing
-vecElemInjectCast platform   WordVec  W8  =  Just (mo_WordTo8  platform)
-vecElemInjectCast platform   WordVec  W16 =  Just (mo_WordTo16 platform)
-vecElemInjectCast platform   WordVec  W32 =  Just (mo_WordTo32 platform)
-vecElemInjectCast _        WordVec  W64 =  Nothing
-vecElemInjectCast _        _        _   =  Nothing
-
-vecElemProjectCast :: Platform -> PrimOpVecCat -> Width -> Maybe MachOp
-vecElemProjectCast _        FloatVec _   =  Nothing
-vecElemProjectCast platform   IntVec   W8  =  Just (mo_s_8ToWord  platform)
-vecElemProjectCast platform   IntVec   W16 =  Just (mo_s_16ToWord platform)
-vecElemProjectCast platform   IntVec   W32 =  Just (mo_s_32ToWord platform)
-vecElemProjectCast _        IntVec   W64 =  Nothing
-vecElemProjectCast platform   WordVec  W8  =  Just (mo_u_8ToWord  platform)
-vecElemProjectCast platform   WordVec  W16 =  Just (mo_u_16ToWord platform)
-vecElemProjectCast platform   WordVec  W32 =  Just (mo_u_32ToWord platform)
-vecElemProjectCast _        WordVec  W64 =  Nothing
-vecElemProjectCast _        _        _   =  Nothing
-
-
--- NOTE [SIMD Design for the future]
+-- Note [SIMD Design for the future]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
 -- Currently these checks are specific to x86 and x86_64 architecture.
@@ -2333,13 +2309,12 @@ checkVecCompatibility cfg vcat l w =
 ------------------------------------------------------------------------------
 -- Helpers for translating vector packing and unpacking.
 
-doVecPackOp :: Maybe MachOp  -- Cast from element to vector component
-            -> CmmType       -- Type of vector
+doVecPackOp :: CmmType       -- Type of vector
             -> CmmExpr       -- Initial vector
             -> [CmmExpr]     -- Elements
             -> CmmFormal     -- Destination for result
             -> FCode ()
-doVecPackOp maybe_pre_write_cast ty z es res = do
+doVecPackOp ty z es res = do
     dst <- newTemp ty
     emitAssign (CmmLocal dst) z
     vecPack dst es 0
@@ -2352,18 +2327,13 @@ doVecPackOp maybe_pre_write_cast ty z es res = do
         dst <- newTemp ty
         if isFloatType (vecElemType ty)
           then emitAssign (CmmLocal dst) (CmmMachOp (MO_VF_Insert len wid)
-                                                    [CmmReg (CmmLocal src), cast e, iLit])
+                                                    [CmmReg (CmmLocal src), e, iLit])
           else emitAssign (CmmLocal dst) (CmmMachOp (MO_V_Insert len wid)
-                                                    [CmmReg (CmmLocal src), cast e, iLit])
+                                                    [CmmReg (CmmLocal src), e, iLit])
         vecPack dst es (i + 1)
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
-
-    cast :: CmmExpr -> CmmExpr
-    cast val = case maybe_pre_write_cast of
-                 Nothing   -> val
-                 Just cast -> CmmMachOp cast [val]
 
     len :: Length
     len = vecLength ty
@@ -2371,12 +2341,11 @@ doVecPackOp maybe_pre_write_cast ty z es res = do
     wid :: Width
     wid = typeWidth (vecElemType ty)
 
-doVecUnpackOp :: Maybe MachOp  -- Cast from vector component to element result
-              -> CmmType       -- Type of vector
+doVecUnpackOp :: CmmType       -- Type of vector
               -> CmmExpr       -- Vector
               -> [CmmFormal]   -- Element results
               -> FCode ()
-doVecUnpackOp maybe_post_read_cast ty e res =
+doVecUnpackOp ty e res =
     vecUnpack res 0
   where
     vecUnpack :: [CmmFormal] -> Int -> FCode ()
@@ -2385,19 +2354,14 @@ doVecUnpackOp maybe_post_read_cast ty e res =
 
     vecUnpack (r : rs) i = do
         if isFloatType (vecElemType ty)
-          then emitAssign (CmmLocal r) (cast (CmmMachOp (MO_VF_Extract len wid)
-                                             [e, iLit]))
-          else emitAssign (CmmLocal r) (cast (CmmMachOp (MO_V_Extract len wid)
-                                             [e, iLit]))
+          then emitAssign (CmmLocal r) (CmmMachOp (MO_VF_Extract len wid)
+                                             [e, iLit])
+          else emitAssign (CmmLocal r) (CmmMachOp (MO_V_Extract len wid)
+                                             [e, iLit])
         vecUnpack rs (i + 1)
       where
         -- vector indices are always 32-bits
         iLit = CmmLit (CmmInt (toInteger i) W32)
-
-    cast :: CmmExpr -> CmmExpr
-    cast val = case maybe_post_read_cast of
-                 Nothing   -> val
-                 Just cast -> CmmMachOp cast [val]
 
     len :: Length
     len = vecLength ty
@@ -2405,26 +2369,21 @@ doVecUnpackOp maybe_post_read_cast ty e res =
     wid :: Width
     wid = typeWidth (vecElemType ty)
 
-doVecInsertOp :: Maybe MachOp  -- Cast from element to vector component
-              -> CmmType       -- Vector type
+doVecInsertOp :: CmmType       -- Vector type
               -> CmmExpr       -- Source vector
               -> CmmExpr       -- Element
               -> CmmExpr       -- Index at which to insert element
               -> CmmFormal     -- Destination for result
               -> FCode ()
-doVecInsertOp maybe_pre_write_cast ty src e idx res = do
+doVecInsertOp ty src e idx res = do
     platform <- getPlatform
     -- vector indices are always 32-bits
     let idx' :: CmmExpr
         idx' = CmmMachOp (MO_SS_Conv (wordWidth platform) W32) [idx]
     if isFloatType (vecElemType ty)
-      then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, cast e, idx'])
-      else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, cast e, idx'])
+      then emitAssign (CmmLocal res) (CmmMachOp (MO_VF_Insert len wid) [src, e, idx'])
+      else emitAssign (CmmLocal res) (CmmMachOp (MO_V_Insert len wid) [src, e, idx'])
   where
-    cast :: CmmExpr -> CmmExpr
-    cast val = case maybe_pre_write_cast of
-                 Nothing   -> val
-                 Just cast -> CmmMachOp cast [val]
 
     len :: Length
     len = vecLength ty

@@ -514,8 +514,11 @@ machOpArgReps platform op =
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]
 
-    MO_V_Insert  l r    -> [typeWidth (vec l (cmmBits r)),r,wordWidth platform]
-    MO_V_Extract l r    -> [typeWidth (vec l (cmmBits r)),wordWidth platform]
+    MO_V_Insert   l r   -> [typeWidth (vec l (cmmBits r)),r, W32]
+    MO_V_Extract  l r   -> [typeWidth (vec l (cmmBits r)), W32]
+    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,W32]
+    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),W32]
+      -- SIMD vector indices are always 32 bit
 
     MO_V_Add _ r        -> [r,r]
     MO_V_Sub _ r        -> [r,r]
@@ -527,9 +530,6 @@ machOpArgReps platform op =
 
     MO_VU_Quot _ r      -> [r,r]
     MO_VU_Rem  _ r      -> [r,r]
-
-    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth platform]
-    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth platform]
 
     MO_VF_Add  _ r      -> [r,r]
     MO_VF_Sub  _ r      -> [r,r]
