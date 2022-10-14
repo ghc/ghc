@@ -43,23 +43,12 @@ import System.IO
 
 import Prelude
 
--- | Return a list of fresh local @Ident@
---
--- Prefix them with 'h$$' such that these will be compacted by the compactor.
-newLocals :: [Ident]
-newLocals = mkIdents 0
-  where
-    mkIdent s  = TxtI (mkFastString ("h$$" <> s))
-    mkIdents n = [mkIdent (c0:cs) | c0 <- chars, cs <- replicateM n chars] ++ mkIdents (n+1)
-    chars      = ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
-
 --------------------------------------------------------------------------------
 -- CompactorState
 --------------------------------------------------------------------------------
 
 data CompactorState = CompactorState
-  { csIdentSupply   :: ![Ident]                    -- ^ ident supply for new names
-  , csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
+  { csNameMap       :: !(UniqMap FastString Ident) -- ^ renaming mapping for internal names
   , csEntries       :: !(UniqMap FastString Int)   -- ^ entry functions (these get listed in the metadata init
                                                    -- array)
   , csNumEntries    :: !Int
@@ -85,18 +74,19 @@ data StringTable = StringTable
 
 -- | The empty @CompactorState@
 emptyCompactorState :: CompactorState
-emptyCompactorState = CompactorState newLocals
-                                     mempty
-                                     mempty
-                                     0
-                                     mempty
-                                     0
-                                     mempty
-                                     0
-                                     mempty
-                                     mempty
-                                     mempty
-                                     emptyStringTable
+emptyCompactorState = CompactorState
+  { csNameMap       = mempty
+  , csEntries       = mempty
+  , csNumEntries    = 0
+  , csStatics       = mempty
+  , csNumStatics    = 0
+  , csLabels        = mempty
+  , csNumLabels     = 0
+  , csParentEntries = mempty
+  , csParentStatics = mempty
+  , csParentLabels  = mempty
+  , csStringTable   = emptyStringTable
+  }
 
 -- | The empty @StringTable@
 emptyStringTable :: StringTable
