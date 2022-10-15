@@ -224,9 +224,9 @@ static line readline(FILE *istream, FILE *ostream) {
     while(i > 0 && isspace(buf[i-1]))
 	i--;
     buf[i] = 0;
-    if (strcmp(buf, BEGINCODE) == 0)
+    if (strncmp(buf, BEGINCODE, LENBEGINCODE) == 0)
 	return BEGIN;
-    if (strcmp(buf, ENDCODE) == 0)
+    if (strncmp(buf, ENDCODE, LENENDCODE) == 0)
 	return END;
 #if defined(PSEUDOCODE)
     else if (strcmp(buf, BEGINPSEUDOCODE) == 0)
