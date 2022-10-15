@@ -121,6 +121,12 @@ Runtime system
   by library authors directly, who may wrap them a safe API that maintains the
   necessary invariants. See the documentation in ``GHC.Prim`` for more details.
 
+- The behaviour of the ``-M`` flag has been made more strict. It will now trigger
+  a heap overflow if the total amount of memory used by the Haskell heap exceeds the limit.
+  Previously only live blocks were taken into account.
+  This makes it more likely to trigger promptly when the heap is highly fragmented.
+
+
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
