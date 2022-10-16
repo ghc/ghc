@@ -57,7 +57,7 @@ data URingMgr = URingMgr { uring :: !URing.URing
                          , freeSqSlot :: !(MVar ())
                          }
 
--- | When a thread tries to submit a request but finds that there are no SQs/SQEs 
+-- | When a thread tries to submit a request but finds that there are no SQs/SQEs
 -- if blocks on this MVar, which gets filled when a pending request completes.
 --
 -- Note that this is technically a deadlock hazard. For instance, if a program
