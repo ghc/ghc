@@ -54,7 +54,7 @@ module GHC.StgToCmm.Monad (
         getModuleName,
 
         -- ideally we wouldn't export these, but some other modules access internal state
-        getState, setState, getSelfLoop, withSelfLoop, getStgToCmmConfig,
+        getState, setState, getStgToCmmConfig,
 
         -- more localised access to monad state
         CgIdInfo(..),
@@ -296,8 +296,6 @@ data FCodeState =
                                                          -- else the RTS will deadlock _and_ also experience a severe
                                                          -- performance degradation
               , fcs_sequel        :: !Sequel             -- ^ What to do at end of basic block
-              , fcs_selfloop      :: Maybe SelfLoopInfo  -- ^ Which tail calls can be compiled as local jumps?
-                                                         --   See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr
               , fcs_ticky         :: !CLabel             -- ^ Destination for ticky counts
               , fcs_tickscope     :: !CmmTickScope       -- ^ Tick scope for new blocks & ticks
               }
@@ -455,7 +453,6 @@ initFCodeState :: Platform -> FCodeState
 initFCodeState p =
   MkFCodeState { fcs_upframeoffset = platformWordSizeInBytes p
                , fcs_sequel        = Return
-               , fcs_selfloop      = Nothing
                , fcs_ticky         = mkTopTickyCtrLabel
                , fcs_tickscope     = GlobalScope
                }
@@ -467,22 +464,13 @@ getFCodeState = FCode $ \_ fstate state -> (fstate,state)
 withFCodeState :: FCode a -> FCodeState -> FCode a
 withFCodeState (FCode fcode) fst = FCode $ \cfg _ state -> fcode cfg fst state
 
-getSelfLoop :: FCode (Maybe SelfLoopInfo)
-getSelfLoop = fcs_selfloop <$> getFCodeState
-
-withSelfLoop :: SelfLoopInfo -> FCode a -> FCode a
-withSelfLoop self_loop code = do
-        fstate <- getFCodeState
-        withFCodeState code (fstate {fcs_selfloop = Just self_loop})
-
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
 
 withSequel :: Sequel -> FCode a -> FCode a
 withSequel sequel code
   = do  { fstate <- getFCodeState
-        ; withFCodeState code (fstate { fcs_sequel = sequel
-                                      , fcs_selfloop = Nothing }) }
+        ; withFCodeState code (fstate { fcs_sequel = sequel }) }
 
 getSequel :: FCode Sequel
 getSequel = fcs_sequel <$> getFCodeState
@@ -578,7 +566,6 @@ forkClosureBody body_code
         ; state    <- getState
         ; let fcs = fstate { fcs_sequel        = Return
                            , fcs_upframeoffset = platformWordSizeInBytes platform
-                           , fcs_selfloop      = Nothing
                            }
               fork_state_in = (initCgState us) { cgs_binds = cgs_binds state }
               ((),fork_state_out) = doFCode body_code cfg fcs fork_state_in

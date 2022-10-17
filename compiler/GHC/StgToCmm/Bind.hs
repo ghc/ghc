@@ -41,7 +41,6 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Foreign    (emitPrimCall)
 
 import GHC.Cmm.Graph
-import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.Utils
@@ -511,12 +510,6 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 ; platform <- getPlatform
                 ; let node_points = nodeMustPointToIt profile lf_info
                       node' = if node_points then Just node else Nothing
-                ; loop_header_id <- newBlockId
-                -- Extend reader monad with information that
-                -- self-recursive tail calls can be optimized into local
-                -- jumps. See Note [Self-recursive tail calls] in GHC.StgToCmm.Expr.
-                ; withSelfLoop (bndr, loop_header_id, arg_regs) $ do
-                {
                 -- Main payload
                 ; entryHeapCheck cl_info node' arity arg_regs $ do
                 { -- emit LDV code when profiling
@@ -533,7 +526,7 @@ closureCodeBody top_lvl bndr cl_info cc args@(arg0:_) body fv_details
                 ; when node_points $ load_fvs node lf_info fv_bindings
                 ; checkFunctionArgTags (text "TagCheck failed - Argument to local function:" <> ppr bndr) bndr args
                 ; void $ cgExpr body
-                }}}
+                }}
 
   }
 

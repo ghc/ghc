@@ -809,12 +809,10 @@ So instead it would be good to *loopify* and transform the letrec `next` to
 
 And now the RHS of the non-recursive `next` is quite cheap to duplicate and
 since there is only one syntactic occurrence it is quite likely to inline, so we
-get a tight loop. Besides, if it *doesn't* inline, the code we get is no worse.
+get a tight loop.
 
-(You might think that the loopified form has unconditionally favorable
-operational properties even if the let is not inlined, because a jump is cheaper
-than a full function call. But we have Note [Self-recursive tail calls] that
-makes sure that the pre-loopified code actually has the same performance.)
+Even if `next` *doesn't* inline, the code we get is much better: the closure for
+`next` is smaller and the recursive call sequence can turn into a jump.
 
 We implement this *transformation* in the Occurrence Analyser because it is has
 all the necessary information at hand in `occAnalRec` while the Simplifier
@@ -832,6 +830,14 @@ regression tests T13966, T14287, T22227 (#14068 has no reproducer).
 
 SpecConstr doesn't much like the loopified form, though. Hence it implements
 Note [Denesting non-recursive let bindings].
+
+Some historic notes: Loopification was first described in "Low-level code
+optimizations in the Glasgow Haskell Compiler" by Krzysztof Woś, though we use
+different approach. Krzysztof performed his optimization at the Cmm level,
+whereas we perform ours at the Core level (already). Historically, we did
+loopification during StgToCmm (d61c3ac) but doing it in Core with join points
+enables subsequent optimisations such as inlining `next` in the example above
+and makes the old implementation superfluous.
 -}
 
 

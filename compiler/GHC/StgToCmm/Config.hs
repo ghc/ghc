@@ -43,7 +43,6 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- dynamic thunks
   , stgToCmmTickyTag       :: !Bool              -- ^ True indicates ticky will count number of avoided tag checks by tag inference.
   ---------------------------------- Flags --------------------------------------
-  , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)
   , stgToCmmOptHpc         :: !Bool              -- ^ perform code generation for code coverage
   , stgToCmmFastPAPCalls   :: !Bool              -- ^

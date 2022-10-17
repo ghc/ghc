@@ -3436,7 +3436,8 @@ fFlagsDeps = [
   flagSpec "liberate-case"                    Opt_LiberateCase,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
-  flagSpec "loopification"                    Opt_Loopification,
+  depFlagSpec "loopification"
+      Opt_Loopification "loopification now happens as part of Occurrence Analysis",
   flagSpec "block-layout-cfg"                 Opt_CfgBlocklayout,
   flagSpec "block-layout-weightless"          Opt_WeightlessBlocklayout,
   flagSpec "omit-interface-pragmas"           Opt_OmitInterfacePragmas,

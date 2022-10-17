@@ -274,7 +274,7 @@ data GeneralFlag
    | Opt_DictsStrict                     -- be strict in argument dictionaries
    | Opt_DmdTxDictSel              -- ^ deprecated, no effect and behaviour is now default.
                                    -- Allowed switching of a special demand transformer for dictionary selectors
-   | Opt_Loopification                  -- See Note [Self-recursive tail calls]
+   | Opt_Loopification                  -- Deprecated
    | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
    | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
    | Opt_CprAnal

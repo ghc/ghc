@@ -32,7 +32,6 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmTickyDynThunk = gopt Opt_Ticky_Dyn_Thunk       dflags
   , stgToCmmTickyTag      = gopt Opt_Ticky_Tag             dflags
   -- flags
-  , stgToCmmLoopification = gopt Opt_Loopification         dflags
   , stgToCmmAlignCheck    = gopt Opt_AlignmentSanitisation dflags
   , stgToCmmOptHpc        = gopt Opt_Hpc                   dflags
   , stgToCmmFastPAPCalls  = gopt Opt_FastPAPCalls          dflags

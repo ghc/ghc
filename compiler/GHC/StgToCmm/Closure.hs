@@ -77,7 +77,6 @@ import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.StgToCmm.Types
-import GHC.StgToCmm.Sequel
 
 import GHC.Types.CostCentre
 import GHC.Cmm.BlockId
@@ -95,7 +94,6 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Misc
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
@@ -511,22 +509,9 @@ getCallMethod :: StgToCmmConfig
                                 -- tail calls using the same data constructor,
                                 -- JumpToIt. This saves us one case branch in
                                 -- cgIdApp
-              -> Maybe SelfLoopInfo -- can we perform a self-recursive tail-call
               -> CallMethod
 
-getCallMethod cfg _ id _  n_args v_args _cg_loc (Just (self_loop_id, block_id, args))
-  | stgToCmmLoopification cfg
-  , id == self_loop_id
-  , args `lengthIs` (n_args - v_args)
-  -- If these patterns match then we know that:
-  --   * loopification optimisation is turned on
-  --   * function is performing a self-recursive call in a tail position
-  --   * number of non-void parameters of the function matches functions arity.
-  -- See Note [Self-recursive tail calls] and Note [Void arguments in
-  -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
-  = JumpToIt block_id args
-
-getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
   | n_args == 0 -- No args at all
   && not (profileIsProfiling (stgToCmmProfile cfg))
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
@@ -534,16 +519,16 @@ getCallMethod cfg name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc _self
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel (stgToCmmPlatform cfg) name (idCafInfo id)) arity
 
-getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc
   = assert (n_args == 0) ReturnIt
 
-getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
+getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc
   = assert (n_args == 0) ReturnIt
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
 getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
-              n_args _v_args _cg_loc _self_loop_info
+              n_args _v_args _cg_loc
 
   | Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
@@ -581,7 +566,7 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
                 updatable) 0
 
 -- Imported(Unknown) Ids
-getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_locs _self_loop_info
+getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_locs
   | n_args == 0
   , Just sig <- idTagSig_maybe id
   , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
@@ -598,14 +583,14 @@ getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _v_args _cg_loc
       EnterIt   -- Not a function
 
 -- TODO: Redundant with above match?
--- getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
+-- getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc
 --   = assertPpr (n_args == 0) (ppr name <+> ppr n_args)
 --     EnterIt -- Not a function
 
-getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs) _self_loop_info
+getCallMethod _ _name _ LFLetNoEscape _n_args _v_args (LneLoc blk_id lne_regs)
   = JumpToIt blk_id lne_regs
 
-getCallMethod _ _ _ _ _ _ _ _ = panic "Unknown call method"
+getCallMethod _ _ _ _ _ _ _ = panic "Unknown call method"
 
 -----------------------------------------------------------------------------
 --              Data types for closure information

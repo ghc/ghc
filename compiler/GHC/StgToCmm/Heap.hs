@@ -635,15 +635,6 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     Just stk_hwm -> tickyStackCheck
       >> (emit =<< mkCmmIfGoto' (sp_oflo stk_hwm) gc_id (Just False) )
 
-  -- Emit new label that might potentially be a header
-  -- of a self-recursive tail call.
-  -- See Note [Self-recursive loop header].
-  self_loop_info <- getSelfLoop
-  case self_loop_info of
-    Just (_, loop_header_id, _)
-        | checkYield && isJust mb_stk_hwm -> emitLabel loop_header_id
-    _otherwise -> return ()
-
   if isJust mb_alloc_lit
     then do
      tickyHeapCheck
@@ -667,26 +658,3 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
                 -- stack check succeeds.  Otherwise we might end up
                 -- with slop at the end of the current block, which can
                 -- confuse the LDV profiler.
-
--- Note [Self-recursive loop header]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Self-recursive loop header is required by loopification optimization (See
--- Note [Self-recursive tail calls] in GHC.StgToCmm.Expr). We emit it if:
---
---  1. There is information about self-loop in the FCode environment. We don't
---     check the binder (first component of the self_loop_info) because we are
---     certain that if the self-loop info is present then we are compiling the
---     binder body. Reason: the only possible way to get here with the
---     self_loop_info present is from closureCodeBody.
---
---  2. checkYield && isJust mb_stk_hwm. checkYield tells us that it is possible
---     to preempt the heap check (see #367 for motivation behind this check). It
---     is True for heap checks placed at the entry to a function and
---     let-no-escape heap checks but false for other heap checks (eg. in case
---     alternatives or created from hand-written high-level Cmm). The second
---     check (isJust mb_stk_hwm) is true for heap checks at the entry to a
---     function and some heap checks created in hand-written Cmm. Otherwise it
---     is Nothing. In other words the only situation when both conditions are
---     true is when compiling stack and heap checks at the entry to a
---     function. This is the only situation when we want to emit a self-loop
---     label.

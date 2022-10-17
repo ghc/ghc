@@ -649,17 +649,16 @@ by saying ``-fno-wombat``.
     Set the size threshold for the liberate-case transformation.
 
 .. ghc-flag:: -floopification
-    :shortdesc: Turn saturated self-recursive tail-calls into local jumps in the
-        generated assembly. Implied by :ghc-flag:`-O`.
+    :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
     :reverse: -fno-loopification
     :category:
 
     :default: on
 
-    When this optimisation is enabled the code generator will turn all
-    self-recursive saturated tail calls into local jumps rather than
-    function calls.
+    This flag has no effect since GHC 9.6 - its behavior is always on.
+    It used to instruct the code generator to turn all self-recursive saturated
+    tail calls into local jumps rather than function calls.
 
 .. ghc-flag:: -fllvm-pass-vectors-in-regs
     :shortdesc: *(deprecated)* Does nothing
