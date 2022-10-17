@@ -2429,11 +2429,11 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
                      Just (clas', tys') -> clas' == clas
                                           && isJust (tcMatchTys tys tys')
                      Nothing -> False
-pprTcSolverReportMsg _ (UnsafeOverlap item matches unsafe_overlapped) =
+pprTcSolverReportMsg _ (UnsafeOverlap item match unsafe_overlapped) =
   vcat [ addArising ct_loc (text "Unsafe overlapping instances for"
                   <+> pprType (mkClassPred clas tys))
        , sep [text "The matching instance is:",
-              nest 2 (pprInstance matches)]
+              nest 2 (pprInstance match)]
        , vcat [ text "It is compiled in a Safe module and as such can only"
               , text "overlap instances from the same module, however it"
               , text "overlaps the following instances from different" <+>

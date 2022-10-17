@@ -3038,7 +3038,7 @@ data TcSolverReportMsg
   -- Test cases: SH_Overlap{1,2,5,6,7,11}.
   | UnsafeOverlap
     { unsafeOverlap_item    :: ErrorItem
-    , unsafeOverlap_matches :: ClsInst
+    , unsafeOverlap_match   :: ClsInst
     , unsafeOverlapped      :: NE.NonEmpty ClsInst }
 
   deriving Generic

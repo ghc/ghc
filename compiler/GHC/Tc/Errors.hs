@@ -2204,8 +2204,6 @@ mkDictErr ctxt orig_items
 --     and the result of evaluating ...".
 mk_dict_err :: HasCallStack => SolverReportErrCtxt -> (ErrorItem, ClsInstLookupResult)
             -> TcM TcSolverReportMsg
--- Report an overlap error if this class constraint results
--- from an overlap (returning Left clas), otherwise return (Right pred)
 mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEmpty matches, NE.nonEmpty unsafe_overlapped) of
   (Nothing, _)  -> do -- No matches but perhaps several unifiers
     { (_, rel_binds, item) <- relevantBindings True ctxt item
@@ -2219,7 +2217,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
 
   (Just (match :| []), Just unsafe_overlappedNE) -> return $
     UnsafeOverlap item (fst match) (NE.map fst unsafe_overlappedNE)
-  (Just (_ :| rest), Just{}) -> pprPanic "should be empty" (ppr rest)
+  (Just matches@(_ :| _), Just overlaps) -> pprPanic "mk_dict_err: multiple matches with overlap" $ vcat [ text "matches:" <+> ppr matches, text "overlaps:" <+> ppr overlaps ]
   where
     orig          = errorItemOrigin item
     pred          = errorItemPred item
