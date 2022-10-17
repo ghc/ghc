@@ -31,7 +31,7 @@ import GHC.JS.Make
 
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
-import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Symbols
 import GHC.StgToJS.Monad
 
 import GHC.Types.CostCentre

@@ -45,7 +45,7 @@ import GHC.StgToJS.Linker.Utils
 import GHC.StgToJS.Rts.Rts
 import GHC.StgToJS.Object
 import GHC.StgToJS.Types hiding (LinkableUnit)
-import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Symbols
 import GHC.StgToJS.Printer
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
@@ -56,7 +56,6 @@ import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Module (moduleStableString)
 
-import GHC.Utils.Encoding
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic
 import GHC.Utils.Error
@@ -701,16 +700,7 @@ mkExportedFuns :: UnitId -> FastString -> [FastString] -> [ExportedFun]
 mkExportedFuns uid mod_name symbols = map mk_fun symbols
   where
     mod        = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod_name)
-    mk_fun sym = ExportedFun mod (LexicalFastString (mkJsSymbol mod sym))
-
--- | Make JS symbol corresponding to the given Haskell symbol in the given
--- module
-mkJsSymbol :: Module -> FastString -> FastString
-mkJsSymbol mod s = mkFastString $ mconcat
-  [ "h$"
-  , zEncodeString (unitModuleString mod <> ".")
-  , zString (zEncodeFS s)
-  ]
+    mk_fun sym = ExportedFun mod (LexicalFastString (mkJsSymbol True mod sym))
 
 -- | read all dependency data from the to-be-linked files
 loadObjDeps :: [LinkedObj] -- ^ object files to link
