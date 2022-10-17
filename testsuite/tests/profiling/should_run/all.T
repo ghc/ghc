@@ -1,3 +1,5 @@
+setTestOpts(js_skip) # JS backend doesn't support profiling yet
+
 # Test for #1227, #1418
 
 test('heapprof002',

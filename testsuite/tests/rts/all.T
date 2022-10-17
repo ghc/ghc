@@ -164,7 +164,9 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
 test('traceEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
-                     extra_run_opts('+RTS -ls -RTS') ],
+                     extra_run_opts('+RTS -ls -RTS'),
+                     js_skip # JS backend has no payload size limit
+                   ],
                    compile_and_run, [''])
 
 test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
@@ -359,7 +361,10 @@ test('T9839_05',
 # ignore_stderr as RTS reports slightly different error messages
 # in 'epoll' and 'select' backends on reading from EBADF
 # mingw32 skip as UNIX pipe and close(fd) is used to exercise the problem
-test('T10590', [ignore_stderr, when(opsys('mingw32'), skip)], compile_and_run, [''])
+test('T10590', [ ignore_stderr
+               , when(opsys('mingw32'), skip)
+               , js_skip # JS backend doesn't support pipes
+               ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
 test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), js_skip_csources ],
