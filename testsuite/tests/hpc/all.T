@@ -1,3 +1,5 @@
+setTestOpts(js_skip) # JS backend doesn't support HPC yet
+
 test('T10138', [extra_files(['.keepme.hpc.T10138/']),
                 ignore_stdout], run_command,
      # Using --hpcdir with an absolute path should work (exit code 0).
