@@ -14,7 +14,7 @@ import GHC.Platform
 import GHC.Types.SourceText
 import GHC.Driver.Session
 import GHC.Driver.Config.Diagnostic
-import GHC.Utils.Error     ( pprLocMsgEnvelope )
+import GHC.Utils.Error     ( pprLocMsgEnvelopeDefault )
 import GHC.Data.FastString ( mkFastString )
 import GHC.Parser.Errors.Ppr ()
 import qualified GHC.Types.Error as E
@@ -45,7 +45,7 @@ parse dflags fpath bs = case unP (go False []) initState of
     PFailed pst ->
       let err:_ = bagToList (E.getMessages $ getPsErrorMessages pst) in
       panic $ showSDoc dflags $
-        text "Hyperlinker parse error:" $$ pprLocMsgEnvelope err
+        text "Hyperlinker parse error:" $$ pprLocMsgEnvelopeDefault err
   where
 
     initState = initParserState pflags buf start
