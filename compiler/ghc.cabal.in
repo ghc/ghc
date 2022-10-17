@@ -659,8 +659,8 @@ Library
         GHC.StgToJS.Stack
         GHC.StgToJS.StaticPtr
         GHC.StgToJS.StgUtils
+        GHC.StgToJS.Symbols
         GHC.StgToJS.Types
-        GHC.StgToJS.UnitUtils
         GHC.StgToJS.Utils
         GHC.StgToJS.Linker.Linker
         GHC.StgToJS.Linker.Types

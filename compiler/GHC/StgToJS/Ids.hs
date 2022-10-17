@@ -41,7 +41,7 @@ import GHC.Prelude
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
 import GHC.StgToJS.CoreUtils
-import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Symbols
 
 import GHC.JS.Syntax
 import GHC.JS.Make
@@ -52,7 +52,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Unit.Module
-import GHC.Utils.Encoding (zEncodeString)
 import GHC.Data.FastString
 import GHC.Data.FastMutInt
 
@@ -61,6 +60,7 @@ import Control.Monad.IO.Class
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map  as M
 import Data.Maybe
+import qualified Data.ByteString.Char8 as BSC
 
 -- | Get fresh unique number
 freshUnique :: G Int
@@ -77,19 +77,9 @@ freshIdent :: G Ident
 freshIdent = do
   i <- freshUnique
   mod <- State.gets gsModule
-  let !name = mkFastString $ mconcat
-                [ "h$$"
-                , zEncodeString (unitModuleString mod)
-                , "_"
-                , encodeUnique i
-                ]
+  let !name = mkFreshJsSymbol mod i
   return (TxtI name)
 
-
-
--- | Encode a Unique number as a base-62 String
-encodeUnique :: Int -> String
-encodeUnique = reverse . iToBase62  -- reversed is more compressible
 
 -- | Generate unique Ident for the given ID (uncached!)
 --
@@ -113,24 +103,34 @@ makeIdentForId i num id_type current_module = TxtI ident
   where
     exported = isExportedId i
     name     = getName i
-    !ident   = mkFastString $ mconcat
-      [ "h$"
-      , if exported then "" else "$"
-      , zEncodeString $ unitModuleString $ case exported of
-          True | Just m <- nameModule_maybe name -> m
-          _                                      -> current_module
-      , zEncodeString "."
-      , zString (zEncodeFS (occNameFS (nameOccName name)))
+    mod
+      | exported
+      , Just m <- nameModule_maybe name
+      = m
+      | otherwise
+      = current_module
+
+    !ident   = mkFastStringByteString $ mconcat
+      [ mkJsSymbolBS exported mod (occNameFS (nameOccName name))
+
+        -------------
+        -- suffixes
+
+        -- suffix for Ids represented with more than one JS var ("_0", "_1", etc.)
       , case num of
-          Nothing -> ""
-          Just v  -> "_" ++ show v
+          Nothing -> mempty
+          Just v  -> mconcat [BSC.pack "_", intBS v]
+
+        -- suffix for entry and constructor entry
       , case id_type of
-          IdPlain    -> ""
-          IdEntry    -> "_e"
-          IdConEntry -> "_con_e"
+          IdPlain    -> mempty
+          IdEntry    -> BSC.pack "_e"
+          IdConEntry -> BSC.pack "_con_e"
+
+        -- unique suffix for non-exported Ids
       , if exported
-          then ""
-          else "_" ++ encodeUnique (getKey (getUnique i))
+          then mempty
+          else mconcat [BSC.pack "_", intBS (getKey (getUnique i))]
       ]
 
 -- | Retrieve the cached Ident for the given Id if there is one. Otherwise make

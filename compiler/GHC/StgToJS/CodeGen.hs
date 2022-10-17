@@ -30,7 +30,7 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.StaticPtr
-import GHC.StgToJS.UnitUtils
+import GHC.StgToJS.Symbols
 import GHC.StgToJS.Stack
 import GHC.StgToJS.Ids
 
