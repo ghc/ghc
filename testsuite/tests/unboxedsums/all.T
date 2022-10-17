@@ -47,5 +47,6 @@ test('ManyUbxSums',
         , '-v0 -dstg-lint -dcmm-lint'])
 
 test('T22187',[only_ways(llvm_ways)],compile,[''])
-test('T22187_run',[only_ways(llvm_ways)],compile_and_run,[''])
+test('T22187_run',[only_ways(llvm_ways)
+                  ,unless(arch('x86_64'), skip)],compile_and_run,[''])
 
