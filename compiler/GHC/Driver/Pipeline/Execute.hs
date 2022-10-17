@@ -345,8 +345,8 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         return output_fn
 
 
--- Note [JS Backend .o file procedure ]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [JS Backend .o file procedure]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- The JS backend breaks some of the assumptions on file generation order
 -- because it directly produces .o files. This violation breaks some of the
@@ -360,8 +360,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 -- 3. Then we generate a .o file in a postHsc phase (calling the asm phase etc.)
 --
 -- For the JS Backend this order is different
--- 1. The JS Backend _directly_ produces .o files (via
---    'GHC.StgToJS.Linker.Linker.embedJsFile')
+-- 1. The JS Backend _directly_ produces .o files
 -- 2. Then we write the interface file. Notice that this breaks the ordering
 -- of .hi > .o (step 2 and step 3 in the NCG above).
 --
@@ -384,7 +383,7 @@ runJsPhase pipe_env hsc_env input_fn = do
 
   -- if the input filename is the same as the output, then we've probably
   -- generated the object ourselves. In this case, we touch the object file to
-  -- ensure the timestamp is refreshed, see Note [ JS Backend .o Files ]. If
+  -- ensure the timestamp is refreshed, see Note [JS Backend .o file procedure]. If
   -- they are not the same then we embed the .js file into a .o file with the
   -- addition of a header
   if (input_fn /= output_fn)
