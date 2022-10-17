@@ -138,7 +138,10 @@ test('T5313',
 test('T2464', normal, compile, [''])
 test('T3674', [], makefile_test, [])
 
-test('rtsopts001', [extra_files(['rtsOpts.hs'])], makefile_test, [])
+test('rtsopts001',
+  [ extra_files(['rtsOpts.hs'])
+  , js_skip # JS RTS doesn't support -rtsopts
+  ], makefile_test, [])
 test('rtsopts002', normal, makefile_test, [])
 
 test('withRtsOpts', [], makefile_test, [])
@@ -270,7 +273,9 @@ test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddu
 test('T16167', [req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
-test('T13604a', [], makefile_test, [])
+test('T13604a',
+  [ js_broken(22261) # require HPC support
+  ], makefile_test, [])
 # omitting hpc and profasm because they affect the
 # inlining and unfoldings
 test('inline-check', omit_ways(['hpc', 'profasm'])
