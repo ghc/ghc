@@ -7,9 +7,12 @@
 test('fed001', normal, compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
-test('ffi001', omit_ways(['ghci']), compile_and_run, [''])
-test('ffi002', [ omit_ways(['ghci']),
-                 pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
+test('ffi001', [ omit_ways(['ghci'])
+               , js_skip # JS backend doesn't support foreign export yet
+               ], compile_and_run, [''])
+test('ffi002', [ omit_ways(['ghci'])
+               , js_skip # JS backend doesn't support foreign export yet
+               , pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
                  # The ffi002_setup hack is to ensure that we generate
                  # ffi002_stub.h before compiling ffi002_c.c, which
                  # needs it.
@@ -43,7 +46,9 @@ test('ffi006', normal, compile_and_run, [''])
 # Sometimes we end up with the wrong exit code, or get an extra
 # 'interrupted' message from the GHCi thread shutting down.
 
-test('ffi007', omit_ways(['ghci']), compile_and_run, [''])
+test('ffi007', [ omit_ways(['ghci'])
+               , js_skip # foreign "dynamic" call
+               ], compile_and_run, [''])
 test('ffi008', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
@@ -76,7 +81,9 @@ test('ffi014', [only_ways(['threaded1', 'threaded2'])], compile_and_run,
 test('ffi015', [omit_ways(['ghci']), js_skip_csources], compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
-test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
+test('ffi016', [ omit_ways(['ghci'])
+               , js_skip # foreign exports
+               ], compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
 

@@ -17,7 +17,10 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
-test('conc071', omit_ways(concurrent_ways), compile_and_run, [''])
+test('conc071',
+  [ omit_ways(concurrent_ways)
+  , js_skip # JS RTS doesn't report the same cap/locked status
+  ] , compile_and_run, [''])
 test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 

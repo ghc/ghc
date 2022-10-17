@@ -138,7 +138,10 @@ test('T5313',
 test('T2464', normal, compile, [''])
 test('T3674', [], makefile_test, [])
 
-test('rtsopts001', [extra_files(['rtsOpts.hs'])], makefile_test, [])
+test('rtsopts001',
+  [ extra_files(['rtsOpts.hs'])
+  , js_skip # JS RTS doesn't support -rtsopts
+  ], makefile_test, [])
 test('rtsopts002', normal, makefile_test, [])
 
 test('withRtsOpts', [], makefile_test, [])
@@ -267,10 +270,12 @@ test('json', normal, compile_fail, ['-ddump-json'])
 # won't tell.  It looks unrelated and is annoying to debug. Hence we disable the
 # warning to prevent spurious errors.
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json -Wno-unsupported-llvm-version'])
-test('T16167', exit_code(1), run_command,
+test('T16167', [req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
-test('T13604a', [], makefile_test, [])
+test('T13604a',
+  [ js_broken(22261) # require HPC support
+  ], makefile_test, [])
 # omitting hpc and profasm because they affect the
 # inlining and unfoldings
 test('inline-check', omit_ways(['hpc', 'profasm'])
@@ -294,7 +299,7 @@ test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', req_th, makefile_test, [])
 test('T17481', normal, makefile_test, [])
 test('T20084', normal, makefile_test, [])
-test('RunMode', extra_files(['RunMode/Test.hs']), run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
+test('RunMode', [req_interp, extra_files(['RunMode/Test.hs'])], run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
 test('T20439', normal, run_command,
      ['echo "module Foo where" >> Foo.hs && \
       {compiler} -E -fno-code -XCPP -v Foo.hs 2>&1 | grep "Copying" | sed "s/.*to//" '])
