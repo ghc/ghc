@@ -5,7 +5,7 @@ test('fat006a', [extra_files(['Fat.hs'])], makefile_test, ['fat006a'])
 test('fat007', [extra_files(['Fat.hs'])], makefile_test, ['fat007'])
 test('fat008', [req_th, unless(ghc_dynamic(), skip), extra_files(['FatTH.hs', 'FatQuote.hs']), copy_files], makefile_test, ['fat008'])
 test('fat009', [req_th, extra_files(['FatTH.hs', 'FatQuote.hs']), copy_files], makefile_test, ['fat009'])
-test('fat010', [extra_files(['THA.hs', 'THB.hs', 'THC.hs']), copy_files], makefile_test, ['fat010'])
+test('fat010', [req_th,extra_files(['THA.hs', 'THB.hs', 'THC.hs']), copy_files], makefile_test, ['fat010'])
 # Check linking works when using -fbyte-code-and-object-code
 test('fat011', [req_th, extra_files(['FatMain.hs', 'FatTH.hs', 'FatQuote.hs'])], multimod_compile, ['FatMain', '-fbyte-code-and-object-code -fprefer-byte-code'])
 # Check that we use interpreter rather than enable dynamic-too if needed for TH
