@@ -912,12 +912,20 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * TODO: see if we can rationalise these two awaitEvent calls before
      * and after scheduleDetectDeadlock()
      *
-     * TODO: these empty-queue tests are highly dubious because they only make
-     * sense for some I/O managers. The sleeping_queue is _only_ used by the
-     * select() I/O manager. The WinIO I/O manager does not use either the
-     * sleeping_queue or the blocked_queue, so both queues will _always_ be
-     * empty and so awaitEvent will _never_ be called here for WinIO. This may
-     * explain why there is a second call to awaitEvent below for mingw32.
+     * TODO: this test anyPendingTimeoutsOrIO does not have a proper
+     * implementation the WinIO I/O manager!
+     *
+     * The select() I/O manager uses the sleeping_queue and the blocked_queue,
+     * and the test checks both. The legacy win32 I/O manager only consults
+     * the blocked_queue, but then it puts threads waiting on delay# on the
+     * blocked_queue too, so that's ok.
+     *
+     * The WinIO I/O manager does not use either the sleeping_queue or the
+     * blocked_queue, but it's implementation of anyPendingTimeoutsOrIO still
+     * checks both! Since both queues will _always_ be empty then it will
+     * _always_ return false and so awaitEvent will _never_ be called here for
+     * WinIO. This may explain why there is a second call to awaitEvent below
+     * for the case of !defined(THREADED_RTS) && defined(mingw32_HOST_OS).
      */
     if (anyPendingTimeoutsOrIO(cap->iomgr))
     {
