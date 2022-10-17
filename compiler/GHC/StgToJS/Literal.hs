@@ -15,6 +15,7 @@ import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Ids
+import GHC.StgToJS.Symbols
 
 import GHC.Data.FastString
 import GHC.Types.Literal
@@ -59,10 +60,10 @@ genLit = \case
   LitDouble r              -> return [ toJExpr (r2d r) ]
   LitLabel name _size fod
     | fod == IsFunction      -> return [ ApplExpr (var "h$mkFunctionPtr")
-                                                  [var (mkFastString $ "h$" ++ unpackFS name)]
+                                                  [var (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
                                        ]
-    | otherwise              -> return [ toJExpr (TxtI . mkFastString $ "h$" ++ unpackFS name)
+    | otherwise              -> return [ toJExpr (TxtI (mkRawSymbol True name))
                                        , ValExpr (JInt 0)
                                        ]
   LitRubbish _rep -> return [ null_ ]
@@ -89,7 +90,7 @@ genStaticLit = \case
     LitNumBigNat  -> panic "genStaticLit: unexpected BigNat that should have been removed in CorePrep"
   LitFloat r               -> return [ DoubleLit . SaneDouble . r2f $ r ]
   LitDouble r              -> return [ DoubleLit . SaneDouble . r2d $ r ]
-  LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkFastString $ "h$" ++ unpackFS name)
+  LitLabel name _size fod  -> return [ LabelLit (fod == IsFunction) (mkRawSymbol True name)
                                      , IntLit 0 ]
   l -> pprPanic "genStaticLit" (ppr l)
 

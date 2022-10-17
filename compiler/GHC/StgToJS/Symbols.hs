@@ -6,6 +6,7 @@ module GHC.StgToJS.Symbols
   , mkJsSymbol
   , mkJsSymbolBS
   , mkFreshJsSymbol
+  , mkRawSymbol
   , intBS
   ) where
 
@@ -72,6 +73,12 @@ mkFreshJsSymbol mod i = mkFastStringByteString $ mconcat
   , BSC.pack "_"
   , intBS i
   ]
+
+-- | Make symbol "h$XYZ" or "h$$XYZ"
+mkRawSymbol :: Bool -> FastString -> FastString
+mkRawSymbol exported fs
+  | exported  = mkFastStringByteString $ mconcat [ hd,  bytesFS fs ]
+  | otherwise = mkFastStringByteString $ mconcat [ hdd, bytesFS fs ]
 
 -- | "h$$" constant string
 hdd :: ByteString
