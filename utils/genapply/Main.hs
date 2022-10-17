@@ -86,20 +86,18 @@ data RegStatus = Registerised | Unregisterised
 
 type Reg = String
 
-availableRegs :: RegStatus -> ([Reg],[Reg],[Reg],[Reg])
-availableRegs Unregisterised = ([],[],[],[])
+availableRegs :: RegStatus -> ([Reg],[Reg],[Reg])
+availableRegs Unregisterised = ([],[],[])
 availableRegs Registerised =
   ( vanillaRegs MAX_REAL_VANILLA_REG,
     floatRegs   MAX_REAL_FLOAT_REG,
-    doubleRegs  MAX_REAL_DOUBLE_REG,
-    longRegs    MAX_REAL_LONG_REG
+    doubleRegs  MAX_REAL_DOUBLE_REG
   )
 
-vanillaRegs, floatRegs, doubleRegs, longRegs :: Int -> [Reg]
+vanillaRegs, floatRegs, doubleRegs :: Int -> [Reg]
 vanillaRegs n = [ "R" ++ show m | m <- [2..n] ]  -- never use R1
 floatRegs   n = [ "F" ++ show m | m <- [1..n] ]
 doubleRegs  n = [ "D" ++ show m | m <- [1..n] ]
-longRegs    n = [ "L" ++ show m | m <- [1..n] ]
 
 -- -----------------------------------------------------------------------------
 -- Loading/saving register arguments to the stack
@@ -132,16 +130,14 @@ assign sp (arg : args) regs doc
                             ((reg, sp) : doc)
     Nothing -> (doc, (arg:args), sp)
 
-findAvailableReg N (vreg:vregs, fregs, dregs, lregs) =
-  Just (vreg, (vregs,fregs,dregs,lregs))
-findAvailableReg P (vreg:vregs, fregs, dregs, lregs) =
-  Just (vreg, (vregs,fregs,dregs,lregs))
-findAvailableReg F (vregs, freg:fregs, dregs, lregs) =
-  Just (freg, (vregs,fregs,dregs,lregs))
-findAvailableReg D (vregs, fregs, dreg:dregs, lregs) =
-  Just (dreg, (vregs,fregs,dregs,lregs))
-findAvailableReg L (vregs, fregs, dregs, lreg:lregs) =
-  Just (lreg, (vregs,fregs,dregs,lregs))
+findAvailableReg N (vreg:vregs, fregs, dregs) =
+  Just (vreg, (vregs,fregs,dregs))
+findAvailableReg P (vreg:vregs, fregs, dregs) =
+  Just (vreg, (vregs,fregs,dregs))
+findAvailableReg F (vregs, freg:fregs, dregs) =
+  Just (freg, (vregs,fregs,dregs))
+findAvailableReg D (vregs, fregs, dreg:dregs) =
+  Just (dreg, (vregs,fregs,dregs))
 findAvailableReg _ _ = Nothing
 
 assign_reg_to_stk reg sp

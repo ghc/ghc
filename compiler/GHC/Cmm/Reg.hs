@@ -142,9 +142,6 @@ data GlobalReg
   | DoubleReg           -- double-precision floating-point registers
         {-# UNPACK #-} !Int     -- its number
 
-  | LongReg             -- long int registers (64-bit, really)
-        {-# UNPACK #-} !Int     -- its number
-
   | XmmReg                      -- 128-bit SIMD vector register
         {-# UNPACK #-} !Int     -- its number
 
@@ -197,7 +194,6 @@ instance Eq GlobalReg where
    VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes
    FloatReg i == FloatReg j = i==j
    DoubleReg i == DoubleReg j = i==j
-   LongReg i == LongReg j = i==j
    -- NOTE: XMM, YMM, ZMM registers actually are the same registers
    -- at least with respect to store at YMM i and then read from XMM i
    -- and similarly for ZMM etc.
@@ -228,7 +224,6 @@ instance Ord GlobalReg where
      -- Ignore type when seeking clashes
    compare (FloatReg i)  (FloatReg  j) = compare i j
    compare (DoubleReg i) (DoubleReg j) = compare i j
-   compare (LongReg i)   (LongReg   j) = compare i j
    compare (XmmReg i)    (XmmReg    j) = compare i j
    compare (YmmReg i)    (YmmReg    j) = compare i j
    compare (ZmmReg i)    (ZmmReg    j) = compare i j
@@ -253,8 +248,6 @@ instance Ord GlobalReg where
    compare _ (FloatReg _)     = GT
    compare (DoubleReg _) _    = LT
    compare _ (DoubleReg _)    = GT
-   compare (LongReg _) _      = LT
-   compare _ (LongReg _)      = GT
    compare (XmmReg _) _       = LT
    compare _ (XmmReg _)       = GT
    compare (YmmReg _) _       = LT
@@ -305,7 +298,6 @@ pprGlobalReg gr
 --        VanillaReg n VGcPtr    -> char 'P' <> int n
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
-        LongReg    n   -> char 'L' <> int n
         XmmReg     n   -> text "XMM" <> int n
         YmmReg     n   -> text "YMM" <> int n
         ZmmReg     n   -> text "ZMM" <> int n
@@ -349,7 +341,6 @@ globalRegType platform = \case
    (VanillaReg _ VNonGcPtr) -> bWord platform
    (FloatReg _)             -> cmmFloat W32
    (DoubleReg _)            -> cmmFloat W64
-   (LongReg _)              -> cmmBits W64
    -- TODO: improve the internal model of SIMD/vectorized registers
    -- the right design SHOULd improve handling of float and double code too.
    -- see remarks in Note [SIMD Design for the future] in GHC.StgToCmm.Prim
@@ -365,7 +356,6 @@ isArgReg :: GlobalReg -> Bool
 isArgReg (VanillaReg {}) = True
 isArgReg (FloatReg {})   = True
 isArgReg (DoubleReg {})  = True
-isArgReg (LongReg {})    = True
 isArgReg (XmmReg {})     = True
 isArgReg (YmmReg {})     = True
 isArgReg (ZmmReg {})     = True

@@ -395,12 +395,6 @@ GLOBAL_REG_DECL(StgWord512,ZMM6,REG_ZMM6)
 #define ZMM6 (BaseReg->rZMM6)
 #endif
 
-#if defined(REG_L1) && !defined(NO_GLOBAL_REG_DECLS)
-GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
-#else
-#define L1 (BaseReg->rL1)
-#endif
-
 /*
  * If BaseReg isn't mapped to a machine register, just use the global
  * address of the current register table (CurrentRegTable in

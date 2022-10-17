@@ -81,8 +81,6 @@ baseRegOffset platform reg = case reg of
    ZmmReg n             -> panic ("Registers above ZMM6 are not supported (tried to use ZMM" ++ show n ++ ")")
    Sp                   -> pc_OFFSET_StgRegTable_rSp    constants
    SpLim                -> pc_OFFSET_StgRegTable_rSpLim constants
-   LongReg 1            -> pc_OFFSET_StgRegTable_rL1    constants
-   LongReg n            -> panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
    Hp                   -> pc_OFFSET_StgRegTable_rHp             constants
    HpLim                -> pc_OFFSET_StgRegTable_rHpLim          constants
    CCCS                 -> pc_OFFSET_StgRegTable_rCCCS           constants

@@ -652,7 +652,6 @@ wanteds os = concat
           ,constantWord Haskell "MAX_Real_Float_REG"   "MAX_REAL_FLOAT_REG"
           ,constantWord Haskell "MAX_Real_Double_REG"  "MAX_REAL_DOUBLE_REG"
           ,constantWord Haskell "MAX_Real_XMM_REG"     "MAX_REAL_XMM_REG"
-          ,constantWord Haskell "MAX_Real_Long_REG"    "MAX_REAL_LONG_REG"
 
           -- This tells the native code generator the size of the spill
           -- area it has available.

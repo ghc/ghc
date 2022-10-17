@@ -389,7 +389,6 @@ RTS_FUN_DECL(stg_gc_unpt_r1);
 RTS_FUN_DECL(stg_gc_unbx_r1);
 RTS_FUN_DECL(stg_gc_f1);
 RTS_FUN_DECL(stg_gc_d1);
-RTS_FUN_DECL(stg_gc_l1);
 RTS_FUN_DECL(stg_gc_pp);
 RTS_FUN_DECL(stg_gc_ppp);
 RTS_FUN_DECL(stg_gc_pppp);

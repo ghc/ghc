@@ -103,7 +103,6 @@ $white_no_nl+           ;
   R@decimal             { global_regN (\n -> VanillaReg n VNonGcPtr) }
   F@decimal             { global_regN FloatReg }
   D@decimal             { global_regN DoubleReg }
-  L@decimal             { global_regN LongReg }
   Sp                    { global_reg Sp }
   SpLim                 { global_reg SpLim }
   Hp                    { global_reg Hp }

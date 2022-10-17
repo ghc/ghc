@@ -605,7 +605,6 @@ extern char **environ;
       SymI_HasDataProto(stg_gc_unbx_r1)                                     \
       SymI_HasDataProto(stg_gc_f1)                                          \
       SymI_HasDataProto(stg_gc_d1)                                          \
-      SymI_HasDataProto(stg_gc_l1)                                          \
       SymI_HasDataProto(stg_gc_pp)                                          \
       SymI_HasDataProto(stg_gc_ppp)                                         \
       SymI_HasDataProto(stg_gc_pppp)                                        \

@@ -471,7 +471,6 @@ cannedGCEntryPoint platform regs
                                   _         -> Nothing
 
           | width == wordWidth platform -> Just (mkGcLabel "stg_gc_unbx_r1")
-          | width == W64                -> Just (mkGcLabel "stg_gc_l1")
           | otherwise                   -> Nothing
           where
               width = typeWidth ty

@@ -179,18 +179,6 @@ INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
 }
 
 /*
- * When the returned value is in L1
- */
-INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
-    /* explicit stack */
-{
-    Sp_adj(-1) - 8;
-    L_[Sp + WDS(1)] = L1;
-    Sp(0) = stg_ret_l_info;
-    jump stg_yield_to_interpreter [];
-}
-
-/*
  * When the returned value is a void
  */
 INFO_TABLE_RET( stg_ctoi_V, RET_BCO )

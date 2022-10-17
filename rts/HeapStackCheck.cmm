@@ -338,13 +338,6 @@ stg_gc_d1 return (D_ d)
 }
 
 
-/*-- L1 contains an int64 ------------------------------------------------- */
-
-stg_gc_l1 return (L_ l)
-{
-    jump stg_gc_noregs (stg_ret_l_info, l) ();
-}
-
 /*-- Unboxed tuples with multiple pointers -------------------------------- */
 
 stg_gc_pp return (P_ arg1, P_ arg2)

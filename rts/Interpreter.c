@@ -1337,19 +1337,6 @@ run_BCO:
             goto nextInsn;
         }
 
-        case bci_PUSH_ALTS_L: {
-            int o_bco  = BCO_GET_LARGE_ARG;
-            SpW(-2) = (W_)&stg_ctoi_L1_info;
-            SpW(-1) = BCO_PTR(o_bco);
-            Sp_subW(2);
-#if defined(PROFILING)
-            Sp_subW(2);
-            SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
-#endif
-            goto nextInsn;
-        }
-
         case bci_PUSH_ALTS_V: {
             int o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_V_info;

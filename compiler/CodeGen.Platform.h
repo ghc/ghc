@@ -449,9 +449,6 @@ callerSaves (DoubleReg 5)     = True
 #if defined(CALLER_SAVES_D6)
 callerSaves (DoubleReg 6)     = True
 #endif
-#if defined(CALLER_SAVES_L1)
-callerSaves (LongReg 1)       = True
-#endif
 #if defined(CALLER_SAVES_Sp)
 callerSaves Sp                = True
 #endif
@@ -796,12 +793,6 @@ globalRegMaybe (ZmmReg 6)               = Just (RealRegSingle REG_ZMM6)
 # endif
 # if defined(REG_Sp)
 globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
-# endif
-# if defined(REG_Lng1)
-globalRegMaybe (LongReg 1)              = Just (RealRegSingle REG_Lng1)
-# endif
-# if defined(REG_Lng2)
-globalRegMaybe (LongReg 2)              = Just (RealRegSingle REG_Lng2)
 # endif
 # if defined(REG_SpLim)
 globalRegMaybe SpLim                    = Just (RealRegSingle REG_SpLim)

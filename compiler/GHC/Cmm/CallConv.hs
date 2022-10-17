@@ -68,29 +68,27 @@ assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
                                     | isFloatType ty = float
                                     | otherwise      = int
         where vec = case (w, regs) of
-                      (W128, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W128 profile -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
-                      (W256, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W256 profile -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
-                      (W512, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W512 profile -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
+                      (W128, (vs, fs, ds, s:ss))
+                          | passVectorInReg W128 profile -> k (RegisterParam (XmmReg s), (vs, fs, ds, ss))
+                      (W256, (vs, fs, ds, s:ss))
+                          | passVectorInReg W256 profile -> k (RegisterParam (YmmReg s), (vs, fs, ds, ss))
+                      (W512, (vs, fs, ds, s:ss))
+                          | passVectorInReg W512 profile -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
-                        (W32, (vs, fs, ds, ls, s:ss))
-                            | passFloatInXmm          -> k (RegisterParam (FloatReg s), (vs, fs, ds, ls, ss))
-                        (W32, (vs, f:fs, ds, ls, ss))
-                            | not passFloatInXmm      -> k (RegisterParam f, (vs, fs, ds, ls, ss))
-                        (W64, (vs, fs, ds, ls, s:ss))
-                            | passFloatInXmm          -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ls, ss))
-                        (W64, (vs, fs, d:ds, ls, ss))
-                            | not passFloatInXmm      -> k (RegisterParam d, (vs, fs, ds, ls, ss))
+                        (W32, (vs, fs, ds, s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (FloatReg s), (vs, fs, ds, ss))
+                        (W32, (vs, f:fs, ds, ss))
+                            | not passFloatInXmm      -> k (RegisterParam f, (vs, fs, ds, ss))
+                        (W64, (vs, fs, ds, s:ss))
+                            | passFloatInXmm          -> k (RegisterParam (DoubleReg s), (vs, fs, ds, ss))
+                        (W64, (vs, fs, d:ds, ss))
+                            | not passFloatInXmm      -> k (RegisterParam d, (vs, fs, ds, ss))
                         _ -> (assts, (r:rs))
               int = case (w, regs) of
                       (W128, _) -> panic "W128 unsupported register type"
-                      (_, (v:vs, fs, ds, ls, ss)) | widthInBits w <= widthInBits (wordWidth platform)
-                          -> k (RegisterParam (v gcp), (vs, fs, ds, ls, ss))
-                      (_, (vs, fs, ds, l:ls, ss)) | widthInBits w > widthInBits (wordWidth platform)
-                          -> k (RegisterParam l, (vs, fs, ds, ls, ss))
+                      (_, (v:vs, fs, ds, ss)) | widthInBits w <= widthInBits (wordWidth platform)
+                          -> k (RegisterParam (v gcp), (vs, fs, ds, ss))
                       _   -> (assts, (r:rs))
               k (asst, regs') = assign_regs ((r, asst) : assts) rs regs'
               ty = arg_ty r
@@ -134,7 +132,6 @@ assignStack platform offset arg_ty args = assign_stk offset [] (reverse args)
 type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
                  , [GlobalReg]   -- floats
                  , [GlobalReg]   -- doubles
-                 , [GlobalReg]   -- longs (int64 and word64)
                  , [Int]         -- XMM (floats and doubles)
                  )
 
@@ -149,7 +146,6 @@ getRegsWithoutNode platform =
   ( filter (\r -> r VGcPtr /= node) (realVanillaRegs platform)
   , realFloatRegs platform
   , realDoubleRegs platform
-  , realLongRegs platform
   , realXmmRegNos platform)
 
 -- getRegsWithNode uses R1/node even if it isn't a register
@@ -159,26 +155,23 @@ getRegsWithNode platform =
     else realVanillaRegs platform
   , realFloatRegs platform
   , realDoubleRegs platform
-  , realLongRegs platform
   , realXmmRegNos platform)
 
-allFloatRegs, allDoubleRegs, allLongRegs :: Platform -> [GlobalReg]
+allFloatRegs, allDoubleRegs :: Platform -> [GlobalReg]
 allVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
 allXmmRegs :: Platform -> [Int]
 
 allVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Vanilla_REG (platformConstants platform))
 allFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Float_REG   (platformConstants platform))
 allDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Double_REG  (platformConstants platform))
-allLongRegs    platform = map LongReg    $ regList (pc_MAX_Long_REG    (platformConstants platform))
 allXmmRegs     platform =                  regList (pc_MAX_XMM_REG     (platformConstants platform))
 
-realFloatRegs, realDoubleRegs, realLongRegs :: Platform -> [GlobalReg]
+realFloatRegs, realDoubleRegs :: Platform -> [GlobalReg]
 realVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
 
 realVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Real_Vanilla_REG (platformConstants platform))
 realFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Real_Float_REG   (platformConstants platform))
 realDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Real_Double_REG  (platformConstants platform))
-realLongRegs    platform = map LongReg    $ regList (pc_MAX_Real_Long_REG    (platformConstants platform))
 
 realXmmRegNos :: Platform -> [Int]
 realXmmRegNos platform
@@ -192,12 +185,11 @@ allRegs :: Platform -> AvailRegs
 allRegs platform = ( allVanillaRegs platform
                    , allFloatRegs   platform
                    , allDoubleRegs  platform
-                   , allLongRegs    platform
                    , allXmmRegs     platform
                    )
 
 nodeOnly :: AvailRegs
-nodeOnly = ([VanillaReg 1], [], [], [], [])
+nodeOnly = ([VanillaReg 1], [], [], [])
 
 -- This returns the set of global registers that *cover* the machine registers
 -- used for argument passing. On platforms where registers can overlap---right
@@ -208,7 +200,6 @@ realArgRegsCover :: Platform -> [GlobalReg]
 realArgRegsCover platform
     | passFloatArgsInXmm platform
     = map ($ VGcPtr) (realVanillaRegs platform) ++
-      realLongRegs platform ++
       realDoubleRegs platform -- we only need to save the low Double part of XMM registers.
                               -- Moreover, the NCG can't load/store full XMM
                               -- registers for now...
@@ -216,8 +207,7 @@ realArgRegsCover platform
     | otherwise
     = map ($ VGcPtr) (realVanillaRegs platform) ++
       realFloatRegs  platform ++
-      realDoubleRegs platform ++
-      realLongRegs   platform
+      realDoubleRegs platform
       -- we don't save XMM registers if they are not used for parameter passing
 
 -- Like realArgRegsCover but always includes the node. This covers the real

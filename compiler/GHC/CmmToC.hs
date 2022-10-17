@@ -1126,7 +1126,6 @@ pprGlobalReg gr = case gr of
         --              JMP_(*R1.p);
     FloatReg   n   -> char 'F' <> int n
     DoubleReg  n   -> char 'D' <> int n
-    LongReg    n   -> char 'L' <> int n
     Sp             -> text "Sp"
     SpLim          -> text "SpLim"
     Hp             -> text "Hp"
