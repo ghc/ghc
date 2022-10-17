@@ -2244,7 +2244,7 @@ builtinBignumRules =
       -- We use a host Int to compute the popCount. If we compile on a 32-bit
       -- host for a 64-bit target, the result may be different than if computed
       -- by the target. So we disable this rule if sizes don't match.
-      guard (platformWordSizeInBits platform == finiteBitSize (0 :: Word))
+      guard (platformWordSizeInBits platform <= finiteBitSize (0 :: Word))
       [a0] <- getArgs
       x <- isBignumLiteral a0
       pure $ Lit (mk_lit platform (fromIntegral (popCount x)))
