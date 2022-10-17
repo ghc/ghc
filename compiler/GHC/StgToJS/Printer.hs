@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +26,8 @@ module GHC.StgToJS.Printer
 where
 
 import GHC.Prelude
-
+import GHC.Int
+import GHC.Exts
 
 import GHC.JS.Syntax
 import GHC.JS.Ppr
@@ -34,15 +37,59 @@ import GHC.Data.FastString
 import GHC.Types.Unique.Map
 
 import Data.List (sortOn)
-import Data.Char (isAlpha,isDigit)
+import Data.Char (isAlpha,isDigit,ord)
+import qualified Data.ByteString.Short as SBS
 
 pretty :: JStat -> Doc
 pretty = jsToDocR ghcjsRenderJs
 
 ghcjsRenderJs :: RenderJs
-ghcjsRenderJs = defaultRenderJs { renderJsV = ghcjsRenderJsV
-                                , renderJsS = ghcjsRenderJsS
-                                }
+ghcjsRenderJs = defaultRenderJs
+  { renderJsV = ghcjsRenderJsV
+  , renderJsS = ghcjsRenderJsS
+  , renderJsI = ghcjsRenderJsI
+  }
+
+hdd :: SBS.ShortByteString
+hdd = SBS.pack (map (fromIntegral . ord) "h$$")
+
+ghcjsRenderJsI :: RenderJs -> Ident -> Doc
+ghcjsRenderJsI _ (TxtI fs)
+  -- Fresh symbols are prefixed with "h$$". They aren't explicitly referred by
+  -- name in user code, only in compiled code. Hence we can rename them if we do
+  -- it consistently in all the linked code.
+  --
+  -- These symbols are usually very large because their name includes the
+  -- unit-id, the module name, and some unique number. So we rename these
+  -- symbols with a much shorter globally unique number.
+  --
+  -- Here we reuse their FastString unique for this purpose! Note that it only
+  -- works if we pretty-print all the JS code linked together at once, which we
+  -- currently do. GHCJS used to maintain a CompactorState to support
+  -- incremental linking: it contained the mapping between original symbols and
+  -- their renaming.
+  | hdd `SBS.isPrefixOf` fastStringToShortByteString fs
+  , u <- uniqueOfFS fs
+  = text "h$$" <> hexDoc (fromIntegral u)
+  | otherwise
+  = ftext fs
+
+-- | Render as an hexadecimal number in reversed order (because it's faster and we
+-- don't care about the actual value).
+hexDoc :: Word -> Doc
+hexDoc 0 = char '0'
+hexDoc v = text $ go v
+  where
+    sym (I# i) = C# (indexCharOffAddr# chars i)
+    chars = "0123456789abcdef"#
+    go = \case
+      0 -> []
+      n -> sym (fromIntegral (n .&. 0x0F))
+           : sym (fromIntegral ((n .&. 0xF0) `shiftR` 4))
+           : go (n `shiftR` 8)
+
+
+
 
 -- attempt to resugar some of the common constructs
 ghcjsRenderJsS :: RenderJs -> JStat -> Doc
