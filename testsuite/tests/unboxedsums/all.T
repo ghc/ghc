@@ -29,5 +29,6 @@ test('T14051', normal, multi_compile, ['T14051.hs', [('T14051a.hs', '')], '-O2 -
 test('T19645', normal, compile_and_run, [''])
 
 test('T22187',[only_ways(llvm_ways)],compile,[''])
-test('T22187_run',[only_ways(llvm_ways)],compile_and_run,[''])
+test('T22187_run',[only_ways(llvm_ways)
+                  ,unless(arch('x86_64'), skip)],compile_and_run,[''])
 
