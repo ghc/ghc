@@ -1,3 +1,5 @@
+setTestOpts(js_skip) # ghc-heap not supported by the JS backend
+
 test('heap_all',
      [when(have_profiling(), extra_ways(['prof'])),
       # These ways produce slightly different heap representations.
