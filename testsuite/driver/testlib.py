@@ -252,8 +252,18 @@ def req_dynamic_hs( name, opts ):
         opts.expect = 'fail'
 
 def req_interp( name, opts ):
+    '''
+    Require GHCi support
+    '''
     if not config.have_interp or isCross():
         opts.expect = 'fail'
+
+def req_plugins( name, opts ):
+    '''
+    Require plugins support
+    '''
+    # Currently no different from req_interp
+    req_interp(name, opts)
 
 def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:

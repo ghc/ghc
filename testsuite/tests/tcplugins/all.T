@@ -1,3 +1,4 @@
+setTestOpts([req_plugins])
 
 # See NullaryPlugin.hs for a description of this plugin.
 test('TcPlugin_Nullary'
