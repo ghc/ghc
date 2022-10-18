@@ -13,8 +13,6 @@ module T17904
 import GHC.Exts ( TYPE, Int (..)  )
 import Prelude hiding (lookup)
 
-{-# ANN module ("HLint: ignore Eta reduce" :: String) #-}
-
 class Hashable a where
     hashWithSalt :: Int -> a -> Int
 
