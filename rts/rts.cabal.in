@@ -597,6 +597,7 @@ library
                  hooks/StackOverflow.c
                  linker/CacheFlush.c
                  linker/Elf.c
+                 linker/InitFini.c
                  linker/LoadArchive.c
                  linker/M32Alloc.c
                  linker/MMap.c
