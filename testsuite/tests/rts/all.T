@@ -270,8 +270,8 @@ test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
 # Times out in ghci way.
 # Also times out on x86_64-linux from time to time.
 test('T7919', [ when(fast(), skip)
-              , omit_ways(['ghci'] + prof_ways)
               , when(platform('x86_64-unknown-linux'), fragile(22283))
+              , req_th
               ]
               , compile_and_run, [config.ghc_th_way_flags])
 
