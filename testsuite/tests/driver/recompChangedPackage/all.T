@@ -13,7 +13,10 @@ if not config.compiler_profiled and config.have_dynamic:
 else:
     dyn = '--disable-shared'
 
-test('recompChangedPackage', [extra_files(['q', 'Main.hs', 'Setup.hs', 'PLib1.hs']),
-                   when(fast(), skip)],
+test('recompChangedPackage',
+     [ extra_files(['q', 'Main.hs', 'Setup.hs', 'PLib1.hs']),
+       js_skip,
+       when(fast(), skip)
+     ],
      run_command,
      ['$MAKE -s --no-print-directory recompChangedPackage VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn])
