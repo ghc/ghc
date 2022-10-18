@@ -5,6 +5,7 @@ else:
 
 test('bkpcabal01',
      [extra_files(['p', 'q', 'impl', 'bkpcabal01.cabal', 'Setup.hs', 'Main.hs']),
+      js_skip,
       run_timeout_multiplier(2)],
      run_command,
      ['$MAKE -s --no-print-directory bkpcabal01 ' + cleanup])
