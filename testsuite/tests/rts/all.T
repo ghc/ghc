@@ -514,15 +514,30 @@ test('T20199', [ grep_errmsg('Hello') ]
 # test).
 test('cloneMyStack', [req_c,only_ways(['normal']), extra_files(['cloneStackLib.c'])],
      compile_and_run, ['cloneStackLib.c'])
+
 test('cloneMyStack2',
   [ ignore_stdout
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
+
 test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
+
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
-test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
+
+test('decodeMyStack',
+  [ js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, ['-finfo-table-map'])
+
 # Options:
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.
-test('decodeMyStack_underflowFrames', [extra_run_opts('+RTS -kc8K -RTS')], compile_and_run, ['-finfo-table-map -rtsopts'])
+test('decodeMyStack_underflowFrames',
+  [ extra_run_opts('+RTS -kc8K -RTS')
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, ['-finfo-table-map -rtsopts'])
+
 # -finfo-table-map intentionally missing
-test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
+test('decodeMyStack_emptyListForMissingFlag',
+  [ ignore_stdout
+  , ignore_stderr
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, [''])

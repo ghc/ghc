@@ -69,7 +69,7 @@ test('T4306',
      makefile_test, ['T4306'])
 
 test('T4201',
-     normal,
+     js_skip, # Test prints NCG codegen info (LFI, etc.)
      makefile_test, ['T4201'])
 
 test('T3772',
