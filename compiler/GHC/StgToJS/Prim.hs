@@ -828,11 +828,11 @@ genPrim prof bound ty op = case op of
         ]
   ReadOffAddrOp_Word8  -> \[c]     [a,o,i] -> PrimInline . boundsChecked bound a (off8  o i) $ AssignStat c $ read_boff_u8  a (off8  o i)
   ReadOffAddrOp_Word16 -> \[c]     [a,o,i] -> PrimInline . boundsChecked bound a (off16 o i) $ AssignStat c $ read_boff_u16 a (off16 o i)
-  ReadOffAddrOp_Word32 -> \[c]     [a,o,i] -> PrimInline . boundsChecked bound a (off32 o i) $ AssignStat c $ read_boff_i32 a (off32 o i)
+  ReadOffAddrOp_Word32 -> \[c]     [a,o,i] -> PrimInline . boundsChecked bound a (off32 o i) $ AssignStat c $ read_boff_u32 a (off32 o i)
   ReadOffAddrOp_Word64 -> \[c1,c2] [a,o,i] ->
       PrimInline $ mconcat
-       [ c1 |= read_boff_i32 a (Add (off64 o i) (Int 4))
-       , c2 |= read_boff_i32 a (off64 o i)
+       [ c1 |= read_boff_u32 a (Add (off64 o i) (Int 4))
+       , c2 |= read_boff_u32 a (off64 o i)
        ]
   WriteOffAddrOp_Char     -> \[] [a,o,i,v]     -> PrimInline . boundsChecked bound a (off8  o i) $ write_boff_u8  a (off8  o i) v
   WriteOffAddrOp_WideChar -> \[] [a,o,i,v]     -> PrimInline . boundsChecked bound a (off32 o i) $ write_boff_i32 a (off32 o i) v
