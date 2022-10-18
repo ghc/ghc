@@ -170,7 +170,9 @@ test('traceEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
                    compile_and_run, [''])
 
 test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
-                           extra_run_opts('+RTS -ls -RTS') ],
+                           extra_run_opts('+RTS -ls -RTS'),
+                           js_skip # traceBinaryEvent not supported
+                           ],
                          compile_and_run, [''])
 
 # Test that -ol flag works as expected
@@ -214,7 +216,10 @@ test('exec_signals',
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
-test('T4850', when(opsys('mingw32'), expect_broken(4850)), makefile_test, ['T4850'])
+test('T4850',
+  [ when(opsys('mingw32'), expect_broken(4850))
+  , js_broken(22261) # FFI "dynamic" convention unsupported
+  ], makefile_test, ['T4850'])
 
 def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
@@ -420,7 +425,9 @@ test('T14900',
   [ js_skip # Compact regions not supported by the JS backend yet
   ], compile_and_run, ['-package ghc-compact'])
 
-test('InternalCounters', normal, makefile_test, ['InternalCounters'])
+test('InternalCounters',
+  [ js_skip # JS backend doesn't support internal counters
+  ], makefile_test, ['InternalCounters'])
 test('alloccounter1', normal, compile_and_run,
   [
     # avoid allocating stack chunks, which counts as
@@ -507,7 +514,10 @@ test('T20199', [ grep_errmsg('Hello') ]
 # test).
 test('cloneMyStack', [req_c,only_ways(['normal']), extra_files(['cloneStackLib.c'])],
      compile_and_run, ['cloneStackLib.c'])
-test('cloneMyStack2', ignore_stdout, compile_and_run, [''])
+test('cloneMyStack2',
+  [ ignore_stdout
+  , js_broken(22261) # cloneMyStack# not yet implemented
+  ], compile_and_run, [''])
 test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
 test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
