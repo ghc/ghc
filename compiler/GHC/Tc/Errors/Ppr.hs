@@ -18,6 +18,7 @@ module GHC.Tc.Errors.Ppr
   , withHsDocContext
   , pprHsDocContext
   , inHsDocContext
+  , TcRnMessageOpts(..)
   )
   where
 
@@ -96,16 +97,25 @@ import Data.Ord ( comparing )
 import Data.Bifunctor
 import GHC.Types.Name.Env
 
+data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
+                                       }
+
+defaultTcRnMessageOpts :: TcRnMessageOpts
+defaultTcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext = True }
+
+
 instance Diagnostic TcRnMessage where
-  type DiagnosticOpts TcRnMessage = NoDiagnosticOpts
-  defaultDiagnosticOpts = NoDiagnosticOpts
+  type DiagnosticOpts TcRnMessage = TcRnMessageOpts
+  defaultDiagnosticOpts = defaultTcRnMessageOpts
   diagnosticMessage opts = \case
     TcRnUnknownMessage (UnknownDiagnostic @e m)
       -> diagnosticMessage (defaultDiagnosticOpts @e) m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg
-             -> messageWithInfoDiagnosticMessage unit_state err_info (diagnosticMessage opts msg)
+             -> messageWithInfoDiagnosticMessage unit_state err_info
+                  (tcOptsShowContext opts)
+                  (diagnosticMessage opts msg)
     TcRnSolverReport msg _ _
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnRedundantConstraints redundants (info, show_info)
@@ -1807,10 +1817,11 @@ deriveInstanceErrReasonHints cls newtype_deriving = \case
 
 messageWithInfoDiagnosticMessage :: UnitState
                                  -> ErrInfo
+                                 -> Bool
                                  -> DecoratedSDoc
                                  -> DecoratedSDoc
-messageWithInfoDiagnosticMessage unit_state ErrInfo{..} important =
-  let err_info' = map (pprWithUnitState unit_state) [errInfoContext, errInfoSupplementary]
+messageWithInfoDiagnosticMessage unit_state ErrInfo{..} show_ctxt important =
+  let err_info' = map (pprWithUnitState unit_state) ([errInfoContext | show_ctxt] ++ [errInfoSupplementary])
       in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
          mkDecorated err_info'
 

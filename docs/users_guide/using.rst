@@ -1360,6 +1360,18 @@ messages and in GHCi:
     error was detected.  This also affects the associated caret symbol that
     points at the region of code at fault.
 
+.. ghc-flag:: -fshow-error-context
+    :shortdesc: Whether to show textual information about error context
+    :type: dynamic
+    :reverse: -fno-show-error-context
+    :category: verbosity
+
+    :default: on
+
+    Controls whether GHC displays information about the context in which an
+    error occurred. This controls whether the part of the error message which
+    says "In the equation..", "In the pattern.." etc is displayed or not.
+
 .. ghc-flag:: -ferror-spans
     :shortdesc: Output full span in error messages
     :type: dynamic

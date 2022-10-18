@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeApplications #-}
+
 -- | Functions for initialising error message printing configuration from the
 -- GHC session flags.
 module GHC.Driver.Config.Diagnostic
@@ -21,6 +21,7 @@ import GHC.Driver.Errors.Ppr ()
 import GHC.Tc.Errors.Types
 import GHC.HsToCore.Errors.Types
 import GHC.Types.Error
+import GHC.Tc.Errors.Ppr
 
 -- | Initialise the general configuration for printing diagnostic messages
 -- For example, this configuration controls things like whether warnings are
@@ -47,7 +48,7 @@ initPsMessageOpts :: DynFlags -> DiagnosticOpts PsMessage
 initPsMessageOpts _ = NoDiagnosticOpts
 
 initTcMessageOpts :: DynFlags -> DiagnosticOpts TcRnMessage
-initTcMessageOpts _ = NoDiagnosticOpts
+initTcMessageOpts dflags = TcRnMessageOpts { tcOptsShowContext = gopt Opt_ShowErrorContext dflags }
 
 initDsMessageOpts :: DynFlags -> DiagnosticOpts DsMessage
 initDsMessageOpts _ = NoDiagnosticOpts

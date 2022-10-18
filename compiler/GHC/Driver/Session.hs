@@ -3508,7 +3508,8 @@ fFlagsDeps = [
       (\turn_on -> updM (\dflags -> do
         unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
-        return dflags))
+        return dflags)),
+  flagSpec "show-error-context"               Opt_ShowErrorContext
 
   ]
   ++ fHoleFlags
@@ -3802,7 +3803,9 @@ defaultFlags settings
       Opt_VersionMacros,
       Opt_RPath,
       Opt_DumpWithWays,
-      Opt_CompactUnwind
+      Opt_CompactUnwind,
+      Opt_ShowErrorContext
+
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
