@@ -2,7 +2,7 @@ test('multipleHomeUnits_single1', [extra_files([ 'a/', 'unitA'])], multiunit_com
 test('multipleHomeUnits_single2', [extra_files([ 'b/', 'unitB'])], multiunit_compile, [['unitB'], '-fhide-source-paths'])
 test('multipleHomeUnits_single3', [extra_files([ 'c/', 'unitC'])], multiunit_compile, [['unitC'], '-fhide-source-paths'])
 test('multipleHomeUnits_single4', [extra_files([ 'd/', 'unitD'])], multiunit_compile, [['unitD'], '-fhide-source-paths'])
-test('multipleHomeUnits_single5', [extra_files([ 'th/', 'unitTH'])], multiunit_compile, [['unitTH'], '-fhide-source-paths'])
+test('multipleHomeUnits_single5', [req_th, extra_files([ 'th/', 'unitTH'])], multiunit_compile, [['unitTH'], '-fhide-source-paths'])
 test('multipleHomeUnits_cpp', [extra_files([ 'cpp-includes/', 'unitCPPIncludes'])], multiunit_compile, [['unitCPPIncludes'], '-fhide-source-paths'])
 test('multipleHomeUnits_cfile', [extra_files([ 'c-file/', 'unitCFile'])], multiunit_compile, [['unitCFile'], '-fhide-source-paths'])
 test('multipleHomeUnits_callstack', [extra_files([ 'callstack/', 'unitCallstack'])], makefile_test, [])
