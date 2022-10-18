@@ -216,7 +216,7 @@ platformNcgSupported platform = if
          ArchAArch64   -> True
          _             -> False
 
--- | Is the platform supported by the Native Code Generator?
+-- | Is the platform supported by the JS backend?
 platformJSSupported :: Platform -> Bool
 platformJSSupported platform
   | platformArch platform == ArchJavaScript = True
