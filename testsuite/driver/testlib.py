@@ -2347,6 +2347,18 @@ def normalise_errmsg(s: str) -> str:
     s = normalise_callstacks(s)
     s = normalise_type_reps(s)
 
+    # normalise slashes, minimise Windows/Unix filename differences
+    s = re.sub('\\\\', '/', s)
+
+    # Normalize the name of the GHC executable. Specifically,
+    # this catches the cases that:
+    #
+    # * In cross-compilers ghc's executable name may include
+    #   a target prefix (e.g. `aarch64-linux-gnu-ghc`)
+    # * On Windows the executable name may mention the
+    #   versioned name (e.g. `ghc-9.2.1`)
+    s = re.sub(Path(config.compiler).name + ':', 'ghc:', s)
+
     # If somefile ends in ".exe" or ".exe:", zap ".exe" (for Windows)
     #    the colon is there because it appears in error messages; this
     #    hacky solution is used in place of more sophisticated filename
