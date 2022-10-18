@@ -90,6 +90,10 @@ def setLocalTestOpts(opts: TestOptions) -> None:
     global testopts_local
     testopts_local.x = opts
 
+def isCross() -> bool:
+    """ Are we testing a cross-compiler? """
+    return config.target_wrapper is not None
+
 def isCompilerStatsTest() -> bool:
     opts = getTestOpts()
     return bool(opts.is_compiler_stats_test)
@@ -255,7 +259,7 @@ def req_dynamic_hs( name, opts ):
         opts.expect = 'fail'
 
 def req_interp( name, opts ):
-    if not config.have_interp:
+    if not config.have_interp or isCross():
         opts.expect = 'fail'
     # JS backend doesn't provide an interpreter yet
     js_skip(name, opts)
@@ -1083,13 +1087,20 @@ def test_common_work(name: TestName, opts,
                 all_ways = [WayName('ghci')]
             else:
                 all_ways = []
+            if isCross():
+                opts.cross_okay = False
         elif func in [makefile_test, run_command]:
             # makefile tests aren't necessarily runtime or compile-time
             # specific. Assume we can run them in all ways. See #16042 for what
             # happened previously.
             all_ways = config.compile_ways + config.run_ways
+            if isCross():
+                opts.cross_okay = False
         else:
             all_ways = [WayName('normal')]
+
+        if isCross() and opts.cross_okay is False:
+            opts.skip = True
 
         # A test itself can request extra ways by setting opts.extra_ways
         all_ways = list(OrderedDict.fromkeys(all_ways + [way for way in opts.extra_ways if way not in all_ways]))
@@ -1816,7 +1827,10 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
+    args = [prog, stats_args, my_rts_flags, extra_run_opts]
+    if config.target_wrapper is not None:
+        args = [config.target_wrapper] + args
+    cmd = ' '.join(args)
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
