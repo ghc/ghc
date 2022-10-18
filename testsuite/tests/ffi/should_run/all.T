@@ -38,7 +38,7 @@ test('ffi005', [ omit_ways(prof_ways + ['ghci']),
                  exit_code(3) ],
                compile_and_run, ['ffi005_c.c'])
 
-test('ffi006', normal, compile_and_run, [''])
+test('ffi006', [normal, js_skip], compile_and_run, [''])
 
 # Skip ffi00{7,8} for GHCi.  These tests both try to exit or raise an
 # error from a foreign export, which shuts down the runtime.  When
@@ -50,7 +50,7 @@ test('ffi006', normal, compile_and_run, [''])
 test('ffi007', [ omit_ways(['ghci'])
                , js_skip # foreign "dynamic" call
                ], compile_and_run, [''])
-test('ffi008', [exit_code(1), omit_ways(['ghci'])], compile_and_run, [''])
+test('ffi008', [exit_code(1), omit_ways(['ghci']), js_skip], compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
 if config.platform.startswith('i386-'):
@@ -59,7 +59,7 @@ else:
     opts = ''
 
 test('ffi010', normal, compile_and_run, [''])
-test('ffi011', normal, compile_and_run, [''])
+test('ffi011', [normal, js_skip], compile_and_run, [''])
 
 # The stdcall calling convention works on Windows, and sometimes on
 # Linux, and fails everywhhere else.  For now, we test only on Windows,
@@ -72,7 +72,7 @@ else:
     skip_if_not_windows = skip
 
 test('ffi012', skip_if_not_windows, compile_and_run, [''])
-test('ffi013', normal, compile_and_run, [''])
+test('ffi013', [normal, js_skip], compile_and_run, [''])
 
 # threaded2 sometimes gives ffi014: Main_dDu: interrupted
 test('ffi014', [only_ways(['threaded1', 'threaded2'])], compile_and_run,
@@ -88,7 +88,7 @@ test('ffi016', [ omit_ways(['ghci'])
 
 test('ffi017', normal, compile_and_run, [''])
 
-test('ffi018', [omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
+test('ffi018', [omit_ways(['ghci']), js_skip], compile_and_run, ['ffi018_c.c'])
 
 test('ffi018_ghci',
      [extra_files(['ffi018.h']),
@@ -98,7 +98,7 @@ test('ffi018_ghci',
       js_skip_csources],
      compile_and_run, ['ffi018_ghci_c.o'])
 
-test('ffi019', normal, compile_and_run, [''])
+test('ffi019', [normal, js_skip], compile_and_run, [''])
 
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
 test('T1679', normal, compile_and_run, [''])
@@ -134,10 +134,11 @@ test('T2917a', normal, compile_and_run, [''])
 # omit prof ways, because this test causes the RTS to exit (correctly)
 # without generating profiling information.
 test('ffi020', [ omit_ways(prof_ways),
-                 exit_code(1) ], compile_and_run, [''])
+                 exit_code(1),
+                 js_skip], compile_and_run, [''])
 
 
-test('ffi021', normal, compile_and_run, [''])
+test('ffi021', [normal, js_skip], compile_and_run, [''])
 
 test('ffi022', normal, compile_and_run, [''])
 
@@ -190,6 +191,7 @@ test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi023', [ omit_ways(['ghci']),
                 extra_run_opts('1000 4'),
+                js_skip,
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
                 # The ffi023_setup hack is to ensure that we generate
                 # ffi023_stub.h before compiling ffi023_c.c, which
