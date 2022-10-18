@@ -207,7 +207,7 @@ testRules = do
         -- cross-compilers)
         let absolute_path1
               | cross     = absolute_path_stage (Stage0 InTreeLibs)
-              | otherwise = absolute_path_stage stg
+              | otherwise = absolute_path_stage $ predStage stg
 
         ghcPath <- getCompilerPath testCompilerArg
 
