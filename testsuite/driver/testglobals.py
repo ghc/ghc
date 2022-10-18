@@ -178,6 +178,11 @@ class TestConfig:
         # threads
         self.threads = 1
 
+        # An optional executable used to wrap target code execution
+        # When set tests which aren't marked with TestConfig.cross_okay
+        # are skipped.
+        self.target_wrapper = None
+
         # tests which should be considered to be broken during this testsuite
         # run.
         self.broken_tests = set() # type: Set[TestName]
@@ -447,6 +452,12 @@ class TestOptions:
 
        # Should we copy the files of symlink the files for the test?
        self.copy_files = False
+
+       # Should the test be run in a cross-compiled tree?
+       #   None:  infer from test function
+       #   True:  run when --target-wrapper is set
+       #   False: do not run in cross-compiled trees
+       self.cross_okay = None # type: Optional[bool]
 
        # The extra hadrian dependencies we need for this particular test
        self.hadrian_deps = set(["test:ghc"]) # type: Set[str]
