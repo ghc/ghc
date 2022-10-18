@@ -3481,7 +3481,7 @@ fFlagsDeps = [
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
-  flagSpec "write-if-simplfied-core"          Opt_WriteIfSimplifedCore,
+  flagSpec "write-if-simplfied-core"          Opt_WriteIfSimplifiedCore,
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
@@ -3878,8 +3878,8 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
                 ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
-                ,(Opt_WriteIfSimplifedCore, turnOn, Opt_WriteInterface)
-                ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifedCore)
+                ,(Opt_WriteIfSimplifiedCore, turnOn, Opt_WriteInterface)
+                ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifiedCore)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- General flags that are switched on/off when other general flags are switched

@@ -446,7 +446,7 @@ data GeneralFlag
    | Opt_KeepOFiles
 
    | Opt_BuildDynamicToo
-   | Opt_WriteIfSimplifedCore
+   | Opt_WriteIfSimplifiedCore
    | Opt_UseBytecodeRatherThanObjects
 
    -- safe haskell flags

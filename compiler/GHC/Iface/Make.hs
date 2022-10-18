@@ -280,8 +280,8 @@ mkIface_ hsc_env
         entities = typeEnvElts type_env
         show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
 
-        extra_decls = if gopt Opt_WriteIfSimplifedCore dflags then Just [ toIfaceTopBind b | b <- core_prog ]
-                                                           else Nothing
+        extra_decls = if gopt Opt_WriteIfSimplifiedCore dflags then Just [ toIfaceTopBind b | b <- core_prog ]
+                                                               else Nothing
         decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,

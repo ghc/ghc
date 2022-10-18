@@ -1110,7 +1110,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
                              hscs_old_iface_hash = mb_old_hash
                            }
 
-      Just desugared_guts | gopt Opt_WriteIfSimplifedCore dflags -> do
+      Just desugared_guts | gopt Opt_WriteIfSimplifiedCore dflags -> do
           -- If -fno-code is enabled (hence we fall through to this case)
           -- Running the simplifier once is necessary before doing byte code generation
           -- in order to inline data con wrappers but we honour whatever level of simplificication the
