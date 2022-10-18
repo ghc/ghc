@@ -786,3 +786,54 @@ function h$putchar(c) {
   h$base_write(1, h$putchar_buf, 0, 1, null);
   return h$errno;
 }
+
+function h$__hscore_set_errno(n) {
+  h$errno = n;
+}
+
+/*******************************************
+ * Directory API
+ *******************************************/
+
+function h$opendir(path) {
+  if(!h$isNode()) {
+    throw "h$opendir unsupported";
+  }
+
+  const d = fs.opendirSync(h$decodeUtf8z(path,0));
+  RETURN_UBX_TUP2(d,0);
+}
+
+function h$closedir(d,o) {
+  if(!h$isNode()) {
+    throw "h$closedir unsupported";
+  }
+  d.closeSync();
+  return 0;
+}
+
+function h$readdir(d,o) {
+  if(!h$isNode()) {
+    throw "h$readdir unsupported";
+  }
+  const c = d.readSync();
+  RETURN_UBX_TUP2(c,0);
+}
+
+function h$__hscore_readdir(d,o,dst_a,dst_o) {
+  if(!h$isNode()) {
+    throw "h$readdir unsupported";
+  }
+  const e = d.readSync();
+
+  if (!dst_a.arr) dst_a.arr = [];
+  dst_a.arr[dst_o*2] = [e,0];
+  return 0;
+}
+
+function h$__hscore_free_dirent(a,o) {
+}
+
+function h$__hscore_d_name(a,o) {
+  RETURN_UBX_TUP2(h$encodeModifiedUtf8(a.name),0);
+}
