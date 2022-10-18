@@ -1,5 +1,5 @@
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
-test('T6145', normal, makefile_test, ['T6145'])
+test('T6145', js_skip, makefile_test, ['T6145'])
 test('T8639_api', req_rts_linker,
               makefile_test, ['T8639_api'])
 test('T8628', req_rts_linker,

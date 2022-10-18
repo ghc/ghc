@@ -1,6 +1,7 @@
 test('PartialDownsweep',
      [ extra_run_opts('"' + config.libdir + '"')
      , ignore_stderr
+     , js_skip
      ],
      compile_and_run,
      ['-package ghc -package exceptions'])
