@@ -1036,8 +1036,8 @@ genPrim prof bound ty op = case op of
   TraceEventBinaryOp -> \[] [ed,eo,len] -> PrimInline $ appS "h$traceEventBinary" [ed,eo,len]
   TraceMarkerOp      -> \[] [ed,eo]     -> PrimInline $ appS "h$traceMarker" [ed,eo]
 
-  IndexByteArrayOp_Word8AsChar      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u8  a i
-  IndexByteArrayOp_Word8AsWideChar  -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32 a i
+  IndexByteArrayOp_Word8AsChar      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i         $ r |= read_boff_u8  a i
+  IndexByteArrayOp_Word8AsWideChar  -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32 a i
   IndexByteArrayOp_Word8AsAddr      -> \[r1,r2] [a,i] ->
       PrimInline $ jVar \x -> mconcat
         [ x |= i .<<. two_
@@ -1048,32 +1048,32 @@ genPrim prof bound ty op = case op of
                         ])
                (mconcat [r1 |= null_, r2 |= one_])
         ]
-  IndexByteArrayOp_Word8AsFloat     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_f32 a i
-  IndexByteArrayOp_Word8AsDouble    -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_f64 a i
+  IndexByteArrayOp_Word8AsFloat     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_f32 a i
+  IndexByteArrayOp_Word8AsDouble    -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 7) $ r |= read_boff_f64 a i
   IndexByteArrayOp_Word8AsStablePtr -> \[r1,r2] [a,i] ->
     PrimInline $ mconcat
     [ r1 |= var "h$stablePtrBuf"
     , r2 |= read_boff_i32 a i
     ]
-  IndexByteArrayOp_Word8AsInt16     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i16 a i
-  IndexByteArrayOp_Word8AsInt32     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32 a i
+  IndexByteArrayOp_Word8AsInt16     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 1) $ r |= read_boff_i16 a i
+  IndexByteArrayOp_Word8AsInt32     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32 a i
   IndexByteArrayOp_Word8AsInt64     -> \[h,l] [a,i] ->
     PrimInline $ mconcat
         [ h |= read_boff_i32 a (Add i (Int 4))
         , l |= read_boff_u32 a i
         ]
-  IndexByteArrayOp_Word8AsInt       -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32  a i
-  IndexByteArrayOp_Word8AsWord16    -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u16  a i
-  IndexByteArrayOp_Word8AsWord32    -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u32  a i
+  IndexByteArrayOp_Word8AsInt       -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32  a i
+  IndexByteArrayOp_Word8AsWord16    -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 1) $ r |= read_boff_u16  a i
+  IndexByteArrayOp_Word8AsWord32    -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_u32  a i
   IndexByteArrayOp_Word8AsWord64    -> \[h,l] [a,i] ->
-    PrimInline $ mconcat
+    PrimInline . boundsChecked bound a (Add i 7) $ mconcat
         [ h |= read_boff_u32 a (Add i (Int 4))
         , l |= read_boff_u32 a i
         ]
-  IndexByteArrayOp_Word8AsWord      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u32  a i
+  IndexByteArrayOp_Word8AsWord      -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_u32  a i
 
-  ReadByteArrayOp_Word8AsChar       -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u8  a i
-  ReadByteArrayOp_Word8AsWideChar   -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32 a i
+  ReadByteArrayOp_Word8AsChar       -> \[r] [a,i] -> PrimInline . boundsChecked bound a i         $ r |= read_boff_u8  a i
+  ReadByteArrayOp_Word8AsWideChar   -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32 a i
   ReadByteArrayOp_Word8AsAddr       -> \[r1,r2] [a,i] ->
       PrimInline $ jVar \x -> mconcat
         [ x |= i .<<. two_
@@ -1084,32 +1084,32 @@ genPrim prof bound ty op = case op of
                         ])
                (mconcat [r1 |= null_, r2 |= one_])
         ]
-  ReadByteArrayOp_Word8AsFloat      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_f32 a i
-  ReadByteArrayOp_Word8AsDouble     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_f64 a i
+  ReadByteArrayOp_Word8AsFloat      -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_f32 a i
+  ReadByteArrayOp_Word8AsDouble     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 7) $ r |= read_boff_f64 a i
   ReadByteArrayOp_Word8AsStablePtr  -> \[r1,r2] [a,i] ->
     PrimInline $ mconcat
     [ r1 |= var "h$stablePtrBuf"
     , r2 |= read_boff_i32 a i
     ]
-  ReadByteArrayOp_Word8AsInt16      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i16 a i
-  ReadByteArrayOp_Word8AsInt32      -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32 a i
+  ReadByteArrayOp_Word8AsInt16      -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 1) $ r |= read_boff_i16 a i
+  ReadByteArrayOp_Word8AsInt32      -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32 a i
   ReadByteArrayOp_Word8AsInt64      -> \[h,l] [a,i] ->
     PrimInline $ mconcat
       [ h |= read_boff_i32 a (Add i (Int 4))
       , l |= read_boff_u32 a i
       ]
-  ReadByteArrayOp_Word8AsInt        -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_i32  a i
-  ReadByteArrayOp_Word8AsWord16     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u16  a i
-  ReadByteArrayOp_Word8AsWord32     -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u32  a i
+  ReadByteArrayOp_Word8AsInt        -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_i32  a i
+  ReadByteArrayOp_Word8AsWord16     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 1) $ r |= read_boff_u16  a i
+  ReadByteArrayOp_Word8AsWord32     -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_u32  a i
   ReadByteArrayOp_Word8AsWord64     -> \[h,l] [a,i] ->
-    PrimInline $ mconcat
+    PrimInline . boundsChecked bound a (Add i 7) $ mconcat
         [ h |= read_boff_u32 a (Add i (Int 4))
         , l |= read_boff_u32 a i
         ]
-  ReadByteArrayOp_Word8AsWord       -> \[r] [a,i] -> PrimInline . boundsChecked bound a i $ r |= read_boff_u32  a i
+  ReadByteArrayOp_Word8AsWord       -> \[r] [a,i] -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_boff_u32  a i
 
-  WriteByteArrayOp_Word8AsChar      -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_i8  a i e
-  WriteByteArrayOp_Word8AsWideChar  -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_i32 a i e
+  WriteByteArrayOp_Word8AsChar      -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i         $ write_boff_i8  a i e
+  WriteByteArrayOp_Word8AsWideChar  -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_i32 a i e
   WriteByteArrayOp_Word8AsAddr      -> \[] [a,i,e1,e2] ->
     PrimInline $ mconcat
       [ ifS (Not (a .^ "arr")) (a .^ "arr" |= ValExpr (JList [])) mempty
@@ -1117,11 +1117,11 @@ genPrim prof bound ty op = case op of
           a .^ "arr" .! (i .<<. two_) |= ValExpr (JList [e1, e2])
       ]
 
-  WriteByteArrayOp_Word8AsFloat     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_f32 a i e
-  WriteByteArrayOp_Word8AsDouble    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_f64 a i e
-  WriteByteArrayOp_Word8AsStablePtr -> \[] [a,i,_e1,e2] -> PrimInline . boundsChecked bound a i $ write_boff_i32 a i e2
-  WriteByteArrayOp_Word8AsInt16     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_i16 a i e
-  WriteByteArrayOp_Word8AsInt32     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_i32 a i e
+  WriteByteArrayOp_Word8AsFloat     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_f32 a i e
+  WriteByteArrayOp_Word8AsDouble    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 7) $ write_boff_f64 a i e
+  WriteByteArrayOp_Word8AsStablePtr -> \[] [a,i,_e1,e2] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_i32 a i e2
+  WriteByteArrayOp_Word8AsInt16     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 1) $ write_boff_i16 a i e
+  WriteByteArrayOp_Word8AsInt32     -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_i32 a i e
   WriteByteArrayOp_Word8AsInt64     -> \[] [a,i,h,l] ->
     -- JS Numbers are little-endian and 32-bit, so write the lower 4 bytes at i
     -- then write the higher 4 bytes to i+4
@@ -1129,20 +1129,20 @@ genPrim prof bound ty op = case op of
                $ mconcat [ write_boff_i32 a (Add i (Int 4)) h
                          , write_boff_u32 a i               l
                          ]
-  WriteByteArrayOp_Word8AsInt       -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_i32 a i e
-  WriteByteArrayOp_Word8AsWord16    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_u16 a i e
-  WriteByteArrayOp_Word8AsWord32    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_u32 a i e
+  WriteByteArrayOp_Word8AsInt       -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_i32 a i e
+  WriteByteArrayOp_Word8AsWord16    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 1) $ write_boff_u16 a i e
+  WriteByteArrayOp_Word8AsWord32    -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_u32 a i e
   WriteByteArrayOp_Word8AsWord64    -> \[] [a,i,h,l] ->
-    PrimInline . boundsChecked bound a i
+    PrimInline . boundsChecked bound a (Add i 7)
                $ mconcat [ write_boff_u32 a  (Add i (Int 4)) h
                          , write_boff_u32 a  i               l
                          ]
-  WriteByteArrayOp_Word8AsWord      -> \[] [a,i,e] -> PrimInline . boundsChecked bound a i $ write_boff_u32 a i e
+  WriteByteArrayOp_Word8AsWord      -> \[] [a,i,e] -> PrimInline . boundsChecked bound a (Add i 3) $ write_boff_u32 a i e
 
-  CasByteArrayOp_Int                -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a i $ casOp read_i32 write_i32 r a i old new
-  CasByteArrayOp_Int8               -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a i $ casOp read_i8  write_i8  r a i old new
-  CasByteArrayOp_Int16              -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a i $ casOp read_i16 write_i16  r a i old new
-  CasByteArrayOp_Int32              -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a i $ casOp read_i32 write_i32 r a i old new
+  CasByteArrayOp_Int                -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a (Add i 3) $ casOp read_i32 write_i32 r a i old new
+  CasByteArrayOp_Int8               -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a i         $ casOp read_i8  write_i8  r a i old new
+  CasByteArrayOp_Int16              -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a (Add i 1) $ casOp read_i16 write_i16 r a i old new
+  CasByteArrayOp_Int32              -> \[r] [a,i,old,new] -> PrimInline . boundsChecked bound a (Add i 3) $ casOp read_i32 write_i32 r a i old new
 
   CasByteArrayOp_Int64              -> \[r_h,r_l] [a,i,old_h,old_l,new_h,new_l] -> PrimInline . boundsChecked bound a (Add (i .<<. one_) one_) $
     jVar \t_h t_l -> mconcat [ t_h |= read_i32 a (Add (i .<<. one_) one_)
