@@ -18,7 +18,7 @@ module GHC.Data.Bag (
         concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, nonEmptyToBag, bagToList, headMaybe, mapAccumBagL,
-        concatMapBag, concatMapBagPair, mapMaybeBag,
+        concatMapBag, concatMapBagPair, mapMaybeBag, unzipBag,
         mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
@@ -33,9 +33,10 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Data
-import Data.Maybe( mapMaybe, listToMaybe )
+import Data.Maybe( mapMaybe )
 import Data.List ( partition, mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup ( (<>) )
 
 infixr 3 `consBag`
@@ -45,7 +46,7 @@ data Bag a
   = EmptyBag
   | UnitBag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
-  | ListBag [a]             -- INVARIANT: the list is non-empty
+  | ListBag (NonEmpty a)
   deriving (Foldable, Functor, Traversable)
 
 emptyBag :: Bag a
@@ -90,7 +91,7 @@ isSingletonBag :: Bag a -> Bool
 isSingletonBag EmptyBag      = False
 isSingletonBag (UnitBag _)   = True
 isSingletonBag (TwoBags _ _) = False          -- Neither is empty
-isSingletonBag (ListBag xs)  = isSingleton xs
+isSingletonBag (ListBag (_:|xs)) = null xs
 
 filterBag :: (a -> Bool) -> Bag a -> Bag a
 filterBag _    EmptyBag = EmptyBag
@@ -98,7 +99,7 @@ filterBag pred b@(UnitBag val) = if pred val then b else EmptyBag
 filterBag pred (TwoBags b1 b2) = sat1 `unionBags` sat2
     where sat1 = filterBag pred b1
           sat2 = filterBag pred b2
-filterBag pred (ListBag vs)    = listToBag (filter pred vs)
+filterBag pred (ListBag vs)    = listToBag (filter pred (toList vs))
 
 filterBagM :: Monad m => (a -> m Bool) -> Bag a -> m (Bag a)
 filterBagM _    EmptyBag = return EmptyBag
@@ -111,7 +112,7 @@ filterBagM pred (TwoBags b1 b2) = do
   sat2 <- filterBagM pred b2
   return (sat1 `unionBags` sat2)
 filterBagM pred (ListBag vs) = do
-  sat <- filterM pred vs
+  sat <- filterM pred (toList vs)
   return (listToBag sat)
 
 allBag :: (a -> Bool) -> Bag a -> Bool
@@ -135,9 +136,7 @@ anyBagM p (TwoBags b1 b2) = do flag <- anyBagM p b1
 anyBagM p (ListBag xs)    = anyM p xs
 
 concatBag :: Bag (Bag a) -> Bag a
-concatBag bss = foldr add emptyBag bss
-  where
-    add bs rs = bs `unionBags` rs
+concatBag = foldr unionBags emptyBag
 
 catBagMaybes :: Bag (Maybe a) -> Bag a
 catBagMaybes bs = foldr add emptyBag bs
@@ -155,7 +154,7 @@ partitionBag pred (TwoBags b1 b2)
   where (sat1, fail1) = partitionBag pred b1
         (sat2, fail2) = partitionBag pred b2
 partitionBag pred (ListBag vs) = (listToBag sats, listToBag fails)
-  where (sats, fails) = partition pred vs
+  where (sats, fails) = partition pred (toList vs)
 
 
 partitionBagWith :: (a -> Either b c) -> Bag a
@@ -171,7 +170,7 @@ partitionBagWith pred (TwoBags b1 b2)
   where (sat1, fail1) = partitionBagWith pred b1
         (sat2, fail2) = partitionBagWith pred b2
 partitionBagWith pred (ListBag vs) = (listToBag sats, listToBag fails)
-  where (sats, fails) = partitionWith pred vs
+  where (sats, fails) = partitionWith pred (toList vs)
 
 foldBag :: (r -> r -> r) -- Replace TwoBags with this; should be associative
         -> (a -> r)      -- Replace UnitBag with this
@@ -220,7 +219,7 @@ mapMaybeBag f (UnitBag x)     = case f x of
                                   Nothing -> EmptyBag
                                   Just y  -> UnitBag y
 mapMaybeBag f (TwoBags b1 b2) = unionBags (mapMaybeBag f b1) (mapMaybeBag f b2)
-mapMaybeBag f (ListBag xs)    = ListBag (mapMaybe f xs)
+mapMaybeBag f (ListBag xs)    = listToBag $ mapMaybe f (toList xs)
 
 mapBagM :: Monad m => (a -> m b) -> Bag a -> m (Bag b)
 mapBagM _ EmptyBag        = return EmptyBag
@@ -267,7 +266,7 @@ mapAndUnzipBagM f (TwoBags b1 b2) = do (r1,s1) <- mapAndUnzipBagM f b1
                                        (r2,s2) <- mapAndUnzipBagM f b2
                                        return (TwoBags r1 r2, TwoBags s1 s2)
 mapAndUnzipBagM f (ListBag xs)    = do ts <- mapM f xs
-                                       let (rs,ss) = unzip ts
+                                       let (rs,ss) = NE.unzip ts
                                        return (ListBag rs, ListBag ss)
 
 mapAccumBagL ::(acc -> x -> (acc, y)) -- ^ combining function
@@ -298,20 +297,31 @@ mapAccumBagLM f s (ListBag xs)    = do { (s', xs') <- mapAccumLM f s xs
 listToBag :: [a] -> Bag a
 listToBag [] = EmptyBag
 listToBag [x] = UnitBag x
-listToBag vs = ListBag vs
+listToBag (x:xs) = ListBag (x:|xs)
 
 nonEmptyToBag :: NonEmpty a -> Bag a
 nonEmptyToBag (x :| []) = UnitBag x
-nonEmptyToBag (x :| xs) = ListBag (x : xs)
+nonEmptyToBag xs = ListBag xs
 
 bagToList :: Bag a -> [a]
 bagToList b = foldr (:) [] b
+
+unzipBag :: Bag (a, b) -> (Bag a, Bag b)
+unzipBag EmptyBag = (EmptyBag, EmptyBag)
+unzipBag (UnitBag (a, b)) = (UnitBag a, UnitBag b)
+unzipBag (TwoBags xs1 xs2) = (TwoBags as1 as2, TwoBags bs1 bs2)
+  where
+    (as1, bs1) = unzipBag xs1
+    (as2, bs2) = unzipBag xs2
+unzipBag (ListBag xs) = (ListBag as, ListBag bs)
+  where
+    (as, bs) = NE.unzip xs
 
 headMaybe :: Bag a -> Maybe a
 headMaybe EmptyBag = Nothing
 headMaybe (UnitBag v) = Just v
 headMaybe (TwoBags b1 _) = headMaybe b1
-headMaybe (ListBag l) = listToMaybe l
+headMaybe (ListBag (v:|_)) = Just v
 
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))

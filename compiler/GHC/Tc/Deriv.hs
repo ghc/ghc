@@ -289,8 +289,8 @@ renameDeriv inst_infos bagBinds
         -- Bring the extra deriving stuff into scope
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
-        ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
-        ; let aux_val_binds = ValBinds NoAnnSortKey aux_binds (bagToList aux_sigs)
+        ; let (aux_binds, aux_sigs) = unzipBag bagBinds
+              aux_val_binds = ValBinds NoAnnSortKey aux_binds (bagToList aux_sigs)
         -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
         -- auxiliary bindings as if they were defined locally.
         -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.

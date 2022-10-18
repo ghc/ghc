@@ -1,3 +1,5 @@
+{-# LANGUAGE MonadComprehensions #-}
+
 -- | Utilities related to Monad and Applicative classes
 --   Mostly for backwards compatibility.
 
@@ -28,8 +30,11 @@ import GHC.Prelude
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Control.Monad.Trans.State.Strict (StateT (..))
 import Data.Foldable (sequenceA_, foldlM, foldrM)
 import Data.List (unzip4, unzip5, zipWith4)
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Tuple (swap)
 
 -------------------------------------------------------------------------------
 -- Common functions
@@ -137,24 +142,42 @@ mapAndUnzip5M f xs =  unzip5 <$> traverse f xs
 -- variant and use it where appropriate.
 
 -- | Monadic version of mapAccumL
-mapAccumLM :: Monad m
+mapAccumLM :: (Monad m, Traversable t)
             => (acc -> x -> m (acc, y)) -- ^ combining function
             -> acc                      -- ^ initial state
-            -> [x]                      -- ^ inputs
-            -> m (acc, [y])             -- ^ final state, outputs
-{-# INLINE mapAccumLM #-}
+            -> t x                      -- ^ inputs
+            -> m (acc, t y)             -- ^ final state, outputs
+{-# INLINE [1] mapAccumLM #-}
 -- INLINE pragma.  mapAccumLM is called in inner loops.  Like 'map',
 -- we inline it so that we can take advantage of knowing 'f'.
 -- This makes a few percent difference (in compiler allocations)
 -- when compiling perf/compiler/T9675
-mapAccumLM f s xs =
-  go s xs
+mapAccumLM f s = fmap swap . flip runStateT s . traverse f'
+  where
+    f' = StateT . (fmap . fmap) swap . flip f
+{-# RULES "mapAccumLM/List" mapAccumLM = mapAccumLM_List #-}
+{-# RULES "mapAccumLM/NonEmpty" mapAccumLM = mapAccumLM_NonEmpty #-}
+
+mapAccumLM_List
+ :: Monad m
+ => (acc -> x -> m (acc, y))
+ -> acc -> [x] -> m (acc, [y])
+{-# INLINE mapAccumLM_List #-}
+mapAccumLM_List f s = go s
   where
     go s (x:xs) = do
       (s1, x')  <- f s x
       (s2, xs') <- go s1 xs
       return    (s2, x' : xs')
     go s [] = return (s, [])
+
+mapAccumLM_NonEmpty
+ :: Monad m
+ => (acc -> x -> m (acc, y))
+ -> acc -> NonEmpty x -> m (acc, NonEmpty y)
+{-# INLINE mapAccumLM_NonEmpty #-}
+mapAccumLM_NonEmpty f s (x:|xs) =
+  [(s2, x':|xs') | (s1, x') <- f s x, (s2, xs') <- mapAccumLM_List f s1 xs]
 
 -- | Monadic version of mapSnd
 mapSndM :: (Applicative m, Traversable f) => (b -> m c) -> f (a,b) -> m (f (a,c))
@@ -174,24 +197,20 @@ mapMaybeM f = foldr g (pure [])
   where g a = liftA2 (maybe id (:)) (f a)
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
-anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-anyM f xs = go xs
-  where
-    go [] = return False
-    go (x:xs) = do b <- f x
-                   if b then return True
-                        else go xs
+anyM :: (Monad m, Foldable f) => (a -> m Bool) -> f a -> m Bool
+anyM f = foldr (orM . f) (pure False)
 
 -- | Monad version of 'all', aborts the computation at the first @False@ value
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM f bs = go bs
-  where
-    go []     = return True
-    go (b:bs) = (f b) >>= (\bv -> if bv then go bs else return False)
+allM :: (Monad m, Foldable f) => (a -> m Bool) -> f a -> m Bool
+allM f = foldr (andM . f) (pure True)
 
 -- | Monadic version of or
 orM :: Monad m => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
+
+-- | Monadic version of and
+andM :: Monad m => m Bool -> m Bool -> m Bool
+andM m1 m2 = m1 >>= \x -> if x then m2 else return False
 
 -- | Monadic version of foldl that discards its result
 foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
