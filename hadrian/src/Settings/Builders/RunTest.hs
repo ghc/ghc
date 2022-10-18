@@ -213,6 +213,7 @@ runTestBuilderArgs = builder Testsuite ? do
     (testEnv, testMetricsFile) <- expr . liftIO $
         (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
     perfBaseline <- expr . liftIO $ lookupEnv "PERF_BASELINE_COMMIT"
+    targetWrapper <- expr . liftIO $ lookupEnv "CROSS_EMULATOR"
 
     threads     <- shakeThreads <$> expr getShakeOptions
     top         <- expr $ topDirectory
@@ -282,6 +283,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , case perfBaseline of
                 Just commit | not (null commit) -> arg ("--perf-baseline=" ++ commit)
                 _ -> mempty
+            , emitWhenSet targetWrapper $ \cmd -> arg ("--target-wrapper=" ++ cmd)
             , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.
