@@ -24,8 +24,8 @@ module GHC.Core.Opt.Simplify.Utils (
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
-        contIsTrivial, contIsRhs,
-        countArgs, contArgs,
+        contIsTrivial, contArgs, contIsRhs,
+        countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop,
         interestingCallContext,
 

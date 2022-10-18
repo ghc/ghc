@@ -117,9 +117,6 @@ seqGuidance :: UnfoldingGuidance -> ()
 seqGuidance (UnfIfGoodArgs ns n b) = n `seq` (seqList (map seqArgDiscount ns) ()) `seq` b `seq` ()
 seqGuidance _                      = ()
 
--- seqTopDiscount :: (a, ArgDiscount) -> ()
--- seqTopDiscount (!_,dc) = seqArgDiscount dc
-
 seqArgDiscount :: ArgDiscount -> ()
 seqArgDiscount (DiscSeq !_ sub_args) = seqEltsUFM seqConDiscount sub_args
 seqArgDiscount !_ = ()

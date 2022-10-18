@@ -163,7 +163,6 @@ updateReportPrefix n opts = opts { unfoldingReportPrefix = n }
 updateMaxDiscountDepth :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateMaxDiscountDepth n opts = opts { unfoldingMaxDiscountDepth = n }
 
-
 {-
 Note [Occurrence analysis of unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -274,7 +273,6 @@ calcUnfoldingGuidance opts is_top_bottoming expr
     mk_discount :: VarEnv ArgDiscount -> Id -> (ArgDiscount)
     mk_discount cbs bndr =
         let !dc = lookupWithDefaultVarEnv cbs NoSeqUse bndr
-            -- !depth = discountDepth dc
         in (dc)
 
 {- Note [Inline unsafeCoerce]
@@ -410,37 +408,83 @@ sharing the wrapper closure.
 
 The solution: don’t ignore coercion arguments after all.
 
-Note [Nested discounts]
-~~~~~~~~~~~~~~~~~~~~~~~
-If we have code like:
+Note [Deep Discounts]
+~~~~~~~~~~~~~~~~~~~~~
+We used to have a simple model of inlining discounts for function arguments,
+where we would simply compute a numerical value to use as discount if a function
+was applied to a value in this specific argument position. For many functions
+this works reasonably well, however it completely fell apart for generics heavy
+code. The issue arose from code like:
 
-f :: Either Bool Int -> Int
-f x = case x of
-    Left l -> case l of
-        True -> 1
-        False -> sum [1..200] :: Int
-    Right r -> case r of
-        r -> r + succ r
+f x y =
+    case x of
+      Just x' -> case x' of x' -> x'
+      Nothing -> y : <veryVeryLarge>
 
-What should the discount be? I argue it should be a discount *tree* like this:
-    [some_con:62,
-      Left:43
-        [some_con:30, False:10[], True:49[]],
-      Right:70
-        [some_con:20, GHC.Types.I#:11[disc:30]]
-        ]
+If `f` is applied to `Just y` inlining it at a call site is certainly always the
+right choice. But if the argument is unknown or known to be `Nothing` it could
+be quite bad for code size to do so.
 
-How can we compute this? While we traverse the expression if we see a case on a interesting
-binder (e.g. x):
-* We look at all the alternatives(Left,Right), treating the constructor bound vars(l,r) as
-  additional interesting binders for their rhss.
-* We compute a default discount `some_con` which assumes we will statically choose the largest
-  alternative if we inline.
-* We compute specific discounts for each constructor alternative by attributing any
-  discount on alternative binders(l,r) to the constructor this alternative is matching on.
-* The discounts for the whole case are then represented by the combination of the flat default discount
-  as well as a list of constructor specific discounts, which carry inside them the discounts for their
-  arguments.
+Deep discounts solve this issue. Instead of computing a single numerical discount
+value per argument we compute "deep" discount information. Together with the
+structure of an argument deep discount information can be evaluated to a more
+accurate numerical discount for a concrete argument.
+
+How can we compute this? This is done by sizeExpr where while we traverse
+the expression to compute unfolding guidance we keep track of a set of
+"interesting" binders and if they are used in interesting ways. We are
+seeding this set with the original function arguments.
+The relevant part for deep discounts happens if a subexpression cases on
+an interesting binder, which means:
+* We look at all the alternatives and compute discounts for them under the
+  assumption that case-of-known-con will trigger:
+  + Inside the rhss we are treating the constructor bound vars as additional
+    interesting binders.
+    E.g. in the above example for the `Just x'` case we look for interesting uses
+    of x' inside the RHS.
+  + We compute a discount for each alternative which is the combination of the
+    benefit of having ruled out the other alternatives and the discounts of using
+    any interesting binders inside the rhs of the alternative.
+  * We compute a flat default discount for the whole case expression. For this we
+    simple assume case-of-known-con will select the largest alternative.
+    This discount will be used if we know an argument is a value
+    but we don't have any more information about the exact constructor.
+* The discounts resulting from the case expression is then represented by the
+   combination of the default discount as well as a list of constructor/alternative specific
+  discounts, which carry inside them nested discounts which relate to the binders
+  each alternative binds.
+
+
+For our simple example function above the final discounts will then look
+something like this: [{seqd:110,Nothing:90[],Just:371[seq:20]} noseq].
+* The `noseq` at the end is the discount information for `y` and says that `y`
+  being a value does not warrant any discount.
+* In the curly braces we have the (deep) discount information about the `x` argument.
+  + seqd:110 tells us the discount for generic value argument should be 110
+  + Nothing:90 tells us the discount for a `Nothing` value argument should be
+    somewhat small at 90.
+  + Just:371 let's us now that we should apply a very high discount of 371 if
+    the argument is a `Just` constructor, with an additional discount of 20
+    if the argument to the `Just` constructor itself is also an value.
+
+If later on during simplification we see an application of f:  `f (Just [1]) 1`
+and need to decide on inlining we match up arguments to discounts in a recursive
+fashion.
+
+
+For the first argument we see a `Just` constructor as the argument and the
+unfolding guidance contains discount info for this argument. We check if there
+is a specific discount for the Just constructor and find one, so we will apply it.
+  We then see that inside the first argument `Just` is further applied to `1:[]`.
+We check if we should apply a further discount for the argument to Just being a
+value. And indeed we find `seq:20` indicating a generic useful use of this
+component of the argument so we apply another discount of 20.
+`seq:20` implies there are no more useful subdiscounts for this argument so we
+move on to the second argument. We find `noseq` indicating no interesting use of
+this argument so we don't give any extra discount based on the function body to
+the second argument.
+
+
 
 -}
 

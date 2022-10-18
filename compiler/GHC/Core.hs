@@ -41,7 +41,7 @@ module GHC.Core (
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
-        bindersOf, foldBindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
@@ -1375,12 +1375,11 @@ data ArgDiscount
 
 instance Outputable ArgDiscount where
   ppr (SomeArgUse n)= text "seq:" <> ppr n
-  ppr (NoSeqUse)= text "lazy use"
-  ppr (FunDisc d f ) = text "fun-"<>ppr f<>text ":"<> ppr d
+  ppr (NoSeqUse)= text "noseq"
+  ppr (FunDisc d f ) = text "fun"<> (whenPprDebug $ brackets (ppr f))<>text ":"<> ppr d
   ppr (DiscSeq d_seq m)
-    | isNullUFM m = text "disc:"<> ppr d_seq
-    | otherwise = sep (punctuate comma ((text "some_con:"<> ppr d_seq) : map ppr (nonDetEltsUFM m)))
-      -- (text "some_con:"<> ppr d_seq) <> text "||" <> braces (pprUFM m ppr)
+    | isNullUFM m = text "seqd:"<> ppr d_seq
+    | otherwise = braces $ vcat (punctuate comma ((text "seqd:"<> ppr d_seq) : map ppr (nonDetEltsUFM m)))
 
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance

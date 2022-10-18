@@ -570,9 +570,9 @@ and another of 10 if it's some non-trivial value.
 However when computing unfolding guidance we might have come to
 the conclusion that certain argument values deservere little or no
 discount. But we want to chance of inlining to only ever increase as
-more is known about the argument to keep things more predictable. So
-we always give at least 10 discount if the argument is a value. No matter
-what the actual value is.
+more is known about the argument to keep things more predictable. Hence
+we always give at least 10 discount for the argument if it's a value.
+No matter what the actual value is.
 -}
 
 
@@ -600,14 +600,8 @@ computeDiscount arg_discounts !res_discount arg_infos cont_info
     mk_arg_discount _        NonTrivArg = 10
     mk_arg_discount NoSeqUse    _       = 10
     mk_arg_discount discount ValueArg   = max 10 (ad_seq_discount discount)
-    mk_arg_discount (DiscSeq seq_discount con_discounts) (ConArg con args)
-
-      -- There is a discount specific to this constructor, use that.
-      | Just (ConDiscount _ branch_dc arg_discounts) <- lookupUFM con_discounts con
-      = max 10 $ max seq_discount (branch_dc + (sum $ zipWith mk_arg_discount arg_discounts args))
-
-      -- Otherwise give it the generic seq discount
-      | otherwise = max 10 seq_discount
+    mk_arg_discount (DiscSeq seq_disc con_discs) (ConArg con args)
+      = max 10 $! get_con_arg_disc seq_disc con_discs con args
     mk_arg_discount (SomeArgUse d) ConArg{} = max 10 d
     mk_arg_discount (FunDisc d _) (ConArg{})
       -- How can this arise? With dictionary constructors for example.
@@ -619,7 +613,15 @@ computeDiscount arg_discounts !res_discount arg_infos cont_info
       = -- pprTrace "Function discount for con arg" (ppr arg_infos)
         max 10 d
 
-    -- zipWithSumLength xs ys = (length $ zip xs ys, sum $ zipWith _ xs ys)
+    get_con_arg_disc seq_disc con_discs con args
+      -- There is a discount specific to this constructor, use that.
+      | Just (ConDiscount _ branch_dc arg_discounts) <- lookupUFM con_discs con
+      = max seq_disc (branch_dc + (sum $ zipWith mk_arg_discount arg_discounts args))
+
+      -- Otherwise give it the generic seq discount
+      | otherwise = seq_disc
+
+    -- zipWithSumLength xs ys = (length $ zip xs ys, sum $ zipWith mk_arg_discount xs ys)
     zipWithSumLength :: [ArgDiscount] -> [ArgSummary] -> (Int, Int)
     zipWithSumLength dcs args = go 0 0 dcs args
       where
@@ -682,6 +684,20 @@ where df is con-like. Then we'd really like to inline 'f' so that the
 rule for (*) (df d) can fire.  To do this
   a) we give a discount for being an argument of a class-op (eg (*) d)
   b) we say that a con-like argument (eg (df d)) is interesting
+
+Note [Class dicts are simple value arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's extremely rare that we actually *case* on a class dictionary.
+Instead uses usually are only in argument position like this:
+
+    fromInteger @a_axP $dNum_axQ T21938.foo1
+
+Indeed these days we take care to avoid taking apart class dictionaries
+as it can interfere with specialization. For example see
+Note [Do not unbox class dictionaries]. This means there is little point
+in carefully recording the structure of such dictionary arguments and we
+can get away with simply recording the fact that we know it is in fact an
+value/dictionary which helps with compile time performance.
 -}
 
 interestingArg :: SimplEnv -> CoreExpr -> ArgSummary
@@ -693,7 +709,7 @@ interestingArg env e =
 
     -- n is # value args to which the expression is applied
     go :: SimplEnv -> Int -> Int -> CoreExpr -> ArgSummary
-    go !_env max_depth _n !_
+    go !_env max_depth !_n !_
       | max_depth <= 0 = TrivArg
     go env depth n (Var v)
        = case substId env v of
@@ -734,13 +750,8 @@ interestingArg env e =
 
     go_var depth n v
       | Just rhs <- maybeUnfoldingTemplate (idUnfolding v)
-      , (f, arg_summaries, _ticks) <- mapArgsTicksVal (go env (depth-1) 0) rhs
-      , Var f' <- varView f
-      , Just con <- isDataConId_maybe f'
-      , not (isClassTyCon $ dataConTyCon con)
-      =
-        -- pprTrace "ConArg1" (ppr $ ConArg con $ map (go env 0) args) $
-        ConArg con arg_summaries
+      , Just con_app <- isConApp_maybe rhs
+      = con_app
 
       | Just con <- isDataConId_maybe v
       = ConArg con []
@@ -754,11 +765,21 @@ interestingArg env e =
       where
         conlike_unfolding = isConLikeUnfolding (idUnfolding v)
 
+        isConApp_maybe rhs
+          | (f, arg_summaries, _ticks) <- mapArgsTicksVal (go env (depth-1) 0) rhs
+          , Var f' <- varView f
+          , Just con <- isDataConId_maybe f'
+          -- See Note [Class dicts are simple value arguments]
+          , not (isClassTyCon $ dataConTyCon con)
+          = Just $ ConArg con arg_summaries
+          | otherwise = Nothing
+
+
         varView (Cast e _) = e
         varView (Tick _ e) = e
         varView e = e
 
--- | Like @collectArgs@, but maps over the arguments at the same time.
+-- | Like @collectArgs@, but maps over the arguments at the same time
 -- and also looks through casts.
 mapArgsTicksVal :: (Expr b -> c) -> Expr b
                  -> (Expr b, [c], [CoreTickish])
