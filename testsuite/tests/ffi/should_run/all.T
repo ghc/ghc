@@ -204,7 +204,7 @@ test('T12614', [omit_ways(['ghci']),js_skip_csources], compile_and_run, ['T12614
 
 test('T14624', [omit_ways(['ghci'])], compile_and_run, ['T14624_c.c'])
 
-test('T15933', extra_files(['T15933_c.c', 'T15933.h']), makefile_test, ['T15933'])
+test('T15933', [extra_files(['T15933_c.c', 'T15933.h']), js_skip_csources], makefile_test, ['T15933'])
 
 test('T16650a', [omit_ways(['ghci']), js_skip_csources], compile_and_run, ['T16650a_c.c'])
 
