@@ -469,22 +469,7 @@ something like this: [{seqd:110,Nothing:90[],Just:371[seq:20]} noseq].
 
 If later on during simplification we see an application of f:  `f (Just [1]) 1`
 and need to decide on inlining we match up arguments to discounts in a recursive
-fashion.
-
-
-For the first argument we see a `Just` constructor as the argument and the
-unfolding guidance contains discount info for this argument. We check if there
-is a specific discount for the Just constructor and find one, so we will apply it.
-  We then see that inside the first argument `Just` is further applied to `1:[]`.
-We check if we should apply a further discount for the argument to Just being a
-value. And indeed we find `seq:20` indicating a generic useful use of this
-component of the argument so we apply another discount of 20.
-`seq:20` implies there are no more useful subdiscounts for this argument so we
-move on to the second argument. We find `noseq` indicating no interesting use of
-this argument so we don't give any extra discount based on the function body to
-the second argument.
-
-
+fashion. This is done by computeDiscount.
 
 -}
 

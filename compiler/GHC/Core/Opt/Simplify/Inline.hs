@@ -591,18 +591,15 @@ computeDiscount arg_discounts !res_discount arg_infos cont_info
     + total_arg_discount + res_discount'
   where
     (applied_arg_length,total_arg_discount) = zipWithSumLength arg_discounts arg_infos
-    -- actual_arg_discounts = zipWith mk_arg_discount (arg_discounts) arg_infos
-    -- total_arg_discount   = sum actual_arg_discounts
 
-    -- See Note [Minimum value discount]
     mk_arg_discount :: ArgDiscount -> ArgSummary -> Int
     mk_arg_discount _        TrivArg    = 0
     mk_arg_discount _        NonTrivArg = 10
     mk_arg_discount NoSeqUse    _       = 10
-    mk_arg_discount discount ValueArg   = max 10 (ad_seq_discount discount)
+    mk_arg_discount discount ValueArg   = (ad_seq_discount discount)
     mk_arg_discount (DiscSeq seq_disc con_discs) (ConArg con args)
-      = max 10 $! get_con_arg_disc seq_disc con_discs con args
-    mk_arg_discount (SomeArgUse d) ConArg{} = max 10 d
+      = get_con_arg_disc seq_disc con_discs con args
+    mk_arg_discount (SomeArgUse d) ConArg{} = d
     mk_arg_discount (FunDisc d _) (ConArg{})
       -- How can this arise? With dictionary constructors for example.
       -- We see C:Show foo bar and give it a FunDisc for being applied
@@ -611,7 +608,7 @@ computeDiscount arg_discounts !res_discount arg_infos cont_info
       -- since well it is one. This is harmless, but a bit odd for sure.
       -- We just treat it like any other boring ValueArg here.
       = -- pprTrace "Function discount for con arg" (ppr arg_infos)
-        max 10 d
+        d
 
     get_con_arg_disc seq_disc con_discs con args
       -- There is a discount specific to this constructor, use that.
@@ -621,13 +618,17 @@ computeDiscount arg_discounts !res_discount arg_infos cont_info
       -- Otherwise give it the generic seq discount
       | otherwise = seq_disc
 
-    -- zipWithSumLength xs ys = (length $ zip xs ys, sum $ zipWith mk_arg_discount xs ys)
+    -- zipWithSumLength xs ys =
+    --    (length $ zip xs ys, sum $ map (mapIfValue (max 10)) $ zipWith mk_arg_discount xs ys)
+    --    but in fast
     zipWithSumLength :: [ArgDiscount] -> [ArgSummary] -> (Int, Int)
     zipWithSumLength dcs args = go 0 0 dcs args
       where
         go !length !discount (dc:dcs) (arg:args) =
-          let arg_discount = mk_arg_discount dc arg
-          in go (1+length) (discount + arg_discount) dcs args
+          let !arg_discount = mk_arg_discount dc arg
+              -- See Note [Minimum value discount]
+              !monotone_arg_discount = if nonTrivArg arg then max 10 arg_discount else arg_discount
+          in go (1+length) (discount + monotone_arg_discount) dcs args
         go l d [] _ = (l,d)
         go l d _ [] = (l,d)
 
