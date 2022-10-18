@@ -1,6 +1,6 @@
 
 test('T21115', normal, compile_fail, [''])
-test('T21115b', normal, compile_fail, ['-dsuppress-uniques -dsuppress-all'])
+test('T21115b', req_th, compile_fail, ['-dsuppress-uniques -dsuppress-all'])
 test('T21152', normal, compile, ['-g3'])
 
 ## Tests which use the GHC API.
