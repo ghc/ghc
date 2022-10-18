@@ -43,6 +43,6 @@ test('T16756a', normal, compile, [''])
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('saks027', omit_ways(['profasm']), compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('saks028', omit_ways(['profasm']), compile, [''])
+test('saks027', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('saks028', req_th, compile, [''])
 test('T17164', omit_ways(['profasm']), compile, ['-v0 -ddump-splices -dsuppress-uniques'])

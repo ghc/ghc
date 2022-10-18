@@ -625,14 +625,7 @@ test('T14811', normal, compile, [''])
 test('T14934', [extra_files(['T14934.hs', 'T14934a.hs'])], makefile_test, [])
 test('T13643', normal, compile, [''])
 test('SplitWD', normal, compile, [''])
-# we omit profasm because it fails with:
-# T14441.hs:1:1: fatal:
-#     Cannot load -prof objects when GHC is built with -dynamic
-#     To fix this, either:
-#       (1) Use -fexternal-interpreter, or
-#       (2) Build the program twice: once with -dynamic, and then
-#           with -prof using -osuf to set a different object file suffix.
-test('T14441', omit_ways(['profasm']), compile, [''])
+test('T14441', req_th, compile, [''])
 test('T15079', normal, compile, [''])
 test('T15050', normal, compile, [''])
 test('T14735', normal, compile, [''])
