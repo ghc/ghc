@@ -78,6 +78,7 @@ parser.add_argument("--metrics-file", help="file in which to save (append) the p
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--unexpected-output-dir", help="directory in which to place unexpected output")
 parser.add_argument("--target-wrapper", help="wrapper executable to use when executing binaries compiled for the target")
+parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
 parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
