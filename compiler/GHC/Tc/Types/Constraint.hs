@@ -235,7 +235,8 @@ data Ct
        --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
        --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
-       --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
+       --   * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
+       --     application of a newtype TyCon.
        --     See Note [No top-level newtypes on RHS of representational equalities]
        --     in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
        --     in scope.)

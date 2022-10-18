@@ -2032,6 +2032,14 @@ and the Id newtype is unwrapped. This is assured by requiring only rewritten
 types in canEqCanLHS *and* having the newtype-unwrapping check above
 the tyvar check in can_eq_nc.
 
+Note that this only applies to saturated applications of newtype TyCons, as
+we can't rewrite an unsaturated application. See for example T22310, where
+we ended up with:
+
+  newtype Compose f g a = ...
+
+  [W] t[tau] ~# Compose Foo Bar
+
 Note [Put touchable variables on the left]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Ticket #10009, a very nasty example:
@@ -2401,15 +2409,17 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
 
     lhs_ty = canEqLHSType lhs
 
-    -- This is about (TyEq:N): check that we don't have a newtype
-    -- whose constructor is in scope at the top-level of the RHS.
+    -- This is about (TyEq:N): check that we don't have a saturated application
+    -- of a newtype TyCon at the top level of the RHS, if the constructor
+    -- of the newtype is in scope.
     ty_eq_N_OK :: TcS Bool
     ty_eq_N_OK
       | ReprEq <- eq_rel
-      , Just tc <- tyConAppTyCon_maybe rhs
+      , Just (tc, tc_args) <- splitTyConApp_maybe rhs
       , Just con <- newTyConDataCon_maybe tc
-      -- #21010: only a problem if the newtype constructor is in scope
-      -- yet we didn't rewrite it away.
+      -- #22310: only a problem if the newtype TyCon is saturated.
+      , tc_args `lengthAtLeast` tyConArity tc
+      -- #21010: only a problem if the newtype constructor is in scope.
       = do { rdr_env <- getGlobalRdrEnvTcS
            ; let con_in_scope = isJust $ lookupGRE_Name rdr_env (dataConName con)
            ; return $ not con_in_scope }
