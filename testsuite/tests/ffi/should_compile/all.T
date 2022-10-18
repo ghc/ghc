@@ -33,14 +33,8 @@ test('cc016', normal, compile, [''])
 test('T10460', normal, compile, [''])
 test('T11983', [omit_ways(['ghci'])], compile, ['T11983.c'])
 test('T14125', normal, compile, [''])
-test(
-    'cc017',
-    # We need TH but can't load profiled dynamic objects
-    when(ghc_dynamic(), omit_ways(['profasm'])),
-    compile,
-    [
-        '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'
-        + (' -optcxx=-stdlib=libc++' if opsys('darwin') else '')
-    ],
-)
+test('cc017', req_th, compile,
+     [ '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'
+       + (' -optcxx=-stdlib=libc++' if opsys('darwin') else '')
+     ])
 test('T15531', normal, compile, ['-Wall'])
