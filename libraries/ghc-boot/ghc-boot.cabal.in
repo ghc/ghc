@@ -80,4 +80,4 @@ Library
                    ghc-boot-th == @ProjectVersionMunged@
     if !os(windows)
         build-depends:
-                   unix       >= 2.7 && < 2.8
+                   unix       >= 2.7 && < 2.9

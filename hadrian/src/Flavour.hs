@@ -33,6 +33,7 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
+import Oracles.Flag
 import Oracles.Setting
 
 
@@ -106,8 +107,13 @@ addArgs args' fl = fl { args = args fl <> args' }
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
+
+-- TODO: the -Wwarn flags are added to make validation flavour works
+-- for cross-compiling unix-2.8.0.0. There needs to be further fixes
+-- in unix and/or hsc2hs to make cross-compiling unix completely free
+-- from warnings.
 werror :: Flavour -> Flavour
-werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
+werror = addArgs (builder Ghc ? notStage0 ? mconcat [arg "-Werror", flag CrossCompiling ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]])
 
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
