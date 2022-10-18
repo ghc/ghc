@@ -4,7 +4,8 @@
 #	extra run flags
 #	expected process return value, if not zero
 
-test('fed001', normal, compile_and_run, [''])
+test( 'fed001', js_skip # qsort not yet implemented in JavaScript backend
+    , compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
 test('ffi001', [ omit_ways(['ghci'])
