@@ -156,7 +156,7 @@ test('T2528', normal, compile_and_run, [''])
 # May 2014: seems to work on msys2
 # May 2018: The behavior of printf seems very implementation dependent.
 #     so let's normalise the output.
-test('T4006', normalise_fun(normalise_quotes), compile_and_run, [''])
+test('T4006', [when(platform('js-unknown-ghcjs'), skip), normalise_fun(normalise_quotes)], compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
@@ -221,7 +221,7 @@ test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [when(platform('js-unknown-ghcjs'), skip), expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
