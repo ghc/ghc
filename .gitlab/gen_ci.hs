@@ -814,6 +814,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu"))
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "s390x-linux-gnu" (Just "qemu-s390x -L /usr/s390x-linux-gnu"))
      ]
 
   where
