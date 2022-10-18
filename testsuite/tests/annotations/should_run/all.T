@@ -9,18 +9,8 @@ setTestOpts(when(fast(), skip))
 test('annrun01',
      [extra_files(['Annrun01_Help.hs']),
       pre_cmd('$MAKE -s --no-print-directory config'),
-      omit_ways(['dyn'] + prof_ways)],
+      omit_ways(['dyn'] + prof_ways),
+      req_interp],
      multimod_compile_and_run,
      ['annrun01', '-package ghc ' + config.ghc_th_way_flags])
 
-""""
-Helpful things to C+P:
-
-test('', normal, compile_fail, [''])
-
-test('', normal, compile, [''])
-
-test('', [], multimod_compile_fail, ['', '-v0'])
-
-test('', [], multimod_compile, ['', '-v0'])
-"""
