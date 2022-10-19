@@ -204,3 +204,4 @@ foreignExportsInitialiser platform mod hs_fns =
 
     closure_ptr :: Id -> SDoc
     closure_ptr fn = text "(StgPtr) &" <> ppr fn <> text "_closure"
+
