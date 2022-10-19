@@ -166,16 +166,16 @@ test('T5594', [ omit_ways(['ghci']),
                 # needs it.
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
-test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c'])],
+test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c']), js_skip],
      makefile_test, ['Capi_Ctype_001'])
 
-test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h'])],
+test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h']), js_skip],
      makefile_test, ['Capi_Ctype_002'])
 
 test('ffi_parsing_001', [omit_ways(['ghci']), c_src], compile_and_run,
      ['ffi_parsing_001_c.c'])
 
-test('capi_value', [omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
+test('capi_value', [omit_ways(['ghci']), js_skip], compile_and_run, ['capi_value_c.c'])
 
 test('T7170',
      [when(opsys('mingw32'), fragile(16801)),
