@@ -499,7 +499,7 @@ function h$logStack() {
   } else {
     size = gt & 0xff;
   }
-  h$dumpStackTop(h$stack, h$sp-size-2, h$p);
+  h$dumpStackTop(h$stack, h$sp-size-2, h$sp);
   for(var i=Math.max(0,h$sp-size+1); i <= h$sp; i++) {
     if(typeof h$stack[i] === 'undefined') {
       throw "undefined on stack";
