@@ -167,7 +167,7 @@ test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
 
-test('T7773', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T7773', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
 # Andreas says that T7773 will not (and should not) work on Windows
 
 # Tests for kind-polymorphic Category
@@ -179,7 +179,7 @@ test('T7653', [when(opsys('mingw32'), skip),
                omit_ways(prof_ways+['ghci'])], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
-test('topHandler01', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('topHandler01', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
       omit_ways(['ghci']),
