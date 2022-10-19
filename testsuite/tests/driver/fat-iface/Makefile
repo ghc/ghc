@@ -49,7 +49,4 @@ fat010: clean
 	echo >> "THB.hs"
 	"$(TEST_HC)" $(TEST_HC_OPTS) THC.hs -fhide-source-paths -fwrite-if-simplfied-core -fprefer-byte-code
 
-fat014: clean
-	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -v0 -fno-code < fat014.script
-
 
