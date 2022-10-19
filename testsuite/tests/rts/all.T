@@ -432,7 +432,7 @@ test('T14900',
 test('InternalCounters',
   [ js_skip # JS backend doesn't support internal counters
   ], makefile_test, ['InternalCounters'])
-test('alloccounter1', normal, compile_and_run,
+test('alloccounter1', js_skip, compile_and_run,
   [
     # avoid allocating stack chunks, which counts as
     # allocation and messes up the results:

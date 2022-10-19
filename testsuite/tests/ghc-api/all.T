@@ -30,6 +30,7 @@ test('T18522-dbg-ppr',
   compile_and_run,
   ['-package ghc'])
 test('T19156', extra_run_opts('"' + config.libdir + '"'),
+               js_skip,
                compile_and_run,
                ['-package ghc'])
 test('T20757', [unless(opsys('mingw32'), skip), exit_code(1)],
