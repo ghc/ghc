@@ -49,9 +49,9 @@ flag profiling
   default: False
 flag debug
   default: False
-flag logging
-  default: False
 flag dynamic
+  default: False
+flag threaded
   default: False
 flag thread-sanitizer
   description:
@@ -117,29 +117,30 @@ library
           extra-bundled-libraries: Cffi-6
         else
           extra-bundled-libraries: Cffi
+      install-includes: ffi.h ffitarget.h
+      -- ^ see Note [Packaging libffi headers] in
+      -- GHC.Driver.CodeOutput.
 
-      -- The make build system does something special in config.mk.in
-      -- for generating profiled, debugged, etc builds of those
-      -- libraries, but we need to be transparent for hadrian which
-      -- gets information about the rts "package" through Cabal and
-      -- this cabal file. We therefore declare several
-      -- flavours to be available when passing the suitable (combination of)
-      -- flag(s) when configuring the RTS from hadrian, using Cabal.
-      extra-library-flavours: _thr
+
+      -- Here we declare several flavours to be available when passing the
+      -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
+      -- using Cabal.
+      if flag(threaded)
+        extra-library-flavours: _thr
 
       if flag(profiling)
-        extra-library-flavours: _p _thr_p
+        extra-library-flavours: _p
+        if flag(threaded)
+          extra-library-flavours: _thr_p
         if flag(debug)
-          extra-library-flavours: _debug_p _thr_debug_p
+          extra-library-flavours: _debug_p
+          if flag(threaded)
+            extra-library-flavours: _thr_debug_p
       if flag(debug)
-        extra-library-flavours: _debug _thr_debug
-        if flag(dynamic)
-          extra-dynamic-library-flavours: _debug _thr_debug
-      if flag(logging)
-        extra-library-flavours: _l _thr_l
-        if flag(dynamic)
-          extra-dynamic-library-flavours: _l _thr_l
-      if flag(dynamic)
+        extra-library-flavours: _debug
+        if flag(threaded)
+          extra-library-flavours: _thr_debug
+      if flag(dynamic) && flag(threaded)
         extra-dynamic-library-flavours: _thr
 
       if flag(thread-sanitizer)
@@ -207,7 +208,7 @@ library
       install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
                         -- ^ from include
-                        DerivedConstants.h ffi.h ffitarget.h
+                        DerivedConstants.h
                         rts/EventLogConstants.h
                         rts/EventTypes.h
                         -- ^ generated
@@ -298,11 +299,11 @@ library
         ld-options:
            "-Wl,-u,_base_GHCziTopHandler_runIO_closure"
            "-Wl,-u,_base_GHCziTopHandler_runNonIO_closure"
-           "-Wl,-u,_ghczmprim_GHCziTuple_Z0T_closure"
+           "-Wl,-u,_ghczmprim_GHCziTupleziPrim_Z0T_closure"
            "-Wl,-u,_ghczmprim_GHCziTypes_True_closure"
            "-Wl,-u,_ghczmprim_GHCziTypes_False_closure"
            "-Wl,-u,_base_GHCziPack_unpackCString_closure"
-           "-Wl,-u,_base_GHCziWeak_runFinalizzerBatch_closure"
+           "-Wl,-u,_base_GHCziWeakFinalizze_runFinalizzerBatch_closure"
            "-Wl,-u,_base_GHCziIOziException_stackOverflow_closure"
            "-Wl,-u,_base_GHCziIOziException_heapOverflow_closure"
            "-Wl,-u,_base_GHCziIOziException_allocationLimitExceeded_closure"
@@ -381,11 +382,11 @@ library
         ld-options:
            "-Wl,-u,base_GHCziTopHandler_runIO_closure"
            "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
-           "-Wl,-u,ghczmprim_GHCziTuple_Z0T_closure"
+           "-Wl,-u,ghczmprim_GHCziTupleziPrim_Z0T_closure"
            "-Wl,-u,ghczmprim_GHCziTypes_True_closure"
            "-Wl,-u,ghczmprim_GHCziTypes_False_closure"
            "-Wl,-u,base_GHCziPack_unpackCString_closure"
-           "-Wl,-u,base_GHCziWeak_runFinalizzerBatch_closure"
+           "-Wl,-u,base_GHCziWeakziFinalizze_runFinalizzerBatch_closure"
            "-Wl,-u,base_GHCziIOziException_stackOverflow_closure"
            "-Wl,-u,base_GHCziIOziException_heapOverflow_closure"
            "-Wl,-u,base_GHCziIOziException_allocationLimitExceeded_closure"
@@ -459,9 +460,6 @@ library
           -- This symbol is useful in gdb, but not referred to anywhere,
           -- so we need to force it to be included in the binary.
           ld-options: "-Wl,-u,findPtr"
-           -- This symbol is useful in gdb, but not referred to anywhere,
-           -- so we need to force it to be included in the binary.
-           "-Wl,-u,findPtr"
 
       if os(windows)
         if flag(leading-underscore)
@@ -512,7 +510,7 @@ library
         if arch(ia64)
           c-sources: adjustor/NativeIA64.c
 
-      -- Use assembler STG entrypoint on archictures where it is used
+      -- Use assembler STG entrypoint on architectures where it is used
       if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)
         asm-sources: StgCRunAsm.S
 
