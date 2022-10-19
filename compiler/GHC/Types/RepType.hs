@@ -766,10 +766,8 @@ isVirtualTyCon tc
   -- That field is boxed
   , isBoxedType field
   -- And it's a boxed ADT!
-  -- , pprTrace "isV.5" empty True
-  -- , pprTrace "isV.6" empty True
-  -- That field is either unlifted or strict
   , isBoxedType (dataConOrigResTy dc)
+  -- That field is either unlifted or strict
   = if (isUnliftedType field)
       then
         -- (\r -> pprTrace "safeUnlifted " (ppr tc <+> ppr r) r)
@@ -783,6 +781,7 @@ isVirtualTyCon tc
   where
     isSafeLifted strictness = case strictness of MarkedStrict -> VirtualBoxed; _ -> NonVirtual
 
+    -- And it's not a prim type.
     isSafeUnlifted field
       | Just field_tc <- tyConAppTyCon_maybe field
       -- , pprTrace "ftc" (ppr field_tc) True

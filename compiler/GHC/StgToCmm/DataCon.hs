@@ -79,16 +79,12 @@ cgTopRhsCon cfg id con mn args
     -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
     (static_info, static_code)
 
+  -- For virtual data constructors simply produce a indirection.
   | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg x)] <- args
   = let cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
         lf_info       = LFUnknown False
   in (cg_id_info, emitIndCon x dontCareCCS closure_label)
-
-    -- panic "topRhsCon" $ let fake_rhs = StgApp x []
-    -- in
-      -- pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
-      -- cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
 
   -- Otherwise generate a closure for the constructor.
   | otherwise
