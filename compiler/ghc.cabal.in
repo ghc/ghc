@@ -632,6 +632,7 @@ Library
         GHC.SysTools
         GHC.SysTools.Ar
         GHC.SysTools.BaseDir
+        GHC.SysTools.Cpp
         GHC.SysTools.Elf
         GHC.SysTools.Info
         GHC.SysTools.Process

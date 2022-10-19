@@ -73,6 +73,7 @@ import GHC.Driver.Hooks
 import GHC.Platform.Ways
 
 import GHC.SysTools
+import GHC.SysTools.Cpp
 import GHC.Utils.TmpFs
 
 import GHC.Linker.ExtraObj
