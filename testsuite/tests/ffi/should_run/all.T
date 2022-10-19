@@ -182,7 +182,7 @@ test('T7170',
       exit_code(1)],
      compile_and_run, [''])
 
-test('T4012', [expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
+test('T4012', [expect_broken_for(7388, ['ghci']), js_skip], multimod_compile_and_run,
      ['T4012', ''])
 
 test('T8083', [omit_ways(['ghci']), c_src], compile_and_run, ['T8083_c.c'])
