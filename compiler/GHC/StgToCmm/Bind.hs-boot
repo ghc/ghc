@@ -6,9 +6,9 @@ import GHC.Types.Basic
 import GHC.Platform
 import GHC.Types.Id
 import GHC.Types.CostCentre
-import qualified GHC.Stack as S
+import qualified GHC.Utils.Misc as S (HasDebugCallStack)
 
-cgBind :: S.HasCallStack => CgStgBinding -> FCode ()
+cgBind :: S.HasDebugCallStack => CgStgBinding -> FCode ()
 
 cgTopRhsClosure :: Platform
                 -> RecFlag              -- member of a recursive group?

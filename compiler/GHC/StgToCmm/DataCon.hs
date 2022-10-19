@@ -43,7 +43,7 @@ import GHC.Types.Id
 import {-# SOURCE #-} GHC.StgToCmm.Bind
 import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
-import GHC.Types.RepType (countConRepArgs, isVirtualTyCon, virtualDataConType, VirtualConType(..), isVirtualDataCon)
+import GHC.Types.RepType (countConRepArgs, virtualDataConType, VirtualConType(..), isVirtualDataCon)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
 import GHC.Utils.Panic
@@ -54,10 +54,8 @@ import GHC.Utils.Monad (mapMaybeM)
 import Control.Monad
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
-import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn, emitTagAssertion, emitTagAssertionId)
+import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn, emitTagAssertionId)
 import GHC.Utils.Outputable
-import GHC.Utils.Trace
-import Data.Maybe
 
 ---------------------------------------------------------------
 --      Top-level constructors
@@ -82,11 +80,15 @@ cgTopRhsCon cfg id con mn args
     (static_info, static_code)
 
   -- Virtual constructor, just return the argument.
+  -- This should never happen. Why? If a user writes:
+  -- "foo = Virtual x" this should translate to
+  -- foo = case x of Virtual x
+  --
   | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg x)] <- args
   = panic "topRhsCon" $ let fake_rhs = StgApp x []
     in
-      pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
+      -- pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
       cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
 
   -- Otherwise generate a closure for the constructor.
@@ -204,19 +206,20 @@ the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
 -------- buildDynCon': Virtual constructor -----------
-buildDynCon' binder mn actually_bound ccs con args
+buildDynCon' binder _mn _actually_bound _ccs con args
   | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg arg)] <- assert (length args == 1) args
   = do
       cfg <- getStgToCmmConfig
-      let platform = stgToCmmPlatform cfg
+      let _platform = stgToCmmPlatform cfg
 
       m_arg_cg_info <- (getCgInfo_maybe $ idName arg)
       case m_arg_cg_info of
         Just arg_info -> do
           emitTagAssertionId "buildDynConVirt:" arg
 
-          -- A virtual con is just the arguments info under another name.
+          -- A virtual con is compiled by simply resuing the arguments cg info
+          -- under another name.
           let fake_con_info = arg_info { cg_id = binder }
 
           return (fake_con_info, return mempty)

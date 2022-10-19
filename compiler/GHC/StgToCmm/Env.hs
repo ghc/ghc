@@ -46,7 +46,6 @@ import GHC.Utils.Panic.Plain
 
 import GHC.Builtin.Names (getUnique)
 import GHC.Utils.Misc
-import GHC.Utils.Trace
 
 
 -------------------------------------
@@ -73,7 +72,8 @@ lneIdInfo platform id regs
     lf     = mkLFLetNoEscape
     blk_id = mkBlockId (idUnique id)
 
--- Construct the cgIdInfo from it's parts and determine a register to put the value.
+-- Construct the cgIdInfo from it's parts and determine which
+-- register to put the value in.
 rhsIdInfo :: Id -> LambdaFormInfo -> FCode (CgIdInfo, LocalReg)
 rhsIdInfo id lf_info
   = do platform <- getPlatform
@@ -127,7 +127,7 @@ addBindsC new_bindings = do
 -- One would think it would be worthwhile to cache these.
 -- Sadly it's not. See #16937
 
-getCgIdInfo :: HasCallStack => Id -> FCode CgIdInfo
+getCgIdInfo :: HasDebugCallStack => Id -> FCode CgIdInfo
 getCgIdInfo id
   = do  { platform <- getPlatform
         ; local_binds <- getBinds -- Try local bindings first
@@ -161,12 +161,11 @@ getCgInfo_maybe name
   = do  { local_binds <- getBinds -- Try local bindings first
         ; return $ lookupVarEnv_Directly local_binds (getUnique name) }
 
-cgLookupPanic :: HasCallStack => Id -> FCode a
+cgLookupPanic :: HasDebugCallStack => Id -> FCode a
 cgLookupPanic id
   = do  local_binds <- getBinds
-        pprTraceM "cgLookupPanic" (callStackDoc)
         pprPanic "GHC.StgToCmm.Env: variable not found"
-                (vcat [ppr id,
+                (vcat [callStackDoc, ppr id,
                 text "local binds for:",
                 pprUFM local_binds $ \infos ->
                   vcat [ ppr (cg_id info) | info <- infos ]

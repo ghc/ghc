@@ -17,7 +17,7 @@ import GHC.Types.Name
 import GHC.Stg.Syntax
 import GHC.Types.Basic ( CbvMark (..) )
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
-import GHC.Types.RepType (dataConRuntimeRepStrictness, isVirtualTyCon, isVirtualDataCon)
+import GHC.Types.RepType (dataConRuntimeRepStrictness, isVirtualDataCon)
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
 import GHC.Utils.Outputable

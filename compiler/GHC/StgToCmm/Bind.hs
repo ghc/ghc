@@ -64,7 +64,7 @@ import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
 import Control.Monad
-import GHC.Utils.Trace
+-- import GHC.Utils.Trace
 import GHC.Types.RepType (isVirtualDataCon)
 
 ------------------------------------------------------------------------
@@ -137,7 +137,7 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
 --              Non-top-level bindings
 ------------------------------------------------------------------------
 
-cgBind :: HasCallStack => CgStgBinding -> FCode ()
+cgBind :: HasDebugCallStack => CgStgBinding -> FCode ()
 cgBind (StgNonRec name rhs)
   = do  { (info, fcode) <- cgRhs name rhs
         ; addBindC info
@@ -294,7 +294,8 @@ mkRhsClosure    profile _ _check_tags bndr _cc
   , StgApp selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 
-  -- Virtual data cons just return themselves.
+  -- A case on a virtual data con will look like a selector
+  -- but must just return itself.
   , not $ isVirtualDataCon con
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets profile (addIdReps (assertNonVoidIds params))
@@ -463,7 +464,8 @@ mkClosureLFInfo platform bndr top fvs upd_flag args
 --              The code for closures
 ------------------------------------------------------------------------
 
-closureCodeBody :: HasCallStack => Bool            -- whether this is a top-level binding
+closureCodeBody :: HasDebugCallStack
+                => Bool            -- whether this is a top-level binding
                 -> Id              -- the closure's name
                 -> ClosureInfo     -- Lots of information about this closure
                 -> CostCentreStack -- Optional cost centre attached to closure

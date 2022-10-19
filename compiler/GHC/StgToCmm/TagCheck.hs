@@ -100,9 +100,11 @@ emitTagAssertion onWhat fun = whenCheckTags $ do
   }
 
 emitTagAssertionId :: String -> Id -> FCode ()
-emitTagAssertionId msg arg = do
+emitTagAssertionId msg arg = whenCheckTags $ do
   id_info <- getCgIdInfo arg
-  let CmmLoc cmm = cg_loc id_info
+  let cmm = case cg_loc id_info of
+        CmmLoc cmm -> cmm
+        LneLoc{} -> panic "Tried to emit tag check for LNE"
   emitTagAssertion msg cmm
 
 -- | Jump to the first block if the argument closure is subject

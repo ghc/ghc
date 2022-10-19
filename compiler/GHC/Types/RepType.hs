@@ -61,7 +61,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.List (sort)
-import GHC.Utils.Trace
 import qualified Data.IntSet as IS
 
 {- **********************************************************************
@@ -700,12 +699,42 @@ mightBeFunTy ty
   | otherwise
   = True
 
-------------------------------------------
+{-----------------------------------------
 --   Virtual Data Con stuff
 ------------------------------------------
 
+Note [Virtual Data Cons]
+~~~~~~~~~~~~~~~~~~~~~~~~
+A virtual data constructor which is one that is presented at runtime by it's
+field. E.g. we can treat MkT from `data T = VC !(Maybe Int)` as a virtual data
+constructor.
+
+The conditions for a constructor to be treated as a virtual one are as follows:
+* It must be the only constructor of the data type
+* It must have a single field that is present at runtime
+* That field must be strict or unlifted
+* The field must be represented by a enterable heap closure. This currently
+  rules out `ByteArray#` and other primitive types.
+
+If all these conditions are met then for `let x = VC y` we can compile this as
+if it were `let x = unsafeCoerce# y`. And when matching on such a
+virtual data constructor we compile `case x of VC y -> e` as if it were
+`case unsafeCoerce# x of y -> e`. Note that `VC` here refers to the constructors
+worker and not the wrapper.
+
+Why does this work?
+* There is no difference if we call seq on the field of the constructor or the
+  constructor itself since both are guaranteed to be values.
+* The GC doesn't care, both are regular heap closures.
+* Since the type has just one constructor we will never discriminate based on
+  the tag of the field.
+* The only tricky case is dataToTag# which is handled as described in #20532
+-}
+
 data VirtualConType = VirtualBoxed -- ^ These have a regular pointer tag
-                    | VirtualUnboxed -- ^ ByteArray# and friends. These don't usually have pointers.
+                    | VirtualUnboxed -- ^ ByteArray# and friends. These don't
+                                     -- have tags and currently can't be shorted
+                                     -- out.
                     | NonVirtual -- ^ Can't be shorted out.
                     deriving (Eq,Show)
 
@@ -734,10 +763,8 @@ isVirtualTyCon tc
   , [(field :: Type, strictness)] <- filter (not . isZeroBitTy . fst) $
                              zipWithEqual "isVirtualTyCon" (\a b -> (scaledThing a, b))
                              (rep_tys) (rep_bangs)
-  , pprTrace "isV.3" empty True
   -- That field is boxed
   , isBoxedType field
-  , pprTrace "isV.4" empty True
   -- And it's a boxed ADT!
   -- , pprTrace "isV.5" empty True
   -- , pprTrace "isV.6" empty True
@@ -745,7 +772,8 @@ isVirtualTyCon tc
   , isBoxedType (dataConOrigResTy dc)
   = if (isUnliftedType field)
       then
-        (\r -> pprTrace "safeUnlifted " (ppr tc <+> ppr r) r) (isSafeUnlifted field)
+        -- (\r -> pprTrace "safeUnlifted " (ppr tc <+> ppr r) r)
+        (isSafeUnlifted field)
       else
         isSafeLifted strictness
   -- , pprTrace "isV.7" empty True

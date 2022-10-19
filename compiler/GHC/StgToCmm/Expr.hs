@@ -45,7 +45,7 @@ import GHC.Types.Id
 import GHC.Builtin.PrimOps
 import GHC.Core.TyCon
 import GHC.Core.Type        ( isUnliftedType )
-import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy, isVirtualTyCon )
+import GHC.Types.RepType    ( isZeroBitTy, countConRepArgs, mightBeFunTy, isVirtualDataCon )
 import GHC.Types.CostCentre ( CostCentreStack, currentCCS )
 import GHC.Types.Tickish
 import GHC.Data.Maybe
@@ -130,7 +130,7 @@ cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con mn args _)
   -- Unlike for a regular con for a virtual con we
   -- might have to evaluate the argument here!
-  | isVirtualTyCon (dataConTyCon con)
+  | isVirtualDataCon con
   , arg <- getArg args
   = cgExpr (StgApp arg [])
   | otherwise
@@ -438,7 +438,7 @@ data GcPlan
                         -- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: HasCallStack => CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
+cgCase :: HasDebugCallStack => CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
 
 {-
 Note [Scrutinising VoidRep]
@@ -684,7 +684,7 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
                              -- MultiValAlt has only one alternative
 
 -------------------------------------
-cgAlts :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
+cgAlts :: HasDebugCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [alt]
@@ -933,7 +933,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --
 
 -------------------
-cgAlgAltRhss :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
+cgAlgAltRhss :: HasDebugCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
              -> FCode ( Maybe CmmAGraphScoped
                       , [(ConTagZ, CmmAGraphScoped)] )
 cgAlgAltRhss gc_plan bndr alts
@@ -953,7 +953,7 @@ cgAlgAltRhss gc_plan bndr alts
 
 
 -------------------
-cgAltRhss :: HasCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
+cgAltRhss :: HasDebugCallStack => (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(AltCon, CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
   platform <- getPlatform
@@ -989,7 +989,7 @@ cgConApp con mn stg_args
        ; emitReturn arg_exprs }
 
   -- Virtual constructor, just return the argument.
-  | isVirtualTyCon (dataConTyCon con)
+  | isVirtualDataCon con
   , [StgVarArg arg] <- assert (length stg_args == 1) stg_args
   = do
       info <- getCgIdInfo arg
@@ -1010,7 +1010,7 @@ cgConApp con mn stg_args
         ; tickyReturnNewCon (length stg_args)
         ; emitReturn [idInfoToAmode idinfo] }
 
-cgIdApp :: HasCallStack => Id -> [StgArg] -> FCode ReturnKind
+cgIdApp :: HasDebugCallStack => Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id args = do
     platform       <- getPlatform
     fun_info       <- getCgIdInfo fun_id

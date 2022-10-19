@@ -595,11 +595,11 @@ stdPattern reps
 --        Amodes for arguments
 -------------------------------------------------------------------------
 
-getArgAmode :: HasCallStack => NonVoid StgArg -> FCode CmmExpr
+getArgAmode :: HasDebugCallStack => NonVoid StgArg -> FCode CmmExpr
 getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
 getArgAmode (NonVoid (StgLitArg lit)) = cgLit lit
 
-getNonVoidArgAmodes :: HasCallStack => [StgArg] -> FCode [CmmExpr]
+getNonVoidArgAmodes :: HasDebugCallStack => [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args,
 --     so the result list may be shorter than the argument list
 getNonVoidArgAmodes [] = return []

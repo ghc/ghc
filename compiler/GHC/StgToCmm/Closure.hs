@@ -101,7 +101,7 @@ import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
 import GHC.Stg.InferTags.TagSig (isTaggedSig)
-import GHC.Utils.Trace (pprTrace)
+-- import GHC.Utils.Trace (pprTrace)
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
