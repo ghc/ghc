@@ -141,6 +141,7 @@ test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
 
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
+                 , js_skip
                  , expect_broken_for(14913, ['ghci'])
                  ], compile_and_run, [''])
 
