@@ -10,7 +10,7 @@
 
 module GHC.StgToCmm.Lit (
     cgLit, mkSimpleLit,
-    newStringCLit, newByteStringCLit
+    newStringCLit, newByteStringCLit, unLit
   ) where
 
 import GHC.Prelude
@@ -33,6 +33,10 @@ import GHC.Utils.Panic
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (ord)
+
+unLit :: CmmExpr -> CmmLit
+unLit (CmmLit l) = l
+unLit _ = panic "unLit"
 
 newStringCLit :: String -> FCode CmmLit
 -- ^ Make a global definition for the string,

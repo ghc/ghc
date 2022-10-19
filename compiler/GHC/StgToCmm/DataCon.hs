@@ -12,7 +12,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.DataCon (
-        cgTopRhsCon, buildDynCon, bindConArgs
+        cgTopRhsCon, buildDynCon, bindConArgs, emitIndCon
     ) where
 
 import GHC.Prelude
@@ -26,7 +26,9 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Layout
+import GHC.StgToCmm.Lit ( unLit )
 import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Types ( LambdaFormInfo(LFUnknown) )
 import GHC.StgToCmm.Closure
 
 import GHC.Cmm.Expr
@@ -38,9 +40,7 @@ import GHC.Types.CostCentre
 import GHC.Unit
 import GHC.Core.DataCon
 import GHC.Data.FastString
-import GHC.Types.Basic
 import GHC.Types.Id
-import {-# SOURCE #-} GHC.StgToCmm.Bind
 import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs, virtualDataConType, VirtualConType(..), isVirtualDataCon)
@@ -79,17 +79,16 @@ cgTopRhsCon cfg id con mn args
     -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
     (static_info, static_code)
 
-  -- Virtual constructor, just return the argument.
-  -- This should never happen. Why? If a user writes:
-  -- "foo = Virtual x" this should translate to
-  -- foo = case x of Virtual x
-  --
   | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg x)] <- args
-  = panic "topRhsCon" $ let fake_rhs = StgApp x []
-    in
+  = let cg_id_info    = litIdInfo platform id lf_info (CmmLabel closure_label)
+        lf_info       = LFUnknown False
+  in (cg_id_info, emitIndCon x dontCareCCS closure_label)
+
+    -- panic "topRhsCon" $ let fake_rhs = StgApp x []
+    -- in
       -- pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
-      cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
+      -- cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
 
   -- Otherwise generate a closure for the constructor.
   | otherwise
@@ -207,30 +206,19 @@ premature looking at the args will cause the compiler to black-hole!
 -}
 -------- buildDynCon': Virtual constructor -----------
 buildDynCon' binder _mn _actually_bound _ccs con args
-  | virtualDataConType con == VirtualBoxed
+  | isVirtualDataCon con
   , [NonVoid (StgVarArg arg)] <- assert (length args == 1) args
   = do
       cfg <- getStgToCmmConfig
       let _platform = stgToCmmPlatform cfg
 
-      m_arg_cg_info <- (getCgInfo_maybe $ idName arg)
-      case m_arg_cg_info of
-        Just arg_info -> do
-          emitTagAssertionId "buildDynConVirt:" arg
+      -- A virtual con is compiled by simply resuing the arguments cg info
+      -- under another name.
+      arg_info <- getCgIdInfo arg
+      emitTagAssertionId "buildDynConVirt:" arg
+      let fake_con_info = arg_info { cg_id = binder }
 
-          -- A virtual con is compiled by simply resuing the arguments cg info
-          -- under another name.
-          let fake_con_info = arg_info { cg_id = binder }
-
-          return (fake_con_info, return mempty)
-        Nothing -> panic "buildDynCon': LFInfo for VCon args unknown" (ppr binder <> text " = " <> ppr con <+> ppr args)
-
-          -- let !lf_info = mkLFArgument arg
-
-          -- (id_info, reg) <- rhsIdInfo binder lf_info
-          -- emit $ mkAssign (CmmLocal reg) ((CmmReg $ CmmLocal $ idToReg platform $ NonVoid arg))
-          -- bindArgToGivenReg (NonVoid arg) reg
-          -- return (id_info, return mempty)
+      return (fake_con_info, return mempty)
 
 -------- buildDynCon': the general case -----------
 buildDynCon' binder mn actually_bound ccs con args
@@ -450,3 +438,14 @@ bindConArgs (DataAlt con) base args
 
 bindConArgs _other_con _base args
   = assert (null args ) return []
+
+---------------------------------------------------------------
+--      Static Indirections
+---------------------------------------------------------------
+
+-- Emit a (top level) indirection
+emitIndCon :: Id -> CostCentreStack -> CLabel -> FCode ()
+emitIndCon indirectee ccs closure_label = do
+  cg_info <- getCgIdInfo indirectee
+  let !payload = unLit (idInfoToAmode cg_info)
+  emitDataCon closure_label indStaticInfoTable ccs [payload]

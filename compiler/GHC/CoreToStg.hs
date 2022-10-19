@@ -728,14 +728,7 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
   = -- CorePrep does this right, but just to make sure
     assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
               (ppr bndr $$ ppr con $$ ppr args) $
-  if isVirtualDataCon con
-    then
-          ( StgRhsClosure noExtFieldSilent
-                    all_cafs_ccs
-                    upd_flag [] (virtual_arg args)
-          , ccs )
-    else
-      ( StgRhsCon dontCareCCS con mn ticks args, ccs )
+    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
@@ -751,12 +744,6 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
     , ccs )
 
   where
-    virtual_arg args
-      | [arg] <- filter (not . isZeroBitTy . idType) [ v | StgVarArg v <- args]
-      = StgApp arg []
-      | [litArg] <- [ l | StgLitArg l <- args]
-      = pprPanic "virtualConTop - literal argument" (ppr litArg)
-      | otherwise = panic "virtualConTop - mkTopStgRhs - what is happening ?!?"
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnceDmd (idDemandInfo bndr) = SingleEntry

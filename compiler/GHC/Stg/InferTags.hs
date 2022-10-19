@@ -15,7 +15,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info (tagSigInfo)
 import GHC.Types.Name
 import GHC.Stg.Syntax
-import GHC.Types.Basic ( CbvMark (..) )
+import GHC.Types.Basic ( CbvMark (..), TopLevelFlag(..), isTopLevel )
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
 import GHC.Types.RepType (dataConRuntimeRepStrictness, isVirtualDataCon)
 import GHC.Core (AltCon(..))
@@ -268,7 +268,7 @@ inferTagTopBind env (StgTopStringLit id bs)
 inferTagTopBind env (StgTopLifted bind)
   = (env', StgTopLifted bind')
   where
-    (env', bind') = inferTagBind env bind
+    (env', bind') = inferTagBind env TopLevel bind
 
 
 -- Why is this polymorphic over the StgPass? See Note [Polymorphic StgPass for inferTagExpr]
@@ -311,7 +311,7 @@ inferTagExpr env (StgApp fun args)
 -- Seems not to matter much but should be changed eventually.
 
 inferTagExpr env (StgConApp con cn args tys)
-  = (inferConTag env con args, StgConApp con cn args tys)
+  = (inferConTag env NotTopLevel con args, StgConApp con cn args tys)
 
 inferTagExpr _ (StgLit l)
   = (TagTagged, StgLit l)
@@ -329,13 +329,13 @@ inferTagExpr _ (StgOpApp op args ty)
 inferTagExpr env (StgLet ext bind body)
   = (info, StgLet ext bind' body')
   where
-    (env', bind') = inferTagBind env bind
+    (env', bind') = inferTagBind env NotTopLevel bind
     (info, body') = inferTagExpr env' body
 
 inferTagExpr env (StgLetNoEscape ext bind body)
   = (info, StgLetNoEscape ext bind' body')
   where
-    (env', bind') = inferTagBind env bind
+    (env', bind') = inferTagBind env NotTopLevel bind
     (info, body') = inferTagExpr env' body
 
 inferTagExpr in_env (StgCase scrut bndr ty alts)
@@ -414,8 +414,8 @@ addAltBndrInfo env _ bndrs = (env, map (noSig env) bndrs)
 
 -----------------------------
 inferTagBind :: (OutputableInferPass p, InferExtEq p)
-  => TagEnv p -> GenStgBinding p -> (TagEnv p, GenStgBinding 'InferTaggedBinders)
-inferTagBind in_env (StgNonRec bndr rhs)
+  => TagEnv p -> TopLevelFlag -> GenStgBinding p -> (TagEnv p, GenStgBinding 'InferTaggedBinders)
+inferTagBind in_env top (StgNonRec bndr rhs)
   =
     -- pprTrace "inferBindNonRec" (
     --   ppr bndr $$
@@ -425,9 +425,9 @@ inferTagBind in_env (StgNonRec bndr rhs)
   where
     id   = getBinderId in_env bndr
     env' = extendSigEnv in_env [(id, sig)]
-    (sig,rhs') = inferTagRhs id in_env rhs
+    (sig,rhs') = inferTagRhs id top in_env rhs
 
-inferTagBind in_env (StgRec pairs)
+inferTagBind in_env top (StgRec pairs)
   = -- pprTrace "rec" (ppr (map fst pairs) $$ ppr (in_env { te_env = out_env }, StgRec pairs')) $
     (in_env { te_env = out_env }, StgRec pairs')
   where
@@ -451,7 +451,7 @@ inferTagBind in_env (StgRec pairs)
          env' = makeTagged go_env
 
          anaRhs :: Id -> GenStgRhs q -> (TagSig, GenStgRhs 'InferTaggedBinders)
-         anaRhs bnd rhs = inferTagRhs bnd rhs_env rhs
+         anaRhs bnd rhs = inferTagRhs bnd top rhs_env rhs
 
          updateBndr :: (Id,TagSig) -> (Id,TagSig)
          updateBndr (v,sig) = (setIdTagSig v sig, sig)
@@ -491,10 +491,11 @@ to be the combination of all non-bottoming branches.
 inferTagRhs :: forall p.
      (OutputableInferPass p, InferExtEq p)
   => Id -- ^ Id we are binding to.
+  -> TopLevelFlag
   -> TagEnv p -- ^
   -> GenStgRhs p -- ^
   -> (TagSig, GenStgRhs 'InferTaggedBinders)
-inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body)
+inferTagRhs bnd_id _top in_env (StgRhsClosure ext cc upd bndrs body)
   | isDeadEndId bnd_id && (notNull) bndrs
   -- See Note [Bottom functions are TagTagged]
   = (TagSig TagTagged, StgRhsClosure ext cc upd out_bndrs body')
@@ -531,11 +532,11 @@ inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body)
               | otherwise -> TagDunno
       in (id, TagSig tag)
 
-inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args)
+inferTagRhs _ top env _rhs@(StgRhsCon cc con cn ticks args)
 -- Constructors, which have untagged arguments to strict fields
 -- become thunks. We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
-    (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args)
+    (TagSig (inferConTag env top con args), StgRhsCon cc con cn ticks args)
 
 {- Note [Constructor TagSigs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -591,12 +592,14 @@ time and there doesn't seem to huge benefit to doing differently.
   -}
 
 -- See Note [Constructor TagSigs]
-inferConTag :: TagEnv p -> DataCon -> [StgArg] -> TagInfo
-inferConTag env con args
-  | isVirtualDataCon con
+inferConTag :: TagEnv p -> TopLevelFlag -> DataCon -> [StgArg] -> TagInfo
+inferConTag env top con args
+  -- Top level virtual cons might be replaced by a static indirction which
+  -- will be untagged
+  | isTopLevel top
+  , isVirtualDataCon con
   = TagDunno
-  -- TODO: This should only be needed for top lvl rhss, but I haven't threaded
-  -- the top level flag through yet
+
   | isUnboxedTupleDataCon con
   = TagTuple $ map (flatten_arg_tag . lookupInfo env) args
   | otherwise =

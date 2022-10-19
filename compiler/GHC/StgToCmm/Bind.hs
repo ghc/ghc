@@ -58,7 +58,6 @@ import GHC.Types.Tickish ( tickishIsCode )
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
@@ -105,9 +104,12 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   --
   gen_code _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
-    = do
-         cg_info <- getCgIdInfo f
-         emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
+    = emitIndCon f ccs closure_label
+    -- -- special case for virtual con "indirections"
+    -- | StgConApp con _ [StgVarArg x] _ <- body
+    -- , null args
+    -- , isVirtualDataCon con
+    -- = emitIndCon x ccs closure_label
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
@@ -129,9 +131,6 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
                                 args body fv_details)
 
         ; return () }
-
-  unLit (CmmLit l) = l
-  unLit _ = panic "unLit"
 
 ------------------------------------------------------------------------
 --              Non-top-level bindings
