@@ -498,7 +498,7 @@ test('T17088',
      [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
      compile_and_run, ['-rtsopts -O2'])
 
-test('T15427', normal, compile_and_run, [''])
+test('T15427', js_skip, compile_and_run, [''])
 
 test('T19481',
      [extra_run_opts('+RTS -T -RTS'),
