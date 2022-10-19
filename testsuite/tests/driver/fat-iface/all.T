@@ -13,7 +13,7 @@ test('fat012', [unless(ghc_dynamic(), skip), extra_files(['FatTH.hs', 'FatQuote.
 # Check that no objects are generated if using -fno-code and -fprefer-byte-code
 test('fat013', [extra_files(['FatTH.hs', 'FatQuote.hs'])], multimod_compile, ['FatTH', '-fno-code -fprefer-byte-code'])
 # When using interpreter should not produce objects
-test('fat014', [extra_files(['FatTH.hs', 'FatQuote.hs'])], makefile_test, ['fat014'])
+test('fat014', [extra_files(['FatTH.hs', 'FatQuote.hs']), extra_run_opts('-fno-code')], ghci_script, ['fat014.script'])
 test('fat015', [unless(ghc_dynamic(), skip), extra_files(['FatQuote.hs', 'FatQuote1.hs', 'FatQuote2.hs', 'FatTH1.hs', 'FatTH2.hs', 'FatTHTop.hs'])], multimod_compile, ['FatTHTop', '-fno-code -fwrite-interface'])
 
 
