@@ -246,6 +246,7 @@ test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
      [collect_stats('max_bytes_used',5),
+      js_skip,
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
