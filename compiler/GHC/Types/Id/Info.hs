@@ -13,7 +13,6 @@ Haskell. [WDP 94/11])
 {-# LANGUAGE BinaryLiterals #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.Id.Info (
         -- * The IdDetails type
@@ -110,7 +109,6 @@ import GHC.Stg.InferTags.TagSig
 import Data.Word
 
 import GHC.StgToCmm.Types (LambdaFormInfo)
-import Data.Data (Data)
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -721,7 +719,7 @@ data CafInfo
 
         | NoCafRefs                     -- ^ A function or static constructor
                                         -- that refers to no CAFs.
-        deriving (Eq, Ord, Data)
+        deriving (Eq, Ord)
 
 -- | Assumes that the 'Id' has CAF references: definitely safe
 vanillaCafInfo :: CafInfo

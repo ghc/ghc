@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Cmm.Reg
     ( -- * Cmm Registers
@@ -25,7 +24,6 @@ import GHC.Platform
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Cmm.Type
-import Data.Data (Data)
 
 -----------------------------------------------------------------------------
 --              Cmm registers
@@ -34,7 +32,7 @@ import Data.Data (Data)
 data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
-  deriving( Eq, Ord, Show, Data )
+  deriving( Eq, Ord, Show )
 
 instance Outputable CmmReg where
     ppr e = pprReg e
@@ -62,7 +60,7 @@ data LocalReg
     -- ^ Parameters:
     --   1. Identifier
     --   2. Type
-  deriving (Show, Data)
+  deriving Show
 
 instance Eq LocalReg where
   (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
@@ -130,7 +128,7 @@ account. However it is still used in UserOfRegs/DefinerOfRegs and
 there are likely still bugs there, beware!
 -}
 
-data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show, Data )
+data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
 
 data GlobalReg
   -- Argument and return registers
@@ -193,7 +191,7 @@ data GlobalReg
   -- from platform to platform (see module PositionIndependentCode).
   | PicBaseReg
 
-  deriving( Show, Data )
+  deriving( Show )
 
 instance Eq GlobalReg where
    VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes

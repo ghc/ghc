@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 module GHC.Cmm.Type
     ( CmmType   -- Abstract
     , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
@@ -41,7 +40,6 @@ import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int
-import Data.Data (Data)
 
 -----------------------------------------------------------------------------
 --              CmmType
@@ -55,14 +53,14 @@ import Data.Data (Data)
 
 data CmmType    -- The important one!
   = CmmType CmmCat !Width
-  deriving (Show,Data)
+  deriving Show
 
 data CmmCat                -- "Category" (not exported)
    = GcPtrCat              -- GC pointer
    | BitsCat               -- Non-pointer
    | FloatCat              -- Float
    | VecCat Length CmmCat  -- Vector
-   deriving( Eq, Show, Data)
+   deriving( Eq, Show )
         -- See Note [Signed vs unsigned] at the end
 
 instance Outputable CmmType where
@@ -184,7 +182,7 @@ data Width
   | W128
   | W256
   | W512
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show)
 
 instance Outputable Width where
    ppr rep = text (show rep)

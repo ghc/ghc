@@ -19,7 +19,6 @@ Haskell).
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns, MagicHash #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Types.Unique (
         -- * Main data types
@@ -61,7 +60,6 @@ import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 import Data.Char        ( chr, ord )
 
 import Language.Haskell.Syntax.Module.Name
-import Data.Data (Data)
 
 {-
 ************************************************************************
@@ -93,7 +91,7 @@ GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known mas
 -- the functions from the 'UniqSupply' module
 --
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
-newtype Unique = MkUnique Int deriving Data
+newtype Unique = MkUnique Int
 
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int

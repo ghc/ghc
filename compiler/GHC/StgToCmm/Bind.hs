@@ -65,7 +65,7 @@ import GHC.Data.List.SetOps
 
 import Control.Monad
 import GHC.Utils.Trace
-import GHC.Types.Rep.Virtual (isVirtualDataCon, virtualDataConType, VirtualConType (..))
+import GHC.Types.RepType (isVirtualDataCon)
 
 ------------------------------------------------------------------------
 --              Top-level bindings
@@ -108,21 +108,6 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
     = do
          cg_info <- getCgIdInfo f
          emitDataCon closure_label indStaticInfoTable ccs [unLit (idInfoToAmode cg_info)]
-    | StgConApp con _ [StgVarArg x] _ <- body
-    , null args
-    , vcon <- virtualDataConType con
-    -- Boxed types we can just compile to a indirection
-    , vcon /= NonVirtual
-    = do
-         cg_info <- getCgIdInfo x
-         let !payload = case vcon of
-                VirtualBoxed -> unLit (idInfoToAmode cg_info)
-                VirtualUnboxedHeap ->
-                  pprPanic "top level unboxed thing" empty $
-                  cmmOffsetLit (unLit (idInfoToAmode cg_info)) 1
-                NonVirtual -> panic "impossible" -- checked in the guard
-
-         emitDataCon closure_label indStaticInfoTable ccs [payload]
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
@@ -309,7 +294,7 @@ mkRhsClosure    profile _ _check_tags bndr _cc
   , StgApp selectee [{-no args-}] <- strip sel_expr
   , the_fv == scrutinee                -- Scrutinee is the only free variable
 
-  -- Virtual data cons look like selectors but shouldn't be evaluated by the RTS.
+  -- Virtual data cons just return themselves.
   , not $ isVirtualDataCon con
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets profile (addIdReps (assertNonVoidIds params))

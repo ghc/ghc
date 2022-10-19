@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Cmm.Expr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, cmmExprAlignment, maybeInvertCmmExpr
@@ -57,7 +56,6 @@ import qualified Data.Set as Set
 import Numeric ( fromRat )
 
 import GHC.Types.Basic (Alignment, mkAlignment, alignmentOf)
-import Data.Data
 
 -----------------------------------------------------------------------------
 --              CmmExpr
@@ -78,7 +76,7 @@ data CmmExpr
         --        ** is shorthand only, meaning **
         -- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
         --      where rep = typeWidth (cmmRegType reg)
-  deriving (Show, Data)
+  deriving Show
 
 instance Eq CmmExpr where       -- Equality ignores the types
   CmmLit l1          == CmmLit l2          = l1==l2
@@ -93,7 +91,7 @@ instance OutputableP Platform CmmExpr where
     pdoc = pprExpr
 
 data AlignmentSpec = NaturallyAligned | Unaligned
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show)
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
@@ -101,7 +99,7 @@ data Area
   = Old            -- See Note [Old Area]
   | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockIds] in GHC.Cmm.Node.
-  deriving (Eq, Ord, Show, Data)
+  deriving (Eq, Ord, Show)
 
 instance Outputable Area where
     ppr e = pprArea e
@@ -232,7 +230,7 @@ data CmmLit
                      -- During the stack-layout pass, CmmHighStackMark
                      -- is replaced by a CmmInt for the actual number
                      -- of bytes used
-  deriving (Eq, Show,Data)
+  deriving (Eq, Show)
 
 instance OutputableP Platform CmmLit where
     pdoc = pprLit

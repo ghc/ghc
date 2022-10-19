@@ -23,11 +23,10 @@ module GHC.Types.RepType
     ubxSumRepType, layoutUbxSum, typeSlotTy, SlotTy (..),
     slotPrimRep, primRepSlot,
 
-    tyHasFixedRuntimeRep,
-
     -- * Is this type known to be data?
     mightBeFunTy,
 
+    isVirtualTyCon, isVirtualDataCon, virtualDataConType, VirtualConType(..)
     ) where
 
 import GHC.Prelude
@@ -62,6 +61,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.List (sort)
+import GHC.Utils.Trace
 import qualified Data.IntSet as IS
 
 {- **********************************************************************
@@ -700,3 +700,65 @@ mightBeFunTy ty
   | otherwise
   = True
 
+------------------------------------------
+--   Virtual Data Con stuff
+------------------------------------------
+
+data VirtualConType = VirtualBoxed -- ^ These have a regular pointer tag
+                    | VirtualUnboxed -- ^ ByteArray# and friends. These don't usually have pointers.
+                    | NonVirtual -- ^ Can't be shorted out.
+                    deriving (Eq,Show)
+
+instance Outputable VirtualConType where
+  ppr :: VirtualConType -> SDoc
+  ppr = text . show
+
+isVirtualDataCon :: DataCon -> Bool
+isVirtualDataCon con = virtualDataConType con /= NonVirtual
+
+virtualDataConType :: DataCon -> VirtualConType
+virtualDataConType = isVirtualTyCon . dataConTyCon
+
+isVirtualTyCon :: HasDebugCallStack => TyCon -> VirtualConType
+isVirtualTyCon tc
+  -- Exactly one constructor
+  | [dc] <- tyConDataCons tc
+  -- No (runtime) constraints
+  , [] <- filter (not . isZeroBitTy) (dataConOtherTheta dc)
+  -- , pprTrace "isV.2" (ppr dc <> text ":" <> ppr tc) True
+  --Exactly one non-void field argument
+  , rep_bangs <- dataConRepStrictness dc
+  , rep_tys <- dataConRepArgTys dc
+  , all (tyHasFixedRuntimeRep) $ map scaledThing rep_tys
+  -- , pprTrace "args,bangs" (ppr rep_bangs <> ppr rep_tys) True
+  , [(field :: Type, strictness)] <- filter (not . isZeroBitTy . fst) $
+                             zipWithEqual "isVirtualTyCon" (\a b -> (scaledThing a, b))
+                             (rep_tys) (rep_bangs)
+  , pprTrace "isV.3" empty True
+  -- That field is boxed
+  , isBoxedType field
+  , pprTrace "isV.4" empty True
+  -- And it's a boxed ADT!
+  -- , pprTrace "isV.5" empty True
+  -- , pprTrace "isV.6" empty True
+  -- That field is either unlifted or strict
+  , isBoxedType (dataConOrigResTy dc)
+  = if (isUnliftedType field)
+      then
+        (\r -> pprTrace "safeUnlifted " (ppr tc <+> ppr r) r) (isSafeUnlifted field)
+      else
+        isSafeLifted strictness
+  -- , pprTrace "isV.7" empty True
+  -- -- Result is boxed
+  -- = pprTrace "foundVirtualCon:" (ppr dc <> text ":" <> ppr tc <> text "@" <> ppr field) True
+  | otherwise = NonVirtual
+  where
+    isSafeLifted strictness = case strictness of MarkedStrict -> VirtualBoxed; _ -> NonVirtual
+
+    isSafeUnlifted field
+      | Just field_tc <- tyConAppTyCon_maybe field
+      -- , pprTrace "ftc" (ppr field_tc) True
+      , isDataTyCon field_tc
+      = VirtualBoxed
+      -- TODO: Hashmaps etc.
+      | otherwise = NonVirtual

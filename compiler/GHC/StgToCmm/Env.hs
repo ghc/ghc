@@ -18,7 +18,7 @@ module GHC.StgToCmm.Env (
         bindArgsToRegs, bindToReg, rebindToReg,
         bindArgToReg, bindArgToGivenReg, idToReg,
         getCgIdInfo, getCgInfo_maybe,
-        maybeLetNoEscape, bindArgToGivenRegOffset,
+        maybeLetNoEscape,
         ) where
 
 import GHC.Prelude
@@ -191,11 +191,6 @@ bindArgToGivenReg (NonVoid id) reg
   = do let !lf_info = mkLFArgument id
        addBindC (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)))
 
-bindArgToGivenRegOffset :: NonVoid Id -> LocalReg -> Int -> FCode ()
--- Records that an arg is already present in the given reg
-bindArgToGivenRegOffset (NonVoid id) reg offset
-  = do let !lf_info = mkLFArgument id
-       addBindC (mkCgIdInfo id lf_info (CmmRegOff (CmmLocal reg) offset))
 
 rebindToReg :: NonVoid Id -> FCode LocalReg
 -- Like bindToReg, but the Id is already in scope, so

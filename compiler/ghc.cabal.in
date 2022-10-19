@@ -732,7 +732,6 @@ Library
         GHC.Types.PkgQual
         GHC.Types.ProfAuto
         GHC.Types.RepType
-        GHC.Types.Rep.Virtual
         GHC.Types.SafeHaskell
         GHC.Types.SourceError
         GHC.Types.SourceFile

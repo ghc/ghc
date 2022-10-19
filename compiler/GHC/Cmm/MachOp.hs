@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 module GHC.Cmm.MachOp
     ( MachOp(..)
@@ -34,7 +33,6 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type
 import GHC.Utils.Outputable
-import Data.Data (Data)
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -157,7 +155,7 @@ data MachOp
 
   -- Alignment check (for -falignment-sanitisation)
   | MO_AlignmentCheck Int Width
-  deriving (Eq, Show, Data)
+  deriving (Eq, Show)
 
 pprMachOp :: MachOp -> SDoc
 pprMachOp mo = text (show mo)

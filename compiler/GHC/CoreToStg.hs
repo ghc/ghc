@@ -34,7 +34,6 @@ import GHC.Stg.Debug
 import GHC.Stg.Utils
 
 import GHC.Types.RepType
-import GHC.Types.Rep.Virtual (isVirtualTyCon, isVirtualDataCon)
 import GHC.Types.Id.Make ( coercionTokenId )
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -729,13 +728,13 @@ mkTopStgRhs dflags this_mod ccs bndr (PreStgRhs bndrs rhs)
   = -- CorePrep does this right, but just to make sure
     assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
               (ppr bndr $$ ppr con $$ ppr args) $
-  -- if isVirtualDataCon con
-  --   then
-  --         ( StgRhsClosure noExtFieldSilent
-  --                   all_cafs_ccs
-  --                   upd_flag [] (virtual_arg args)
-  --         , ccs )
-    -- else
+  if isVirtualDataCon con
+    then
+          ( StgRhsClosure noExtFieldSilent
+                    all_cafs_ccs
+                    upd_flag [] (virtual_arg args)
+          , ccs )
+    else
       ( StgRhsCon dontCareCCS con mn ticks args, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].

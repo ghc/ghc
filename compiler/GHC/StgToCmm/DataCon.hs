@@ -10,7 +10,6 @@
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.StgToCmm.DataCon (
         cgTopRhsCon, buildDynCon, bindConArgs
@@ -44,8 +43,7 @@ import GHC.Types.Id
 import {-# SOURCE #-} GHC.StgToCmm.Bind
 import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
 import GHC.Types.Name (isInternalName)
-import GHC.Types.RepType (countConRepArgs)
-import GHC.Types.Rep.Virtual (isVirtualDataCon, VirtualConType(..), virtualDataConType)
+import GHC.Types.RepType (countConRepArgs, isVirtualTyCon, virtualDataConType, VirtualConType(..), isVirtualDataCon)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
 import GHC.Utils.Panic
@@ -56,9 +54,10 @@ import GHC.Utils.Monad (mapMaybeM)
 import Control.Monad
 import Data.Char
 import GHC.StgToCmm.Config (stgToCmmPlatform)
-import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn, emitTagAssertionId)
+import GHC.StgToCmm.TagCheck (checkConArgsStatic, checkConArgsDyn, emitTagAssertion, emitTagAssertionId)
 import GHC.Utils.Outputable
 import GHC.Utils.Trace
+import Data.Maybe
 
 ---------------------------------------------------------------
 --      Top-level constructors
@@ -82,12 +81,10 @@ cgTopRhsCon cfg id con mn args
     -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
     (static_info, static_code)
 
-  -- Virtual constructor, just return the argument, behaves more like an closure
-  | virtualDataConType con /= NonVirtual
+  -- Virtual constructor, just return the argument.
+  | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg x)] <- args
-  -- It could only be unboxed if we implemented top level unlifted boxy data types.
-  = assert (virtualDataConType con == VirtualBoxed) $
-    let fake_rhs = StgConApp con {-unused-}NoNumber [StgVarArg x] [idType x] :: CgStgExpr
+  = panic "topRhsCon" $ let fake_rhs = StgApp x []
     in
       pprTrace "cgTopRhsCon" (ppr id $$ ppr con $$ ppr args) $
       cgTopRhsClosure platform NonRecursive id dontCareCCS Updatable [] fake_rhs
@@ -207,32 +204,22 @@ the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
 -------- buildDynCon': Virtual constructor -----------
-buildDynCon' binder _mn _actually_bound _ccs con args
-  | vcon <- virtualDataConType con
-  , vcon /= NonVirtual
+buildDynCon' binder mn actually_bound ccs con args
+  | virtualDataConType con == VirtualBoxed
   , [NonVoid (StgVarArg arg)] <- assert (length args == 1) args
   = do
-      pprTraceM "buildDynCon" (ppr con)
       cfg <- getStgToCmmConfig
       let platform = stgToCmmPlatform cfg
 
       m_arg_cg_info <- (getCgInfo_maybe $ idName arg)
       case m_arg_cg_info of
-        Just arg_info@CgIdInfo{ cg_loc, cg_id } -> do
-          case vcon of
-            -- A virtual con for regular boxed things is just the argument info under another name.
-            VirtualBoxed -> do
-              emitTagAssertionId "buildDynConVirt:" arg
-              let virt_con_info = arg_info { cg_id = binder }
-              return (virt_con_info, return mempty)
-            -- These things usually don't have a pointer tag. But here we attach one to avoid these values from being entered.
-            VirtualUnboxedHeap
-              | CmmLoc{ cgl_cmm } <- cg_loc -> do
-                  let virt_con_info = arg_info { cg_id = binder, cg_loc = cg_loc { cgl_cmm = cmmOffset platform cgl_cmm 1 } }
-                  return (virt_con_info, return mempty)
-              | otherwise -> panic "VirtualCon with LNE value as argument"
-            NonVirtual -> panic "impossible" -- handled by guard on buildDynCon'/CmmLoc
+        Just arg_info -> do
+          emitTagAssertionId "buildDynConVirt:" arg
 
+          -- A virtual con is just the arguments info under another name.
+          let fake_con_info = arg_info { cg_id = binder }
+
+          return (fake_con_info, return mempty)
         Nothing -> panic "buildDynCon': LFInfo for VCon args unknown" (ppr binder <> text " = " <> ppr con <+> ppr args)
 
           -- let !lf_info = mkLFArgument arg
@@ -435,16 +422,9 @@ bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 bindConArgs (DataAlt con) base args
   | isVirtualDataCon con
   , [NonVoid arg] <- assert (length args == 1) args
-  = case virtualDataConType con of
-      NonVirtual -> panic "Impossible" -- checked by guard above
-      VirtualBoxed -> do
-        bindArgToGivenReg (NonVoid arg) base
-        return [base]
-      VirtualUnboxedHeap -> do
-        pprTraceM "BindOffset" (ppr con)
-        bindArgToGivenRegOffset (NonVoid arg) base (-1)
-        return [base]
-
+  = do
+      bindArgToGivenReg (NonVoid arg) base
+      return [base]
 
   | otherwise = assert (not (isUnboxedTupleDataCon con)) $
     do profile <- getProfile
