@@ -61,7 +61,7 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
-test('openFile003', [normalise_win32_io_errors], compile_and_run, [''])
+test('openFile003', [normalise_win32_io_errors, js_skip], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
 test('openFile005', [], compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
