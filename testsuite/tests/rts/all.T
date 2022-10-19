@@ -196,7 +196,7 @@ test('EventlogOutput_IPE',
 def noCapabilityOutputFilter(s):
      return re.sub(r'[a-f0-9]+: IPE:', 'IPE:', s)
 
-test('T4059', [], makefile_test, ['T4059'])
+test('T4059', req_c, makefile_test, ['T4059'])
 
 # Test for #4274
 test('exec_signals',
@@ -222,7 +222,7 @@ test('T5250', [extra_files(['spalign.c']),
                 omit_ways(['ghci']) ],
               compile_and_run, ['spalign.c'])
 
-test('T5423', [], makefile_test, ['T5423'])
+test('T5423', cmm_src, makefile_test, ['T5423'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
@@ -270,7 +270,8 @@ test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
 # Times out in ghci way.
 # Also times out on x86_64-linux from time to time.
 test('T7919', [ when(fast(), skip)
-              , omit_ways(['ghci'] + prof_ways)
+              , omit_ways(['ghci'])
+              , req_th
               , when(platform('x86_64-unknown-linux'), fragile(22283))
               ]
               , compile_and_run, [config.ghc_th_way_flags])
@@ -362,8 +363,9 @@ test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
 
 test('T9405', [when(opsys('mingw32'), expect_broken(21361))], makefile_test, ['T9405'])
 
-test('T11788', when(ghc_dynamic(), skip),
-              makefile_test, ['T11788'])
+test('T11788', [ when(ghc_dynamic(), skip)
+               , req_interp
+               ], makefile_test, ['T11788'])
 
 test('T10296a', [req_smp], makefile_test, ['T10296a'])
 
@@ -446,10 +448,10 @@ test('keep-cafs',
 
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
-test('T11829', [ check_errmsg("This is a test") ], compile_and_run,
+test('T11829', [ req_c, check_errmsg("This is a test") ], compile_and_run,
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
-test('T16514', normal, compile_and_run, ['T16514_c.c'])
+test('T16514', req_c, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',
@@ -457,7 +459,10 @@ test('T13676',
       extra_files(['T13676.hs'])],
      ghci_script, ['T13676.script'])
 test('InitEventLogging',
-     [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
+     [ only_ways(['normal'])
+     , extra_run_opts('+RTS -RTS')
+     , req_c
+     ],
      compile_and_run, ['InitEventLogging_c.c'])
 test('RestartEventLogging',
      [only_ways(['threaded1','threaded2']), extra_run_opts('+RTS -la -RTS')],
@@ -485,11 +490,11 @@ test('T20199', [ grep_errmsg('Hello') ]
 # We need to be precise about the used way here as different ways may lead to
 # different closures (and their orders) on the stack (which is checked by this
 # test).
-test('cloneMyStack', [only_ways(['normal']), extra_files(['cloneStackLib.c'])],
+test('cloneMyStack', [req_c,only_ways(['normal']), extra_files(['cloneStackLib.c'])],
      compile_and_run, ['cloneStackLib.c'])
 test('cloneMyStack2', ignore_stdout, compile_and_run, [''])
-test('cloneMyStack_retBigStackFrame', [extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
-test('cloneThreadStack', [only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
+test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
+test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
 test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
 # Options:
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.

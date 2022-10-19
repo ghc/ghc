@@ -1,5 +1,5 @@
 test('T20735',
-     normal,
+     req_c,
      multi_compile_and_run,
      ['T20735', [('T20735_c.c', '')], ''])
 

@@ -1,4 +1,4 @@
-test('recompTH', [extra_files(['A.hs', 'B1.hs', 'B2.hs' ]),
+test('recompTH', [req_th, extra_files(['A.hs', 'B1.hs', 'B2.hs' ]),
                    when(fast(), skip)
                   , normalise_slashes],
      makefile_test, [])

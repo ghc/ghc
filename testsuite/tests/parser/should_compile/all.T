@@ -165,7 +165,8 @@ test('NegativeLiteralsNoExt', normal, compile, [''])
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
 test('proposal-229f',
-     [ extra_files(['proposal-229f.hs', 'Proposal229f_instances.hs']),
+     [ req_th,
+       extra_files(['proposal-229f.hs', 'Proposal229f_instances.hs']),
        omit_ways(['profasm', 'profthreaded'])
      ],
      multimod_compile_and_run, ['proposal-229f.hs', ''])

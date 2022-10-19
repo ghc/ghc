@@ -267,7 +267,7 @@ test('json', normal, compile_fail, ['-ddump-json'])
 # won't tell.  It looks unrelated and is annoying to debug. Hence we disable the
 # warning to prevent spurious errors.
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json -Wno-unsupported-llvm-version'])
-test('T16167', exit_code(1), run_command,
+test('T16167', [req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])
@@ -291,10 +291,10 @@ test('T17786', unless(opsys('mingw32'), skip), makefile_test, [])
 test('T18369', normal, compile, ['-O'])
 test('T21682', normal, compile_fail, ['-Werror=unrecognised-warning-flags -Wfoo'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
-test('OneShotTH', normal, makefile_test, [])
+test('OneShotTH', req_th, makefile_test, [])
 test('T17481', normal, makefile_test, [])
 test('T20084', normal, makefile_test, [])
-test('RunMode', extra_files(['RunMode/Test.hs']), run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
+test('RunMode', [req_interp,extra_files(['RunMode/Test.hs'])], run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
 test('T20439', normal, run_command,
      ['echo "module Foo where" >> Foo.hs && \
       {compiler} -E -fno-code -XCPP -v Foo.hs 2>&1 | grep "Copying" | sed "s/.*to//" '])

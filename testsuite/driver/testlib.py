@@ -255,6 +255,11 @@ def req_rts_linker( name, opts ):
     if not config.have_RTS_linker:
         opts.expect = 'fail'
 
+def req_c( name, opts ):
+    """
+    Mark a test as requiring C source file support
+    """
+
 def req_th( name, opts ):
     """
     Mark a test as requiring TemplateHaskell. In addition to having interpreter
@@ -724,6 +729,7 @@ def literate( name, opts ):
 
 def c_src( name, opts ):
     opts.c_src = True
+    req_c (name, opts)
 
 def objc_src( name, opts ):
     opts.objc_src = True

@@ -37,12 +37,6 @@ test('T16731', normal, compile, [''])
 test('T16721', normal, ghci_script, ['T16721.script'])
 test('T16756a', normal, compile, [''])
 
-# We omit 'profasm' because it fails with:
-# Cannot load -prof objects when GHC is built with -dynamic
-#     To fix this, either:
-#       (1) Use -fexternal-interpreter, or
-#       (2) Build the program twice: once with -dynamic, and then
-#           with -prof using -osuf to set a different object file suffix.
-test('saks027', omit_ways(['profasm']), compile, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('saks028', omit_ways(['profasm']), compile, [''])
-test('T17164', omit_ways(['profasm']), compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('saks027', req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('saks028', req_th, compile, [''])
+test('T17164',  req_th, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
