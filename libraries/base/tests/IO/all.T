@@ -115,7 +115,7 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', extra_files(['encoded-data/']), compile_and_run, [''])
+test('encoding004', [extra_files(['encoded-data/']), js_skip], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])
