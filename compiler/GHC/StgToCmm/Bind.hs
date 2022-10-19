@@ -105,11 +105,6 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   gen_code _ closure_label
     | StgApp f [] <- body, null args, isNonRec rec
     = emitIndCon f ccs closure_label
-    -- -- special case for virtual con "indirections"
-    -- | StgConApp con _ [StgVarArg x] _ <- body
-    -- , null args
-    -- , isVirtualDataCon con
-    -- = emitIndCon x ccs closure_label
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile

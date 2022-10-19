@@ -15,7 +15,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info (tagSigInfo)
 import GHC.Types.Name
 import GHC.Stg.Syntax
-import GHC.Types.Basic ( CbvMark (..), TopLevelFlag(..), isTopLevel )
+import GHC.Types.Basic
 import GHC.Types.Unique.Supply (mkSplitUniqSupply)
 import GHC.Types.RepType (dataConRuntimeRepStrictness, isVirtualDataCon)
 import GHC.Core (AltCon(..))
