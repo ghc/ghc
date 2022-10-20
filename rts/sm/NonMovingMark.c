@@ -39,6 +39,9 @@ static void trace_PAP_payload (MarkQueue *queue,
                                StgClosure *fun,
                                StgClosure **payload,
                                StgWord size);
+#if defined(DEBUG)
+static bool is_nonmoving_weak(StgWeak *weak);
+#endif
 
 // How many Array# entries to add to the mark queue at once?
 #define MARK_ARRAY_CHUNK_LENGTH 128
@@ -1502,10 +1505,12 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         break;
     }
 
+    case WEAK:
+        ASSERT(is_nonmoving_weak((StgWeak*) p));
+        // fallthrough
     gen_obj:
     case CONSTR:
     case CONSTR_NOCAF:
-    case WEAK:
     case PRIM:
     {
         for (StgWord i = 0; i < info->layout.payload.ptrs; i++) {
@@ -1860,6 +1865,30 @@ static bool nonmovingIsNowAlive (StgClosure *p)
     }
 }
 
+// Mark all Weak#s on nonmoving_old_weak_ptr_list.
+void nonmovingMarkWeakPtrList (struct MarkQueue_ *queue)
+{
+    ASSERT(nonmoving_weak_ptr_list == NULL);
+    for (StgWeak *w = nonmoving_old_weak_ptr_list; w != NULL; w = w->link) {
+        mark_closure(queue, (StgClosure *) w, NULL);
+    }
+}
+
+// Determine whether a weak pointer object is on one of the nonmoving
+// collector's weak pointer lists. Used for sanity checking.
+#if defined(DEBUG)
+static bool is_nonmoving_weak(StgWeak *weak)
+{
+    for (StgWeak *w = nonmoving_old_weak_ptr_list; w != NULL; w = w->link) {
+        if (w == weak) return true;
+    }
+    for (StgWeak *w = nonmoving_weak_ptr_list; w != NULL; w = w->link) {
+        if (w == weak) return true;
+    }
+    return false;
+}
+#endif
+
 // Non-moving heap variant of `tidyWeakList`
 bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
 {
@@ -1868,6 +1897,9 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
     StgWeak **last_w = &nonmoving_old_weak_ptr_list;
     StgWeak *next_w;
     for (StgWeak *w = nonmoving_old_weak_ptr_list; w != NULL; w = next_w) {
+        // This should have been marked by nonmovingMarkWeaks
+        ASSERT(nonmovingIsNowAlive((StgClosure *) w));
+
         if (w->header.info == &stg_DEAD_WEAK_info) {
             // finalizeWeak# was called on the weak
             next_w = w->link;
@@ -1878,7 +1910,10 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
         // Otherwise it's a live weak
         ASSERT(w->header.info == &stg_WEAK_info);
 
-        if (nonmovingIsNowAlive(w->key)) {
+        // See Note [Weak pointer processing and the non-moving GC] in
+        // MarkWeak.c
+        bool key_in_nonmoving = Bdescr((StgPtr) w->key)->flags & BF_NONMOVING;
+        if (!key_in_nonmoving || nonmovingIsNowAlive(w->key)) {
             nonmovingMarkLiveWeak(queue, w);
             did_work = true;
 
@@ -1886,7 +1921,7 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
             *last_w = w->link;
             next_w = w->link;
 
-            // and put it on the weak ptr list
+            // and put it on nonmoving_weak_ptr_list
             w->link = nonmoving_weak_ptr_list;
             nonmoving_weak_ptr_list = w;
         } else {
@@ -1908,7 +1943,8 @@ void nonmovingMarkDeadWeak (struct MarkQueue_ *queue, StgWeak *w)
 
 void nonmovingMarkLiveWeak (struct MarkQueue_ *queue, StgWeak *w)
 {
-    ASSERT(nonmovingClosureMarkedThisCycle((P_)w));
+    ASSERT(nonmovingIsNowAlive((StgClosure *) w));
+    ASSERT(nonmovingIsNowAlive((StgClosure *) w->key));
     markQueuePushClosure_(queue, w->value);
     markQueuePushClosure_(queue, w->finalizer);
     markQueuePushClosure_(queue, w->cfinalizers);
@@ -1922,9 +1958,9 @@ void nonmovingMarkDeadWeaks (struct MarkQueue_ *queue, StgWeak **dead_weaks)
 {
     StgWeak *next_w;
     for (StgWeak *w = nonmoving_old_weak_ptr_list; w; w = next_w) {
-        ASSERT(!nonmovingClosureMarkedThisCycle((P_)(w->key)));
+        ASSERT(!nonmovingIsNowAlive(w->key));
         nonmovingMarkDeadWeak(queue, w);
-        next_w = w ->link;
+        next_w = w->link;
         w->link = *dead_weaks;
         *dead_weaks = w;
     }
