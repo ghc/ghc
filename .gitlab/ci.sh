@@ -65,6 +65,7 @@ Environment variables affecting both build systems:
                     "decreases", or "all")
   HERMETIC          Take measures to avoid looking at anything in \$HOME
   CONFIGURE_ARGS    Arguments passed to configure script.
+  CONFIGURE_WRAPPER Wrapper for the configure script (e.g. Emscripten's emconfigure).
   ENABLE_NUMA       Whether to enable numa support for the build (disabled by default)
   INSTALL_CONFIGURE_ARGS
                     Arguments passed to the binary distribution configure script
@@ -421,7 +422,7 @@ function configure() {
   start_section "configuring"
   # See https://stackoverflow.com/questions/7577052 for a rationale for the
   # args[@] symbol-soup below.
-  run ./configure \
+  run ${CONFIGURE_WRAPPER:-} ./configure \
     --enable-tarballs-autodownload \
     "${args[@]+"${args[@]}"}" \
     GHC="$GHC" \
