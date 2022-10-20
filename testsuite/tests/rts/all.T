@@ -184,13 +184,17 @@ test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
 # Test that -ol flag works as expected
 test('EventlogOutput1',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+       omit_ways(['dyn', 'ghci'] + prof_ways),
+       js_skip
+     ],
      makefile_test, ['EventlogOutput1'])
 
 # Test that -ol flag defaults to <program>.eventlog
 test('EventlogOutput2',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+       omit_ways(['dyn', 'ghci'] + prof_ways),
+       js_skip
+     ],
      makefile_test, ['EventlogOutput2'])
 
 test('EventlogOutputNull',
