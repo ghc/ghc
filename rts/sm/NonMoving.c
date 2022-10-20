@@ -26,7 +26,7 @@
 #include "NonMovingCensus.h"
 #include "StablePtr.h" // markStablePtrTable
 #include "Schedule.h" // markScheduler
-#include "Weak.h" // dead_weak_ptr_list
+#include "Weak.h" // scheduleFinalizers
 
 struct NonmovingHeap nonmovingHeap;
 
@@ -248,6 +248,9 @@ Mutex concurrent_coll_finished_lock;
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
  *
+ *  - Note [Weak pointer processing and the non-moving GC] (MarkWeak.c) describes
+ *    how weak pointers are handled when the non-moving GC is in use.
+ *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
  *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
@@ -296,6 +299,7 @@ Mutex concurrent_coll_finished_lock;
  *                    ┆
  *      B ←────────────── A ←─────────────── root
  *      │             ┆     ↖─────────────── gen1 mut_list
+ *      │             ┆
  *      ╰───────────────→ C
  *                    ┆
  *
@@ -336,8 +340,9 @@ Mutex concurrent_coll_finished_lock;
  * The implementation details of this are described in Note [Non-moving GC:
  * Marking evacuated objects] in Evac.c.
  *
- * Note [Deadlock detection under nonmoving collector]
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Note [Deadlock detection under the non-moving collector]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * In GHC the garbage collector is responsible for identifying deadlocked
  * programs. Providing for this responsibility is slightly tricky in the
  * non-moving collector due to the existence of aging. In particular, the
@@ -896,43 +901,6 @@ static void nonmovingPrepareMark(void)
 #endif
 }
 
-// Mark weak pointers in the non-moving heap. They'll either end up in
-// dead_weak_ptr_list or stay in weak_ptr_list. Either way they need to be kept
-// during sweep. See `MarkWeak.c:markWeakPtrList` for the moving heap variant
-// of this.
-static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_ptr_list)
-{
-    for (StgWeak *w = oldest_gen->weak_ptr_list; w; w = w->link) {
-        markQueuePushClosureGC(mark_queue, (StgClosure*)w);
-        // Do not mark finalizers and values here, those fields will be marked
-        // in `nonmovingMarkDeadWeaks` (for dead weaks) or
-        // `nonmovingTidyWeaks` (for live weaks)
-    }
-
-    // We need to mark dead_weak_ptr_list too. This is subtle:
-    //
-    // - By the beginning of this GC we evacuated all weaks to the non-moving
-    //   heap (in `markWeakPtrList`)
-    //
-    // - During the scavenging of the moving heap we discovered that some of
-    //   those weaks are dead and moved them to `dead_weak_ptr_list`. Note that
-    //   because of the fact above _all weaks_ are in the non-moving heap at
-    //   this point.
-    //
-    // - So, to be able to traverse `dead_weak_ptr_list` and run finalizers we
-    //   need to mark it.
-    for (StgWeak *w = dead_weak_ptr_list; w; w = w->link) {
-        markQueuePushClosureGC(mark_queue, (StgClosure*)w);
-
-        // Mark the value and finalizer since they will be needed regardless of
-        // whether we find the weak is live.
-        if (w->cfinalizers != &stg_NO_FINALIZER_closure) {
-            markQueuePushClosureGC(mark_queue, w->value);
-        }
-        markQueuePushClosureGC(mark_queue, w->finalizer);
-    }
-}
-
 void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 {
 #if defined(THREADED_RTS)
@@ -965,9 +933,15 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
                 getCapability(n), true/*don't mark sparks*/);
     }
-    markScheduler((evac_fn)markQueueAddRoot, mark_queue);
-    nonmovingMarkWeakPtrList(mark_queue, *dead_weaks);
     markStablePtrTable((evac_fn)markQueueAddRoot, mark_queue);
+
+    // The dead weak pointer list shouldn't contain any weaks in the
+    // nonmoving heap
+#if defined(DEBUG)
+    for (StgWeak *w = *dead_weaks; w; w = w->link) {
+        ASSERT(Bdescr((StgPtr) w)->gen != oldest_gen);
+    }
+#endif
 
     // Mark threads resurrected during moving heap scavenging
     for (StgTSO *tso = *resurrected_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
@@ -994,8 +968,23 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // alive).
     ASSERT(oldest_gen->old_weak_ptr_list == NULL);
     ASSERT(nonmoving_old_weak_ptr_list == NULL);
-    nonmoving_old_weak_ptr_list = oldest_gen->weak_ptr_list;
-    oldest_gen->weak_ptr_list = NULL;
+    {
+        // Move both oldest_gen->weak_ptr_list and nonmoving_weak_ptr_list to
+        // nonmoving_old_weak_ptr_list
+        StgWeak **weaks = &oldest_gen->weak_ptr_list;
+        uint32_t n = 0;
+        while (*weaks) {
+            weaks = &(*weaks)->link;
+            n++;
+        }
+        debugTrace(DEBUG_nonmoving_gc, "%d new nonmoving weaks", n);
+        *weaks = nonmoving_weak_ptr_list;
+        nonmoving_old_weak_ptr_list = oldest_gen->weak_ptr_list;
+        nonmoving_weak_ptr_list = NULL;
+        oldest_gen->weak_ptr_list = NULL;
+        // At this point all weaks in the nonmoving generation are on
+        // nonmoving_old_weak_ptr_list
+    }
     trace(TRACE_nonmoving_gc, "Finished nonmoving GC preparation");
 
     // We are now safe to start concurrent marking
@@ -1017,7 +1006,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
         OSThreadId thread;
-        if (createOSThread(&thread, "non-moving mark thread",
+        if (createOSThread(&thread, "nonmoving-mark",
                            nonmovingConcurrentMark, mark_queue) != 0) {
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
@@ -1059,7 +1048,6 @@ static void* nonmovingConcurrentMark(void *data)
     return NULL;
 }
 
-// TODO: Not sure where to put this function.
 // Append w2 to the end of w1.
 static void appendWeakList( StgWeak **w1, StgWeak *w2 )
 {
@@ -1100,6 +1088,9 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         }
     }
 
+    // Mark Weak#s
+    nonmovingMarkWeakPtrList(mark_queue);
+
     // Do concurrent marking; most of the heap will get marked here.
     nonmovingMarkThreadsWeaks(mark_queue);
 
@@ -1110,21 +1101,13 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     if (getSchedState() > SCHED_RUNNING) {
         // Note that we break our invariants here and leave segments in
         // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
-        // However because we won't be running mark-sweep in the final GC this
+        // However because we won't be running sweep in the final GC this
         // is OK.
-
-        // This is a RTS shutdown so we need to move our copy (snapshot) of
-        // weaks (nonmoving_old_weak_ptr_list and nonmoving_weak_ptr_list) to
-        // oldest_gen->threads to be able to run C finalizers in hs_exit_. Note
-        // that there may be more weaks added to oldest_gen->threads since we
-        // started mark, so we need to append our list to the tail of
-        // oldest_gen->threads.
-        appendWeakList(&nonmoving_old_weak_ptr_list, nonmoving_weak_ptr_list);
-        appendWeakList(&oldest_gen->weak_ptr_list, nonmoving_old_weak_ptr_list);
-        // These lists won't be used again so this is not necessary, but still
-        nonmoving_old_weak_ptr_list = NULL;
-        nonmoving_weak_ptr_list = NULL;
-
+        //
+        // However, we must move any weak pointers remaining on
+        // nonmoving_old_weak_ptr_list back to nonmoving_weak_ptr_list
+        // such that their C finalizers can be run by hs_exit_.
+        appendWeakList(&nonmoving_weak_ptr_list, nonmoving_old_weak_ptr_list);
         goto finish;
     }
 
@@ -1196,15 +1179,9 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
         nonmoving_old_threads = END_TSO_QUEUE;
     }
 
-    {
-        StgWeak **weaks = &oldest_gen->weak_ptr_list;
-        while (*weaks) {
-            weaks = &(*weaks)->link;
-        }
-        *weaks = nonmoving_weak_ptr_list;
-        nonmoving_weak_ptr_list = NULL;
-        nonmoving_old_weak_ptr_list = NULL;
-    }
+    // At this point point any weak that remains on nonmoving_old_weak_ptr_list
+    // has a dead key.
+    nonmoving_old_weak_ptr_list = NULL;
 
     // Prune spark lists
     // See Note [Spark management under the nonmoving collector].

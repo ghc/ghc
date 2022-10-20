@@ -157,6 +157,7 @@ void initMarkQueue(MarkQueue *queue);
 void freeMarkQueue(MarkQueue *queue);
 void nonmovingMark(struct MarkQueue_ *restrict queue);
 
+void nonmovingMarkWeakPtrList(struct MarkQueue_ *queue);
 bool nonmovingTidyWeaks(struct MarkQueue_ *queue);
 void nonmovingTidyThreads(void);
 void nonmovingMarkDeadWeaks(struct MarkQueue_ *queue, StgWeak **dead_weak_ptr_list);
