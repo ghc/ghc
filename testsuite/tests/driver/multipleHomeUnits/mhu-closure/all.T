@@ -4,6 +4,8 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('mhu-closure',
-     extra_files(['p/', 'q/', 'r/', 'r1/', 'unitP', 'unitQ', 'unitR', 'unitR1', 'Setup.hs']),
+     [ extra_files(['p/', 'q/', 'r/', 'r1/', 'unitP', 'unitQ', 'unitR', 'unitR1', 'Setup.hs'])
+     , js_skip
+     ],
      run_command,
      ['$MAKE -s --no-print-directory mhu-closure ' + cleanup])
