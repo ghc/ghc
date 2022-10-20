@@ -153,14 +153,18 @@ test('T5402', [ omit_ways(['ghci']),
                   # The T5402_setup hack is to ensure that we generate
                   # T5402_stub.h before compiling T5402_main.c, which
                   # needs it.
-                pre_cmd('$MAKE -s --no-print-directory T5402_setup') ],
+                pre_cmd('$MAKE -s --no-print-directory T5402_setup'),
+                js_skip
+              ],
               compile_and_run, ["-no-hs-main T5402_main.c"])
 
 test('T5594', [ omit_ways(['ghci']),
-                pre_cmd('$MAKE -s --no-print-directory T5594_setup') ],
+                pre_cmd('$MAKE -s --no-print-directory T5594_setup'),
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
                 # needs it.
+                js_skip
+              ],
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
 test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c']), js_skip],
