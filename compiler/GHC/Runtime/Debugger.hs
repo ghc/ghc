@@ -16,6 +16,9 @@ import GHC.Prelude
 
 import GHC
 
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
+
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Monad
@@ -48,7 +51,7 @@ import GHC.Types.TyThing
 
 import Control.Monad
 import Control.Monad.Catch as MC
-import Data.List ( (\\), partition )
+import Data.List ( partition )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.IORef
@@ -149,7 +152,7 @@ bindSuspensions t = do
       let ictxt        = hsc_IC hsc_env
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
-          availNames   = map ((prefix++) . show) [(1::Int)..] \\ alreadyUsedNames
+          availNames   = (Inf.filter (`notElem` alreadyUsedNames) . fmap ((prefix++) . show)) (Inf.enumFrom (1::Int))
       availNames_var  <- liftIO $ newIORef availNames
       (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos hsc_env availNames_var) t
       let (names, tys, fhvs) = unzip3 stuff
@@ -163,7 +166,7 @@ bindSuspensions t = do
      where
 
 --    Processing suspensions. Give names and collect info
-        nameSuspensionsAndGetInfos :: HscEnv -> IORef [String]
+        nameSuspensionsAndGetInfos :: HscEnv -> IORef (Infinite String)
                                    -> TermFold (IO (Term, [(Name,Type,ForeignHValue)]))
         nameSuspensionsAndGetInfos hsc_env freeNames = TermFold
                       {
@@ -182,7 +185,7 @@ bindSuspensions t = do
                                     return (RefWrap ty term, names)
                       }
         doSuspension hsc_env freeNames ct ty hval _name = do
-          name <- atomicModifyIORef' freeNames (\x->(tail x, head x))
+          name <- atomicModifyIORef' freeNames (\(Inf x xs)->(xs, x))
           n <- newGrimName hsc_env name
           return (Suspension ct ty hval (Just n), [(n,ty,hval)])
 
