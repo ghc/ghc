@@ -257,7 +257,7 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  # needs it.
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
-test('T7037', [], makefile_test, ['T7037'])
+test('T7037', js_skip, makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
