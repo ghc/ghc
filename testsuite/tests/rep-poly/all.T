@@ -80,7 +80,7 @@ test('RepPolyTuple', normal, compile_fail, [''])
 test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
 test('RepPolyUnliftedDatatype', js_skip, compile, [''])
-test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
+test('RepPolyUnliftedDatatype2', js_skip, compile, ['-O'])
 test('RepPolyUnliftedNewtype', normal, compile,
      ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
