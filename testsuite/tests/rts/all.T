@@ -421,7 +421,7 @@ test('T13894', normal, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
-test('T14695', [normal, ignore_stderr], makefile_test, ['T14695'])
+test('T14695', [js_skip, ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
                , when(opsys('mingw32'), fragile(18953))
