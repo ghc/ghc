@@ -50,7 +50,7 @@
 
    - weak_stage == WeakPtrs
 
-     We process all the weak pointers whos keys are alive (evacuate
+     We process all the weak pointers whose keys are alive (evacuate
      their values and finalizers), and repeat until we can find no new
      live keys.  If no live keys are found in this pass, then we
      evacuate the finalizers of all the dead weak pointers in order to
@@ -82,6 +82,12 @@ static bool tidyWeakList (generation *gen);
 static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_threads);
 static void    tidyThreadList (generation *gen);
 
+/*
+ * Prepare the weak object lists for GC. Specifically, reset weak_stage
+ * and move all generations' `weak_ptr_list`s to `old_weak_ptr_list`.
+ * Weaks with live keys will later be moved back to `weak_ptr_list` by
+ * `tidyWeakList`.
+ */
 void
 initWeakForGC(void)
 {
@@ -96,6 +102,14 @@ initWeakForGC(void)
     weak_stage = WeakThreads;
 }
 
+/*
+ * Walk the weak pointer lists after having finished a round of scavenging,
+ * tidying the weak (and possibly thread) lists (depending upon the current
+ * weak_stage).
+ *
+ * Returns true if new live weak pointers were found, implying that another
+ * round of scavenging is necessary.
+ */
 bool
 traverseWeakPtrList(StgWeak **dead_weak_ptr_list, StgTSO **resurrected_threads)
 {
@@ -182,6 +196,11 @@ traverseWeakPtrList(StgWeak **dead_weak_ptr_list, StgTSO **resurrected_threads)
   }
 }
 
+/*
+ * Deal with weak pointers with unreachable keys after GC has concluded.
+ * This means marking the finalizer (and possibly value) in preparation for
+ * later finalization.
+ */
 static void collectDeadWeakPtrs (generation *gen, StgWeak **dead_weak_ptr_list)
 {
     StgWeak *w, *next_w;
@@ -198,6 +217,10 @@ static void collectDeadWeakPtrs (generation *gen, StgWeak **dead_weak_ptr_list)
     }
 }
 
+/*
+ * Deal with threads left on the old_threads list after GC has concluded,
+ * moving them onto the resurrected_threads list where appropriate.
+ */
 static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_threads)
 {
     StgTSO *t, *tmp, *next;
@@ -233,6 +256,13 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
     return flag;
 }
 
+/*
+ * Walk over the `old_weak_ptr_list` of the given generation and:
+ *
+ *  - remove any DEAD_WEAKs
+ *  - move any weaks with reachable keys to the `weak_ptr_list` of the
+ *    appropriate to-space and mark the weak's value and finalizer.
+ */
 static bool tidyWeakList(generation *gen)
 {
     StgWeak *w, **last_w, *next_w;
@@ -322,6 +352,10 @@ static bool tidyWeakList(generation *gen)
     return flag;
 }
 
+/*
+ * Walk over the `old_threads` list of the given generation and move any
+ * reachable threads onto the `threads` list.
+ */
 static void tidyThreadList (generation *gen)
 {
     StgTSO *t, *tmp, *next, **prev;
@@ -381,6 +415,10 @@ static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
 }
 #endif
 
+/*
+ * Traverse the capabilities' local new-weak-pointer lists at the beginning of
+ * GC and move them to the nursery's weak_ptr_list.
+ */
 void collectFreshWeakPtrs()
 {
     uint32_t i;
