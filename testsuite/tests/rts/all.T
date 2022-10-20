@@ -518,7 +518,7 @@ test('T19381',
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
-test('T20199', [ grep_errmsg('Hello') ]
+test('T20199', [ grep_errmsg('Hello'), js_skip ]
       , makefile_test, [])
 
 # We need to be precise about the used way here as different ways may lead to
