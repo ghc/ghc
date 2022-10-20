@@ -63,14 +63,14 @@ test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
 test('openFile003', [normalise_win32_io_errors, js_skip], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
-test('openFile005', [], compile_and_run, [''])
+test('openFile005', js_skip, compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
-test('openFile007', [], compile_and_run, [''])
+test('openFile007', js_skip, compile_and_run, [''])
 test('openFile008', [when(platform('js-unknown-ghcjs'), skip), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
 test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
-test('readFile001', [], compile_and_run, [''])
+test('readFile001', js_skip, compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
