@@ -206,8 +206,9 @@ testRules = do
         -- get absolute path for the given program in stage1 (useful for
         -- cross-compilers)
         let absolute_path1
-              | cross     = absolute_path_stage (Stage0 InTreeLibs)
-              | otherwise = absolute_path_stage $ predStage stg
+              | cross            = absolute_path_stage (Stage0 InTreeLibs)
+              | Stage0 {} <- stg = absolute_path_stage stg
+              | otherwise        = absolute_path_stage $ predStage stg
 
         ghcPath <- getCompilerPath testCompilerArg
 
