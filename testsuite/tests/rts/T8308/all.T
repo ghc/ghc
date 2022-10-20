@@ -1,1 +1,1 @@
-test('T8308', normal, makefile_test, ['T8308'])
+test('T8308', js_skip, makefile_test, ['T8308'])
