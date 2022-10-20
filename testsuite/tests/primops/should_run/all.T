@@ -55,7 +55,7 @@ test('UnliftedSmallArray1', normal, compile_and_run, [''])
 test('UnliftedSmallArray2', normal, compile_and_run, [''])
 test('UnliftedStablePtr', normal, compile_and_run, [''])
 test('UnliftedTVar1', normal, compile_and_run, [''])
-test('UnliftedTVar2', normal, compile_and_run, [''])
+test('UnliftedTVar2', js_skip, compile_and_run, [''])
 test('UnliftedWeakPtr', normal, compile_and_run, [''])
 
 test('T21624', normal, compile_and_run, [''])
