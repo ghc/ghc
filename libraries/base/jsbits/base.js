@@ -687,7 +687,7 @@ if(h$isNode()) {
         printErr(h$decodeUtf8(buf, n, buf_offset));
         c(n);
     }
-} else if(h$isJsCore) {
+} else if(h$isJsCore()) {
     h$base_readStdin = function(fd, fdo, buf, buf_offset, n, c) {
 	c(0);
     }
@@ -758,7 +758,7 @@ function h$shutdownHaskellAndExit(code, fast) {
 #ifndef GHCJS_BROWSER
 #ifdef GHCJS_LOG_BUFFER
     if(h$isNode()) console.log(h$logBuffer);
-    if(h$isJsShell() || h$isJsCore) print(h$logBuffer);
+    if(h$isJsShell() || h$isJsCore()) print(h$logBuffer);
 #endif
 #endif
     h$exitProcess(code);
