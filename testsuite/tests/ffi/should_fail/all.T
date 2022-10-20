@@ -24,7 +24,7 @@ test('T21305_fail', normal, compile_fail, [''])
 # (threaded runtime will hang). See #14912.
 test('UnsafeReenter',
      [ omit_ways(threaded_ways)
-     , exit_code(1),
+     , exit_code(1)
      , req_c
      ],
      compile_and_run,
