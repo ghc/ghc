@@ -74,7 +74,8 @@ flavour = do
         (settingErrs, tweak) = applySettings kvs
 
     when (not $ null settingErrs) $ fail
-      $ "failed to apply key-value settings:" ++ unlines (map (" - " ++) settingErrs)
+      $ "failed to apply key-value settings:\n\t" ++ unlines (map (" - " ++) settingErrs) ++
+        "\t   Entries should look something like \"stage1.containers.ghc.hs.opts += -Werror\""
 
     case parseFlavour flavours flavourTransformers flavourName of
       Left err -> fail err
