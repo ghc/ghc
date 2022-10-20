@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TupleSections              #-}
 
 -- only for DB.Binary instances on Module
 {-# OPTIONS_GHC -fno-warn-orphans #-}
