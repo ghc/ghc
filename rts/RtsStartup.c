@@ -481,6 +481,7 @@ hs_exit_(bool wait_foreign)
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         runAllCFinalizers(generations[g].weak_ptr_list);
     }
+    runAllCFinalizers(nonmoving_weak_ptr_list);
 
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {
