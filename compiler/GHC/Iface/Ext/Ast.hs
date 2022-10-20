@@ -246,7 +246,7 @@ getUnlocatedEvBinds file = do
       mkNodeInfo (n,ci) = (Right (varName n), IdentifierDetails (Just $ varType n) ci)
 
       go e@(v,_) (xs,ys) = case nameSrcSpan $ varName v of
-        RealSrcSpan spn _
+        RealSrcSpan spn
           | srcSpanFile spn == file ->
             let node = Node (mkSourcedNodeInfo org ni) spn []
                 ni = NodeInfo mempty [] $ M.fromList [mkNodeInfo e]
@@ -336,10 +336,11 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
         Just c -> forM_ (classSCSelIds c) $ \v ->
           addUnlocatedEvBind v (EvidenceVarBind (EvInstBind True (className c)) ModuleScope Nothing)
     let spanFile file children = case nonEmpty children of
-          Nothing -> realSrcLocSpan (mkRealSrcLoc file 1 1)
+          Nothing -> realSrcLocSpan (mkRealSrcLoc file 1 1) Strict.Nothing
           Just children -> mkRealSrcSpan
               (realSrcSpanStart $ nodeSpan (NE.head children))
               (realSrcSpanEnd   $ nodeSpan (NE.last children))
+              Strict.Nothing
 
         flat_asts = concat
           [ tasts
@@ -354,7 +355,7 @@ enrichHie ts (hsGrp, imports, exports, docs) ev_bs insts tcs =
           top_ev_asts :: [HieAST Type] <- do
             let
               l :: SrcSpanAnnA
-              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan $ mkRealSrcLoc file 1 1) Strict.Nothing)
+              l = noAnnSrcSpan (RealSrcSpan (realSrcLocSpan (mkRealSrcLoc file 1 1) Strict.Nothing))
             toHie $ EvBindContext ModuleScope Nothing
                   $ L l (EvBinds ev_bs)
 
@@ -401,7 +402,7 @@ getRealSpanA :: SrcSpanAnn' ann -> Maybe Span
 getRealSpanA la = getRealSpan (locA la)
 
 getRealSpan :: SrcSpan -> Maybe Span
-getRealSpan (RealSrcSpan sp _) = Just sp
+getRealSpan (RealSrcSpan sp) = Just sp
 getRealSpan _ = Nothing
 
 grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcAnn NoEpAnns)
@@ -414,7 +415,7 @@ bindingsOnly (C c n : xs) = do
   org <- ask
   rest <- bindingsOnly xs
   pure $ case nameSrcSpan n of
-    RealSrcSpan span _ -> Node (mkSourcedNodeInfo org nodeinfo) span [] : rest
+    RealSrcSpan span -> Node (mkSourcedNodeInfo org nodeinfo) span [] : rest
       where nodeinfo = NodeInfo S.empty [] (M.singleton (Right n) info)
             info = mempty{identInfo = S.singleton c}
     _ -> rest
@@ -609,7 +610,7 @@ instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
 instance ToHie (IEContext (LocatedA ModuleName)) where
-  toHie (IEC c (L (SrcSpanAnn _ (RealSrcSpan span _)) mname)) = do
+  toHie (IEC c (L (SrcSpanAnn _ (RealSrcSpan span)) mname)) = do
       org <- ask
       pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
@@ -624,7 +625,7 @@ instance ToHie (Context (Located a)) => ToHie (Context (LocatedA a)) where
 
 instance ToHie (Context (Located Var)) where
   toHie c = case c of
-      C context (L (RealSrcSpan span _) name')
+      C context (L (RealSrcSpan span) name')
         | varUnique name' == mkBuiltinUnique 1 -> pure []
           -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
         | otherwise -> do
@@ -651,7 +652,7 @@ instance ToHie (Context (Located Var)) where
 
 instance ToHie (Context (Located Name)) where
   toHie c = case c of
-      C context (L (RealSrcSpan span _) name')
+      C context (L (RealSrcSpan span) name')
         | nameUnique name' == mkBuiltinUnique 1 -> pure []
           -- `mkOneRecordSelector` makes a field var using this unique, which we ignore
         | otherwise -> do

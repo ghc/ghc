@@ -93,7 +93,7 @@ selectPoint hf (sl,sc) = getFirst $
         Just ast' -> Just ast'
  where
    sloc fs = mkRealSrcLoc fs sl sc
-   sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
+   sp fs = mkRealSrcSpan (sloc fs) (sloc fs) Strict.Nothing
 
 findEvidenceUse :: NodeIdentifiers a -> [Name]
 findEvidenceUse ni = [n | (Right n, dets) <- xs, any isEvidenceUse (identInfo dets)]
@@ -309,7 +309,7 @@ getNameScopeAndBinding
   -> M.Map HiePath (HieAST a)
   -> Maybe ([Scope], Maybe Span)
 getNameScopeAndBinding n asts = case nameSrcSpan n of
-  RealSrcSpan sp _ -> do -- @Maybe
+  RealSrcSpan sp -> do -- @Maybe
     ast <- M.lookup (HiePath (srcSpanFile sp)) asts
     defNode <- selectLargestContainedBy sp ast
     getFirst $ foldMap First $ do -- @[]
@@ -373,7 +373,7 @@ selectSmallestContaining sp node
 
 definedInAsts :: M.Map HiePath (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of
-  RealSrcSpan sp _ -> M.member (HiePath (srcSpanFile sp)) asts
+  RealSrcSpan sp -> M.member (HiePath (srcSpanFile sp)) asts
   _ -> False
 
 getEvidenceBindDeps :: ContextInfo -> [Name]
@@ -520,7 +520,7 @@ simpleNodeInfo :: FastString -> FastString -> NodeInfo a
 simpleNodeInfo cons typ = NodeInfo (S.singleton (NodeAnnotation cons typ)) [] M.empty
 
 locOnly :: Monad m => SrcSpan -> ReaderT NodeOrigin m [HieAST a]
-locOnly (RealSrcSpan span _) = do
+locOnly (RealSrcSpan span) = do
   org <- ask
   let e = mkSourcedNodeInfo org $ emptyNodeInfo
   pure [Node e span []]
@@ -530,7 +530,7 @@ mkScopeA :: SrcSpanAnn' ann -> Scope
 mkScopeA l = mkScope (locA l)
 
 mkScope :: SrcSpan -> Scope
-mkScope (RealSrcSpan sp _) = LocalScope sp
+mkScope (RealSrcSpan sp) = LocalScope sp
 mkScope _ = NoScope
 
 mkLScope :: Located a -> Scope
@@ -548,7 +548,7 @@ combineScopes _ ModuleScope = ModuleScope
 combineScopes NoScope x = x
 combineScopes x NoScope = x
 combineScopes (LocalScope a) (LocalScope b) =
-  mkScope $ combineSrcSpans (RealSrcSpan a Strict.Nothing) (RealSrcSpan b Strict.Nothing)
+  mkScope $ combineSrcSpans (RealSrcSpan a) (RealSrcSpan b)
 
 mkSourcedNodeInfo :: NodeOrigin -> NodeInfo a -> SourcedNodeInfo a
 mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni
@@ -570,7 +570,7 @@ makeNode
 makeNode x spn = do
   org <- ask
   pure $ case spn of
-    RealSrcSpan span _ -> [Node (mkSourcedNodeInfo org $ simpleNodeInfo cons typ) span []]
+    RealSrcSpan span -> [Node (mkSourcedNodeInfo org $ simpleNodeInfo cons typ) span []]
     _ -> []
   where
     cons = mkFastString . show . toConstr $ x
@@ -595,7 +595,7 @@ makeTypeNode
 makeTypeNode x spn etyp = do
   org <- ask
   pure $ case spn of
-    RealSrcSpan span _ ->
+    RealSrcSpan span ->
       [Node (mkSourcedNodeInfo org $ NodeInfo (S.singleton (NodeAnnotation cons typ)) [etyp] M.empty) span []]
     _ -> []
   where

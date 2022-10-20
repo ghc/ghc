@@ -120,7 +120,7 @@ getIdentifier :: Int -- ^ adornment length
                  -- ^ The remaining input beginning with the found token
               -> (RealSrcSpan, ByteString)
 getIdentifier !i !loc0 !len0 !s0 =
-    (mkRealSrcSpan loc1 loc2, ident)
+    (mkRealSrcSpan loc1 loc2 Strict.Nothing, ident)
   where
     (adornment, s1) = BS.splitAt i s0
     ident = BS.take (len0 - 2*i) s1
@@ -145,7 +145,7 @@ lexStringLiteral identParser (L l sl@(StringLiteral _ fs _))
 
     plausibleIdents :: [(SrcSpan,ByteString)]
     plausibleIdents = case l of
-      RealSrcSpan span _ -> [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) bs]
+      RealSrcSpan span -> [(RealSrcSpan span', tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) bs]
       UnhelpfulSpan reason -> [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc bs]
 
     fakeLoc = mkRealSrcLoc (mkFastString "") 0 0
@@ -164,8 +164,8 @@ lexHsDoc identParser doc =
     maybeDocIdentifier = uncurry (validateIdentWith identParser)
 
     plausibleIdents :: LHsDocStringChunk -> [(SrcSpan,ByteString)]
-    plausibleIdents (L (RealSrcSpan span _) (HsDocStringChunk s))
-      = [(RealSrcSpan span' Strict.Nothing, tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
+    plausibleIdents (L (RealSrcSpan span) (HsDocStringChunk s))
+      = [(RealSrcSpan span', tok) | (span', tok) <- alexScanTokens (realSrcSpanStart span) s]
     plausibleIdents (L (UnhelpfulSpan reason) (HsDocStringChunk s))
       = [(UnhelpfulSpan reason, tok) | (_, tok) <- alexScanTokens fakeLoc s] -- preserve the original reason
 
@@ -190,12 +190,12 @@ validateIdentWith identParser mloc str0 =
         }
       buffer = stringBufferFromByteString str0
       realSrcLc = case mloc of
-        RealSrcSpan loc _ -> realSrcSpanStart loc
+        RealSrcSpan loc -> realSrcSpanStart loc
         UnhelpfulSpan _ -> mkRealSrcLoc (mkFastString "") 0 0
       pstate = initParserState pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of
-       RealSrcSpan _ _ -> reLoc name
+       RealSrcSpan _ -> reLoc name
        UnhelpfulSpan _ -> L mloc (unLoc name) -- Preserve the original reason
     _ -> Nothing
 }

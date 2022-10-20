@@ -131,8 +131,8 @@ newtype PmPatBind p =
   PmPatBind (PmGRHS p)
 
 instance Outputable SrcInfo where
-  ppr (SrcInfo (L (RealSrcSpan rss _) _)) = ppr (srcSpanStartLine rss)
-  ppr (SrcInfo (L s                   _)) = ppr s
+  ppr (SrcInfo (L (RealSrcSpan rss) _)) = ppr (srcSpanStartLine rss)
+  ppr (SrcInfo (L s                 _)) = ppr s
 
 -- | Format LYG guards as @| True <- x, let x = 42, !z@
 instance Outputable GrdVec where

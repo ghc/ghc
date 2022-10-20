@@ -74,7 +74,7 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
     -- If the name has a span, use that initially as the source position in-case
     -- we don't get anything better.
     with_span = case nameSrcSpan name of
-                  RealSrcSpan pos _ -> withSpan (pos, occNameString (getOccName name))
+                  RealSrcSpan pos -> withSpan (pos, occNameString (getOccName name))
                   _ -> id
   e' <- with_span $ collectExpr e
   recordInfo bndr e'

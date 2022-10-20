@@ -118,7 +118,7 @@ addTicksToBinds logger cfg
                       , inScope      = emptyVarSet
                       , blackList    = Set.fromList $
                                        mapMaybe (\tyCon -> case getSrcSpan (tyConName tyCon) of
-                                                             RealSrcSpan l _ -> Just l
+                                                             RealSrcSpan l   -> Just l
                                                              UnhelpfulSpan _ -> Nothing)
                                                 tyCons
                       , density      = mkDensity tickish $ ticks_profAuto cfg
@@ -1104,7 +1104,7 @@ getFileName :: TM FastString
 getFileName = fileName `liftM` getEnv
 
 isGoodSrcSpan' :: SrcSpan -> Bool
-isGoodSrcSpan' pos@(RealSrcSpan _ _) = srcSpanStart pos /= srcSpanEnd pos
+isGoodSrcSpan' pos@(RealSrcSpan _) = srcSpanStart pos /= srcSpanEnd pos
 isGoodSrcSpan' (UnhelpfulSpan _) = False
 
 isGoodTickSrcSpan :: SrcSpan -> TM Bool
@@ -1128,7 +1128,7 @@ bindLocals new_ids (TM m)
   where occs = [ nameOccName (idName id) | id <- new_ids ]
 
 isBlackListed :: SrcSpan -> TM Bool
-isBlackListed (RealSrcSpan pos _) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
+isBlackListed (RealSrcSpan pos) = TM $ \ env st -> (Set.member pos (blackList env), noFVs, st)
 isBlackListed (UnhelpfulSpan _) = return False
 
 -- the tick application inherits the source position of its
@@ -1196,7 +1196,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
     Breakpoints -> Breakpoint noExtField <$> addMixEntry me <*> pure ids
 
-    SourceNotes | RealSrcSpan pos' _ <- pos ->
+    SourceNotes | RealSrcSpan pos' <- pos ->
       return $ SourceNote pos' cc_name
 
     _otherwise -> panic "mkTickish: bad source span!"
