@@ -8,7 +8,8 @@ test('T1407',
      [extra_files(['A.c']),
       unless(doing_ghci, skip),
       pre_cmd('$MAKE -s --no-print-directory compile_libT1407'),
-      extra_hc_opts('-L"$PWD/T1407dir"')],
+      extra_hc_opts('-L"$PWD/T1407dir"'),
+      js_skip],
      makefile_test, [])
 
 test('T3242',
