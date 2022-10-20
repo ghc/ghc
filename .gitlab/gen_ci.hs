@@ -121,6 +121,7 @@ data BuildConfig
                 , withNuma       :: Bool
                 , crossTarget    :: Maybe String
                 , crossEmulator  :: Maybe String
+                , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
@@ -146,7 +147,7 @@ data Flavour = Flavour BaseFlavour [FlavourTrans]
 
 data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser
 
-data BaseFlavour = Release | Validate | SlowValidate
+data BaseFlavour = Release | Validate | SlowValidate | PerfJS
 
 -----------------------------------------------------------------------------
 -- Build Configs
@@ -164,6 +165,7 @@ vanilla = BuildConfig
   , withNuma = False
   , crossTarget = Nothing
   , crossEmulator = Nothing
+  , configureWrapper = Nothing
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
@@ -196,10 +198,12 @@ staticNativeInt = static { bignumBackend = Native }
 
 crossConfig :: String       -- ^ target triple
             -> Maybe String -- ^ emulator for testing
+            -> Maybe String -- ^ Configure wrapper
             -> BuildConfig
-crossConfig triple emulator =
+crossConfig triple emulator configure_wrapper =
     vanilla { crossTarget = Just triple
             , crossEmulator = emulator
+            , configureWrapper = configure_wrapper
             }
 
 llvm :: BuildConfig
@@ -278,6 +282,7 @@ flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . fl
     baseString Release = "release"
     baseString Validate = "validate"
     baseString SlowValidate = "slow-validate"
+    baseString PerfJS = "perf-js"
 
     flavourString Llvm = "llvm"
     flavourString Dwarf = "debug_info"
@@ -636,6 +641,7 @@ job arch opsys buildConfig = (jobName, Job {..})
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
+      , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
       , maybe mempty ("CROSS_EMULATOR" =:) (crossEmulator buildConfig)
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
@@ -813,7 +819,12 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu"))
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" Nothing (Just "emconfigure")
+        )
+        { bignumBackend = Native
+        , buildFlavour  = PerfJS
+        }
      ]
 
   where
