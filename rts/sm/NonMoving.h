@@ -298,7 +298,6 @@ INLINE_HEADER void nonmovingSetClosureMark(StgPtr p)
     nonmovingSetMark(nonmovingGetSegment(p), nonmovingGetBlockIdx(p));
 }
 
-// TODO: Audit the uses of these
 /* Was the given closure marked this major GC cycle? */
 INLINE_HEADER bool nonmovingClosureMarkedThisCycle(StgPtr p)
 {
