@@ -65,7 +65,7 @@ writeMixEntries hpc_dir mod extendedMixEntries filename
         return hashNo
 
 mkHpcPos :: SrcSpan -> HpcPos
-mkHpcPos pos@(RealSrcSpan s _)
+mkHpcPos pos@(RealSrcSpan s)
    | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
                                     srcSpanStartCol s,
                                     srcSpanEndLine s,

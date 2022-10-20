@@ -362,7 +362,7 @@ toArgs starting_loc orig_str
   advance_src_loc_many = foldl' advanceSrcLoc
 
   locate :: RealSrcLoc -> RealSrcLoc -> a -> Located a
-  locate begin end x = L (RealSrcSpan (mkRealSrcSpan begin end) Strict.Nothing) x
+  locate begin end x = L (RealSrcSpan (mkRealSrcSpan begin end Strict.Nothing)) x
 
   toArgs' :: RealSrcLoc -> String -> Either String [Located String]
   -- Remove outer quotes:

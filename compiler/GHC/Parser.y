@@ -3931,7 +3931,7 @@ getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag src True))  = (Inline src,FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag src False)) = (NoInline src,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
-getVOCURLY      (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
+getVOCURLY      (L (RealSrcSpan l) ITvocurly) = srcSpanStartCol l
 
 getINTEGERs     (L _ (ITinteger (IL src _ _))) = src
 getCHARs        (L _ (ITchar       src _)) = src
@@ -4390,7 +4390,7 @@ commentsPA la@(L l a) = do
   return (L (addCommentsToSrcAnn l cs) a)
 
 rs :: SrcSpan -> RealSrcSpan
-rs (RealSrcSpan l _) = l
+rs (RealSrcSpan l) = l
 rs _ = panic "Parser should only have RealSrcSpan"
 
 hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList

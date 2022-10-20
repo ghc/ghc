@@ -147,16 +147,16 @@ rs2range :: RealSrcSpan -> (Pos,Pos)
 rs2range ss = (ss2pos ss, ss2posEnd ss)
 
 rs :: SrcSpan -> RealSrcSpan
-rs (RealSrcSpan s _) = s
+rs (RealSrcSpan s) = s
 rs _ = badRealSrcSpan
 
 range2rs :: (Pos,Pos) -> RealSrcSpan
-range2rs (s,e) = mkRealSrcSpan (mkLoc s) (mkLoc e)
+range2rs (s,e) = mkRealSrcSpan (mkLoc s) (mkLoc e) Strict.Nothing
   where
     mkLoc (l,c) = mkRealSrcLoc (fsLit "ghc-exactprint") l c
 
 badRealSrcSpan :: RealSrcSpan
-badRealSrcSpan = mkRealSrcSpan bad bad
+badRealSrcSpan = mkRealSrcSpan bad bad Strict.Nothing
   where
     bad = mkRealSrcLoc (fsLit "ghc-exactprint-nospan") 0 0
 
@@ -403,17 +403,19 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 hackSrcSpanToAnchor :: SrcSpan -> Anchor
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
-hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
-  = if s <= 0 && e <= 0
-    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
-      `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-    else Anchor r UnchangedAnchor
+hackSrcSpanToAnchor (RealSrcSpan r)
+  = case  realSrcSpanBufSpan r of
+    (Strict.Just (BufSpan (BufPos s) (BufPos e))) ->
+      if s <= 0 && e <= 0
+      then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+        `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
+      else Anchor r UnchangedAnchor
+    _ -> Anchor r UnchangedAnchor
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
-hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
+hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan (setRealSrcSpanBufSpan r Strict.Nothing)
 hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
-  = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
+  = RealSrcSpan (setRealSrcSpanBufSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
       `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
   where
     s = - (getDeltaLine dp)

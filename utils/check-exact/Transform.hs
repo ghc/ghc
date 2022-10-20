@@ -170,7 +170,7 @@ isUniqueSrcSpan :: SrcSpan -> Bool
 isUniqueSrcSpan ss = srcSpanStartLine' ss == -1
 
 srcSpanStartLine' :: SrcSpan -> Int
-srcSpanStartLine' (RealSrcSpan s _) = srcSpanStartLine s
+srcSpanStartLine' (RealSrcSpan s) = srcSpanStartLine s
 srcSpanStartLine' _ = 0
 
 -- ---------------------------------------------------------------------

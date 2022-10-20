@@ -46,7 +46,6 @@ import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
 import           GHC.Types.Var
-import qualified GHC.Data.Strict as Strict
 
 -- | Info about a module. This information is generated every time a
 -- module is loaded.
@@ -144,7 +143,7 @@ findNameUses infos span0 string =
     locToSpans (modinfo,name',span') =
         stripSurrounding (span' : map toSrcSpan spans)
       where
-        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s) Strict.Nothing
+        toSrcSpan s = RealSrcSpan (spaninfoSrcSpan s)
         spans = filter ((== Just name') . fmap getName . spaninfoVar)
                        (modinfoSpans modinfo)
 
@@ -154,7 +153,7 @@ stripSurrounding xs = filter (not . isRedundant) xs
   where
     isRedundant x = any (x `strictlyContains`) xs
 
-    (RealSrcSpan s1 _) `strictlyContains` (RealSrcSpan s2 _)
+    (RealSrcSpan s1) `strictlyContains` (RealSrcSpan s2)
          = s1 /= s2 && s1 `containsSpan` s2
     _                `strictlyContains` _ = False
 
@@ -373,7 +372,7 @@ processAllTypeCheckedModule tcm
 
     -- | Pretty print the types into a 'SpanInfo'.
     toSpanInfo :: (Maybe Id,SrcSpan,Type) -> Maybe SpanInfo
-    toSpanInfo (n,RealSrcSpan spn _,typ)
+    toSpanInfo (n,RealSrcSpan spn,typ)
         = Just $ spanInfoFromRealSrcSpan spn (Just typ) n
     toSpanInfo _ = Nothing
 

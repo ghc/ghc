@@ -423,7 +423,7 @@ initTcInteractive :: HscEnv -> TcM a -> IO (Messages TcRnMessage, Maybe a)
 initTcInteractive hsc_env thing_inside
   = initTc hsc_env HsSrcFile False
            (icInteractiveModule (hsc_IC hsc_env))
-           (realSrcLocSpan interactive_src_loc)
+           (realSrcLocSpan interactive_src_loc Strict.Nothing)
            thing_inside
   where
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
@@ -964,7 +964,7 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Strict.Nothing) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env)) }
 
 -- See Note [Error contexts in generated code]
 inGeneratedCode :: TcRn Bool
@@ -973,7 +973,7 @@ inGeneratedCode = tcl_in_gen_code <$> getLclEnv
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
 -- See Note [Error contexts in generated code]
 -- for the tcl_in_gen_code manipulation
-setSrcSpan (RealSrcSpan loc _) thing_inside
+setSrcSpan (RealSrcSpan loc) thing_inside
   = updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
               thing_inside
 
