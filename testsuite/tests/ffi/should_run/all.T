@@ -202,7 +202,7 @@ test('T12134', [omit_ways(['ghci']),req_c], compile_and_run, ['T12134_c.c'])
 
 test('T12614', [omit_ways(['ghci']),req_c], compile_and_run, ['T12614_c.c'])
 
-test('T14624', [omit_ways(['ghci'])], compile_and_run, ['T14624_c.c'])
+test('T14624', [omit_ways(['ghci']), js_skip], compile_and_run, ['T14624_c.c'])
 
 test('T15933', [extra_files(['T15933_c.c', 'T15933.h']), req_c], makefile_test, ['T15933'])
 

@@ -517,7 +517,7 @@ test('T19381',
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
-test('T20199', [ grep_errmsg('Hello') ]
+test('T20199', [ grep_errmsg('Hello'), js_skip ]
       , makefile_test, [])
 
 test('cloneMyStack', [req_c,extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
