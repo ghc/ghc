@@ -275,6 +275,8 @@ def req_c( name, opts ):
     """
     Mark a test as requiring C source file support
     """
+    # JS backend doesn't support C (yet)
+    js_skip(name, opts)
 
 def req_th( name, opts ):
     """

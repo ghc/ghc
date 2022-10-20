@@ -258,7 +258,7 @@ test('T7037', [], makefile_test, ['T7037'])
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
 
-test('T7040', [omit_ways(['ghci']), c_src], compile_and_run, ['T7040_c.c'])
+test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
@@ -378,7 +378,7 @@ test('T10590', [ ignore_stderr
                ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
-test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), c_src ],
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
                compile_and_run, ['T10904lib.c'])
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
