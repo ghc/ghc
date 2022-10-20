@@ -130,8 +130,8 @@ goodComment c = isGoodComment (tokComment c)
 
 
 toRealLocated :: GHC.Located a -> GHC.RealLocated a
-toRealLocated (GHC.L (GHC.RealSrcSpan s _) x) = GHC.L s              x
-toRealLocated (GHC.L _ x)                     = GHC.L badRealSrcSpan x
+toRealLocated (GHC.L (GHC.RealSrcSpan s) x) = GHC.L s              x
+toRealLocated (GHC.L _ x)                   = GHC.L badRealSrcSpan x
 
 -- ---------------------------------------------------------------------
 

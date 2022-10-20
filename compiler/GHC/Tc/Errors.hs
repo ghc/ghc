@@ -75,7 +75,6 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 import GHC.Data.Bag
 import GHC.Data.List.SetOps ( equivClasses, nubOrdBy )
 import GHC.Data.Maybe
-import qualified GHC.Data.Strict as Strict
 
 import Control.Monad      ( unless, when, foldM, forM_ )
 import Data.Foldable      ( toList )
@@ -1176,7 +1175,7 @@ mkErrorReport tcl_env msg mb_ctxt supplementary
                (vcat $ map (pprSolverReportSupplementary hfdc) supplementary)
        ; let detailed_msg = mkDetailedMessage err_info msg
        ; mkTcRnMessage
-           (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
+           (RealSrcSpan (tcl_loc tcl_env))
            (TcRnMessageWithInfo unit_state $ detailed_msg) }
 
 

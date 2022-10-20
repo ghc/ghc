@@ -84,6 +84,7 @@ import GHC.Utils.Panic.Plain
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import qualified GHC.Data.Strict as Strict
 
 import Control.Monad
 import Data.List (find)
@@ -368,7 +369,7 @@ tcRnCheckUnit hsc_env uid =
           HsigFile -- bogus
           False
           (mainModIs (hsc_HUE hsc_env))
-          (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
+          (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0) Strict.Nothing) -- bogus
     $ checkUnit uid
   where
    dflags = hsc_dflags hsc_env

@@ -548,7 +548,7 @@ getMessageClassColour _                                       = const mempty
 
 getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
+getCaretDiagnostic msg_class (RealSrcSpan span) =
   caretDiagnostic <$> getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =

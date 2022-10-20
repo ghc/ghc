@@ -335,7 +335,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env msg_var cc_st_var
                                                           else Nothing) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              NotBoot
-        real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
+        real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1) Strict.Nothing
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_gbl_rdr_env  = rdr_env
@@ -406,12 +406,12 @@ updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
-                  ; return (RealSrcSpan (dsl_loc env) Strict.Nothing) }
+                  ; return (RealSrcSpan (dsl_loc env)) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (UnhelpfulSpan {}) thing_inside
   = thing_inside
-putSrcSpanDs (RealSrcSpan real_span _) thing_inside
+putSrcSpanDs (RealSrcSpan real_span) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
 
 putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a

@@ -44,6 +44,7 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import qualified GHC.Data.Strict as Strict
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
@@ -2488,7 +2489,7 @@ instance Binary IfaceTickish where
                     let start = mkRealSrcLoc file sl sc
                         end = mkRealSrcLoc file el ec
                     name <- get bh
-                    return (IfaceSource (mkRealSrcSpan start end) name)
+                    return (IfaceSource (mkRealSrcSpan start end Strict.Nothing) name)
             _ -> panic ("get IfaceTickish " ++ show h)
 
 instance Binary IfaceConAlt where

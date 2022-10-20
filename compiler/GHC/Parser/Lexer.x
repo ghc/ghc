@@ -1983,7 +1983,7 @@ setColumn (PsSpan span _) buf len _buf2 = do
   lexToken
 
 alrInitialLoc :: FastString -> RealSrcSpan
-alrInitialLoc file = mkRealSrcSpan loc loc
+alrInitialLoc file = mkRealSrcSpan loc loc Strict.Nothing -- invalid loc, so not needed
     where -- This is a hack to ensure that the first line in a file
           -- looks like it is after the initial location:
           loc = mkRealSrcLoc file (-1) (-1)
@@ -2413,7 +2413,7 @@ warnTab srcspan _buf _len _buf2 = do
 
 warnThen :: PsMessage -> Action -> Action
 warnThen warning action srcspan buf len buf2 = do
-    addPsMessage (RealSrcSpan (psRealSpan srcspan) Strict.Nothing) warning
+    addPsMessage (RealSrcSpan (psRealSpan srcspan)) warning
     action srcspan buf len buf2
 
 -- -----------------------------------------------------------------------------
@@ -2583,7 +2583,7 @@ failMsgP f = do
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> MsgEnvelope PsMessage) -> P a
 failLocMsgP loc1 loc2 f =
-  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Strict.Nothing))
+  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2 Strict.Nothing)))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -3122,15 +3122,15 @@ instance MonadP P where
        } (EpaCommentsBalanced (Strict.fromMaybe [] header_comments') newAnns)
 
 getCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
-getCommentsFor (RealSrcSpan l _) = allocateCommentsP l
+getCommentsFor (RealSrcSpan l) = allocateCommentsP l
 getCommentsFor _ = return emptyComments
 
 getPriorCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
-getPriorCommentsFor (RealSrcSpan l _) = allocatePriorCommentsP l
+getPriorCommentsFor (RealSrcSpan l) = allocatePriorCommentsP l
 getPriorCommentsFor _ = return emptyComments
 
 getFinalCommentsFor :: (MonadP m) => SrcSpan -> m EpAnnComments
-getFinalCommentsFor (RealSrcSpan l _) = allocateFinalCommentsP l
+getFinalCommentsFor (RealSrcSpan l) = allocateFinalCommentsP l
 getFinalCommentsFor _ = return emptyComments
 
 getEofPos :: P (Strict.Maybe (Strict.Pair RealSrcSpan RealSrcSpan))
@@ -3168,7 +3168,7 @@ getPsMessages p =
         Strict.Nothing -> ws
         Strict.Just tf ->
           let msg = mkPlainMsgEnvelope diag_opts
-                          (RealSrcSpan tf Strict.Nothing)
+                          (RealSrcSpan tf)
                           (PsWarnTab (tab_count p))
           in msg `addMessage` ws
   in (ws', errors p)
@@ -3629,7 +3629,7 @@ warn_unknown_prag prags span buf len buf2 = do
   let uppercase    = map toUpper
       unknown_prag = uppercase (clean_pragma (lexemeToString buf len))
       suggestions  = map uppercase (Map.keys prags)
-  addPsMessage (RealSrcSpan (psRealSpan span) Strict.Nothing) $
+  addPsMessage (RealSrcSpan (psRealSpan span)) $
     PsWarnUnrecognisedPragma unknown_prag suggestions
   nested_comment span buf len buf2
 
@@ -3653,8 +3653,8 @@ mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan lo),AddEpAnn AnnCloseP (EpaSpan l
     sc = srcSpanStartCol ss
     el = srcSpanEndLine ss
     ec = srcSpanEndCol ss
-    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
-    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
+    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1)) Strict.Nothing
+    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)        Strict.Nothing
 
 queueComment :: RealLocated Token -> P()
 queueComment c = P $ \s -> POk s {

@@ -1318,7 +1318,8 @@ instance Binary BinSpan where
             el <- get bh
             ec <- get bh
             return $ BinSpan (mkRealSrcSpan (mkRealSrcLoc f sl sc)
-                                            (mkRealSrcLoc f el ec))
+                                            (mkRealSrcLoc f el ec)
+                                            Strict.Nothing)
 
 instance Binary UnhelpfulSpanReason where
   put_ bh r = case r of
@@ -1341,7 +1342,7 @@ newtype BinSrcSpan = BinSrcSpan { unBinSrcSpan :: SrcSpan }
 
 -- See Note [Source Location Wrappers]
 instance Binary BinSrcSpan where
-  put_ bh (BinSrcSpan (RealSrcSpan ss _sb)) = do
+  put_ bh (BinSrcSpan (RealSrcSpan ss)) = do
           putByte bh 0
           -- BufSpan doesn't ever get serialised because the positions depend
           -- on build location.

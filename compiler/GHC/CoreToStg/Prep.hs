@@ -47,6 +47,7 @@ import GHC.Data.OrdList
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Data.Graph.UnVar
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -310,12 +311,12 @@ mkDataConWorkers generate_debug_info mod_loc data_tycons
    -- worker. This is useful, especially for heap profiling.
    tick_it name
      | not generate_debug_info               = id
-     | RealSrcSpan span _ <- nameSrcSpan name = tick span
+     | RealSrcSpan span <- nameSrcSpan name = tick span
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")
      where tick span  = Tick $ SourceNote span $
              renderWithContext defaultSDocContext $ ppr name
-           span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
+           span1 file = realSrcLocSpan (mkRealSrcLoc (mkFastString file) 1 1) Strict.Nothing
 
 {-
 Note [Floating out of top level bindings]

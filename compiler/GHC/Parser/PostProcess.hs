@@ -1042,13 +1042,13 @@ checkTyClHdr is_cls ty
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
         an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
-      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
+      in SrcSpanAnn an (RealSrcSpan lr)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
         an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c ta) (csp Semi.<> cs))
-      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
+      in SrcSpanAnn an (RealSrcSpan lr)
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1134,18 +1134,18 @@ checkImportDecl mPre mPost = do
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $
-      failNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failNotEnabledImportQualifiedPost (RealSrcSpan (epaLocationRealSrcSpan post))
 
   -- Error if 'qualified' occurs in both pre and postpositive
   -- positions.
   whenJust mPost $ \post ->
     when (isJust mPre) $
-      failImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post) Strict.Nothing)
+      failImportQualifiedTwice (RealSrcSpan (epaLocationRealSrcSpan post))
 
   -- Warn if 'qualified' found in prepositive position and
   -- 'Opt_WarnPrepositiveQualifiedModule' is enabled.
   whenJust mPre $ \pre ->
-    warnPrepositiveQualifiedModule (RealSrcSpan (epaLocationRealSrcSpan pre) Strict.Nothing)
+    warnPrepositiveQualifiedModule (RealSrcSpan (epaLocationRealSrcSpan pre))
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -3126,13 +3126,13 @@ mkMultTy pct t arr = HsExplicitMult pct t arr
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
-mkTokenLocation (RealSrcSpan r _)  = TokenLoc (EpaSpan r)
+mkTokenLocation (RealSrcSpan r)   = TokenLoc (EpaSpan r)
 
 -- Precondition: the TokenLocation has EpaSpan, never EpaDelta.
 token_location_widenR :: TokenLocation -> SrcSpan -> TokenLocation
 token_location_widenR NoTokenLoc _ = NoTokenLoc
 token_location_widenR tl (UnhelpfulSpan _) = tl
-token_location_widenR (TokenLoc (EpaSpan r1)) (RealSrcSpan r2 _) =
+token_location_widenR (TokenLoc (EpaSpan r1)) (RealSrcSpan r2) =
                       (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2)))
 token_location_widenR (TokenLoc (EpaDelta _ _)) _ =
   -- Never happens because the parser does not produce EpaDelta.

@@ -447,7 +447,7 @@ dsExpr (HsStatic (_, whole_ty) expr@(L loc _)) = do
     dflags <- getDynFlags
     let platform = targetPlatform dflags
     let (line, col) = case locA loc of
-           RealSrcSpan r _ ->
+           RealSrcSpan r ->
                             ( srcLocLine $ realSrcSpanStart r
                             , srcLocCol  $ realSrcSpanStart r
                             )

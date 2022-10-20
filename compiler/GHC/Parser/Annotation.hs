@@ -517,11 +517,11 @@ data EpAnn ann
 -- the element relative to its container. If it is moved, that
 -- relationship is tracked in the 'anchor_op' instead.
 
-data Anchor = Anchor        { anchor :: RealSrcSpan
+data Anchor = Anchor        { anchor :: !RealSrcSpan
                                  -- ^ Base location for the start of
                                  -- the syntactic element holding
                                  -- the annotations.
-                            , anchor_op :: AnchorOperation }
+                            , anchor_op :: !AnchorOperation }
         deriving (Data, Eq, Show)
 
 -- | If tools modify the parsed source, the 'MovedAnchor' variant can
@@ -911,10 +911,10 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 -- ---------------------------------------------------------------------
 
 realSrcSpan :: SrcSpan -> RealSrcSpan
-realSrcSpan (RealSrcSpan s _) = s
-realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
+realSrcSpan (RealSrcSpan s) = s
+realSrcSpan _ = mkRealSrcSpan l l Strict.Nothing -- AZ temporary
   where
-    l = mkRealSrcLoc (fsLit "foo") (-1) (-1)
+    l = mkRealSrcLoc (fsLit "from UnhelpfulSpan") (-1) (-1)
 
 la2r :: SrcSpanAnn' a -> RealSrcSpan
 la2r l = realSrcSpan (locA l)
@@ -976,7 +976,7 @@ widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s Strict.Nothing : go rest
+    go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s : go rest
     go (AddEpAnn _ (EpaDelta _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
@@ -1073,7 +1073,7 @@ noComments = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) NoEpAnns emptyCo
 
 -- TODO:AZ get rid of this
 placeholderRealSpan :: RealSrcSpan
-placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1))
+placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1)) Strict.Nothing
 
 comment :: RealSrcSpan -> EpAnnComments -> EpAnnCO
 comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs

@@ -636,7 +636,7 @@ ghciLogAction lastErrLocations old_log_action
     old_log_action dflags msg_class srcSpan msg
     case msg_class of
         MCDiagnostic SevError _reason _code -> case srcSpan of
-            RealSrcSpan rsp _ -> modifyIORef lastErrLocations
+            RealSrcSpan rsp -> modifyIORef lastErrLocations
                 (++ [(srcLocFile (realSrcSpanStart rsp), srcLocLine (realSrcSpanStart rsp))])
             _ -> return ()
         _ -> return ()
@@ -2408,6 +2408,7 @@ parseSpanArg s = do
                               -- End column of RealSrcSpan is the column
                               -- after the end of the span.
                               (mkRealSrcLoc fs el (ec + 1))
+                              Strict.Nothing
 
     return (span',trailer)
   where
@@ -2441,7 +2442,7 @@ parseSpanArg s = do
 -- while simply unpacking 'UnhelpfulSpan's
 showSrcSpan :: SrcSpan -> String
 showSrcSpan (UnhelpfulSpan s)  = unpackFS (unhelpfulSpanFS s)
-showSrcSpan (RealSrcSpan spn _) = showRealSrcSpan spn
+showSrcSpan (RealSrcSpan spn) = showRealSrcSpan spn
 
 -- | Variant of 'showSrcSpan' for 'RealSrcSpan's
 showRealSrcSpan :: RealSrcSpan -> String
@@ -3819,7 +3820,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
-           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl Strict.Nothing) GHC.SingleStep
+           doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl) GHC.SingleStep
 
 stepModuleCmd :: GhciMonad m => String -> m ()
 stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
@@ -3837,7 +3838,7 @@ stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
 -- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: GhciMonad m => Module -> SrcSpan -> m RealSrcSpan
 enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
-enclosingTickSpan md (RealSrcSpan src _) = do
+enclosingTickSpan md (RealSrcSpan src) = do
   ticks <- getTickArray md
   let line = srcSpanStartLine src
   massert (inRange (bounds ticks) line)
@@ -4162,7 +4163,7 @@ findBreakAndSet md lookupTickTree = do
          (alreadySet, nm) <-
                recordBreak $ BreakLocation
                        { breakModule = md
-                       , breakLoc = RealSrcSpan pan Strict.Nothing
+                       , breakLoc = RealSrcSpan pan
                        , breakTick = tick
                        , onBreakCmd = ""
                        , breakEnabled = True
@@ -4207,7 +4208,7 @@ findBreakForBind str_name modbreaks _ = filter (not . enclosed) ticks
     ticks = [ (index, span)
             | (index, decls) <- assocs (GHC.modBreaks_decls modbreaks),
               str_name == declPath decls,
-              RealSrcSpan span _ <- [GHC.modBreaks_locs modbreaks ! index] ]
+              RealSrcSpan span <- [GHC.modBreaks_locs modbreaks ! index] ]
     enclosed (_,sp0) = any subspan ticks
       where subspan (_,sp) = sp /= sp0 &&
                          realSrcSpanStart sp <= realSrcSpanStart sp0 &&
@@ -4224,7 +4225,7 @@ findBreakByCoord mb_file (line, col) arr
         ticks = arr ! line
 
         -- the ticks that span this coordinate
-        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan Strict.Nothing `spans` (line,col),
+        contains = [ tick | tick@(_,pan) <- ticks, RealSrcSpan pan `spans` (line,col),
                             is_correct_file pan ]
 
         is_correct_file pan
@@ -4285,7 +4286,7 @@ listCmd "" = do
    case mb_span of
       Nothing ->
           printForUser $ text "Not stopped at a breakpoint; nothing to list"
-      Just (RealSrcSpan pan _) ->
+      Just (RealSrcSpan pan) ->
           listAround pan True
       Just pan@(UnhelpfulSpan _) ->
           do resumes <- GHC.getResumeContext
@@ -4323,7 +4324,7 @@ list2 [arg] = do
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
                                         tickArray
                   case mb_span of
-                    Nothing       -> listAround (realSrcLocSpan l) False
+                    Nothing       -> listAround (realSrcLocSpan l Strict.Nothing) False
                     Just (_, pan) -> listAround pan False
             UnhelpfulLoc _ ->
                   noCanDo name $ text "can't find its location: " <>
@@ -4343,7 +4344,7 @@ listModuleLine modl line = do
      Just summ -> do
            let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
                loc = mkRealSrcLoc (mkFastString (filename)) line 0
-           listAround (realSrcLocSpan loc) False
+           listAround (realSrcLocSpan loc Strict.Nothing) False
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
@@ -4438,9 +4439,9 @@ discardTickArrays = modifyGHCiState (\st -> st {tickarrays = emptyModuleEnv})
 mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
 mkTickArray ticks
   = accumArray (flip (:)) [] (1, max_line)
-        [ (line, (nm,pan)) | (nm,RealSrcSpan pan _) <- ticks, line <- srcSpanLines pan ]
+        [ (line, (nm,pan)) | (nm,RealSrcSpan pan) <- ticks, line <- srcSpanLines pan ]
     where
-        max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp _) <- ticks ]
+        max_line = foldr max 0 [ GHC.srcSpanEndLine sp | (_, RealSrcSpan sp) <- ticks ]
         srcSpanLines pan = [ GHC.srcSpanStartLine pan ..  GHC.srcSpanEndLine pan ]
 
 -- don't reset the counter back to zero?

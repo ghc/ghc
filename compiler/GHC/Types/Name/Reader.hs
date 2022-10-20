@@ -1370,7 +1370,7 @@ instance Outputable ImportSpec where
             | otherwise                  = empty
 
 pprLoc :: SrcSpan -> SDoc
-pprLoc (RealSrcSpan s _)  = text "at" <+> ppr s
+pprLoc (RealSrcSpan s)  = text "at" <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
 
 -- | Indicate if the given name is the "@" operator
