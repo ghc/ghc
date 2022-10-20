@@ -74,7 +74,7 @@ test('readFile001', js_skip, compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
-test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs')],
+test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs'), js_skip],
      compile_and_run, ['-cpp'])
 
 test('readwrite003', [], compile_and_run, [''])
