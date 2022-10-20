@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE LambdaCase        #-}
@@ -538,10 +537,9 @@ collectDeps mod_deps packages all_deps = do
                         (map (\(m,v) -> (moduleUnitId m,[v])) (M.toList mod_deps))
 
   ar_state <- emptyArchiveState
-  code <- fmap (catMaybes . concat) . forM packages' $ \pkg ->
+  fmap (catMaybes . concat) . forM packages' $ \pkg ->
     mapM (uncurry $ extractDeps ar_state units_by_module)
          (fromMaybe [] $ M.lookup pkg mod_deps_bypkg)
-  return code
 
 extractDeps :: ArchiveState
             -> Map Module IntSet
