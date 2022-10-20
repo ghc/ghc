@@ -19,9 +19,9 @@ test('T10272', [ when(arch('arm'), expect_broken(17556))
                , js_broken(17556)
                ], makefile_test, [])
 
-test('T11004', [], makefile_test, [])
+test('T11004', js_skip, makefile_test, [])
 
-test('T12504', [extra_files(['T12504']), ignore_stdout], makefile_test, [])
+test('T12504', [extra_files(['T12504']), ignore_stdout, js_skip], makefile_test, [])
 
 # Make sure response files are read and used.
 test('T15758', [], makefile_test, [])
