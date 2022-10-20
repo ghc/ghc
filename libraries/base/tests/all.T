@@ -269,7 +269,8 @@ test('clamp', normal, compile_and_run, [''])
 test('T18642',
      [extra_run_opts('+RTS -T -RTS'),
       # The nonmoving GC's residency behavior is very conservative
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity']),
+      js_skip],
      compile_and_run, ['-O2'])
 test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])
