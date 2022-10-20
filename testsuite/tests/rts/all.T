@@ -211,7 +211,7 @@ test('EventlogOutput_IPE',
 def noCapabilityOutputFilter(s):
      return re.sub(r'[a-f0-9]+: IPE:', 'IPE:', s)
 
-test('T4059', c_src, makefile_test, ['T4059'])
+test('T4059', req_c, makefile_test, ['T4059'])
 
 # Test for #4274
 test('exec_signals',
@@ -258,7 +258,7 @@ test('T7037', [], makefile_test, ['T7037'])
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
 
-test('T7040', [omit_ways(['ghci']), c_src], compile_and_run, ['T7040_c.c'])
+test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
@@ -378,7 +378,7 @@ test('T10590', [ ignore_stderr
                ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
-test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), c_src ],
+test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
                compile_and_run, ['T10904lib.c'])
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
@@ -475,10 +475,10 @@ test('keep-cafs',
 
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
-test('T11829', [ check_errmsg("This is a test"), c_src], compile_and_run,
+test('T11829', [ check_errmsg("This is a test"), req_c], compile_and_run,
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
-test('T16514', c_src, compile_and_run, ['T16514_c.c'])
+test('T16514', req_c, compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',
@@ -488,7 +488,7 @@ test('T13676',
 test('InitEventLogging',
      [ only_ways(['normal'])
      , extra_run_opts('+RTS -RTS')
-     , c_src
+     , req_c
      ],
      compile_and_run, ['InitEventLogging_c.c'])
 test('RestartEventLogging',
@@ -516,16 +516,16 @@ test('T19381',
 test('T20199', [ grep_errmsg('Hello') ]
       , makefile_test, [])
 
-test('cloneMyStack', [c_src,extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
+test('cloneMyStack', [req_c,extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
 
 test('cloneMyStack2',
   [ ignore_stdout
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
 
-test('cloneMyStack_retBigStackFrame', [c_src,extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
+test('cloneMyStack_retBigStackFrame', [req_c,extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
 
-test('cloneThreadStack', [c_src,only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
+test('cloneThreadStack', [req_c,only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
 
 test('decodeMyStack',
   [ js_broken(22261) # cloneMyStack# not yet implemented

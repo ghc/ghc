@@ -271,6 +271,13 @@ def req_rts_linker( name, opts ):
     # JS backend doesn't provide the RTS linker
     js_skip(name, opts)
 
+def req_c( name, opts ):
+    """
+    Mark a test as requiring C source file support
+    """
+    # JS backend doesn't support C (yet)
+    js_skip(name, opts)
+
 def req_th( name, opts ):
     """
     Mark a test as requiring TemplateHaskell. In addition to having interpreter
@@ -737,8 +744,7 @@ def literate( name, opts ):
 
 def c_src( name, opts ):
     opts.c_src = True
-    # JS backend doesn't support C (yet)
-    js_skip(name, opts)
+    req_c (name, opts)
 
 def objc_src( name, opts ):
     opts.objc_src = True

@@ -9,7 +9,7 @@ test('T3066', normal, compile_fail, [''])
 test('ccfail004', [extra_files(['Ccfail004A.hs'])], multimod_compile_fail, ['ccfail004', '-v0'])
 test('ccfail005', normal, compile_fail, [''])
 test('ccall_value', normal, compile_fail, [''])
-test('capi_value_function', c_src, compile_fail, [''])
+test('capi_value_function', req_c, compile_fail, [''])
 test('NonreducingFfiSignature', normal, compile_fail, [''])
 test('T5664', normal, compile_fail, ['-v0'])
 test('T7506', normal, compile_fail, [''])
@@ -23,8 +23,10 @@ test('T21305_fail', normal, compile_fail, [''])
 # from an unsafe foreign function) and only makes sense in non-threaded way
 # (threaded runtime will hang). See #14912.
 test('UnsafeReenter',
-     [omit_ways(threaded_ways), exit_code(1),
-     c_src],
+     [ omit_ways(threaded_ways)
+     , exit_code(1),
+     , req_c
+     ],
      compile_and_run,
      ['UnsafeReenterC.c'])
 
