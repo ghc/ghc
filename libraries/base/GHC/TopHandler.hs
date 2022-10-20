@@ -208,13 +208,17 @@ real_handler exit se = do
 -- don't use errorBelch() directly, because we cannot call varargs functions
 -- using the FFI.
 foreign import ccall unsafe "HsBase.h errorBelch2"
-   errorBelch :: CString -> CString -> IO ()
+    c_errorBelch :: CString -> CString -> IO ()
+
+errorBelch :: String -> IO ()
+errorBelch msg =
+    withCAString "%s" $ \fmt ->
+      withCAString msg $ \msg' ->
+          c_errorBelch fmt msg'
 
 disasterHandler :: (Int -> IO a) -> IOError -> IO a
 disasterHandler exit _ =
-  withCAString "%s" $ \fmt ->
-    withCAString msgStr $ \msg ->
-      errorBelch fmt msg >> exit 1
+    errorBelch msgStr >> exit 1
   where
     msgStr =
         "encountered an exception while trying to report an exception.\n" ++
