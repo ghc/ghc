@@ -388,7 +388,7 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), expect_broken(21361))], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), expect_broken(21361)), js_skip], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
