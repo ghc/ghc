@@ -6,6 +6,8 @@ test('T21336b',
      [unless(opsys('linux') or opsys('freebsd'), skip)],
      makefile_test, [])
 test('T21336c',
-     [unless(opsys('linux') or opsys('freebsd'), skip)],
+     [ unless(opsys('linux') or opsys('freebsd'), skip)
+     , js_skip
+     ],
      makefile_test, [])
 
