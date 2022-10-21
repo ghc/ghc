@@ -1872,7 +1872,7 @@ void nonmovingMarkDeadWeak (struct MarkQueue_ *queue, StgWeak *w)
 
 void nonmovingMarkLiveWeak (struct MarkQueue_ *queue, StgWeak *w)
 {
-    ASSERT(nonmovingClosureMarkedThisCycle((P_)w));
+    ASSERT(nonmovingIsNowAlive((P_)w));
     markQueuePushClosure_(queue, w->value);
     markQueuePushClosure_(queue, w->finalizer);
     markQueuePushClosure_(queue, w->cfinalizers);
@@ -1886,9 +1886,9 @@ void nonmovingMarkDeadWeaks (struct MarkQueue_ *queue, StgWeak **dead_weaks)
 {
     StgWeak *next_w;
     for (StgWeak *w = nonmoving_old_weak_ptr_list; w; w = next_w) {
-        ASSERT(!nonmovingClosureMarkedThisCycle((P_)(w->key)));
+        ASSERT(!nonmovingIsNowAlive((P_)(w->key)));
         nonmovingMarkDeadWeak(queue, w);
-        next_w = w ->link;
+        next_w = w->link;
         w->link = *dead_weaks;
         *dead_weaks = w;
     }
