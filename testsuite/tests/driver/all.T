@@ -282,7 +282,7 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
-test('T14452', [], makefile_test, [])
+test('T14452', js_skip, makefile_test, [])
 test('T14923', normal, makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
@@ -297,7 +297,7 @@ test('T18369', normal, compile, ['-O'])
 test('T21682', normal, compile_fail, ['-Werror=unrecognised-warning-flags -Wfoo'])
 test('FullGHCVersion', normal, compile_and_run, ['-package ghc-boot'])
 test('OneShotTH', req_th, makefile_test, [])
-test('T17481', normal, makefile_test, [])
+test('T17481', js_skip, makefile_test, [])
 test('T20084', normal, makefile_test, [])
 test('RunMode', [req_interp, extra_files(['RunMode/Test.hs'])], run_command, ['{compiler} --run -iRunMode/ -ignore-dot-ghci RunMode.hs -- hello'])
 test('T20439', normal, run_command,

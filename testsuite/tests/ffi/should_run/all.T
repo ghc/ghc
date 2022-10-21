@@ -120,7 +120,7 @@ test('T2469', js_skip, compile_and_run, ['-optc-std=gnu99'])
 
 test('T2594', [omit_ways(['ghci']), req_c], compile_and_run, ['T2594_c.c'])
 
-test('fptr01', [omit_ways(['ghci'])], compile_and_run,
+test('fptr01', [omit_ways(['ghci']), js_skip], compile_and_run,
       [ 'fptr01_js.js' if arch("js") else 'fptr01_c.c'])
 test('fptr02', normal, compile_and_run, [''])
 
