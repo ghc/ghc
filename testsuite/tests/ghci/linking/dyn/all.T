@@ -1,7 +1,9 @@
 setTestOpts(req_dynamic_lib_support)
 
-test('load_short_name', [extra_files(['A.c']),
-                         unless(doing_ghci, skip)],
+test('load_short_name', [ extra_files(['A.c'])
+                        , unless(doing_ghci, skip)
+                        , js_skip
+                        ],
      makefile_test, ['load_short_name'])
 
 test('T1407',
