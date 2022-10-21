@@ -3,12 +3,12 @@ test('hsc2hs001', [], makefile_test, [])
 
 test('hsc2hs002', [], makefile_test, [])
 
-test('hsc2hs003', [], makefile_test, [])
+test('hsc2hs003', js_skip, makefile_test, [])
 
 test('hsc2hs004', [], makefile_test, [])
 
 
-test('T3837', [], makefile_test, [])
+test('T3837', js_skip, makefile_test, [])
 
 # These are broken on CI (and potentially elsewhere) since we
 # are building ARMv7 # binaries on an AArch64 machine.
