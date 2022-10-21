@@ -426,7 +426,7 @@ function h$throw(e, async) {
       } else if(!h$stmValidateTransaction()) { // restart transaction if invalid, don't propagate exception
       h$sp++;
       h$stack[h$sp] = h$checkInvariants_e;
-      return h$stmStartTransaction(h$stack[h$sp-2]);
+      return h$stmStartTransaction(h$stack[h$sp-1]);
     }
   }
   if(f === h$catchStm_e && !async) break; // catchSTM only catches sync
