@@ -156,7 +156,7 @@ test('T10246', normal, compile_and_run, [''])
 test('T9533', normal, compile_and_run, [''])
 test('T9533b', normal, compile_and_run, [''])
 test('T9533c', normal, compile_and_run, [''])
-test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp],
+test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_smp, js_skip],
      compile_and_run, ['-feager-blackholing'])
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
