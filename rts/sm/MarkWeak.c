@@ -83,6 +83,30 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
 static void    tidyThreadList (generation *gen);
 
 /*
+ * Note [Weak pointer processing and the non-moving GC]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When using the non-moving GC we defer weak pointer processing
+ * until the concurrent marking phase as weaks in the non-moving heap may be
+ * keyed on objects living in the non-moving generation. To accomplish this
+ * initWeakForGC keeps all weak pointers on oldest_gen->weak_ptr_list, where
+ * nonmovingCollect will find them. From there they will be moved to
+ * nonmoving_old_weak_ptr_list. During the mark loop we will move weaks with
+ * reachable keys to nonmoving_weak_ptr_list. At the end of concurrent marking
+ * we tidy the weak list (in nonmovingTidyWeakList) and perform another set of
+ * marking as necessary, just as is done in tidyWeakList.
+ *
+ * Note that this treatment takes advantage of the fact that we usually need
+ * not worry about Weak#s living in the non-moving heap but being keyed on an
+ * object in the moving heap since the Weak# must be strictly older than the
+ * key. Such objects would otherwise pose a problem since the non-moving
+ * collector would be unable to safely determine the liveness of the key.
+ * In the rare case that we *do* see such a key (e.g. in the case of a
+ * pinned ByteArray# living in a partially-filled accumulator block)
+ * the nonmoving collector assumes that it is live.
+ *
+ */
+
+/*
  * Prepare the weak object lists for GC. Specifically, reset weak_stage
  * and move all generations' `weak_ptr_list`s to `old_weak_ptr_list`.
  * Weaks with live keys will later be moved back to `weak_ptr_list` by
@@ -91,9 +115,13 @@ static void    tidyThreadList (generation *gen);
 void
 initWeakForGC(void)
 {
-    uint32_t g;
+    uint32_t oldest = N;
+    if (RtsFlags.GcFlags.useNonmoving && N == oldest_gen->no) {
+        // See Note [Weak pointer processing and the non-moving GC].
+        oldest = oldest_gen->no - 1;
+    }
 
-    for (g = 0; g <= N; g++) {
+    for (uint32_t g = 0; g <= oldest; g++) {
         generation *gen = &generations[g];
         gen->old_weak_ptr_list = gen->weak_ptr_list;
         gen->weak_ptr_list = NULL;
@@ -265,6 +293,12 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
  */
 static bool tidyWeakList(generation *gen)
 {
+    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+        // See Note [Weak pointer processing and the non-moving GC].
+        ASSERT(gen->old_weak_ptr_list == NULL);
+        return false;
+    }
+
     StgWeak *w, **last_w, *next_w;
     const StgInfoTable *info;
     StgClosure *new;

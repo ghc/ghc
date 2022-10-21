@@ -1842,7 +1842,10 @@ bool nonmovingTidyWeaks (struct MarkQueue_ *queue)
         // Otherwise it's a live weak
         ASSERT(w->header.info == &stg_WEAK_info);
 
-        if (nonmovingIsNowAlive(w->key)) {
+        // See Note [Weak pointer processing and the non-moving GC] in
+        // MarkWeak.c
+        bool key_in_nonmoving = Bdescr((StgPtr) w->key)->flags & BF_NONMOVING;
+        if (!key_in_nonmoving || nonmovingIsNowAlive(w->key)) {
             nonmovingMarkLiveWeak(queue, w);
             did_work = true;
 

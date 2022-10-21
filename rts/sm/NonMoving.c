@@ -244,6 +244,9 @@ Mutex concurrent_coll_finished_lock;
  *    how we use the DIRTY flags associated with MUT_VARs and TVARs to improve
  *    barrier efficiency.
  *
+ *  - Note [Weak pointer processing and the non-moving GC] (MarkWeak.c) describes
+ *    how weak pointers are handled when the non-moving GC is in use.
+ *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
  *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
@@ -282,8 +285,8 @@ Mutex concurrent_coll_finished_lock;
  * was (unsurprisingly) also found to result in significant amounts of
  * unnecessary copying.
  *
- * Consequently, we now allow aging. Aging allows the preparatory GC leading up
- * to a major collection to evacuate some objects into the young generation.
+ * Consequently, we now allow "aging", allows the preparatory GC leading up
+ * to a major collection to evacuate objects into the young generation.
  * However, this introduces the following tricky case that might arise after
  * we have finished the preparatory GC:
  *
@@ -292,6 +295,7 @@ Mutex concurrent_coll_finished_lock;
  *                    ┆
  *      B ←────────────── A ←─────────────── root
  *      │             ┆     ↖─────────────── gen1 mut_list
+ *      │             ┆
  *      ╰───────────────→ C
  *                    ┆
  *
@@ -331,6 +335,7 @@ Mutex concurrent_coll_finished_lock;
  *
  * The implementation details of this are described in Note [Non-moving GC:
  * Marking evacuated objects] in Evac.c.
+ *
  *
  * Note [Deadlock detection under the non-moving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
