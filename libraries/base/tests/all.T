@@ -199,7 +199,9 @@ test('topHandler04',
 
 test('T8766',
         [ collect_stats('bytes allocated',5)
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_skip
+        ],
       compile_and_run,
       ['-O'])
 
@@ -227,7 +229,9 @@ test('hWaitForInput-accurate-stdin', [when(platform('js-unknown-ghcjs'), skip), 
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_skip
+        ],
       compile_and_run,
       ['-O'])
 test('T10149', normal, compile_and_run, [''])
@@ -236,11 +240,13 @@ test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
-test('T11760', req_smp, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T11760', [req_smp, js_skip], compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ collect_stats('bytes allocated', 5)
-        , only_ways(['normal'])],
+        , only_ways(['normal'])
+        , js_skip
+        ],
       compile_and_run,
       ['-O'])
 test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
@@ -265,7 +271,7 @@ test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_r
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
-test('T17499', [collect_stats('bytes allocated',5)], compile_and_run, ['-O -w'])
+test('T17499', [collect_stats('bytes allocated',5), js_skip], compile_and_run, ['-O -w'])
 test('T16643', normal, compile_and_run, [''])
 test('clamp', normal, compile_and_run, [''])
 test('T18642',

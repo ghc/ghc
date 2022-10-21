@@ -350,8 +350,10 @@ def grep_stderr(pattern):
 
 # The ghci way gets confused by the RTS options
 test('T9839_01',
-     [omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp,
-      grep_stderr('given an argument when none was expected')],
+     [ omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp
+     , grep_stderr('given an argument when none was expected')
+     , js_skip
+     ],
      compile_and_run, [''])
 
 test('T9839_02',
