@@ -260,7 +260,9 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
 test('T7037', js_skip, makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
-test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
+test('T7160', [ omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc'])
+              , js_skip
+              ], compile_and_run, [''])
 
 test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
 
@@ -331,7 +333,10 @@ test('T10017', [ when(opsys('mingw32'), skip)
 
 test('T11108', normal, compile_and_run, [''])
 
-test('GcStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
+test('GcStaticPointers', [ when(doing_ghci()
+                         , extra_hc_opts('-fobject-code'))
+                         , js_skip
+                         ],
      compile_and_run, [''])
 test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, [''])
