@@ -420,16 +420,13 @@ writeHtml out = do
 
 templateHtml :: B.ByteString
 templateHtml =
-  "<!DOCTYPE html>\
-  \<html>\
-  \  <head>\
-  \    <script language=\"javascript\" src=\"rts.js\"></script>\
-  \    <script language=\"javascript\" src=\"lib.js\"></script>\
-  \    <script language=\"javascript\" src=\"out.js\"></script>\
-  \  </head>\
-  \  <body>\
-  \  </body>\
-  \  <script language=\"javascript\" src=\"runmain.js\" defer></script>\
+  "<!DOCTYPE html>\n\
+  \<html>\n\
+  \  <head>\n\
+  \  </head>\n\
+  \  <body>\n\
+  \  </body>\n\
+  \  <script language=\"javascript\" src=\"all.js\" defer></script>\n\
   \</html>"
 
 -- | write the runmain.js file that will be run with defer so that it runs after
