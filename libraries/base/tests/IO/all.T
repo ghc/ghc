@@ -10,9 +10,9 @@ test('IOError001', [omit_ways(['ghci']), set_stdin('IOError001.hs')],
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001', [], compile_and_run, [''])
-test('hClose002', [normalise_win32_io_errors], compile_and_run, [''])
+test('hClose002', [normalise_win32_io_errors, js_skip], compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
-test('hFileSize002', [omit_ways(['ghci'])], compile_and_run, [''])
+test('hFileSize002', [omit_ways(['ghci']), js_skip], compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
 test('hGetBuffering001',
@@ -46,7 +46,10 @@ test('hSeek004', [], compile_and_run, ['-cpp'])
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
 test('hSetBuffering003',
-    [omit_ways(['ghci']), set_stdin('hSetBuffering003.hs')],
+    [ omit_ways(['ghci'])
+    , set_stdin('hSetBuffering003.hs')
+    , js_skip
+    ],
 	compile_and_run, [''])
 
 test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, [''])
