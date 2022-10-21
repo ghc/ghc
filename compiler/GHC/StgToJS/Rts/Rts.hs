@@ -626,7 +626,7 @@ rts' s =
                     (appS "h$stmCommitTransaction" []
                      <> adjSpN' 2
                      <> returnS (stack .! sp))
-                    (returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])))
+                    (returnS (app "h$stmStartTransaction" [stack .! (sp - 1)])))
 
           , closure (ClosureInfo (TxtI "h$stmCatchRetry_e") (CIRegs 0 [PtrV]) "catch retry" (CILayoutFixed 1 [PtrV]) CIStackFrame mempty)
                         (adjSpN' 2
@@ -643,7 +643,7 @@ rts' s =
                                     , blocked |= stack .! (sp - 1)
                                     , adjSpN' 2
                                     , appS "h$stmRemoveBlockedThread" [blocked, var "h$currentThread"]
-                                    , returnS (app "h$stmStartTransaction" [stack .! (sp - 2)])
+                                    , returnS (app "h$stmStartTransaction" [stack .! (sp - 1)])
                                     ])
           , closure (ClosureInfo (TxtI "h$lazy_e") (CIRegs 0 [PtrV]) "generic lazy value" (CILayoutFixed 0 []) CIThunk mempty)
                         (jVar $ \x ->
