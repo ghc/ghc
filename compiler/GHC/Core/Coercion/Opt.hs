@@ -804,37 +804,38 @@ opt_trans_rule is co1 co2
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
 
-  -- See Note [Why call checkAxInstCo during optimisation]
+  -- See Note [Push transitivity inside axioms] and
+  -- Note [Push transitivity inside newtype axioms only]
   -- TrPushSymAxR
   | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , isNewTyCon (coAxiomTyCon con)
   , True <- sym
   , Just cos2 <- matchAxiom sym con ind co2
   , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
-  , Nothing <- checkAxInstCo newAxInst
   = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
 
   -- TrPushAxR
   | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
+  , isNewTyCon (coAxiomTyCon con)
   , False <- sym
   , Just cos2 <- matchAxiom sym con ind co2
   , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  , Nothing <- checkAxInstCo newAxInst
   = fireTransRule "TrPushAxR" co1 co2 newAxInst
 
   -- TrPushSymAxL
   | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , isNewTyCon (coAxiomTyCon con)
   , True <- sym
   , Just cos1 <- matchAxiom (not sym) con ind co1
   , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
-  , Nothing <- checkAxInstCo newAxInst
   = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
 
   -- TrPushAxL
   | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
+  , isNewTyCon (coAxiomTyCon con)
   , False <- sym
   , Just cos1 <- matchAxiom (not sym) con ind co1
   , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  , Nothing <- checkAxInstCo newAxInst
   = fireTransRule "TrPushAxL" co1 co2 newAxInst
 
   -- TrPushAxSym/TrPushSymAx
@@ -915,6 +916,81 @@ fireTransRule _rule _co1 _co2 res
   = Just res
 
 {-
+Note [Push transitivity inside axioms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+opt_trans_rule tries to push transitivity inside axioms to deal with cases like
+the following:
+
+    newtype N a = MkN a
+
+    axN :: N a ~R# a
+
+    covar :: a ~R# b
+    co1 = axN <a> :: N a ~R# a
+    co2 = axN <b> :: N b ~R# b
+
+    co :: a ~R# b
+    co = sym co1 ; N covar ; co2
+
+When we are optimising co, we want to notice that the two axiom instantiations
+cancel out. This is implemented by rules such as TrPushSymAxR, which transforms
+    sym (axN <a>) ; N covar
+into
+    sym (axN covar)
+so that TrPushSymAx can subsequently transform
+    sym (axN covar) ; axN <b>
+into
+    covar
+which is much more compact. In some perf test cases this kind of pattern can be
+generated repeatedly during simplification, so it is very important we squash it
+to stop coercions growing exponentially.  For more details see the paper:
+
+    Evidence normalisation in System FC
+    Dimitrios Vytiniotis and Simon Peyton Jones
+    RTA'13, 2013
+    https://www.microsoft.com/en-us/research/publication/evidence-normalization-system-fc-2/
+
+
+Note [Push transitivity inside newtype axioms only]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The optimization described in Note [Push transitivity inside axioms] is possible
+for both newtype and type family axioms.  However, for type family axioms it is
+relatively common to have transitive sequences of axioms instantiations, for
+example:
+
+    data Nat = Zero | Suc Nat
+
+    type family Index (n :: Nat) (xs :: [Type]) :: Type where
+      Index Zero    (x : xs) = x
+      Index (Suc n) (x : xs) = Index n xs
+
+    axIndex :: { forall x::Type. forall xs::[Type]. Index Zero (x : xs) ~ x
+               ; forall n::Nat. forall x::Type. forall xs::[Type]. Index (Suc n) (x : xs) ~ Index n xs }
+
+    co :: Index (Suc (Suc Zero)) [a, b, c] ~ c
+    co = axIndex[1] <Suc Zero> <a> <[b, c]>
+       ; axIndex[1] <Zero> <b> <[c]>
+       ; axIndex[0] <c> <[]>
+
+Not only are there no cancellation opportunities here, but calling matchAxiom
+repeatedly down the transitive chain is very expensive.  Hence we do not attempt
+to push transitivity inside type family axioms.  See #8095, !9210 and related tickets.
+
+This is implemented by opt_trans_rule checking that the axiom is for a newtype
+constructor (i.e. not a type family).  Adding these guards substantially
+improved performance (reduced bytes allocated by more than 10%) for the tests
+CoOpt_Singletons, LargeRecord, T12227, T12545, T13386, T15703, T5030, T8095.
+
+A side benefit is that we do not risk accidentally creating an ill-typed
+coercion; see Note [Why call checkAxInstCo during optimisation].
+
+There may exist programs that previously relied on pushing transitivity inside
+type family axioms to avoid creating huge coercions, which will regress in
+compile time performance as a result of this change.  We do not currently know
+of any examples, but if any come to light we may need to reconsider this
+behaviour.
+
+
 Note [Conflict checking with AxiomInstCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following type family and axiom:
@@ -939,6 +1015,10 @@ the first branch should be taken. See also Note [Apartness] in
 
 Note [Why call checkAxInstCo during optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NB: The following is no longer relevant, because we no longer push transitivity
+into type family axioms (Note [Push transitivity inside newtype axioms only]).
+It is retained for reference in case we change this behaviour in the future.
+
 It is possible that otherwise-good-looking optimisations meet with disaster
 in the presence of axioms with multiple equations. Consider
 
