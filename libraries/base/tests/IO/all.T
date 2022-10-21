@@ -92,7 +92,7 @@ test('hGetBuf001',
 test('hDuplicateTo001', [fragile_for(16819, concurrent_ways),
                          when(opsys('mingw32'), skip)], compile_and_run, [''])
 
-test('countReaders001', [], compile_and_run, [''])
+test('countReaders001', js_skip, compile_and_run, [''])
 
 test('concio001', [normal, multi_cpu_race],
      makefile_test, ['test.concio001'])
