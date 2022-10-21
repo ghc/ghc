@@ -256,15 +256,22 @@ INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment_unchecked(StgPtr p)
     return (struct NonmovingSegment *) (((uintptr_t) p) & mask);
 }
 
+INLINE_HEADER bool nonmovingIsInSegment(StgPtr p)
+{
+    bdescr *bd = Bdescr(p);
+    return HEAP_ALLOCED_GC(p) &&
+        (bd->flags & BF_NONMOVING) &&
+        !(bd->flags & BF_LARGE);
+}
+
 INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment(StgPtr p)
 {
-    ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
+    ASSERT(nonmovingIsInSegment(p));
     return nonmovingGetSegment_unchecked(p);
 }
 
 INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
 {
-    ASSERT(HEAP_ALLOCED_GC(p) && (Bdescr(p)->flags & BF_NONMOVING));
     struct NonmovingSegment *seg = nonmovingGetSegment(p);
     ptrdiff_t blk0 = (ptrdiff_t)nonmovingSegmentGetBlock(seg, 0);
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
