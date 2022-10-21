@@ -502,6 +502,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "MissingBinding"                                = 44432
   GhcDiagnosticCode "NoTopLevelBinding"                             = 10173
   GhcDiagnosticCode "UnknownSubordinate"                            = 54721
+  GhcDiagnosticCode "UnknownAssociatedType"                         = 87875
 
   -- Diagnostic codes for deriving
   GhcDiagnosticCode "DerivErrNotWellKinded"                         = 62016

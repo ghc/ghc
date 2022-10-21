@@ -206,6 +206,14 @@ instance Outputable GhcHint where
            <+> quotes (ppr name) <+> text "has an INLINABLE pragma"
          where
            mod = nameModule name
+    SuggestDeclareAssociatedType name rdrName (Just decl)
+      -> text "Declare" <+> quotes (ppr rdrName) <+> text "by adding:"
+          $+$ nest 2 (pprCode $ text decl)
+          $+$ text "to the class" <+> quotes (ppr name)
+    SuggestDeclareAssociatedType name rdrName Nothing
+      -> text "Declare the associated type" <+> quotes (ppr rdrName) 
+            <+> text "for class" <+> quotes (ppr name)
+            <+> text "in addition to the default equation" 
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

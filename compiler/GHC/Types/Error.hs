@@ -56,6 +56,7 @@ module GHC.Types.Error
    , pprMessageBag
    , mkLocMessage
    , mkLocMessageWarningGroups
+   , getSrcCodeString
    , getCaretDiagnostic
    -- * Queries
    , isIntrinsicErrorMessage
@@ -526,10 +527,14 @@ getMessageClassColour (MCDiagnostic SevWarning _reason _code) = Col.sWarning
 getMessageClassColour MCFatal                                 = Col.sFatal
 getMessageClassColour _                                       = const mempty
 
-getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
-getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
-getCaretDiagnostic msg_class (RealSrcSpan span _) =
-  caretDiagnostic <$> getSrcLine (srcSpanFile span) row
+-- | Get the snippet of code referenced by `SrcSpan`
+--
+-- We need this so that we can include the source code within our error message.
+-- E.g: https://gitlab.haskell.org/ghc/ghc/-/issues/21100
+getSrcCodeString :: SrcSpan -> IO (Maybe String)
+getSrcCodeString (UnhelpfulSpan _) = pure Nothing
+getSrcCodeString (RealSrcSpan span _) =
+  getSrcLine (srcSpanFile span) row
   where
     getSrcLine fn i =
       getLine i (unpackFS fn)
@@ -549,11 +554,18 @@ getCaretDiagnostic msg_class (RealSrcSpan span _) =
             _           -> Nothing
         _ -> pure Nothing
 
+    row = srcSpanStartLine span
+
     -- allow user to visibly see that their code is incorrectly encoded
     -- (StringBuffer.nextChar uses \0 to represent undecodable characters)
     fix '\0' = '\xfffd'
     fix c    = c
 
+getCaretDiagnostic :: MessageClass -> SrcSpan -> IO SDoc
+getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
+getCaretDiagnostic msg_class srcSpan@(RealSrcSpan span _) =
+  caretDiagnostic <$> getSrcCodeString srcSpan
+  where
     row = srcSpanStartLine span
     rowStr = show row
     multiline = row /= srcSpanEndLine span

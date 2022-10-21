@@ -1,3 +1,9 @@
 
-AssocTyDef07.hs:5:10: error: [GHC-54721]
-    ‘Typ’ is not a (visible) associated type of class ‘Cls’
+AssocTyDef07.hs:5:10: [GHC-87875]
+    The line:
+          type Typ a = Int
+    defines a default equation for type ‘Typ’ but ‘Typ’ itself has not been declared.
+    Suggested fix:
+      Declare ‘Typ’ by adding:
+            type Typ a 
+      to the class ‘Cls’

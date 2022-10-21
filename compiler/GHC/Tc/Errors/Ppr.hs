@@ -3074,7 +3074,20 @@ pprScopeError rdr_name scope_err =
       hang (text "No top-level binding for")
         2 (what <+> quotes (ppr rdr_name) <+> text "in this module")
     UnknownSubordinate doc ->
-      quotes (ppr rdr_name) <+> text "is not a (visible)" <+> doc
+      quotes (ppr rdr_name) <+> text "is not a (visible)" <+> doc 
+    UnknownAssociatedType _ _ code ->
+      case code of
+        Just c ->
+          text "The line:"
+            $+$ nest 2 (pprCode $ text c)
+            $+$ text "defines a default equation for type" <+> sname 
+            <+> text "but" <+> sname <+> text "itself has not been declared."
+        Nothing ->
+          text "A default equation for" <+> sname <+> text "was found, but" <+> sname
+            <+> text "has not been declared." 
+      where
+        sname = quotes (ppr rdr_name)
+
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 
@@ -3087,6 +3100,9 @@ scopeErrorHints scope_err =
     MissingBinding _ hints -> hints
     NoTopLevelBinding      -> noHints
     UnknownSubordinate {}  -> noHints
+    UnknownAssociatedType name rdr code -> 
+      [SuggestDeclareAssociatedType name rdr decl]
+      where decl = head . split '=' <$> code 
 
 {- *********************************************************************
 *                                                                      *

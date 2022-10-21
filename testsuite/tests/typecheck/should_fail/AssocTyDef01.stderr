@@ -1,3 +1,9 @@
 
-AssocTyDef01.hs:9:10: error: [GHC-54721]
-    ‘OtherType’ is not a (visible) associated type of class ‘Cls’
+AssocTyDef01.hs:9:10: [GHC-87875]
+    The line:
+          type OtherType a = Int
+    defines a default equation for type ‘OtherType’ but ‘OtherType’ itself has not been declared.
+    Suggested fix:
+      Declare ‘OtherType’ by adding:
+            type OtherType a 
+      to the class ‘Cls’

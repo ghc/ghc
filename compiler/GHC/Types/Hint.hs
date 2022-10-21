@@ -417,6 +417,13 @@ data GhcHint
         Test cases: none
     -}
   | SuggestSpecialiseVisibilityHints Name
+    {-| Suggest to declare the associated type
+    -}
+  | SuggestDeclareAssociatedType 
+      { typeclassName :: Name -- ^ The name of the typeclass with the missing type decl 
+      , associatedTypeName :: RdrName -- ^ The name of the undeclared associated type
+      , typeDecl :: Maybe String -- ^ The code suggestion of how to declare the associated type
+      }
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

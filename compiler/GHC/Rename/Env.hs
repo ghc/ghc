@@ -350,7 +350,7 @@ lookupExactOcc_either name
        }
 
 -----------------------------------------------
-lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
+lookupInstDeclBndr :: Name -> String -> RdrName -> RnM Name
 -- This is called on the method name on the left-hand side of an
 -- instance declaration binding. eg.  instance Functor T where
 --                                       fmap = ...
@@ -378,11 +378,20 @@ lookupInstDeclBndr cls what rdr
                                 -- when it's used
                           cls doc rdr
        ; case mb_name of
-           Left err -> do { addErr (mkTcRnNotInScope rdr err)
+           Left err -> 
+            -- If `what` is an associated type, we ignore the `err` value and create
+            -- our own error specifically dealing with associated types
+            case what of
+              "associated type" -> do { srcSpan <- getSrcSpanM 
+                          ; code <- liftIO $ getSrcCodeString srcSpan
+                          ; addErr (mkTcRnNotInScope rdr (UnknownAssociatedType cls rdr code))
+                          ; return (mkUnboundNameRdr rdr) }
+
+              _ -> do { addErr (mkTcRnNotInScope rdr err)
                           ; return (mkUnboundNameRdr rdr) }
            Right nm -> return nm }
   where
-    doc = what <+> text "of class" <+> quotes (ppr cls)
+    doc = text what <+> text "of class" <+> quotes (ppr cls)
 
 -----------------------------------------------
 lookupFamInstName :: Maybe Name -> LocatedN RdrName
@@ -390,7 +399,7 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
-  = wrapLocMA (lookupInstDeclBndr cls (text "associated type")) tc_rdr
+  = wrapLocMA (lookupInstDeclBndr cls "associated type") tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRnConstr tc_rdr
 

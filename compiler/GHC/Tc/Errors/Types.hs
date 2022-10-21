@@ -3248,6 +3248,13 @@ data NotInScopeError
   -- or, a class doesn't have an associated type with this name,
   -- or, a record doesn't have a record field with this name.
   | UnknownSubordinate SDoc
+
+  -- | A class doesn't have an associated type with this name.
+  | UnknownAssociatedType 
+    { typeclassName :: Name -- ^ The name of the typeclass with the missing type decl 
+    , associatedTypeName :: RdrName -- ^ The name of the undeclared associated type
+    , srcCode :: Maybe String -- ^ The source code that caused the error. Derived from SrcSpan
+    }
   deriving Generic
 
 -- | Create a @"not in scope"@ error message for the given 'RdrName'.
