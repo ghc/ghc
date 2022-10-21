@@ -1913,7 +1913,7 @@ run_BCO:
             void *argptrs[nargs];
             void (*fn)(void);
 
-            if (cif->rtype->type == FFI_TYPE_VOID) {
+            if (cif->rtype == &ffi_type_void) {
                 // necessary because cif->rtype->size == 1 for void,
                 // but the bytecode generator has not pushed a
                 // placeholder in this case.
