@@ -287,6 +287,7 @@ void nonmovingSweepMutLists()
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
             for (StgPtr p = bd->start; p < bd->free; p++) {
                 StgClosure **q = (StgClosure**)p;
+                ASSERT(Bdescr((StgPtr) *q)->gen == oldest_gen);
                 if (nonmovingIsAlive(*q) && !is_closure_clean(*q)) {
                     recordMutableCap(*q, cap, oldest_gen->no);
                 }
