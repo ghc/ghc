@@ -201,7 +201,9 @@ testRules = do
               fixAbsolutePathOnWindows abs_path
 
         -- get absolute path for the given program in the target stage
-        let absolute_path = absolute_path_stage stg
+        let absolute_path
+              | Stage0 {} <- stg = absolute_path_stage stg
+              | otherwise        = absolute_path_stage $ predStage stg
 
         -- get absolute path for the given program in stage1 (useful for
         -- cross-compilers)
