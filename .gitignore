@@ -17,6 +17,8 @@ Thumbs.db
 
 *.hi
 *.hi-boot
+*.hie
+*.hie-boot
 *.o-boot
 *.p_o
 *.t_o
