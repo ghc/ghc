@@ -673,7 +673,7 @@ stg_raiseOverflowzh ()
  */
 stg_paniczh (W_ str)
 {
-    ccall barf(str) never returns;
+    ccall barf(str, NULL) never returns;
 }
 
 // See Note [Compiler error functions] in GHC.Prim.Panic

@@ -639,6 +639,7 @@ genApply regstatus args =
         text "RET_SMALL, W_ info_ptr, " <> (cat $ zipWith formalParam args [1..]) <>
         text ")\n{",
       nest 4 (vcat [
+       text "W_ _unused;",
        text "W_ info;",
        text "W_ arity;",
        text "unwind Sp = Sp + WDS(" <> int (1+all_args_size) <> text ");",
@@ -668,9 +669,9 @@ genApply regstatus args =
        tickForArity (length args),
        text "",
        text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <>
-          text "... \"); foreign \"C\" printClosure(R1 \"ptr\"));",
+          text "... \", NULL); foreign \"C\" printClosure(R1 \"ptr\"));",
 
-       text "IF_DEBUG(sanity,foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
+       text "IF_DEBUG(sanity,(_unused) = foreign \"C\" checkStackFrame(Sp+WDS(" <> int (1 + all_args_size)
         <> text ")\"ptr\"));",
 
 --       text "IF_DEBUG(sanity,checkStackChunk(Sp+" <> int (1 + all_args_size) <>
@@ -795,7 +796,7 @@ genApply regstatus args =
 
        text "default: {",
        nest 4 (
-         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\") never returns;"
+         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\", NULL) never returns;"
        ),
        text "}"
 

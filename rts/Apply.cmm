@@ -57,12 +57,14 @@ STRING(stg_ap_0_ret_str,"stg_ap_0_ret... ")
 
 stg_ap_0_fast ( P_ fun )
 {
+    W_ _unused;
+
     IF_DEBUG(apply,
-        ccall debugBelch(stg_ap_0_ret_str);
+        ccall debugBelch(stg_ap_0_ret_str, NULL);
         ccall printClosure(R1 "ptr"));
 
     IF_DEBUG(sanity,
-        ccall checkStackFrame(Sp "ptr"));
+        (_unused) = ccall checkStackFrame(Sp "ptr"));
 
 #if !defined(PROFILING)
 
