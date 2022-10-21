@@ -51,6 +51,7 @@ targetVirtualRegSqueeze platform
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
       ArchRISCV64   -> panic "targetVirtualRegSqueeze ArchRISCV64"
       ArchJavaScript-> panic "targetVirtualRegSqueeze ArchJavaScript"
+      ArchWasm32    -> panic "targetVirtualRegSqueeze ArchWasm32"
       ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
 
 
@@ -69,6 +70,7 @@ targetRealRegSqueeze platform
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
       ArchRISCV64   -> panic "targetRealRegSqueeze ArchRISCV64"
       ArchJavaScript-> panic "targetRealRegSqueeze ArchJavaScript"
+      ArchWasm32    -> panic "targetRealRegSqueeze ArchWasm32"
       ArchUnknown   -> panic "targetRealRegSqueeze ArchUnknown"
 
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
@@ -86,6 +88,7 @@ targetClassOfRealReg platform
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
       ArchRISCV64   -> panic "targetClassOfRealReg ArchRISCV64"
       ArchJavaScript-> panic "targetClassOfRealReg ArchJavaScript"
+      ArchWasm32    -> panic "targetClassOfRealReg ArchWasm32"
       ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
 
 targetMkVirtualReg :: Platform -> Unique -> Format -> VirtualReg
@@ -103,6 +106,7 @@ targetMkVirtualReg platform
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
       ArchRISCV64   -> panic "targetMkVirtualReg ArchRISCV64"
       ArchJavaScript-> panic "targetMkVirtualReg ArchJavaScript"
+      ArchWasm32    -> panic "targetMkVirtualReg ArchWasm32"
       ArchUnknown   -> panic "targetMkVirtualReg ArchUnknown"
 
 targetRegDotColor :: Platform -> RealReg -> SDoc
@@ -120,6 +124,7 @@ targetRegDotColor platform
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
       ArchRISCV64   -> panic "targetRegDotColor ArchRISCV64"
       ArchJavaScript-> panic "targetRegDotColor ArchJavaScript"
+      ArchWasm32    -> panic "targetRegDotColor ArchWasm32"
       ArchUnknown   -> panic "targetRegDotColor ArchUnknown"
 
 

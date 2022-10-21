@@ -214,6 +214,7 @@ platformNcgSupported platform = if
          ArchPPC       -> True
          ArchPPC_64 {} -> True
          ArchAArch64   -> True
+         ArchWasm32    -> True
          _             -> False
 
 

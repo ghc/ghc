@@ -46,6 +46,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
       nto-qnx*)
         $3="nto-qnx"
         ;;
+      wasi)
+        $3="wasi"
+        ;;
       *)
         echo "Unknown OS $1"
         exit 1

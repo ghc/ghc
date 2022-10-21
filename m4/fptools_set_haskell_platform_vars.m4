@@ -42,6 +42,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         riscv64)
             test -z "[$]2" || eval "[$]2=ArchRISCV64"
             ;;
+        wasm32)
+            test -z "[$]2" || eval "[$]2=ArchWasm32"
+            ;;
         hppa|hppa1_1|ia64|m68k|nios2|riscv32|rs6000|s390|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
@@ -96,6 +99,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
             ;;
         nto-qnx)
             test -z "[$]2" || eval "[$]2=OSQNXNTO"
+            ;;
+        wasi)
+            test -z "[$]2" || eval "[$]2=OSWasi"
             ;;
         dragonfly|hpux|linuxaout|freebsd2|nextstep2|nextstep3|sunos4|ultrix)
             test -z "[$]2" || eval "[$]2=OSUnknown"

@@ -225,6 +225,7 @@ linearRegAlloc config entry_ids block_live sccs
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
       ArchRISCV64    -> panic "linearRegAlloc ArchRISCV64"
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
+      ArchWasm32     -> panic "linearRegAlloc ArchWasm32"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"
  where
   go :: (FR regs, Outputable regs)

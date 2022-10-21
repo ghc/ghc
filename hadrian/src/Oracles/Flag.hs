@@ -80,10 +80,11 @@ arSupportsDashL _           = flag ArSupportsDashL
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
     windows       <- isWinTarget
+    wasm          <- anyTargetArch [ "wasm32" ]
     ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
     solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
     solarisBroken <- flag SolarisBrokenShld
-    return $ not (windows || ppc_linux || solaris && solarisBroken)
+    return $ not (windows || wasm || ppc_linux || solaris && solarisBroken)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool

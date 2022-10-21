@@ -45,6 +45,7 @@ data Arch
    | ArchMipsel
    | ArchRISCV64
    | ArchJavaScript
+   | ArchWasm32
    deriving (Read, Show, Eq, Ord)
 
 -- | ARM Instruction Set Architecture
@@ -95,6 +96,7 @@ data OS
    | OSQNXNTO
    | OSAIX
    | OSHurd
+   | OSWasi
    deriving (Read, Show, Eq, Ord)
 
 
@@ -133,6 +135,7 @@ stringEncodeArch = \case
   ArchMipsel        -> "mipsel"
   ArchRISCV64       -> "riscv64"
   ArchJavaScript    -> "js"
+  ArchWasm32        -> "wasm32"
 
 -- | See Note [Platform Syntax].
 stringEncodeOS :: OS -> String
@@ -151,3 +154,4 @@ stringEncodeOS = \case
   OSQNXNTO    -> "nto-qnx"
   OSAIX       -> "aix"
   OSHurd      -> "hurd"
+  OSWasi      -> "wasi"
