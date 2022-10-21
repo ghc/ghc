@@ -249,7 +249,7 @@ test('T13191',
         ],
       compile_and_run,
       ['-O'])
-test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
+test('T13525', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
