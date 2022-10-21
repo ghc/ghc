@@ -183,11 +183,13 @@ test('topHandler01', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [
 test('topHandler02',
      [when(opsys('mingw32'), skip),
       omit_ways(['ghci']),
-      signal_exit_code(2)
+      signal_exit_code(2),
+      js_skip
      ], compile_and_run, [''])
 test('topHandler03',
      [when(opsys('mingw32'), skip), ignore_stderr,
-      signal_exit_code(15)
+      signal_exit_code(15),
+      js_skip
      ], compile_and_run, [''])
 test('topHandler04',
      [when(opsys('mingw32'), skip),
