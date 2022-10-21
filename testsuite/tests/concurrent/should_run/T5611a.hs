@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP,ForeignFunctionInterface #-}
 
 import Control.Concurrent
+import Data.Functor
 import Foreign.C
 import System.IO
 
@@ -10,8 +11,8 @@ import System.IO
 sleep n = sleepBlock (n*1000)
 foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
 #else
-sleep n = sleepBlock n
-foreign import ccall unsafe "sleep" sleepBlock :: Int -> IO ()
+sleep n = void $ sleepBlock n
+foreign import ccall unsafe "sleep" sleepBlock :: Int -> IO Int
 #endif
 
 main :: IO ()
