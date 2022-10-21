@@ -1022,6 +1022,8 @@ dnl ** check for eventfd which is needed by the I/O manager
 AC_CHECK_HEADERS([sys/eventfd.h])
 AC_CHECK_FUNCS([eventfd])
 
+AC_CHECK_FUNCS([getpid getuid raise])
+
 dnl ** Check for __thread support in the compiler
 AC_MSG_CHECKING(for __thread support)
 AC_COMPILE_IFELSE(
