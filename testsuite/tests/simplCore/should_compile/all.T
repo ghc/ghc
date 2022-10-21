@@ -199,7 +199,7 @@ test('T10083',
      makefile_test, ['T10083'])
 test('T10689', normal, compile, [''])
 test('T11155',
-     normal,
+     js_skip,
      makefile_test, ['T11155'])
 test('T11232', normal, compile, ['-O2'])
 test('T11562', normal, compile, ['-O2'])
