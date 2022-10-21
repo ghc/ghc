@@ -21,7 +21,7 @@
 #include "Capability.h"
 #include "RtsFlags.h"
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
 #include "posix/Signals.h"
 #endif
 

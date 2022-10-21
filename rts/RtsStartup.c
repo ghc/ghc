@@ -659,7 +659,7 @@ shutdownHaskellAndExit(int n, int fastExit)
     stg_exit(n);
 }
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
 static void exitBySignal(int sig) STG_NORETURN;
 
 void

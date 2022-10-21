@@ -8,7 +8,7 @@
 
 #pragma once
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
 
 #include "posix/Signals.h"
 
@@ -22,7 +22,7 @@
 
 #endif
 
-#if RTS_USER_SIGNALS
+#if defined(RTS_USER_SIGNALS)
 
 #include "BeginPrivate.h"
 
