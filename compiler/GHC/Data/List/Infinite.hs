@@ -16,14 +16,17 @@ module GHC.Data.List.Infinite
   , allListsOf
   , toList
   , repeat
+  , enumFrom
   ) where
 
-import Prelude ((-), Applicative (..), Bool (..), Foldable, Functor (..), Int, Maybe (..), Traversable (..), flip, otherwise)
+import Prelude ((-), Applicative (..), Bool (..), Enum (succ), Foldable, Functor (..), Int, Maybe (..), Monad (..), Traversable (..), (<$>), flip, otherwise)
 import Control.Category (Category (..))
 import Control.Monad (guard)
 import qualified Data.Foldable as F
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified GHC.Base as List (build)
+
+infixr 5 `Inf`
 
 data Infinite a = Inf a (Infinite a)
   deriving (Foldable, Functor, Traversable)
@@ -43,6 +46,11 @@ tail (Inf _ as) = as
 instance Applicative Infinite where
     pure = repeat
     Inf f fs <*> Inf a as = Inf (f a) (fs <*> as)
+
+instance Monad Infinite where
+    x >>= f = join (f <$> x)
+      where
+        join (Inf a as) = head a `Inf` join (tail <$> as)
 
 mapMaybe :: (a -> Maybe b) -> Infinite a -> Infinite b
 mapMaybe f = go
@@ -170,6 +178,10 @@ repeatFB c x = xs where xs = c x xs
 "repeat" [~1] forall a . repeat a = build \ c -> repeatFB c a
 "repeatFB" [1] repeatFB Inf = repeat
   #-}
+
+enumFrom :: Enum a => a -> Infinite a
+enumFrom = iterate succ
+{-# INLINE enumFrom #-}
 
 {-
 Note [Fusion for `Infinite` lists]

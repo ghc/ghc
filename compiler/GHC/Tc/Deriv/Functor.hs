@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonadComprehensions #-}
 
 -- | The deriving code for the Functor, Foldable, and Traversable classes
 module GHC.Tc.Deriv.Functor
@@ -43,7 +44,10 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Id.Make (coerceId)
 import GHC.Builtin.Types (true_RDR, false_RDR)
+import GHC.Data.List.Infinite (Infinite (..))
+import qualified GHC.Data.List.Infinite as Inf
 
+import Data.Foldable
 import Data.Maybe (catMaybes, isJust)
 
 {-
@@ -181,7 +185,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
 
     fmap_eqns = map fmap_eqn data_cons
 
-    ft_fmap :: FFoldType (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
+    ft_fmap :: FFoldType (LHsExpr GhcPs -> State (Infinite RdrName) (LHsExpr GhcPs))
     ft_fmap = FT { ft_triv = \x -> pure x
                    -- fmap f x = x
                  , ft_var  = \x -> pure $ nlHsApp f_Expr x
@@ -220,7 +224,7 @@ gen_Functor_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
 
     replace_eqns = map replace_eqn data_cons
 
-    ft_replace :: FFoldType (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
+    ft_replace :: FFoldType (LHsExpr GhcPs -> State (Infinite RdrName) (LHsExpr GhcPs))
     ft_replace = FT { ft_triv = \x -> pure x
                    -- p <$ x = x
                  , ft_var  = \_ -> pure z_Expr
@@ -600,27 +604,23 @@ foldDataConArgs ft con dit
     -- The kind checks have ensured the last type parameter is of kind *.
 
 -- Make a HsLam using a fresh variable from a State monad
-mkSimpleLam :: (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
-            -> State [RdrName] (LHsExpr GhcPs)
+mkSimpleLam :: (LHsExpr GhcPs -> State (Infinite RdrName) (LHsExpr GhcPs))
+            -> State (Infinite RdrName) (LHsExpr GhcPs)
 -- (mkSimpleLam fn) returns (\x. fn(x))
 mkSimpleLam lam =
-    get >>= \case
-      n:names -> do
+    get >>= \ (Inf n names) -> do
         put names
         body <- lam (nlHsVar n)
         return (mkHsLam (noLocA [nlVarPat n]) body)
-      _ -> panic "mkSimpleLam"
 
 mkSimpleLam2 :: (LHsExpr GhcPs -> LHsExpr GhcPs
-             -> State [RdrName] (LHsExpr GhcPs))
-             -> State [RdrName] (LHsExpr GhcPs)
+             -> State (Infinite RdrName) (LHsExpr GhcPs))
+             -> State (Infinite RdrName) (LHsExpr GhcPs)
 mkSimpleLam2 lam =
-    get >>= \case
-      n1:n2:names -> do
+    get >>= \ (n1 `Inf` n2 `Inf` names) -> do
         put names
         body <- lam (nlHsVar n1) (nlHsVar n2)
         return (mkHsLam (noLocA [nlVarPat n1,nlVarPat n2]) body)
-      _ -> panic "mkSimpleLam2"
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
 --
@@ -637,7 +637,7 @@ mkSimpleConMatch :: Monad m => HsMatchContextPs
                  -> m (LMatch GhcPs (LHsExpr GhcPs))
 mkSimpleConMatch ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
-    let vars_needed = takeList insides as_RDRs
+    let vars_needed = takeList insides as_RDRList
     let bare_pat = nlConVarPat con_name vars_needed
     let pat = if null vars_needed
           then bare_pat
@@ -673,7 +673,7 @@ mkSimpleConMatch2 :: Monad m
                   -> m (LMatch GhcPs (LHsExpr GhcPs))
 mkSimpleConMatch2 ctxt fold extra_pats con insides = do
     let con_name = getRdrName con
-        vars_needed = takeList insides as_RDRs
+        vars_needed = takeList insides (toList as_RDRs)
         pat = nlConVarPat con_name vars_needed
         -- Make sure to zip BEFORE invoking catMaybes. We want the variable
         -- indices in each expression to match up with the argument indices
@@ -684,13 +684,13 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
         -- with the same index has a type which mentions the last type
         -- variable.
         argTysTyVarInfo = map isJust insides
-        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo as_Vars
+        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo (toList as_Vars)
 
         con_expr
           | null asWithTyVar = nlHsApps con_name asWithoutTyVar
           | otherwise =
-              let bs   = filterByList  argTysTyVarInfo bs_RDRs
-                  vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
+              let bs   = filterByList  argTysTyVarInfo bs_RDRList
+                  vars = filterByLists argTysTyVarInfo bs_VarList as_VarList
               in mkHsLam (noLocA (map nlVarPat bs)) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
@@ -887,7 +887,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     -- Yields 'Just' an expression if we're folding over a type that mentions
     -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
     -- See Note [FFoldType and functorLikeTraverse]
-    ft_foldr :: FFoldType (State [RdrName] (Maybe (LHsExpr GhcPs)))
+    ft_foldr :: FFoldType (State (Infinite RdrName) (Maybe (LHsExpr GhcPs)))
     ft_foldr
       = FT { ft_triv    = return Nothing
              -- foldr f = \x z -> z
@@ -922,7 +922,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
         mkFoldr = foldr nlHsApp z
 
     -- See Note [FFoldType and functorLikeTraverse]
-    ft_foldMap :: FFoldType (State [RdrName] (Maybe (LHsExpr GhcPs)))
+    ft_foldMap :: FFoldType (State (Infinite RdrName) (Maybe (LHsExpr GhcPs)))
     ft_foldMap
       = FT { ft_triv = return Nothing
              -- foldMap f = \x -> mempty
@@ -957,7 +957,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     -- that may or may not be null. Yields IsNull if it's certainly
     -- null, and yields NotNull if it's certainly not null.
     -- See Note [Deriving null]
-    ft_null :: FFoldType (State [RdrName] (NullM (LHsExpr GhcPs)))
+    ft_null :: FFoldType (State (Infinite RdrName) (NullM (LHsExpr GhcPs)))
     ft_null
       = FT { ft_triv = return IsNull
              -- null = \_ -> True
@@ -1082,7 +1082,7 @@ gen_Traversable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     -- Yields 'Just' an expression if we're folding over a type that mentions
     -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
     -- See Note [FFoldType and functorLikeTraverse]
-    ft_trav :: FFoldType (State [RdrName] (Maybe (LHsExpr GhcPs)))
+    ft_trav :: FFoldType (State (Infinite RdrName) (Maybe (LHsExpr GhcPs)))
     ft_trav
       = FT { ft_triv    = return Nothing
              -- traverse f = pure x
@@ -1140,13 +1140,21 @@ f_RDR, z_RDR :: RdrName
 f_RDR = mkVarUnqual (fsLit "f")
 z_RDR = mkVarUnqual (fsLit "z")
 
-as_RDRs, bs_RDRs :: [RdrName]
-as_RDRs = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
-bs_RDRs = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
+as_RDRs, bs_RDRs :: Infinite RdrName
+as_RDRs = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- Inf.enumFrom (1::Int) ]
+bs_RDRs = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- Inf.enumFrom (1::Int) ]
 
-as_Vars, bs_Vars :: [LHsExpr GhcPs]
-as_Vars = map nlHsVar as_RDRs
-bs_Vars = map nlHsVar bs_RDRs
+as_Vars, bs_Vars :: Infinite (LHsExpr GhcPs)
+as_Vars = fmap nlHsVar as_RDRs
+bs_Vars = fmap nlHsVar bs_RDRs
+
+as_RDRList, bs_RDRList :: [RdrName]
+as_RDRList = Inf.toList as_RDRs
+bs_RDRList = Inf.toList bs_RDRs
+
+as_VarList, bs_VarList :: [LHsExpr GhcPs]
+as_VarList = Inf.toList as_Vars
+bs_VarList = Inf.toList bs_Vars
 
 f_Pat, z_Pat :: LPat GhcPs
 f_Pat = nlVarPat f_RDR
