@@ -805,7 +805,7 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
  * procRtsOpts: Process rts_argv between rts_argc0 and rts_argc.
  * -------------------------------------------------------------------------- */
 
-#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS)
+#if defined(HAVE_UNISTD_H) && defined(HAVE_SYS_TYPES_H) && !defined(mingw32_HOST_OS) && defined(HAVE_GETUID)
 static void checkSuid(RtsOptsEnabledEnum enabled)
 {
     if (enabled == RtsOptsSafeOnly) {
