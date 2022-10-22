@@ -298,19 +298,17 @@ INLINE_HEADER void nonmovingSetClosureMark(StgPtr p)
     nonmovingSetMark(nonmovingGetSegment(p), nonmovingGetBlockIdx(p));
 }
 
+INLINE_HEADER uint8_t nonmovingGetClosureMark(StgPtr p)
+{
+    struct NonmovingSegment *seg = nonmovingGetSegment(p);
+    nonmoving_block_idx blk_idx = nonmovingGetBlockIdx(p);
+    return nonmovingGetMark(seg, blk_idx);
+}
+
 /* Was the given closure marked this major GC cycle? */
 INLINE_HEADER bool nonmovingClosureMarkedThisCycle(StgPtr p)
 {
-    struct NonmovingSegment *seg = nonmovingGetSegment(p);
-    nonmoving_block_idx blk_idx = nonmovingGetBlockIdx(p);
-    return nonmovingGetMark(seg, blk_idx) == nonmovingMarkEpoch;
-}
-
-INLINE_HEADER bool nonmovingClosureMarked(StgPtr p)
-{
-    struct NonmovingSegment *seg = nonmovingGetSegment(p);
-    nonmoving_block_idx blk_idx = nonmovingGetBlockIdx(p);
-    return nonmovingGetMark(seg, blk_idx) != 0;
+    return nonmovingGetClosureMark(p) == nonmovingMarkEpoch;
 }
 
 // Can be called during a major collection to determine whether a particular
