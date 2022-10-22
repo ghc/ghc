@@ -25,7 +25,10 @@
 #include "NonMovingSweep.h"
 #include "NonMovingCensus.h"
 #include "StablePtr.h" // markStablePtrTable
+#include "Sanity.h"
 #include "Weak.h" // scheduleFinalizers
+
+//#define NONCONCURRENT_SWEEP
 
 struct NonmovingHeap nonmovingHeap;
 
@@ -1191,7 +1194,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 #endif
 
     // Everything has been marked; allow the mutators to proceed
-#if defined(THREADED_RTS)
+#if defined(THREADED_RTS) && !defined(NONCONCURRENT_SWEEP)
     nonmoving_write_barrier_enabled = false;
     nonmovingFinishFlush(task);
 #endif
@@ -1228,6 +1231,15 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 #if defined(TRACING)
     if (RtsFlags.TraceFlags.nonmoving_gc)
         nonmovingTraceAllocatorCensus();
+#endif
+
+#if defined(THREADED_RTS) && defined(NONCONCURRENT_SWEEP)
+#if defined(DEBUG)
+    checkNonmovingHeap(&nonmovingHeap);
+    checkSanity(true, true);
+#endif
+    nonmoving_write_barrier_enabled = false;
+    nonmovingFinishFlush(task);
 #endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
