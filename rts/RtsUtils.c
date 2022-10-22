@@ -293,8 +293,10 @@ heapCheckFail( void )
 int genericRaise(int sig) {
 #if defined(THREADED_RTS) && (defined(openbsd_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(darwin_HOST_OS))
         return pthread_kill(pthread_self(), sig);
-#else
+#elif defined(HAVE_RAISE)
         return raise(sig);
+#else
+        exit(sig);
 #endif
 }
 
