@@ -482,7 +482,11 @@ test('T19381',
 test('T20199', [ grep_errmsg('Hello') ]
       , makefile_test, [])
 
-test('cloneMyStack', [extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c'])
+# We need to be precise about the used way here as different ways may lead to
+# different closures (and their orders) on the stack (which is checked by this
+# test).
+test('cloneMyStack', [only_ways(['normal']), extra_files(['cloneStackLib.c'])],
+     compile_and_run, ['cloneStackLib.c'])
 test('cloneMyStack2', ignore_stdout, compile_and_run, [''])
 test('cloneMyStack_retBigStackFrame', [extra_files(['cloneStackLib.c']), ignore_stdout], compile_and_run, ['cloneStackLib.c'])
 test('cloneThreadStack', [only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c'])], compile_and_run, ['cloneStackLib.c -threaded'])
