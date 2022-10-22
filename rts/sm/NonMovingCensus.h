@@ -11,6 +11,7 @@
 #include "NonMoving.h"
 
 struct NonmovingAllocCensus {
+    bool collected_live_words;
     uint32_t n_active_segs;
     uint32_t n_filled_segs;
     uint32_t n_live_blocks;
@@ -24,5 +25,5 @@ nonmovingAllocatorCensusWithWords(struct NonmovingAllocator *alloc);
 struct NonmovingAllocCensus
 nonmovingAllocatorCensus(struct NonmovingAllocator *alloc);
 
-void nonmovingPrintAllocatorCensus(void);
+void nonmovingPrintAllocatorCensus(bool collect_live_words);
 void nonmovingTraceAllocatorCensus(void);
