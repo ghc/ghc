@@ -1224,7 +1224,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     traceConcSweepEnd();
 #if defined(DEBUG)
     if (RtsFlags.DebugFlags.nonmoving_gc)
-        nonmovingPrintAllocatorCensus();
+        nonmovingPrintAllocatorCensus(true);
 #endif
 #if defined(TRACING)
     if (RtsFlags.TraceFlags.nonmoving_gc)
