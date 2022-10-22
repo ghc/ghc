@@ -4,11 +4,6 @@
 \section{Common subexpression}
 -}
 
-
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
 module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 
 import GHC.Prelude
@@ -32,6 +27,7 @@ import GHC.Types.Tickish
 import GHC.Core.Map.Expr
 import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
+import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
 
 {-
@@ -412,7 +408,7 @@ cseBind toplevel env (Rec [(in_id, rhs)])
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
 
   where
-    (env1, [out_id]) = addRecBinders env [in_id]
+    (env1, Identity out_id) = addRecBinders env (Identity in_id)
     rhs'  = cseExpr env1 rhs
     rhs'' = stripTicksE tickishFloatable rhs'
     ticks = stripTicksT tickishFloatable rhs'
@@ -916,7 +912,8 @@ addBinders cse vs = (cse { cs_subst = sub' }, vs')
                 where
                   (sub', vs') = substBndrs (cs_subst cse) vs
 
-addRecBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
-addRecBinders cse vs = (cse { cs_subst = sub' }, vs')
-                where
-                  (sub', vs') = substRecBndrs (cs_subst cse) vs
+addRecBinders :: Traversable f => CSEnv -> f Id -> (CSEnv, f Id)
+addRecBinders = \ cse vs ->
+    let (sub', vs') = substRecBndrs (cs_subst cse) vs
+    in (cse { cs_subst = sub' }, vs')
+{-# INLINE addRecBinders #-}

@@ -7,9 +7,6 @@
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -78,6 +75,8 @@ import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, unless )
+import Data.Foldable
+import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
@@ -405,9 +404,10 @@ There are various entry points to renaming patterns, depending on
 --   * local namemaker
 --   * unused and duplicate checking
 --   * no fixities
-rnPats :: HsMatchContext GhcRn -- for error messages
-       -> [LPat GhcPs]
-       -> ([LPat GhcRn] -> RnM (a, FreeVars))
+rnPats :: Traversable f
+       => HsMatchContext GhcRn -- for error messages
+       -> f (LPat GhcPs)
+       -> (f (LPat GhcRn) -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
 rnPats ctxt pats thing_inside
   = do  { envs_before <- getRdrEnvs
@@ -424,7 +424,7 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See Note [Don't report shadowing for pattern synonyms]
-        ; let bndrs = collectPatsBinders CollNoDictBinders pats'
+        ; let bndrs = collectPatsBinders CollNoDictBinders (toList pats')
         ; addErrCtxt doc_pat $
           if isPatSynCtxt ctxt
              then checkDupNames bndrs
@@ -432,6 +432,8 @@ rnPats ctxt pats thing_inside
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
+{-# SPECIALIZE rnPats :: HsMatchContext GhcRn -> [LPat GhcPs] -> ([LPat GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
+{-# SPECIALIZE rnPats :: HsMatchContext GhcRn -> Identity (LPat GhcPs) -> (Identity (LPat GhcRn) -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
 
 rnPat :: HsMatchContext GhcRn -- for error messages
       -> LPat GhcPs
@@ -439,7 +441,7 @@ rnPat :: HsMatchContext GhcRn -- for error messages
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
                                -- appear in the result FreeVars
 rnPat ctxt pat thing_inside
-  = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
+  = rnPats ctxt (Identity pat) (thing_inside . runIdentity)
 
 applyNameMaker :: NameMaker -> LocatedN RdrName -> RnM (LocatedN Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
@@ -471,7 +473,7 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parameterized by how you make new names
 
-rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
+rnLPatsAndThen :: Traversable f => NameMaker -> f (LPat GhcPs) -> CpsRn (f (LPat GhcRn))
 rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
   -- Despite the map, the monad ensures that each pattern binds
   -- variables that may be mentioned in subsequent patterns in the list
@@ -963,7 +965,7 @@ generalizeOverLitVal (HsFractional fl@(FL {fl_text=src,fl_neg=neg,fl_exp=e}))
     , denominator val == 1 = HsIntegral (IL {il_text=src,il_neg=neg,il_value=numerator val})
 generalizeOverLitVal lit = lit
 
-isNegativeZeroOverLit :: HsOverLit t -> Bool
+isNegativeZeroOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t -> Bool
 isNegativeZeroOverLit lit
  = case ol_val lit of
         HsIntegral i    -> 0 == il_value i && il_neg i
@@ -985,7 +987,7 @@ in this case return not only literal itself but also negateName so that users
 can apply it explicitly. In this case it stays negative zero.  #13211
 -}
 
-rnOverLit :: HsOverLit t ->
+rnOverLit :: (XXOverLit t ~ DataConCantHappen) => HsOverLit t ->
              RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeVars)
 rnOverLit origLit
   = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals

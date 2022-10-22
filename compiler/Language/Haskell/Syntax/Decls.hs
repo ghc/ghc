@@ -19,9 +19,6 @@
 (c) The GRASP/@type@AQUA Project, Glasgow University, 1992-1998
 -}
 
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- See Note [Language.Haskell.Syntax.* Hierarchy] for why not GHC.Hs.*
 
 -- | Abstract syntax of global declarations.

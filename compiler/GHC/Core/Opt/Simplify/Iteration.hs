@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiWayIf #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.Simplify.Iteration ( simplTopBinds, simplExpr, simplImpRules ) where
 
 import GHC.Prelude

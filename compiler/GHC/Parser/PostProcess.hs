@@ -10,8 +10,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 --
 --  (c) The University of Glasgow 2002-2006
 --

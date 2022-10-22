@@ -9,9 +9,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
 -- CmmNode type for representation using Hoopl graphs.
 
 module GHC.Cmm.Node (
@@ -33,6 +30,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.Expr
 import GHC.Cmm.Switch
 import GHC.Data.FastString
+import GHC.Data.Pair
 import GHC.Types.ForeignCall
 import GHC.Utils.Outputable
 import GHC.Runtime.Heap.Layout
@@ -725,7 +723,7 @@ mapExpM _ (CmmComment _)            = Nothing
 mapExpM _ (CmmTick _)               = Nothing
 mapExpM f (CmmUnwind regs)          = CmmUnwind `fmap` mapM (\(r,e) -> mapM f e >>= \e' -> pure (r,e')) regs
 mapExpM f (CmmAssign r e)           = CmmAssign r `fmap` f e
-mapExpM f (CmmStore addr e align)   = (\[addr', e'] -> CmmStore addr' e' align) `fmap` mapListM f [addr, e]
+mapExpM f (CmmStore addr e align)   = (\ (Pair addr' e') -> CmmStore addr' e' align) `fmap` traverse f (Pair addr e)
 mapExpM _ (CmmBranch _)             = Nothing
 mapExpM f (CmmCondBranch e ti fi l) = (\x -> CmmCondBranch x ti fi l) `fmap` f e
 mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e

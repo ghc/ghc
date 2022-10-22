@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Monadic definitions for the constraint solver
 module GHC.Tc.Solver.Monad (

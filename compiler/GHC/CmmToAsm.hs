@@ -15,8 +15,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | Native code generator
 --
 -- The native-code generator has machine-independent and

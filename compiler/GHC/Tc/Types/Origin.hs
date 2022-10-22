@@ -3,9 +3,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
 -- | Describes the provenance of types as they flow through the type-checker.
 -- The datatypes here are mainly used for error message generation.
 module GHC.Tc.Types.Origin (

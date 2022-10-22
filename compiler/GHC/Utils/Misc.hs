@@ -7,8 +7,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MagicHash #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 -- | Highly random utility functions
 --
 module GHC.Utils.Misc (
@@ -17,9 +15,7 @@ module GHC.Utils.Misc (
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
-        zipLazy, stretchZipWith, zipWithAndUnzip, zipAndUnzip,
-
-        zipWithLazy, zipWith3Lazy,
+        stretchZipWith, zipWithAndUnzip, zipAndUnzip,
 
         filterByList, filterByLists, partitionByList,
 
@@ -261,25 +257,6 @@ zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
 zipWith4Equal _   _ [] [] [] [] =  []
 zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists: "++msg)
 #endif
-
--- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
-zipLazy :: [a] -> [b] -> [(a,b)]
-zipLazy []     _       = []
-zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
-
--- | 'zipWithLazy' is like 'zipWith' but is lazy in the second list.
--- The length of the output is always the same as the length of the first
--- list.
-zipWithLazy :: (a -> b -> c) -> [a] -> [b] -> [c]
-zipWithLazy _ []     _       = []
-zipWithLazy f (a:as) ~(b:bs) = f a b : zipWithLazy f as bs
-
--- | 'zipWith3Lazy' is like 'zipWith3' but is lazy in the second and third lists.
--- The length of the output is always the same as the length of the first
--- list.
-zipWith3Lazy :: (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]
-zipWith3Lazy _ []     _       _       = []
-zipWith3Lazy f (a:as) ~(b:bs) ~(c:cs) = f a b c : zipWith3Lazy f as bs cs
 
 -- | 'filterByList' takes a list of Bools and a list of some elements and
 -- filters out these elements for which the corresponding value in the list of

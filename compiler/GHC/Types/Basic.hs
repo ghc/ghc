@@ -20,8 +20,6 @@ types that
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Types.Basic (
         LeftOrRight(..),
         pickLR,

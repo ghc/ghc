@@ -6,8 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module GHC.StgToCmm.Heap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset,
@@ -612,10 +610,6 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
   gc_id       <- newBlockId
 
   let
-    Just alloc_lit = mb_alloc_lit
-
-    bump_hp   = cmmOffsetExprB platform hpExpr alloc_lit
-
     -- Sp overflow if ((old + 0) - CmmHighStack < SpLim)
     -- At the beginning of a function old + 0 = Sp
     -- See Note [Single stack check]
@@ -629,8 +623,6 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
     hp_oflo = CmmMachOp (mo_wordUGt platform) [hpExpr, hpLimExpr]
-
-    alloc_n = mkAssign hpAllocReg alloc_lit
 
   case mb_stk_hwm of
     Nothing -> return ()
@@ -646,12 +638,14 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
         | checkYield && isJust mb_stk_hwm -> emitLabel loop_header_id
     _otherwise -> return ()
 
-  if isJust mb_alloc_lit
-    then do
+  case mb_alloc_lit of
+    Just alloc_lit -> do
+     let bump_hp   = cmmOffsetExprB platform hpExpr alloc_lit
+         alloc_n = mkAssign hpAllocReg alloc_lit
      tickyHeapCheck
      emitAssign hpReg bump_hp
      emit =<< mkCmmIfThen' hp_oflo (alloc_n <*> mkBranch gc_id) (Just False)
-    else
+    Nothing ->
       when (checkYield && not omit_yields) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq platform)

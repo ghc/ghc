@@ -3,8 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | This module defines types and simple operations over constraints, as used
 -- in the type-checker and constraint solver.
 module GHC.Tc.Types.Constraint (

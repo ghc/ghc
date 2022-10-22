@@ -8,7 +8,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Typechecking instance declarations
@@ -1284,7 +1283,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; self_dict <- newDict clas inst_tys
        ; let class_tc      = classTyCon clas
              loc'          = noAnnSrcSpan loc
-             [dict_constr] = tyConDataCons class_tc
+             dict_constr   = tyConSingleDataCon class_tc
              dict_bind = mkVarBind self_dict (L loc' con_app_args)
 
                      -- We don't produce a binding for the dict_constr; instead we
@@ -1368,7 +1367,7 @@ addDFunPrags dfun_id sc_meth_ids
    ev_ids      = mkTemplateLocalsNum 1                    dfun_theta
    dfun_bndrs  = dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
-   [dict_con]  = tyConDataCons clas_tc
+   dict_con    = tyConSingleDataCon clas_tc
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc

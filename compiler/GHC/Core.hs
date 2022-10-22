@@ -7,9 +7,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types

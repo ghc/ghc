@@ -3,7 +3,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 {-
 (c) The University of Glasgow 2006

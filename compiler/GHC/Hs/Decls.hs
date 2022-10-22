@@ -16,9 +16,6 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | Abstract syntax of global declarations.
 --
 -- Definitions for: @SynDecl@ and @ConDecl@, @ClassDecl@,

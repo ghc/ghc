@@ -9,7 +9,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -28,7 +27,7 @@ module GHC.ThToHs
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
@@ -62,6 +61,7 @@ import Control.Applicative( (<|>) )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -1224,11 +1224,12 @@ cvtOpApp x op y
 -------------------------------------
 
 cvtHsDo :: HsDoFlavour -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
-cvtHsDo do_or_lc stmts
-  | null stmts = failWith EmptyStmtListInDoBlock
-  | otherwise
-  = do  { stmts' <- cvtStmts stmts
-        ; let Just (stmts'', last') = snocView stmts'
+cvtHsDo do_or_lc stmts = case nonEmpty stmts of
+    Nothing -> failWith EmptyStmtListInDoBlock
+    Just stmts -> do
+        { stmts' <- traverse cvtStmt stmts
+        ; let stmts'' = NE.init stmts'
+              last' = NE.last stmts'
 
         ; last'' <- case last' of
                     (L loc (BodyStmt _ body _ _))

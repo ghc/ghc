@@ -4,7 +4,6 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 {-
 (c) The University of Glasgow 2006

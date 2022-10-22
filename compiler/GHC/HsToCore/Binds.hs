@@ -2,8 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -848,29 +846,52 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   , Just con <- isDataConId_maybe funId
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
 
-  | Nothing <- mb_lhs_app
-  = Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+  | otherwise = case decompose fun2 args2 of
+        Nothing -> Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+        Just (fn_id, args)
+          | not (null unbound) ->
+            -- Check for things unbound on LHS
+            -- See Note [Unused spec binders]
+            -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+            --                                     , text "orig_lhs:" <+> ppr orig_lhs
+            --                                     , text "lhs_fvs:" <+> ppr lhs_fvs
+            --                                     , text "rhs_fvs:" <+> ppr rhs_fvs
+            --                                     , text "unbound:" <+> ppr unbound
+            --                                     ]) $
+            Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
+          | otherwise ->
+            -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+            --                                    , text "orig_lhs:" <+> ppr orig_lhs
+            --                                    , text "lhs1:"     <+> ppr lhs1
+            --                                    , text "extra_bndrs:" <+> ppr extra_bndrs
+            --                                    , text "fn_id:" <+> ppr fn_id
+            --                                    , text "args:"   <+> ppr args
+            --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+            --                                    ]) $
+            Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
 
-  | not (null unbound)    -- Check for things unbound on LHS
-                          -- See Note [Unused spec binders]
-  = -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-    --                                     , text "orig_lhs:" <+> ppr orig_lhs
-    --                                     , text "lhs_fvs:" <+> ppr lhs_fvs
-    --                                     , text "rhs_fvs:" <+> ppr rhs_fvs
-    --                                     , text "unbound:" <+> ppr unbound
-    --                                     ]) $
-    Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
+          where -- See Note [Variables unbound on the LHS]
+                lhs_fvs = exprsFreeVars args
+                all_fvs       = lhs_fvs `unionVarSet` rhs_fvs
+                trimmed_bndrs = filter (`elemVarSet` all_fvs) orig_bndrs
+                unbound       = filterOut (`elemVarSet` lhs_fvs) trimmed_bndrs
+                    -- Needed on RHS but not bound on LHS
 
-  | otherwise
-  = -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-    --                                    , text "orig_lhs:" <+> ppr orig_lhs
-    --                                    , text "lhs1:"     <+> ppr lhs1
-    --                                    , text "extra_bndrs:" <+> ppr extra_bndrs
-    --                                    , text "fn_id:" <+> ppr fn_id
-    --                                    , text "args:"   <+> ppr args
-    --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
-    --                                    ]) $
-    Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
+                -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
+                -- and extra dict binders: Note [Free dictionaries on rule LHS]
+                extra_bndrs = scopedSort extra_tvs ++ extra_dicts
+                  where
+                    extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
+                extra_dicts =
+                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
+                  | d <- extra_vars, isDictId d ]
+                extra_vars  =
+                  [ v
+                  | v <- exprsFreeVarsList args
+                  , not (v `elemVarSet` orig_bndr_set)
+                  , not (v == fn_id) ]
+                    -- fn_id: do not quantify over the function itself, which may
+                    -- itself be a dictionary (in pathological cases, #10251)
 
  where
    simpl_opts    = initSimpleOpts dflags
@@ -879,29 +900,6 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
    lhs1         = drop_dicts orig_lhs
    lhs2         = simpleOptExpr simpl_opts lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
-
-   mb_lhs_app = decompose fun2 args2
-   Just (fn_id, args) = mb_lhs_app
-
-   -- See Note [Variables unbound on the LHS]
-   lhs_fvs       = exprsFreeVars args
-   all_fvs       = lhs_fvs `unionVarSet` rhs_fvs
-   trimmed_bndrs = filter (`elemVarSet` all_fvs) orig_bndrs
-   unbound       = filterOut (`elemVarSet` lhs_fvs) trimmed_bndrs
-                   -- Needed on RHS but not bound on LHS
-
-        -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
-        -- and extra dict binders: Note [Free dictionaries on rule LHS]
-   extra_bndrs = scopedSort extra_tvs ++ extra_dicts
-     where
-       extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
-       extra_dicts = [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
-                     | d <- extra_vars, isDictId d ]
-       extra_vars  = [ v | v <- exprsFreeVarsList args
-                         , not (v `elemVarSet` orig_bndr_set)
-                         , not (v == fn_id) ]
-         -- fn_id: do not quantify over the function itself, which may
-         -- itself be a dictionary (in pathological cases, #10251)
 
    decompose (Var fn_id) args
       | not (fn_id `elemVarSet` orig_bndr_set)
@@ -1253,8 +1251,7 @@ dsEvTypeable :: Type -> EvTypeable -> DsM CoreExpr
 dsEvTypeable ty ev
   = do { tyCl <- dsLookupTyCon typeableClassName    -- Typeable
        ; let kind = typeKind ty
-             Just typeable_data_con
-                 = tyConSingleDataCon_maybe tyCl    -- "Data constructor"
+             typeable_data_con = tyConSingleDataCon tyCl  -- "Data constructor"
                                                     -- for Typeable
 
        ; rep_expr <- ds_ev_typeable ty ev           -- :: TypeRep a

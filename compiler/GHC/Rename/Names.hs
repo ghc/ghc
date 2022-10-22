@@ -11,9 +11,6 @@ Extracting imported and top-level names in scope
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordSelector,
         extendGlobalRdrEnvRn,
@@ -919,8 +916,15 @@ getLocalNonValBinders fixity_env
           --    foreign decls and pattern synonyms for an ordinary module
           --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBootOrSig
-        ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
-                        | otherwise = for_hs_bndrs
+        ; let val_bndrs
+                | is_boot = case binds of
+                      ValBinds _ _val_binds val_sigs ->
+                          -- In a hs-boot file, the value binders come from the
+                          --  *signatures*, and there should be no foreign binders
+                          [ L (l2l decl_loc) (unLoc n)
+                          | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
+                      _ -> panic "Non-ValBinds in hs-boot group"
+                | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = concat nti_availss ++ val_avails
@@ -941,15 +945,8 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
-    ValBinds _ _val_binds val_sigs = binds
-
     for_hs_bndrs :: [LocatedN RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
-
-    -- In a hs-boot file, the value binders come from the
-    --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ L (l2l decl_loc) (unLoc n)
-                        | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name

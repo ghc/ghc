@@ -6,7 +6,6 @@ Type and Coercion - friends' interface
 
 
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Substitution into types and coercions.
 module GHC.Core.TyCo.Subst

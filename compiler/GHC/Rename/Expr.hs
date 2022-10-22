@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -77,7 +78,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List (unzip4, minimumBy)
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import Data.Maybe (isJust, isNothing)
 import Control.Arrow (first)
 import Data.Ord
@@ -1089,15 +1090,13 @@ rnStmtsWithFreeVars ctxt _ [] thing_inside
        ; (thing, fvs) <- thing_inside []
        ; return (([], thing), fvs) }
 
-rnStmtsWithFreeVars mDoExpr@(HsDoStmt MDoExpr{}) rnBody stmts thing_inside    -- Deal with mdo
+rnStmtsWithFreeVars mDoExpr@(HsDoStmt MDoExpr{}) rnBody (nonEmpty -> Just stmts) thing_inside    -- Deal with mdo
   = -- Behave like do { rec { ...all but last... }; last }
     do { ((stmts1, (stmts2, thing)), fvs)
-           <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocA all_but_last)) $ \ _ ->
-              do { last_stmt' <- checkLastStmt mDoExpr last_stmt
+           <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocA (NE.init stmts))) $ \ _ ->
+              do { last_stmt' <- checkLastStmt mDoExpr (NE.last stmts)
                  ; rnStmt mDoExpr rnBody last_stmt' thing_inside }
         ; return (((stmts1 ++ stmts2), thing), fvs) }
-  where
-    Just (all_but_last, last_stmt) = snocView stmts
 
 rnStmtsWithFreeVars ctxt rnBody (lstmt@(L loc _) : lstmts) thing_inside
   | null lstmts

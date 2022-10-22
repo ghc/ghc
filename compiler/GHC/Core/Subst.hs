@@ -6,8 +6,6 @@
 Utility functions on @Core@ syntax
 -}
 
-
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Core.Subst (
         -- * Main data types
         Subst(..), -- Implementation exported for supercompiler's Renaming.hs only
@@ -65,6 +63,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
+import Data.Functor.Identity (Identity (..))
 import Data.List (mapAccumL)
 
 {-
@@ -343,15 +342,18 @@ substBndr subst bndr
   | otherwise     = substIdBndr (text "var-bndr") subst subst bndr
 
 -- | Applies 'substBndr' to a number of 'Var's, accumulating a new 'Subst' left-to-right
-substBndrs :: Subst -> [Var] -> (Subst, [Var])
-substBndrs subst bndrs = mapAccumL substBndr subst bndrs
+substBndrs :: Traversable f => Subst -> f Var -> (Subst, f Var)
+substBndrs = mapAccumL substBndr
+{-# INLINE substBndrs #-}
 
 -- | Substitute in a mutually recursive group of 'Id's
-substRecBndrs :: Subst -> [Id] -> (Subst, [Id])
+substRecBndrs :: Traversable f => Subst -> f Id -> (Subst, f Id)
 substRecBndrs subst bndrs
   = (new_subst, new_bndrs)
   where         -- Here's the reason we need to pass rec_subst to subst_id
     (new_subst, new_bndrs) = mapAccumL (substIdBndr (text "rec-bndr") new_subst) subst bndrs
+{-# SPECIALIZE substRecBndrs :: Subst -> [Id] -> (Subst, [Id]) #-}
+{-# SPECIALIZE substRecBndrs :: Subst -> Identity Id -> (Subst, Identity Id) #-}
 
 substIdBndr :: SDoc
             -> Subst            -- ^ Substitution to use for the IdInfo

@@ -5,7 +5,6 @@
 
 {-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Main functions for manipulating types and type-related things
 module GHC.Core.Type (

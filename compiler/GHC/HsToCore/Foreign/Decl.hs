@@ -2,8 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1998

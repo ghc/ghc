@@ -13,6 +13,7 @@ import GHC.Types.Unique
 
 import qualified Control.Exception as E
 import Control.Monad
+import Data.Foldable
 import System.Environment (getArgs)
 import System.IO
 
@@ -49,7 +50,7 @@ layout_tests = sequence_
       let
         layout_ret = ubxSumRepType (map typePrimRep tys)
       in
-        assert (layout_ret == layout)
+        assert (toList layout_ret == layout)
                tn
                (text "Unexpected sum layout." $$
                 text "Alts:           " <+> ppr tys $$

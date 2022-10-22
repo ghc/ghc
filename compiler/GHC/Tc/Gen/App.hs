@@ -6,8 +6,6 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-
 {-
 %
 (c) The University of Glasgow 2006

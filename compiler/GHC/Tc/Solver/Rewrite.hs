@@ -2,8 +2,6 @@
 
 {-# LANGUAGE DeriveFunctor #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Tc.Solver.Rewrite(
    rewrite, rewriteArgsNom,
    rewriteType

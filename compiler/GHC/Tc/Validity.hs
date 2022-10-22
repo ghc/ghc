@@ -1734,15 +1734,12 @@ synonyms, by matching on TyConApp directly.
 -}
 
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
-checkValidInstance ctxt hs_type ty
-  | not is_tc_app
-  = failWithTc (TcRnNoClassInstHead tau)
-
-  | isNothing mb_cls
-  = failWithTc (TcRnIllegalClassInst (tyConFlavour tc))
-
-  | otherwise
-  = do  { setSrcSpanA head_loc $
+checkValidInstance ctxt hs_type ty = case tau of
+  -- See Note [Instances and constraint synonyms]
+  TyConApp tc inst_tys -> case tyConClass_maybe tc of
+    Nothing -> failWithTc (TcRnIllegalClassInst (tyConFlavour tc))
+    Just clas -> do
+        { setSrcSpanA head_loc $
           checkValidInstHead ctxt clas inst_tys
 
         ; traceTc "checkValidInstance {" (ppr ty)
@@ -1775,12 +1772,9 @@ checkValidInstance ctxt hs_type ty
         ; traceTc "End checkValidInstance }" empty
 
         ; return () }
+  _ -> failWithTc (TcRnNoClassInstHead tau)
   where
     (_tvs, theta, tau)   = tcSplitSigmaTy ty
-    is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
-    TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
-    mb_cls               = tyConClass_maybe tc
-    Just clas            = mb_cls
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)

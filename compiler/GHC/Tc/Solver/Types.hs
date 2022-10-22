@@ -1,8 +1,6 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans

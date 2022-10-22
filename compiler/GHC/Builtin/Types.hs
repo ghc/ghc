@@ -207,6 +207,7 @@ import GHC.Utils.Panic.Plain
 
 import qualified Data.ByteString.Char8 as BS
 
+import Data.Foldable
 import Data.List        ( elemIndex, intersperse )
 
 alpha_tyvar :: [TyVar]
@@ -1611,7 +1612,7 @@ sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
-      = map slotPrimRep (ubxSumRepType prim_repss)
+      = map slotPrimRep (toList (ubxSumRepType prim_repss))
       where
         rr_tys     = extractPromotedList rr_ty_list
         doc        = text "sumRepDataCon" <+> ppr rr_tys
@@ -1734,26 +1735,8 @@ unliftedRepTy = mkTyConTy unliftedRepTyCon
 vecCountTyConName :: Name
 vecCountTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "VecCount") vecCountTyConKey vecCountTyCon
 
--- See Note [Wiring in RuntimeRep]
-vecCountDataConNames :: [Name]
-vecCountDataConNames = zipWith3Lazy mk_runtime_rep_dc_name
-                         [ fsLit "Vec2", fsLit "Vec4", fsLit "Vec8"
-                         , fsLit "Vec16", fsLit "Vec32", fsLit "Vec64" ]
-                         vecCountDataConKeys
-                         vecCountDataCons
-
 vecElemTyConName :: Name
 vecElemTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "VecElem") vecElemTyConKey vecElemTyCon
-
--- See Note [Wiring in RuntimeRep]
-vecElemDataConNames :: [Name]
-vecElemDataConNames = zipWith3Lazy mk_runtime_rep_dc_name
-                        [ fsLit "Int8ElemRep", fsLit "Int16ElemRep", fsLit "Int32ElemRep"
-                        , fsLit "Int64ElemRep", fsLit "Word8ElemRep", fsLit "Word16ElemRep"
-                        , fsLit "Word32ElemRep", fsLit "Word64ElemRep"
-                        , fsLit "FloatElemRep", fsLit "DoubleElemRep" ]
-                        vecElemDataConKeys
-                        vecElemDataCons
 
 vecRepDataCon :: DataCon
 vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
@@ -1777,12 +1760,13 @@ vecCountTyCon = pcTyCon vecCountTyConName Nothing [] vecCountDataCons
 
 -- See Note [Wiring in RuntimeRep]
 vecCountDataCons :: [DataCon]
-vecCountDataCons = zipWithLazy mk_vec_count_dc
-                     [ 2, 4, 8, 16, 32, 64 ]
-                     vecCountDataConNames
+vecCountDataCons = zipWith mk_vec_count_dc [1..6] vecCountDataConKeys
   where
-    mk_vec_count_dc n name
-      = pcSpecialDataCon name [] vecCountTyCon (VecCount n)
+    mk_vec_count_dc logN key = con
+      where
+        n = 2^(logN :: Int)
+        name = mk_runtime_rep_dc_name (fsLit ("Vec" ++ show n)) key con
+        con = pcSpecialDataCon name [] vecCountTyCon (VecCount n)
 
 -- See Note [Wiring in RuntimeRep]
 vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
@@ -1795,14 +1779,19 @@ vecElemTyCon = pcTyCon vecElemTyConName Nothing [] vecElemDataCons
 
 -- See Note [Wiring in RuntimeRep]
 vecElemDataCons :: [DataCon]
-vecElemDataCons = zipWithLazy mk_vec_elem_dc
-                    [ Int8ElemRep, Int16ElemRep, Int32ElemRep, Int64ElemRep
-                    , Word8ElemRep, Word16ElemRep, Word32ElemRep, Word64ElemRep
-                    , FloatElemRep, DoubleElemRep ]
-                    vecElemDataConNames
+vecElemDataCons = zipWith3 mk_vec_elem_dc
+  [ fsLit "Int8ElemRep", fsLit "Int16ElemRep", fsLit "Int32ElemRep", fsLit "Int64ElemRep"
+  , fsLit "Word8ElemRep", fsLit "Word16ElemRep", fsLit "Word32ElemRep", fsLit "Word64ElemRep"
+  , fsLit "FloatElemRep", fsLit "DoubleElemRep" ]
+  [ Int8ElemRep, Int16ElemRep, Int32ElemRep, Int64ElemRep
+  , Word8ElemRep, Word16ElemRep, Word32ElemRep, Word64ElemRep
+  , FloatElemRep, DoubleElemRep ]
+    vecElemDataConKeys
   where
-    mk_vec_elem_dc elem name
-      = pcSpecialDataCon name [] vecElemTyCon (VecElem elem)
+    mk_vec_elem_dc nameFs elemRep key = con
+      where
+        name = mk_runtime_rep_dc_name nameFs key con
+        con = pcSpecialDataCon name [] vecElemTyCon (VecElem elemRep)
 
 -- See Note [Wiring in RuntimeRep]
 int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,

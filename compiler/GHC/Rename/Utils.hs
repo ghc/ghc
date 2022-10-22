@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies     #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-
 
 This module contains miscellaneous functions related to renaming.

@@ -56,6 +56,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.List (sort)
 import qualified Data.IntSet as IS
 
@@ -203,14 +204,14 @@ type SortedSlotTys = [SlotTy]
 --
 -- INVARIANT: Result slots are sorted (via Ord SlotTy), except that at the head
 -- of the list we have the slot for the tag.
-ubxSumRepType :: [[PrimRep]] -> [SlotTy]
+ubxSumRepType :: [[PrimRep]] -> NonEmpty SlotTy
 ubxSumRepType constrs0
   -- These first two cases never classify an actual unboxed sum, which always
   -- has at least two disjuncts. But it could happen if a user writes, e.g.,
   -- forall (a :: TYPE (SumRep [IntRep])). ...
   -- which could never be instantiated. We still don't want to panic.
   | constrs0 `lengthLessThan` 2
-  = [WordSlot]
+  = WordSlot :| []
 
   | otherwise
   = let
@@ -238,7 +239,7 @@ ubxSumRepType constrs0
       rep :: [PrimRep] -> SortedSlotTys
       rep ty = sort (map primRepSlot ty)
 
-      sumRep = WordSlot : combine_alts (map rep constrs0)
+      sumRep = WordSlot :| combine_alts (map rep constrs0)
                -- WordSlot: for the tag of the sum
     in
       sumRep

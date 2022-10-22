@@ -2,8 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections    #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
 
@@ -279,6 +277,7 @@ import GHC.Utils.Misc
 import GHC.Types.Var.Env
 
 import Data.Bifunctor (second)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (mapMaybe)
 import qualified Data.IntMap as IM
 
@@ -483,10 +482,9 @@ elimCase rho args bndr (MultiValAlt _) [GenStgAlt{ alt_con   = _
 
        unariseExpr rho2 rhs
 
-elimCase rho args bndr (MultiValAlt _) alts
+elimCase rho args@(tag_arg : real_args) bndr (MultiValAlt _) alts
   | isUnboxedSumBndr bndr
-  = do let (tag_arg : real_args) = args
-       tag_bndr <- mkId (mkFastString "tag") tagTy
+  = do tag_bndr <- mkId (mkFastString "tag") tagTy
           -- this won't be used but we need a binder anyway
        let rho1 = extendRho rho bndr (MultiVal args)
            scrut' = case tag_arg of
@@ -658,7 +656,7 @@ mkUbxSum
   -> [OutStgArg]  -- Final tuple arguments
 mkUbxSum dc ty_args args0
   = let
-      (_ : sum_slots) = ubxSumRepType (map typePrimRep ty_args)
+      _ :| sum_slots = ubxSumRepType (map typePrimRep ty_args)
         -- drop tag slot
 
       tag = dataConTag dc

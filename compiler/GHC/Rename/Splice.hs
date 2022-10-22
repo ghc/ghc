@@ -1,8 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-
 module GHC.Rename.Splice (
         rnTopSpliceDecls,
 
