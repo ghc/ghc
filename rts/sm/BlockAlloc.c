@@ -27,6 +27,16 @@
 
 static void  initMBlock(void *mblock, uint32_t node);
 
+/*
+ * By default the DEBUG RTS is built with block allocator assertions
+ * enabled. However, these are quite expensive and consequently it can
+ * sometimes be useful to disable them if debugging an issue known to be
+ * elsewhere
+ */
+#if defined(DEBUG)
+#define BLOCK_ALLOC_DEBUG
+#endif
+
 /* -----------------------------------------------------------------------------
 
   Implementation notes
@@ -246,7 +256,7 @@ initGroup(bdescr *head)
       last->link = head;
   }
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
   for (uint32_t i=0; i < head->blocks; i++) {
       head[i].flags = 0;
   }
@@ -618,7 +628,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
 
     ASSERT(slop_low_blocks + slop_high_blocks + n == num_blocks);
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
     checkFreeListSanity();
     W_ free_before = countFreeList();
 #endif
@@ -628,7 +638,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         ASSERT(countBlocks(bd) == num_blocks - slop_low_blocks);
     }
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
     ASSERT(countFreeList() == free_before + slop_low_blocks);
     checkFreeListSanity();
 #endif
@@ -636,7 +646,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
     // At this point the bd should be aligned, but we may have slop on the high side
     ASSERT((uintptr_t)bd->start % group_size == 0);
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
     free_before = countFreeList();
 #endif
 
@@ -645,7 +655,7 @@ allocAlignedGroupOnNode (uint32_t node, W_ n)
         ASSERT(bd->blocks == n);
     }
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
     ASSERT(countFreeList() == free_before + slop_high_blocks);
     checkFreeListSanity();
 #endif
@@ -928,7 +938,7 @@ freeGroup(bdescr *p)
 
   ASSERT(RELAXED_LOAD(&p->free) != (P_)-1);
 
-#if defined(DEBUG)
+#if defined(BLOCK_ALLOC_DEBUG)
   for (uint32_t i=0; i < p->blocks; i++) {
       p[i].flags = 0;
   }
