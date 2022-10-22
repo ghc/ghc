@@ -252,6 +252,17 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         stg_exit(1);
     }
 
+#if defined(wasm32_HOST_ARCH)
+    char *pwd = getenv("PWD");
+    if (pwd != NULL) {
+        int chdir_result = chdir(pwd);
+        if (chdir_result != 0) {
+            errorBelch("hs_init_ghc: chdir(%s) failed with %d", pwd, chdir_result);
+            stg_exit(1);
+        }
+    }
+#endif
+
     setlocale(LC_CTYPE,"");
 
     /* Initialise the stats department, phase 0 */
