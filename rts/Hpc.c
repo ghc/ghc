@@ -203,7 +203,9 @@ startupHpc(void)
     return;
   }
   hpc_inited = 1;
+#if defined(HAVE_GETPID)
   hpc_pid    = getpid();
+#endif
   hpc_tixdir = getenv("HPCTIXDIR");
   hpc_tixfile = getenv("HPCTIXFILE");
 
@@ -387,7 +389,12 @@ exitHpc(void) {
   // Any sub-process from use of fork from inside Haskell will
   // not clobber the .tix file.
 
-  if (hpc_pid == getpid()) {
+#if defined(HAVE_GETPID)
+  bool is_subprocess = hpc_pid != getpid();
+#else
+  bool is_subprocess = false;
+#endif
+  if (!is_subprocess) {
     FILE *f = __rts_fopen(tixFilename,"w+");
     writeTix(f);
   }

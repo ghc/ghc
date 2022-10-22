@@ -485,11 +485,14 @@ void traceWallClockTime_(void) {
 
 void traceOSProcessInfo_(void) {
     if (eventlog_enabled) {
+
+#if defined(HAVE_GETPID)
         postCapsetEvent(EVENT_OSPROCESS_PID,
                         CAPSET_OSPROCESS_DEFAULT,
                         getpid());
+#endif
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && defined(HAVE_GETPID)
 /* Windows has no strong concept of process hierarchy, so no getppid().
  * In any case, this trace event is mainly useful for tracing programs
  * that use 'forkProcess' which Windows doesn't support anyway.
@@ -605,7 +608,11 @@ void traceTaskCreate_ (Task       *task,
 #endif
     {
         EventTaskId         taskid = serialisableTaskId(task);
+#if !defined(HAVE_GETPID)
+        EventKernelThreadId tid    = 0;
+#else
         EventKernelThreadId tid    = kernelThreadId();
+#endif
         postTaskCreateEvent(taskid, cap->no, tid);
     }
 }

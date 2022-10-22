@@ -68,6 +68,9 @@ static char *outputFileName(void)
                                         + 10 /* .eventlog */,
                                         "initEventLogFileWriter");
 
+#if !defined(HAVE_GETPID)
+            sprintf(filename, "%s.eventlog", prog);
+#else
         if (event_log_pid == -1) { // #4512
             // Single process
             sprintf(filename, "%s.eventlog", prog);
@@ -82,6 +85,7 @@ static char *outputFileName(void)
             sprintf(filename, "%s.%" FMT_Word64 ".eventlog",
                     prog, (StgWord64)event_log_pid);
         }
+#endif
         stgFree(prog);
         return filename;
     }
