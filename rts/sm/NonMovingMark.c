@@ -1896,7 +1896,19 @@ static bool nonmovingIsNowAlive (StgClosure *p)
             || (bd->flags & BF_MARKED) != 0;
                    // The object was marked
     } else {
-        return nonmovingClosureMarkedThisCycle((P_)p);
+        struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
+        StgClosure *snapshot_loc =
+          (StgClosure *) nonmovingSegmentGetBlock(seg, nonmovingSegmentInfo(seg)->next_free_snap);
+        if (p >= snapshot_loc && nonmovingGetClosureMark((StgPtr) p) == 0) {
+            /*
+             * In this case we are looking at a block that wasn't allocated
+             * at the time that the snapshot was taken. As we do not mark such
+             * blocks, we must assume that it is reachable.
+             */
+            return true;
+        } else {
+            return nonmovingClosureMarkedThisCycle((P_)p);
+        }
     }
 }
 
