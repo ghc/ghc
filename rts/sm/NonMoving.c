@@ -1087,10 +1087,11 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
                 // Set snapshot
                 nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
                 n_filled++;
-                if (seg->link)
+                if (seg->link) {
                     seg = seg->link;
-                else
+                } else {
                     break;
+                }
             }
             // add filled segments to sweep_list
             SET_SEGMENT_STATE(seg, FILLED_SWEEPING);
