@@ -570,6 +570,7 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
 
       | otherwise
       = NS_Done
+-- AMG TODO: refactor tcTopNormaliseNewTypeTF_maybe to just return count of steps taken?
 
 {-
 ************************************************************************

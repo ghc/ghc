@@ -1240,7 +1240,7 @@ findTypeShape fam_envs ty
        = TsUnk
 
     go_tc rec_tc tc tc_args
-       | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+       | Just (HetReduction (Reduction _ _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
        = go rec_tc rhs
 
        | Just con <- tyConSingleAlgDataCon_maybe tc
@@ -1335,7 +1335,7 @@ isRecDataCon fam_envs fuel orig_dc
     go_tc_app fuel visited_tcs tc tc_args =
       case tyConDataCons_maybe tc of
       --- | pprTrace "tc_app" (vcat [ppr tc, ppr tc_args]) False = undefined
-        _ | Just (HetReduction (Reduction _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+        _ | Just (HetReduction (Reduction _ _ rhs) _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
           -- This is the only place where we look at tc_args, which might have
           -- See Note [Detecting recursive data constructors], point (C) and (5)
           -> go_arg_ty fuel visited_tcs rhs

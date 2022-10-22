@@ -1,20 +1,21 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 98, types: 38, coercions: 6, joins: 0/0}
+  = {terms: 98, types: 38, coercions: 8, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
 convert1 :: Wrap Age -> Wrap Age
 [GblId, Arity=1, Unf=OtherCon []]
 convert1 = \ (ds :: Wrap Age) -> ds
 
--- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 8, joins: 0/0}
 convert :: Wrap Age -> Int
 [GblId, Arity=1, Unf=OtherCon []]
 convert
   = convert1
     `cast` (<Wrap Age>_R
-            %<'Many>_N ->_R Roles13.N:Wrap[0] (Roles13.N:Age[0])
+            %<'Many>_N ->_R Roles13.N:Wrap[0] <Age>_R
+                            ; Roles13.N:Age[0]
             :: (Wrap Age -> Wrap Age) ~R# (Wrap Age -> Int))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -69,8 +70,8 @@ Roles13.$tcAge :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcAge
   = GHC.Types.TyCon
-      3456257068627873222##
-      14056710845110756026##
+      3456257068627873222##64
+      14056710845110756026##64
       Roles13.$trModule
       $tcAge2
       0#
@@ -103,8 +104,8 @@ Roles13.$tc'MkAge :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkAge
   = GHC.Types.TyCon
-      18264039750958872441##
-      1870189534242358050##
+      18264039750958872441##64
+      1870189534242358050##64
       Roles13.$trModule
       $tc'MkAge2
       0#
@@ -125,8 +126,8 @@ Roles13.$tcWrap :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcWrap
   = GHC.Types.TyCon
-      13773534096961634492##
-      15591525585626702988##
+      13773534096961634492##64
+      15591525585626702988##64
       Roles13.$trModule
       $tcWrap2
       0#
@@ -164,8 +165,8 @@ Roles13.$tc'MkWrap :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkWrap
   = GHC.Types.TyCon
-      15580677875333883466##
-      808508687714473149##
+      15580677875333883466##64
+      808508687714473149##64
       Roles13.$trModule
       $tc'MkWrap2
       1#

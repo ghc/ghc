@@ -1,0 +1,16 @@
+
+DCo_Phantom.hs:35:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole:
+        _a :: [Integer] -> Sorted (O ('NLogN 2 0)) (O N) 'True Integer
+      Or perhaps ‘_a’ is mis-spelled, or not in scope
+    • In the expression: _a [3, 1, 2]
+      In an equation for ‘mySortA’: mySortA = _a [3, 1, 2]
+    • Relevant bindings include
+        mySortA :: Sorted (O (N ^. 2)) (O N) 'True Integer
+          (bound at DCo_Phantom.hs:35:1)
+      Valid hole fits include
+        Sorted :: forall (cpu :: AsympPoly) (mem :: AsympPoly)
+                         (stable :: Bool) a.
+                  [a] -> Sorted cpu mem stable a
+          with Sorted @(O ('NLogN 2 0)) @(O N) @'True @Integer
+          (defined at DCo_Phantom.hs:32:18)

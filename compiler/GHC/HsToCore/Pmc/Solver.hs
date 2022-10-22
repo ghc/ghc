@@ -382,7 +382,7 @@ pmTopNormaliseType (TySt _ inert) typ = {-# SCC "pmTopNormaliseType" #-} do
     tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], a -> a)
     tyFamStepper env rec_nts tc tys  -- Try to step a type/data family
       = case topReduceTyFamApp_maybe env tc tys of
-          Just (HetReduction (Reduction _ rhs) _)
+          Just (HetReduction (Reduction _ _ rhs) _)
             -> NS_Step rec_nts rhs ((rhs:), id)
           _ -> NS_Done
 
