@@ -31,6 +31,7 @@ enum SweepResult {
 GNUC_ATTR_HOT static enum SweepResult
 nonmovingSweepSegment(struct NonmovingSegment *seg)
 {
+    ASSERT_SEGMENT_STATE(seg, FILLED_SWEEPING);
     const nonmoving_block_idx blk_cnt = nonmovingSegmentBlockCount(seg);
     bool found_free = false;
     bool found_live = false;
