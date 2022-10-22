@@ -44,6 +44,8 @@ static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
 static void  checkSTACK          (StgStack *stack);
 
+static void  checkCompactObjects (bdescr *bd);
+
 static W_    countNonMovingSegments ( struct NonmovingSegment *segs );
 static W_    countNonMovingHeap     ( struct NonmovingHeap *heap );
 
