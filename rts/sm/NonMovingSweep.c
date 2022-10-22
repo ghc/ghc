@@ -39,20 +39,20 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
     {
         if (seg->bitmap[i] == nonmovingMarkEpoch) {
             found_live = true;
-        } else if (!found_free) {
-            // This is the first free block we've found; set next_free,
-            // next_free_snap, and the scan pointer.
-            found_free = true;
-            seg->next_free = i;
-            nonmovingSegmentInfo(seg)->next_free_snap = i;
-            Bdescr((P_)seg)->u.scan = (P_)nonmovingSegmentGetBlock(seg, i);
-            seg->bitmap[i] = 0;
         } else {
             seg->bitmap[i] = 0;
+            if (!found_free) {
+                // This is the first free block we've found; set next_free,
+                // next_free_snap, and the scan pointer.
+                found_free = true;
+                seg->next_free = i;
+                nonmovingSegmentInfo(seg)->next_free_snap = i;
+                Bdescr((P_)seg)->u.scan = (P_)nonmovingSegmentGetBlock(seg, i);
+            }
         }
 
         if (found_free && found_live) {
-            // zero the remaining dead object's mark bits
+            // zero the remaining dead objects' mark bits
             for (; i < nonmovingSegmentBlockCount(seg); ++i) {
                 if (seg->bitmap[i] != nonmovingMarkEpoch) {
                     seg->bitmap[i] = 0;
@@ -118,7 +118,8 @@ clear_segment_free_blocks(struct NonmovingSegment* seg)
 {
     unsigned int block_size = nonmovingSegmentBlockSize(seg);
     for (unsigned int p_idx = 0; p_idx < nonmovingSegmentBlockCount(seg); ++p_idx) {
-        // after mark, so bit not set == dead
+        // N.B. nonmovingSweepSegment helpfully clears the bitmap entries of
+        // dead blocks
         if (nonmovingGetMark(seg, p_idx) == 0) {
             memset(nonmovingSegmentGetBlock(seg, p_idx), 0, block_size);
         }
