@@ -45,8 +45,10 @@ enum NonmovingSegmentState {
 };
 
 #define SET_SEGMENT_STATE(seg, st) RELAXED_STORE(&(seg)->state, (st))
+#define ASSERT_SEGMENT_STATE(seg, st) ASSERT(RELAXED_LOAD(&(seg)->state) == (st))
 #else
 #define SET_SEGMENT_STATE(_seg,_st)
+#define ASSERT_SEGMENT_STATE(_seg, _st)
 #endif
 
 // A non-moving heap segment
