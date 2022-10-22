@@ -946,6 +946,8 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent, SymTy
         }
         return internal_dlsym(lbl + 1);
 
+#       elif defined(OBJFORMAT_WASM32)
+        return NULL;
 #       else
 #       error No OBJFORMAT_* macro set
 #       endif

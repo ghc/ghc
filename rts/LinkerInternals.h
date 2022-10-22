@@ -29,6 +29,8 @@ void printLoadedObjects(void);
 #  define OBJFORMAT_PEi386
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
+#elif defined(wasm32_HOST_ARCH)
+#  define OBJFORMAT_WASM32
 #endif
 
 typedef void SymbolAddr;
@@ -66,6 +68,8 @@ typedef enum _SymType {
 #  include "linker/PEi386Types.h"
 #elif defined(OBJFORMAT_MACHO)
 #  include "linker/MachOTypes.h"
+#elif defined(OBJFORMAT_WASM32)
+#  include "linker/Wasm32Types.h"
 #else
 #  error "Unknown OBJECT_FORMAT for HOST_OS"
 #endif
