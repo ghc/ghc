@@ -44,6 +44,8 @@ static void  checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, uint32_t );
 static void  checkClosureShallow ( const StgClosure * );
 static void  checkSTACK          (StgStack *stack);
 
+static void  checkCompactObjects (bdescr *bd);
+
 static W_    countNonMovingSegments ( struct NonmovingSegment *segs );
 static W_    countNonMovingHeap     ( struct NonmovingHeap *heap );
 
@@ -631,6 +633,9 @@ static void checkNonmovingSegments (struct NonmovingSegment *seg)
 
 void checkNonmovingHeap (const struct NonmovingHeap *heap)
 {
+    checkLargeObjects(nonmoving_large_objects);
+    checkLargeObjects(nonmoving_marked_large_objects);
+    checkCompactObjects(nonmoving_compact_objects);
     for (unsigned int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
         const struct NonmovingAllocator *alloc = heap->allocators[i];
         checkNonmovingSegments(alloc->filled);
