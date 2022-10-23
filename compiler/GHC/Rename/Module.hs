@@ -275,7 +275,7 @@ rnSrcWarnDecls _ []
 rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
        ; mapM_ (\ dups -> let ((L loc rdr) :| (lrdr':_)) = dups
-                          in addErrAt (locA loc) (TcRnDuplicateWarningDecls lrdr' rdr))
+                          in addErrAt (locN loc) (TcRnDuplicateWarningDecls lrdr' rdr))
                warn_rdr_dups
        ; pairs_s <- mapM (addLocMA rn_deprec) decls
        ; return (WarnSome ((concat pairs_s))) }
@@ -838,7 +838,7 @@ rnFamEqn doc atfi extra_kvars
     --
     --   type instance F a b c = Either a b
     --                   ^^^^^
-    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLocA extra_kvars of
+    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLocN extra_kvars of
       []         -> panic "rnFamEqn.lhs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
@@ -2377,7 +2377,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    -- not-in-scope variables) don't check the validity of injectivity
    -- annotation. This gives better error messages.
    ; when (noRnErrors && not lhsValid) $
-        addErrAt (getLocA injFrom) $ mkTcRnUnknownMessage $ mkPlainError noHints $
+        addErrAt (getLocN injFrom) $ mkTcRnUnknownMessage $ mkPlainError noHints $
               ( vcat [ text $ "Incorrect type variable on the LHS of "
                            ++ "injectivity condition"
               , nest 5
@@ -2436,7 +2436,7 @@ rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc, con_forall = forall_ })
-  = do  { _        <- addLocMA checkConName name
+  = do  { _        <- addLocMN checkConName name
         ; new_name <- lookupLocatedTopConstructorRnN name
 
         -- We bind no implicit binders here; this is just like
@@ -2473,7 +2473,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_g_args  = args
                        , con_res_ty  = res_ty
                        , con_doc     = mb_doc })
-  = do  { mapM_ (addLocMA checkConName) names
+  = do  { mapM_ (addLocMN checkConName) names
         ; new_names <- mapM (lookupLocatedTopConstructorRnN) names
 
         ; let -- We must ensure that we extract the free tkvs in left-to-right
@@ -2587,8 +2587,8 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
       | (L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
                                        , psb_args = RecCon as }))) <- bind
       = do
-          bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
-          let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
+          bnd_name <- newTopSrcBinder (L (l2ln bind_loc) n)
+          let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocN (foLabel f)) f) . recordPatSynField) as
           flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n})) <- bind

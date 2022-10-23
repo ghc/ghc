@@ -190,7 +190,7 @@ rnExports explicit_mod exports
                  | explicit_mod = exports
                  | has_main
                           = Just (noLocA [noLocA (IEVar noExtField
-                                     (noLocA (IEName noExtField $ noLocA default_main)))])
+                                     (noLocA (IEName noExtField $ noLocN default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing

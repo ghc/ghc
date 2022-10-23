@@ -148,7 +148,7 @@ mkSyntaxExpr = SyntaxExprRn
 -- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
 -- renamer).
 mkRnSyntaxExpr :: Name -> SyntaxExprRn
-mkRnSyntaxExpr name = SyntaxExprRn $ HsVar noExtField $ noLocA name
+mkRnSyntaxExpr name = SyntaxExprRn $ HsVar noExtField $ noLocN name
 
 instance Outputable SyntaxExprRn where
   ppr (SyntaxExprRn expr) = ppr expr

@@ -889,7 +889,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
   where
     loc      = getSrcSpan sel_name
     loc'     = noAnnSrcSpan loc
-    locn     = noAnnSrcSpan loc
+    locn     = noAnnSrcSpanN loc
     locc     = noAnnSrcSpan loc
     lbl      = flLabel fl
     sel_name = flSelector fl

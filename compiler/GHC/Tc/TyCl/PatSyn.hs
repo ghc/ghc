@@ -786,7 +786,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
-  = do { let loc' = locA loc
+  = do { let loc' = locN loc
        ; rr_name <- newNameAt (mkTyVarOcc "rep") loc'
        ; tv_name <- newNameAt (mkTyVarOcc "r")   loc'
        ; let rr_tv  = mkTyVar rr_name runtimeRepTy
@@ -982,7 +982,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated (noLocA [builder_match])
           where
-            builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
+            builder_args  = [L (nn2la loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
@@ -1039,7 +1039,7 @@ tcPatToExpr name args pat = go pat
                     -> Either SDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; let con = L (l2l loc) (HsVar noExtField lcon)
+           ; let con = L (nn2la loc) (HsVar noExtField lcon)
            ; return (unLoc $ mkHsApps con exprs)
            }
 

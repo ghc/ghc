@@ -50,6 +50,7 @@ module Transform
         , noAnnSrcSpanDP0
         , noAnnSrcSpanDP1
         , noAnnSrcSpanDPn
+        , noAnnSrcSpanDP0N
         , d0, d1, dn
         , m0, m1, mn
         , addComma
@@ -80,6 +81,7 @@ module Transform
         , setEntryDP
         , getEntryDP
         , transferEntryDP
+        , transferEntryDPN
         , transferEntryDP'
         , wrapSig, wrapDecl
         , decl2Sig, decl2Bind
@@ -210,8 +212,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
     -- AnnDColon, and to the start of the ty
     AddEpAnn kw dca = dc
     rd = case last ns of
-      L (SrcSpanAnn EpAnnNotUsed   ll) _ -> realSrcSpan ll
-      L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
+      L (EpAnnS anc' _ _) _ -> anchor anc' -- TODO MovedAnchor?
     dc' = case dca of
       EpaSpan r -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
       EpaDelta _ _ -> AddEpAnn kw dca
@@ -383,6 +384,14 @@ transferEntryDP (L (SrcSpanAnn EpAnnNotUsed _l1) _) (L (SrcSpanAnn (EpAnn anc2 a
       anc2' = case anc2 of
         Anchor _a op   -> Anchor (realSrcSpan l2) op
 
+transferEntryDPN :: (Monad m)
+  => LocatedN a -> LocatedN b -> TransformT m (LocatedN b)
+transferEntryDPN (L (EpAnnS anca ana csa) a) (L (EpAnnS ancb anb csb) b) = do
+    r <- transferEntryDP (L (SrcSpanAnn (EpAnn anca ana csa) (spanFromAnchor anca)) a)
+                        (L (SrcSpanAnn (EpAnn ancb anb csb) (spanFromAnchor ancb)) b)
+    case r of
+      L (SrcSpanAnn (EpAnn ancr annr csr) _) _ -> return (L (EpAnnS ancr annr csr) b)
+      _ -> error $ "Should not happen"
 
 -- |If a and b are the same type return first arg, else return second
 combine :: (Typeable a, Typeable b) => a -> b -> b
@@ -772,8 +781,17 @@ noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP l dp
   = SrcSpanAnn (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty emptyComments) l
 
+-- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
+-- given @DeltaPos@.
+noAnnSrcSpanDPN :: (Monoid ann) => SrcSpan -> DeltaPos -> (EpAnnS ann)
+noAnnSrcSpanDPN l dp
+  = (EpAnnS (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty emptyComments)
+
 noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (SameLine 0)
+
+noAnnSrcSpanDP0N :: (Monoid ann) => SrcSpan -> (EpAnnS ann)
+noAnnSrcSpanDP0N l = noAnnSrcSpanDPN l (SameLine 0)
 
 noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (SameLine 1)

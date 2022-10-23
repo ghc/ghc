@@ -447,7 +447,7 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
-  = do { addLocMA checkConName rdrname
+  = do { addLocMN checkConName rdrname
        ; name <-
            lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
@@ -676,7 +676,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
-     foldlM add_one env [ (locA loc,locA name_loc,name,fixity)
+     foldlM add_one env [ (locA loc,locN name_loc,name,fixity)
                         | L name_loc name <- names ]
 
    add_one env (loc, name_loc, name,fixity) = do
@@ -784,7 +784,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
       }
   where
     -- See Note [Renaming pattern synonym variables]
-    lookupPatSynBndr = wrapLocMA lookupLocalOccRn
+    lookupPatSynBndr = wrapLocMN lookupLocalOccRn
 
     patternSynonymErr :: TcRnMessage
     patternSynonymErr
@@ -936,7 +936,7 @@ rnMethodBindLHS :: Bool -> Name
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpanA loc $ do
-    do { sel_name <- wrapLocMA (lookupInstDeclBndr cls (text "method")) name
+    do { sel_name <- wrapLocMN (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
        ; return (L loc bind' `consBag` rest ) }
@@ -1375,7 +1375,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
     lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one (L name_loc rdr_name)
-      = setSrcSpanA name_loc $
+      = setSrcSpanN name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
         do names <- lookupLocalTcNames sig_ctxt what rdr_name
@@ -1392,11 +1392,11 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
 dupSigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> RnM ()
 dupSigDeclErr pairs@((L loc name, sig) :| _)
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
+  = addErrAt (locN loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
     vcat [ text "Duplicate" <+> what_it_is
            <> text "s for" <+> quotes (ppr name)
          , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest
-                                       $ map (getLocA . fst)
+                                       $ map (getLocN . fst)
                                        $ toList pairs)
          ]
   where

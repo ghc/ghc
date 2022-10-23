@@ -492,7 +492,7 @@ rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (BangPat noExtField pat') }
 rnPatAndThen mk (VarPat x (L l rdr))
     = do { loc <- liftCps getSrcSpanM
-         ; name <- newPatName mk (L (noAnnSrcSpan loc) rdr)
+         ; name <- newPatName mk (L (noAnnSrcSpanN loc) rdr)
          ; return (VarPat x (L l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
@@ -541,14 +541,14 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
-  = do { new_name <- newPatName mk (l2n rdr)
+  = do { new_name <- newPatName mk rdr
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
                                                 -- sense in n + k patterns
        ; minus <- liftCpsFV $ lookupSyntax minusName
        ; ge    <- liftCpsFV $ lookupSyntax geName
-       ; return (NPlusKPat noExtField (L (noAnnSrcSpan $ nameSrcSpan new_name) new_name)
+       ; return (NPlusKPat noExtField (L (noAnnSrcSpanN $ nameSrcSpan new_name) new_name)
                                       (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
@@ -688,7 +688,7 @@ rnHsRecPatsAndThen mk (L _ con)
        ; check_unused_wildcard (implicit_binders flds' <$> dd)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
-    mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
+    mkVarPat l n = VarPat noExtField (L (noAnnSrcSpanN l) n)
     rn_field (L l fld, n') =
       do { arg' <- rnLPatAndThen (nested_mk dd mk (RecFieldsDotDot n')) (hfbRHS fld)
          ; return (L l (fld { hfbRHS = arg' })) }
@@ -836,7 +836,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hfbAnn = noAnn
                         , hfbLHS
-                           = L (noAnnSrcSpan loc) (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
+                           = L (noAnnSrcSpan loc) (FieldOcc sel (L (noAnnSrcSpanN loc) arg_rdr))
                         , hfbRHS = L locn (mk_arg loc arg_rdr)
                         , hfbPun      = False })
                     | fl <- dot_dot_fields
@@ -893,14 +893,14 @@ rnHsRecUpdFields flds
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (l2l loc) (HsVar noExtField
-                                              (L (l2l loc) arg_rdr))) }
+                                              (L (l2ln loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
            ; let (lbl', fvs') = case mb_sel of
                    UnambiguousGre gname -> let sel_name = greNameMangledName gname
-                                           in (Unambiguous sel_name (L (l2l loc) lbl), fvs `addOneFV` sel_name)
-                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2l loc) lbl), fvs)
+                                           in (Unambiguous sel_name (L (l2ln loc) lbl), fvs `addOneFV` sel_name)
+                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2ln loc) lbl), fvs)
 
            ; return (L l (HsFieldBind { hfbAnn = noAnn
                                       , hfbLHS = L loc lbl'
@@ -997,7 +997,7 @@ rnOverLit origLit
         ; (from_thing_name, fvs1) <- lookupSyntaxName std_name
         ; let rebindable = from_thing_name /= std_name
               lit' = lit { ol_ext = OverLitRn { ol_rebindable = rebindable
-                                              , ol_from_fun = noLocA from_thing_name } }
+                                              , ol_from_fun = noLocN from_thing_name } }
         ; if isNegativeZeroOverLit lit'
           then do { (negate_name, fvs2) <- lookupSyntaxExpr negateName
                   ; return ((lit' { ol_val = negateOverLitVal val }, Just negate_name)

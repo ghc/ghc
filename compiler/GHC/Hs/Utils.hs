@@ -283,7 +283,7 @@ mkHsCaseAlt pat expr
 
 nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
-  = noLocA (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLocA fun_id)))
+  = noLocA (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLocN fun_id)))
 
 nlHsTyApps :: Id -> [Type] -> [LHsExpr GhcTc] -> LHsExpr GhcTc
 nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
@@ -449,7 +449,7 @@ mkLetStmt anns binds = LetStmt anns binds
 -- | A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
+mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocN op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
@@ -473,11 +473,11 @@ mkConLikeTc con = XExpr (ConLikeTc con [] [])
 
 nlHsVar :: IsSrcSpanAnn p a
         => IdP (GhcPass p) -> LHsExpr (GhcPass p)
-nlHsVar n = noLocA (HsVar noExtField (noLocA n))
+nlHsVar n = noLocA (HsVar noExtField (noLocN n))
 
 nl_HsVar :: IsSrcSpanAnn p a
         => IdP (GhcPass p) -> HsExpr (GhcPass p)
-nl_HsVar n = HsVar noExtField (noLocA n)
+nl_HsVar n = HsVar noExtField (noLocN n)
 
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
@@ -491,7 +491,7 @@ nlHsIntLit n = noLocA (HsLit noComments (HsInt noExtField (mkIntegralLit n)))
 
 nlVarPat :: IsSrcSpanAnn p a
         => IdP (GhcPass p) -> LPat (GhcPass p)
-nlVarPat n = noLocA (VarPat noExtField (noLocA n))
+nlVarPat n = noLocA (VarPat noExtField (noLocN n))
 
 nlLitPat :: HsLit GhcPs -> LPat GhcPs
 nlLitPat l = noLocA (LitPat noExtField l)
@@ -516,8 +516,8 @@ nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IsSrcSpanAnn p a
             => IdP (GhcPass p) -> [IdP (GhcPass p)] -> LHsExpr (GhcPass p)
-nlHsVarApps f xs = noLocA (foldl' mk (HsVar noExtField (noLocA f))
-                                         (map ((HsVar noExtField) . noLocA) xs))
+nlHsVarApps f xs = noLocA (foldl' mk (HsVar noExtField (noLocN f))
+                                         (map ((HsVar noExtField) . noLocN) xs))
                  where
                    mk f a = HsApp noComments (noLocA f) (noLocA a)
 
@@ -529,7 +529,7 @@ nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
 nlInfixConPat con l r = noLocA $ ConPat
-  { pat_con = noLocA con
+  { pat_con = noLocN con
   , pat_args = InfixCon (parenthesizePat opPrec l)
                         (parenthesizePat opPrec r)
   , pat_con_ext = noAnn
@@ -538,28 +538,28 @@ nlInfixConPat con l r = noLocA $ ConPat
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLocA $ ConPat
   { pat_con_ext = noAnn
-  , pat_con = noLocA con
+  , pat_con = noLocN con
   , pat_args = PrefixCon [] (map (parenthesizePat appPrec) pats)
   }
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLocA $ ConPat
   { pat_con_ext = noExtField
-  , pat_con = noLocA con
+  , pat_con = noLocN con
   , pat_args = PrefixCon [] (map (parenthesizePat appPrec) pats)
   }
 
 nlNullaryConPat :: RdrName -> LPat GhcPs
 nlNullaryConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
-  , pat_con = noLocA con
+  , pat_con = noLocN con
   , pat_args = PrefixCon [] []
   }
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
-  , pat_con = noLocA $ getRdrName con
+  , pat_con = noLocN $ getRdrName con
   , pat_args = PrefixCon [] $
      replicate (dataConSourceArity con)
                nlWildPat
@@ -606,7 +606,7 @@ nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
-nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
+nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocN x))
 nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
@@ -617,7 +617,7 @@ nlHsTyConApp :: IsSrcSpanAnn p a
 nlHsTyConApp prom fixity tycon tys
   | Infix <- fixity
   , HsValArg ty1 : HsValArg ty2 : rest <- tys
-  = foldl' mk_app (noLocA $ HsOpTy noAnn prom ty1 (noLocA tycon) ty2) rest
+  = foldl' mk_app (noLocA $ HsOpTy noAnn prom ty1 (noLocN tycon) ty2) rest
   | otherwise
   = foldl' mk_app (nlHsTyVar prom tycon) tys
   where
@@ -896,8 +896,8 @@ spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
 mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
-  = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpan loc) fun)
-              [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)) pats expr
+  = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpanN loc) fun)
+              [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpanN loc) fun)) pats expr
                        emptyLocalBinds]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
@@ -1391,7 +1391,7 @@ hsForeignDeclsBinders :: forall p a. (UnXRec (GhcPass p), IsSrcSpanAnn p a)
                       => [LForeignDecl (GhcPass p)] -> [LIdP (GhcPass p)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
-  = [ L (noAnnSrcSpan (locA decl_loc)) n
+  = [ L (noAnnSrcSpanN (locA decl_loc)) n
     | L decl_loc (ForeignImport { fd_name = L _ n })
         <- foreign_decls]
 
@@ -1615,6 +1615,6 @@ lPatImplicits = hs_lpat
                                                     ,  let  pat_explicit =
                                                               maybe True ((i<) . unRecFieldsDotDot . unLoc)
                                                                          (rec_dotdot fs)]
-            err_loc = maybe (getLocA n) getLoc (rec_dotdot fs)
+            err_loc = maybe (getLocN n) getLoc (rec_dotdot fs)
 
     details _ (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2

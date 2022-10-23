@@ -255,7 +255,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocN ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -1520,7 +1520,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
                , hfbLHS
-                       = L (l2l loc) (Unambiguous i (L (l2l loc) lbl))
+                       = L (l2l loc) (Unambiguous i (L (l2ln loc) lbl))
                , hfbRHS = hfbRHS upd
                , hfbPun = hfbPun upd
                }

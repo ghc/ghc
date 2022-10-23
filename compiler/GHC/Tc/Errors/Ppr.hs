@@ -168,7 +168,7 @@ instance Diagnostic TcRnMessage where
     TcRnDuplicateWarningDecls d rdr_name
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
-                 text "also at " <+> ppr (getLocA d)]
+                 text "also at " <+> ppr (getLocN d)]
     TcRnSimplifierTooManyIterations simples limit wc
       -> mkSimpleDecorated $
            hang (text "solveWanteds: too many iterations"
@@ -1837,7 +1837,7 @@ dodgy_msg_insert :: forall p . (Anno (IdP (GhcPass p)) ~ SrcSpanAnnN) => IdP (Gh
 dodgy_msg_insert tc = IEThingAll noAnn ii
   where
     ii :: LIEWrappedName (GhcPass p)
-    ii = noLocA (IEName noExtField $ noLocA tc)
+    ii = noLocA (IEName noExtField $ noLocN tc)
 
 pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
 pprTypeDoesNotHaveFixedRuntimeRep ty prov =

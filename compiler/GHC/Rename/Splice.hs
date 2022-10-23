@@ -175,7 +175,7 @@ rn_utbracket outer_stage br@(VarBr x flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-       ; return (VarBr x flg (noLocA name), unitFV name) }
+       ; return (VarBr x flg (noLocN name), unitFV name) }
 
 rn_utbracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr x e', fvs) }
@@ -307,7 +307,7 @@ rnUntypedSpliceGen run_splice pend_splice splice
           -> do { (splice', fvs) <- setStage pop_stage $
                                     rnUntypedSplice splice
                 ; loc  <- getSrcSpanM
-                ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+                ; splice_name <- newLocalBndrRn (L (noAnnSrcSpanN loc) unqualSplice)
                 ; let (pending_splice, result) = pend_splice splice_name splice'
                 ; ps <- readMutVar ps_var
                 ; writeMutVar ps_var (pending_splice : ps)
@@ -488,7 +488,7 @@ rnTypedSplice expr
       do { loc <- getSrcSpanM
          -- The renamer allocates a splice-point name to every typed splice
          -- (incl the top level ones for which it will not ultimately be used)
-         ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+         ; n' <- newLocalBndrRn (L (noAnnSrcSpanN loc) unqualSplice)
          ; (expr', fvs) <- rnLExpr expr
          ; return (HsTypedSplice n' expr', fvs) }
 

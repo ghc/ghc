@@ -14,11 +14,14 @@ module GHC.Parser.Annotation (
   -- * In-tree Exact Print Annotations
   AddEpAnn(..),
   EpaLocation(..), epaLocationRealSrcSpan, epaLocationFromSrcAnn,
+  epaLocationFromEpAnnS,
   TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
+  EpAnnS(..),
   spanAsAnchor, realSpanAsAnchor,
+  spanFromAnchor,
   noAnn,
 
   -- ** Comments in Annotations
@@ -49,6 +52,7 @@ module GHC.Parser.Annotation (
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
   la2na, na2la, n2l, l2n, l2l, la2la,
+  na2ln, nn2la, locN, l2ln,
   reLoc, reLocA, reLocL, reLocC, reLocN,
 
   la2r, realSrcSpan,
@@ -74,8 +78,9 @@ module GHC.Parser.Annotation (
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
   noLocA, getLocA,
-  noSrcSpanA,
-  noAnnSrcSpan,
+  noLocN, getLocN,
+  noSrcSpanA, noSrcSpanN,
+  noAnnSrcSpan, noAnnSrcSpanN,
 
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
@@ -455,6 +460,10 @@ epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
 epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l)
 epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
 
+epaLocationFromEpAnnS :: EpAnnS ann -> EpaLocation
+epaLocationFromEpAnnS (EpAnnS anc _ _) = EpaSpan (anchor anc)
+
+
 instance Outputable EpaLocation where
   ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
   ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
@@ -518,6 +527,18 @@ data EpAnn ann
 -- the element relative to its container. If it is moved, that
 -- relationship is tracked in the 'anchor_op' instead.
 
+-- AZ: This is a temporary type until we get rid of EpAnnNotUsed, at
+-- which time it replaces EpAnn
+data EpAnnS ann
+  = EpAnnS { s_entry   :: !Anchor
+            -- ^ Base location for the start of the syntactic element
+            -- holding the annotations.
+            , s_anns     :: !ann -- ^ Annotations added by the Parser
+            , s_comments :: !EpAnnComments
+               -- ^ Comments enclosed in the SrcSpan of the element
+               -- this `EpAnn` is attached to
+            } deriving (Data, Eq, Functor)
+
 data Anchor = Anchor        { anchor :: !RealSrcSpan
                                  -- ^ Base location for the start of
                                  -- the syntactic element holding
@@ -540,6 +561,9 @@ spanAsAnchor s  = Anchor (realSrcSpan s) UnchangedAnchor
 
 realSpanAsAnchor :: RealSrcSpan -> Anchor
 realSpanAsAnchor s  = Anchor s UnchangedAnchor
+
+spanFromAnchor :: Anchor -> SrcSpan
+spanFromAnchor (Anchor r _) = RealSrcSpan r
 
 -- ---------------------------------------------------------------------
 
@@ -587,7 +611,7 @@ type LocatedP = GenLocated SrcSpanAnnP
 type LocatedC = GenLocated SrcSpanAnnC
 
 type SrcSpanAnnA = SrcAnn AnnListItem
-type SrcSpanAnnN = SrcAnn NameAnn
+type SrcSpanAnnN = EpAnnS NameAnn
 
 type SrcSpanAnnL = SrcAnn AnnList
 type SrcSpanAnnP = SrcAnn AnnPragma
@@ -837,10 +861,8 @@ addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
-addTrailingCommaToN :: SrcSpan -> EpAnn NameAnn -> EpaLocation -> EpAnn NameAnn
-addTrailingCommaToN s EpAnnNotUsed l
-  = EpAnn (spanAsAnchor s) (NameAnnTrailing [AddCommaAnn l]) emptyComments
-addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
+addTrailingCommaToN :: SrcSpan -> EpAnnS NameAnn -> EpaLocation -> EpAnnS NameAnn
+addTrailingCommaToN _ n l = n { s_anns = addTrailing (s_anns n) l }
   where
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
@@ -871,15 +893,15 @@ knowing that in most cases the original list is empty.
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
 l2n :: LocatedAn a1 a2 -> LocatedN a2
-l2n (L la a) = L (noAnnSrcSpan (locA la)) a
+l2n (L la a) = L (noAnnSrcSpanN (locA la)) a
 
-n2l :: LocatedN a -> LocatedA a
-n2l (L la a) = L (na2la la) a
+n2l :: LocatedN a -> LocatedAn ann a
+n2l (L la a) = L (nn2la la) a
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
 la2na :: SrcSpanAnn' a -> SrcSpanAnnN
-la2na l = noAnnSrcSpan (locA l)
+la2na l = noAnnSrcSpanN (locA l)
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
@@ -889,10 +911,26 @@ la2la (L la a) = L (noAnnSrcSpan (locA la)) a
 l2l :: SrcSpanAnn' a -> SrcAnn ann
 l2l l = noAnnSrcSpan (locA l)
 
+l2ln :: SrcSpanAnn' a -> EpAnnS NameAnn
+l2ln l = noAnnSrcSpanN (locA l)
+
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
 na2la :: SrcSpanAnn' a -> SrcAnn ann
 na2la l = noAnnSrcSpan (locA l)
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+na2ln :: SrcSpanAnn' a -> EpAnnS NameAnn
+na2ln l = noAnnSrcSpanN (locA l)
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+nn2la :: EpAnnS NameAnn -> SrcAnn ann
+nn2la l = noAnnSrcSpan (locN l)
+
+locN :: EpAnnS ann -> SrcSpan
+locN a = RealSrcSpan $ anchor $ s_entry a
 
 reLoc :: LocatedAn a e -> Located e
 reLoc (L (SrcSpanAnn _ l) a) = L l a
@@ -901,13 +939,13 @@ reLocA :: Located e -> LocatedAn ann e
 reLocA (L l a) = (L (SrcSpanAnn EpAnnNotUsed l) a)
 
 reLocL :: LocatedN e -> LocatedA e
-reLocL (L l a) = (L (na2la l) a)
+reLocL (L l a) = (L (nn2la l) a)
 
 reLocC :: LocatedN e -> LocatedC e
-reLocC (L l a) = (L (na2la l) a)
+reLocC (L l a) = (L (nn2la l) a)
 
 reLocN :: LocatedN a -> Located a
-reLocN (L (SrcSpanAnn _ l) a) = L l a
+reLocN (L ln a) = L (locN ln) a
 
 -- ---------------------------------------------------------------------
 
@@ -935,18 +973,29 @@ reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
 
-
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA (L (SrcSpanAnn _ l) _) = l
 
 noLocA :: a -> LocatedAn an a
 noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
 
+getLocN :: GenLocated (EpAnnS an) a -> SrcSpan
+getLocN (L l _) = locN l
+
+noLocN :: a -> LocatedN a
+noLocN = L (noAnnSrcSpanN noSrcSpan)
+
 noAnnSrcSpan :: SrcSpan -> SrcAnn ann
 noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
 
+noAnnSrcSpanN :: SrcSpan -> EpAnnS NameAnn
+noAnnSrcSpanN l = EpAnnS (spanAsAnchor l) mempty emptyComments
+
 noSrcSpanA :: SrcAnn ann
 noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+noSrcSpanN :: EpAnnS NameAnn
+noSrcSpanN = noAnnSrcSpanN noSrcSpan
 
 -- | Short form for 'EpAnnNotUsed'
 noAnn :: EpAnn a
@@ -1239,6 +1288,9 @@ instance Outputable EpAnnComments where
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locA l) a)
 
+instance (NamedThing (Located a)) => NamedThing (LocatedN a) where
+  getName (L l a) = getName (L (locN l) a)
+
 instance Outputable AnnContext where
   ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
 
@@ -1267,8 +1319,20 @@ instance (Outputable a, Outputable e)
      => Outputable (GenLocated (SrcSpanAnn' a) e) where
   ppr = pprLocated
 
+instance (Outputable a) => Outputable (EpAnnS a) where
+  ppr (EpAnnS anc an cs) = text "EpAnnS" <+> ppr anc <+> ppr an <+> ppr cs
+
+instance (Outputable a, Outputable e)
+     => Outputable (GenLocated (EpAnnS a) e) where
+  ppr = pprLocated
+
 instance (Outputable a, OutputableBndr e)
      => OutputableBndr (GenLocated (SrcSpanAnn' a) e) where
+  pprInfixOcc = pprInfixOcc . unLoc
+  pprPrefixOcc = pprPrefixOcc . unLoc
+
+instance (Outputable a, OutputableBndr e)
+     => OutputableBndr (GenLocated (EpAnnS a) e) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
 

@@ -264,7 +264,7 @@ rnExpr (HsVar _ (L l v))
               -> rnExpr (ExplicitList noAnn [])
 
               | otherwise
-              -> finishHsVar (L (na2la l) name) ;
+              -> finishHsVar (L (nn2la l) name) ;
             Just (FieldGreName fl)
               -> do { let sel_name = flSelector fl
                     ; this_mod <- getModule
@@ -471,7 +471,7 @@ rnExpr (RecordCon { rcon_con = con_id
                            , rcon_con = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
-    mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
+    mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpanN l) n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hfbRHS fld)
                             ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
@@ -1338,12 +1338,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExtField (noLocA fm), unitFV fm) }
+                 ; return (HsVar noExtField (noLocN fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExtField (noLocA name), emptyFVs)
+    not_rebindable = return (HsVar noExtField (noLocN name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
@@ -2699,7 +2699,7 @@ getMonadFailOp ctxt
               nlHsApp (noLocA failExpr)
                       (nlHsApp (noLocA $ fromStringExpr) arg_syn_expr)
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLocA $ VarPat noExtField $ noLocA arg_name] body
+              unLoc $ mkHsLam [noLocA $ VarPat noExtField $ noLocN arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

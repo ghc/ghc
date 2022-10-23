@@ -334,6 +334,9 @@ setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
+setAnchorAnN :: LocatedN a -> Anchor -> EpAnnComments -> LocatedN a
+setAnchorAnN (L (EpAnnS _ an _) a) anc cs = (L (EpAnnS anc an cs) a)
+
 setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
 setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
 setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs

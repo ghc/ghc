@@ -949,7 +949,8 @@ getLocalNonValBinders fixity_env
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ L (l2l decl_loc) (unLoc n)
+    hs_boot_sig_bndrs :: [LocatedN RdrName]
+    hs_boot_sig_bndrs = [ L (l2ln decl_loc) (unLoc n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
@@ -1025,7 +1026,7 @@ getLocalNonValBinders fixity_env
              -- See (1) above
              L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
              -- See (2) above
-             MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe cls_rdr
+             MaybeT $ setSrcSpan (locN loc) $ lookupGlobalOccRn_maybe cls_rdr
            -- Assuming the previous step succeeded, process any associated data
            -- family instances. If the previous step failed, bail out.
            case mb_cls_nm of
@@ -1054,7 +1055,7 @@ getLocalNonValBinders fixity_env
 newRecordSelector :: DuplicateRecordFields -> FieldSelectors -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector dup_fields_ok has_sel (dc:_) (L loc (FieldOcc _ (L _ fld)))
-  = do { selName <- newTopSrcBinder $ L (l2l loc) $ field
+  = do { selName <- newTopSrcBinder $ L (l2ln loc) $ field
        ; return $ FieldLabel { flLabel = fieldLabelString
                              , flHasDuplicateRecordFields = dup_fields_ok
                              , flHasFieldSelector = has_sel

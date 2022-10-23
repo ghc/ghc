@@ -286,7 +286,7 @@ mkStandaloneKindSig loc lhs rhs anns =
     check_lhs_name v@(unLoc->name) =
       if isUnqual name && isTcOcc (rdrNameOcc name)
       then return v
-      else addFatalError $ mkPlainErrorMsgEnvelope (getLocA v) $
+      else addFatalError $ mkPlainErrorMsgEnvelope (getLocN v) $
              (PsErrUnexpectedQualifiedConstructor (unLoc v))
     check_singular_lhs vs =
       case vs of
@@ -675,7 +675,7 @@ tyConToDataCon (L loc tc)
   = return (L loc (setRdrNameSpace tc srcDataName))
 
   | otherwise
-  = Left $ mkPlainErrorMsgEnvelope (locA loc) $ (PsErrNotADataCon tc)
+  = Left $ mkPlainErrorMsgEnvelope (locN loc) $ (PsErrNotADataCon tc)
   where
     occ = rdrNameOcc tc
 
@@ -684,7 +684,7 @@ mkPatSynMatchGroup :: LocatedN RdrName
                    -> P (MatchGroup GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     do { matches <- mapM fromDecl (fromOL decls)
-       ; when (null matches) (wrongNumberErr (locA loc))
+       ; when (null matches) (wrongNumberErr (locN loc))
        ; return $ mkMatchGroup FromSource (L ld matches) }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
@@ -1023,7 +1023,7 @@ checkTyClHdr is_cls ty
     go _ (HsAppTy _ t1 t2) acc ops cps fix = goL t1 (HsValArg t2:acc) ops cps fix
     go _ (HsAppKindTy l ty ki) acc ops cps fix = goL ty (HsTypeArg l ki:acc) ops cps fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ops cps fix
-      = return (L (noAnnSrcSpan l) (nameRdrName tup_name)
+      = return (L (noAnnSrcSpanN l) (nameRdrName tup_name)
                , map HsValArg ts, fix, (reverse ops)++cps)
       where
         arity = length ts
@@ -1040,14 +1040,12 @@ checkTyClHdr is_cls ty
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
-      in SrcSpanAnn an (RealSrcSpan lr)
+      in (EpAnnS (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c ta) (csp Semi.<> cs))
-      in SrcSpanAnn an (RealSrcSpan lr)
+      in (EpAnnS (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c ta) (csp Semi.<> cs))
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1206,11 +1204,11 @@ checkAPat loc e0 = do
            (EpAnn anc _ cs)
                      | nPlusKPatterns && (plus == plus_RDR)
                      -> return (mkNPlusKPat (L nloc n) (L (l2l lloc) lit)
-                                (EpAnn anc (epaLocationFromSrcAnn l) cs))
+                                (EpAnn anc (epaLocationFromEpAnnS l) cs))
 
    -- Improve error messages for the @-operator when the user meant an @-pattern
    PatBuilderOpApp _ op _ _ | opIsAt (unLoc op) -> do
-     addError $ mkPlainErrorMsgEnvelope (getLocA op) PsErrAtInPatPos
+     addError $ mkPlainErrorMsgEnvelope (getLocN op) PsErrAtInPatPos
      return (WildPat noExtField)
 
    PatBuilderOpApp l (L cl c) r anns
@@ -1235,7 +1233,7 @@ placeHolderPunRhs :: DisambECP b => PV (LocatedA b)
 -- The RHS of a punned record field will be filled in by the renamer
 -- It's better not to make it an error, in case we want to print it when
 -- debugging
-placeHolderPunRhs = mkHsVarPV (noLocA pun_RDR)
+placeHolderPunRhs = mkHsVarPV (noLocN pun_RDR)
 
 plus_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+") -- Hack
@@ -1685,7 +1683,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsParPV l lpar c rpar = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsCmdPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar c rpar)
-  mkHsVarPV (L l v) = cmdFail (locA l) (ppr v)
+  mkHsVarPV (L l v) = cmdFail (locN l) (ppr v)
   mkHsLitPV (L l a) = cmdFail l (ppr a)
   mkHsOverLitPV (L l a) = cmdFail (locA l) (ppr a)
   mkHsWildCardPV l = cmdFail l (text "_")
@@ -1772,7 +1770,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsParPV l lpar e rpar = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar e rpar)
-  mkHsVarPV v@(L l _) = return $ L (na2la l) (HsVar noExtField v)
+  mkHsVarPV v@(L l _) = return $ L (nn2la l) (HsVar noExtField v)
   mkHsLitPV (L l a) = do
     cs <- getCommentsFor l
     return $ L l (HsLit (comment (realSrcSpan l) cs) a)
@@ -1848,7 +1846,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
-  mkHsVarPV v@(getLoc -> l) = return $ L (na2la l) (PatBuilderVar v)
+  mkHsVarPV v@(getLoc -> l) = return $ L (nn2la l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
     checkUnboxedLitPat lit
     return $ L l (PatBuilderPat (LitPat noExtField a))
@@ -2037,7 +2035,7 @@ tyToDataConBuilder (L l (HsTyVar _ prom v)) = do
   checkNotPromotedDataCon prom data_con
   return $ L l (PrefixDataConBuilder nilOL data_con)
 tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
-  let data_con = L (l2l l) (getRdrName (tupleDataCon Boxed (length ts)))
+  let data_con = L (l2ln l) (getRdrName (tupleDataCon Boxed (length ts)))
   return $ L l (PrefixDataConBuilder (toOL ts) data_con)
 tyToDataConBuilder t =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA t) $
@@ -2047,7 +2045,7 @@ tyToDataConBuilder t =
 checkNotPromotedDataCon :: PromotionFlag -> LocatedN RdrName -> PV ()
 checkNotPromotedDataCon NotPromoted _ = return ()
 checkNotPromotedDataCon IsPromoted (L l name) =
-  addError $ mkPlainErrorMsgEnvelope (locA l) $
+  addError $ mkPlainErrorMsgEnvelope (locN l) $
     PsErrIllegalPromotionQuoteDataCon name
 
 {- Note [Ambiguous syntactic categories]
@@ -2564,15 +2562,15 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
         -- The idea here is to convert the label to a singleton [FastString].
         let f = occNameFS . rdrNameOcc $ rdr
             fl = DotFieldOcc noAnn (L loc (FieldLabelString f))
-            lf = locA loc
-        in mkRdrProjUpdate l (L lf [L (l2l loc) fl]) (punnedVar f) pun anns
+            lf = locN loc
+        in mkRdrProjUpdate l (L lf [L (nn2la loc) fl]) (punnedVar f) pun anns
         where
           -- If punning, compute HsVar "f" otherwise just arg. This
           -- has the effect that sentinel HsVar "pun-rhs" is replaced
           -- by HsVar "f" here, before the update is written to a
           -- setField expressions.
           punnedVar :: FastString -> LHsExpr GhcPs
-          punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocA . mkRdrUnqual . mkVarOccFS $ f
+          punnedVar f  = if not pun then arg else noLocA . HsVar noExtField . noLocN . mkRdrUnqual . mkVarOccFS $ f
 
 mkRdrRecordCon
   :: LocatedN RdrName -> HsRecordBinds GhcPs -> EpAnn [AddEpAnn] -> HsExpr GhcPs
@@ -2839,7 +2837,7 @@ mkTypeImpExp :: LocatedN RdrName   -- TcCls or Var name space
              -> P (LocatedN RdrName)
 mkTypeImpExp name =
   do allowed <- getBit ExplicitNamespacesBit
-     unless allowed $ addError $ mkPlainErrorMsgEnvelope (getLocA name) $
+     unless allowed $ addError $ mkPlainErrorMsgEnvelope (getLocN name) $
                                    PsErrIllegalExplicitNamespace
      return (fmap (`setRdrNameSpace` tcClsName) name)
 
@@ -2888,7 +2886,7 @@ failOpFewArgs :: MonadP m => LocatedN RdrName -> m a
 failOpFewArgs (L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
      ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
-     ; addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
+     ; addFatalError $ mkPlainErrorMsgEnvelope (locN loc) $
          (PsErrOpFewArgs is_star_type op) }
 
 -----------------------------------------------------------------------------
@@ -3110,7 +3108,7 @@ mkSumOrTuplePat l Boxed a@Sum{} _ =
 
 mkLHsOpTy :: PromotionFlag -> LHsType GhcPs -> LocatedN RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy prom x op y =
-  let loc = getLoc x `combineSrcSpansA` (noAnnSrcSpan $ getLocA op) `combineSrcSpansA` getLoc y
+  let loc = getLoc x `combineSrcSpansA` (noAnnSrcSpan $ getLocN op) `combineSrcSpansA` getLoc y
   in L loc (mkHsOpTy prom x op y)
 
 mkMultTy :: LHsToken "%" GhcPs -> LHsType GhcPs -> LHsUniToken "->" "→" GhcPs -> HsArrow GhcPs

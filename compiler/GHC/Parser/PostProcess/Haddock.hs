@@ -431,7 +431,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -> Bool -- ^ Comment on Bool
   --
   addHaddock (SigD _ (TypeSig x names t)) = do
-      traverse_ registerHdkA names
+      traverse_ registerHdkN names
       t' <- addHaddock t
       pure (SigD noExtField (TypeSig x names t'))
 
@@ -442,7 +442,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -> Maybe Bool -- ^ Comment on Maybe Bool
   --
   addHaddock (SigD _ (PatSynSig x names t)) = do
-    traverse_ registerHdkA names
+    traverse_ registerHdkN names
     t' <- addHaddock t
     pure (SigD noExtField (PatSynSig x names t'))
 
@@ -458,7 +458,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --        -> IO ()   -- ^ Comment on IO ()
   --
   addHaddock (SigD _ (ClassOpSig x is_dflt names t)) = do
-    traverse_ registerHdkA names
+    traverse_ registerHdkN names
     t' <- addHaddock t
     pure (SigD noExtField (ClassOpSig x is_dflt names t'))
 
@@ -481,7 +481,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD x decl)
     | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn } <- decl
     = do
-        registerHdkA tcdLName
+        registerHdkN tcdLName
         defn' <- addHaddock defn
         pure $
           TyClD x (DataDecl {
@@ -502,7 +502,7 @@ instance HasHaddock (HsDecl GhcPs) where
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
                   tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
     = do
-        registerHdkA tcdLName
+        registerHdkN tcdLName
         -- todo: register keyword location of 'where', see Note [Register keyword location]
         where_cls' <-
           addHaddockInterleaveItems tcdLayout (mkDocHsDecl tcdLayout) $
@@ -530,7 +530,7 @@ instance HasHaddock (HsDecl GhcPs) where
       dfid_eqn' <- case dfid_eqn of
         FamEqn { feqn_ext, feqn_tycon, feqn_bndrs, feqn_pats, feqn_fixity, feqn_rhs }
           -> do
-            registerHdkA feqn_tycon
+            registerHdkN feqn_tycon
             feqn_rhs' <- addHaddock feqn_rhs
             pure $ FamEqn {
                 feqn_ext,
@@ -547,7 +547,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD _ decl)
     | SynDecl { tcdSExt, tcdLName, tcdTyVars, tcdFixity, tcdRhs } <- decl
     = do
-        registerHdkA tcdLName
+        registerHdkN tcdLName
         -- todo: register keyword location of '=', see Note [Register keyword location]
         tcdRhs' <- addHaddock tcdRhs
         pure $
@@ -563,7 +563,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --        -> IO Float  -- ^ The output float
   --
   addHaddock (ForD _ decl) = do
-    registerHdkA (fd_name decl)
+    registerHdkN (fd_name decl)
     fd_sig_ty' <- addHaddock (fd_sig_ty decl)
     pure $ ForD noExtField (decl{ fd_sig_ty = fd_sig_ty' })
 
@@ -700,7 +700,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
     case con_decl of
       ConDeclGADT { con_g_ext, con_names, con_dcolon, con_bndrs, con_mb_cxt, con_g_args, con_res_ty } -> do
         -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-        con_doc' <- discardHasInnerDocs $ getConDoc (getLocA (NE.head con_names))
+        con_doc' <- discardHasInnerDocs $ getConDoc (getLocN (NE.head con_names))
         con_g_args' <-
           case con_g_args of
             PrefixConGADT ts -> PrefixConGADT <$> addHaddock ts
@@ -718,7 +718,7 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
         addConTrailingDoc (srcSpanEnd $ locA l_con_decl) $
         case con_args of
           PrefixCon _ ts -> do
-            con_doc' <- getConDoc (getLocA con_name)
+            con_doc' <- getConDoc (getLocN con_name)
             ts' <- traverse addHaddockConDeclFieldTy ts
             pure $ L l_con_decl $
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
@@ -726,14 +726,14 @@ instance HasHaddock (LocatedA (ConDecl GhcPs)) where
                            con_args = PrefixCon noTypeArgs ts' }
           InfixCon t1 t2 -> do
             t1' <- addHaddockConDeclFieldTy t1
-            con_doc' <- getConDoc (getLocA con_name)
+            con_doc' <- getConDoc (getLocN con_name)
             t2' <- addHaddockConDeclFieldTy t2
             pure $ L l_con_decl $
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                            con_doc = lexLHsDocString <$> con_doc',
                            con_args = InfixCon t1' t2' }
           RecCon (L l_rec flds) -> do
-            con_doc' <- getConDoc (getLocA con_name)
+            con_doc' <- getConDoc (getLocN con_name)
             flds' <- traverse addHaddockConDeclField flds
             pure $ L l_con_decl $
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
@@ -1157,6 +1157,9 @@ registerLocHdkA l = HdkA (getBufSpan l) (pure ())
 -- See Note [Adding Haddock comments to the syntax tree].
 registerHdkA :: GenLocated (SrcSpanAnn' a) e -> HdkA ()
 registerHdkA a = registerLocHdkA (getLocA a)
+
+registerHdkN :: GenLocated (EpAnnS a) e -> HdkA ()
+registerHdkN a = registerLocHdkA (getLocN a)
 
 -- Modify the action of a HdkA computation.
 hoistHdkA :: (HdkM a -> HdkM b) -> HdkA a -> HdkA b

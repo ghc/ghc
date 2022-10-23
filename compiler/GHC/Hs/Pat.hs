@@ -420,7 +420,7 @@ mkPrefixConPat :: DataCon ->
                   [LPat GhcTc] -> [Type] -> LPat GhcTc
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLocA $ ConPat { pat_con = noLocA (RealDataCon dc)
+  = noLocA $ ConPat { pat_con = noLocN (RealDataCon dc)
                     , pat_args = PrefixCon [] pats
                     , pat_con_ext = ConPatTc
                       { cpt_tvs = []
