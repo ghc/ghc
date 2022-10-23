@@ -158,6 +158,22 @@ typedef SRWLOCK Mutex;
 
 #endif // CMINUSMINUS
 
+# elif defined(wasm32_HOST_ARCH)
+
+#if defined(CMINUSMINUS)
+#else // CMINUSMINUS
+
+#include <errno.h>
+
+typedef void* Condition;
+typedef void* Mutex;
+typedef void* OSThreadId;
+typedef void* ThreadLocalKey;
+
+#define OSThreadProcAttr
+
+#endif // CMINUSMINUS
+
 # elif defined(THREADED_RTS)
 #  error "Threads not supported"
 # endif
