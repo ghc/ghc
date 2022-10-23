@@ -516,7 +516,7 @@ hs_exit_(bool wait_foreign)
 #endif
 
     // set the terminal settings back to what they were
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH)
     resetTerminalSettings();
 #endif
 
@@ -619,8 +619,10 @@ hs_exit_(bool wait_foreign)
     // Free the various argvs
     freeRtsArgs();
 
+#if !defined(wasm32_HOST_ARCH)
     // Free threading resources
     freeThreadingResources();
+#endif
 
     exitIpe();
 }
