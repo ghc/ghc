@@ -71,6 +71,11 @@
 #define MACHREGS_riscv64  1
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+#undef  MACHREGS_NO_REGS
+#define MACHREGS_NO_REGS 1
+#endif
+
 #endif
 
 #include "MachRegs.h"

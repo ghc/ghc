@@ -664,7 +664,8 @@ globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_powerpc) \
     || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
-    || defined(MACHREGS_s390x) || defined(MACHREGS_riscv64)
+    || defined(MACHREGS_s390x) || defined(MACHREGS_riscv64) \
+    || defined(MACHREGS_wasm32)
 # if defined(REG_Base)
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif

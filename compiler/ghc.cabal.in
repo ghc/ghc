@@ -560,6 +560,7 @@ Library
         GHC.Platform.Regs
         GHC.Platform.RISCV64
         GHC.Platform.S390X
+        GHC.Platform.Wasm32
         GHC.Platform.Ways
         GHC.Platform.X86
         GHC.Platform.X86_64
