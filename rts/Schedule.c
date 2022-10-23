@@ -109,7 +109,7 @@ volatile StgWord sched_state = SCHED_RUNNING;
 Mutex sched_mutex;
 #endif
 
-#if !defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS) && !defined(wasm32_HOST_ARCH)
 #define FORKPROCESS_PRIMOP_SUPPORTED
 #endif
 
