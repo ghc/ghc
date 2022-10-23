@@ -617,6 +617,8 @@ freeMBlocks(void *addr, uint32_t n)
 void
 freeAllMBlocks(void)
 {
+// See Note [Megablock allocator on wasm].
+#if !defined(wasm32_HOST_ARCH)
     debugTrace(DEBUG_gc, "freeing all megablocks");
 
 #if defined(USE_LARGE_ADDRESS_SPACE)
@@ -646,6 +648,7 @@ freeAllMBlocks(void)
     stgFree(mblock_maps);
 #endif
 
+#endif
 #endif
 }
 

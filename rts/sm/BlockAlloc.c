@@ -1184,6 +1184,10 @@ countAllocdBlocks(bdescr *bd)
 // Returns the number of blocks which were able to be freed
 uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
 {
+#if defined(wasm32_HOST_ARCH)
+    // See Note [Megablock allocator on wasm].
+    return 0;
+#else
     bdescr *bd;
     uint32_t node;
     StgWord size;
@@ -1237,6 +1241,7 @@ uint32_t returnMemoryToOS(uint32_t n /* megablocks */)
         }
     );
     return (init_n - n);
+#endif
 }
 
 /* -----------------------------------------------------------------------------
