@@ -2234,13 +2234,18 @@ liftEnvSubstRight = liftEnvSubst pSnd
 
 liftEnvSubst :: (forall a. Pair a -> a) -> Subst -> LiftCoEnv -> Subst
 liftEnvSubst selector subst lc_env
-  = composeTCvSubst (Subst emptyInScopeSet emptyIdSubstEnv tenv cenv) subst
+  = composeTCvSubst (Subst in_scope emptyIdSubstEnv tenv cenv) subst
   where
     pairs            = nonDetUFMToList lc_env
                        -- It's OK to use nonDetUFMToList here because we
                        -- immediately forget the ordering by creating
                        -- a VarEnv
     (tpairs, cpairs) = partitionWith ty_or_co pairs
+    -- Make sure the in-scope set is wide enough to cover the range of the
+    -- substitution (#22235).
+    in_scope         = mkInScopeSet $
+                       tyCoVarsOfTypes (map snd tpairs) `unionVarSet`
+                       tyCoVarsOfCos (map snd cpairs)
     tenv             = mkVarEnv_Directly tpairs
     cenv             = mkVarEnv_Directly cpairs
 
