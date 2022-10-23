@@ -245,8 +245,13 @@ composeTCvSubst subst1@(Subst is1 ids1 tenv1 cenv1) (Subst is2 _ tenv2 cenv2)
   = Subst is3 ids1 tenv3 cenv3
   where
     is3 = is1 `unionInScope` is2
-    tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy subst1) tenv2
-    cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo subst1) cenv2
+    tenv3 = tenv1 `plusVarEnv` mapVarEnv (substTy extended_subst1) tenv2
+    cenv3 = cenv1 `plusVarEnv` mapVarEnv (substCo extended_subst1) cenv2
+
+    -- Make sure the in-scope set in the first substitution is wide enough to
+    -- cover the free variables in the range of the second substitution before
+    -- applying it (#22235).
+    extended_subst1 = subst1 `setInScope` is3
 
 emptySubst :: Subst
 emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv emptyVarEnv
