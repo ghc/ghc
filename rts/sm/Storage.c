@@ -1783,6 +1783,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && (defined(ios_HOST_OS) || defined(darwin_HOST_OS))
   /* On iOS we need to use the special 'sys_icache_invalidate' call. */
   sys_icache_invalidate(exec_addr, len);
+#elif defined(wasm32_HOST_ARCH)
 #elif defined(__clang__)
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
