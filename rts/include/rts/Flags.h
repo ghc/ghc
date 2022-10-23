@@ -198,7 +198,19 @@ typedef struct _CONCURRENT_FLAGS {
  *
  * It is changed by the +RTS -V<secs> flag.
  */
+
+// Note [No timer on wasm32]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~
+// Due to the lack of threads and preemption semantics, on wasm32
+// there can't be a background timer that periodically resets the
+// context switch flag. So it makes sense to make the scheduler
+// default to -C0 on wasm32 for better fairness and avoid starving
+// threads.
+#if defined(wasm32_HOST_ARCH)
+#define DEFAULT_TICK_INTERVAL USToTime(0)
+#else
 #define DEFAULT_TICK_INTERVAL USToTime(10000)
+#endif
 
 /*
  * When linkerAlwaysPic is true, the runtime linker assume that all object

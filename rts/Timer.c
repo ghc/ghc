@@ -26,6 +26,11 @@
 #include "RtsSignals.h"
 #include "rts/EventLogWriter.h"
 
+// See Note [No timer on wasm32]
+#if !defined(wasm32_HOST_ARCH)
+#define HAVE_PREEMPTION
+#endif
+
 // This global counter is used to allow multiple threads to stop the
 // timer temporarily with a stopTimer()/startTimer() pair.  If
 //      timer_enabled  == 0          timer is enabled
@@ -174,37 +179,45 @@ handle_tick(int unused STG_UNUSED)
 void
 initTimer(void)
 {
+#if defined(HAVE_PREEMPTION)
     initProfTimer();
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
     SEQ_CST_STORE(&timer_disabled, 1);
+#endif
 }
 
 void
 startTimer(void)
 {
+#if defined(HAVE_PREEMPTION)
     if (atomic_dec(&timer_disabled) == 0) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
             startTicker();
         }
     }
+#endif
 }
 
 void
 stopTimer(void)
 {
+#if defined(HAVE_PREEMPTION)
     if (atomic_inc(&timer_disabled, 1) == 1) {
         if (RtsFlags.MiscFlags.tickInterval != 0) {
             stopTicker();
         }
     }
+#endif
 }
 
 void
 exitTimer (bool wait)
 {
+#if defined(HAVE_PREEMPTION)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         exitTicker(wait);
     }
+#endif
 }
