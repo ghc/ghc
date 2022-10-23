@@ -231,6 +231,9 @@ instance HasEntry (EpAnn a) where
   fromAnn (EpAnn anchor _ cs) = mkEntry anchor cs
   fromAnn EpAnnNotUsed = NoEntryVal
 
+instance HasEntry (EpAnnS a) where
+  fromAnn (EpAnnS anchor _ cs) = mkEntry anchor cs
+
 -- ---------------------------------------------------------------------
 
 fromAnn' :: (HasEntry a) => a -> Entry
@@ -254,6 +257,7 @@ cua NoCanUpdateAnchor _ = return []
 
 -- | "Enter" an annotation, by using the associated 'anchor' field as
 -- the new reference point for calculating all DeltaPos positions.
+-- This is the heart of the exact printing process.
 --
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
@@ -4048,12 +4052,9 @@ instance ExactPrint (HsSigType GhcPs) where
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann
-  setAnnotationAnchor = setAnchorAn
+  setAnnotationAnchor = setAnchorAnN
 
-  exact x@(L (SrcSpanAnn EpAnnNotUsed l) n) = do
-    _ <- printUnicode (spanAsAnchor l) n
-    return x
-  exact (L (SrcSpanAnn (EpAnn anc ann cs) ll) n) = do
+  exact (L (EpAnnS anc ann cs) n) = do
     ann' <-
       case ann of
         NameAnn a o l c t -> do
@@ -4095,7 +4096,7 @@ instance ExactPrint (LocatedN RdrName) where
           _anc' <- printUnicode anc n
           t' <- markTrailing t
           return (NameAnnTrailing t')
-    return (L (SrcSpanAnn (EpAnn anc ann' cs) ll) n)
+    return (L (EpAnnS anc ann' cs) n)
 
 locFromAdd :: AddEpAnn -> EpaLocation
 locFromAdd (AddEpAnn _ loc) = loc

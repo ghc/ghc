@@ -86,9 +86,9 @@ newLocalBndrRn (L loc rdr_name)
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
   | otherwise
   = do { unless (isUnqual rdr_name)
-                (addErrAt (locA loc) (badQualBndrErr rdr_name))
+                (addErrAt (locN loc) (badQualBndrErr rdr_name))
        ; uniq <- newUnique
-       ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
+       ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locN loc)) }
 
 newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
@@ -112,14 +112,14 @@ bindLocalNamesFV names enclosed_scope
 checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNames rdr_names_w_loc
-  = mapM_ (dupNamesErr getLocA) dups
+  = mapM_ (dupNamesErr getLocN) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
 checkDupRdrNamesN :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNamesN rdr_names_w_loc
-  = mapM_ (dupNamesErr getLocA) dups
+  = mapM_ (dupNamesErr getLocN) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
@@ -142,7 +142,7 @@ checkShadowedRdrNames loc_rdr_names
   where
     filtered_rdrs = filterOut (isExact . unLoc) loc_rdr_names
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
-    get_loc_occ (L loc rdr) = (locA loc,rdrNameOcc rdr)
+    get_loc_occ (L loc rdr) = (locN loc,rdrNameOcc rdr)
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names
@@ -438,7 +438,7 @@ check_unused flag bound_names used_names
 warnForallIdentifier :: LocatedN RdrName -> RnM ()
 warnForallIdentifier (L l rdr_name@(Unqual occ))
   | isKw (fsLit "forall") || isKw (fsLit "∀")
-  = addDiagnosticAt (locA l) (TcRnForallIdentifier rdr_name)
+  = addDiagnosticAt (locN l) (TcRnForallIdentifier rdr_name)
   where isKw = (occNameFS occ ==)
 warnForallIdentifier _ = return ()
 
@@ -669,6 +669,11 @@ wrapGenSpan :: a -> LocatedAn an a
 -- See Note [Rebindable syntax and HsExpansion]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
+wrapGenSpanN :: a -> LocatedN a
+-- Wrap something in a "generatedSrcSpan"
+-- See Note [Rebindable syntax and HsExpansion]
+wrapGenSpanN x = L (noAnnSrcSpanN generatedSrcSpan) x
+
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
 
@@ -679,7 +684,7 @@ genLHsVar :: Name -> LHsExpr GhcRn
 genLHsVar nm = wrapGenSpan $ genHsVar nm
 
 genHsVar :: Name -> HsExpr GhcRn
-genHsVar nm = HsVar noExtField $ wrapGenSpan nm
+genHsVar nm = HsVar noExtField $ wrapGenSpanN nm
 
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
@@ -694,11 +699,11 @@ genSimpleConPat :: Name -> [LPat GhcRn] -> LPat GhcRn
 -- The pattern (C p1 .. pn)
 genSimpleConPat con pats
   = wrapGenSpan $ ConPat { pat_con_ext = noExtField
-                         , pat_con     = wrapGenSpan con
+                         , pat_con     = wrapGenSpanN con
                          , pat_args    = PrefixCon [] pats }
 
 genVarPat :: Name -> LPat GhcRn
-genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpan n)
+genVarPat n = wrapGenSpan $ VarPat noExtField (wrapGenSpanN n)
 
 genWildPat :: LPat GhcRn
 genWildPat = wrapGenSpan $ WildPat noExtField
@@ -706,11 +711,12 @@ genWildPat = wrapGenSpan $ WildPat noExtField
 genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
-  = L gen $ genFunBind (L gen fun)
-        [mkMatch (mkPrefixFunRhs (L gen fun)) pats expr
+  = L gen $ genFunBind (L genN fun)
+        [mkMatch (mkPrefixFunRhs (L genN fun)) pats expr
                  emptyLocalBinds]
   where
     gen = noAnnSrcSpan generatedSrcSpan
+    genN = noAnnSrcSpanN generatedSrcSpan
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn

@@ -4368,7 +4368,7 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
   = setSrcSpan con_loc $
-    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpan con_loc) con_name))) $
+    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpanN con_loc) con_name))) $
     do  { let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con

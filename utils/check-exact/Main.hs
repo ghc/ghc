@@ -417,7 +417,7 @@ rename newNameStr spans' a
 
     replaceRdr :: LocatedN RdrName -> LocatedN RdrName
     replaceRdr (L ln _)
-        | cond (locA ln) = L ln newName
+        | cond (locN ln) = L ln newName
     replaceRdr x = x
 
 -- ---------------------------------------------------------------------
@@ -428,7 +428,7 @@ changeWhereIn4 _libdir parsed
   where
     replace :: LocatedN RdrName -> LocatedN RdrName
     replace (L ln _n)
-      | ss2range (locA ln) == ((12,16),(12,17)) = L ln (mkRdrUnqual (mkVarOcc "p_2"))
+      | ss2range (locN ln) == ((12,16),(12,17)) = L ln (mkRdrUnqual (mkVarOcc "p_2"))
     replace x = x
 
 -- ---------------------------------------------------------------------
@@ -854,7 +854,7 @@ rmTypeSig1 _libdir lp = do
          let (s0:de1:d2) = tlDecs
              s1 = captureTypeSigSpacing s0
              (L l (SigD x1 (TypeSig x2 [n1,n2] typ))) = s1
-         n2' <- transferEntryDP n1 n2
+         n2' <- transferEntryDPN n1 n2
          let s1' = (L l (SigD x1 (TypeSig x2 [n2'] typ)))
          replaceDecls lp (s1':de1:d2)
 
@@ -889,8 +889,8 @@ addHiding1 _libdir (L l p) = do
         l2 <- uniqueSrcSpanT
         let
           [L li imp1,imp2] = hsmodImports p
-          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
-          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
+          n1 = L (noAnnSrcSpanDP0N l1) (mkVarUnqual (mkFastString "n1"))
+          n2 = L (noAnnSrcSpanDP0N l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2)))
           impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan l0) m0)
@@ -926,8 +926,8 @@ addHiding2 _libdir top = do
                                               [(AddEpAnn AnnHiding d1)]
                                               [])
                                        emptyComments) (locA lh))
-          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1"))
-          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
+          n1 = L (noAnnSrcSpanDP0N l1) (mkVarUnqual (mkFastString "n1"))
+          n2 = L (noAnnSrcSpanDP0N l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2)))
           L ln n = last ns

@@ -327,12 +327,12 @@ getInstLoc = \case
   --   type instance Foo Int = Bool
   --                 ^^^
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locA l
+    { dfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locN l
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
   TyFamInstD _ (TyFamInstDecl
-    { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locA l
+    { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locN l
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -347,10 +347,10 @@ subordinates env instMap decl = case decl of
       DataFamInstDecl { dfid_eqn =
         FamEqn { feqn_tycon = L l _
                , feqn_rhs   = defn }} <- unLoc <$> cid_datafam_insts d
-      [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ] ++ dataSubs defn
+      [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locN l) instMap] ] ++ dataSubs defn
     ty_fams = do
       TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = L l _ } } <- unLoc <$> cid_tyfam_insts d
-      [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locA l) instMap] ]
+      [ (n, [], IM.empty) | Just n <- [lookupSrcSpan (locN l) instMap] ]
     in data_fams ++ ty_fams
 
   InstD _ (DataFamInstD _ (DataFamInstDecl d))

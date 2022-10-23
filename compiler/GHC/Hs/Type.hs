@@ -354,10 +354,10 @@ type instance XXTyLit        (GhcPass _) = DataConCantHappen
 
 
 oneDataConHsTy :: HsType GhcRn
-oneDataConHsTy = HsTyVar noAnn NotPromoted (noLocA oneDataConName)
+oneDataConHsTy = HsTyVar noAnn NotPromoted (noLocN oneDataConName)
 
 manyDataConHsTy :: HsType GhcRn
-manyDataConHsTy = HsTyVar noAnn NotPromoted (noLocA manyDataConName)
+manyDataConHsTy = HsTyVar noAnn NotPromoted (noLocN manyDataConName)
 
 hsLinear :: a -> HsScaled (GhcPass p) a
 hsLinear = HsScaled (HsLinearArrow (HsPct1 noHsTok noHsUniTok))
@@ -436,7 +436,7 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
   = kvs ++ hsLTyVarNames tvs
 
 hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> LocatedN (IdP (GhcPass p))
-hsLTyVarLocName (L l a) = L (l2l l) (hsTyVarName a)
+hsLTyVarLocName (L l a) = L (l2ln l) (hsTyVarName a)
 
 hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [LocatedN (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)

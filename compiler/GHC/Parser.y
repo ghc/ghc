@@ -1909,7 +1909,7 @@ rule_vars :: { [LRuleTyTmVar] }
         | {- empty -}                           { [] }
 
 rule_var :: { LRuleTyTmVar }
-        : varid                         { sL1l $1 (RuleTyTmVar noAnn $1 Nothing) }
+        : varid                         { sL1ln $1 (RuleTyTmVar noAnn $1 Nothing) }
         | '(' varid '::' ctype ')'      {% acsA (\cs -> sLL $1 $> (RuleTyTmVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3,mcp $5] cs) $2 (Just $4))) }
 
 {- Note [Parsing explicit foralls in Rules]
@@ -2186,7 +2186,7 @@ infixtype :: { forall b. DisambTD b => PV (LocatedA b) }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
                                           do { let (op, prom) = $2
-                                             ; when (looksLikeMult $1 op $3) $ hintLinear (getLocA op)
+                                             ; when (looksLikeMult $1 op $3) $ hintLinear (getLocN op)
                                              ; mkHsOpTyPV prom $1 op $3 } }
         | unpackedness infixtype        { $2 >>= \ $2 ->
                                           mkUnpackednessPV $1 $2 }
@@ -2206,10 +2206,10 @@ tyarg :: { LHsType GhcPs }
 tyop :: { (LocatedN RdrName, PromotionFlag) }
         : qtyconop                      { ($1, NotPromoted) }
         | tyvarop                       { ($1, NotPromoted) }
-        | SIMPLEQUOTE qconop            {% do { op <- amsrn (sLL $1 (reLoc $>) (unLoc $2))
+        | SIMPLEQUOTE qconop            {% do { op <- amsrn (sLL $1 (reLocN $>) (unLoc $2))
                                                             (NameAnnQuote (glAA $1) (gl $2) [])
                                               ; return (op, IsPromoted) } }
-        | SIMPLEQUOTE varop             {% do { op <- amsrn (sLL $1 (reLoc $>) (unLoc $2))
+        | SIMPLEQUOTE varop             {% do { op <- amsrn (sLL $1 (reLocN $>) (unLoc $2))
                                                             (NameAnnQuote (glAA $1) (gl $2) [])
                                               ; return (op, IsPromoted) } }
 
@@ -2453,7 +2453,7 @@ fielddecl :: { LConDeclField GhcPs }
         : sig_vars '::' ctype
             {% acsA (\cs -> L (comb2 $1 (reLoc $3))
                       (ConDeclField (EpAnn (glR $1) [mu AnnDcolon $2] cs)
-                                    (reverse (map (\ln@(L l n) -> L (l2l l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
+                                    (reverse (map (\ln@(L l n) -> L (nn2la l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -2890,8 +2890,8 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ acsa (\cs ->
-                 let fl = sLLa $2 (reLoc $>) (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
-                 mkRdrGetField (noAnnSrcSpan $ comb2 (reLoc $1) (reLoc $>)) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
+                 let fl = sLLa $2 (reLocN $>) (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
+                 mkRdrGetField (noAnnSrcSpan $ comb2 (reLoc $1) (reLocN $>)) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
 
 
         | aexp2                { $1 }
@@ -2976,8 +2976,8 @@ projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             {% acs (\cs -> sLL $1 (reLoc $>) ((sLLa $2 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
-        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 (reLoc $>) ((sLLa $1 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
+                             {% acs (\cs -> sLL $1 (reLocN $>) ((sLLa $2 (reLocN $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 (reLocN $>) ((sLLa $1 (reLocN $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noAnn) (reLocA $1) }
@@ -3411,13 +3411,13 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
 
 fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1l $1 $ mkFieldOcc $1) $3 False) }
+                           fmap Left $ acsA (\cs -> sLL (reLocN $1) (reLoc $>) $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1ln $1 $ mkFieldOcc $1) $3 False) }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1l $1 $ mkFieldOcc $1) rhs True) }
+                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1ln $1 $ mkFieldOcc $1) rhs True) }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 
@@ -3425,15 +3425,15 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
-                            let top = sL1 (la2la $1) $ DotFieldOcc noAnn $1
+                            let top = sL1 (n2l $1) $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (reLoc $ L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
-                                l = comb2 (reLoc $1) $3
+                                l = comb2 (reLocN $1) $3
                                 isPun = False
                             $5 <- unECP $5
-                            fmap Right $ mkHsProjUpdatePV (comb2 (reLoc $1) (reLoc $5)) (L l fields) $5 isPun
+                            fmap Right $ mkHsProjUpdatePV (comb2 (reLocN $1) (reLoc $5)) (L l fields) $5 isPun
                                             [mj AnnEqual $4]
                         }
 
@@ -3441,24 +3441,24 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate
                         { do
-                            let top =  sL1 (la2la $1) $ DotFieldOcc noAnn $1
+                            let top =  sL1 (n2l $1) $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (reLoc $ L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
                                 final = last fields
-                                l = comb2 (reLoc $1) $3
+                                l = comb2 (reLocN $1) $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpanN $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun []
                         }
 
 fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLocA $3) >>= \cs ->
-                                                     return (sLL $1 (reLoc $>) ((sLLa $2 (reLoc $>) (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
-        | field       {% getCommentsFor (getLocA $1) >>= \cs ->
-                        return (sL1 (reLoc $1) [sL1a (reLoc $1) (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
+        : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLocN $3) >>= \cs ->
+                                                     return (sLL $1 (reLocN $>) ((sLLa $2 (reLocN $>) (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
+        | field       {% getCommentsFor (getLocN $1) >>= \cs ->
+                        return (sL1 (reLocN $1) [sL1a (reLocN $1) (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -4020,7 +4020,7 @@ comb3A a b c = a `seq` b `seq` c `seq`
 
 comb3N :: Located a -> Located b -> LocatedN c -> SrcSpan
 comb3N a b c = a `seq` b `seq` c `seq`
-    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLocA c))
+    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLocN c))
 
 comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
@@ -4054,7 +4054,7 @@ sL1A x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1N #-}
 sL1N :: LocatedN a -> b -> Located b
-sL1N x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
+sL1N x = sL (getLocN x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1a #-}
 sL1a :: Located a -> b -> LocatedAn t b
@@ -4064,9 +4064,13 @@ sL1a x = sL (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
 sL1l :: LocatedAn t a -> b -> LocatedAn u b
 sL1l x = sL (l2l $ getLoc x)   -- #define sL1   sL (getLoc $1)
 
+{-# INLINE sL1ln #-}
+sL1ln :: LocatedN a -> b -> LocatedAn u b
+sL1ln x = sL (noAnnSrcSpan $ getLocN x)   -- #define sL1   sL (getLoc $1)
+
 {-# INLINE sL1n #-}
 sL1n :: Located a -> b -> LocatedN b
-sL1n x = L (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
+sL1n x = L (noAnnSrcSpanN $ getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sLL #-}
 sLL :: Located a -> Located b -> c -> Located c
@@ -4151,7 +4155,7 @@ looksLikeMult ty1 l_op ty2
   | Unqual op_name <- unLoc l_op
   , occNameFS op_name == fsLit "%"
   , Strict.Just ty1_pos <- getBufSpan (getLocA ty1)
-  , Strict.Just pct_pos <- getBufSpan (getLocA l_op)
+  , Strict.Just pct_pos <- getBufSpan (getLocN l_op)
   , Strict.Just ty2_pos <- getBufSpan (getLocA ty2)
   , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
@@ -4247,7 +4251,7 @@ glA :: LocatedAn t a -> SrcSpan
 glA = getLocA
 
 glN :: LocatedN a -> SrcSpan
-glN = getLocA
+glN = getLocN
 
 glR :: Located a -> Anchor
 glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
@@ -4262,10 +4266,10 @@ glAR :: LocatedAn t a -> Anchor
 glAR la = Anchor (realSrcSpan $ getLocA la) UnchangedAnchor
 
 glNR :: LocatedN a -> Anchor
-glNR ln = Anchor (realSrcSpan $ getLocA ln) UnchangedAnchor
+glNR ln = Anchor (realSrcSpan $ getLocN ln) UnchangedAnchor
 
 glNRR :: LocatedN a -> EpaLocation
-glNRR = EpaSpan <$> realSrcSpan . getLocA
+glNRR = EpaSpan <$> realSrcSpan . getLocN
 
 anc :: RealSrcSpan -> Anchor
 anc r = Anchor r UnchangedAnchor
@@ -4330,8 +4334,7 @@ amsrp a@(L l _) bs = do
 amsrn :: MonadP m => Located a -> NameAnn -> m (LocatedN a)
 amsrn (L l a) an = do
   cs <- getCommentsFor l
-  let ann = (EpAnn (spanAsAnchor l) an cs)
-  return (L (SrcSpanAnn ann l) a)
+  return (L (EpAnnS (spanAsAnchor l) an cs) a)
 
 -- |Synonyms for AddEpAnn versions of AnnOpen and AnnClose
 mo,mc :: Located Token -> AddEpAnn
@@ -4360,7 +4363,7 @@ pvA a = do { av <- a
 
 pvN :: MonadP m => m (Located a) -> m (LocatedN a)
 pvN a = do { (L l av) <- a
-           ; return (L (noAnnSrcSpan l) av) }
+           ; return (L (noAnnSrcSpanN l) av) }
 
 pvL :: MonadP m => m (LocatedAn t a) -> m (Located a)
 pvL a = do { av <- a
@@ -4456,14 +4459,15 @@ addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
 
 -- Mostly use to add AnnComma, special case it to NOP if adding a zero-width annotation
 addTrailingCommaN :: MonadP m => LocatedN a -> SrcSpan -> m (LocatedN a)
-addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
+addTrailingCommaN (L anns a) span = do
+  let l = locN anns
   -- cs <- getCommentsFor l
   let cs = emptyComments
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
                 then anns
                 else addTrailingCommaToN l anns (EpaSpan $ rs span)
-  return (L (SrcSpanAnn anns' l) a)
+  return (L anns' a)
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral
 addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaLocationRealSrcSpan span) })

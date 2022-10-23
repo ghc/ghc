@@ -173,7 +173,7 @@ tcClassSigs clas sigs def_methods
                       -> IOEnv (Env TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType op_names gen_hs_ty
-           ; return [ (op_name, (locA loc, gen_op_ty))
+           ; return [ (op_name, (locN loc, gen_op_ty))
                                                  | L loc op_name <- op_names ] }
 
 {-
@@ -190,8 +190,8 @@ tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
-    setSrcSpan (getLocA class_name) $
-    do  { clas <- tcLookupLocatedClass (n2l class_name)
+    setSrcSpan (getLocN class_name) $
+    do  { clas <- tcLookupLocatedClass class_name
 
         -- We make a separate binding for each default method.
         -- At one time I used a single AbsBinds for all of them, thus
@@ -391,7 +391,7 @@ findMethodBind sel_name binds prag_fn
 
     f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
       | op_name == sel_name
-             = Just (bind, locA bndr_loc, prags)
+             = Just (bind, locN bndr_loc, prags)
     f _other = Nothing
 
 ---------------------------
@@ -504,7 +504,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              (tv', cv') = partition isTyVar tcv'
              tvs'     = scopedSort tv'
              cvs'     = scopedSort cv'
-       ; rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpan loc) (tyConName fam_tc)) pat_tys'
+       ; rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpanN loc) (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' [] cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances

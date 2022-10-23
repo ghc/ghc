@@ -1013,11 +1013,11 @@ tcInferOverLit lit@(OverLit { ol_val = val
                                                            (1, []) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
-       ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
+       ; let lit_expr = L (nn2la loc) $ mkHsWrapCo co $
                         HsLit noAnn hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
                          HsVar noExtField (L loc from_id)
-             witness = HsApp noAnn (L (l2l loc) from_expr) lit_expr
+             witness = HsApp noAnn (L (nn2la loc) from_expr) lit_expr
              lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
                                              , ol_witness = witness
                                              , ol_type = res_ty } }
@@ -1036,7 +1036,7 @@ tcCheckId name res_ty
        ; addFunResCtxt rn_fun [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) rn_fun expr actual_res_ty res_ty }
   where
-    rn_fun = HsVar noExtField (noLocA name)
+    rn_fun = HsVar noExtField (noLocN name)
 
 ------------------------
 tcInferId :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -1061,7 +1061,7 @@ tc_infer_assert assert_name
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExtField (noLocA assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar noExtField (noLocN assert_error_id)), id_rho)
        }
 
 tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -1119,7 +1119,7 @@ tc_infer_id id_name
        return $ unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
          lcl_env imp_info (mkRdrUnqual occ)
 
-    return_id id = return (HsVar noExtField (noLocA id), idType id)
+    return_id id = return (HsVar noExtField (noLocN id), idType id)
 
 check_local_id :: Id -> TcM ()
 check_local_id id
@@ -1330,7 +1330,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar noExtField (noLocA sid)) }
+                        ; return (HsVar noExtField (noLocN sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE

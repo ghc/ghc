@@ -555,7 +555,7 @@ instance HasLoc (LocatedA a) where
   loc (L la _) = locA la
 
 instance HasLoc (LocatedN a) where
-  loc (L la _) = locA la
+  loc (L la _) = locN la
 
 instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
@@ -618,7 +618,7 @@ instance ToHie (IEContext (LocatedA ModuleName)) where
   toHie _ = pure []
 
 instance ToHie (Context (Located a)) => ToHie (Context (LocatedN a)) where
-  toHie (C c (L l a)) = toHie (C c (L (locA l) a))
+  toHie (C c (L l a)) = toHie (C c (L (locN l) a))
 
 instance ToHie (Context (Located a)) => ToHie (Context (LocatedA a)) where
   toHie (C c (L l a)) = toHie (C c (L (locA l) a))

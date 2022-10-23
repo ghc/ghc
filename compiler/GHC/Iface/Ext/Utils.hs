@@ -541,7 +541,7 @@ mkLScopeA :: GenLocated (SrcSpanAnn' a) e -> Scope
 mkLScopeA = mkScope . locA . getLoc
 
 mkLScopeN :: LocatedN a -> Scope
-mkLScopeN = mkScope . getLocA
+mkLScopeN = mkScope . getLocN
 
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope
