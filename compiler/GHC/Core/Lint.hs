@@ -56,7 +56,6 @@ import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv( compatibleBranches )
 import GHC.Core.Unify
-import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
 
 import GHC.Core.Opt.Monad
@@ -2530,6 +2529,70 @@ lintCoercion this@(AxiomRuleCo ax cos)
 lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
+
+
+{-
+Note [Conflict checking with AxiomInstCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following type family and axiom:
+
+type family Equal (a :: k) (b :: k) :: Bool
+type instance where
+  Equal a a = True
+  Equal a b = False
+--
+Equal :: forall k::*. k -> k -> Bool
+axEqual :: { forall k::*. forall a::k. Equal k a a ~ True
+           ; forall k::*. forall a::k. forall b::k. Equal k a b ~ False }
+
+The coercion (axEqual[1] <*> <Int> <Int) is ill-typed, and Lint should reject it.
+(Recall that the index is 0-based, so this is the second branch of the axiom.)
+The problem is that, on the surface, it seems that
+
+  (axEqual[1] <*> <Int> <Int>) :: (Equal * Int Int ~ False)
+
+and that all is OK. But, all is not OK: we want to use the first branch of the
+axiom in this case, not the second. The problem is that the parameters of the
+first branch can unify with the supplied coercions, thus meaning that the first
+branch should be taken. See also Note [Apartness] in "GHC.Core.FamInstEnv".
+
+For more details, see the section "Branched axiom conflict checking" in
+docs/core-spec, which defines the corresponding no_conflict function used by the
+Co_AxiomInstCo rule in the section "Coercion typing".
+-}
+
+-- | Check to make sure that an AxInstCo is internally consistent.
+-- Returns the conflicting branch, if it exists
+-- See Note [Conflict checking with AxiomInstCo]
+checkAxInstCo :: Coercion -> Maybe CoAxBranch
+-- defined here to avoid dependencies in GHC.Core.Coercion
+-- If you edit this function, you may need to update the GHC formalism
+-- See Note [GHC Formalism] in GHC.Core.Lint
+checkAxInstCo (AxiomInstCo ax ind cos)
+  = let branch       = coAxiomNthBranch ax ind
+        tvs          = coAxBranchTyVars branch
+        cvs          = coAxBranchCoVars branch
+        incomps      = coAxBranchIncomps branch
+        (tys, cotys) = splitAtList tvs (map coercionLKind cos)
+        co_args      = map stripCoercionTy cotys
+        subst        = zipTvSubst tvs tys `composeTCvSubst`
+                       zipCvSubst cvs co_args
+        target   = Type.substTys subst (coAxBranchLHS branch)
+        in_scope = mkInScopeSet $
+                   unionVarSets (map (tyCoVarsOfTypes . coAxBranchLHS) incomps)
+        flattened_target = flattenTys in_scope target in
+    check_no_conflict flattened_target incomps
+  where
+    check_no_conflict :: [Type] -> [CoAxBranch] -> Maybe CoAxBranch
+    check_no_conflict _    [] = Nothing
+    check_no_conflict flat (b@CoAxBranch { cab_lhs = lhs_incomp } : rest)
+         -- See Note [Apartness] in GHC.Core.FamInstEnv
+      | SurelyApart <- tcUnifyTysFG alwaysBindFun flat lhs_incomp
+      = check_no_conflict flat rest
+      | otherwise
+      = Just b
+checkAxInstCo _ = Nothing
+
 
 {-
 ************************************************************************
