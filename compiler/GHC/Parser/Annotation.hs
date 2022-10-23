@@ -184,6 +184,152 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 
 -}
 
+-- DRAFT NEW VERSION
+{-
+Note [Exactprint annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the syntax tree produced by the parser (of type `HsExpr GhcPs`, for
+expressions) the tree decorated with "ExactPrint Annotations". The
+goal of these annotations is to be able to print the syntax tree
+/precisely/ as it was read in by the parser, including
+* Every keyword placed exactly where it was in the original input
+* Every parenthesis, and every comma
+* Every comment, including Haddock comments
+
+The extra information to achieve this is held in the TTG extension
+fields of each constructor. (See Note [Trees that Grow] in module
+Language.Haskell.Syntax.Extension). For example, the extension field
+of the `HsIf` constructor tells where the `if`, `then`, and `else`
+keywords are placed:
+
+  data HsExpr p = ...
+               | HsIf (XIf p) (LHsExpr p) (LHsExpr p) (LHsExpr p)
+
+  type instance XIf GhcPs = EpAnn AnnsIf
+
+Here the extension field is populated with `EpAnn AnnsIf`:
+* The /specifics/ of the keywords etc for `HsIf` are contained in the `AnnsIf` data type,
+* The /generic requirements/ for exact-print are in the `EpAnn` wrapper, which wraps
+  every exact-print annotation
+
+  data AnnsIf
+    = AnnsIf {
+        aiIf       :: EpaLocation,
+        aiThen     :: EpaLocation,
+        aiElse     :: EpaLocation,
+        aiThenSemi :: Maybe EpaLocation,
+        aiElseSemi :: Maybe EpaLocation
+        } deriving Data
+
+
+  data EpAnn ann
+    = EpAnn { entry    :: !Anchor
+            , anns     :: !ann
+            , comments :: !EpAnnComments
+            }
+
+The EpAnn is a type capturing the generic requirements for exact
+printing, as well as the placement of keywords specific to the
+constructor being annotated. In this case they are
+
+  data EpaLocation = EpaSpan !RealSrcSpan
+                   | EpaDelta !DeltaPos ![LEpaComment]
+
+To start with the generic requirements, the first is the Anchor.
+
+  data Anchor = Anchor { anchor :: RealSrcSpan
+                       , anchor_op :: AnchorOperation }
+
+  data AnchorOperation = UnchangedAnchor
+                       | MovedAnchor DeltaPos
+
+Printing involves going to the appropriate start location, and then
+outputting a representation of the item there. Given the AST is a
+tree, this is an inherently recursive operation.
+
+The anchor exists to identify the appropriate start location. It caters
+to the two scenarios for exact printing:
+ * to reproduce the original source that was parsed
+ * to be able to print a modified AST
+
+To achieve both of these use cases at the same time, the exact printing
+algorithm uses the Anchor as a reference to the "top left" corner of
+the AST fragment to be printed. In the unmodified case, this location
+is simply the `RealSrcSpan` in the `anchor` field, and the `anchor_op`
+is `UnchangedAnchor`. If the AST fragment to be printed has moved, its
+spacing in the printing its containing AST fragment is captured in a
+`MovedAnchor` operation, with an appropriate `DeltaPos`.
+
+A similar role is played by `EpaLocation` for positioning the
+annotated keywords.
+
+But, the `anchor` RealSrcSpan is /also/ used to calculate the offset
+of the first item to be printed for HsIf (AZ note: in practice this
+offset is always zero, hence we could likely unify EpaLocation and
+Anchor).
+
+Located Items
+~~~~~~~~~~~~~
+
+Historically the exact print annotations were kept out of the AST
+itself, and linked in by a combination of SrcSpan and Constructor
+name. This has carried over to the current version by inserting an
+exact print annotation into every `Located` item in the `GhcPass` AST.
+Now that exact print annotations can be placed in the TTG extension
+points, we can potentially remove some of the ones in locations, if
+they are not needed for other reasons such as error reporting.
+
+The annotations are stored by making use of the `XRec` type family to
+make the association (See Note [XRec and SrcSpans in the AST] in
+Language.Haskell.Syntax.Extension).
+
+  type family XRec p a = r | r -> a
+
+  type family Anno a = b -- See Note [XRec and Anno in the AST] in GHC.Parser.Annotation
+
+  type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+
+To go back to the `HsIf` example, it is a constructor for `HsExpr`.
+
+  type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+
+This tells us that in an AST belonging to a GHC pass, the `Anno`
+instance is `SrcSpannAnnA`.
+
+i.e. XRec GhcPs HsExpr ~ GenLocated SrcSpannAnnA HsExpr
+
+This is captured in a shorthand form with a type synonym as
+
+  type LocatedA = GenLocated SrcSpanAnnA
+
+In turn, SrcSpanAnnA is a type synonym for a further cascade of types
+
+  type SrcSpanAnnA = SrcAnn AnnListItem
+
+  type SrcAnn ann = SrcSpanAnn' (EpAnn ann)
+
+  data SrcSpanAnn' a = SrcSpanAnn { ann :: !a, locA :: !SrcSpan }
+
+And at the end of the cascade we see
+
+  LocatedA HsExpr
+     ~ GenLocated (SrcSpanAnn { ann: EpAnn AnnListItem, locA: SrcSpan}) HsExpr
+
+So the SrcSpan used in the rest of GHC for error message locations is
+included, as well as an `EpAnn` giving the general exact printing
+requirements and a custom annotation type
+
+  data AnnListItem = AnnListItem {lann_trailing  :: [TrailingAnn]}
+
+The `[TrailingAnn]` capture the locations of any mix of commas,
+semicolons or vbars that may follow the given expression in its
+surrounding context. This is not properly a part of the `HsExpr`,
+since it relates to how it is used in its parent structure.
+
+TO BE CONTINUED, input welcome
+-}
+
+
 -- --------------------------------------------------------------------
 
 -- | Exact print annotations exist so that tools can perform source to
