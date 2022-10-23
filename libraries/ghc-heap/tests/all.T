@@ -76,8 +76,16 @@ test('stack_big_ret',
 test('stack_underflow',
      [
         extra_files(['TestUtils.hs']),
-         extra_run_opts('+RTS -kc512B -kb64B -RTS'),
-         ignore_stdout,
-         ignore_stderr
+        extra_run_opts('+RTS -kc512B -kb64B -RTS'),
+        ignore_stdout,
+        ignore_stderr
      ],
      compile_and_run, ['-rtsopts'])
+
+test('stack_stm_frames',
+     [
+        extra_files(['TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+      ],
+     compile_and_run, ['-debug'])

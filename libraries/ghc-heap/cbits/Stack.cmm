@@ -147,6 +147,25 @@ unpackHandlerFromCatchFramezh(P_ stack, W_ index){
   jump stg_unpackClosurezh(handlerPtr);
 }
 
+// Reduce duplication by using offsets instead on pointer macros.
+unpackCodeFromCatchSTMFramezh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, codePtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  codePtr = StgCatchSTMFrame_code(closurePtr);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(codePtr));
+  jump stg_unpackClosurezh(codePtr);
+}
+
+unpackHandlerFromCatchSTMFramezh(P_ stack, W_ index){
+  P_ closurePtr, closurePtrPrime, handlerPtr;
+  closurePtr = (StgStack_sp(stack) + WDS(index));
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  handlerPtr = StgCatchSTMFrame_handler(closurePtr);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(handlerPtr));
+  jump stg_unpackClosurezh(handlerPtr);
+}
+
 getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime, updateePtr;
   closurePtr = (StgStack_sp(stack) + WDS(index));

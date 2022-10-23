@@ -150,7 +150,11 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
      STOP_FRAME ->  StopFrame
      ATOMICALLY_FRAME ->  AtomicallyFrame
      CATCH_RETRY_FRAME ->  CatchRetryFrame
-     CATCH_STM_FRAME ->  CatchStmFrame
+     CATCH_STM_FRAME -> let
+          c = toClosure unpackCodeFromCatchSTMFrame# sfi
+          h = toClosure unpackHandlerFromCatchSTMFrame# sfi
+        in
+          CatchStmFrame c h
      x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- | Right-fold over the elements of a 'ByteArray'.
@@ -186,6 +190,10 @@ foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "unpackHandlerFromCatchFramezh" unpackHandlerFromCatchFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "unpackHandlerFromCatchSTMFramezh" unpackHandlerFromCatchSTMFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "unpackCodeFromCatchSTMFramezh" unpackCodeFromCatchSTMFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 
@@ -229,14 +237,14 @@ data UpdateFrameType =
   deriving (Enum, Eq, Show)
 
 data StackFrame =
-  UpdateFrame UpdateFrameType CL.Closure |
-  CatchFrame Word CL.Closure |
-  CatchStmFrame |
+  UpdateFrame { knownUpdateFrameType :: UpdateFrameType, updatee :: CL.Closure } |
+  CatchFrame { exceptions_blocked :: Word,  handler :: CL.Closure } |
+  CatchStmFrame { code :: CL.Closure, handler :: CL.Closure  } |
   CatchRetryFrame |
   AtomicallyFrame |
   UnderflowFrame { nextChunk:: StackSnapshot } |
   StopFrame |
-  RetSmall SpecialRetSmall [BitmapPayload] |
+  RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
   RetBig { payload :: [BitmapPayload] } |
   RetFun |
   RetBCO
