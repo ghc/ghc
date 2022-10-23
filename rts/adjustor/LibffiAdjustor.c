@@ -14,6 +14,20 @@
 #include "ffi.h"
 #include <string.h>
 
+// Note that ffi_alloc_prep_closure is a non-standard libffi closure
+// API that is only provided by libffi-wasm32, not upstream libffi.
+#if !defined(wasm32_HOST_ARCH)
+
+static ffi_status ffi_alloc_prep_closure(ffi_closure **pclosure, ffi_cif *cif,
+                                  void (*fun)(ffi_cif *cif, void *ret,
+                                              void **args, void *user_data),
+                                  void *user_data, void **code) {
+  *pclosure = ffi_closure_alloc(sizeof(ffi_closure), code);
+  return ffi_prep_closure_loc(*pclosure, cif, fun, user_data, *code);
+}
+
+#endif
+
 /* Maps AdjustorExecutable* to AdjustorWritable*. */
 static HashTable* allocatedExecs;
 
@@ -21,17 +35,20 @@ void initAdjustors() {
     allocatedExecs = allocHashTable();
 }
 
-static AdjustorWritable allocate_adjustor(AdjustorExecutable *exec_ret)
+static AdjustorWritable allocate_adjustor(AdjustorExecutable *exec_ret, ffi_cif *cif, void *wptr, void *hptr)
 {
     AdjustorWritable writ;
-    ffi_closure* cl;
 
-    ACQUIRE_SM_LOCK;
-    cl = writ = ffi_closure_alloc(sizeof(ffi_closure), exec_ret);
-    if (cl != NULL) {
+    ffi_status r = ffi_alloc_prep_closure(&writ, cif, wptr, hptr, exec_ret);
+    if (r != FFI_OK)
+        barf("ffi_alloc_prep_closure failed: %d", r);
+
+    if (*exec_ret != NULL) {
+        ACQUIRE_SM_LOCK;
         insertHashTable(allocatedExecs, (StgWord)*exec_ret, writ);
+        RELEASE_SM_LOCK;
     }
-    RELEASE_SM_LOCK;
+
     return writ;
 }
 
@@ -165,13 +182,10 @@ createAdjustor (int cconv,
     r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
     if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
 
-    cl = allocate_adjustor(&code);
+    cl = allocate_adjustor(&code, cif, wptr, hptr);
     if (cl == NULL) {
         barf("createAdjustor: failed to allocate memory");
     }
-
-    r = ffi_prep_closure_loc(cl, cif, (void*)wptr, hptr/*userdata*/, code);
-    if (r != FFI_OK) barf("ffi_prep_closure_loc failed: %d", r);
 
     return (void*)code;
 }
