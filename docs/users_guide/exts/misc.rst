@@ -9,3 +9,4 @@ Miscellaneous
     generics
     assert
     callstack
+    whitespace
