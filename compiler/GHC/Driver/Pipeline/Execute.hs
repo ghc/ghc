@@ -323,6 +323,10 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                           , not $ target32Bit (targetPlatform dflags)
                           ]
 
+                       -- See Note [-Wa,--no-type-check on wasm32]
+                       ++ [ GHC.SysTools.Option "-Wa,--no-type-check"
+                          | platformArch (targetPlatform dflags) == ArchWasm32]
+
                        ++ (if any (asmInfo ==) [Clang, AppleClang, AppleClang51]
                             then [GHC.SysTools.Option "-Qunused-arguments"]
                             else [])
@@ -1246,4 +1250,31 @@ Archeology
   that commit was addressing has since been solved in a different manner, in a
   commit called "Fix the filename passed to unlit" (1eedbc6b). So the
   `normalise` is no longer necessary.
+-}
+
+{-
+Note [-Wa,--no-type-check on wasm32]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Wasm32 has a type system and corresponding validation rules, so it's
+possible to produce syntactically valid object code that doesn't pass
+validation.
+
+We have no problem with that, but we do have a problem with clang.
+When clang takes an assembly input for wasm32, it uses its internal
+type-checker, which is a huge source of trouble (see llvm ticket
+#56935 #58438): it may reject valid assembly, and even worse, it may
+silently alter the output object code!!! The worsest of all, is the
+person that added the wasm32 asm typechecker logic has moved on from
+Google/LLVM, and while other LLVM devs may be knowledgable enough to
+fix this mess, they likely got tons of other stuff on their table and
+don't care enough.
+
+We do have an escape hatch, just pass -Wa,--no-type-check to clang to
+bypass the entire wasm32 asm typechecking logic. There's little point
+in type-checking object code at compile-time anyway, the wasm engines
+will do type-checking at run-time. And even if we want to add some
+linting flag to do compile-time checks, we should just rely on
+battle-tested external tools instead of a completely broken horror
+story.
 -}
