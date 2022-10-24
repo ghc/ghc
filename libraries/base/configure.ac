@@ -84,6 +84,15 @@ fi
 # unsetenv
 AC_CHECK_FUNCS([unsetenv])
 
+AC_CHECK_FUNCS([chmod])
+AC_CHECK_FUNCS([dup])
+AC_CHECK_FUNCS([fork])
+AC_CHECK_FUNCS([getpid])
+AC_CHECK_FUNCS([mkfifo])
+AC_CHECK_FUNCS([pipe])
+
+AC_CHECK_TYPE([struct rlimit],[AC_DEFINE([HAVE_STRUCT_RLIMIT],[1],[HAVE_STRUCT_RLIMIT])],[],[#include <sys/resource.h>])
+
 ###  POSIX.1003.1 unsetenv returns 0 or -1 (EINVAL), but older implementations
 ###  in common use return void.
 AC_CACHE_CHECK([return type of unsetenv], fptools_cv_func_unsetenv_return_type,
