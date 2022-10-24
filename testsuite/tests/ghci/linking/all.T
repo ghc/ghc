@@ -54,6 +54,8 @@ test('T11531',
      [extra_files(['T11531.hs', 'T11531.c', 'T11531.h']),
       unless(doing_ghci, skip),
       unless(opsys('linux'), skip),
+      req_c,
+      req_interp
       fragile(11531)],
      makefile_test, ['T11531'])
 
