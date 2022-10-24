@@ -611,6 +611,14 @@ library
                   win32/WorkQueue.c
                   win32/veh_excn.c
                   -- win32/**/*.c
+    elif arch(wasm32)
+      asm-sources: wasm/Wasm.S
+      c-sources: wasm/StgRun.c
+                 wasm/GetTime.c
+                 wasm/Ops.c
+                 wasm/OSMem.c
+                 wasm/OSThreads.c
+                 posix/Select.c
     else
        c-sources: posix/GetEnv.c
                   posix/GetTime.c
