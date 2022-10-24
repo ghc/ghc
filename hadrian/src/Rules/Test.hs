@@ -194,29 +194,30 @@ testRules = do
 
         cross <- flag CrossCompiling
 
-        -- get absolute path for the given program in the given stage
-        let absolute_path_stage s p = do
-              rel_path <- programPath =<< programContext s p
+        -- get relative path for the given program in the given stage
+        let relative_path_stage s p = programPath =<< programContext s p
+        let make_absolute rel_path = do
               abs_path <- liftIO (IO.makeAbsolute rel_path)
               fixAbsolutePathOnWindows abs_path
 
-        -- get absolute path for the given program in the target stage
-        let absolute_path
-              | Stage0 {} <- stg = absolute_path_stage stg
-              | otherwise        = absolute_path_stage (predStage stg)
+        rel_ghc_pkg     <- relative_path_stage Stage1 ghcPkg
+        rel_hsc2hs      <- relative_path_stage Stage1 hsc2hs
+        rel_hp2ps       <- relative_path_stage Stage1 hp2ps
+        rel_haddock     <- relative_path_stage (Stage0 InTreeLibs) haddock
+        rel_hpc         <- relative_path_stage (Stage0 InTreeLibs) hpc
+        rel_runghc      <- relative_path_stage (Stage0 InTreeLibs) runGhc
 
-        -- get absolute path for the given program in stage1 (useful for
-        -- cross-compilers)
-        let absolute_path1 = absolute_path_stage (Stage0 InTreeLibs)
+        -- force stage0 program building for cross
+        when cross $ need [rel_hpc, rel_haddock, rel_runghc]
+
+        prog_ghc_pkg     <- make_absolute rel_ghc_pkg
+        prog_hsc2hs      <- make_absolute rel_hsc2hs
+        prog_hp2ps       <- make_absolute rel_hp2ps
+        prog_haddock     <- make_absolute rel_haddock
+        prog_hpc         <- make_absolute rel_hpc
+        prog_runghc      <- make_absolute rel_runghc
 
         ghcPath <- getCompilerPath testCompilerArg
-
-        prog_ghc_pkg     <- absolute_path ghcPkg
-        prog_hsc2hs      <- absolute_path hsc2hs
-        prog_hp2ps       <- absolute_path hp2ps
-        prog_hpc         <- absolute_path1 hpc
-        prog_haddock     <- absolute_path1 haddock
-        prog_runghc      <- absolute_path1 runGhc
 
         makePath        <- builderPath $ Make ""
         top             <- topDirectory
