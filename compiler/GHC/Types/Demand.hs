@@ -1473,7 +1473,7 @@ defaultArgDmd :: Divergence -> Demand
 defaultArgDmd Dunno    = topDmd
 -- NB: not botDmd! We don't want to mask the precise exception by forcing the
 -- argument. But it is still absent.
-defaultArgDmd ExnOrDiv = absDmd
+defaultArgDmd ExnOrDiv = topDmd
 defaultArgDmd Diverges = botDmd
 
 {- Note [Precise vs imprecise exceptions]
