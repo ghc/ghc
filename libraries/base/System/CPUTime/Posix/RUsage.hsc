@@ -18,6 +18,8 @@ import System.CPUTime.Utils
 #include <sys/resource.h>
 #endif
 
+#if HAVE_GETRUSAGE
+
 getCPUTime :: IO Integer
 getCPUTime = allocaBytes (#const sizeof(struct rusage)) $ \ p_rusage -> do
     throwErrnoIfMinus1_ "getrusage" $ getrusage (#const RUSAGE_SELF) p_rusage
@@ -40,3 +42,13 @@ getCpuTimePrecision =
     return $ round ((1e12::Integer) % fromIntegral clk_tck)
 
 foreign import ccall unsafe clk_tck :: CLong
+
+#else
+
+getCPUTime :: IO Integer
+getCPUTime = fail "System.CPUTime.Posix.RUsage.getCPUTime"
+
+getCpuTimePrecision :: IO Integer
+getCpuTimePrecision = fail "System.CPUTime.Posix.RUsage.getCpuTimePrecision"
+
+#endif

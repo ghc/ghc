@@ -37,6 +37,7 @@ AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 AC_CHECK_FUNCS([lstat])
 AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_FUNCS([clock_gettime])
+AC_CHECK_DECLS([CLOCK_PROCESS_CPUTIME_ID], [], [], [[#include <time.h>]])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 

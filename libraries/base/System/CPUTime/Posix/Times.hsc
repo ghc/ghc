@@ -18,6 +18,8 @@ import System.CPUTime.Utils
 #include <sys/times.h>
 #endif
 
+#if HAVE_TIMES
+
 getCPUTime :: IO Integer
 getCPUTime = allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
     _ <- times p_tms
@@ -37,3 +39,13 @@ foreign import ccall unsafe clk_tck :: CLong
 
 clockTicks :: Integer
 clockTicks = fromIntegral clk_tck
+
+#else
+
+getCPUTime :: IO Integer
+getCPUTime = fail "System.CPUTime.Posix.Times.getCPUTime"
+
+getCpuTimePrecision :: IO Integer
+getCpuTimePrecision = fail "System.CPUTime.Posix.Times.getCpuTimePrecision"
+
+#endif

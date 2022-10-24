@@ -40,7 +40,12 @@ withTimespec action =
 
 foreign import capi unsafe "time.h clock_getres"  clock_getres  :: CUIntPtr -> Ptr Timespec -> IO CInt
 foreign import capi unsafe "time.h clock_gettime" clock_gettime :: CUIntPtr -> Ptr Timespec -> IO CInt
+
+#if HAVE_DECL_CLOCK_PROCESS_CPUTIME_ID
 foreign import capi unsafe "time.h value CLOCK_PROCESS_CPUTIME_ID" cLOCK_PROCESS_CPUTIME_ID :: CUIntPtr
+#else
+foreign import capi unsafe "time.h value CLOCK_MONOTONIC" cLOCK_PROCESS_CPUTIME_ID :: CUIntPtr
+#endif // HAVE_DECL_CLOCK_PROCESS_CPUTIME_ID
 
 #else
 
