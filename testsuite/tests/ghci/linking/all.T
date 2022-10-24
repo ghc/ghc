@@ -55,7 +55,7 @@ test('T11531',
       unless(doing_ghci, skip),
       unless(opsys('linux'), skip),
       req_c,
-      req_interp
+      req_interp,
       fragile(11531)],
      makefile_test, ['T11531'])
 
