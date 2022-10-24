@@ -113,7 +113,7 @@ getLinkerInfo' logger dflags = do
 
         | any (\line -> "LLD" `isPrefixOf` line || "LLD" `elem` words line) stdo =
           return (LlvmLLD $ map Option [ --see Note [ELF needed shared libs]
-                                        "-Wl,--no-as-needed"])
+                                        "-Wl,--no-as-needed" | osElfTarget os || os == OSMinGW32 ])
 
          -- Unknown linker.
         | otherwise = fail "invalid --version output, or linker is unsupported"
