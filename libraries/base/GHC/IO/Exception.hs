@@ -100,7 +100,8 @@ blockedIndefinitelyOnSTM = toException BlockedIndefinitelyOnSTM
 data Deadlock = Deadlock
 
 -- | @since 4.1.0.0
-instance Exception Deadlock
+instance Exception Deadlock where
+    displayException _ = "no threads to run:  infinite loop or deadlock?"
 
 -- | @since 4.1.0.0
 instance Show Deadlock where
