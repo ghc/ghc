@@ -158,7 +158,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
 
             occName n  =  braces $
                           text "OccName:"
-                      <+> text (occNameString n)
+                      <+> ftext (occNameFS n)
 
             moduleName :: ModuleName -> SDoc
             moduleName m = braces $ text "ModuleName:" <+> ppr m

@@ -1,6 +1,5 @@
 module GHC.Types.Name.Occurrence where
 
-import GHC.Prelude (String)
 import GHC.Data.FastString
 
 data OccName
@@ -8,6 +7,6 @@ data OccName
 class HasOccName name where
   occName :: name -> OccName
 
-occNameString :: OccName -> String
-mkRecFldSelOcc :: String -> OccName
+occNameFS :: OccName -> FastString
+mkRecFldSelOcc :: FastString -> OccName
 mkVarOccFS :: FastString -> OccName

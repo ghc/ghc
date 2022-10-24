@@ -744,7 +744,7 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
       cis' <- conv_cimportspec cis
-      MkC str <- coreStringLit (static ++ chStr ++ cis')
+      MkC str <- coreStringLit (mkFastString (static ++ chStr ++ cis'))
       dec <- rep2 forImpDName [cc', s', str, name', typ']
       return (locA loc, dec)
  where
@@ -818,7 +818,7 @@ repRuleD (L loc (HsRule { rd_name = n
                          ; tm_bndrs' <- repListM ruleBndrTyConName
                                                 repRuleBndr
                                                 tm_bndrs
-                         ; n'   <- coreStringLit $ unpackFS $ unLoc n
+                         ; n'   <- coreStringLit $ unLoc n
                          ; act' <- repPhases act
                          ; lhs' <- repLE lhs
                          ; rhs' <- repLE rhs
@@ -1861,7 +1861,7 @@ rep_implicit_param_bind (L loc (IPBind _ (L _ n) (L _ rhs)))
       ; return (locA loc, ipb) }
 
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
-rep_implicit_param_name (HsIPName name) = coreStringLit (unpackFS name)
+rep_implicit_param_name (HsIPName name) = coreStringLit name
 
 rep_val_binds :: HsValBinds GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -2195,8 +2195,8 @@ globalVar name
         ; rep2_nwDsM mkNameLName [occ,uni] }
   where
       mod = assert (isExternalName name) nameModule name
-      name_mod = moduleNameString (moduleName mod)
-      name_pkg = unitString (moduleUnit mod)
+      name_mod = moduleNameFS (moduleName mod)
+      name_pkg = unitFS (moduleUnit mod)
       name_occ = nameOccName name
       mk_varg | isDataOcc name_occ = mkNameG_dName
               | isVarOcc  name_occ = mkNameG_vName
@@ -2235,10 +2235,10 @@ wrapGenSyms binds body@(MkC b)
                       gensym_app (MkC (Lam id body')) }
 
 nameLit :: Name -> DsM (Core String)
-nameLit n = coreStringLit (occNameString (nameOccName n))
+nameLit n = coreStringLit (occNameFS (nameOccName n))
 
 occNameLit :: OccName -> MetaM (Core String)
-occNameLit name = coreStringLit (occNameString name)
+occNameLit name = coreStringLit (occNameFS name)
 
 
 -- %*********************************************************************
@@ -2416,7 +2416,7 @@ repDoBlock doName maybeModName (MkC ss) = do
     coreModNameM :: MetaM (Core (Maybe TH.ModName))
     coreModNameM = case maybeModName of
       Just m -> do
-        MkC s <- coreStringLit (moduleNameString m)
+        MkC s <- coreStringLit (moduleNameFS m)
         mName <- rep2_nw mkModNameName [s]
         coreJust modNameTyConName mName
       _ -> coreNothing modNameTyConName
@@ -2950,17 +2950,17 @@ repUnboundVar (MkC name) = rep2 unboundVarEName [name]
 
 repOverLabel :: FastString -> MetaM (Core (M TH.Exp))
 repOverLabel fs = do
-                    (MkC s) <- coreStringLit $ unpackFS fs
+                    MkC s <- coreStringLit fs
                     rep2 labelEName [s]
 
 repGetField :: Core (M TH.Exp) -> FastString -> MetaM (Core (M TH.Exp))
 repGetField (MkC exp) fs = do
-  MkC s <- coreStringLit $ unpackFS fs
+  MkC s <- coreStringLit fs
   rep2 getFieldEName [exp,s]
 
 repProjection :: NonEmpty FastString -> MetaM (Core (M TH.Exp))
 repProjection fs = do
-  MkC xs <- coreListNonEmpty stringTy <$> mapM (coreStringLit . unpackFS) fs
+  MkC xs <- coreListNonEmpty stringTy <$> mapM coreStringLit fs
   rep2 projectionEName [xs]
 
 ------------ Lists -------------------
@@ -3004,8 +3004,8 @@ nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 nonEmptyCoreList' :: NonEmpty (Core a) -> Core [a]
 nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap unC xs))
 
-coreStringLit :: MonadThings m => String -> m (Core String)
-coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
+coreStringLit :: MonadThings m => FastString -> m (Core String)
+coreStringLit s = do { z <- mkStringExprFS s; return (MkC z) }
 
 ------------------- Maybe ------------------
 

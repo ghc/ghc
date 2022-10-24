@@ -965,8 +965,7 @@ mkRuleTyVarBndrs = fmap cvt_one
 checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (L loc (Unqual occ)) =
-          -- TODO: don't use string here, OccName has a Unique/FastString
-          when ((occNameString occ ==) `any` ["forall","family","role"])
+          when (occNameFS occ `elem` [fsLit "forall",fsLit "family",fsLit "role"])
             (addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
                (PsErrParseErrorOnInput occ))
         check _ = panic "checkRuleTyVarBndrNames"
@@ -1009,7 +1008,7 @@ checkTyClHdr is_cls ty
     -- workaround to define '*' despite StarIsType
     go _ (HsParTy an (L l (HsStarTy _ isUni))) acc ops' cps' fix
       = do { addPsMessage (locA l) PsWarnStarBinder
-           ; let name = mkOccName tcClsName (starSym isUni)
+           ; let name = mkOccNameFS tcClsName (starSym isUni)
            ; let a' = newAnns l an
            ; return (L a' (Unqual name), acc, fix
                     , (reverse ops') ++ cps') }
@@ -2776,7 +2775,7 @@ mkExport (L lc cconv) (L le (StringLiteral esrc entity _), v, ty)
 -- want z-encoding (e.g. names with z's in them shouldn't be doubled)
 --
 mkExtName :: RdrName -> CLabelString
-mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
+mkExtName rdrNm = occNameFS (rdrNameOcc rdrNm)
 
 --------------------------------------------------------------------------------
 -- Help with module system imports/exports
@@ -3142,9 +3141,9 @@ token_location_widenR (TokenLoc (EpaDelta _ _)) _ =
 -----------------------------------------------------------------------------
 -- Token symbols
 
-starSym :: Bool -> String
-starSym True = "★"
-starSym False = "*"
+starSym :: Bool -> FastString
+starSym True = fsLit "★"
+starSym False = fsLit "*"
 
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.

@@ -2036,7 +2036,7 @@ mayThrowUnitErr = \case
 instance Outputable UnitErr where
     ppr = \case
         CloseUnitErr p mb_parent
-            -> (ftext (fsLit "unknown unit:") <+> ppr p)
+            -> (text "unknown unit:" <+> ppr p)
                <> case mb_parent of
                      Nothing     -> Outputable.empty
                      Just parent -> space <> parens (text "dependency of"

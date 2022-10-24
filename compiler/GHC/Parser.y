@@ -67,7 +67,7 @@ import GHC.Prelude
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOcc, occNameString)
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS, occNameString)
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -3447,7 +3447,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                                 final = last fields
                                 l = comb2 (reLoc $1) $3
                                 isPun = True
-                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOcc . unpackFS . field_label . unLoc . dfoLabel . unLoc $ final))
+                            var <- mkHsVarPV (L (noAnnSrcSpan $ getLocA final) (mkRdrUnqual . mkVarOccFS . field_label . unLoc . dfoLabel . unLoc $ final))
                             fmap Right $ mkHsProjUpdatePV l (L l fields) var isPun []
                         }
 
@@ -3830,7 +3830,7 @@ special_id
 
 special_sym :: { Located FastString }
 special_sym : '.'       { sL1 $1 (fsLit ".") }
-            | '*'       { sL1 $1 (fsLit (starSym (isUnicode $1))) }
+            | '*'       { sL1 $1 (starSym (isUnicode $1)) }
 
 -----------------------------------------------------------------------------
 -- Data constructors

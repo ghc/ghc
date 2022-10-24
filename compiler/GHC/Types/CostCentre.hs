@@ -259,7 +259,7 @@ instance Outputable CostCentre where
   ppr cc = getPprStyle $ \ sty ->
            if codeStyle sty
            then ppCostCentreLbl cc
-           else text (costCentreUserName cc)
+           else ftext (costCentreUserNameFS cc)
 
 -- Printing in Core
 pprCostCentreCore :: CostCentre -> SDoc
