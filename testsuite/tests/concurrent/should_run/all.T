@@ -133,7 +133,9 @@ test('conc015',
   [ when(arch("js"), fragile(22261)) # delays are flaky with the JS backend when the system is overloaded
   ], compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
-test('conc016', omit_ways(concurrent_ways), # see comment in conc016.hs
+test('conc016', [omit_ways(concurrent_ways)  # see comment in conc016.hs
+                , js_skip
+                ],
                 compile_and_run, [''])
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
@@ -163,7 +165,8 @@ test('conc033', normal, compile_and_run, [''])
 test('conc034', [
                  normal,
                  omit_ways(['ghci']),
-                 extra_run_opts('+RTS -C0 -RTS')],
+                 extra_run_opts('+RTS -C0 -RTS'),
+                 js_skip],
 		compile_and_run, [''])
 
 test('conc035', normal, compile_and_run, [''])

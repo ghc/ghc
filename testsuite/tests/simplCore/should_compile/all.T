@@ -177,7 +177,7 @@ test('T5996',
      normal,
      makefile_test, ['T5996'])
 test('T8537', normal, compile, [''])
-test('T8832', normal, makefile_test, ['T8832'])
+test('T8832', js_skip, makefile_test, ['T8832'])
 test('T8848', normal, makefile_test, ['T8848'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
@@ -238,7 +238,7 @@ test('T13170', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13317',
      normal,
      makefile_test, ['T13317'])
-test('T13340', normal, makefile_test, ['T13340'])
+test('T13340', js_skip, makefile_test, ['T13340'])
 test('T13338', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13367', normal, makefile_test, ['T13367'])
 test('T13417', normal, compile, ['-O'])

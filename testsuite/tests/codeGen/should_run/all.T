@@ -183,7 +183,9 @@ test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
 test('T13425', normal, compile_and_run, ['-O'])
 test('castFloatWord', normal, compile_and_run, ['-dcmm-lint'])
 test('T13825-unit',
-     extra_run_opts('"' + config.libdir + '"'),
+     [ extra_run_opts('"' + config.libdir + '"')
+     , js_skip
+     ],
      compile_and_run,
      ['-package ghc'])
 test('T14619', normal, compile_and_run, [''])

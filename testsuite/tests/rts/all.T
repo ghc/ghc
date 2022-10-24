@@ -165,7 +165,7 @@ test('rtsflags001', [ only_ways(['normal']),
                      compile_and_run, [''])
 
 # Crashed with 7.2 and earlier
-test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
+test('rtsflags002', [ only_ways(['normal']), js_skip ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
 
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
@@ -221,7 +221,8 @@ test('T4059', req_c, makefile_test, ['T4059'])
 test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
-      cmd_prefix('./exec_signals_prepare')],
+      cmd_prefix('./exec_signals_prepare'),
+      js_skip],
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
@@ -421,7 +422,8 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 test('T12903', [ when(opsys('mingw32'), skip)
                , when(opsys('darwin'), skip)
                , when(arch('i386'), fragile(20377))
-               , omit_ways(['ghci', 'profasm'])]
+               , omit_ways(['ghci', 'profasm'])
+               , js_skip]
                , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])

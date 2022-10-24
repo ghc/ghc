@@ -1,7 +1,7 @@
 
-test('hsc2hs001', [], makefile_test, [])
+test('hsc2hs001', js_skip, makefile_test, [])
 
-test('hsc2hs002', [], makefile_test, [])
+test('hsc2hs002', js_skip, makefile_test, [])
 
 test('hsc2hs003', js_skip, makefile_test, [])
 
@@ -24,4 +24,4 @@ test('T11004', js_skip, makefile_test, [])
 test('T12504', [extra_files(['T12504']), ignore_stdout, js_skip], makefile_test, [])
 
 # Make sure response files are read and used.
-test('T15758', [], makefile_test, [])
+test('T15758', js_skip, makefile_test, [])
