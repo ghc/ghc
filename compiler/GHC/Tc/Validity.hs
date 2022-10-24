@@ -733,7 +733,7 @@ check_type ve (CastTy ty _) = check_type ve ty
 --
 -- Critically, this case must come *after* the case for TyConApp.
 -- See Note [Liberal type synonyms].
-check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
+check_type ve@(ValidityEnv{ ve_tidy_env = env
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr rank)
@@ -745,9 +745,7 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                 -- Reject forall (a :: Eq b => b). blah
                 -- In a kind signature we don't allow constraints
 
-        ; checkTcM (all (isInvisibleArgFlag . binderArgFlag) tvbs
-                         || vdqAllowed ctxt)
-                   (env, TcRnVDQInTermType (tidyType env ty))
+        ; checkVdqOK ve tvbs ty
                 -- Reject visible, dependent quantification in the type of a
                 -- term (e.g., `f :: forall a -> a -> Maybe a`)
 
@@ -937,6 +935,14 @@ checkConstraintsOK ve theta ty
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and #16263
     checkTcM (all isEqPred theta) (env, TcRnConstraintInKind (tidyType env ty))
   where env = ve_tidy_env ve
+
+checkVdqOK :: ValidityEnv -> [TyVarBinder] -> Type -> TcM ()
+checkVdqOK ve tvbs ty = do
+  checkTcM (vdqAllowed ctxt || no_vdq)
+           (env, TcRnVDQInTermType (Just (tidyType env ty)))
+  where
+    no_vdq = all (isInvisibleArgFlag . binderArgFlag) tvbs
+    ValidityEnv{ve_tidy_env = env, ve_ctxt = ctxt} = ve
 
 {-
 Note [Liberal type synonyms]

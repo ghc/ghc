@@ -288,7 +288,7 @@ Note [No nested foralls or contexts in instance types] in GHC.Hs.Type).
 --   "GHC.Rename.Module" and 'renameSig' in "GHC.Rename.Bind").
 --   See @Note [No nested foralls or contexts in instance types]@ in
 --   "GHC.Hs.Type".
-noNestedForallsContextsErr :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, SDoc)
+noNestedForallsContextsErr :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, TcRnMessage)
 noNestedForallsContextsErr what lty =
   case ignoreParens lty of
     L l (HsForAllTy { hst_tele = tele })
@@ -297,9 +297,7 @@ noNestedForallsContextsErr what lty =
          -- types of terms, so we give a slightly more descriptive error
          -- message in the event that they contain visible dependent
          -- quantification (currently only allowed in kinds).
-      -> Just (locA l, vcat [ text "Illegal visible, dependent quantification" <+>
-                              text "in the type of a term"
-                            , text "(GHC does not yet support this)" ])
+      -> Just (locA l, TcRnVDQInTermType Nothing)
       |  HsForAllInvis{} <- tele
       -> Just (locA l, nested_foralls_contexts_err)
     L l (HsQualTy {})
@@ -307,6 +305,7 @@ noNestedForallsContextsErr what lty =
     _ -> Nothing
   where
     nested_foralls_contexts_err =
+      mkTcRnUnknownMessage $ mkPlainError noHints $
       what <+> text "cannot contain nested"
       <+> quotes forAllLit <> text "s or contexts"
 
@@ -314,9 +313,7 @@ noNestedForallsContextsErr what lty =
 addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
 addNoNestedForallsContextsErr ctxt what lty =
   whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
-    addErrAt l $
-      TcRnWithHsDocContext ctxt $
-      mkTcRnUnknownMessage $ mkPlainError noHints err_msg
+    addErrAt l $ TcRnWithHsDocContext ctxt err_msg
 
 {-
 ************************************************************************

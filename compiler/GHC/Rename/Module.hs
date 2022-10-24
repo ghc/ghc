@@ -618,7 +618,8 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                Just (L _ cls) -> Right cls
                Nothing        -> Left
                  ( getLocA head_ty'
-                 , hang (text "Illegal head of an instance declaration:"
+                 , mkTcRnUnknownMessage $ mkPlainError noHints $
+                   hang (text "Illegal head of an instance declaration:"
                            <+> quotes (ppr head_ty'))
                       2 (vcat [ text "Instance heads must be of the form"
                               , nest 2 $ text "C ty_1 ... ty_n"
@@ -681,9 +682,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
     -- reach the typechecker, lest we encounter different errors that are
     -- hopelessly confusing (such as the one in #16114).
     bail_out (l, err_msg) = do
-      addErrAt l $
-        TcRnWithHsDocContext ctxt $
-        mkTcRnUnknownMessage $ mkPlainError noHints err_msg
+      addErrAt l $ TcRnWithHsDocContext ctxt err_msg
       pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
 rnFamEqn :: HsDocContext

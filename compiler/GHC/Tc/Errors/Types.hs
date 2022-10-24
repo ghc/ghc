@@ -915,7 +915,7 @@ data TcRnMessage where
                   dependent/should_fail/T17687
                   dependent/should_fail/T18271
   -}
-  TcRnVDQInTermType :: !Type -> TcRnMessage
+  TcRnVDQInTermType :: !(Maybe Type) -> TcRnMessage
 
   {-| TcRnBadQuantPredHead is an error that occurs whenever a quantified predicate
       lacks a class or type variable head.

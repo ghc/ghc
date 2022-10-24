@@ -364,12 +364,16 @@ instance Diagnostic TcRnMessage where
                 2 (text "type:" <+> quotes (ppr ty))
            , hang (text "where the body of the forall has this kind:")
                 2 (quotes (pprKind kind)) ]
-    TcRnVDQInTermType ty
+    TcRnVDQInTermType mb_ty
       -> mkSimpleDecorated $ vcat
-           [ hang (text "Illegal visible, dependent quantification" <+>
-                   text "in the type of a term:")
-                2 (pprType ty)
+           [ case mb_ty of
+               Nothing -> main_msg
+               Just ty -> hang (main_msg <> char ':') 2 (pprType ty)
            , text "(GHC does not yet support this)" ]
+      where
+        main_msg =
+          text "Illegal visible, dependent quantification" <+>
+          text "in the type of a term"
     TcRnBadQuantPredHead ty
       -> mkSimpleDecorated $
            hang (text "Quantified predicate must have a class or type variable head:")
