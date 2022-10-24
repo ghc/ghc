@@ -107,7 +107,6 @@ module GHC.Conc.Sync
 import Foreign
 import Foreign.C
 
-import Data.Typeable
 import Data.Maybe
 
 import GHC.Base
@@ -948,11 +947,9 @@ uncaughtExceptionHandler :: IORef (SomeException -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
       defaultHandler :: SomeException -> IO ()
-      defaultHandler se@(SomeException ex) = do
+      defaultHandler se = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
-         let msg = case cast ex of
-               Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
-               _                  -> showsPrec 0 se ""
+         let msg = displayException se
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg

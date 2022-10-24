@@ -2,6 +2,7 @@
 
 ## 4.20.0.0 *TBA*
   * Export `foldl'` from `Prelude` ([CLC proposal #167](https://github.com/haskell/core-libraries-committee/issues/167))
+  * The top-level handler for uncaught exceptions now displays the output of `displayException` rather than `show`  ([CLC proposal #198](https://github.com/haskell/core-libraries-committee/issues/198))
   * Add `permutations` and `permutations1` to `Data.List.NonEmpty` ([CLC proposal #68](https://github.com/haskell/core-libraries-committee/issues/68))
   * Add a `RULE` to `Prelude.lookup`, allowing it to participate in list fusion ([CLC proposal #175](https://github.com/haskell/core-libraries-committee/issues/175))
   * Implement `stimes` for `instance Semigroup (Endo a)` explicitly ([CLC proposal #4](https://github.com/haskell/core-libraries-committee/issues/4))
