@@ -21,6 +21,8 @@
 --
 -----------------------------------------------------------------------------
 
+#include <ghcplatform.h>
+
 module Foreign.C.Types
         ( -- * Representations of C types
           -- $ctypes
@@ -176,9 +178,16 @@ INTEGRAL_TYPE(CSize,"size_t",HTYPE_SIZE_T)
 -- | Haskell type representing the C @wchar_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
 INTEGRAL_TYPE(CWchar,"wchar_t",HTYPE_WCHAR_T)
+
+#if defined(HTYPE_SIG_ATOMIC_T)
 -- | Haskell type representing the C @sig_atomic_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
+-- See Note [Lack of signals on wasm32-wasi].
 INTEGRAL_TYPE(CSigAtomic,"sig_atomic_t",HTYPE_SIG_ATOMIC_T)
+#else
+newtype CSigAtomic = CSigAtomic Int32
+    deriving newtype (Read, Show, ARITHMETIC_CLASSES, INTEGRAL_CLASSES, Ix)
+#endif
 
 -- | Haskell type representing the C @clock_t@ type.
 -- /(The concrete types of "Foreign.C.Types#platform" are platform-specific.)/
@@ -259,4 +268,3 @@ representing a C type @t@:
   corresponding bitwise operation in C on @t@.
 
 -}
-

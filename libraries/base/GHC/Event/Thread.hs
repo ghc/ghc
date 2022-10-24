@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 
@@ -15,6 +16,9 @@ module GHC.Event.Thread
     , registerDelay
     , blockedOnBadFD -- used by RTS
     ) where
+
+#include <ghcplatform.h>
+
 -- TODO: Use new Windows I/O manager
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
@@ -421,9 +425,17 @@ ioManagerCapabilitiesChanged =
               tid <- restartPollLoop mgr i
               writeIOArray eventManagerArray i (Just (tid,mgr))
 
+#if defined(wasm32_HOST_ARCH)
+c_setIOManagerControlFd :: CUInt -> CInt -> IO ()
+c_setIOManagerControlFd _ _ = pure ()
+
+c_setTimerManagerControlFd :: CInt -> IO ()
+c_setTimerManagerControlFd _ = pure ()
+#else
 -- Used to tell the RTS how it can send messages to the I/O manager.
 foreign import ccall unsafe "setIOManagerControlFd"
    c_setIOManagerControlFd :: CUInt -> CInt -> IO ()
 
 foreign import ccall unsafe "setTimerManagerControlFd"
    c_setTimerManagerControlFd :: CInt -> IO ()
+#endif

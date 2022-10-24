@@ -28,6 +28,7 @@ module GHC.TopHandler (
         flushStdHandles
     ) where
 
+#include <ghcplatform.h>
 #include "HsBaseConfig.h"
 
 import Control.Exception
@@ -103,6 +104,8 @@ install_interrupt_handler handler = do
            Close    -> handler
            _ -> return ()
   return ()
+#elif !defined(HAVE_SIGNAL_H)
+install_interrupt_handler _ = pure ()
 #else
 #include "rts/Signals.h"
 -- specialised version of System.Posix.Signals.installHandler, which
@@ -279,14 +282,22 @@ exitHelper exitKind r
   | otherwise
   = shutdownHaskellAndExit   0xff                exitKind >> unreachable
 
+-- See Note [Lack of signals on wasm32-wasi].
+#if !defined(HAVE_SIGNAL_H)
+shutdownHaskellAndSignal :: CInt -> CInt -> IO ()
+shutdownHaskellAndSignal = shutdownHaskellAndExit
+#else
 foreign import ccall "shutdownHaskellAndSignal"
   shutdownHaskellAndSignal :: CInt -> CInt -> IO ()
+#endif
 #endif
 
 exitInterrupted :: IO a
 exitInterrupted =
 #if defined(mingw32_HOST_OS)
   safeExit 252
+#elif !defined(HAVE_SIGNAL_H)
+  safeExit 1
 #else
   -- we must exit via the default action for SIGINT, so that the
   -- parent of this process can take appropriate action (see #2301)

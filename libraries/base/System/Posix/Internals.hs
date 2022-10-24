@@ -26,6 +26,7 @@
 
 module System.Posix.Internals where
 
+#include <ghcplatform.h>
 #include "HsBaseConfig.h"
 
 import System.Posix.Types
@@ -263,7 +264,7 @@ foreign import ccall unsafe "HsBase.h __hscore_get_saved_termios"
 foreign import ccall unsafe "HsBase.h __hscore_set_saved_termios"
    set_saved_termios :: CInt -> (Ptr CTermios) -> IO ()
 
-#else
+#elif defined(mingw32_HOST_OS)
 
 -- 'raw' mode for Win32 means turn off 'line input' (=> buffering and
 -- character translation for the console.) The Win32 API for doing
@@ -311,6 +312,17 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 
 foreign import ccall unsafe "consUtils.h is_console__"
    is_console :: CInt -> IO CInt
+
+#else
+
+setCooked :: FD -> Bool -> IO ()
+setCooked _ _ = errorWithoutStackTrace "setCooked"
+
+setEcho :: FD -> Bool -> IO ()
+setEcho _ _ = errorWithoutStackTrace "setEcho"
+
+getEcho :: FD -> IO Bool
+getEcho _ = errorWithoutStackTrace "getEcho"
 
 #endif
 
@@ -454,8 +466,13 @@ foreign import capi unsafe "unistd.h lseek"
 foreign import ccall unsafe "HsBase.h access"
    c_access :: CString -> CInt -> IO CInt
 
+#if !defined(HAVE_CHMOD)
+c_chmod :: CString -> CMode -> IO CInt
+c_chmod _ _ = ioError (ioeSetLocation unsupportedOperation "chmod")
+#else
 foreign import ccall unsafe "HsBase.h chmod"
    c_chmod :: CString -> CMode -> IO CInt
+#endif
 
 foreign import ccall unsafe "HsBase.h close"
    c_close :: CInt -> IO CInt
@@ -463,11 +480,19 @@ foreign import ccall unsafe "HsBase.h close"
 foreign import ccall unsafe "HsBase.h creat"
    c_creat :: CString -> CMode -> IO CInt
 
+#if !defined(HAVE_DUP)
+c_dup :: CInt -> IO CInt
+c_dup _ = ioError (ioeSetLocation unsupportedOperation "dup")
+
+c_dup2 :: CInt -> CInt -> IO CInt
+c_dup2 _ _ = ioError (ioeSetLocation unsupportedOperation "dup2")
+#else
 foreign import ccall unsafe "HsBase.h dup"
    c_dup :: CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
+#endif
 
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
@@ -518,8 +543,13 @@ foreign import capi unsafe "HsBase.h write"
 foreign import capi safe "HsBase.h write"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
+#if !defined(HAVE_PIPE)
+c_pipe :: Ptr CInt -> IO CInt
+c_pipe _ = ioError (ioeSetLocation unsupportedOperation "pipe")
+#else
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
+#endif
 #endif
 
 foreign import ccall unsafe "HsBase.h unlink"
@@ -528,8 +558,13 @@ foreign import ccall unsafe "HsBase.h unlink"
 foreign import capi unsafe "HsBase.h utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
+#if !defined(HAVE_GETPID)
+c_getpid :: IO CPid
+c_getpid = pure 1
+#else
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
+#endif
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
@@ -547,16 +582,27 @@ foreign import capi unsafe "HsBase.h fcntl"
 foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
+#if !defined(HAVE_FORK)
+c_fork :: IO CPid
+c_fork = ioError (ioeSetLocation unsupportedOperation "fork")
+#else
 foreign import ccall unsafe "HsBase.h fork"
    c_fork :: IO CPid
+#endif
 
 foreign import ccall unsafe "HsBase.h link"
    c_link :: CString -> CString -> IO CInt
 
+#if !defined(HAVE_MKFIFO)
+c_mkfifo :: CString -> CMode -> IO CInt
+c_mkfifo _ _ = ioError (ioeSetLocation unsupportedOperation "mkfifo")
+#else
 -- capi is required at least on Android
 foreign import capi unsafe "HsBase.h mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
+#endif
 
+#if HAVE_SIGNAL_H
 foreign import capi unsafe "signal.h sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
@@ -565,6 +611,17 @@ foreign import capi unsafe "signal.h sigaddset"
 
 foreign import capi unsafe "signal.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
+#endif
+
+#if !defined(HAVE_TERMIOS_H)
+
+c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
+c_tcgetattr _ _ = ioError (ioeSetLocation unsupportedOperation "tcgetattr")
+
+c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
+c_tcsetattr _ _ _ = ioError (ioeSetLocation unsupportedOperation "tcsetattr")
+
+#else
 
 -- capi is required at least on Android
 foreign import capi unsafe "HsBase.h tcgetattr"
@@ -573,6 +630,8 @@ foreign import capi unsafe "HsBase.h tcgetattr"
 -- capi is required at least on Android
 foreign import capi unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
+
+#endif
 
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
@@ -665,4 +724,3 @@ with the types in Microsoft's documentation which means that c_read,
 c_safe_read, c_write and c_safe_write have different Haskell types depending on
 the OS.
 -}
-

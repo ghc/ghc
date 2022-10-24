@@ -465,7 +465,7 @@ INLINE int __hscore_sig_setmask( void )
 #endif
 }
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && defined(HAVE_SIGNAL_H)
 INLINE size_t __hscore_sizeof_siginfo_t (void)
 {
     return sizeof(siginfo_t);

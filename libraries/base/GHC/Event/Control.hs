@@ -26,6 +26,7 @@ module GHC.Event.Control
     , setNonBlockingFD
     ) where
 
+#include <ghcplatform.h>
 #include "EventConfig.h"
 
 import GHC.Base
@@ -145,6 +146,10 @@ io_MANAGER_WAKEUP, io_MANAGER_DIE :: Word8
 io_MANAGER_WAKEUP = 0xff
 io_MANAGER_DIE    = 0xfe
 
+#if !defined(HAVE_SIGNAL_H)
+readControlMessage :: Control -> Fd -> IO ControlMessage
+readControlMessage _ _ = errorWithoutStackTrace "readControlMessage"
+#else
 foreign import ccall "__hscore_sizeof_siginfo_t"
     sizeof_siginfo_t :: CSize
 
@@ -179,6 +184,7 @@ readControlMessage ctrl fd
             8
 #else
             4096
+#endif
 #endif
 
 sendWakeup :: Control -> IO ()
@@ -229,5 +235,10 @@ foreign import ccall unsafe "sys/eventfd.h eventfd_write"
    c_eventfd_write :: CInt -> CULLong -> IO CInt
 #endif
 
+#if defined(wasm32_HOST_ARCH)
+c_setIOManagerWakeupFd :: CInt -> IO ()
+c_setIOManagerWakeupFd _ = pure ()
+#else
 foreign import ccall unsafe "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
+#endif
