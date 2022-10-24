@@ -816,6 +816,11 @@ Library
         GHC.Utils.Trace
         GHC.Wasm.ControlFlow
         GHC.Wasm.ControlFlow.FromCmm
+        GHC.CmmToAsm.Wasm
+        GHC.CmmToAsm.Wasm.Asm
+        GHC.CmmToAsm.Wasm.FromCmm
+        GHC.CmmToAsm.Wasm.Types
+        GHC.CmmToAsm.Wasm.Utils
 
         Language.Haskell.Syntax
         Language.Haskell.Syntax.Basic

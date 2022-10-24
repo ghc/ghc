@@ -83,6 +83,7 @@ import GHC.Prelude hiding (head)
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
 import qualified GHC.CmmToAsm.AArch64 as AArch64
+import qualified GHC.CmmToAsm.Wasm as Wasm32
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
@@ -169,6 +170,7 @@ nativeCodeGen logger config modLoc h us cmms
       ArchRISCV64   -> panic "nativeCodeGen: No NCG for RISCV64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
+      ArchWasm32    -> Wasm32.ncgWasm platform us modLoc h cmms
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.
