@@ -1,2 +1,2 @@
 
-TH_finalizer.hs:1:1: warning: Just True
+TH_finalizer.hs:1:1: warning: [GHC-39584] Just True

@@ -3,7 +3,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -33,6 +32,7 @@ import GHC.Prelude
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
+import GHC.Tc.Errors.Types
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name
 import GHC.Unit.Module
@@ -47,12 +47,10 @@ import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.SourceText
-import GHC.Utils.Error
 import GHC.Data.Bag
 import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
-import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -60,6 +58,8 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
+import Data.Bifunctor (first)
+import Data.Foldable (for_)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
@@ -71,29 +71,33 @@ import System.IO.Unsafe
 -------------------------------------------------------------------
 --              The external interface
 
-convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either SDoc [LHsDecl GhcPs]
-convertToHsDecls origin loc ds = initCvt origin loc (fmap catMaybes (mapM cvt_dec ds))
+convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either RunSpliceFailReason [LHsDecl GhcPs]
+convertToHsDecls origin loc ds =
+  initCvt origin loc $ fmap catMaybes (mapM cvt_dec ds)
   where
-    cvt_dec d = wrapMsg "declaration" d (cvtDec d)
+    cvt_dec d =
+      wrapMsg (ConvDec d) $ cvtDec d
 
-convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either SDoc (LHsExpr GhcPs)
+convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either RunSpliceFailReason (LHsExpr GhcPs)
 convertToHsExpr origin loc e
-  = initCvt origin loc $ wrapMsg "expression" e $ cvtl e
+  = initCvt origin loc $ wrapMsg (ConvExp e) $ cvtl e
 
-convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either SDoc (LPat GhcPs)
+convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either RunSpliceFailReason (LPat GhcPs)
 convertToPat origin loc p
-  = initCvt origin loc $ wrapMsg "pattern" p $ cvtPat p
+  = initCvt origin loc $ wrapMsg (ConvPat p) $ cvtPat p
 
-convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either SDoc (LHsType GhcPs)
+convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either RunSpliceFailReason (LHsType GhcPs)
 convertToHsType origin loc t
-  = initCvt origin loc $ wrapMsg "type" t $ cvtType t
+  = initCvt origin loc $ wrapMsg (ConvType t) $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either SDoc (SrcSpan, a) }
+newtype CvtM' err a = CvtM { unCvtM :: Origin -> SrcSpan -> Either err (SrcSpan, a) }
     deriving (Functor)
         -- Push down the Origin (that is configurable by
         -- -fenable-th-splice-warnings) and source location;
         -- Can fail, with a single error message
+
+type CvtM = CvtM' ConversionFailReason
 
 -- NB: If the conversion succeeds with (Right x), there should
 --     be no exception values hiding in x
@@ -103,22 +107,25 @@ newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either SDoc (SrcSpan, a) 
 -- Use the SrcSpan everywhere, for lack of anything better.
 -- See Note [Source locations within TH splices].
 
-instance Applicative CvtM where
+instance Applicative (CvtM' err) where
     pure x = CvtM $ \_ loc -> Right (loc,x)
     (<*>) = ap
 
-instance Monad CvtM where
+instance Monad (CvtM' err) where
   (CvtM m) >>= k = CvtM $ \origin loc -> case m origin loc of
     Left err -> Left err
     Right (loc',v) -> unCvtM (k v) origin loc'
 
-initCvt :: Origin -> SrcSpan -> CvtM a -> Either SDoc a
+mapCvtMError :: (err1 -> err2) -> CvtM' err1 a -> CvtM' err2 a
+mapCvtMError f (CvtM m) = CvtM $ \origin loc -> first f $ m origin loc
+
+initCvt :: Origin -> SrcSpan -> CvtM' err a -> Either err a
 initCvt origin loc (CvtM m) = fmap snd (m origin loc)
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
 
-failWith :: SDoc -> CvtM a
+failWith :: ConversionFailReason -> CvtM a
 failWith m = CvtM (\_ _ -> Left m)
 
 getOrigin :: CvtM Origin
@@ -141,19 +148,8 @@ returnJustLA = fmap Just . returnLA
 wrapParLA :: (LocatedAn ann a -> b) -> a -> CvtM b
 wrapParLA add_par x = CvtM (\_ loc -> Right (loc, add_par (L (noAnnSrcSpan loc) x)))
 
-wrapMsg :: (Show a, TH.Ppr a) => String -> a -> CvtM b -> CvtM b
--- E.g  wrapMsg "declaration" dec thing
-wrapMsg what item (CvtM m)
-  = CvtM $ \origin loc -> case m origin loc of
-      Left err -> Left (err $$ msg)
-      Right v  -> Right v
-  where
-        -- Show the item in pretty syntax normally,
-        -- but with all its constructors if you say -dppr-debug
-    msg = hang (text "When splicing a TH" <+> text what <> colon)
-                 2 (getPprDebug $ \case
-                     True  -> text (show item)
-                     False -> text (pprint item))
+wrapMsg :: ThingBeingConverted -> CvtM' ConversionFailReason a -> CvtM' RunSpliceFailReason a
+wrapMsg what = mapCvtMError (ConversionFail what)
 
 wrapL :: CvtM a -> CvtM (Located a)
 wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of
@@ -220,7 +216,7 @@ cvtDec (TH.ValD pat body ds)
   | otherwise
   = do  { pat' <- cvtPat pat
         ; body' <- cvtGuard body
-        ; ds' <- cvtLocalDecs (text "a where clause") ds
+        ; ds' <- cvtLocalDecs WhereClause ds
         ; returnJustLA $ Hs.ValD noExtField $
           PatBind { pat_lhs = pat'
                   , pat_rhs = GRHSs emptyComments body' ds'
@@ -229,9 +225,7 @@ cvtDec (TH.ValD pat body ds)
 
 cvtDec (TH.FunD nm cls)
   | null cls
-  = failWith (text "Function binding for"
-                 <+> quotes (text (TH.pprint nm))
-                 <+> text "has no equations")
+  = failWith $ FunBindLacksEquations nm
   | otherwise
   = do  { nm' <- vNameN nm
         ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
@@ -282,10 +276,9 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
               isGadtDecl  = all isGadtCon constrs
               isH98Decl   = all (not . isGadtCon) constrs
         ; unless (isGadtDecl || isH98Decl)
-                 (failWith (text "Cannot mix GADT constructors with Haskell 98"
-                        <+> text "constructors"))
+                 (failWith CannotMixGADTConsWith98Cons)
         ; unless (isNothing ksig || isGadtDecl)
-                 (failWith (text "Kind signatures are only allowed on GADTs"))
+                 (failWith KindSigsOnlyAllowedOnGADTs)
         ; (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
         ; cons' <- mapM cvtConstr constrs
@@ -322,11 +315,9 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
         ; fds'  <- mapM cvt_fundep fds
-        ; (binds', sigs', fams', at_defs', adts') <- cvt_ci_decs (text "a class declaration") decs
+        ; (binds', sigs', fams', at_defs', adts') <- cvt_ci_decs ClssDecl decs
         ; unless (null adts')
-            (failWith $ (text "Default data instance declarations"
-                     <+> text "are not allowed:")
-                   $$ (Outputable.ppr adts'))
+            (failWith $ DefaultDataInstDecl adts')
         ; returnJustLA $ TyClD noExtField $
           ClassDecl { tcdCExt = (noAnn, NoAnnSortKey), tcdLayout = NoLayoutInfo
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
@@ -338,9 +329,9 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         }
 
 cvtDec (InstanceD o ctxt ty decs)
-  = do  { let doc = text "an instance declaration"
-        ; (binds', sigs', fams', ats', adts') <- cvt_ci_decs doc decs
-        ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
+  = do  { (binds', sigs', fams', ats', adts') <- cvt_ci_decs InstanceDecl decs
+        ; for_ (nonEmpty fams') $ \ bad_fams ->
+            failWith (IllegalDeclaration InstanceDecl $ IllegalFamDecls bad_fams)
         ; ctxt' <- cvtContext funPrec ctxt
         ; (L loc ty') <- cvtType ty
         ; let inst_ty' = L loc $ mkHsImplicitSigType $
@@ -490,7 +481,7 @@ cvtDec (TH.PatSynSigD nm ty)
 -- cvtImplicitParamBind. They are not allowed in any other scope, so
 -- reaching this case indicates an error.
 cvtDec (TH.ImplicitParamBindD _ _)
-  = failWith (text "Implicit parameter binding only allowed in let or where")
+  = failWith InvalidImplicitParamBinding
 
 ----------------
 cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
@@ -520,12 +511,11 @@ cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
                                                 (map HsValArg args') ++ args
                                                , feqn_fixity = Hs.Infix
                                                , feqn_rhs    = rhs' } }
-           _ -> failWith $ text "Invalid type family instance LHS:"
-                          <+> text (show lhs)
+           _ -> failWith $ InvalidTyFamInstLHS lhs
         }
 
 ----------------
-cvt_ci_decs :: SDoc -> [TH.Dec]
+cvt_ci_decs :: THDeclDescriptor -> [TH.Dec]
             -> CvtM (LHsBinds GhcPs,
                      [LSig GhcPs],
                      [LFamilyDecl GhcPs],
@@ -533,14 +523,15 @@ cvt_ci_decs :: SDoc -> [TH.Dec]
                      [LDataFamInstDecl GhcPs])
 -- Convert the declarations inside a class or instance decl
 -- ie signatures, bindings, and associated types
-cvt_ci_decs doc decs
+cvt_ci_decs declDescr decs
   = do  { decs' <- cvtDecs decs
         ; let (ats', bind_sig_decs') = partitionWith is_tyfam_inst decs'
         ; let (adts', no_ats')       = partitionWith is_datafam_inst bind_sig_decs'
         ; let (sigs', prob_binds')   = partitionWith is_sig no_ats'
         ; let (binds', prob_fams')   = partitionWith is_bind prob_binds'
         ; let (fams', bads)          = partitionWith is_fam_decl prob_fams'
-        ; unless (null bads) (failWith (mkBadDecMsg doc bads))
+        ; for_ (nonEmpty bads) $ \ bad_decls ->
+            failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
@@ -573,8 +564,7 @@ cvt_datainst_hdr cxt bndrs tys
                                 ; args' <- mapM cvtType [t1,t2]
                                 ; return (cxt', nm', outer_bndrs,
                                          ((map HsValArg args') ++ args)) }
-          _ -> failWith $ text "Invalid type instance header:"
-                          <+> text (show tys) }
+          _ -> failWith $ InvalidTypeInstanceHeader tys }
 
 ----------------
 cvt_tyfam_head :: TypeFamilyHead
@@ -584,7 +574,7 @@ cvt_tyfam_head :: TypeFamilyHead
                        , Maybe (Hs.LInjectivityAnn GhcPs))
 
 cvt_tyfam_head (TypeFamilyHead tc tyvars result injectivity)
-  = do {(_, tc', tyvars') <- cvt_tycl_hdr [] tc tyvars
+  = do { (_, tc', tyvars') <- cvt_tycl_hdr [] tc tyvars
        ; result' <- cvtFamilyResultSig result
        ; injectivity' <- traverse cvtInjectivityAnnotation injectivity
        ; return (tc', tyvars', result', injectivity') }
@@ -621,11 +611,6 @@ is_bind decl                     = Right decl
 is_ip_bind :: TH.Dec -> Either (String, TH.Exp) TH.Dec
 is_ip_bind (TH.ImplicitParamBindD n e) = Left (n, e)
 is_ip_bind decl             = Right decl
-
-mkBadDecMsg :: Outputable a => SDoc -> [a] -> SDoc
-mkBadDecMsg doc bads
-  = sep [ text "Illegal declaration(s) in" <+> doc <> colon
-        , nest 2 (vcat (map Outputable.ppr bads)) ]
 
 ---------------------------------------------------
 --      Data types
@@ -683,7 +668,7 @@ cvtConstr (ForallC tvs ctxt con)
         all_tvs = tvs' ++ ex_tvs
 
 cvtConstr (GadtC c strtys ty) = case nonEmpty c of
-    Nothing -> failWith (text "GadtC must have at least one constructor name")
+    Nothing -> failWith GadtNoCons
     Just c -> do
         { c'      <- mapM cNameN c
         ; args    <- mapM cvt_arg strtys
@@ -691,7 +676,7 @@ cvtConstr (GadtC c strtys ty) = case nonEmpty c of
         ; mk_gadt_decl c' (PrefixConGADT $ map hsLinear args) ty'}
 
 cvtConstr (RecGadtC c varstrtys ty) = case nonEmpty c of
-    Nothing -> failWith (text "RecGadtC must have at least one constructor name")
+    Nothing -> failWith RecGadtNoCons
     Just c -> do
         { c'       <- mapM cNameN c
         ; ty'      <- cvtType ty
@@ -770,7 +755,7 @@ cvtForD (ImportF callconv safety from nm ty) =
                                           from (L l $ quotedSourceText from)
           -> mk_imp impspec
           |  otherwise
-          -> failWith $ text (show from) <+> text "is not a valid ccall impent" }
+          -> failWith $ InvalidCCallImpent from }
   where
     mk_imp impspec
       = do { nm' <- vNameN nm
@@ -939,21 +924,22 @@ cvtRuleBndr (TypedRuleVar n ty)
 --              Declarations
 ---------------------------------------------------
 
-cvtLocalDecs :: SDoc -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
-cvtLocalDecs doc ds
+cvtLocalDecs :: THDeclDescriptor -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
+cvtLocalDecs declDescr ds
   = case partitionWith is_ip_bind ds of
       ([], []) -> return (EmptyLocalBinds noExtField)
       ([], _) -> do
         ds' <- cvtDecs ds
         let (binds, prob_sigs) = partitionWith is_bind ds'
         let (sigs, bads) = partitionWith is_sig prob_sigs
-        unless (null bads) (failWith (mkBadDecMsg doc bads))
+        for_ (nonEmpty bads) $ \ bad_decls ->
+          failWith (IllegalDeclaration declDescr $ IllegalDecls bad_decls)
         return (HsValBinds noAnn (ValBinds NoAnnSortKey (listToBag binds) sigs))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
         return (HsIPBinds noAnn (IPBinds noExtField binds))
       ((_:_), (_:_)) ->
-        failWith (text "Implicit parameters mixed with other bindings")
+        failWith ImplicitParamsWithOtherBinds
 
 cvtClause :: HsMatchContext GhcPs
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
@@ -961,7 +947,7 @@ cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
-        ; ds' <- cvtLocalDecs (text "a where clause") wheres
+        ; ds' <- cvtLocalDecs WhereClause wheres
         ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs emptyComments g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
@@ -1018,7 +1004,7 @@ cvtl e = wrapLA (cvt e)
                             ; wrapParLA (HsLamCase noAnn LamCase . mkMatchGroup th_origin) ms'
                             }
     cvt (LamCasesE ms)
-      | null ms   = failWith (text "\\cases expression with no alternatives")
+      | null ms   = failWith CasesExprWithoutAlts
       | otherwise = do { ms' <- mapM (cvtClause $ LamCaseAlt LamCases) ms
                        ; th_origin <- getOrigin
                        ; wrapParLA (HsLamCase noAnn LamCases . mkMatchGroup th_origin) ms'
@@ -1031,10 +1017,10 @@ cvtl e = wrapLA (cvt e)
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ mkHsIf x' y' z' noAnn }
     cvt (MultiIfE alts)
-      | null alts      = failWith (text "Multi-way if-expression with no alternatives")
+      | null alts      = failWith MultiWayIfWithoutAlts
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf noAnn alts' }
-    cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
+    cvt (LetE ds e)    = do { ds' <- cvtLocalDecs LetExpression ds
                             ; e' <- cvtl e; return $ HsLet noAnn noHsTok ds' noHsTok e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
@@ -1129,8 +1115,7 @@ ensureValidOpExp :: TH.Exp -> CvtM a -> CvtM a
 ensureValidOpExp (VarE _n) m = m
 ensureValidOpExp (ConE _n) m = m
 ensureValidOpExp (UnboundVarE _n) m = m
-ensureValidOpExp _e _m =
-    failWith (text "Non-variable expression is not allowed in an infix expression")
+ensureValidOpExp _e _m = failWith NonVarInInfixExpr
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1243,7 +1228,7 @@ cvtOpApp x op y
 
 cvtHsDo :: HsDoFlavour -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
-  | null stmts = failWith (text "Empty stmt list in do-block")
+  | null stmts = failWith EmptyStmtListInDoBlock
   | otherwise
   = do  { stmts' <- cvtStmts stmts
         ; let Just (stmts'', last') = snocView stmts'
@@ -1255,9 +1240,7 @@ cvtHsDo do_or_lc stmts
 
         ; wrapParLA (HsDo noAnn do_or_lc) (stmts'' ++ [last'']) }
   where
-    bad_last stmt = vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
-                         , nest 2 $ Outputable.ppr stmt
-                         , text "(It should be an expression.)" ]
+    bad_last stmt = IllegalLastStatement do_or_lc stmt
 
 cvtStmts :: [TH.Stmt] -> CvtM [Hs.LStmt GhcPs (LHsExpr GhcPs)]
 cvtStmts = mapM cvtStmt
@@ -1265,7 +1248,7 @@ cvtStmts = mapM cvtStmt
 cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt GhcPs (LHsExpr GhcPs))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnLA $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnLA $ mkPsBindStmt noAnn p' e' }
-cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (text "a let binding") ds
+cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs LetBinding ds
                             ; returnLA $ LetStmt noAnn ds' }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                             ; returnLA $ ParStmt noExtField dss' noExpr noSyntaxExpr }
@@ -1284,7 +1267,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      (L loc SigPat{}) -> L loc (gParPat p') -- #14875
                      _                -> p'
         ; g' <- cvtGuard body
-        ; decs' <- cvtLocalDecs (text "a where clause") decs
+        ; decs' <- cvtLocalDecs WhereClause decs
         ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs emptyComments g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
@@ -1531,21 +1514,21 @@ cvtDerivStrategy (TH.ViaStrategy ty) = do
   returnLA $ Hs.ViaStrategy (XViaStrategyPs noAnn ty')
 
 cvtType :: TH.Type -> CvtM (LHsType GhcPs)
-cvtType = cvtTypeKind "type"
+cvtType = cvtTypeKind TypeLevel
 
 cvtSigType :: TH.Type -> CvtM (LHsSigType GhcPs)
-cvtSigType = cvtSigTypeKind "type"
+cvtSigType = cvtSigTypeKind TypeLevel
 
 -- | Convert a Template Haskell 'Type' to an 'LHsSigType'. To avoid duplicating
 -- the logic in 'cvtTypeKind' here, we simply reuse 'cvtTypeKind' and perform
 -- surgery on the 'LHsType' it returns to turn it into an 'LHsSigType'.
-cvtSigTypeKind :: String -> TH.Type -> CvtM (LHsSigType GhcPs)
-cvtSigTypeKind ty_str ty = do
-  ty' <- cvtTypeKind ty_str ty
+cvtSigTypeKind :: TypeOrKind -> TH.Type -> CvtM (LHsSigType GhcPs)
+cvtSigTypeKind typeOrKind ty = do
+  ty' <- cvtTypeKind typeOrKind ty
   pure $ hsTypeToHsSigType ty'
 
-cvtTypeKind :: String -> TH.Type -> CvtM (LHsType GhcPs)
-cvtTypeKind ty_str ty
+cvtTypeKind :: TypeOrKind -> TH.Type -> CvtM (LHsType GhcPs)
+cvtTypeKind typeOrKind ty
   = do { (head_ty, tys') <- split_ty_app ty
        ; let m_normals = mapM extract_normal tys'
                                 where extract_normal (HsValArg ty) = Just ty
@@ -1568,10 +1551,7 @@ cvtTypeKind ty_str ty
                    ; mk_apps (HsTyVar noAnn NotPromoted tuple_tc) tys' }
            UnboxedSumT n
              | n < 2
-            -> failWith $
-                   vcat [ text "Illegal sum arity:" <+> text (show n)
-                        , nest 2 $
-                            text "Sums must have an arity of at least 2" ]
+            -> failWith $ IllegalSumArity n
              | Just normals <- m_normals
              , normals `lengthIs` n -- Saturated
              -> returnLA (HsSumTy noAnn normals)
@@ -1748,7 +1728,7 @@ cvtTypeKind ty_str ty
                    ; returnLA (HsIParamTy noAnn (reLocA n') t')
                    }
 
-           _ -> failWith (text "Malformed " <> text ty_str <+> text (show ty))
+           _ -> failWith (MalformedType typeOrKind ty)
     }
 
 hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
@@ -1859,10 +1839,10 @@ cvtOpAppT prom x op y
        ; returnLA (mkHsOpTy prom x' op y) }
 
 cvtKind :: TH.Kind -> CvtM (LHsKind GhcPs)
-cvtKind = cvtTypeKind "kind"
+cvtKind = cvtTypeKind KindLevel
 
 cvtSigKind :: TH.Kind -> CvtM (LHsSigType GhcPs)
-cvtSigKind = cvtSigTypeKind "kind"
+cvtSigKind = cvtSigTypeKind KindLevel
 
 -- | Convert Maybe Kind to a type family result signature. Used with data
 -- families where naming of the result is not possible (thus only kind or no
@@ -1939,14 +1919,11 @@ overloadedLit _             = False
 unboxedSumChecks :: TH.SumAlt -> TH.SumArity -> CvtM ()
 unboxedSumChecks alt arity
     | alt > arity
-    = failWith $ text "Sum alternative"    <+> text (show alt)
-             <+> text "exceeds its arity," <+> text (show arity)
+    = failWith $ SumAltArityExceeded alt arity
     | alt <= 0
-    = failWith $ vcat [ text "Illegal sum alternative:" <+> text (show alt)
-                      , nest 2 $ text "Sum alternatives must start from 1" ]
+    = failWith $ IllegalSumAlt alt
     | arity < 2
-    = failWith $ vcat [ text "Illegal sum arity:" <+> text (show arity)
-                      , nest 2 $ text "Sums must have an arity of at least 2" ]
+    = failWith $ IllegalSumArity arity
     | otherwise
     = return ()
 
@@ -2045,12 +2022,12 @@ tconName n = cvtName OccName.tcClsName n
 
 ipName :: String -> CvtM HsIPName
 ipName n
-  = do { unless (okVarOcc n) (failWith (badOcc OccName.varName n))
+  = do { unless (okVarOcc n) (failWith (IllegalOccName OccName.varName n))
        ; return (HsIPName (fsLit n)) }
 
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtName ctxt_ns (TH.Name occ flavour)
-  | not (okOcc ctxt_ns occ_str) = failWith (badOcc ctxt_ns occ_str)
+  | not (okOcc ctxt_ns occ_str) = failWith (IllegalOccName ctxt_ns occ_str)
   | otherwise
   = do { loc <- getL
        ; let rdr_name = thRdrName loc ctxt_ns occ_str flavour
@@ -2072,11 +2049,6 @@ isVarName (TH.Name occ _)
   = case TH.occString occ of
       ""    -> False
       (c:_) -> startsVarId c || startsVarSym c
-
-badOcc :: OccName.NameSpace -> String -> SDoc
-badOcc ctxt_ns occ
-  = text "Illegal" <+> pprNameSpace ctxt_ns
-        <+> text "name:" <+> quotes (text occ)
 
 thRdrName :: SrcSpan -> OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a TH Name into a RdrName; used for both binders and occurrences

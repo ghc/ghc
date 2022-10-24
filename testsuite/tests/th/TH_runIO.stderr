@@ -1,5 +1,5 @@
 
-TH_runIO.hs:12:7: error:
+TH_runIO.hs:12:7: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         user error (hi)
       Code: (runIO (fail "hi"))

@@ -257,7 +257,7 @@ tcLookupGlobal name
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return thing
-            Failed msg      -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints msg)
+            Failed msg      -> failWithTc (TcRnInterfaceLookupError name msg)
         }}}
 
 -- Look up only in this module's global env't. Don't look in imports, etc.

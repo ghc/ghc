@@ -1,5 +1,5 @@
 
-T7276.hs:6:5: error:
+T7276.hs:6:5: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         T7276.hs:6:8: error: [GHC-83865]
     • Couldn't match type ‘[Language.Haskell.TH.Syntax.Dec]’

@@ -1,5 +1,5 @@
 
-MultiLayerModules.hs:334:8: error:
+MultiLayerModules.hs:334:8: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         deliberate error
 CallStack (from HasCallStack):

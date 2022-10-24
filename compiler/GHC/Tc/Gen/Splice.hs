@@ -124,7 +124,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (throwIO, ErrorCall(..))
+import GHC.Utils.Exception (throwIO, ErrorCall(..), SomeException(..))
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
@@ -794,16 +794,10 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 -- Takes a m and tau and returns the type m (TExp tau)
 tcTExpTy :: TcType -> TcType -> TcM TcType
 tcTExpTy m_ty exp_ty
-  = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
+  = do { unless (isTauTy exp_ty) $ addErr (TcRnTypedTHWithPolyType exp_ty)
        ; codeCon <- tcLookupTyCon codeTyConName
        ; let rep = getRuntimeRep exp_ty
        ; return (mkTyConApp codeCon [rep, m_ty, exp_ty]) }
-  where
-    err_msg ty
-      = mkTcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ text "Illegal polytype:" <+> ppr ty
-             , text "The type of a Typed Template Haskell expression must" <+>
-               text "not have any quantification." ]
 
 quotationCtxtDoc :: LHsExpr GhcRn -> SDoc
 quotationCtxtDoc br_body
@@ -1023,15 +1017,15 @@ runAnnotation target expr = do
                ann_value = serialized
            }
 
-convertAnnotationWrapper :: ForeignHValue -> TcM (Either SDoc Serialized)
+convertAnnotationWrapper :: ForeignHValue -> TcM Serialized
 convertAnnotationWrapper fhv = do
   interp <- tcGetInterp
   case interpInstance interp of
-    ExternalInterp {} -> Right <$> runTH THAnnWrapper fhv
+    ExternalInterp {} -> runTH THAnnWrapper fhv
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp    -> do
       annotation_wrapper <- liftIO $ wormhole interp fhv
-      return $ Right $
+      return $
         case unsafeCoerce annotation_wrapper of
            AnnotationWrapper value | let serialized = toSerialized serializeWithData value ->
                -- Got the value and dictionaries: build the serialized value and
@@ -1118,7 +1112,7 @@ defaultRunMeta (MetaT r)
 defaultRunMeta (MetaD r)
   = fmap r . runMeta' True ppr (runQResult TH.pprint convertToHsDecls runTHDec)
 defaultRunMeta (MetaAW r)
-  = fmap r . runMeta' False (const empty) (const convertAnnotationWrapper)
+  = fmap r . runMeta' False (const empty) (const $ fmap Right . convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
     -- the toAnnotationWrapper function that we slap around the user's code
 
@@ -1188,7 +1182,7 @@ Previously, we failed to abort in cases (b) and (c), leading to #19709.
 ---------------
 runMeta' :: Bool                 -- Whether code should be printed in the exception message
          -> (hs_syn -> SDoc)                                    -- how to print the code
-         -> (SrcSpan -> ForeignHValue -> TcM (Either SDoc hs_syn))        -- How to run x
+         -> (SrcSpan -> ForeignHValue -> TcM (Either RunSpliceFailReason hs_syn)) -- How to run x
          -> LHsExpr GhcTc        -- Of type x; typically x = Q TH.Exp, or
                                  --    something like that
          -> TcM hs_syn           -- Of type t
@@ -1236,7 +1230,7 @@ runMeta' show_code ppr_hs run_and_convert expr
         ; either_hval <- tryM $ liftIO $
                          GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
         ; case either_hval of {
-            Left exn   -> fail_with_exn "compile and link" exn ;
+            Left exn   -> fail_with_exn SplicePhase_CompileAndLink exn ;
             Right (hval, needed_mods, needed_pkgs) -> do
 
         {       -- Coerce it to Q t, and run it
@@ -1257,7 +1251,7 @@ runMeta' show_code ppr_hs run_and_convert expr
                                                 -- see where this splice is
              do { mb_result <- run_and_convert expr_span hval
                 ; case mb_result of
-                    Left err     -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
+                    Left err     -> failWithTc (TcRnRunSpliceFailure Nothing err)
                     Right result -> do { traceTc "Got HsSyn result:" (ppr_hs result)
                                        ; return $! result } }
 
@@ -1265,17 +1259,15 @@ runMeta' show_code ppr_hs run_and_convert expr
             Right v -> return v
             Left se -> case fromException se of
                          Just IOEnvFailure -> failM -- Error already in Tc monad
-                         _ -> fail_with_exn "run" se -- Exception
+                         _ -> fail_with_exn SplicePhase_Run se -- Exception
         }}}
   where
     -- see Note [Concealed TH exceptions]
-    fail_with_exn :: Exception e => String -> e -> TcM a
+    fail_with_exn :: Exception e => SplicePhase -> e -> TcM a
     fail_with_exn phase exn = do
         exn_msg <- liftIO $ Panic.safeShowException exn
-        let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
-                        nest 2 (text exn_msg),
-                        if show_code then text "Code:" <+> ppr expr else empty]
-        failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints msg)
+        failWithTc
+          $ TcRnSpliceThrewException phase (SomeException exn) exn_msg expr show_code
 
 {-
 Note [Running typed splices in the zonker]
@@ -1391,9 +1383,8 @@ instance TH.Quasi TcM where
 
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
-  qReport True msg  = seqList msg $ addErr $ mkTcRnUnknownMessage $ mkPlainError noHints (text msg)
-  qReport False msg = seqList msg $ addDiagnostic $ mkTcRnUnknownMessage $
-    mkPlainDiagnostic WarningWithoutFlag noHints (text msg)
+  qReport True msg  = seqList msg $ addErr $ TcRnReportCustomQuasiError True msg
+  qReport False msg = seqList msg $ addDiagnostic $ TcRnReportCustomQuasiError False msg
 
   qLocation :: TcM TH.Loc
   qLocation = do { m <- getModule
@@ -1446,9 +1437,8 @@ instance TH.Quasi TcM where
       th_origin <- getThSpliceOrigin
       let either_hval = convertToHsDecls th_origin l thds
       ds <- case either_hval of
-              Left exn -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                hang (text "Error in a declaration passed to addTopDecls:")
-                   2 exn
+              Left exn -> failWithTc
+                            $ TcRnRunSpliceFailure (Just "addTopDecls") exn
               Right ds -> return ds
       mapM_ (checkTopDecl . unLoc) ds
       th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
@@ -1463,9 +1453,8 @@ instance TH.Quasi TcM where
         = return ()
       checkTopDecl (ForD _ (ForeignImport { fd_name = L _ name }))
         = bindName name
-      checkTopDecl _
-        = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"
+      checkTopDecl d
+        = addErr $ TcRnInvalidTopDecl d
 
       bindName :: RdrName -> TcM ()
       bindName (Exact n)
@@ -1473,10 +1462,7 @@ instance TH.Quasi TcM where
              ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
              }
 
-      bindName name =
-          addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
-             2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
+      bindName name = addErr $ TcRnNonExactName name
 
   qAddForeignFilePath lang fp = do
     var <- fmap tcg_th_foreign_files getGblEnv
@@ -1494,15 +1480,10 @@ instance TH.Quasi TcM where
       let dflags    = hsc_dflags hsc_env
       let fopts     = initFinderOpts dflags
       r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
-      let err = hang
-            (text "addCorePlugin: invalid plugin module "
-               <+> text (show plugin)
-            )
-            2
-            (text "Plugins in the current package can't be specified.")
+      let err = TcRnAddInvalidCorePlugin plugin
       case r of
-        Found {} -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints err
-        FoundMultiple {} -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints err
+        Found {} -> addErr err
+        FoundMultiple {} -> addErr err
         _ -> return ()
       th_coreplugins_var <- tcg_th_coreplugins <$> getGblEnv
       updTcRef th_coreplugins_var (plugin:)
@@ -1527,9 +1508,7 @@ instance TH.Quasi TcM where
     th_doc_var <- tcg_th_docs <$> getGblEnv
     resolved_doc_loc <- resolve_loc doc_loc
     is_local <- checkLocalName resolved_doc_loc
-    unless is_local $ failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $ text
-      "Can't add documentation to" <+> ppr_loc doc_loc <+>
-      text "as it isn't inside the current module"
+    unless is_local $ failWithTc $ TcRnAddDocToNonLocalDefn doc_loc
     let ds = mkGeneratedHsDocString s
         hd = lexHsDoc parseIdentifier ds
     hd' <- rnHsDoc hd
@@ -1539,11 +1518,6 @@ instance TH.Quasi TcM where
       resolve_loc (TH.ArgDoc n i) = ArgDoc <$> lookupThName n <*> pure i
       resolve_loc (TH.InstDoc t) = InstDoc <$> fmap getName (lookupThInstName t)
       resolve_loc TH.ModuleDoc = pure ModuleDoc
-
-      ppr_loc (TH.DeclDoc n) = ppr_th n
-      ppr_loc (TH.ArgDoc n _) = ppr_th n
-      ppr_loc (TH.InstDoc t) = ppr_th t
-      ppr_loc TH.ModuleDoc = text "the module header"
 
       -- It doesn't make sense to add documentation to something not inside
       -- the current module. So check for it!
@@ -1617,10 +1591,8 @@ lookupThInstName th_type = do
     Right (_, (inst:_)) -> return $ getName inst
     Right (_, [])       -> noMatches
   where
-    noMatches = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-      text "Couldn't find any instances of"
-        <+> ppr_th th_type
-        <+> text "to add documentation to"
+    noMatches = failWithTc $
+      TcRnFailedToLookupThInstName th_type NoMatchesFound
 
     -- Get the name of the class for the instance we are documenting
     -- > inst_cls_name (Monad Maybe) == Monad
@@ -1656,10 +1628,8 @@ lookupThInstName th_type = do
     inst_cls_name TH.WildCardT               = inst_cls_name_err
     inst_cls_name (TH.ImplicitParamT _ _)    = inst_cls_name_err
 
-    inst_cls_name_err = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-      text "Couldn't work out what instance"
-        <+> ppr_th th_type
-        <+> text "is supposed to be"
+    inst_cls_name_err = failWithTc $
+      TcRnFailedToLookupThInstName th_type CouldNotDetermineInstance
 
     -- Basically does the opposite of 'mkThAppTs'
     -- > inst_arg_types (Monad Maybe) == [Maybe]
@@ -1947,16 +1917,14 @@ reifyInstances' th_nm th_tys
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances'2" (ppr matches)
                      ; return $ Right (tc, map fim_instance matches) }
-            _  -> bale_out $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                  (hang (text "reifyInstances:" <+> quotes (ppr ty))
-                      2 (text "is not a class constraint or type family application")) }
+            _  -> bale_out $ TcRnCannotReifyInstance ty }
   where
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
     cvt :: Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
     cvt origin loc th_ty = case convertToHsType origin loc th_ty of
-      Left msg -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints msg)
+      Left msg -> failWithTc (TcRnRunSpliceFailure Nothing msg)
       Right ty -> return ty
 
 {-
@@ -2057,18 +2025,15 @@ tcLookupTh name
      do { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return (AGlobal thing)
-            Failed msg      -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints msg)
+            Failed msg      -> failWithTc (TcRnInterfaceLookupError name msg)
     }}}}
 
 notInScope :: TH.Name -> TcRnMessage
-notInScope th_name = mkTcRnUnknownMessage $ mkPlainError noHints $
-  quotes (text (TH.pprint th_name)) <+>
-          text "is not in scope at a reify"
-        -- Ugh! Rather an indirect way to display the name
+notInScope th_name =
+  TcRnCannotReifyOutOfScopeThing th_name
 
 notInEnv :: Name -> TcRnMessage
-notInEnv name = mkTcRnUnknownMessage $ mkPlainError noHints $
-  quotes (ppr name) <+> text "is not in the type environment at a reify"
+notInEnv name = TcRnCannotReifyThingNotInTypeEnv name
 
 ------------------------------
 reifyRoles :: TH.Name -> TcM [TH.Role]
@@ -2076,7 +2041,7 @@ reifyRoles th_name
   = do { thing <- getThing th_name
        ; case thing of
            AGlobal (ATyCon tc) -> return (map reify_role (tyConRoles tc))
-           _ -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints $ text "No roles associated with" <+> (ppr thing))
+           _ -> failWithTc (TcRnNoRolesAssociatedWithThing thing)
        }
   where
     reify_role Nominal          = TH.NominalR
@@ -2609,11 +2574,11 @@ reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
   | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
                         ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = noTH (text "linear invisible argument") (ppr ty)
+  | InvisArg <- af = noTH LinearInvisibleArgument ty
   | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
                         ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
-reifyType ty@(CoercionTy {})= noTH (text "coercions in types") (ppr ty)
+reifyType ty@(CoercionTy {})= noTH CoercionsInTypes ty
 
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
@@ -2869,11 +2834,8 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
 mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
-noTH :: SDoc -> SDoc -> TcM a
-noTH s d = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-  (hsep [text "Can't represent" <+> s <+>
-         text "in Template Haskell:",
-           nest 2 d])
+noTH :: UnrepresentableTypeDescr -> Type -> TcM a
+noTH s d = failWithTc $ TcRnCannotRepresentType s d
 
 ppr_th :: TH.Ppr a => a -> SDoc
 ppr_th x = text (TH.pprint x)

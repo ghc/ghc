@@ -468,6 +468,22 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNoExplicitAssocTypeOrDefaultDeclaration"   = 08585
   GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
   GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
+  GhcDiagnosticCode "TcRnTypedTHWithPolyType"                       = 94642
+  GhcDiagnosticCode "TcRnSpliceThrewException"                      = 87897
+  GhcDiagnosticCode "TcRnInvalidTopDecl"                            = 52886
+  GhcDiagnosticCode "TcRnNonExactName"                              = 77923
+  GhcDiagnosticCode "TcRnAddInvalidCorePlugin"                      = 86463
+  GhcDiagnosticCode "TcRnAddDocToNonLocalDefn"                      = 67760
+  GhcDiagnosticCode "TcRnFailedToLookupThInstName"                  = 49530
+  GhcDiagnosticCode "TcRnCannotReifyInstance"                       = 30384
+  GhcDiagnosticCode "TcRnCannotReifyOutOfScopeThing"                = 24922
+  GhcDiagnosticCode "TcRnCannotReifyThingNotInTypeEnv"              = 79890
+  GhcDiagnosticCode "TcRnNoRolesAssociatedWithThing"                = 65923
+  GhcDiagnosticCode "TcRnCannotRepresentType"                       = 75721
+  GhcDiagnosticCode "TcRnReportCustomQuasiError"                    = 39584
+  GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
+
+  -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
   GhcDiagnosticCode "IsNonLinear"                                   = 38291
   GhcDiagnosticCode "IsGADT"                                        = 89498
@@ -478,6 +494,30 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394
   GhcDiagnosticCode "DeprecatedTxt"                                 = 68441
+
+  -- TcRnRunSliceFailure/ConversionFail
+  GhcDiagnosticCode "IllegalOccName"                                = 55017
+  GhcDiagnosticCode "SumAltArityExceeded"                           = 68444
+  GhcDiagnosticCode "IllegalSumAlt"                                 = 63966
+  GhcDiagnosticCode "IllegalSumArity"                               = 97721
+  GhcDiagnosticCode "MalformedType"                                 = 28709
+  GhcDiagnosticCode "IllegalLastStatement"                          = 47373
+  GhcDiagnosticCode "KindSigsOnlyAllowedOnGADTs"                    = 40746
+  GhcDiagnosticCode "IllegalDeclaration"                            = 23882
+  GhcDiagnosticCode "CannotMixGADTConsWith98Cons"                   = 24104
+  GhcDiagnosticCode "EmptyStmtListInDoBlock"                        = 34949
+  GhcDiagnosticCode "NonVarInInfixExpr"                             = 99831
+  GhcDiagnosticCode "MultiWayIfWithoutAlts"                         = 63930
+  GhcDiagnosticCode "CasesExprWithoutAlts"                          = 91745
+  GhcDiagnosticCode "ImplicitParamsWithOtherBinds"                  = 42974
+  GhcDiagnosticCode "InvalidCCallImpent"                            = 60220
+  GhcDiagnosticCode "RecGadtNoCons"                                 = 18816
+  GhcDiagnosticCode "GadtNoCons"                                    = 38140
+  GhcDiagnosticCode "InvalidTypeInstanceHeader"                     = 37056
+  GhcDiagnosticCode "InvalidTyFamInstLHS"                           = 78486
+  GhcDiagnosticCode "InvalidImplicitParamBinding"                   = 51603
+  GhcDiagnosticCode "DefaultDataInstDecl"                           = 39639
+  GhcDiagnosticCode "FunBindLacksEquations"                         = 52078
 
   -- Diagnostic codes for the foreign function interface
   GhcDiagnosticCode "NotADataType"                                  = 31136
@@ -594,6 +634,12 @@ type family ConRecursInto con where
   ConRecursInto "TcRnPragmaWarning"        = 'Just (WarningTxt GhcRn)
   ConRecursInto "TcRnNotInScope"           = 'Just NotInScopeError
   ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason
+
+    --
+    -- TH errors
+
+  ConRecursInto "TcRnRunSpliceFailure"     = 'Just RunSpliceFailReason
+  ConRecursInto "ConversionFail"           = 'Just ConversionFailReason
 
     ------------------
     -- FFI errors

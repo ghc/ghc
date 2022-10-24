@@ -1,5 +1,5 @@
 
-<interactive>:2:10: error:
+<interactive>:2:10: error: [GHC-87897]
     • Exception when trying to run compile-time code:
         Prelude.undefined
 CallStack (from HasCallStack):

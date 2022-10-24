@@ -170,7 +170,7 @@ checkHsigIface tcg_env gr sig_iface
         -- tcg_env (TODO: but maybe this isn't relevant anymore).
         r <- tcLookupImported_maybe name
         case r of
-          Failed err -> addErr (mkTcRnUnknownMessage $ mkPlainError noHints err)
+          Failed err -> addErr (TcRnInterfaceLookupError name err)
           Succeeded real_thing -> checkHsigDeclM sig_iface sig_thing real_thing
 
       -- The hsig did NOT define this function; that means it must

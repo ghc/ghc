@@ -1,5 +1,5 @@
 
-T11452.hs:6:12: error:
+T11452.hs:6:12: error: [GHC-94642]
     • Illegal polytype: (forall a. a -> a) -> ()
       The type of a Typed Template Haskell expression must not have any quantification.
     • In the Template Haskell splice $$([|| \ _ -> () ||])

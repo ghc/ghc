@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -96,6 +97,7 @@ import Data.List ( groupBy, sortBy, tails
 import Data.Ord ( comparing )
 import Data.Bifunctor
 import GHC.Types.Name.Env
+import qualified Language.Haskell.TH as TH
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        }
@@ -1046,6 +1048,108 @@ instance Diagnostic TcRnMessage where
           sneaky_eq_spec
             = any (\eq -> any (( == eqSpecTyVar eq) . binderVar) invisible_binders)
                 $ dataConEqSpec con
+    TcRnTypedTHWithPolyType ty
+      -> mkSimpleDecorated $
+        vcat [ text "Illegal polytype:" <+> ppr ty
+             , text "The type of a Typed Template Haskell expression must" <+>
+               text "not have any quantification." ]
+    TcRnSpliceThrewException phase _exn exn_msg expr show_code
+      -> mkSimpleDecorated $
+           vcat [ text "Exception when trying to" <+> text phaseStr <+> text "compile-time code:"
+                , nest 2 (text exn_msg)
+                , if show_code then text "Code:" <+> ppr expr else empty]
+         where phaseStr =
+                 case phase of
+                   SplicePhase_Run -> "run"
+                   SplicePhase_CompileAndLink -> "compile and link"
+    TcRnInvalidTopDecl _decl
+      -> mkSimpleDecorated $
+         text "Only function, value, annotation, and foreign import declarations may be added with addTopDecls"
+    TcRnNonExactName name
+      -> mkSimpleDecorated $
+         hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
+            2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
+    TcRnAddInvalidCorePlugin plugin
+      -> mkSimpleDecorated $
+         hang
+           (text "addCorePlugin: invalid plugin module "
+              <+> text (show plugin)
+           )
+           2
+           (text "Plugins in the current package can't be specified.")
+    TcRnAddDocToNonLocalDefn doc_loc
+      -> mkSimpleDecorated $
+         text "Can't add documentation to" <+> ppr_loc doc_loc <+>
+         text "as it isn't inside the current module"
+      where
+        ppr_loc (TH.DeclDoc n) = text $ TH.pprint n
+        ppr_loc (TH.ArgDoc n _) = text $ TH.pprint n
+        ppr_loc (TH.InstDoc t) = text $ TH.pprint t
+        ppr_loc TH.ModuleDoc = text "the module header"
+
+    TcRnFailedToLookupThInstName th_type reason
+      -> mkSimpleDecorated $
+         case reason of
+           NoMatchesFound ->
+             text "Couldn't find any instances of"
+               <+> text (TH.pprint th_type)
+               <+> text "to add documentation to"
+           CouldNotDetermineInstance ->
+             text "Couldn't work out what instance"
+               <+> text (TH.pprint th_type)
+               <+> text "is supposed to be"
+    TcRnCannotReifyInstance ty
+      -> mkSimpleDecorated $
+         hang (text "reifyInstances:" <+> quotes (ppr ty))
+            2 (text "is not a class constraint or type family application")
+    TcRnCannotReifyOutOfScopeThing th_name
+      -> mkSimpleDecorated $
+         quotes (text (TH.pprint th_name)) <+>
+                 text "is not in scope at a reify"
+               -- Ugh! Rather an indirect way to display the name
+    TcRnCannotReifyThingNotInTypeEnv name
+      -> mkSimpleDecorated $
+         quotes (ppr name) <+> text "is not in the type environment at a reify"
+    TcRnNoRolesAssociatedWithThing thing
+      -> mkSimpleDecorated $
+         text "No roles associated with" <+> (ppr thing)
+    TcRnCannotRepresentType sort ty
+      -> mkSimpleDecorated $
+         hsep [text "Can't represent" <+> sort_doc <+>
+               text "in Template Haskell:",
+                 nest 2 (ppr ty)]
+       where
+         sort_doc = text $
+           case sort of
+             LinearInvisibleArgument -> "linear invisible argument"
+             CoercionsInTypes -> "coercions in types"
+    TcRnRunSpliceFailure mCallingFnName (ConversionFail what reason)
+      -> mkSimpleDecorated
+           . addCallingFn
+           . addSpliceInfo
+           $ pprConversionFailReason reason
+      where
+        addCallingFn rest =
+          case mCallingFnName of
+            Nothing -> rest
+            Just callingFn ->
+              hang (text ("Error in a declaration passed to " ++ callingFn ++ ":"))
+                 2 rest
+        addSpliceInfo = case what of
+          ConvDec d -> addSliceInfo' "declaration" d
+          ConvExp e -> addSliceInfo' "expression" e
+          ConvPat p -> addSliceInfo' "pattern" p
+          ConvType t -> addSliceInfo' "type" t
+        addSliceInfo' what item reasonErr = reasonErr $$ descr
+          where
+                -- Show the item in pretty syntax normally,
+                -- but with all its constructors if you say -dppr-debug
+            descr = hang (text "When splicing a TH" <+> text what <> colon)
+                       2 (getPprDebug $ \case
+                           True  -> text (show item)
+                           False -> text (TH.pprint item))
+    TcRnReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
+    TcRnInterfaceLookupError _ sdoc -> mkSimpleDecorated sdoc
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1381,6 +1485,36 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids{}
       -> ErrorWithoutFlag
     TcRnIllegalNewtype{}
+      -> ErrorWithoutFlag
+    TcRnTypedTHWithPolyType{}
+      -> ErrorWithoutFlag
+    TcRnSpliceThrewException{}
+      -> ErrorWithoutFlag
+    TcRnInvalidTopDecl{}
+      -> ErrorWithoutFlag
+    TcRnNonExactName{}
+      -> ErrorWithoutFlag
+    TcRnAddInvalidCorePlugin{}
+      -> ErrorWithoutFlag
+    TcRnAddDocToNonLocalDefn{}
+      -> ErrorWithoutFlag
+    TcRnFailedToLookupThInstName{}
+      -> ErrorWithoutFlag
+    TcRnCannotReifyInstance{}
+      -> ErrorWithoutFlag
+    TcRnCannotReifyOutOfScopeThing{}
+      -> ErrorWithoutFlag
+    TcRnCannotReifyThingNotInTypeEnv{}
+      -> ErrorWithoutFlag
+    TcRnNoRolesAssociatedWithThing{}
+      -> ErrorWithoutFlag
+    TcRnCannotRepresentType{}
+      -> ErrorWithoutFlag
+    TcRnRunSpliceFailure{}
+      -> ErrorWithoutFlag
+    TcRnReportCustomQuasiError isError _
+      -> if isError then ErrorWithoutFlag else WarningWithoutFlag
+    TcRnInterfaceLookupError{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -1719,6 +1853,36 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids{}
       -> noHints
     TcRnIllegalNewtype{}
+      -> noHints
+    TcRnTypedTHWithPolyType{}
+      -> noHints
+    TcRnSpliceThrewException{}
+      -> noHints
+    TcRnInvalidTopDecl{}
+      -> noHints
+    TcRnNonExactName{}
+      -> noHints
+    TcRnAddInvalidCorePlugin{}
+      -> noHints
+    TcRnAddDocToNonLocalDefn{}
+      -> noHints
+    TcRnFailedToLookupThInstName{}
+      -> noHints
+    TcRnCannotReifyInstance{}
+      -> noHints
+    TcRnCannotReifyOutOfScopeThing{}
+      -> noHints
+    TcRnCannotReifyThingNotInTypeEnv{}
+      -> noHints
+    TcRnNoRolesAssociatedWithThing{}
+      -> noHints
+    TcRnCannotRepresentType{}
+      -> noHints
+    TcRnRunSpliceFailure{}
+      -> noHints
+    TcRnReportCustomQuasiError{}
+      -> noHints
+    TcRnInterfaceLookupError{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -3610,3 +3774,79 @@ pprHsDocContext (ConDeclCtx [name])
    = text "the definition of data constructor" <+> quotes (ppr name)
 pprHsDocContext (ConDeclCtx names)
    = text "the definition of data constructors" <+> interpp'SP names
+
+pprConversionFailReason :: ConversionFailReason -> SDoc
+pprConversionFailReason = \case
+  IllegalOccName ctxt_ns occ ->
+    text "Illegal" <+> pprNameSpace ctxt_ns
+    <+> text "name:" <+> quotes (text occ)
+  SumAltArityExceeded alt arity ->
+    text "Sum alternative" <+> text (show alt)
+    <+> text "exceeds its arity," <+> text (show arity)
+  IllegalSumAlt alt ->
+    vcat [ text "Illegal sum alternative:" <+> text (show alt)
+         , nest 2 $ text "Sum alternatives must start from 1" ]
+  IllegalSumArity arity ->
+    vcat [ text "Illegal sum arity:" <+> text (show arity)
+         , nest 2 $ text "Sums must have an arity of at least 2" ]
+  MalformedType typeOrKind ty ->
+    text "Malformed " <> text ty_str <+> text (show ty)
+    where ty_str = case typeOrKind of
+                     TypeLevel -> "type"
+                     KindLevel -> "kind"
+  IllegalLastStatement do_or_lc stmt ->
+    vcat [ text "Illegal last statement of" <+> pprAHsDoFlavour do_or_lc <> colon
+         , nest 2 $ ppr stmt
+         , text "(It should be an expression.)" ]
+  KindSigsOnlyAllowedOnGADTs ->
+    text "Kind signatures are only allowed on GADTs"
+  IllegalDeclaration declDescr bad_decls ->
+    sep [ text "Illegal" <+> what <+> text "in" <+> descrDoc <> colon
+        , nest 2 bads ]
+    where
+      (what, bads) = case bad_decls of
+        IllegalDecls (NE.toList -> decls) ->
+            (text "declaration" <> plural decls, vcat $ map ppr decls)
+        IllegalFamDecls (NE.toList -> decls) ->
+            ( text "family declaration" <> plural decls, vcat $ map ppr decls)
+      descrDoc = text $ case declDescr of
+                   InstanceDecl -> "an instance declaration"
+                   WhereClause -> "a where clause"
+                   LetBinding -> "a let expression"
+                   LetExpression -> "a let expression"
+                   ClssDecl -> "a class declaration"
+  CannotMixGADTConsWith98Cons ->
+    text "Cannot mix GADT constructors with Haskell 98"
+    <+> text "constructors"
+  EmptyStmtListInDoBlock ->
+    text "Empty stmt list in do-block"
+  NonVarInInfixExpr ->
+    text "Non-variable expression is not allowed in an infix expression"
+  MultiWayIfWithoutAlts ->
+    text "Multi-way if-expression with no alternatives"
+  CasesExprWithoutAlts ->
+    text "\\cases expression with no alternatives"
+  ImplicitParamsWithOtherBinds ->
+    text "Implicit parameters mixed with other bindings"
+  InvalidCCallImpent from ->
+    text (show from) <+> text "is not a valid ccall impent"
+  RecGadtNoCons ->
+    text "RecGadtC must have at least one constructor name"
+  GadtNoCons ->
+    text "GadtC must have at least one constructor name"
+  InvalidTypeInstanceHeader tys ->
+    text "Invalid type instance header:"
+    <+> text (show tys)
+  InvalidTyFamInstLHS lhs ->
+    text "Invalid type family instance LHS:"
+    <+> text (show lhs)
+  InvalidImplicitParamBinding ->
+    text "Implicit parameter binding only allowed in let or where"
+  DefaultDataInstDecl adts ->
+    (text "Default data instance declarations"
+    <+> text "are not allowed:")
+      $$ ppr adts
+  FunBindLacksEquations nm ->
+    text "Function binding for"
+    <+> quotes (text (TH.pprint nm))
+    <+> text "has no equations"

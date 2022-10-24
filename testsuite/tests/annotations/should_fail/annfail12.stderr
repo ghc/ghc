@@ -1,5 +1,5 @@
 
-annfail12.hs:5:1: error:
+annfail12.hs:5:1: error: [GHC-87897]
     Exception when trying to run compile-time code:
       You were meant to see this error!
 CallStack (from ImplicitParams):
