@@ -50,6 +50,14 @@ FP_FIND_ROOT
 
 # ToDo: if Stage1Only=YES, should be YES
 CrossCompiling=NO
+# If 'host' and 'target' differ, then this means we are building a cross-compiler.
+if test "$target" != "$host" ; then
+    CrossCompiling=YES
+    cross_compiling=yes   # This tells configure that it can accept just 'target',
+                          # otherwise you get
+                          #   configure: error: cannot run C compiled programs.
+                          #   If you meant to cross compile, use `--host'.
+fi
 CrossCompilePrefix="@CrossCompilePrefix@"
 TargetPlatformFull="${target}"
 TablesNextToCode="@TablesNextToCode@"
