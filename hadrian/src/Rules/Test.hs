@@ -193,11 +193,6 @@ testRules = do
         need [root -/- timeoutPath]
 
         cross <- flag CrossCompiling
-        isJs  <- isJsTarget
-
-        let stage2 s
-             | Stage2 {} <- s = True
-             | otherwise      = False
 
         -- get absolute path for the given program in the given stage
         let absolute_path_stage s p = do
@@ -207,15 +202,12 @@ testRules = do
 
         -- get absolute path for the given program in the target stage
         let absolute_path
-              | isJs && stage2 stg = absolute_path_stage (predStage stg)
-              | otherwise          = absolute_path_stage stg
+              | Stage0 {} <- stg = absolute_path_stage stg
+              | otherwise        = absolute_path_stage (predStage stg)
 
         -- get absolute path for the given program in stage1 (useful for
         -- cross-compilers)
-        let absolute_path1
-              | cross            = absolute_path_stage (Stage0 InTreeLibs)
-              | Stage0 {} <- stg = absolute_path_stage stg
-              | otherwise        = absolute_path_stage $ predStage stg
+        let absolute_path1 = absolute_path_stage (Stage0 InTreeLibs)
 
         ghcPath <- getCompilerPath testCompilerArg
 
@@ -254,12 +246,13 @@ testRules = do
             setEnv "TEST_CC" ccPath
             setEnv "TEST_CC_OPTS" ccFlags
 
-            setEnv "GHC_PKG"   prog_ghc_pkg
-            setEnv "HSC2HS"    prog_hsc2hs
-            setEnv "HP2PS_ABS" prog_hp2ps
-            setEnv "HPC"       prog_hpc
-            setEnv "HADDOCK"   prog_haddock
-            setEnv "RUNGHC"    prog_runghc
+            when cross $ do
+              setEnv "GHC_PKG"   prog_ghc_pkg
+              setEnv "HSC2HS"    prog_hsc2hs
+              setEnv "HP2PS_ABS" prog_hp2ps
+              setEnv "HPC"       prog_hpc
+              setEnv "HADDOCK"   prog_haddock
+              setEnv "RUNGHC"    prog_runghc
 
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
