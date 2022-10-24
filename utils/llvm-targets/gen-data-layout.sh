@@ -55,6 +55,9 @@ TARGETS=(
     "aarch64-unknown-linux-gnu"
     "aarch64-unknown-linux-musl"
     "aarch64-unknown-linux"
+    "aarch64_be-unknown-linux-gnu"
+    "aarch64_be-unknown-linux-musl"
+    "aarch64_be-unknown-linux"
     # Linux x86
     "i386-unknown-linux-gnu"
     "i386-unknown-linux-musl"
