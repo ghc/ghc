@@ -40,7 +40,7 @@ module GHC.Types.Unique.FM (
         listToUFM_Directly,
         listToUFM_C,
         listToIdentityUFM,
-        addToUFM,addToUFM_C,addToUFM_Acc,
+        addToUFM,addToUFM_C,addToUFM_Acc,addToUFM_L,
         addListToUFM,addListToUFM_C,
         addToUFM_Directly,
         addListToUFM_Directly,
@@ -182,6 +182,24 @@ addToUFM_Acc
   -> UniqFM key elts            -- result
 addToUFM_Acc exi new (UFM m) k v =
   UFM (M.insertWith (\_new old -> exi v old) (getKey $ getUnique k) (new v) m)
+
+-- | Add an element, returns previous lookup result and new map. If
+-- old element doesn't exist, add the passed element directly,
+-- otherwise compute the element to add using the passed function.
+addToUFM_L
+  :: Uniquable key
+  => (key -> elt -> elt -> elt) -- key,old,new
+  -> key
+  -> elt -- new
+  -> UniqFM key elt
+  -> (Maybe elt, UniqFM key elt) -- old, result
+addToUFM_L f k v (UFM m) =
+  coerce $
+    M.insertLookupWithKey
+      (\_ _n _o -> f k _o _n)
+      (getKey $ getUnique k)
+      v
+      m
 
 alterUFM
   :: Uniquable key
