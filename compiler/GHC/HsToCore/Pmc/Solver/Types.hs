@@ -766,7 +766,7 @@ it's already overloaded.
 
 instance Outputable PmLitValue where
   ppr (PmLitInt i)        = ppr i
-  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
+  ppr (PmLitRat r)        = double (fromRat r) -- good enough
   ppr (PmLitChar c)       = pprHsChar c
   ppr (PmLitString s)     = pprHsString s
   ppr (PmLitOverInt n i)  = minuses n (ppr i)

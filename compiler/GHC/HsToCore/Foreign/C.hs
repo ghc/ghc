@@ -423,7 +423,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   arg_cname n stg_ty
         | libffi    = char '*' <> parens (stg_ty <> char '*') <>
                       text "args" <> brackets (int (n-1))
-        | otherwise = text ('a':show n)
+        | otherwise = char 'a' <> int n
 
   -- generate a libffi-style stub if this is a "wrapper" and libffi is enabled
   libffi = platformMisc_libFFI (platformMisc dflags) && isNothing maybe_target
@@ -552,16 +552,16 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ]
 
 mkHObj :: Type -> SDoc
-mkHObj t = text "rts_mk" <> text (showFFIType t)
+mkHObj t = text "rts_mk" <> showFFIType t
 
 unpackHObj :: Type -> SDoc
-unpackHObj t = text "rts_get" <> text (showFFIType t)
+unpackHObj t = text "rts_get" <> showFFIType t
 
 showStgType :: Type -> SDoc
-showStgType t = text "Hs" <> text (showFFIType t)
+showStgType t = text "Hs" <> showFFIType t
 
-showFFIType :: Type -> String
-showFFIType t = getOccString (getName (typeTyCon t))
+showFFIType :: Type -> SDoc
+showFFIType t = ftext (occNameFS (getOccName (typeTyCon t)))
 
 typeTyCon :: Type -> TyCon
 typeTyCon ty

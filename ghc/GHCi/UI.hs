@@ -3423,7 +3423,7 @@ pprStopped res =
   text "Stopped in"
     <+> ((case mb_mod_name of
            Nothing -> empty
-           Just mod_name -> text (moduleNameString mod_name) <> char '.')
+           Just mod_name -> ftext (moduleNameFS mod_name) <> char '.')
          <> text (GHC.resumeDecl res))
     <> char ',' <+> ppr (GHC.resumeSpan res)
  where

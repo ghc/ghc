@@ -646,8 +646,8 @@ mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
 
 -- Overloaded record field selectors
-mkRecFldSelOcc :: String -> OccName
-mkRecFldSelOcc s = mk_deriv varName "$sel" [fsLit s]
+mkRecFldSelOcc :: FastString -> OccName
+mkRecFldSelOcc s = mk_deriv varName "$sel" [s]
 
 mk_simple_deriv :: NameSpace -> FastString -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]

@@ -213,7 +213,7 @@ pprTickCounts counts
 
 pprTickGroup :: NonEmpty (Tick, Int) -> SDoc
 pprTickGroup group@((tick1,_) :| _)
-  = hang (int (sum (fmap snd group)) <+> text (tickString tick1))
+  = hang (int (sum (fmap snd group)) <+> pprTickType tick1)
        2 (vcat [ int n <+> pprTickCts tick
                                     -- flip as we want largest first
                | (tick,n) <- sortOn (Down . snd) (NE.toList group)])
@@ -242,7 +242,7 @@ data Tick  -- See Note [Which transformations are innocuous]
   | SimplifierDone              -- Ticked at each iteration of the simplifier
 
 instance Outputable Tick where
-  ppr tick = text (tickString tick) <+> pprTickCts tick
+  ppr tick = pprTickType tick <+> pprTickCts tick
 
 instance Eq Tick where
   a == b = case a `cmpTick` b of
@@ -270,23 +270,23 @@ tickToTag (FillInCaseDefault _)         = 13
 tickToTag SimplifierDone                = 16
 tickToTag (AltMerge _)                  = 17
 
-tickString :: Tick -> String
-tickString (PreInlineUnconditionally _) = "PreInlineUnconditionally"
-tickString (PostInlineUnconditionally _)= "PostInlineUnconditionally"
-tickString (UnfoldingDone _)            = "UnfoldingDone"
-tickString (RuleFired _)                = "RuleFired"
-tickString LetFloatFromLet              = "LetFloatFromLet"
-tickString (EtaExpansion _)             = "EtaExpansion"
-tickString (EtaReduction _)             = "EtaReduction"
-tickString (BetaReduction _)            = "BetaReduction"
-tickString (CaseOfCase _)               = "CaseOfCase"
-tickString (KnownBranch _)              = "KnownBranch"
-tickString (CaseMerge _)                = "CaseMerge"
-tickString (AltMerge _)                 = "AltMerge"
-tickString (CaseElim _)                 = "CaseElim"
-tickString (CaseIdentity _)             = "CaseIdentity"
-tickString (FillInCaseDefault _)        = "FillInCaseDefault"
-tickString SimplifierDone               = "SimplifierDone"
+pprTickType :: Tick -> SDoc
+pprTickType (PreInlineUnconditionally _) = text "PreInlineUnconditionally"
+pprTickType (PostInlineUnconditionally _)= text "PostInlineUnconditionally"
+pprTickType (UnfoldingDone _)            = text "UnfoldingDone"
+pprTickType (RuleFired _)                = text "RuleFired"
+pprTickType LetFloatFromLet              = text "LetFloatFromLet"
+pprTickType (EtaExpansion _)             = text "EtaExpansion"
+pprTickType (EtaReduction _)             = text "EtaReduction"
+pprTickType (BetaReduction _)            = text "BetaReduction"
+pprTickType (CaseOfCase _)               = text "CaseOfCase"
+pprTickType (KnownBranch _)              = text "KnownBranch"
+pprTickType (CaseMerge _)                = text "CaseMerge"
+pprTickType (AltMerge _)                 = text "AltMerge"
+pprTickType (CaseElim _)                 = text "CaseElim"
+pprTickType (CaseIdentity _)             = text "CaseIdentity"
+pprTickType (FillInCaseDefault _)        = text "FillInCaseDefault"
+pprTickType SimplifierDone               = text "SimplifierDone"
 
 pprTickCts :: Tick -> SDoc
 pprTickCts (PreInlineUnconditionally v) = ppr v

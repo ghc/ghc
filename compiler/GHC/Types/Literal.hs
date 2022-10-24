@@ -904,7 +904,7 @@ pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
     where b = case mb of
               Nothing -> pprHsString l
-              Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
+              Just x  -> doubleQuotes (ftext l <> text ('@':show x))
 pprLiteral _       (LitRubbish rep)
   = text "RUBBISH" <> parens (ppr rep)
 

@@ -3781,13 +3781,13 @@ pprConversionFailReason = \case
     text "Illegal" <+> pprNameSpace ctxt_ns
     <+> text "name:" <+> quotes (text occ)
   SumAltArityExceeded alt arity ->
-    text "Sum alternative" <+> text (show alt)
-    <+> text "exceeds its arity," <+> text (show arity)
+    text "Sum alternative" <+> int alt
+    <+> text "exceeds its arity," <+> int arity
   IllegalSumAlt alt ->
-    vcat [ text "Illegal sum alternative:" <+> text (show alt)
+    vcat [ text "Illegal sum alternative:" <+> int alt
          , nest 2 $ text "Sum alternatives must start from 1" ]
   IllegalSumArity arity ->
-    vcat [ text "Illegal sum arity:" <+> text (show arity)
+    vcat [ text "Illegal sum arity:" <+> int arity
          , nest 2 $ text "Sums must have an arity of at least 2" ]
   MalformedType typeOrKind ty ->
     text "Malformed " <> text ty_str <+> text (show ty)

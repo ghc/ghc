@@ -188,7 +188,7 @@ fieldSelectorOccName lbl dc dup_fields_ok has_sel
   | otherwise     = mkVarOccFS fl
   where
     fl      = field_label lbl
-    str     = ":" ++ unpackFS fl ++ ":" ++ occNameString dc
+    str     = concatFS [fsLit ":", fl, fsLit ":", occNameFS dc]
 
 -- | Undo the name mangling described in Note [FieldLabel] to produce a Name
 -- that has the user-visible OccName (but the selector's unique).  This should
