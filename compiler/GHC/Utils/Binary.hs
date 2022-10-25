@@ -74,7 +74,7 @@ module GHC.Utils.Binary
 
    -- * User data
    UserData(..), getUserData, setUserData,
-   newReadState, newWriteState, defaultUserData,
+   newReadState, newWriteState, noUserData,
 
    -- * String table ("dictionary")
    putDictionary, getDictionary, putFS,
@@ -161,7 +161,7 @@ dataHandle (BinData size bin) = do
   ixr <- newFastMutInt 0
   szr <- newFastMutInt size
   binr <- newIORef bin
-  return (BinMem defaultUserData ixr szr binr)
+  return (BinMem noUserData ixr szr binr)
 
 handleData :: BinHandle -> IO BinData
 handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef binr
@@ -198,7 +198,7 @@ unsafeUnpackBinBuffer (BS.BS arr len) = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt len
-  return (BinMem defaultUserData ix_r sz_r arr_r)
+  return (BinMem noUserData ix_r sz_r arr_r)
 
 ---------------------------------------------------------------
 -- Bin
@@ -241,7 +241,7 @@ openBinMem size
    arr_r <- newIORef arr
    ix_r <- newFastMutInt 0
    sz_r <- newFastMutInt size
-   return (BinMem defaultUserData ix_r sz_r arr_r)
+   return (BinMem noUserData ix_r sz_r arr_r)
 
 tellBin :: BinHandle -> IO (Bin a)
 tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
@@ -294,7 +294,7 @@ readBinMem_ filesize h = do
   arr_r <- newIORef arr
   ix_r <- newFastMutInt 0
   sz_r <- newFastMutInt filesize
-  return (BinMem defaultUserData ix_r sz_r arr_r)
+  return (BinMem noUserData ix_r sz_r arr_r)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
@@ -1099,8 +1099,8 @@ newWriteState put_nonbinding_name put_binding_name put_fs
                ud_put_fs   = put_fs
              }
 
-defaultUserData :: UserData
-defaultUserData = UserData
+noUserData :: UserData
+noUserData = UserData
   { ud_get_name            = undef "get_name"
   , ud_get_fs              = undef "get_fs"
   , ud_put_nonbinding_name = undef "put_nonbinding_name"

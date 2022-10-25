@@ -293,7 +293,7 @@ getObjectBody :: BinHandle -> ModuleName -> IO Object
 getObjectBody bh0 mod_name = do
   -- Read the string table
   dict <- forwardGet bh0 (getDictionary bh0)
-  let bh = setUserData bh0 $ defaultUserData { ud_get_fs = getDictFastString dict }
+  let bh = setUserData bh0 $ noUserData { ud_get_fs = getDictFastString dict }
 
   deps     <- get bh
   idx      <- forwardGet bh (get bh)
