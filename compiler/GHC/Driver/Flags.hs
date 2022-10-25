@@ -151,6 +151,7 @@ extensionName = \case
   LangExt.OverloadedStrings -> "OverloadedStrings"
   LangExt.OverloadedLists -> "OverloadedLists"
   LangExt.NumDecimals -> "NumDecimals"
+  LangExt.OrPatterns -> "OrPatterns"
   LangExt.DisambiguateRecordFields -> "DisambiguateRecordFields"
   LangExt.RecordWildCards -> "RecordWildCards"
   LangExt.NamedFieldPuns -> "NamedFieldPuns"

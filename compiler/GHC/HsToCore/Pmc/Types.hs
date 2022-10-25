@@ -18,7 +18,9 @@ module GHC.HsToCore.Pmc.Types (
         -- * LYG syntax
 
         -- ** Guard language
-        SrcInfo(..), PmGrd(..), GrdVec(..),
+        SrcInfo(..), PmGrd(..), GrdDag(..),
+        consGrdDag, gdSeq, sequencePmGrds, sequenceGrdDags,
+        alternativesGrdDags,
 
         -- ** Guard tree language
         PmMatchGroup(..), PmMatch(..), PmGRHSs(..), PmGRHS(..),
@@ -103,8 +105,51 @@ instance Outputable PmGrd where
 -- location.
 newtype SrcInfo = SrcInfo (Located SDoc)
 
--- | A sequence of 'PmGrd's.
-newtype GrdVec = GrdVec [PmGrd]
+-- | A series-parallel graph of 'PmGrd's, so very nearly a guard tree, if
+-- it weren't for or-patterns/'GdAlt'!
+-- The implicit "source" corresponds to "before the match" and the implicit
+-- "sink" corresponds to "after a successful match".
+--
+--   * 'GdEnd' is a 'GrdDag' that always matches.
+--   * 'GdOne' is a 'GrdDag' that matches iff its 'PmGrd' matches.
+--   * @'GdSeq' g1 g2@ corresponds to matching guards @g1@ and then @g2@
+--     if matching @g1@ succeeded.
+--     Example: The Haskell guard @| x > 1, x < 10 = ...@ will test @x > 1@
+--     before @x < 10@, failing if either test fails.
+--   * @'GdAlt' g1 g2@ is far less common than 'GdSeq' and corresponds to
+--     matching an or-pattern @(LT; EQ)@, succeeding if the
+--     match variable matches /either/ 'LT' or 'EQ'.
+--     See Note [Implementation of OrPatterns] for a larger example.
+--
+data GrdDag
+  = GdEnd
+  | GdOne !PmGrd
+  | GdSeq !GrdDag !GrdDag
+  | GdAlt !GrdDag !GrdDag
+
+-- | Sequentially compose a list of 'PmGrd's into a 'GrdDag'.
+sequencePmGrds :: [PmGrd] -> GrdDag
+sequencePmGrds = sequenceGrdDags . map GdOne
+
+-- | Sequentially compose a list of 'GrdDag's.
+sequenceGrdDags :: [GrdDag] -> GrdDag
+sequenceGrdDags xs = foldr gdSeq GdEnd xs
+
+-- | Sequentially compose a 'PmGrd' in front of a 'GrdDag'.
+consGrdDag :: PmGrd -> GrdDag -> GrdDag
+consGrdDag g d = gdSeq (GdOne g) d
+
+-- | Sequentially compose two 'GrdDag's. A smart constructor for `GdSeq` that
+-- eliminates `GdEnd`s.
+gdSeq :: GrdDag -> GrdDag -> GrdDag
+gdSeq g1    GdEnd = g1
+gdSeq GdEnd g2    = g2
+gdSeq g1    g2    = g1 `GdSeq` g2
+
+-- | Parallel composition of a list of 'GrdDag's.
+-- Needs a non-empty list as 'GdAlt' does not have a neutral element.
+alternativesGrdDags :: NonEmpty GrdDag -> GrdDag
+alternativesGrdDags xs = foldr1 GdAlt xs
 
 -- | A guard tree denoting 'MatchGroup'.
 newtype PmMatchGroup p = PmMatchGroup (NonEmpty (PmMatch p))
@@ -139,9 +184,15 @@ instance Outputable SrcInfo where
   ppr (SrcInfo (L s                   _)) = ppr s
 
 -- | Format LYG guards as @| True <- x, let x = 42, !z@
-instance Outputable GrdVec where
-  ppr (GrdVec [])     = empty
-  ppr (GrdVec (g:gs)) = fsep (char '|' <+> ppr g : map ((comma <+>) . ppr) gs)
+instance Outputable GrdDag where
+  ppr GdEnd = empty
+  ppr (GdOne g) = ppr g
+  ppr (GdSeq d1 d2) = ppr d1 <> comma <+> ppr d2
+  ppr d0@GdAlt{} = parens $ fsep (ppr d : map ((semi <+>) . ppr) ds)
+    where
+      d NE.:| ds = collect d0
+      collect (GdAlt d1 d2) = collect d1 Semi.<> collect d2
+      collect d = NE.singleton d
 
 -- | Format a LYG sequence (e.g. 'Match'es of a 'MatchGroup' or 'GRHSs') as
 -- @{ <first alt>; ...; <last alt> }@
@@ -236,7 +287,7 @@ instance Outputable a => Outputable (CheckResult a) where
 --
 
 -- | Used as tree payload pre-checking. The LYG guards to check.
-type Pre = GrdVec
+type Pre = GrdDag
 
 -- | Used as tree payload post-checking. The redundancy info we elaborated.
 type Post = RedSets

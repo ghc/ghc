@@ -1,0 +1,5 @@
+Or1.hs:4:4: error: [GHC-29847]
+    Illegal or-pattern: 2; 3
+    Suggested fix:
+      Perhaps you intended to use the ‘OrPatterns’ extension
+

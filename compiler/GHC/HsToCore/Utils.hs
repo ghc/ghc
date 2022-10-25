@@ -80,6 +80,7 @@ import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
+import GHC.Rename.Utils
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence
@@ -969,25 +970,34 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see #3403.
 -}
 
-dsHandleMonadicFailure :: HsDoFlavour -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
-    -- In a do expression, pattern-match failure just calls
-    -- the monadic 'fail' rather than throwing an exception
-dsHandleMonadicFailure ctx pat match m_fail_op =
+dsHandleMonadicFailure :: HsDoFlavour -> LPat GhcTc -> Type -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
+    -- In an ApplicativeDo expression, pattern-match failure just calls the
+    -- monadic 'fail' rather than throwing an exception.
+dsHandleMonadicFailure ctx pat res_ty match m_fail_op =
   case shareFailureHandler match of
     MR_Infallible body -> body
     MR_Fallible body -> do
-      fail_op <- case m_fail_op of
+      dflags <- getDynFlags
+      fail_expr <- case m_fail_op of
         -- Note that (non-monadic) list comprehension, pattern guards, etc could
         -- have fallible bindings without an explicit failure op, but this is
         -- handled elsewhere. See Note [Failing pattern matches in Stmts] the
         -- breakdown of regular and special binds.
-        Nothing -> pprPanic "missing fail op" $
-          text "Pattern match:" <+> ppr pat <+>
-          text "is failable, and fail_expr was left unset"
-        Just fail_op -> pure fail_op
-      dflags <- getDynFlags
-      fail_msg <- mkStringExpr (mk_fail_msg dflags ctx pat)
-      fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+        -- It *is* possible to land here for infallible Or patterns in
+        -- ApplicativeDo, because their desugaring to ViewPatterns leads
+        -- to a MR_Fallible match. But irrefutability is easily asserted:
+        Nothing -> do
+          massertPpr (isIrrefutableHsPat dflags pat) $
+            text "Pattern match:" <+> ppr pat <+>
+            text "is failable, and fail_expr was left unset"
+          -- In this case we likely desugar the pattern-match in something like
+          --   do (~True; False) <- m; stmts
+          -- just presume a fail_expr like in the desugaring of lambdas;
+          -- that's the non-ApplicativeDo code path
+          mkErrorAppDs pAT_ERROR_ID res_ty (matchDoContextErrString ctx)
+        Just fail_op -> do
+          fail_msg <- mkStringExpr (mk_fail_msg dflags ctx pat)
+          dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
 mk_fail_msg :: DynFlags -> HsDoFlavour -> LocatedA e -> String

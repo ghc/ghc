@@ -1789,6 +1789,7 @@ data Pat
   | ViewP Exp Pat                   -- ^ @{ e -> p }@
   | TypeP Type                      -- ^ @{ type p }@
   | InvisP Type                     -- ^ @{ @p }@
+  | OrP (NonEmpty Pat)              -- ^ @{ p1; p2 }@
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | A (field name, pattern) pair. See 'RecP'.

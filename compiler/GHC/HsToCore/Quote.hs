@@ -2096,6 +2096,9 @@ repLambda (L _ m) = notHandled (ThGuardedLambdas m)
 repLPs :: [LPat GhcRn] -> MetaM (Core [(M TH.Pat)])
 repLPs ps = repListM patTyConName repLP ps
 
+repLPs1 :: NonEmpty (LPat GhcRn) -> MetaM (Core (NonEmpty (M TH.Pat)))
+repLPs1 ps = repNonEmptyM patTyConName repLP ps
+
 repLP :: LPat GhcRn -> MetaM (Core (M TH.Pat))
 repLP p = repP (unLoc p)
 
@@ -2150,6 +2153,7 @@ repP (EmbTyPat _ t) = do { t' <- repLTy (hstp_body t)
                          ; repPtype t' }
 repP (InvisPat _ t) = do { t' <- repLTy (hstp_body t)
                          ; repPinvis t' }
+repP (OrPat _ ps) = do { ps' <- repLPs1 ps; repPor ps' }
 repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice n
 repP p@(SplicePat (HsUntypedSpliceTop _ _) _) = pprPanic "repP: top level splice" (ppr p)
 repP other = notHandled (ThExoticPattern other)
@@ -2402,6 +2406,9 @@ repPlist (MkC ps) = rep2 listPName [ps]
 
 repPview :: Core (M TH.Exp) -> Core (M TH.Pat) -> MetaM (Core (M TH.Pat))
 repPview (MkC e) (MkC p) = rep2 viewPName [e,p]
+
+repPor :: Core (NonEmpty (M TH.Pat)) -> MetaM (Core (M TH.Pat))
+repPor (MkC ps) = rep2 orPName [ps]
 
 repPsig :: Core (M TH.Pat) -> Core (M TH.Type) -> MetaM (Core (M TH.Pat))
 repPsig (MkC p) (MkC t) = rep2 sigPName [p, t]
@@ -3081,6 +3088,16 @@ repListM tc_name f args
   = do { ty <- wrapName tc_name
        ; args1 <- mapM f args
        ; return $ coreList' ty args1 }
+
+repNonEmptyM
+  :: Name
+  -> (a  -> MetaM (Core b))
+  -> NonEmpty a -> MetaM (Core (NonEmpty b))
+repNonEmptyM tc_name f args
+  = do { ty <- wrapName tc_name
+       ; args' <- traverse f args
+       ; ne_tycon <- lift $ dsLookupTyCon nonEmptyTyConName -- the DataCon is not known-key
+       ; return $ coreListNonEmpty ne_tycon ty args' }
 
 coreListM :: Name -> [Core a] -> MetaM (Core [a])
 coreListM tc as = repListM tc return as

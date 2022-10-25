@@ -1258,6 +1258,10 @@ collect_pat flag pat bndrs = case pat of
   ParPat _ pat          -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
+  OrPat _ _             -> []
+      -- See Note [Implementation of OrPatterns], Renamer:
+      -- evidence binders in an OrPat currently aren't visible outside their
+      -- binding pattern, so we return [].
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
   LitPat _ _            -> bndrs
   NPat {}               -> bndrs

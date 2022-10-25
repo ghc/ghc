@@ -1417,8 +1417,10 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""
 
-cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
+cvtPats :: Traversable f => f (TH.Pat) -> CvtM (f (Hs.LPat GhcPs))
 cvtPats pats = mapM cvtPat pats
+{-# SPECIALISE cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs] #-}
+{-# SPECIALISE cvtPats :: NonEmpty (TH.Pat) -> CvtM (NonEmpty (Hs.LPat GhcPs)) #-}
 
 cvtPat :: TH.Pat -> CvtM (Hs.LPat GhcPs)
 cvtPat pat = wrapLA (cvtp pat)
@@ -1492,6 +1494,8 @@ cvtp (TypeP t)         = do { t' <- cvtType t
                             ; return $ EmbTyPat noAnn (mkHsTyPat t') }
 cvtp (InvisP t)        = do { t' <- cvtType t
                             ; pure (InvisPat noAnn (mkHsTyPat t'))}
+cvtp (OrP ps)          = do { ps' <- cvtPats ps
+                            ; pure (OrPat noExtField ps')}
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)

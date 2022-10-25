@@ -227,3 +227,5 @@ test('ListTuplePunsFail4', extra_files(['ListTuplePunsFail4.hs']), ghci_script, 
 test('ListTuplePunsFail5', extra_files(['ListTuplePunsFail5.hs']), ghci_script, ['ListTuplePunsFail5.script'])
 test('T17879a', normal, compile_fail, [''])
 test('T17879b', normal, compile_fail, [''])
+test('Or1', normal, compile_fail, [''])
+test('OrPatInExprErr', normal, compile_fail, [''])

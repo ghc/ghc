@@ -51,6 +51,7 @@ hsPatType (LitPat _ lit)                = hsLitType lit
 hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
 hsPatType (ListPat ty _)                = mkListTy ty
+hsPatType (OrPat ty _)                  = ty
 hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
                   -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys

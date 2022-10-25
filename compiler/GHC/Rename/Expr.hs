@@ -2148,7 +2148,7 @@ stmtTreeToStmts
 -- change the @return@ to @pure@.
 stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt xbs pat rhs), _))
                 tail _tail_fvs
-  | not (isStrictPattern pat), (False,tail') <- needJoin monad_names tail Nothing
+  | definitelyLazyPattern pat, (False,tail') <- needJoin monad_names tail Nothing
   -- See Note [ApplicativeDo and strict patterns]
   = mkApplicativeStmt ctxt [ApplicativeArgOne
                             { xarg_app_arg_one = xbsrn_failOp xbs
@@ -2271,15 +2271,15 @@ segments stmts = merge $ reverse $ map reverse $ walk (reverse stmts)
             (_, fvs') = stmtRefs stmt fvs
 
     chunter _ [] = ([], [])
-    chunter vars ((stmt,fvs) : rest)
-       | not (isEmptyNameSet vars)
-       || isStrictPatternBind stmt
+    chunter vars orig@((stmt,fvs) : rest)
+       | isEmptyNameSet vars, definitelyLazyPatternBind stmt
+       = ([], orig)
+       | otherwise
            -- See Note [ApplicativeDo and strict patterns]
        = ((stmt,fvs) : chunk, rest')
        where (chunk,rest') = chunter vars' rest
              (pvars, evars) = stmtRefs stmt fvs
              vars' = (vars `minusNameSet` pvars) `unionNameSet` evars
-    chunter _ rest = ([], rest)
 
     stmtRefs stmt fvs
       | isLetStmt stmt = (pvars, fvs' `minusNameSet` pvars)
@@ -2287,9 +2287,9 @@ segments stmts = merge $ reverse $ map reverse $ walk (reverse stmts)
       where fvs' = fvs `intersectNameSet` allvars
             pvars = mkNameSet (collectStmtBinders CollNoDictBinders (unLoc stmt))
 
-    isStrictPatternBind :: ExprLStmt GhcRn -> Bool
-    isStrictPatternBind (L _ (BindStmt _ pat _)) = isStrictPattern pat
-    isStrictPatternBind _ = False
+    definitelyLazyPatternBind :: ExprLStmt GhcRn -> Bool
+    definitelyLazyPatternBind (L _ (BindStmt _ pat _)) = definitelyLazyPattern pat
+    definitelyLazyPatternBind _ = True
 
 {-
 Note [ApplicativeDo and strict patterns]
@@ -2309,45 +2309,67 @@ allowed this to be transformed into
 then it could be lazier than the standard desugaring using >>=.  See #13875
 for more examples.
 
-Thus, whenever we have a strict pattern match, we treat it as a
+Thus, whenever we have a potentially strict pattern match, we treat it as a
 dependency between that statement and the following one.  The
 dependency prevents those two statements from being performed "in
 parallel" in an ApplicativeStmt, but doesn't otherwise affect what we
 can do with the rest of the statements in the same "do" expression.
+
+The necessary "definitely lazy" test is similar, but distinct to irrefutability.
+See Note [definitelyLazyPattern vs. isIrrefutableHsPat].
+
+Note [definitelyLazyPattern vs. isIrrefutableHsPat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lazy patterns are irrefutable, but not all irrefutable patterns are lazy.
+Examples:
+  * (x,y) is an irrefutable pattern, but not lazy.
+  * x is both irrefutable and lazy.
+  * The or pattern (~True; False) is both irrefutable and lazy,
+    because the first pattern alt accepts without forcing the scrutinee.
+  * The or pattern (False; ~True) is irrefutable, but not lazy,
+    because the first pattern alt forces the scrutinee and may fail,
+    but the second alt is irrefutable and hence the whole pattern is.
 -}
 
-isStrictPattern :: forall p. IsPass p => LPat (GhcPass p) -> Bool
-isStrictPattern (L loc pat) =
+definitelyLazyPattern :: forall p. IsPass p => LPat (GhcPass p) -> Bool
+-- See Note [definitelyLazyPattern vs. isIrrefutableHsPat]
+-- A conservative analysis that says False if in doubt, hence "definitely".
+-- E.g., the ViewPat (const 5 -> 13) is really lazy, but below we say False.
+definitelyLazyPattern (L loc pat) =
   case pat of
-    WildPat{}       -> False
-    VarPat{}        -> False
-    LazyPat{}       -> False
-    AsPat _ _ p     -> isStrictPattern p
-    ParPat _ p      -> isStrictPattern p
-    ViewPat _ _ p   -> isStrictPattern p
-    SigPat _ p _    -> isStrictPattern p
-    BangPat{}       -> True
-    ListPat{}       -> True
-    TuplePat{}      -> True
-    SumPat{}        -> True
-    ConPat{}        -> True
-    LitPat{}        -> True
-    NPat{}          -> True
-    NPlusKPat{}     -> True
-    SplicePat{}     -> True
+    WildPat{}       -> True
+    VarPat{}        -> True
+    LazyPat{}       -> True
+    AsPat _ _ p     -> definitelyLazyPattern p
+    ParPat _ p      -> definitelyLazyPattern p
+    ViewPat _ _f p  -> definitelyLazyPattern p --- || definitelyLazyFun _f
+      -- NB: We keep it simple and assume `definitelyLazyFun _ = False`
+    SigPat _ p _    -> definitelyLazyPattern p
+    OrPat _ p       -> definitelyLazyPattern (NE.head p)
+      -- NB: foo (~True; False) = () is lazy!
+      -- See Note [definitelyLazyPattern vs. isIrrefutableHsPat]
+    BangPat{}       -> False
+    ListPat{}       -> False
+    TuplePat{}      -> False
+    SumPat{}        -> False
+    ConPat{}        -> False -- Some PatSyns are lazy; False is conservative
+    LitPat{}        -> False
+    NPat{}          -> False -- Some NPats are lazy; False is conservative
+    NPlusKPat{}     -> False
+    SplicePat{}     -> False
 
     -- The behavior of this case is unimportant, as GHC will throw an error shortly
     -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
-    EmbTyPat{}  -> False
-    InvisPat{}  -> False
+    EmbTyPat{}  -> True
+    InvisPat{}  -> True
 
     XPat ext        -> case ghcPass @p of
       GhcRn
         | HsPatExpanded _ p <- ext
-        -> isStrictPattern (L loc p)
+        -> definitelyLazyPattern (L loc p)
       GhcTc -> case ext of
-        ExpansionPat _ p -> isStrictPattern (L loc p)
-        CoPat {} -> panic "isStrictPattern: CoPat"
+        ExpansionPat _ p -> definitelyLazyPattern (L loc p)
+        CoPat {} -> panic "definitelyLazyPattern: CoPat"
 
 {-
 Note [ApplicativeDo and refutable patterns]
@@ -2402,7 +2424,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- then we have actually done some splitting. Otherwise it will go into
   -- an infinite loop (#14163).
   go lets indep bndrs ((L loc (BindStmt xbs pat body), fvs): rest)
-    | disjointNameSet bndrs fvs && not (isStrictPattern pat)
+    | disjointNameSet bndrs fvs, definitelyLazyPattern pat
     = go lets ((L loc (BindStmt xbs pat body), fvs) : indep)
          bndrs' rest
     where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders CollNoDictBinders pat)

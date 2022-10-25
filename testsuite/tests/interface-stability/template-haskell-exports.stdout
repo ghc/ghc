@@ -170,6 +170,7 @@ module Language.Haskell.TH where
     | RecordWildCards
     | NamedFieldPuns
     | ViewPatterns
+    | OrPatterns
     | GADTs
     | GADTSyntax
     | NPlusKPatterns
@@ -318,7 +319,7 @@ module Language.Haskell.TH where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
   type PatQ :: *
   type PatQ = Q Pat
   type PatSynArgs :: *
@@ -768,6 +769,7 @@ module Language.Haskell.TH.LanguageExtensions where
     | RecordWildCards
     | NamedFieldPuns
     | ViewPatterns
+    | OrPatterns
     | GADTs
     | GADTSyntax
     | NPlusKPatterns
@@ -1418,6 +1420,7 @@ module Language.Haskell.TH.Lib.Internal where
   notStrict :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Strict
   numTyLit :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Num.Integer.Integer -> m GHC.Internal.TH.Syntax.TyLit
   openTypeFamilyD :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.TH.Syntax.Name -> [m (GHC.Internal.TH.Syntax.TyVarBndr GHC.Internal.TH.Syntax.BndrVis)] -> m GHC.Internal.TH.Syntax.FamilyResultSig -> GHC.Internal.Maybe.Maybe InjectivityAnn -> m GHC.Internal.TH.Syntax.Dec
+  orP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => GHC.Internal.Base.NonEmpty (m GHC.Internal.TH.Syntax.Pat) -> m GHC.Internal.TH.Syntax.Pat
   parS :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => [[m GHC.Internal.TH.Syntax.Stmt]] -> m GHC.Internal.TH.Syntax.Stmt
   parensE :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Exp -> m GHC.Internal.TH.Syntax.Exp
   parensP :: forall (m :: * -> *). GHC.Internal.TH.Syntax.Quote m => m GHC.Internal.TH.Syntax.Pat -> m GHC.Internal.TH.Syntax.Pat
@@ -1832,6 +1835,7 @@ module Language.Haskell.TH.Syntax where
     | RecordWildCards
     | NamedFieldPuns
     | ViewPatterns
+    | OrPatterns
     | GADTs
     | GADTSyntax
     | NPlusKPatterns
@@ -1984,7 +1988,7 @@ module Language.Haskell.TH.Syntax where
   type ParentName :: *
   type ParentName = Name
   type Pat :: *
-  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type
+  data Pat = LitP Lit | VarP Name | TupP [Pat] | UnboxedTupP [Pat] | UnboxedSumP Pat SumAlt SumArity | ConP Name [Type] [Pat] | InfixP Pat Name Pat | UInfixP Pat Name Pat | ParensP Pat | TildeP Pat | BangP Pat | AsP Name Pat | WildP | RecP Name [FieldPat] | ListP [Pat] | SigP Pat Type | ViewP Exp Pat | TypeP Type | InvisP Type | OrP (GHC.Internal.Base.NonEmpty Pat)
   type PatSynArgs :: *
   data PatSynArgs = PrefixPatSyn [Name] | InfixPatSyn Name Name | RecordPatSyn [Name]
   type PatSynDir :: *

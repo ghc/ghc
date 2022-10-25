@@ -270,6 +270,9 @@ data PsMessage
    -- | View-pattern in expression
    | PsErrViewPatInExpr !(LHsExpr GhcPs) !(LHsExpr GhcPs)
 
+   -- | Or-pattern in expression
+   | PsErrOrPatInExpr !(LPat GhcPs)
+
    -- | Type-application without space before '@'
    | PsErrTypeAppWithoutSpace !RdrName !(LHsExpr GhcPs)
 
@@ -460,6 +463,9 @@ data PsMessage
       String -- ^ the name of the character that it looks like
 
    | PsErrInvalidPun !PsErrPunDetails
+
+   -- | Or pattern used without -XOrPatterns
+   | PsErrIllegalOrPat (LPat GhcPs)
 
    deriving Generic
 
