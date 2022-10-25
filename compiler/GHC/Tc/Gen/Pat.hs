@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -71,6 +73,7 @@ import Control.Arrow  ( second )
 import Control.Monad
 import GHC.Data.FastString
 import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty (..))
 
 import GHC.Data.List.SetOps ( getNth )
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -358,6 +361,17 @@ tc_lpats tys penv pats
                penv
                (zipEqual "tc_lpats" pats tys)
 
+-- NB: do not require tys and pats to have the same length
+tc_lpats_ne :: NonEmpty (Scaled ExpSigmaTypeFRR)
+            -> Checker (NonEmpty (LPat GhcRn)) (NonEmpty (LPat GhcTc))
+tc_lpats_ne (ty:|tys) penv (pat:|pats) ti = do
+  err_ctxt <- getErrCtxt
+  (p, (ps, res)) <-
+      tc_lpat ty penv pat $
+      setErrCtxt err_ctxt $
+      tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p) penv (zip pats tys) ti
+  return (p:|ps, res)
+
 --------------------
 -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper
@@ -385,6 +399,11 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
   BangPat x pat -> do
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
         ; return (BangPat x pat', res) }
+
+  OrPat _ pats -> do -- or-patterns with variables are rejected later, after zonking
+    { (pats', res) <- tc_lpats_ne (NE.repeat pat_ty) penv pats thing_inside
+    ; pat_ty <- expTypeToType (scaledThing pat_ty)
+    ; return (OrPat pat_ty pats', res) }
 
   LazyPat x pat -> do
         { mult_wrap <- checkManyPattern pat_ty

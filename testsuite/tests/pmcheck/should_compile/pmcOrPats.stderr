@@ -1,0 +1,25 @@
+
+pmcOrPats.hs:8:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Patterns of type ‘T’, ‘U’ not matched: A W
+
+pmcOrPats.hs:11:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘h’:
+        Patterns of type ‘T’, ‘U’, ‘T’ not matched:
+            A _ A
+            B V A
+            B W A
+
+pmcOrPats.hs:13:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘h’: h (one of A, B) _ B = ...
+
+pmcOrPats.hs:15:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘z’:
+        Patterns of type ‘a’ not matched: p where p is not one of {3, 1, 2}
+
+pmcOrPats.hs:17:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘z’: z 1 = ...

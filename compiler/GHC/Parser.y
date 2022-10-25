@@ -42,7 +42,7 @@ where
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
 import Data.Maybe       ( maybeToList )
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), (<|) )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
 
@@ -507,6 +507,22 @@ Ambiguity:
     empty activation and inlining '[0] Something'.
 -}
 
+{- Note [%shift: orpats -> pat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    orpats -> pat .
+    orpats -> pat . ',' orpats
+
+Example:
+
+    (one of a, b)
+
+Ambiguity:
+    We use ',' as a delimiter between options inside an or-pattern.
+    However, the ',' could also mean a tuple pattern.
+    If the user wants a tuple pattern, they have to put the or-pattern in parentheses.
+-}
+
 {- Note [Parser API Annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A lot of the productions are now cluttered with calls to
@@ -605,6 +621,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'interruptible' { L _ ITinterruptible }
  'unsafe'       { L _ ITunsafe }
  'family'       { L _ ITfamily }
+ 'one'          { L _ ITone }
  'role'         { L _ ITrole }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
@@ -3060,11 +3077,31 @@ texp :: { ECP }
                                 $1 >>= \ $1 ->
                                 pvA $ mkHsSectionR_PV (comb2 (reLocN $1) (reLoc $>)) (n2l $1) $2 }
 
+
+        | 'one' 'of' vocurly orpats close
+                             {% do {
+                                    let srcSpan = comb2 $1 (reLoc (NE.last $4))
+                                    ; cs <- getCommentsFor srcSpan
+                                    ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) $4
+                                    ; let pat = sL (noAnnSrcSpan srcSpan) pat'
+                                    ; orPatsOn <- hintOrPats pat
+                                    ; when (orPatsOn && length $4 < 2) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrOrPatNeedsTwoAlternatives pat)
+                                    ; return $ ecpFromPat pat
+                             }  }
+
        -- View patterns get parenthesized above
         | exp '->' texp   { ECP $
                              unECP $1 >>= \ $1 ->
                              unECP $3 >>= \ $3 ->
                              mkHsViewPatPV (comb2 (reLoc $1) (reLoc $>)) $1 $3 [mu AnnRarrow $2] }
+
+orpats :: { NonEmpty (LPat GhcPs) }
+        : tpat %shift      { NE.singleton $1 }
+
+        | tpat ',' orpats  {% do {
+                                  a <- addTrailingCommaA $1 (getLoc $2)
+                                  ; return (a<|$3)
+                           } }
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -3328,6 +3365,9 @@ gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
+
+tpat     :: { LPat GhcPs }
+tpat     :  texp          {% (checkPattern <=< runPV) (unECP $1) }
 
 -- 'pats1' does the same thing as 'pat', but returns it as a singleton
 -- list so that it can be used with a parameterized production rule
@@ -3821,8 +3861,8 @@ varsym_no_minus :: { LocatedN RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places,
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe', 'interruptible', 'forall', 'family', 'role', 'stock', and
--- 'anyclass', whose treatment differs depending on context
+-- except 'unsafe', 'interruptible', 'forall', 'family', 'role', 'stock'
+-- and 'anyclass', whose treatment differs depending on context
 special_id :: { Located FastString }
 special_id
         : 'as'                  { sL1 $1 (fsLit "as") }
@@ -3835,6 +3875,7 @@ special_id
         | 'ccall'               { sL1 $1 (fsLit "ccall") }
         | 'capi'                { sL1 $1 (fsLit "capi") }
         | 'prim'                { sL1 $1 (fsLit "prim") }
+        | 'one'                 { sL1 $1 (fsLit "one") }
         | 'javascript'          { sL1 $1 (fsLit "javascript") }
         -- See Note [%shift: special_id -> 'group']
         | 'group' %shift        { sL1 $1 (fsLit "group") }
@@ -4207,6 +4248,13 @@ looksLikeMult ty1 l_op ty2
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True
   | otherwise = False
+
+-- Hint about or-patterns
+hintOrPats :: MonadP m => LPat GhcPs -> m Bool
+hintOrPats pat = do
+  orPatsEnabled <- getBit OrPatternsBit
+  unless orPatsEnabled $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) $ PsErrIllegalOrPat pat
+  return orPatsEnabled
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()

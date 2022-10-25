@@ -84,6 +84,7 @@ import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
 import GHC.Driver.DynFlags (DynFlags, xopt)
 import qualified GHC.LanguageExtensions as LangExt
+import qualified Data.List.NonEmpty as NE
 import Data.Data
 
 
@@ -120,6 +121,10 @@ type instance XListPat GhcTc = Type
 type instance XTuplePat GhcPs = EpAnn [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
+
+type instance XOrPat GhcPs = EpAnn [AddEpAnn]
+type instance XOrPat GhcRn = NoExtField
+type instance XOrPat GhcTc = Type
 
 type instance XSumPat GhcPs = EpAnn EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
@@ -348,6 +353,7 @@ pprPat (SplicePat ext splice)   =
       GhcTc -> dataConCantHappen ext
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
+pprPat (OrPat _ pats)           = text "one of" <+> pprWithCommas ppr (NE.toList pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `MkSolo x`, not `(x)`
@@ -570,6 +576,7 @@ isIrrefutableHsPat' is_strict = goL
     go (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
     go (ListPat {})        = False
+    go (OrPat _ pats)      = any (isIrrefutableHsPat' is_strict) pats
 
     go (ConPat
         { pat_con  = con
@@ -648,6 +655,7 @@ patNeedsParens p = go @p
     -- at a different GhcPass (see the case for GhcTc XPat below).
     go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
+    go (OrPat {})        = False
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds })
                          = conPatNeedsParens p ds

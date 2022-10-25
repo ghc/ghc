@@ -1,0 +1,5 @@
+
+Or2.hs:6:4: error: [GHC-96152]
+    An or-pattern needs at least two alternatives: one of 4
+
+Or2.hs:9:7: error: [GHC-58481] parse error on input ‘of’

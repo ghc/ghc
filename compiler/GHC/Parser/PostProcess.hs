@@ -10,6 +10,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
 
+
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -107,6 +108,7 @@ module GHC.Parser.PostProcess (
         DisambECP(..),
         ecpFromExp,
         ecpFromCmd,
+        ecpFromPat,
         PatBuilder,
 
         -- Type/datacon ambiguity resolution
@@ -164,7 +166,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 import Data.Kind       ( Type )
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty(..))
 
 {- **********************************************************************
 
@@ -1158,30 +1160,34 @@ checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (L
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLPat e@(L l _) = checkPat l e [] []
+checkLPat e@(L l _) = checkFPat l e [] []
 
-checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
+checkFPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
-checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
+checkFPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
       }
+  | null args && null tyargs = return $ L l (VarPat noExtField (L ln c))
   | not (null tyargs) =
       patFail (locA l) . PsErrInPat e $ PEIP_TypeArgs tyargs
-  | (not (null args) && patIsRec c) = do
+  | patIsRec c = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
-checkPat loc (L _ (PatBuilderAppType f at t)) tyargs args =
-  checkPat loc f (HsConPatTyArg at t : tyargs) args
-checkPat loc (L _ (PatBuilderApp f e)) [] args = do
+  | otherwise = do
+      details <- fromParseContext <$> askParseContext
+      patFail (locA l) (PsErrInPat e details)
+checkFPat loc (L _ (PatBuilderAppType f at t)) tyargs args =
+  checkFPat loc f (HsConPatTyArg at t : tyargs) args
+checkFPat loc (L _ (PatBuilderApp f e)) [] args = do
   p <- checkLPat e
-  checkPat loc f [] (p : args)
-checkPat loc (L l e) [] [] = do
+  checkFPat loc f [] (p : args)
+checkFPat loc (L l e) [] [] = do
   p <- checkAPat loc e
   return (L l p)
-checkPat loc e _ _ = do
+checkFPat loc e _ _ = do
   details <- fromParseContext <$> askParseContext
   patFail (locA loc) (PsErrInPat (unLoc e) details)
 
@@ -1190,7 +1196,7 @@ checkAPat loc e0 = do
  nPlusKPatterns <- getBit NPlusKPatternsBit
  case e0 of
    PatBuilderPat p -> return p
-   PatBuilderVar x -> return (VarPat noExtField x)
+   PatBuilderVar _ -> unLoc <$> checkLPat (L loc e0)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
@@ -1226,7 +1232,15 @@ checkAPat loc e0 = do
      p <- checkLPat e
      return (ParPat (EpAnn (spanAsAnchor (locA loc)) NoEpAnns emptyComments) lpar p rpar)
 
-   _           -> do
+   PatBuilderApp _ _ -> do
+    a <- checkFPat loc (L loc e0) [] []
+    return (unLoc a)
+
+   PatBuilderAppType {} -> do
+    a <- checkFPat loc (L loc e0) [] []
+    return (unLoc a)
+
+   _ -> do
      details <- fromParseContext <$> askParseContext
      patFail (locA loc) (PsErrInPat e0 details)
 
@@ -1452,6 +1466,9 @@ ecpFromExp a = ECP (ecpFromExp' a)
 ecpFromCmd :: LHsCmd GhcPs -> ECP
 ecpFromCmd a = ECP (ecpFromCmd' a)
 
+ecpFromPat :: LPat GhcPs -> ECP
+ecpFromPat a = ECP (ecpFromPat' a)
+
 -- The 'fbinds' parser rule produces values of this type. See Note
 -- [RecordDotSyntax field updates].
 type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (LocatedA b))
@@ -1494,6 +1511,7 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (LocatedA b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
+  ecpFromPat' :: LPat GhcPs -> PV (LocatedA b)
   mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "\... -> ..." (lambda)
@@ -1643,6 +1661,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
+  ecpFromPat' (L l e) = cmdFail (locA l) (ppr e)
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $
                                                  PsErrOverloadedRecordDotInvalid
   mkHsLamPV l mg = do
@@ -1727,6 +1746,7 @@ instance DisambECP (HsExpr GhcPs) where
     addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInExpr c
     return (L l (hsHoleExpr noAnn))
   ecpFromExp' = return
+  ecpFromPat' (L l e) = cmdFail (locA l) (ppr e)
   mkHsProjUpdatePV l fields arg isPun anns = do
     cs <- getCommentsFor l
     return $ mkRdrProjUpdate (noAnnSrcSpan l) fields arg isPun (EpAnn (spanAsAnchor l) anns cs)
@@ -1821,6 +1841,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (L l c)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInPat c
   ecpFromExp' (L l e)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowExprInPat e
+  ecpFromPat' p          = return $ L (getLoc p) (PatBuilderPat (unLoc p))
   mkHsLamPV l _          = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLambdaInPat
   mkHsLetPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLetInPat
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrOverloadedRecordDotInvalid

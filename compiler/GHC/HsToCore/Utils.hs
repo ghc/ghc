@@ -21,7 +21,7 @@ module GHC.HsToCore.Utils (
         cantFailMatchResult, alwaysFailMatchResult,
         extractMatchResult, combineMatchResults,
         adjustMatchResultDs,
-        shareFailureHandler,
+        shareFailureHandler, shareSuccessHandler,
         dsHandleMonadicFailure,
         mkCoLetMatchResult, mkViewMatchResult, mkGuardedMatchResult,
         matchCanFail, mkEvalMatchResult,
@@ -81,6 +81,7 @@ import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence
@@ -906,31 +907,46 @@ carefully), but we certainly don't support it now.
 anyway, and the Void# doesn't do much harm.
 -}
 
-mkFailurePair :: CoreExpr       -- Result type of the whole case expression
-              -> DsM (CoreBind, -- Binds the newly-created fail variable
-                                -- to \ _ -> expression
-                      CoreExpr) -- Fail variable applied to realWorld#
--- See Note [Failure thunks and CPR]
-mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
-       ; fail_fun_arg <- newSysLocalDs ManyTy unboxedUnitTy
-       ; let real_arg = setOneShotLambda fail_fun_arg
-       ; return (NonRec fail_fun_var (Lam real_arg expr),
-                 App (Var fail_fun_var) unboxedUnitExpr) }
-  where
-    ty = exprType expr
+mkSharedPair :: FastString  -- Name of the newly created variable
+             -> Type        -- Type of the expression to share
+             -> DsM (CoreExpr -> (CoreExpr -> CoreExpr),
+                     -- Given the expression to share, returns a float that
+                     -- wraps a NonRec let around the expression for the shared
+                     -- binding
+                     CoreExpr)
+                     -- Fail variable applied to (# #)
+mkSharedPair fun_name ty
+  = do { fun_var <- mkSysLocalM fun_name ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
+       ; fun_arg <- newSysLocalDs ManyTy unboxedUnitTy
+       ; let real_arg = setOneShotLambda fun_arg
+       ; return (Let . NonRec fun_var . Lam real_arg,
+                 App (Var fun_var) unboxedUnitExpr) }
 
--- Uses '@mkFailurePair@' to bind the failure case. Infallible matches have
--- neither a failure arg or failure "hole", so nothing is let-bound, and no
+mkFailurePair :: Type -> DsM (CoreExpr -> (CoreExpr -> CoreExpr), CoreExpr)
+-- See Note [Failure thunks and CPR]
+mkFailurePair = mkSharedPair (fsLit "fail")
+
+mkSuccessPair :: Type -> DsM (CoreExpr -> (CoreExpr -> CoreExpr), CoreExpr)
+mkSuccessPair = mkSharedPair (fsLit "success")
+
+-- Uses '@mkSharedPair@' to bind the failure case. Infallible matches have
+-- neither a failure arg nor failure "hole", so nothing is let-bound, and no
 -- extraneous Core is produced.
 shareFailureHandler :: MatchResult CoreExpr -> MatchResult CoreExpr
 shareFailureHandler = \case
   mr@(MR_Infallible _) -> mr
   MR_Fallible match_fn -> MR_Fallible $ \fail_expr -> do
-    (fail_bind, shared_failure_handler) <- mkFailurePair fail_expr
-    body <- match_fn shared_failure_handler
+    (mk_fail_bind, shared_failure_handler) <- mkFailurePair (exprType fail_expr)
     -- Never unboxed, per the above, so always OK for `let` not `case`.
-    return $ Let fail_bind body
+    mk_fail_bind fail_expr <$> match_fn shared_failure_handler
+
+-- Uses '@mkSharedPair@' to bind the success case
+shareSuccessHandler :: MatchResult CoreExpr -> Type -> (CoreExpr -> DsM (MatchResult CoreExpr)) -> DsM (MatchResult CoreExpr)
+shareSuccessHandler success_result ty match_body = do
+  (mk_success_bind, shared_success_handler) <- mkSuccessPair ty
+  -- Never unboxed, per the above, so always OK for `let` not `case`.
+  body_result <- match_body shared_success_handler
+  pure (mk_success_bind <$> success_result <*> body_result)
 
 {-
 Note [Failure thunks and CPR]

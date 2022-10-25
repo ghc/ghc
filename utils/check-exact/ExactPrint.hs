@@ -63,6 +63,7 @@ import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
@@ -4549,6 +4550,7 @@ instance ExactPrint (Pat GhcPs) where
   getAnnotationEntry (NPat an _ _ _)          = fromAnn an
   getAnnotationEntry (NPlusKPat an _ _ _ _ _) = fromAnn an
   getAnnotationEntry (SigPat an _ _)          = fromAnn an
+  getAnnotationEntry (OrPat an _)             = fromAnn an
 
   setAnnotationAnchor a@(WildPat _)              _ _s = a
   setAnnotationAnchor a@(VarPat _ _)             _ _s = a
@@ -4566,6 +4568,7 @@ instance ExactPrint (Pat GhcPs) where
   setAnnotationAnchor (NPat an a b c)          anc cs = (NPat (setAnchorEpa an anc cs) a b c)
   setAnnotationAnchor (NPlusKPat an a b c d e) anc cs = (NPlusKPat (setAnchorEpa an anc cs) a b c d e)
   setAnnotationAnchor (SigPat an a b)          anc cs = (SigPat (setAnchorEpa an anc cs) a b)
+  setAnnotationAnchor (OrPat an a)             anc cs = (OrPat (setAnchorEpa an anc cs) a)
 
   exact (WildPat w) = do
     anchor <- getAnchorU
@@ -4654,6 +4657,12 @@ instance ExactPrint (Pat GhcPs) where
     an0 <- markEpAnnL an lidl AnnDcolon
     sig' <- markAnnotated sig
     return (SigPat an0 pat' sig')
+
+  exact (OrPat an pats) = do
+    an0 <- markEpAnnL an lidl AnnOne
+    an1 <- markEpAnnL an0 lidl AnnOf
+    pats' <- markAnnotated (NE.toList pats)
+    return (OrPat an1 (NE.fromList pats'))
 
 -- ---------------------------------------------------------------------
 

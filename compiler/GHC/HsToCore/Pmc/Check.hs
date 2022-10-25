@@ -43,6 +43,13 @@ import Data.Coerce
 newtype CheckAction a = CA { unCA :: Nablas -> DsM (CheckResult a) }
   deriving Functor
 
+-- | A 'CheckAction' representing a successful pattern-match.
+matchSucceeded :: CheckAction RedSets
+matchSucceeded = CA $ \inc -> -- succeed
+  pure CheckResult { cr_ret = emptyRedSets { rs_cov = inc }
+                   , cr_uncov = mempty
+                   , cr_approx = Precise }
+
 -- | Composes 'CheckAction's top-to-bottom:
 -- If a value falls through the resulting action, then it must fall through the
 -- first action and then through the second action.
@@ -91,12 +98,12 @@ throttle limit old@(MkNablas old_ds) new@(MkNablas new_ds)
   | length new_ds > max limit (length old_ds) = (Approximate, old)
   | otherwise                                 = (Precise,     new)
 
-checkSequence :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
+checkAlternatives :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
 -- The implementation is pretty similar to
 -- @traverse1 :: Apply f => (a -> f b) -> NonEmpty a -> f (NonEmpty b)@
-checkSequence act (t :| [])       = (:| []) <$> act t
-checkSequence act (t1 :| (t2:ts)) =
-  topToBottom (NE.<|) (act t1) (checkSequence act (t2:|ts))
+checkAlternatives act (t :| [])       = (:| []) <$> act t
+checkAlternatives act (t1 :| (t2:ts)) =
+  topToBottom (NE.<|) (act t1) (checkAlternatives act (t2:|ts))
 
 emptyRedSets :: RedSets
 -- Semigroup instance would be misleading!
@@ -148,33 +155,49 @@ checkGrd grd = CA $ \inc -> case grd of
                      , cr_uncov = uncov
                      , cr_approx = Precise }
 
-checkGrds :: [PmGrd] -> CheckAction RedSets
-checkGrds [] = CA $ \inc ->
-  pure CheckResult { cr_ret = emptyRedSets { rs_cov = inc }
-                   , cr_uncov = mempty
-                   , cr_approx = Precise }
-checkGrds (g:grds) = leftToRight merge (checkGrd g) (checkGrds grds)
+
+
+checkGrdDag :: GrdDag -> CheckAction RedSets
+checkGrdDag (GdOne g)     = checkGrd g
+checkGrdDag GdEnd         = matchSucceeded
+checkGrdDag (GdSeq dl dr) = leftToRight merge (checkGrdDag dl) (checkGrdDag dr)
   where
-    merge ri_g ri_grds = -- This operation would /not/ form a Semigroup!
-      RedSets { rs_cov   = rs_cov ri_grds
-              , rs_div   = rs_div ri_g   Semi.<> rs_div ri_grds
-              , rs_bangs = rs_bangs ri_g Semi.<> rs_bangs ri_grds }
+    -- Note that
+    --   * the incoming set of dr is the covered set of dl
+    --   * the covered set of dr is a subset of the incoming set of dr
+    --   * this is so that the covered set of dr is the covered set of the
+    --     entire sequence
+    -- Hence we merge by returning @rs_cov ri_r@ as the covered set.
+    merge ri_l ri_r =
+      RedSets { rs_cov   = rs_cov   ri_r
+              , rs_div   = rs_div   ri_l Semi.<> rs_div   ri_r
+              , rs_bangs = rs_bangs ri_l Semi.<> rs_bangs ri_r }
+checkGrdDag (GdAlt dt db) = topToBottom merge (checkGrdDag dt) (checkGrdDag db)
+  where
+    -- The intuition here: ri_b is disjoint with ri_t, because db only gets
+    -- fed the "leftover" uncovered set of dt. But for the GrdDag that follows
+    -- to the right of the GdAlt (say), we have to reunite the RedSets. Hence
+    -- component-wise merge.
+    merge ri_t ri_b =
+      RedSets { rs_cov   = rs_cov   ri_t Semi.<> rs_cov   ri_b
+              , rs_div   = rs_div   ri_t Semi.<> rs_div   ri_b
+              , rs_bangs = rs_bangs ri_t Semi.<> rs_bangs ri_b }
 
 checkMatchGroup :: PmMatchGroup Pre -> CheckAction (PmMatchGroup Post)
 checkMatchGroup (PmMatchGroup matches) =
-  PmMatchGroup <$> checkSequence checkMatch matches
+  PmMatchGroup <$> checkAlternatives checkMatch matches
 
 checkMatch :: PmMatch Pre -> CheckAction (PmMatch Post)
-checkMatch (PmMatch { pm_pats = GrdVec grds, pm_grhss = grhss }) =
-  leftToRight PmMatch (checkGrds grds) (checkGRHSs grhss)
+checkMatch (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
+  leftToRight PmMatch (checkGrdDag grds) (checkGRHSs grhss)
 
 checkGRHSs :: PmGRHSs Pre -> CheckAction (PmGRHSs Post)
-checkGRHSs (PmGRHSs { pgs_lcls = GrdVec lcls, pgs_grhss = grhss }) =
-  leftToRight PmGRHSs (checkGrds lcls) (checkSequence checkGRHS grhss)
+checkGRHSs (PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss }) =
+  leftToRight PmGRHSs (checkGrdDag lcls) (checkAlternatives checkGRHS grhss)
 
 checkGRHS :: PmGRHS Pre -> CheckAction (PmGRHS Post)
-checkGRHS (PmGRHS { pg_grds = GrdVec grds, pg_rhs = rhs_info }) =
-  flip PmGRHS rhs_info <$> checkGrds grds
+checkGRHS (PmGRHS { pg_grds = grds, pg_rhs = rhs_info }) =
+  flip PmGRHS rhs_info <$> checkGrdDag grds
 
 checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
 -- See Note [Checking EmptyCase]

@@ -2701,7 +2701,18 @@ data TcRnMessage where
   -}
   TcRnTypeDataForbids :: !TypeDataForbids -> TcRnMessage
 
-  {-| TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
+  {-| TcRnOrPatBindsVariables is an error that happens when an
+     or-pattern binds variables or has dictionary or evidence biders, e.g. (one of A, B x).
+
+     Test case:
+     testsuite/tests/typecheck/should_fail/Or3
+  -}
+  TcRnOrPatBindsVariables
+    :: Pat GhcTc -- the or-pattern
+    -> Bool -- True => pattern contains just (type) variables; False => pattern contains other dictionary/evidence binders
+    -> TcRnMessage
+
+  {- | TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
        is missing methods that are required by the minimal definition.
 
        Example:
