@@ -95,7 +95,7 @@ import qualified Data.Set                 as S
 import Data.Word
 
 import System.IO
-import System.FilePath ((<.>), (</>), dropExtension)
+import System.FilePath ((<.>), (</>), dropExtension, takeDirectory)
 import System.Directory ( createDirectoryIfMissing
                         , doesFileExist
                         , getCurrentDirectory
@@ -800,6 +800,8 @@ readDepsFromObj = \case
 embedJsFile :: Logger -> DynFlags -> TmpFs -> UnitEnv -> FilePath -> FilePath -> IO ()
 embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
   let profiling  = False -- FIXME: add support for profiling way
+
+  createDirectoryIfMissing True (takeDirectory output_fn)
 
   -- the header lets the linker recognize processed JavaScript files
   -- But don't add JavaScript header to object files!
