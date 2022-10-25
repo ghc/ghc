@@ -216,6 +216,13 @@ data TcRnMessage where
                       -> !TcRnMessageDetailed
                       -> TcRnMessage
 
+  {-| TcRnWithHsDocContext annotates an error message with the context in which
+      it originated.
+  -}
+  TcRnWithHsDocContext :: !HsDocContext
+                       -> !TcRnMessage
+                       -> TcRnMessage
+
   {-| TcRnSolverReport is the constructor used to report unsolved constraints
       after constraint solving, as well as other errors such as hole fit errors.
 
@@ -539,7 +546,6 @@ data TcRnMessage where
     :: Maybe Name
         -- ^ the wildcard name, or 'Nothing' for an anonymous wildcard
     -> !BadAnonWildcardContext
-    -> !(Maybe HsDocContext)
     -> TcRnMessage
 
 

@@ -57,7 +57,7 @@ import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
 import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprScopeError
-                         , inHsDocContext, withHsDocContext, pprHsDocContext )
+                         , inHsDocContext, pprHsDocContext )
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
@@ -622,8 +622,9 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
 
 rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
   = do { when (isRnKindLevel env && isRdrTyVar rdr_name) $
-         unlessXOptM LangExt.PolyKinds $ addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-         withHsDocContext (rtke_ctxt env) $
+         unlessXOptM LangExt.PolyKinds $ addErr $
+         TcRnWithHsDocContext (rtke_ctxt env) $
+         mkTcRnUnknownMessage $ mkPlainError noHints $
          vcat [ text "Unexpected kind variable" <+> quotes (ppr rdr_name)
               , text "Perhaps you intended to use PolyKinds" ]
            -- Any type variable at the kind level is illegal without the use
@@ -760,8 +761,9 @@ rnHsTyKi env (XHsType ty)
       mb_name <- lookupLocalOccRn_maybe rdr_name
       -- TODO: refactor this to avoid mkTcRnUnknownMessage
       when (isNothing mb_name) $
-        addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          withHsDocContext (rtke_ctxt env) $
+        addErr $
+          TcRnWithHsDocContext (rtke_ctxt env) $
+          mkTcRnUnknownMessage $ mkPlainError noHints $
           pprScopeError rdr_name (notInScopeErr WL_LocalOnly rdr_name)
 
 rnHsTyKi env ty@(HsExplicitListTy _ ip tys)
@@ -860,7 +862,8 @@ checkWildCard :: RnTyKiEnv
               -> Maybe BadAnonWildcardContext
               -> RnM ()
 checkWildCard env mb_name (Just bad)
-  = addErr $ TcRnIllegalWildcardInType mb_name bad (Just $ rtke_ctxt env)
+  = addErr $ TcRnWithHsDocContext (rtke_ctxt env) $
+             TcRnIllegalWildcardInType mb_name bad
 checkWildCard _ _ Nothing
   = return ()
 
@@ -1658,8 +1661,9 @@ unexpectedPatSigTypeErr ty
 
 badKindSigErr :: HsDocContext -> LHsType GhcPs -> TcM ()
 badKindSigErr doc (L loc ty)
-  = setSrcSpanA loc $ addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    withHsDocContext doc $
+  = setSrcSpanA loc $ addErr $
+    TcRnWithHsDocContext doc $
+    mkTcRnUnknownMessage $ mkPlainError noHints $
     hang (text "Illegal kind signature:" <+> quotes (ppr ty))
        2 (text "Perhaps you intended to use KindSignatures")
 

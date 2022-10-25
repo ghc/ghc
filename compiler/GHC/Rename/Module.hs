@@ -38,7 +38,7 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr (withHsDocContext, pprScopeError )
+import GHC.Tc.Errors.Ppr (pprScopeError)
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -681,7 +681,9 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
     -- reach the typechecker, lest we encounter different errors that are
     -- hopelessly confusing (such as the one in #16114).
     bail_out (l, err_msg) = do
-      addErrAt l $ mkTcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
+      addErrAt l $
+        TcRnWithHsDocContext ctxt $
+        mkTcRnUnknownMessage $ mkPlainError noHints err_msg
       pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
 rnFamEqn :: HsDocContext

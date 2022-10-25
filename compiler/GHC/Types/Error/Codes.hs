@@ -629,6 +629,7 @@ type family ConRecursInto con where
     -- Recur into TcRnMessageWithInfo to get the underlying TcRnMessage
   ConRecursInto "TcRnMessageWithInfo"      = 'Just TcRnMessageDetailed
   ConRecursInto "TcRnMessageDetailed"      = 'Just TcRnMessage
+  ConRecursInto "TcRnWithHsDocContext"     = 'Just TcRnMessage
 
   ConRecursInto "TcRnCannotDeriveInstance" = 'Just DeriveInstanceErrReason
   ConRecursInto "TcRnPragmaWarning"        = 'Just (WarningTxt GhcRn)

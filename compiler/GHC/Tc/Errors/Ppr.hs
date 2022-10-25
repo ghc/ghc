@@ -16,7 +16,6 @@ module GHC.Tc.Errors.Ppr
   , tidySkolemInfo
   , tidySkolemInfoAnon
   --
-  , withHsDocContext
   , pprHsDocContext
   , inHsDocContext
   , TcRnMessageOpts(..)
@@ -118,6 +117,13 @@ instance Diagnostic TcRnMessage where
              -> messageWithInfoDiagnosticMessage unit_state err_info
                   (tcOptsShowContext opts)
                   (diagnosticMessage opts msg)
+    TcRnWithHsDocContext ctxt msg
+      -> if tcOptsShowContext opts
+         then main_msg `unionDecoratedSDoc` ctxt_msg
+         else main_msg
+      where
+        main_msg = diagnosticMessage opts msg
+        ctxt_msg = mkSimpleDecorated (inHsDocContext ctxt)
     TcRnSolverReport msg _ _
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnRedundantConstraints redundants (info, show_info)
@@ -191,11 +197,8 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $ text "Illegal use of punning for field" <+> quotes (ppr fld)
     TcRnIllegalWildcardsInRecord fld_part
       -> mkSimpleDecorated $ text "Illegal `..' in record" <+> pprRecordFieldPart fld_part
-    TcRnIllegalWildcardInType mb_name bad mb_ctxt
-      -> mkSimpleDecorated $ vcat [ main_msg, context_msg ]
-      where
-        main_msg :: SDoc
-        main_msg = case bad of
+    TcRnIllegalWildcardInType mb_name bad
+      -> mkSimpleDecorated $ case bad of
           WildcardNotLastInConstraint ->
             hang notAllowed 2 constraint_hint_msg
           ExtraConstraintWildcardNotAllowed allow_sole ->
@@ -206,10 +209,7 @@ instance Diagnostic TcRnMessage where
                 hang notAllowed 2 sole_msg
           WildcardsNotAllowedAtAll ->
             notAllowed
-        context_msg :: SDoc
-        context_msg = case mb_ctxt of
-          Just ctxt -> nest 2 (text "in" <+> pprHsDocContext ctxt)
-          _         -> empty
+      where
         notAllowed, what, wildcard, how :: SDoc
         notAllowed = what <+> quotes wildcard <+> how
         wildcard = case mb_name of
@@ -1157,6 +1157,8 @@ instance Diagnostic TcRnMessage where
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed _ m -> diagnosticReason m
+    TcRnWithHsDocContext _ msg
+      -> diagnosticReason msg
     TcRnSolverReport _ reason _
       -> reason -- Error, or a Warning if we are deferring type errors
     TcRnRedundantConstraints {}
@@ -1523,6 +1525,8 @@ instance Diagnostic TcRnMessage where
     TcRnMessageWithInfo _ msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed _ m -> diagnosticHints m
+    TcRnWithHsDocContext _ msg
+      -> diagnosticHints msg
     TcRnSolverReport _ _ hints
       -> hints
     TcRnRedundantConstraints{}
@@ -3739,9 +3743,6 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
 *                                                                      *
 ************************************************************************
 -}
-
-withHsDocContext :: HsDocContext -> SDoc -> SDoc
-withHsDocContext ctxt doc = doc $$ inHsDocContext ctxt
 
 inHsDocContext :: HsDocContext -> SDoc
 inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt

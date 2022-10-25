@@ -43,7 +43,6 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr (withHsDocContext)
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Types.Error
@@ -204,7 +203,9 @@ checkInferredVars ctxt (Just msg) ty =
   let bndrs = sig_ty_bndrs ty
   in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
     Nothing -> return ()
-    Just _  -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt msg)
+    Just _  -> addErr $
+      TcRnWithHsDocContext ctxt $
+      mkTcRnUnknownMessage $ mkPlainError noHints msg
   where
     sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs}))
@@ -313,7 +314,9 @@ noNestedForallsContextsErr what lty =
 addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
 addNoNestedForallsContextsErr ctxt what lty =
   whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
-    addErrAt l $ mkTcRnUnknownMessage $ mkPlainError noHints (withHsDocContext ctxt err_msg)
+    addErrAt l $
+      TcRnWithHsDocContext ctxt $
+      mkTcRnUnknownMessage $ mkPlainError noHints err_msg
 
 {-
 ************************************************************************
