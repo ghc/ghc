@@ -3060,6 +3060,7 @@ data ExtBits
   | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
   | OverloadedRecordDotBit
   | OverloadedRecordUpdateBit
+  | OrPatternsBit
   | ExtendedLiteralsBit
   | ListTuplePunsBit
 
@@ -3141,6 +3142,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. NoLexicalNegationBit        `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
       .|. OverloadedRecordDotBit      `xoptBit` LangExt.OverloadedRecordDot
       .|. OverloadedRecordUpdateBit   `xoptBit` LangExt.OverloadedRecordUpdate  -- Enable testing via 'getBit OverloadedRecordUpdateBit' in the parser (RecordDotSyntax parsing uses that information).
+      .|. OrPatternsBit               `xoptBit` LangExt.OrPatterns
       .|. ExtendedLiteralsBit         `xoptBit` LangExt.ExtendedLiterals
       .|. ListTuplePunsBit            `xoptBit` LangExt.ListTuplePuns
     optBits =

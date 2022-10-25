@@ -79,12 +79,14 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
+import GHC.Utils.Monad
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
 import Data.Data
+import qualified Data.List.NonEmpty as NE
 
 import Data.Functor.Identity
 
@@ -123,6 +125,10 @@ type instance XListPat GhcTc = Type
 type instance XTuplePat GhcPs = [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
+
+type instance XOrPat GhcPs = NoExtField
+type instance XOrPat GhcRn = NoExtField
+type instance XOrPat GhcTc = Type
 
 type instance XSumPat GhcPs = EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
@@ -433,6 +439,7 @@ pprPat (SplicePat ext splice)   =
       GhcTc -> dataConCantHappen ext
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
+pprPat (OrPat _ pats)           = pprWithSemis ppr (NE.toList pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `MkSolo x`, not `(x)`
@@ -682,7 +689,8 @@ isIrrefutableHsPatHelperM is_strict isConLikeIrr pat = go (unLoc pat)
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
-    go (TuplePat _ pats _) = do { bs <- mapM goL pats; return $ and bs }
+    go (TuplePat _ pats _) = allM goL pats
+    go (OrPat _ pats)      = anyM goL pats
     go (SumPat {})         = return False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
     go (ListPat {})        = return False
@@ -764,6 +772,7 @@ isBoringHsPat = goL
               -- A pattern match on a GADT constructor can introduce
               -- type-level information (for example, T18572).
               -> False
+      OrPat _ pats  -> all goL pats
       LitPat {}     -> True
       NPat {}       -> True
       NPlusKPat {}  -> True
@@ -854,7 +863,129 @@ Here we *do not* want to emit a pattern-match warning on the first line for the
 incomplete pattern-match, as incompleteness inside do-notation is handled
 using MonadFail. However, we still want to propagate the fact that x is headed
 by the 'Just' constructor, to avoid a pattern-match warning on the last line.
+
+Note [Implementation of OrPatterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes the implementation of the extension -XOrPatterns.
+
+* Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst
+* Discussion: https://github.com/ghc-proposals/ghc-proposals/pull/522 and others
+
+Parser
+------
+We parse an or-pattern `pat_1; ...; pat_k` into `OrPat [pat_1, ..., pat_k]`,
+where `OrPat` is a constructor of `Pat` in Language.Haskell.Syntax.Pat.
+We occasionally refer to any of the `pat_k` as "pattern alternatives" below.
+The changes to the parser are as outlined in Section 8.1 of the proposal.
+The main productions are
+
+  orpats -> exp | exp ';' orpats
+  aexp2 -> '(' orpats ')'
+  pat -> orpats
+
+Renamer and typechecker
+-----------------------
+The typing rule for or-patterns in terms of pattern types is
+
+                   Γ0, Σ0 ⊢ pat_i : τ ⤳ Γ0,Σi,Ψi
+            --------------------------------------------
+            Γ0, Σ0 ⊢ ( pat_1; ...; pat_n ) : τ ⤳ Γ0,Σ0,∅
+
+(See the proposal for what a pattern type `Γ, Σ ⊢ pat : τ ⤳ Γ,Σ,Ψ` is.)
+The main points
+
+  * None of the patterns may bind any variables, hence the same Γ0 in both input
+    and output.
+  * Any Given constraints bound by the pattern are discarded: the rule discards
+    the Σi returned by each pattern.
+  * Similarly any existentials Ψi bound by the pattern are discarded.
+
+In GHC.Rename.Pat.rnPatAndThen, we reject visible term and type binders (i.e.
+concerning Γ0).
+
+Regarding the Givens Σi and existenials Ψi (i.e. invisible type binders)
+introduced by the pattern alternatives `pat_i`, we discard them in
+GHC.Tc.Gen.Pats.tc_pat in a manner similar to LazyPats;
+see Note [Hopping the LIE in lazy patterns].
+
+Why is it useful to allow Σi and Ψi only to discard them immediately after?
+Consider
+
+  data T a where MkT :: forall a x. Num a => x -> T a
+  foo :: T a -> a
+  foo (MkT{}; MkT{}) = 3
+
+We do want to allow matching on MkT{} in or-patterns, despite them invisibly
+binding an existential type variable `x` and a new Given constraint `Num a`.
+Clearly, `x` must be dead in the RHS of foo, because there is no field binder
+that brings it to life, so no harm done.
+But we must be careful not to solve the `Num a` Wanted constraint in the RHS of
+foo with the Given constraint from the pattern alternatives, hence we are
+Hopping the LIE.
+
+Desugarer
+---------
+The desugaring of or-patterns is complicated by the fact that we have to avoid
+exponential code blowup. Consider
+  f (LT; GT) (EQ; GT) = rhs1
+  f _        _        = rhs2
+The naïve desugaring of or-patterns would explode every or-pattern, thus
+  f LT EQ = rhs1
+  f LT GT = rhs1
+  f GT EQ = rhs1
+  f GT GT = rhs1
+  f _  _  = rhs2
+which leads to an exponential number of copies of `rhs1`.
+Our current strategy, implemented in GHC.HsToCore.Match.tidy1, is to
+desugar to LambdaCase and ViewPatterns,
+  f ((\case LT -> True; GT -> True; _ -> False) -> True)
+    ((\case EQ -> True; GT -> True; _ -> False) -> True)
+    = rhs1
+  f _ _ = rhs2
+The existing code for ViewPatterns makes sure that we do not duplicate `rhs1`
+and the Simplifier will take care to turn this into efficient code.
+
+Pattern-match checker
+---------------------
+The changes to the pattern-match checker are described in detail in Section 4.9
+of the 2024 revision of the "Lower Your Guards" paper.
+What follows is a brief summary of that change.
+
+The pattern-match checker desugars patterns as well, into syntactic variants of
+*guard trees* such as `PmMatch`, describing a single Match `f ps | grhss`.
+It used to be that each such guard trees nicely captured the effects of pattern
+matching `ps` in a conjunctive list of `PmGrd`s, each of which refines
+the set of Nablas that reach the RHS of the clause.
+`PmGrd` is the heart of the Lower Your Guards approach: it is compositional,
+simple, and *non-recursive*, unlike or-patterns!
+Conjunction is implemented with the `...Pmc.Check.leftToRight` combinator.
+But to desugar or-patterns, we need to compose with `Pmc.Check.topToBottom`
+to model first match semantics!
+This was previously impossible in the pattern fragment, and indeed is
+incompatible with the simple "list of `PmGrd`s" desugaring of patterns.
+
+So our solution is to generalise "sequence of `PmGrd`" into a series-parallel
+graph `GrdDag`, a special kind of DAG, where "series" corresponds to
+left-to-right sequence and "parallel" corresponds to top-to-bottom or-pattern
+alternatives. Example
+
+  f (LT; GT) True (EQ; GT) = rhs
+
+desugars to
+
+   /- LT <- x -\             /- EQ <- z -\
+  .             . True <- y .             .-> rhs
+   \- GT <- x ./             \- GT <- z -/
+
+Branching is GdAlt and models first-match semantics of or-patterns, and
+sequencing is GdSeq.
+
+We must take care of exponential explosion of Covered sets for long matches like
+  g (LT; GT) (LT; GT) ... True = 1
+Fortunately, we can build on our existing throttling mechanism;
+see Note [Countering exponential blowup] in GHC.HsToCore.Pmc.Check.
 -}
+
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
@@ -865,6 +996,7 @@ patNeedsParens p = go @p
     -- at a different GhcPass (see the case for GhcTc XPat below).
     go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
+    go (OrPat {})        = p > topPrec
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds })
                          = conPatNeedsParens p ds
@@ -947,6 +1079,7 @@ collectEvVarsPat pat =
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
+    OrPat _ ps       -> unionManyBags $ map collectEvVarsLPat (NE.toList ps)
     SumPat _ p _ _   -> collectEvVarsLPat p
     ConPat
       { pat_args  = args

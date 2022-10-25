@@ -100,6 +100,7 @@ import GHC.Data.Bag
 import Control.Monad
 import Control.Monad.Trans.Class ( lift )
 import Data.Semigroup
+import Data.List.NonEmpty ( NonEmpty )
 
 {- Note [What is zonking?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1525,6 +1526,11 @@ zonk_pat (TuplePat tys pats boxed)
         ; pats' <- zonkPats pats
         ; return (TuplePat tys' pats' boxed) }
 
+zonk_pat (OrPat ty pats)
+  = do  { ty' <- noBinders $ zonkTcTypeToTypeX ty
+        ; pats' <- zonkPats pats
+        ; return (OrPat ty' pats') }
+
 zonk_pat (SumPat tys pat alt arity )
   = do  { tys' <- noBinders $ mapM zonkTcTypeToTypeX tys
         ; pat' <- zonkPat pat
@@ -1629,8 +1635,10 @@ zonkConStuff (RecCon (HsRecFields rpats dd))
         -- Field selectors have declared types; hence no zonking
 
 ---------------------------
-zonkPats :: [LPat GhcTc] -> ZonkBndrTcM [LPat GhcTc]
+zonkPats :: Traversable f => f (LPat GhcTc) -> ZonkBndrTcM (f (LPat GhcTc))
 zonkPats = traverse zonkPat
+{-# SPECIALISE zonkPats :: [LPat GhcTc] -> ZonkBndrTcM [LPat GhcTc] #-}
+{-# SPECIALISE zonkPats :: NonEmpty (LPat GhcTc) -> ZonkBndrTcM (NonEmpty (LPat GhcTc)) #-}
 
 {-
 ************************************************************************

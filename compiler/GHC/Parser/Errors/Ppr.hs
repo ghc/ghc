@@ -349,6 +349,11 @@ instance Diagnostic PsMessage where
            sep [ text "View pattern in expression context:"
                , nest 4 (ppr a <+> text "->" <+> ppr b)
                ]
+    PsErrOrPatInExpr p
+      -> mkSimpleDecorated $
+           sep [ text "Or pattern in expression context:"
+               , nest 4 (ppr p)
+               ]
     PsErrCaseCmdInFunAppCmd a
       -> mkSimpleDecorated $ pp_unexpected_fun_app (text "case command") a
     PsErrLambdaCmdInFunAppCmd lam_variant a
@@ -532,6 +537,9 @@ instance Diagnostic PsMessage where
         , text "Use" <+> quotes (text "Sum<n># a b c ...") <+> text "to refer to the type constructor."
         ]
 
+    PsErrIllegalOrPat pat
+      -> mkSimpleDecorated $ vcat [text "Illegal or-pattern:" <+> ppr (unLoc pat)]
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -609,6 +617,7 @@ instance Diagnostic PsMessage where
     PsErrArrowCmdInPat{}                          -> ErrorWithoutFlag
     PsErrArrowCmdInExpr{}                         -> ErrorWithoutFlag
     PsErrViewPatInExpr{}                          -> ErrorWithoutFlag
+    PsErrOrPatInExpr{}                            -> ErrorWithoutFlag
     PsErrCaseCmdInFunAppCmd{}                     -> ErrorWithoutFlag
     PsErrLambdaCmdInFunAppCmd{}                   -> ErrorWithoutFlag
     PsErrIfCmdInFunAppCmd{}                       -> ErrorWithoutFlag
@@ -647,6 +656,7 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
+    PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -743,6 +753,7 @@ instance Diagnostic PsMessage where
     PsErrArrowCmdInPat{}                          -> noHints
     PsErrArrowCmdInExpr{}                         -> noHints
     PsErrViewPatInExpr{}                          -> noHints
+    PsErrOrPatInExpr{}                            -> noHints
     PsErrLambdaCmdInFunAppCmd{}                   -> suggestParensAndBlockArgs
     PsErrCaseCmdInFunAppCmd{}                     -> suggestParensAndBlockArgs
     PsErrIfCmdInFunAppCmd{}                       -> suggestParensAndBlockArgs
@@ -813,6 +824,7 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> noHints
     PsErrUnicodeCharLooksLike{}                   -> noHints
     PsErrInvalidPun {}                            -> [suggestExtension LangExt.ListTuplePuns]
+    PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
 
   diagnosticCode = constructorCode
 

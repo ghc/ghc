@@ -187,6 +187,9 @@ viewP e p = do e' <- e
                p' <- p
                pure (ViewP e' p')
 
+orP :: Quote m => (NonEmpty (m Pat)) -> m Pat
+orP ps = do ps' <- sequenceA ps
+            pure (OrP ps')
 
 fieldPat :: Quote m => Name -> m Pat -> m FieldPat
 fieldPat n p = do p' <- p

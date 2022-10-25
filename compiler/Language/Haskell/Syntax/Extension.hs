@@ -66,7 +66,7 @@ See also Note [IsPass] and Note [NoGhcTc] in GHC.Hs.Extension.
 -}
 
 -- | A placeholder type for TTG extension points that are not currently
--- unused to represent any particular value.
+-- used to represent any particular value.
 --
 -- This should not be confused with 'DataConCantHappen', which are found in unused
 -- extension /constructors/ and therefore should never be inhabited. In
@@ -588,6 +588,7 @@ type family XBangPat     x
 type family XListPat     x
 type family XTuplePat    x
 type family XSumPat      x
+type family XOrPat       x
 type family XConPat      x
 type family XViewPat     x
 type family XSplicePat   x

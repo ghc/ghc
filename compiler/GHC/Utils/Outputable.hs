@@ -32,7 +32,7 @@ module GHC.Utils.Outputable (
         SDoc, runSDoc, PDoc(..),
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
-        pprQuotedList, pprWithCommas,
+        pprQuotedList, pprWithCommas, pprWithSemis,
         unquotedListWith,
         quotedListWithOr, quotedListWithNor, quotedListWithAnd,
         pprWithBars,
@@ -1389,6 +1389,12 @@ pprWithCommas :: (a -> SDoc) -- ^ The pretty printing function to use
               -> SDoc        -- ^ 'SDoc' where the things have been pretty printed,
                              -- comma-separated and finally packed into a paragraph.
 pprWithCommas pp xs = fsep (punctuate comma (map pp xs))
+
+pprWithSemis :: (a -> SDoc) -- ^ The pretty printing function to use
+              -> [a]         -- ^ The things to be pretty printed
+              -> SDoc        -- ^ 'SDoc' where the things have been pretty printed,
+                             -- semicolon-separated and finally packed into a paragraph.
+pprWithSemis pp xs = fsep (punctuate semi (map pp xs))
 
 pprWithBars :: (a -> SDoc) -- ^ The pretty printing function to use
             -> [a]         -- ^ The things to be pretty printed

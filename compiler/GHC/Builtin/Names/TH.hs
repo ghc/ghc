@@ -47,7 +47,7 @@ templateHaskellNames = [
     litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName,
     conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName,
-    typePName, invisPName,
+    typePName, invisPName, orPName,
     -- FieldPat
     fieldPatName,
     -- Match
@@ -277,7 +277,7 @@ charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName, conPName,
     infixPName, tildePName, bangPName, asPName, wildPName, recPName, listPName,
-    sigPName, viewPName, typePName, invisPName :: Name
+    sigPName, viewPName, typePName, invisPName, orPName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
@@ -293,8 +293,9 @@ recPName   = libFun (fsLit "recP")   recPIdKey
 listPName  = libFun (fsLit "listP")  listPIdKey
 sigPName   = libFun (fsLit "sigP")   sigPIdKey
 viewPName  = libFun (fsLit "viewP")  viewPIdKey
+orPName    = libFun (fsLit "orP")    orPIdKey
 typePName  = libFun (fsLit "typeP")  typePIdKey
-invisPName = libFun (fsLit "invisP")  invisPIdKey
+invisPName = libFun (fsLit "invisP") invisPIdKey
 
 -- type FieldPat = ...
 fieldPatName :: Name
@@ -841,7 +842,7 @@ liftStringIdKey     = mkPreludeMiscIdUnique 230
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, unboxedSumPIdKey, conPIdKey,
   infixPIdKey, tildePIdKey, bangPIdKey, asPIdKey, wildPIdKey, recPIdKey,
-  listPIdKey, sigPIdKey, viewPIdKey, typePIdKey, invisPIdKey :: Unique
+  listPIdKey, sigPIdKey, viewPIdKey, typePIdKey, invisPIdKey, orPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 240
 varPIdKey         = mkPreludeMiscIdUnique 241
 tupPIdKey         = mkPreludeMiscIdUnique 242
@@ -859,6 +860,7 @@ sigPIdKey         = mkPreludeMiscIdUnique 253
 viewPIdKey        = mkPreludeMiscIdUnique 254
 typePIdKey        = mkPreludeMiscIdUnique 255
 invisPIdKey       = mkPreludeMiscIdUnique 256
+orPIdKey          = mkPreludeMiscIdUnique 257
 
 -- type FieldPat = ...
 fieldPatIdKey :: Unique

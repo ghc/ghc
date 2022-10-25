@@ -74,3 +74,5 @@ test('T19289', normal, compile_and_run, [''])
 test('T19680', normal, compile_and_run, [''])
 test('T19680A', normal, compile_and_run, [''])
 test('T20024', exit_code(1), compile_and_run, [''])
+
+test('Or5', exit_code(1), compile_and_run, [''])

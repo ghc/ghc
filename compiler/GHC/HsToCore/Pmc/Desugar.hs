@@ -46,7 +46,6 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Utils.Monad (concatMapM)
 import GHC.Types.SourceText (FractionalLit(..))
 import Control.Monad (zipWithM, replicateM)
 import Data.List (elemIndex)
@@ -56,9 +55,8 @@ import qualified Data.List.NonEmpty as NE
 -- import GHC.Driver.Ppr
 
 -- | Smart constructor that eliminates trivial lets
-mkPmLetVar :: Id -> Id -> [PmGrd]
-mkPmLetVar x y | x == y = []
-mkPmLetVar x y          = [PmLet x (Var y)]
+mkPmLetVar :: Id -> Id -> GrdDag
+mkPmLetVar x y = sequencePmGrds [ PmLet x (Var y) | x /= y ]
 
 -- | ADT constructor pattern => no existentials, no local constraints
 vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
@@ -66,25 +64,25 @@ vanillaConGrd scrut con arg_ids =
   PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
         , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
 
--- | Creates a '[PmGrd]' refining a match var of list type to a list,
--- where list fields are matched against the incoming tagged '[PmGrd]'s.
+-- | Creates a 'GrdDag' refining a match var of list type to a list,
+-- where list fields are matched against the incoming tagged 'GrdDag's.
 -- For example:
 --   @mkListGrds "a" "[(x, True <- x),(y, !y)]"@
 -- to
 --   @"[(x:b) <- a, True <- x, (y:c) <- b, !y, [] <- c]"@
 -- where @b@ and @c@ are freshly allocated in @mkListGrds@ and @a@ is the match
 -- variable.
-mkListGrds :: Id -> [(Id, [PmGrd])] -> DsM [PmGrd]
+mkListGrds :: Id -> [(Id, GrdDag)] -> DsM GrdDag
 -- See Note [Order of guards matters] for why we need to intertwine guards
 -- on list elements.
-mkListGrds a []                  = pure [vanillaConGrd a nilDataCon []]
+mkListGrds a []                  = pure (GdOne (vanillaConGrd a nilDataCon []))
 mkListGrds a ((x, head_grds):xs) = do
   b <- mkPmId (idType a)
   tail_grds <- mkListGrds b xs
-  pure $ vanillaConGrd a consDataCon [x, b] : head_grds ++ tail_grds
+  pure $ vanillaConGrd a consDataCon [x, b] `consGrdDag` head_grds `gdSeq` tail_grds
 
--- | Create a '[PmGrd]' refining a match variable to a 'PmLit'.
-mkPmLitGrds :: Id -> PmLit -> DsM [PmGrd]
+-- | Create a 'GrdDag' refining a match variable to a 'PmLit'.
+mkPmLitGrds :: Id -> PmLit -> DsM GrdDag
 mkPmLitGrds x (PmLit _ (PmLitString s)) = do
   -- We desugar String literals to list literals for better overlap reasoning.
   -- It's a little unfortunate we do this here rather than in
@@ -102,29 +100,28 @@ mkPmLitGrds x lit = do
                   , pm_con_tvs = []
                   , pm_con_dicts = []
                   , pm_con_args = [] }
-  pure [grd]
+  pure (GdOne grd)
 
--- | @desugarPat _ x pat@ transforms @pat@ into a '[PmGrd]', where
+-- | @desugarPat _ x pat@ transforms @pat@ into a 'GrdDag', where
 -- the variable representing the match is @x@.
-desugarPat :: Id -> Pat GhcTc -> DsM [PmGrd]
+desugarPat :: Id -> Pat GhcTc -> DsM GrdDag
 desugarPat x pat = case pat of
-  WildPat  _ty -> pure []
+  WildPat  _ty -> pure GdEnd
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> desugarLPat x p
-  LazyPat _ _  -> pure [] -- like a wildcard
+  LazyPat _ _  -> pure GdEnd -- like a wildcard
   BangPat _ p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
-    (PmBang x pm_loc :) <$> desugarLPat x p
+    consGrdDag (PmBang x pm_loc) <$> desugarLPat x p
       where pm_loc = Just (SrcInfo (L (locA l) (ppr p')))
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> desugarLPat y p
-
+  AsPat _ (L _ y) p -> (mkPmLetVar y x `gdSeq`) <$> desugarLPat y p
   SigPat _ p _ty -> desugarLPat x p
-  EmbTyPat _ _ -> pure []
-  InvisPat _ _ -> pure []
+  EmbTyPat _ _ -> pure GdEnd
+  InvisPat _ _ -> pure GdEnd
 
   XPat ext -> case ext of
 
@@ -157,24 +154,20 @@ desugarPat x pat = case pat of
       | otherwise -> do
           (y, grds) <- desugarPatV p
           dsHsWrapper wrapper $ \wrap_rhs_y ->
-              pure (PmLet y (wrap_rhs_y (Var x)) : grds)
-
-  -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
+            pure (PmLet y (wrap_rhs_y (Var x)) `consGrdDag` grds)  -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
     b <- mkPmId boolTy
     let grd_b = vanillaConGrd b trueDataCon []
     [ke1, ke2] <- traverse dsOverLit [unLoc k1, k2]
     rhs_b <- dsSyntaxExpr ge    [Var x, ke1]
     rhs_n <- dsSyntaxExpr minus [Var x, ke2]
-    pure [PmLet b rhs_b, grd_b, PmLet n rhs_n]
+    pure $ sequencePmGrds [PmLet b rhs_b, grd_b, PmLet n rhs_n]
 
   -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
   ViewPat _arg_ty lexpr pat -> do
     (y, grds) <- desugarLPatV pat
     fun <- dsLExpr lexpr
-    pure $ PmLet y (App fun (Var x)) : grds
-
-  -- list
+    pure $ consGrdDag (PmLet y (App fun (Var x))) grds  -- list
   ListPat _ ps ->
     desugarListPat x ps
 
@@ -238,41 +231,44 @@ desugarPat x pat = case pat of
   TuplePat _tys pats boxity -> do
     (vars, grdss) <- mapAndUnzipM desugarLPatV pats
     let tuple_con = tupleDataCon boxity (length vars)
-    pure $ vanillaConGrd x tuple_con vars : concat grdss
+    pure $ vanillaConGrd x tuple_con vars `consGrdDag` sequenceGrdDags grdss
+
+  OrPat _tys pats -> alternativesGrdDags <$> traverse (desugarLPat x) pats
 
   SumPat _ty p alt arity -> do
     (y, grds) <- desugarLPatV p
     let sum_con = sumDataCon alt arity
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-    pure $ vanillaConGrd x sum_con [y] : grds
+    pure $ vanillaConGrd x sum_con [y] `consGrdDag` grds
 
   SplicePat {} -> panic "Check.desugarPat: SplicePat"
 
+
 -- | 'desugarPat', but also select and return a new match var.
-desugarPatV :: Pat GhcTc -> DsM (Id, [PmGrd])
+desugarPatV :: Pat GhcTc -> DsM (Id, GrdDag)
 desugarPatV pat = do
   x <- selectMatchVar ManyTy pat
   grds <- desugarPat x pat
   pure (x, grds)
 
-desugarLPat :: Id -> LPat GhcTc -> DsM [PmGrd]
+desugarLPat :: Id -> LPat GhcTc -> DsM GrdDag
 desugarLPat x = desugarPat x . unLoc
 
 -- | 'desugarLPat', but also select and return a new match var.
-desugarLPatV :: LPat GhcTc -> DsM (Id, [PmGrd])
+desugarLPatV :: LPat GhcTc -> DsM (Id, GrdDag)
 desugarLPatV = desugarPatV . unLoc
 
 -- | @desugarListPat _ x [p1, ..., pn]@ is basically
 --   @desugarConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
 -- constructing the 'ConPatOut's.
-desugarListPat :: Id -> [LPat GhcTc] -> DsM [PmGrd]
+desugarListPat :: Id -> [LPat GhcTc] -> DsM GrdDag
 desugarListPat x pats = do
   vars_and_grdss <- traverse desugarLPatV pats
   mkListGrds x vars_and_grdss
 
 -- | Desugar a constructor pattern
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
-                 -> [EvVar] -> HsConPatDetails GhcTc -> DsM [PmGrd]
+                 -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdDag
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
@@ -314,15 +310,15 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
       let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
       -- 2. guards from field selector patterns
-      let arg_grds = concat arg_grdss
+      let arg_grds = sequenceGrdDags arg_grdss
 
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
-      pure (con_grd : arg_grds)
+      pure (con_grd `consGrdDag` arg_grds)
 
 desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
 desugarPatBind loc var pat =
-  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) . GrdVec <$> desugarPat var pat
+  PmPatBind . flip PmGRHS (SrcInfo (L loc (ppr pat))) <$> desugarPat var pat
 
 desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
@@ -339,10 +335,10 @@ desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   dflags <- getDynFlags
   -- decideBangHood: See Note [Desugaring -XStrict matches in Pmc]
   let banged_pats = map (decideBangHood dflags) pats
-  pats'  <- concat <$> zipWithM desugarLPat vars banged_pats
+  pats'  <- sequenceGrdDags <$> zipWithM desugarLPat vars banged_pats
   grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
-  return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
+  return PmMatch { pm_pats = pats', pm_grhss = grhss' }
 
 desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (PmGRHSs Pre)
 desugarGRHSs match_loc pp_pats grhss = do
@@ -351,7 +347,7 @@ desugarGRHSs match_loc pp_pats grhss = do
               . expectJust "desugarGRHSs"
               . NE.nonEmpty
               $ grhssGRHSs grhss
-  return PmGRHSs { pgs_lcls = GrdVec lcls, pgs_grhss = grhss' }
+  return PmGRHSs { pgs_lcls = lcls, pgs_grhss = grhss' }
 
 -- | Desugar a guarded right-hand side to a single 'GrdTree'
 desugarLGRHS :: SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM (PmGRHS Pre)
@@ -364,11 +360,11 @@ desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
   let rhs_info = case gs of
         []              -> L match_loc      pp_pats
         (L grd_loc _):_ -> L (locA grd_loc) (pp_pats <+> vbar <+> interpp'SP gs)
-  grds <- concatMapM (desugarGuard . unLoc) gs
-  pure PmGRHS { pg_grds = GrdVec grds, pg_rhs = SrcInfo rhs_info }
+  grdss <- traverse (desugarGuard . unLoc) gs
+  pure PmGRHS { pg_grds = sequenceGrdDags grdss, pg_rhs = SrcInfo rhs_info }
 
--- | Desugar a guard statement to a '[PmGrd]'
-desugarGuard :: GuardStmt GhcTc -> DsM [PmGrd]
+-- | Desugar a guard statement to a 'GrdDag'
+desugarGuard :: GuardStmt GhcTc -> DsM GrdDag
 desugarGuard guard = case guard of
   BodyStmt _   e _ _ -> desugarBoolGuard e
   LetStmt  _   binds -> desugarLocalBinds binds
@@ -379,22 +375,25 @@ desugarGuard guard = case guard of
   RecStmt         {} -> panic "desugarGuard RecStmt"
   XStmtLR ApplicativeStmt{} -> panic "desugarGuard ApplicativeLastStmt"
 
+sequenceGrdDagMapM :: Applicative f => (a -> f GrdDag) -> [a] -> f GrdDag
+sequenceGrdDagMapM f as = sequenceGrdDags <$> traverse f as
+
 -- | Desugar local bindings to a bunch of 'PmLet' guards.
 -- Deals only with simple @let@ or @where@ bindings without any polymorphism,
 -- recursion, pattern bindings etc.
 -- See Note [Long-distance information for HsLocalBinds].
-desugarLocalBinds :: HsLocalBinds GhcTc -> DsM [PmGrd]
+desugarLocalBinds :: HsLocalBinds GhcTc -> DsM GrdDag
 desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
-  concatMapM (concatMapM go . bagToList) (map snd binds)
+  sequenceGrdDagMapM (sequenceGrdDagMapM go . bagToList) (map snd binds)
   where
-    go :: LHsBind GhcTc -> DsM [PmGrd]
+    go :: LHsBind GhcTc -> DsM GrdDag
     go (L _ FunBind{fun_id = L _ x, fun_matches = mg})
       -- See Note [Long-distance information for HsLocalBinds] for why this
       -- pattern match is so very specific.
       | L _ [L _ Match{m_pats = [], m_grhss = grhss}] <- mg_alts mg
       , GRHSs{grhssGRHSs = [L _ (GRHS _ _grds rhs)]} <- grhss = do
           core_rhs <- dsLExpr rhs
-          return [PmLet x core_rhs]
+          return (GdOne (PmLet x core_rhs))
     go (L _ (XHsBindsLR (AbsBinds
                           { abs_tvs = [], abs_ev_vars = []
                           , abs_exports=exports, abs_binds = binds }))) = do
@@ -410,14 +409,14 @@ desugarLocalBinds (HsValBinds _ (XValBindsLR (NValBinds binds _))) =
             | otherwise
             = Nothing
       let exps = mapMaybe go_export exports
-      bs <- concatMapM go (bagToList binds)
-      return (exps ++ bs)
-    go _ = return []
-desugarLocalBinds _binds = return []
+      bs <- sequenceGrdDagMapM go (bagToList binds)
+      return (sequencePmGrds exps `gdSeq` bs)
+    go _ = return GdEnd
+desugarLocalBinds _binds = return GdEnd
 
 -- | Desugar a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
-desugarBind :: LPat GhcTc -> LHsExpr GhcTc -> DsM [PmGrd]
+desugarBind :: LPat GhcTc -> LHsExpr GhcTc -> DsM GrdDag
 desugarBind p e = dsLExpr e >>= \case
   Var y
     | Nothing <- isDataConId_maybe y
@@ -425,24 +424,24 @@ desugarBind p e = dsLExpr e >>= \case
     -> desugarLPat y p
   rhs -> do
     (x, grds) <- desugarLPatV p
-    pure (PmLet x rhs : grds)
+    pure (PmLet x rhs `consGrdDag` grds)
 
 -- | Desugar a boolean guard
 --   @e ==>  let x = e; True <- x@
-desugarBoolGuard :: LHsExpr GhcTc -> DsM [PmGrd]
+desugarBoolGuard :: LHsExpr GhcTc -> DsM GrdDag
 desugarBoolGuard e
-  | isJust (isTrueLHsExpr e) = return []
+  | isJust (isTrueLHsExpr e) = return GdEnd
     -- The formal thing to do would be to generate (True <- True)
     -- but it is trivial to solve so instead we give back an empty
-    -- [PmGrd] for efficiency
+    -- GrdDag for efficiency
   | otherwise = dsLExpr e >>= \case
       Var y
         | Nothing <- isDataConId_maybe y
         -- Omit the let by matching on y
-        -> pure [vanillaConGrd y trueDataCon []]
+        -> pure (GdOne (vanillaConGrd y trueDataCon []))
       rhs -> do
         x <- mkPmId boolTy
-        pure [PmLet x rhs, vanillaConGrd x trueDataCon []]
+        pure $ sequencePmGrds [PmLet x rhs, vanillaConGrd x trueDataCon []]
 
 {- Note [Field match order for RecCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

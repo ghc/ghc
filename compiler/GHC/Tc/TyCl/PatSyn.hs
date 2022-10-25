@@ -1072,6 +1072,7 @@ tcPatToExpr args pat = go pat
     go1 p@(WildPat {})                       = notInvertible p
     go1 p@(AsPat {})                         = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
+    go1 p@(OrPat {})                         = notInvertible p
 
     notInvertible p = Left (PatSynNotInvertible p)
 

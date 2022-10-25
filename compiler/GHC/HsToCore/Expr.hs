@@ -463,9 +463,9 @@ dsExpr (HsLet _ binds body) = do
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
 dsExpr (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
-dsExpr (HsDo _ ctx@DoExpr{}      (L _ stmts)) = dsDo ctx stmts
-dsExpr (HsDo _ ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts
-dsExpr (HsDo _ ctx@MDoExpr{}     (L _ stmts)) = dsDo ctx stmts
+dsExpr (HsDo res_ty ctx@DoExpr{}      (L _ stmts)) = dsDo ctx stmts res_ty
+dsExpr (HsDo res_ty ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts res_ty
+dsExpr (HsDo res_ty ctx@MDoExpr{}     (L _ stmts)) = dsDo ctx stmts res_ty
 dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
 dsExpr (HsIf _ guard_expr then_expr else_expr)
@@ -743,8 +743,12 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: HsDoFlavour -> [ExprLStmt GhcTc] -> DsM CoreExpr
-dsDo ctx stmts
+dsDo :: HsDoFlavour -> [ExprLStmt GhcTc] -> Type -> DsM CoreExpr
+-- SG: Surprisingly, this code path seems inactive for regular Do,
+--     which is expanded in GHC.Tc.Gen.Do.
+--     It's all used for ApplicativeDo (even the BindStmt case), which is *very*
+--     annoying because it is a lot of duplicated code that is seldomly tested.
+dsDo ctx stmts res_ty
   = goL stmts
   where
     goL [] = panic "dsDo"
@@ -765,6 +769,9 @@ dsDo ctx stmts
            ; dsLocalBinds binds rest }
 
     go _ (BindStmt xbs pat rhs) stmts
+      -- SG: As far as I can tell, this code path is only triggered when ApplicativeDo fails, e.g.
+      --   do blah <- action1; action2 (blah * 2)
+      -- It is reached when compiling GHC.Parser.PostProcess.Haddock.addHaddockToModule
       = do  { var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
             ; rhs'  <- dsLExpr rhs
             ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
@@ -772,7 +779,7 @@ dsDo ctx stmts
             -- NB: "goL stmts" needs to happen inside matchSinglePatVar, and not
             -- before it, so that long-distance information is properly threaded.
             -- See Note [Long-distance information in do notation].
-            ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
+            ; match_code <- dsHandleMonadicFailure ctx pat res_ty match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
     go loc (RecStmt { recS_stmts = L _ rec_stmts, recS_later_ids = later_ids
@@ -824,7 +831,7 @@ dsDo ctx stmts
                do_arg (ApplicativeArgOne fail_op pat expr _) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat _) =
-                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]))
+                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]) res_ty)
 
            ; rhss' <- sequence rhss
 
@@ -835,7 +842,7 @@ dsDo ctx stmts
                      do { var   <- selectSimpleMatchVarL ManyTy pat
                         ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                                    body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
+                        ; match_code <- dsHandleMonadicFailure ctx pat body_ty match fail_op
                         ; return (var:vs, match_code)
                         }
 

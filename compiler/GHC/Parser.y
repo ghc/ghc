@@ -476,7 +476,7 @@ Ambiguity:
 -}
 
 {- Note [%shift: activation -> {- empty -}]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Context:
     sigdecl -> '{-# INLINE' . activation qvarcon '#-}'
     activation -> {- empty -}
@@ -491,6 +491,37 @@ Ambiguity:
     of the [] data constructor.
     We parse this as having '[0]' activation for inlining 'Something', rather than
     empty activation and inlining '[0] Something'.
+-}
+
+{- Note [%shift: orpats -> exp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+
+    texp -> exp .
+    orpats -> exp .
+    texp -> exp . '->' texp
+    orpats -> exp . ';' orpats
+
+    in Lookahead ')': reduce/reduce conflict between the two first productions
+
+Example:
+
+    f (True) = 3
+       ----^
+
+Ambiguity:
+    We don't know whether the ')' encloses a parenthesized pat (reduce with
+    first production) or a unary Or pattern (reduce with second production).
+    We want to parse it as a parenthesized pat, because
+      * That is the status quo
+      * Parsing it as a unary Or patterns prompts the user to activate -XOrPatterns.
+    Thus, we add a %shift pragma to `orpats -> exp` to lower its precedence,
+    which has the effect of letting `texp -> exp` win (!).
+
+An alternative to resolve this ambiguity would be to accept only OrPatterns
+with at least two patterns in `orpats`, just as in `tup_exprs`.
+But the present code seems simpler, because it just needs one non-terminal,
+at the expense of using a small pragma.
 -}
 
 {- Note [Parser API Annotations]
@@ -1642,18 +1673,18 @@ role : VARID             { sL1 $1 $ Just $ getVARID $1 }
 
 -- Glasgow extension: pattern synonyms
 pattern_synonym_decl :: { LHsDecl GhcPs }
-        : 'pattern' pattern_synonym_lhs '=' pat
+        : 'pattern' pattern_synonym_lhs '=' pat_syn_pat
          {%      let (name, args, as ) = $2 in
                  amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4
                                                     ImplicitBidirectional
                       (as ++ [mj AnnPattern $1, mj AnnEqual $3])) }
 
-        | 'pattern' pattern_synonym_lhs '<-' pat
+        | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat
          {%    let (name, args, as) = $2 in
                amsA' (sLL $1 $> . ValD noExtField $ mkPatSynBind name args $4 Unidirectional
                        (as ++ [mj AnnPattern $1,mu AnnLarrow $3])) }
 
-        | 'pattern' pattern_synonym_lhs '<-' pat where_decls
+        | 'pattern' pattern_synonym_lhs '<-' pat_syn_pat where_decls
             {% do { let (name, args, as) = $2
                   ; mg <- mkPatSynMatchGroup name $5
                   ; amsA' (sLL $1 $> . ValD noExtField $
@@ -2997,6 +3028,11 @@ aexp2   :: { ECP }
                                            mkSumOrTuplePV (noAnnSrcSpan $ comb2 $1 $>) Boxed $2
                                                 [mop $1,mcp $3]}
 
+        | '(' orpats ')'                {% do
+                                              { pat <- hintOrPats (sL1a $2 (OrPat NoExtField (unLoc $2)))
+                                              ; fmap ecpFromPat
+                                                (amsA' (sLL $1 $> (ParPat (epTok $1, epTok $>) pat))) }}
+
         -- This case is only possible when 'OverloadedRecordDotBit' is enabled.
         | '(' projection ')'            { ECP $
                                             amsA' (sLL $1 $> $ mkRdrProjection (NE.reverse (unLoc $2)) (AnnProjection (glAA $1) (glAA $3)) )
@@ -3094,7 +3130,7 @@ cvtopdecls0 :: { [LHsDecl GhcPs] }
 -- things that can appear unparenthesized as long as they're
 -- inside parens or delimited by commas
 texp :: { ECP }
-        : exp                           { $1 }
+        : exp                { $1 }
 
         -- Note [Parsing sections]
         -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3124,6 +3160,16 @@ texp :: { ECP }
                              unECP $1 >>= \ $1 ->
                              unECP $3 >>= \ $3 ->
                              mkHsViewPatPV (comb2 $1 $>) $1 $3 [mu AnnRarrow $2] }
+
+orpats :: { Located (NonEmpty (LPat GhcPs)) }
+        -- See Note [%shift: orpats -> exp]
+        : exp %shift         {% do
+                                 { pat <- (checkPattern <=< runPV) (unECP $1)
+                                 ; return (sL1 pat (NE.singleton pat)) }}
+        | exp ';' orpats     {% do
+                                 { pat <- (checkPattern <=< runPV) (unECP $1)
+                                 ; pat <- addTrailingSemiA pat (getLoc $2)
+                                 ; return (sLL pat $> (pat NE.<| unLoc $3)) }}
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -3382,8 +3428,15 @@ gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
 --      e.g.  "!x" or "!(x,y)" or "C a b" etc
 -- Bangs inside are parsed as infix operator applications, so that
 -- we parse them right when bang-patterns are off
+
+pat_syn_pat :: { LPat GhcPs }
+pat_syn_pat :  exp          {% (checkPattern <=< runPV) (unECP $1) }
+
 pat     :: { LPat GhcPs }
-pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
+pat     :  orpats      {% case unLoc $1 of
+                            pat :| [] -> return pat
+                            pats      -> hintOrPats (sL1a $1 (OrPat NoExtField pats)) }
+
 
 -- 'pats1' does the same thing as 'pat', but returns it as a singleton
 -- list so that it can be used with a parameterized production rule
@@ -4258,6 +4311,13 @@ looksLikeMult ty1 l_op ty2
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True
   | otherwise = False
+
+-- Hint about or-patterns
+hintOrPats :: MonadP m => LPat GhcPs -> m (LPat GhcPs)
+hintOrPats pat = do
+  orPatsEnabled <- getBit OrPatternsBit
+  unless orPatsEnabled $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) $ PsErrIllegalOrPat pat
+  return pat
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()

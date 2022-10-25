@@ -17,6 +17,7 @@ import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( isVarSymChar )
 import Data.Ratio ( numerator, denominator )
 import Data.Foldable ( toList )
+import qualified Data.List.NonEmpty as NE
 import Prelude hiding ((<>))
 
 nestDepth :: Int
@@ -394,6 +395,7 @@ pprPat i (SigP p t) = parensIf (i > noPrec) $ ppr p <+> dcolon <+> ppr t
 pprPat _ (ViewP e p) = parens $ pprExp noPrec e <+> text "->" <+> pprPat noPrec p
 pprPat _ (TypeP t) = parens $ text "type" <+> ppr t
 pprPat _ (InvisP t) = parens $ text "@" <+> ppr t
+pprPat _ (OrP t) = parens $ semiSep (NE.toList t)
 
 ------------------------------
 instance Ppr Dec where

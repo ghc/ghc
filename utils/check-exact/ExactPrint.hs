@@ -64,6 +64,7 @@ import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
@@ -4716,6 +4717,10 @@ instance ExactPrint (Pat GhcPs) where
     an2 <- markAnnKwAllL an1 lsumPatVbarsAfter AnnVbar
     an3 <- markEpAnnL an2 lsumPatParens AnnClosePH
     return (SumPat an3 pat' alt arity)
+
+  exact (OrPat an pats) = do
+    pats' <- markAnnotated (NE.toList pats)
+    return (OrPat an (NE.fromList pats'))
 
   exact (ConPat an con details) = do
     (an', con', details') <- exactUserCon an con details

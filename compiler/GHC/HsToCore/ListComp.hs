@@ -608,7 +608,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
             -- NB: dsMcStmts needs to happen inside matchSinglePatVar, and not
             -- before it, so that long-distance information is properly threaded.
             -- See Note [Long-distance information in do notation] in GHC.HsToCore.Expr.
-        ; match_code <- dsHandleMonadicFailure MonadComp pat match fail_op
+        ; match_code <- dsHandleMonadicFailure MonadComp pat res1_ty match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs

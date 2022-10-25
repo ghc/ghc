@@ -641,6 +641,16 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
         ; return (BangPat x pat', res) }
 
+  OrPat _ pats -> do -- See Note [Implementation of OrPatterns], Typechecker (1)
+    { let pats_list = NE.toList pats
+    ; (pats_list', (res, pat_ct)) <- tc_lpats (map (const pat_ty) pats_list) penv pats_list (captureConstraints thing_inside)
+    ; let pats' = NE.fromList pats_list' -- tc_lpats preserves non-emptiness
+    ; emitConstraints pat_ct
+        -- captureConstraints/extendConstraints:
+        --   like in Note [Hopping the LIE in lazy patterns]
+    ; pat_ty <- expTypeToType (scaledThing pat_ty)
+    ; return (OrPat pat_ty pats', res) }
+
   LazyPat x pat -> do
         { mult_wrap <- checkManyPattern LazyPatternReason (noLocA ps_pat) pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
