@@ -3,7 +3,7 @@ test('T21336a',
      [unless(opsys('linux') or opsys('freebsd'), skip), js_skip],
      compile_and_run, [''])
 test('T21336b',
-     [unless(opsys('linux') or opsys('freebsd'), skip), js_skip],
+     [unless(opsys('linux') or opsys('freebsd'), skip), req_js_compactor],
      makefile_test, [])
 test('T21336c',
      [ unless(opsys('linux') or opsys('freebsd'), skip)
