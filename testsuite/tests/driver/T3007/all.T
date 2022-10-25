@@ -1,5 +1,5 @@
 test('T3007',
      [ extra_files(['A/', 'B/'])
-     , js_skip
+     , js_broken(22356)
      ],
      makefile_test, [])

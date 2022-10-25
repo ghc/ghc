@@ -5,7 +5,7 @@ else:
 
 test('T18567',
      [ extra_files(['Setup.hs', 'sublib/', 'sublib-unused', 'src/', 'internal-lib.cabal'])
-     , js_skip
+     , js_broken(22356)
      ],
      run_command,
      ['$MAKE -s --no-print-directory T18567 ' + cleanup])

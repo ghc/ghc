@@ -5,7 +5,7 @@ else:
 
 test('t19518',
      [ extra_files(['Setup.hs', 'p/', 'q/', 'r/'])
-     , js_skip
+     , js_broken(22356)
      ],
      run_command,
      ['$MAKE -s --no-print-directory t19518 ' + cleanup])

@@ -6,7 +6,7 @@ else:
 test('T20509',
      [extra_files(['p', 'q', 'T20509.cabal', 'Setup.hs'])
      , run_timeout_multiplier(2)
-     , js_skip
+     , js_broken(22356)
      ],
      run_command,
      ['$MAKE -s --no-print-directory T20509 ' + cleanup])
