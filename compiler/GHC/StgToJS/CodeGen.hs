@@ -60,6 +60,8 @@ import GHC.Utils.Outputable hiding ((<>))
 import qualified Data.Set as S
 import Data.Monoid
 import Control.Monad
+import System.Directory
+import System.FilePath
 
 -- | Code generator for JavaScript
 stgToJS
@@ -94,6 +96,8 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
   -- Write the object file
   bh <- openBinMem (4 * 1024 * 1000) -- a bit less than 4kB
   Object.putObject bh (moduleName this_mod) deps (map luObjUnit lus)
+
+  createDirectoryIfMissing True (takeDirectory output_fn)
   writeBinMem bh output_fn
 
 

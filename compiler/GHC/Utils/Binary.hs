@@ -34,7 +34,7 @@ module GHC.Utils.Binary
     SymbolTable, Dictionary,
 
    BinData(..), dataHandle, handleData,
-   packBinBuffer, unpackBinBuffer, unsafeUnpackBinBuffer,
+   unsafeUnpackBinBuffer,
 
    openBinMem,
 --   closeBin,
@@ -120,8 +120,6 @@ import System.IO.Unsafe         ( unsafeInterleaveIO )
 import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import Data.IntMap (IntMap)
-import System.Directory
-import System.FilePath
 import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
@@ -195,24 +193,6 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
   ix <- readFastMutInt ix_r
   action $ BS.fromForeignPtr arr 0 ix
 
-packBinBuffer :: BinHandle -> IO ByteString
-packBinBuffer bh@(BinMem _ ix_r _ _) = do
-  l <- readFastMutInt ix_r
-  here <- tellBin bh
-  seekBin bh (BinPtr 0)
-  b <- BS.create l $ \dest -> do
-    getPrim bh l (\src -> BS.memcpy dest src l)
-  seekBin bh here
-  return b
-
-unpackBinBuffer :: Int -> ByteString -> IO BinHandle
-unpackBinBuffer n from = do
-  bh <- openBinMem n
-  BS.unsafeUseAsCString from $ \ptr -> do
-    putPrim bh n (\op -> BS.memcpy op (castPtr ptr) n)
-  seekBin bh (BinPtr 0)
-  return bh
-
 unsafeUnpackBinBuffer :: ByteString -> IO BinHandle
 unsafeUnpackBinBuffer (BS.BS arr len) = do
   arr_r <- newIORef arr
@@ -283,7 +263,6 @@ seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinMem _ ix_r _ arr_r) fn = do
-  createDirectoryIfMissing True (takeDirectory fn)
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
