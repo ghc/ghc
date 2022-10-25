@@ -36,7 +36,6 @@ module GHC.Unit.Types
    , Instantiations
    , GenInstantiations
    , mkInstantiatedUnit
-   , mkInstantiatedUnitSorted
    , mkInstantiatedUnitHash
    , mkVirtUnit
    , mapGenUnit
@@ -309,7 +308,17 @@ instance Binary InstantiatedUnit where
   put_ bh indef = do
     put_ bh (instUnitInstanceOf indef)
     put_ bh (instUnitInsts indef)
-  get bh = mkInstantiatedUnitSorted <$> get bh <*> get bh
+  get bh = do
+    cid   <- get bh
+    insts <- get bh
+    let fs = mkInstantiatedUnitHash cid insts
+    return InstantiatedUnit {
+            instUnitInstanceOf = cid,
+            instUnitInsts = insts,
+            instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
+            instUnitFS = fs,
+            instUnitKey = getUnique fs
+           }
 
 instance IsUnitId u => Eq (GenUnit u) where
   uid1 == uid2 = unitUnique uid1 == unitUnique uid2
@@ -379,29 +388,17 @@ moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 
 -- | Create a new 'GenInstantiatedUnit' given an explicit module substitution.
 mkInstantiatedUnit :: IsUnitId u => u -> GenInstantiations u -> GenInstantiatedUnit u
-mkInstantiatedUnit cid insts = mkInstantiatedUnitSorted cid sorted_insts
-  where
-     sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
-
--- | Like mkInstantiatedUnit but assumes that instatiations are sorted
---
--- Useful to make deserialization code faster by not sorting instantiations
--- (that are stored sorted).
---
-mkInstantiatedUnitSorted
-  :: IsUnitId u
-  => u
-  -> [(ModuleName, GenModule (GenUnit u))]
-  -> GenInstantiatedUnit u
-mkInstantiatedUnitSorted cid insts =
-  let fs = mkInstantiatedUnitHash cid insts
-  in InstantiatedUnit
-    { instUnitInstanceOf = cid
-    , instUnitInsts      = insts
-    , instUnitHoles      = unionManyUniqDSets (map (moduleFreeHoles . snd) insts)
-    , instUnitFS         = fs
-    , instUnitKey        = getUnique fs
+mkInstantiatedUnit cid insts =
+    InstantiatedUnit {
+        instUnitInstanceOf = cid,
+        instUnitInsts = sorted_insts,
+        instUnitHoles = unionManyUniqDSets (map (moduleFreeHoles.snd) insts),
+        instUnitFS = fs,
+        instUnitKey = getUnique fs
     }
+  where
+     fs           = mkInstantiatedUnitHash cid sorted_insts
+     sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
 
 
 -- | Smart constructor for instantiated GenUnit
