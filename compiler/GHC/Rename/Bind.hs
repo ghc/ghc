@@ -572,6 +572,7 @@ isOkNoBindPattern (L _ pat) =
           AsPat _ _ lp  -> lpatternContainsSplice lp
           ParPat _ lp -> lpatternContainsSplice lp
           ViewPat _ _ lp -> lpatternContainsSplice lp
+          OrPat _ lps -> any lpatternContainsSplice lps
           SigPat _ lp _  -> lpatternContainsSplice lp
           ListPat _ lps  -> any lpatternContainsSplice lps
           TuplePat _ lps _ -> any lpatternContainsSplice lps

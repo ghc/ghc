@@ -461,6 +461,9 @@ data PsMessage
 
    | PsErrInvalidPun !PsErrPunDetails
 
+   -- | Or pattern used without -XOrPatterns
+   | PsErrIllegalOrPat (LPat GhcPs)
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

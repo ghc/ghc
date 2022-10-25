@@ -1,0 +1,45 @@
+
+pmcOrPats.hs:10:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Patterns of type ‘T’, ‘U’ not matched: A W
+
+pmcOrPats.hs:13:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘h’:
+        Patterns of type ‘T’, ‘U’, ‘T’ not matched:
+            A _ A
+            B V A
+            B W A
+
+pmcOrPats.hs:15:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘h’: h (A; B) _ B = ...
+
+pmcOrPats.hs:17:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘z’:
+        Patterns of type ‘a’ not matched: p where p is not one of {3, 1, 2}
+
+pmcOrPats.hs:19:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘z’: z 1 = ...
+
+pmcOrPats.hs:21:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘careful’:
+        Patterns of type ‘Ordering’, ‘Ordering’, ‘Ordering’, ‘Ordering’,
+                         ‘Ordering’, ‘Ordering’, ‘Ordering’, ‘Ordering’, ‘Ordering’,
+                         ‘Ordering’, ‘Ordering’, ‘Ordering’, ‘Ordering’, ‘Bool’ not matched:
+            LT _ _ _ _ _ _ _ _ _ _ _ _ _
+            GT _ _ _ _ _ _ _ _ _ _ _ _ _
+            EQ LT _ _ _ _ _ _ _ _ _ _ _ _
+            EQ GT _ _ _ _ _ _ _ _ _ _ _ _
+            ...
+
+pmcOrPats.hs:21:1: warning: [GHC-61505]
+    Pattern match checker ran into -fmax-pmcheck-models=30 limit, so
+      • Redundant clauses might not be reported at all
+      • Redundant clauses might be reported as inaccessible
+      • Patterns reported as unmatched might actually be matched
+    Suggested fix:
+      Increase the limit or resolve the warnings to suppress this message.

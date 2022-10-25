@@ -82,12 +82,14 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
+import GHC.Utils.Monad
 import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
 import Data.Data
+import qualified Data.List.NonEmpty as NE
 
 import Data.Functor.Identity
 
@@ -126,6 +128,10 @@ type instance XListPat GhcTc = Type
 type instance XTuplePat GhcPs = [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
+
+type instance XOrPat GhcPs = NoExtField
+type instance XOrPat GhcRn = NoExtField
+type instance XOrPat GhcTc = Type
 
 type instance XSumPat GhcPs = EpAnnSumPat
 type instance XSumPat GhcRn = NoExtField
@@ -455,6 +461,7 @@ pprPat (SplicePat ext splice)   =
       GhcTc -> dataConCantHappen ext
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
+pprPat (OrPat _ pats)           = pprWithSemis ppr (NE.toList pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `MkSolo x`, not `(x)`
@@ -716,7 +723,8 @@ isIrrefutableHsPatHelperM is_strict isConLikeIrr pat = go (unLoc pat)
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
-    go (TuplePat _ pats _) = do { bs <- mapM goL pats; return $ and bs }
+    go (TuplePat _ pats _) = allM goL pats
+    go (OrPat _ pats)      = anyM goL pats
     go (SumPat {})         = return False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
     go (ListPat {})        = return False
@@ -797,6 +805,7 @@ isBoringHsPat = goL
               -- A pattern match on a GADT constructor can introduce
               -- type-level information (for example, T18572).
               -> False
+      OrPat _ pats  -> all goL pats
       LitPat {}     -> True
       NPat {}       -> True
       NPlusKPat {}  -> True
@@ -886,7 +895,141 @@ Here we *do not* want to emit a pattern-match warning on the first line for the
 incomplete pattern-match, as incompleteness inside do-notation is handled
 using MonadFail. However, we still want to propagate the fact that x is headed
 by the 'Just' constructor, to avoid a pattern-match warning on the last line.
+
+Note [Implementation of OrPatterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes the implementation of the extension -XOrPatterns.
+
+* Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0522-or-patterns.rst
+* Discussion: https://github.com/ghc-proposals/ghc-proposals/pull/522 and others
+
+Parser
+------
+We parse an Or pattern `pat_1; ...; pat_k` into `OrPat [pat_1, ..., pat_k]`,
+where `OrPat` is a new constructor of `Pat` in Language.Haskell.Syntax.Pat.
+We occasionally refer to any of the `pat_k` as "pattern alternatives" below.
+The changes to the parser are as outlined in Section 8.1 of the proposal.
+The main productions are
+
+  orpats -> exp | exp ';' orpats
+  aexp2 -> '(' orpats ')'
+  pat -> orpats
+
+Renamer
+-------
+Or patterns which (visibly) bind term or type variables are currently rejected
+in the renamer, see Section 2.3 of the proposal.
+This is apparent in GHC.Rename.Pat.rnPatAndThen, where we collect term and type
+binders to perform the check.
+Invisible variables, for example evidence binders introduced during
+type-checking, may only be used in the pattern alternative in which they were
+introduced.
+A later proposal might relax the no-binders restriction somewhat, for example
+allowing binders that occur in all pattern alternatives.
+
+Typechecker
+-----------
+The typing rule for Or patterns in terms of pattern types is
+
+                   Γ0, Σ0 ⊢ pat_i : τ ⤳ Γ0,Σi,Ψi
+            --------------------------------------------
+            Γ0, Σ0 ⊢ ( pat_1; ...; pat_n ) : τ ⤳ Γ0,Σ0,∅
+
+(See the proposal for what a pattern type `Γ, Σ ⊢ pat : τ ⤳ Γ,Σ,Ψ` is.)
+We implement this rule in GHC.Tc.Gen.Pats.tc_pat. The crux is not to bring into
+scope any of the Givens introduced by the pattern alternatives `pat_i`.
+This is similar to LazyPats; see Note [Hopping the LIE in lazy patterns].
+Consider
+   f (Dict{}; Dict2{}) = 3
+We may not discharge the Num constraint with dictionaries bound by `Dict` or
+`Dict2`. To facilitate that, we "hop around" the pattern, as in the linked Note.
+
+Desugarer
+---------
+The desugaring of or-patterns is complicated because we have to avoid
+exponential code blowup. Consider
+  f (LT; GT) (EQ; GT) = rhs
+The naïve desugaring of or-patterns would explode every or-pattern, thus
+  f LT EQ = rhs
+  f LT GT = rhs
+  f GT EQ = rhs
+  f GT GT = rhs
+which leads to an exponential number of copies of `rhs`.
+Our code in GHC.HsToCore.Match.explodeOrPats is much smarter, allocating
+a shared success handler (`shareSuccessHandler`) before exploding:
+  f = \x y ->
+    join j2 = rhs in
+    join j1 = case y of { EQ -> jump j2; GT -> jump j2 } in
+    case x of { LT -> jump j1; GT -> jump j1 }
+So there is only one copy of `rhs`.
+
+Wrinkles:
+  (OR1) Consider   (live example in testcase Or5, function f4)
+      g (LT;EQ) True  = rhs1
+      g LT      False = rhs2
+    At present, we do not combine a match on an or-pattern with following
+    matches, and thus desugar to (omitting patError cases)
+      g = \x y ->
+        join fail = case x of LT -> case y of False -> rhs2
+        join success = case y of
+          True  -> rhs1
+          False -> fail
+        in case x of LT -> jump success; EQ -> jump success
+    Note that for `g LT False` we will do the match on `x` twice.
+    We would like to do better, by exploding to
+      g LT \
+            True  = rhs1
+      g EQ /
+      g LT  False = rhs2
+    Then allocating a shared success handler for `True = rhs`.
+    ALAS, at the point where we allocate the shared success handler (in
+    explodeOrPats), we need to produce a MatchResult, i.e., stay oblivious to
+    the failure continuation that is supposed to fall through to
+    `g LT False = rhs2`! This in turn means that we cannot produce a DsWrapper
+    for the success handler, because that DsWrapper must fix the failure
+    continuation.
+    Ergo we can only allocate that success handler in the MatchResult that goes
+    into EqnDone, at the end of the EquationInfo, hence we must return a
+    *single* EquationInfo; not multiple ones for each pattern (LT, EQ).
+    Perhaps we should parameterise DsWrapper over the failure handler to do a
+    better job. Not now.
+
+Pattern-match checker
+---------------------
+The pattern-match checker desugars patterns as well, into syntactic variants of
+*guard trees* such as `PmMatch`, describing a single Match `f ps | grhss`.
+It used to be that each such guard trees nicely captured the effects of pattern
+matching `ps` in a single list of `PmGrd`s, each of which filters the incoming
+set of Nablas into those that this `PmGrd` covers, composing `leftToRight`.
+`PmGrd` is the heart of the Lower Your Guards approach: it is compositional,
+simple, and *non-recursive*, unlike or-patterns!
+But to desugar or-patterns, we need to compose `topToBottom` to model first
+match semantics! This was previosly impossible in the pattern fragment, and
+indeed is incompatible with the simple "list of `PmGrd`s" desugaring of
+patterns.
+
+So our solution is to generalise "sequence of `PmGrd`" into a series-parallel
+graph `GrdDag`, a special kind of DAG, where "series" corresponds to
+left-to-right sequence and "parallel" corresponds to top-to-bottom or-pattern
+alternatives. Example
+
+  f (LT; GT) True (EQ; GT) = rhs
+
+desugars to
+
+   /- LT <- x -\             /- EQ <- z -\
+  .             . True <- y .             .-> rhs
+   \- GT <- x ./             \- GT <- z -/
+
+Branching is GdAlt and models first-match semantics of or-patterns, and
+sequencing is GdSeq.
+
+We must take care of exponential explosion of Covered sets for long matches like
+  g (LT; GT) (LT; GT) ... True = 1
+Fortunately, we can build on our existing throttling mechanism;
+see Note [Countering exponential blowup] in GHC.HsToCore.Pmc.Check.
 -}
+
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
@@ -897,6 +1040,7 @@ patNeedsParens p = go @p
     -- at a different GhcPass (see the case for GhcTc XPat below).
     go :: forall q. IsPass q => Pat (GhcPass q) -> Bool
     go (NPlusKPat {})    = p > opPrec
+    go (OrPat {})        = p > topPrec
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds })
                          = conPatNeedsParens p ds
@@ -985,6 +1129,7 @@ collectEvVarsPat pat =
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
+    OrPat _ ps       -> unionManyBags $ map collectEvVarsLPat (NE.toList ps)
     SumPat _ p _ _   -> collectEvVarsLPat p
     ConPat
       { pat_args  = args

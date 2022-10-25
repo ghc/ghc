@@ -171,6 +171,7 @@ test('PprT13747', [ignore_stderr, req_ppr_deps], makefile_test, ['PprT13747'])
 test('PprBracesSemiDataDecl', [ignore_stderr, req_ppr_deps], makefile_test, ['PprBracesSemiDataDecl'])
 test('PprUnicodeSyntax', [ignore_stderr, req_ppr_deps], makefile_test, ['PprUnicodeSyntax'])
 test('PprCommentPlacement2', [ignore_stderr, req_ppr_deps], makefile_test, ['PprCommentPlacement2'])
+test('PprOrPat', [ignore_stderr, req_ppr_deps], makefile_test, ['PprOrPat'])
 test('PprExportWarn', [ignore_stderr, req_ppr_deps], makefile_test, ['PprExportWarn'])
 test('PprInstanceWarn', [ignore_stderr, req_ppr_deps], makefile_test, ['PprInstanceWarn'])
 

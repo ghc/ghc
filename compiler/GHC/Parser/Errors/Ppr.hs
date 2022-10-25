@@ -531,6 +531,9 @@ instance Diagnostic PsMessage where
         , text "Use" <+> quotes (text "Sum<n># a b c ...") <+> text "to refer to the type constructor."
         ]
 
+    PsErrIllegalOrPat pat
+      -> mkSimpleDecorated $ vcat [text "Illegal or-pattern:" <+> ppr (unLoc pat)]
+
   diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -646,6 +649,7 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
     PsErrInvalidPun {}                            -> ErrorWithoutFlag
+    PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -816,6 +820,7 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> noHints
     PsErrUnicodeCharLooksLike{}                   -> noHints
     PsErrInvalidPun {}                            -> [suggestExtension LangExt.ListTuplePuns]
+    PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
 
   diagnosticCode = constructorCode
 

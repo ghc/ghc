@@ -80,7 +80,7 @@ import GHC.Types.Unique.DFM
 
 import Control.Monad ( zipWithM, unless )
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NEL
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 
 {-
@@ -198,17 +198,19 @@ match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
 
 match [] ty eqns
   = assertPpr (not (null eqns)) (ppr ty) $
-    combineEqnRhss (NEL.fromList eqns)
+    combineEqnRhss (NE.fromList eqns)
 
 match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
   = assertPpr (all (isInternalName . idName) vars) (ppr vars) $
     do  { dflags <- getDynFlags
         ; let platform = targetPlatform dflags
+        ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
                 -- Tidy the first pattern, generating
                 -- auxiliary bindings if necessary
-        ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
+        ; expl_eqns <- mapM (explodeOrPats (v:|vs) ty) tidy_eqns
+                -- Explode equations starting with OrPatterns.
+        ; let grouped = groupEquations platform expl_eqns
                 -- Group the equations and match each group in turn
-        ; let grouped = groupEquations platform tidy_eqns
 
          -- print the view patterns that are commoned up to help debug
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
@@ -240,8 +242,8 @@ match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
-      where eqns' = NEL.toList eqns
-            ne l = case NEL.nonEmpty l of
+      where eqns' = NE.toList eqns
+            ne l = case NE.nonEmpty l of
               Just nel -> nel
               Nothing -> pprPanic "match match_group" $ text "Empty result should be impossible since input was non-empty"
 
@@ -270,11 +272,11 @@ matchEmpty var res_ty
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- Real true variables, just like in matchVar, SLPJ p 94
 -- No binding to do: they'll all be wildcards by now (done in tidy)
-matchVariables (_ :| vars) ty eqns = match vars ty $ NEL.toList $ shiftEqns eqns
+matchVariables (_ :| vars) ty eqns = match vars ty $ NE.toList $ shiftEqns eqns
 
 matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 matchBangs (var :| vars) ty eqns
-  = do  { match_result <- match (var:vars) ty $ NEL.toList $
+  = do  { match_result <- match (var:vars) ty $ NE.toList $
             decomposeFirstPat getBangPat <$> eqns
         ; return (mkEvalMatchResult var ty match_result) }
 
@@ -284,7 +286,7 @@ matchCoercion (var :| vars) ty eqns@(eqn1 :| _)
   = do  { let XPat (CoPat co pat _) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
-        ; match_result <- match (var':vars) ty $ NEL.toList $
+        ; match_result <- match (var':vars) ty $ NE.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
         { let bind = NonRec var' (core_wrap (Var var))
@@ -300,7 +302,7 @@ matchView (var :| vars) ty eqns@(eqn1 :| _)
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idMult var) pat_ty'
-        ; match_result <- match (var':vars) ty $ NEL.toList $
+        ; match_result <- match (var':vars) ty $ NE.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
         ; viewExpr' <- dsExpr viewExpr
@@ -410,6 +412,35 @@ tidyEqnInfo v eqn@(EqnMatch { eqn_pat = (L loc pat) }) = do
   (wrap, pat') <- tidy1 v (not . isGoodSrcSpan . locA $ loc) pat
   return (wrap, eqn{eqn_pat = L loc pat' })
 
+explodeOrPats :: NonEmpty MatchId -> Type -> EquationInfo -> DsM EquationInfo
+-- Explodes equations starting with an or-pattern into several equations
+-- starting with the respective patterns of the or-pattern and having a single
+-- shared success handler as a MatchResult.
+-- We return a single EqnDone MatchResult for matching the or-pattern; see
+-- Wrinkle (OR1) of Note [Implementation of OrPatterns].
+explodeOrPats (var :| vars) ty eqn@(EqnMatch { eqn_pat = (L l (OrPat pat_ty sub_pats)) }) = do
+  -- what to do *after* the OrPat matches
+  mr_after <- match vars ty (shiftEqns [eqn])
+  -- share `mr_after` across the different cases of the OrPat match
+  mr_total <- shareSuccessHandler mr_after ty (\jump_to_handler -> do
+      let singleEqn expr pat = EqnMatch { eqn_pat = pat, eqn_rest = EqnDone (pure expr) }
+      let or_eqns = map (singleEqn jump_to_handler) (NE.toList sub_pats)
+      match [var] ty or_eqns)
+  let replicate_wild 0 = EqnDone mr_total
+      replicate_wild n = EqnMatch { eqn_pat = L l (WildPat pat_ty)
+                                  , eqn_rest = replicate_wild (n-1) }
+      -- So Sad! We produce a single wild card match (of appropriate arity),
+      -- instead of one `EqnMatch` alternative per `sub_pats`.
+      -- See Wrinkle (OR1) of Note [Implementation of OrPatterns] for why;
+      -- concretely, we would need `mr_after :: CoreExpr`, but it is a
+      -- `MatchResult`. Hence we can't lift `or_eqns` out of the lambda.
+      -- We fill up with WildPat so that it has the same arity as expected from
+      -- the original EquationInfo.
+  return (replicate_wild (length (var :| vars)))
+
+explodeOrPats _ _ eqn = return eqn
+  -- Future Work: consider multiple nested OrPats?
+
 tidy1 :: Id                  -- The Id being scrutinised
       -> Bool                -- `True` if the pattern was generated, `False` if it was user-written
       -> Pat GhcTc           -- The pattern against which it is to be matched
@@ -426,6 +457,12 @@ tidy1 v g (ParPat _ pat)      = tidy1 v g (unLoc pat)
 tidy1 v g (SigPat _ pat _)    = tidy1 v g (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v g (BangPat _ (L l p)) = tidy_bang_pat v g l p
+
+tidy1 v o (OrPat x lpats) = do
+  (wraps, pats) <- mapAndUnzipM (tidy1 v o . unLoc) (NE.toList lpats)
+  let locs = map getLoc (NE.toList lpats)
+  let wrap = foldr (.) id wraps
+  return (wrap, OrPat x (NE.fromList (zipWith L locs pats)))
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
@@ -525,6 +562,8 @@ tidy_bang_pat v g l (AsPat x v' p)
   = tidy1 v g (AsPat x v' (L l (BangPat noExtField p)))
 tidy_bang_pat v g l (XPat (CoPat w p t))
   = tidy1 v g (XPat $ CoPat w (BangPat noExtField (L l p)) t)
+tidy_bang_pat v g l (OrPat x (p:|ps)) -- push bang into first pat alt
+  = tidy1 v g (OrPat x (L l (BangPat noExtField p) :| ps))
 
 -- Discard bang around strict pattern
 tidy_bang_pat v g _ p@(LitPat {})    = tidy1 v g p
@@ -840,7 +879,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
     initNablasGRHSs :: Nablas -> GRHSs GhcTc b -> NonEmpty Nablas
     initNablasGRHSs ldi_nablas m
       = expectJust "GRHSs non-empty"
-      $ NEL.nonEmpty
+      $ NE.nonEmpty
       $ replicate (length (grhssGRHSs m)) ldi_nablas
 
     is_pat_syn_match :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
@@ -1040,13 +1079,13 @@ the PgN constructor as a FractionalLit if numeric, and add a PgOverStr construct
 for overloaded strings.
 -}
 
-groupEquations :: Platform -> [EquationInfoNE] -> [NonEmpty (PatGroup, EquationInfoNE)]
+groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInfo)]
 -- If the result is of form [g1, g2, g3],
 -- (a) all the (pg,eq) pairs in g1 have the same pg
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
+  = NE.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
@@ -1065,11 +1104,11 @@ subGroup :: (m -> [NonEmpty EquationInfo]) -- Map.elems
 -- Parameterized by map operations to allow different implementations
 -- and constraints, eg. types without Ord instance.
 subGroup elems empty lookup insert group
-    = fmap NEL.reverse $ elems $ foldl' accumulate empty group
+    = fmap NE.reverse $ elems $ foldl' accumulate empty group
   where
     accumulate pg_map (pg, eqn)
       = case lookup pg pg_map of
-          Just eqns -> insert pg (NEL.cons eqn eqns) pg_map
+          Just eqns -> insert pg (NE.cons eqn eqns) pg_map
           Nothing   -> insert pg [eqn] pg_map
     -- pg_map :: Map a [EquationInfo]
     -- Equations seen so far in reverse order of appearance

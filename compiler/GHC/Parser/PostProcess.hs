@@ -104,6 +104,7 @@ module GHC.Parser.PostProcess (
         DisambECP(..),
         ecpFromExp,
         ecpFromCmd,
+        ecpFromPat,
         PatBuilder,
         hsHoleExpr,
 
@@ -1222,6 +1223,8 @@ checkLPat e@(L l _) = checkPat l e [] []
 
 checkPat :: SrcSpanAnnA -> LocatedA (PatBuilder GhcPs) -> [HsConPatTyArg GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
+-- SG: I think this function checks what Haskell2010 calls the `pat` and `lpat`
+-- productions
 checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
@@ -1535,6 +1538,9 @@ ecpFromExp a = ECP (ecpFromExp' a)
 ecpFromCmd :: LHsCmd GhcPs -> ECP
 ecpFromCmd a = ECP (ecpFromCmd' a)
 
+ecpFromPat :: LPat GhcPs -> ECP
+ecpFromPat a = ECP (ecpFromPat' a)
+
 -- The 'fbinds' parser rule produces values of this type. See Note
 -- [RecordDotSyntax field updates].
 type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (LocatedA b))
@@ -1575,6 +1581,8 @@ class (b ~ (Body b) GhcPs, AnnoBody b) => DisambECP b where
   ecpFromCmd' :: LHsCmd GhcPs -> PV (LocatedA b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
   ecpFromExp' :: LHsExpr GhcPs -> PV (LocatedA b)
+  -- | Return an pattern without ambiguity, or fail in a non-pattern context.
+  ecpFromPat' :: LPat GhcPs -> PV (LocatedA b)
   mkHsProjUpdatePV :: SrcSpan -> Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)]
     -> LocatedA b -> Bool -> [AddEpAnn] -> PV (LHsRecProj GhcPs (LocatedA b))
   -- | Disambiguate "let ... in ..."
@@ -1723,6 +1731,7 @@ instance DisambECP (HsCmd GhcPs) where
   type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail (locA l) (ppr e)
+  ecpFromPat' (L l e) = cmdFail (locA l) (ppr e)
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l $
                                                  PsErrOverloadedRecordDotInvalid
   mkHsLamPV l lam_variant (L lm m) anns = do
@@ -1810,6 +1819,7 @@ instance DisambECP (HsExpr GhcPs) where
     addError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInExpr c
     return (L l (hsHoleExpr noAnn))
   ecpFromExp' = return
+  ecpFromPat' (L l e) = cmdFail (locA l) (ppr e)
   mkHsProjUpdatePV l fields arg isPun anns = do
     !cs <- getCommentsFor l
     return $ mkRdrProjUpdate (EpAnn (spanAsAnchor l) noAnn cs) fields arg isPun anns
@@ -1904,6 +1914,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (L l c)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInPat c
   ecpFromExp' (L l e)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowExprInPat e
+  ecpFromPat' p          = return $ L (getLoc p) (PatBuilderPat (unLoc p))
   mkHsLetPV l _ _ _ _    = addFatalError $ mkPlainErrorMsgEnvelope l PsErrLetInPat
   mkHsProjUpdatePV l _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrOverloadedRecordDotInvalid
   type InfixOp (PatBuilder GhcPs) = RdrName

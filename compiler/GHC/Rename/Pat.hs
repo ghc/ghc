@@ -516,8 +516,8 @@ rnLArgPatsAndThen mk = mapM (wrapSrcSpanCps rnArgPatAndThen) where
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parameterized by how you make new names
 
-rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
-rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
+rnLPatsAndThen :: Traversable f => NameMaker -> f (LPat GhcPs) -> CpsRn (f (LPat GhcRn))
+rnLPatsAndThen mk = traverse (rnLPatAndThen mk)
   -- Despite the map, the monad ensures that each pattern binds
   -- variables that may be mentioned in subsequent patterns in the list
 
@@ -649,6 +649,14 @@ rnPatAndThen mk (ListPat _ pats)
 rnPatAndThen mk (TuplePat _ pats boxed)
   = do { pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat noExtField pats' boxed) }
+
+rnPatAndThen mk (OrPat _ pats)
+  = do { loc <- liftCps getSrcSpanM
+       ; pats' <- rnLPatsAndThen mk pats
+       ; let bndrs = collectPatsBinders CollVarTyVarBinders (NE.toList pats')
+       ; liftCps $ setSrcSpan loc $ checkErr (null bndrs) $
+           TcRnOrPatBindsVariables (NE.fromList (ordNubOn getOccName bndrs))
+       ; return (OrPat noExtField pats') }
 
 rnPatAndThen mk (SumPat _ pat alt arity)
   = do { pat <- rnLPatAndThen mk pat
