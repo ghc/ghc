@@ -222,7 +222,7 @@ test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
       cmd_prefix('./exec_signals_prepare'),
-      js_skip],
+      js_broken(22355)],
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
