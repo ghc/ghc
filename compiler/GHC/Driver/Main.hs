@@ -2481,7 +2481,7 @@ hscTidy hsc_env guts = do
   -- on, print now
   unless (logHasDumpFlag logger Opt_D_dump_simpl) $
     putDumpFileMaybe logger Opt_D_dump_rules
-      (renderWithContext defaultSDocContext (ppr CoreTidy <+> text "rules"))
+      "Tidy Core rules"
       FormatText
       (pprRulesForUser tidy_rules)
 

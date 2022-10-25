@@ -455,7 +455,7 @@ data ForeignLabelSource
 --      The regular Outputable instance only shows the label name, and not its other info.
 --
 pprDebugCLabel :: Platform -> CLabel -> SDoc
-pprDebugCLabel platform lbl = pprCLabel platform AsmStyle lbl <> parens extra
+pprDebugCLabel platform lbl = pprAsmLabel platform lbl <> parens extra
    where
       extra = case lbl of
          IdLabel _ _ info
@@ -1416,18 +1416,33 @@ allocation.  Take care if you want to remove them!
 
 -}
 
+-- | Style of label pretty-printing.
+--
+-- When we produce C sources or headers, we have to take into account that C
+-- compilers transform C labels when they convert them into symbols. For
+-- example, they can add prefixes (e.g., "_" on Darwin) or suffixes (size for
+-- stdcalls on Windows). So we provide two ways to pretty-print CLabels: C style
+-- or Asm style.
+--
+data LabelStyle
+   = CStyle   -- ^ C label style (used by C and LLVM backends)
+   | AsmStyle -- ^ Asm label style (used by NCG backend)
+
 pprAsmLabel :: Platform -> CLabel -> SDoc
-pprAsmLabel platform lbl = pprCLabel platform AsmStyle lbl
+pprAsmLabel platform lbl = pprCLabelStyle platform AsmStyle lbl
+
+pprCLabel :: Platform -> CLabel -> SDoc
+pprCLabel platform lbl = pprCLabelStyle platform CStyle lbl
 
 instance OutputableP Platform CLabel where
   {-# INLINE pdoc #-} -- see Note [Bangs in CLabel]
   pdoc !platform lbl = getPprStyle $ \pp_sty ->
                         case pp_sty of
-                          PprDump{} -> pprCLabel platform CStyle lbl
-                          _         -> pprPanic "Labels in code should be printed with pprCLabel" (pprCLabel platform CStyle lbl)
+                          PprDump{} -> pprCLabel platform lbl
+                          _         -> pprPanic "Labels in code should be printed with pprCLabel or pprAsmLabel" (pprCLabel platform lbl)
 
-pprCLabel :: Platform -> LabelStyle -> CLabel -> SDoc
-pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
+pprCLabelStyle :: Platform -> LabelStyle -> CLabel -> SDoc
+pprCLabelStyle !platform !sty lbl = -- see Note [Bangs in CLabel]
   let
     !use_leading_underscores = platformLeadingUnderscore platform
 
@@ -1456,11 +1471,11 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
       -> asmTempLabelPrefix platform
          <> case l of AsmTempLabel u    -> pprUniqueAlways u
                       LocalBlockLabel u -> pprUniqueAlways u
-                      _other            -> pprCLabel platform sty l
+                      _other            -> pprCLabelStyle platform sty l
          <> ftext suf
 
    DynamicLinkerLabel info lbl
-      -> pprDynamicLinkerAsmLabel platform info (pprCLabel platform AsmStyle lbl)
+      -> pprDynamicLinkerAsmLabel platform info (pprAsmLabel platform lbl)
 
    PicBaseLabel
       -> text "1b"
@@ -1473,7 +1488,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
          optional `_` (underscore) because this is how you mark non-temp symbols
          on some platforms (Darwin)
       -}
-      maybe_underscore $ text "dsp_" <> pprCLabel platform sty lbl <> text "_dsp"
+      maybe_underscore $ text "dsp_" <> pprCLabelStyle platform sty lbl <> text "_dsp"
 
    StringLitLabel u
       -> maybe_underscore $ pprUniqueAlways u <> text "_str"
@@ -1556,7 +1571,7 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    CC_Label cc   -> maybe_underscore $ ppr cc
    CCS_Label ccs -> maybe_underscore $ ppr ccs
-   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform CStyle l <> text "_" <> ppr m <> text "_ipe")
+   IPE_Label (InfoProvEnt l _ _ m _) -> maybe_underscore $ (pprCLabel platform l <> text "_" <> ppr m <> text "_ipe")
    ModuleLabel mod kind        -> maybe_underscore $ ppr mod <> text "_" <> ppr kind
 
    CmmLabel _ _ fs CmmCode     -> maybe_underscore $ ftext fs

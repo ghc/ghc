@@ -219,8 +219,8 @@ instance Outputable CCallSpec where
              | otherwise       = text "_unsafe"
 
       ppr_fun (StaticTarget st lbl mPkgId isFun)
-        = text (if isFun then "__ffi_static_ccall"
-                         else "__ffi_static_ccall_value")
+        = (if isFun then text "__ffi_static_ccall"
+                    else text "__ffi_static_ccall_value")
        <> gc_suf
        <+> (case mPkgId of
             Nothing -> empty

@@ -330,7 +330,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
  = {-# SCC profilingInitCode #-}
    initializerCStub platform fn_name decls body
  where
-   pdocC = pprCLabel platform CStyle
+   pdocC = pprCLabel platform
    fn_name = mkInitializerStubLabel this_mod "prof_init"
    decls = vcat
         $  map emit_cc_decl local_CCs
@@ -378,7 +378,7 @@ ipInitCode do_info_table platform this_mod
 
    body = text "registerInfoProvList" <> parens (text "&" <> ipe_buffer_label) <> semi
 
-   ipe_buffer_label = pprCLabel platform CStyle (mkIPELabel this_mod)
+   ipe_buffer_label = pprCLabel platform (mkIPELabel this_mod)
 
    ipe_buffer_decl =
        text "extern IpeBufferListNode" <+> ipe_buffer_label <> text ";"

@@ -249,11 +249,11 @@ sptModuleInitCode platform this_mod entries =
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
         $$ text "extern StgPtr "
-           <> (pprCLabel platform CStyle $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
+           <> (pprCLabel platform $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
         $$ text "hs_spt_insert" <> parens
              (hcat $ punctuate comma
                 [ char 'k' <> int i
-                , char '&' <> pprCLabel platform CStyle (mkClosureLabel (idName n) (idCafInfo n))
+                , char '&' <> pprCLabel platform (mkClosureLabel (idName n) (idCafInfo n))
                 ]
              )
         <> semi

@@ -66,7 +66,7 @@ module GHC.Hs.Utils(
   spanHsLocaLBinds,
 
   -- * Literals
-  mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringPrimLit,
+  mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringFS, mkHsStringPrimLit,
   mkHsCharPrimLit,
 
   -- * Patterns
@@ -453,6 +453,9 @@ mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLocA (HsVar noExtField (noLocA op))) e2
 
 mkHsString :: String -> HsLit (GhcPass p)
 mkHsString s = HsString NoSourceText (mkFastString s)
+
+mkHsStringFS :: FastString -> HsLit (GhcPass p)
+mkHsStringFS s = HsString NoSourceText s
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)

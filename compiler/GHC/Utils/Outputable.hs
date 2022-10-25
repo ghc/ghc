@@ -83,7 +83,7 @@ module GHC.Utils.Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle(..), LabelStyle(..), PrintUnqualified(..),
+        PprStyle(..), PrintUnqualified(..),
         QueryQualifyName, QueryQualifyModule, QueryQualifyPackage,
         reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
@@ -172,19 +172,6 @@ data PprStyle
                 -- are printed with uniques.
 
   | PprCode -- ^ Print code; either C or assembler
-
--- | Style of label pretty-printing.
---
--- When we produce C sources or headers, we have to take into account that C
--- compilers transform C labels when they convert them into symbols. For
--- example, they can add prefixes (e.g., "_" on Darwin) or suffixes (size for
--- stdcalls on Windows). So we provide two ways to pretty-print CLabels: C style
--- or Asm style.
---
-data LabelStyle
-   = CStyle   -- ^ C label style (used by C and LLVM backends)
-   | AsmStyle -- ^ Asm label style (used by NCG backend)
-   deriving (Eq,Ord,Show)
 
 data Depth
    = AllTheWay

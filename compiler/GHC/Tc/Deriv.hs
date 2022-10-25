@@ -201,7 +201,6 @@ tcDeriving deriv_infos deriv_decls
         ; famInsts2 <- concatMapM genFamInsts infer_specs
         ; let famInsts = famInsts1 ++ famInsts2
 
-        ; dflags <- getDynFlags
         ; logger <- getLogger
 
           -- We must put all the derived type family instances (from both
@@ -229,7 +228,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; let (_, aux_specs, fvs) = unzip3 (given_inst_binds ++ infer_inst_binds)
         ; loc <- getSrcSpanM
-        ; let aux_binds = genAuxBinds dflags loc (unionManyBags aux_specs)
+        ; let aux_binds = genAuxBinds loc (unionManyBags aux_specs)
 
         ; let infer_inst_infos = map fstOf3 infer_inst_binds
         ; let inst_infos = given_inst_infos ++ infer_inst_infos

@@ -440,7 +440,7 @@ strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
     ctx <- llvmCgContext <$> getConfig
     platform <- getPlatform
-    let sdoc = pprCLabel platform CStyle lbl
+    let sdoc = pprCLabel platform lbl
         str = Outp.showSDocOneLine ctx sdoc
     return (fsLit str)
 

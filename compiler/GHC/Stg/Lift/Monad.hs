@@ -276,13 +276,13 @@ withSubstBndrs = runContT . traverse (ContT . withSubstBndr)
 withLiftedBndr :: DIdSet -> Id -> (Id -> LiftM a) -> LiftM a
 withLiftedBndr abs_ids bndr inner = do
   uniq <- getUniqueM
-  let str = "$l" ++ occNameString (getOccName bndr)
+  let str = fsLit "$l" `appendFS` occNameFS (getOccName bndr)
   let ty = mkLamTypes (dVarSetElems abs_ids) (idType bndr)
   let bndr'
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
         = transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        . mkSysLocal (mkFastString str) uniq Many
+        . mkSysLocal str uniq Many
         $ ty
   LiftM $ RWS.local
     (\e -> e

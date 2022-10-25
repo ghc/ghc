@@ -77,20 +77,20 @@ instance Diagnostic PsMessage where
     PsWarnTransitionalLayout reason
       -> mkSimpleDecorated $
             text "transitional layout will not be accepted in the future:"
-            $$ text (case reason of
-               TransLayout_Where -> "`where' clause at the same depth as implicit layout block"
-               TransLayout_Pipe  -> "`|' at the same depth as implicit layout block"
+            $$ (case reason of
+               TransLayout_Where -> text "`where' clause at the same depth as implicit layout block"
+               TransLayout_Pipe  -> text "`|' at the same depth as implicit layout block"
             )
     PsWarnOperatorWhitespaceExtConflict sym
       -> let mk_prefix_msg extension_name syntax_meaning =
                   text "The prefix use of a" <+> quotes (pprOperatorWhitespaceSymbol sym)
-                    <+> text "would denote" <+> text syntax_meaning
-               $$ nest 2 (text "were the" <+> text extension_name <+> text "extension enabled.")
+                    <+> text "would denote" <+> syntax_meaning
+               $$ nest 2 (text "were the" <+> extension_name <+> text "extension enabled.")
          in mkSimpleDecorated $
          case sym of
-           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg "LinearTypes" "a multiplicity annotation"
-           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg "TemplateHaskell" "an untyped splice"
-           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg "TemplateHaskell" "a typed splice"
+           OperatorWhitespaceSymbol_PrefixPercent -> mk_prefix_msg (text "LinearTypes") (text "a multiplicity annotation")
+           OperatorWhitespaceSymbol_PrefixDollar -> mk_prefix_msg (text "TemplateHaskell") (text "an untyped splice")
+           OperatorWhitespaceSymbol_PrefixDollarDollar -> mk_prefix_msg (text "TemplateHaskell") (text "a typed splice")
     PsWarnOperatorWhitespace sym occ_type
       -> let mk_msg occ_type_str =
                   text "The" <+> text occ_type_str <+> text "use of a" <+> quotes (ftext sym)
@@ -124,21 +124,21 @@ instance Diagnostic PsMessage where
 
     PsErrLexer err kind
       -> mkSimpleDecorated $ hcat
-           [ text $ case err of
-              LexError               -> "lexical error"
-              LexUnknownPragma       -> "unknown pragma"
-              LexErrorInPragma       -> "lexical error in pragma"
-              LexNumEscapeRange      -> "numeric escape sequence out of range"
-              LexStringCharLit       -> "lexical error in string/character literal"
-              LexStringCharLitEOF    -> "unexpected end-of-file in string/character literal"
-              LexUnterminatedComment -> "unterminated `{-'"
-              LexUnterminatedOptions -> "unterminated OPTIONS pragma"
-              LexUnterminatedQQ      -> "unterminated quasiquotation"
+           [ case err of
+              LexError               -> text "lexical error"
+              LexUnknownPragma       -> text "unknown pragma"
+              LexErrorInPragma       -> text "lexical error in pragma"
+              LexNumEscapeRange      -> text "numeric escape sequence out of range"
+              LexStringCharLit       -> text "lexical error in string/character literal"
+              LexStringCharLitEOF    -> text "unexpected end-of-file in string/character literal"
+              LexUnterminatedComment -> text "unterminated `{-'"
+              LexUnterminatedOptions -> text "unterminated OPTIONS pragma"
+              LexUnterminatedQQ      -> text "unterminated quasiquotation"
 
-           , text $ case kind of
-              LexErrKind_EOF    -> " at end of input"
-              LexErrKind_UTF8   -> " (UTF-8 decoding error)"
-              LexErrKind_Char c -> " at character " ++ show c
+           , case kind of
+              LexErrKind_EOF    -> text " at end of input"
+              LexErrKind_UTF8   -> text " (UTF-8 decoding error)"
+              LexErrKind_Char c -> text $ " at character " ++ show c
            ]
     PsErrParse token _details
       | null token
