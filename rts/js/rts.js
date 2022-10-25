@@ -713,3 +713,112 @@ function h$keepAlive(x, f) {
   h$r1 = f;
   return h$ap_1_0_fast();
 }
+
+var h$nProc = 1;
+var h$procs = [];
+
+function h$runInteractiveProcess( args_in, workingDir, env
+                                , stdin_fd, stdout_fd, stderr_fd
+                                , pfdStdInput, pfdStdOutput, pfdStdError
+                                , childGroup, childUser
+                                , flags
+                                , failed_doing ) {
+    var args = [];
+    for (i in args_in.arr) {
+       if (args_in.arr[i] && args_in.arr[i][0]) {
+          args.push(h$decodeUtf8z(args_in.arr[i][0],0));
+       }
+    }
+    if(h$isNode()) {
+        var stdin_p, stdout_p, stderr_p;
+        if(pfdStdInput === -1) {
+            stdin_p = 'pipe';
+        } else if(pfdStdInput === 0) {
+            stdin_p = process.stdin;
+        } else {
+            throw "runInteractiveProcess: custom stdin unsupported";
+        }
+
+        if(pfdStdOutput === -1) {
+            stdout_p = 'pipe';
+        } else if(pfdStdOutput === 1) {
+            stdout_p = process.stdout;
+        } else {
+	    console.log(stdout_fd);
+            throw "runInteractiveProcess: custom stdout unsupported";
+        }
+
+        if(pfdStdError === -1) {
+            stderr_p = 'pipe'
+        } else if(pfdStdError === 2) {
+            stderr_p = process.stderr;
+        } else {
+            throw "runInteractiveProcess: custom stderr unsupported";
+        }
+	console.log("at1");
+
+        var options = { detached: false
+                        , stdio: [stdin_p, stdout_p, stderr_p]
+                      };
+        if(workingDir) options.cwd = workingDir;
+        if(env !== null) {
+            var envObj = {};
+            for(var i=0;i<env.length;i+=2) envObj[env[i]] = env[i+1];
+            if(process.env['GHCJS_BOOTING']) envObj['GHCJS_BOOTING']=1;
+            if(process.env['GHCJS_BOOTING1']) envObj['GHCJS_BOOTING1']=1;
+            options.env = envObj;
+        }
+	
+        console.log("at2");
+
+        var procObj;
+        var child;
+	// node.js on Windows x86 sometimes throw an EBADF exception when process.stdin is invalid,
+	// retry with ignored stdin when this happens
+	try {
+	    child = h$child.spawn(args[0], args.slice(1), options);
+	} catch(e) {
+	    if(e.toString().indexOf('EBADF') !== -1 && options.stdio[0] === process.stdin) {
+		options.stdio[0] = 'ignore';
+		child = h$child.spawn(args[0], args.slice(1), options);
+	    } else {
+		throw e;
+	    }
+	}
+        child.on('exit', function(code, sig) {
+            procObj.exit = code;
+            for(var i=0;i<procObj.waiters.length;i++) {
+                procObj.waiters[i](code);
+            }
+        });
+	
+	console.log("at3");
+
+        child.on('error', function(e) {
+            var codemap = { 'ENOENT': 127 };
+            var code = codemap[e.code];
+            procObj.exit = code;
+            for(var i=0;i<procObj.waiters.length;i++) {
+                procObj.waiters[i](code);
+            }
+        });
+
+	console.log("at4");
+
+        // fixme this leaks
+        procObj = { pid: h$nProc
+                  , fds: [ stdin_fd  === -1 ? h$process_pipeFd(child.stdio[0], true)  : 0
+                         , stdout_fd === -1 ? h$process_pipeFd(child.stdio[1], false) : 1
+                         , stderr_fd === -1 ? h$process_pipeFd(child.stdio[2], false) : 2
+                         ]
+                  , exit: null
+                  , waiters : []
+                  , child: child
+                  };
+        h$procs[h$nProc++] = procObj;
+	
+	console.log("at5");
+
+        return procObj;
+    }
+}
