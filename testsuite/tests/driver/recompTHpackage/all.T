@@ -15,6 +15,6 @@ else:
 
 test('recompTHpackage', [extra_files(['p', 'q', 'Setup.hs']),
                    when(fast(), skip),
-                   js_skip],
+                   req_js_compactor],
      run_command,
      ['$MAKE -s --no-print-directory recompTHpackage VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn])

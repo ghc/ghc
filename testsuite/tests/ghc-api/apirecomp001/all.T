@@ -1,4 +1,4 @@
 test('apirecomp001',
      [extra_files(['A.hs', 'B.hs', 'myghc.hs']),
-     js_skip],
+     req_js_compactor],
      makefile_test, ['apirecomp001'])
