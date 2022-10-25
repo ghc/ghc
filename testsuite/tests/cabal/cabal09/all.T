@@ -5,6 +5,6 @@ else:
 
 test('cabal09',
      [extra_files(['Main.hs', 'Setup.hs', 'reexport.cabal']),
-     js_skip],
+     js_broken(22351)],
      run_command,
      ['$MAKE -s --no-print-directory cabal09 ' + cleanup])

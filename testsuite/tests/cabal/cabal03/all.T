@@ -5,6 +5,6 @@ else:
 
 test('cabal03',
      [extra_files(['Setup.lhs', 'p/', 'q/', 'r/']),
-     js_skip],
+     js_broken(22351)],
      run_command,
      ['$MAKE -s --no-print-directory cabal03 ' + cleanup])
