@@ -298,6 +298,20 @@ flagWordBreakChars :: String
 flagWordBreakChars = " \t\n"
 
 
+showSDocForUser' :: GHC.GhcMonad m => SDoc -> m String
+showSDocForUser' doc = do
+    dflags <- getDynFlags
+    unit_state <- hsc_units <$> GHC.getSession
+    unqual <- GHC.getPrintUnqual
+    pure $ showSDocForUser dflags unit_state unqual doc
+
+showSDocForUserQualify :: GHC.GhcMonad m => SDoc -> m String
+showSDocForUserQualify doc = do
+    dflags <- getDynFlags
+    unit_state <- hsc_units <$> GHC.getSession
+    pure $ showSDocForUser dflags unit_state alwaysQualify doc
+
+
 keepGoing :: (String -> GHCi ()) -> (String -> InputT GHCi CmdExecOutcome)
 keepGoing a str = keepGoing' (lift . a) str
 
@@ -1572,11 +1586,10 @@ help _ = do
 info :: GHC.GhcMonad m => Bool -> String -> m ()
 info _ "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info allInfo s  = handleSourceError GHC.printException $ do
-    unqual <- GHC.getPrintUnqual
-    dflags <- getDynFlags
-    sdocs  <- mapM (infoThing allInfo) (words s)
-    unit_state <- hsc_units <$> GHC.getSession
-    mapM_ (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs
+    forM_ (words s) $ \thing -> do
+      sdoc <- infoThing allInfo thing
+      rendered <- showSDocForUser' sdoc
+      liftIO (putStrLn rendered)
 
 infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
 infoThing allInfo str = do
@@ -1906,10 +1919,8 @@ docCmd s  = do
 
   let sdocs = pprDocs docs
       sdocs' = vcat (intersperse (text "") sdocs)
-  unqual <- GHC.getPrintUnqual
-  dflags <- getDynFlags
-  unit_state <- hsc_units <$> GHC.getSession
-  (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs'
+  sdoc <- showSDocForUser' sdocs'
+  liftIO (putStrLn sdoc)
 
 data DocComponents =
   DocComponents
@@ -2264,9 +2275,6 @@ keepPackageImports = filterM is_pkg_import
 modulesLoadedMsg :: GHC.GhcMonad m => SuccessFlag -> [GHC.ModSummary] -> m ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
-  unit_state <- hsc_units <$> GHC.getSession
-  unqual <- GHC.getPrintUnqual
-
   msg <- if gopt Opt_ShowLoadedModules dflags
          then do
                mod_names <- mapM mod_name mods
@@ -2278,8 +2286,9 @@ modulesLoadedMsg ok mods = do
                return $ status <> text ","
                     <+> speakNOf (length mods) (text "module") <+> "loaded."
 
-  when (verbosity dflags > 0) $
-     liftIO $ putStrLn $ showSDocForUser dflags unit_state unqual msg
+  when (verbosity dflags > 0) $ do
+     rendered_msg <- showSDocForUser' msg
+     liftIO $ putStrLn rendered_msg
   where
     status = case ok of
                   Failed    -> text "Failed"
@@ -2302,9 +2311,8 @@ runExceptGhciMonad act = handleSourceError GHC.printException $
                          runExceptT act
   where
     handleErr sdoc = do
-        dflags <- getDynFlags
-        unit_state <- hsc_units <$> GHC.getSession
-        liftIO . hPutStrLn stderr . showSDocForUser dflags unit_state alwaysQualify $ sdoc
+        rendered <- showSDocForUserQualify sdoc
+        liftIO $ hPutStrLn stderr rendered
         failIfExprEvalMode
 
 -- | Inverse of 'runExceptT' for \"pure\" computations
@@ -2369,11 +2377,8 @@ allTypesCmd _ = runExceptGhciMonad $ do
   where
     printSpan span'
       | Just ty <- spaninfoType span' = do
-        hsc_env <- GHC.getSession
-        let tyInfo = unwords . words $
-                     showSDocForUser (hsc_dflags hsc_env)
-                                     (hsc_units  hsc_env)
-                                     alwaysQualify (pprSigmaType ty)
+        tyInfo <- (unwords . words) <$>
+                  showSDocForUserQualify (pprSigmaType ty)
         liftIO . putStrLn $
             showRealSrcSpan (spaninfoSrcSpan span') ++ ": " ++ tyInfo
       | otherwise = return ()
@@ -2618,15 +2623,11 @@ guessCurrentModule cmd
 -- with sorted, sort items alphabetically
 browseModule :: GHC.GhcMonad m => Bool -> Module -> Bool -> m ()
 browseModule bang modl exports_only = do
-  -- :browse reports qualifiers wrt current context
-  unqual <- GHC.getPrintUnqual
-
   mb_mod_info <- GHC.getModuleInfo modl
   case mb_mod_info of
     Nothing -> throwGhcException (CmdLineError ("unknown module: " ++
                                 GHC.moduleNameString (GHC.moduleName modl)))
     Just mod_info -> do
-        dflags <- getDynFlags
         let names
                | exports_only = GHC.modInfoExports mod_info
                | otherwise    = GHC.modInfoTopLevelScope mod_info
@@ -2685,8 +2686,10 @@ browseModule bang modl exports_only = do
             prettyThings = map pretty things
             prettyThings' | bang      = annotate $ zip modNames prettyThings
                           | otherwise = prettyThings
-        unit_state <- hsc_units <$> GHC.getSession
-        liftIO $ putStrLn $ showSDocForUser dflags unit_state unqual (vcat prettyThings')
+
+        -- :browse reports qualifiers wrt current context
+        rendered_things <- showSDocForUser' (vcat prettyThings')
+        liftIO $ putStrLn rendered_things
         -- ToDo: modInfoInstances currently throws an exception for
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))

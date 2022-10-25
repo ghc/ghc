@@ -126,7 +126,7 @@ hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
                   tickboxes
                 ])) <> semi
 
-    tickboxes = pprCLabel platform CStyle (mkHpcTicksLabel $ this_mod)
+    tickboxes = pprCLabel platform (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (moduleNameFS (moduleName this_mod)))

@@ -124,13 +124,13 @@ mkExtraObjToLinkIntoBinary logger tmpfs dflags unit_state = do
         text " __conf.rts_opts_enabled = "
             <> text (show (rtsOptsEnabled dflags)) <> semi,
         text " __conf.rts_opts_suggestions = "
-            <> text (if rtsOptsSuggestions dflags
-                        then "true"
-                        else "false") <> semi,
+            <> (if rtsOptsSuggestions dflags
+                then text "true"
+                else text "false") <> semi,
         text "__conf.keep_cafs = "
-            <> text (if gopt Opt_KeepCAFs dflags
-                       then "true"
-                       else "false") <> semi,
+            <> (if gopt Opt_KeepCAFs dflags
+                then text "true"
+                else text "false") <> semi,
         case rtsOpts dflags of
             Nothing   -> Outputable.empty
             Just opts -> text "    __conf.rts_opts= " <>

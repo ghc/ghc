@@ -64,7 +64,7 @@ emitIpeBufferListNode this_mod ents = do
 
 toCgIPE :: Platform -> SDocContext -> StrTabOffset -> InfoProvEnt -> State StringTable CgInfoProvEnt
 toCgIPE platform ctx module_name ipe = do
-    table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform CStyle (infoTablePtr ipe))
+    table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform (infoTablePtr ipe))
     closure_desc <- lookupStringTable $ ST.pack $ show (infoProvEntClosureType ipe)
     type_desc <- lookupStringTable $ ST.pack $ infoTableType ipe
     let label_str = maybe "" snd (infoTableProv ipe)

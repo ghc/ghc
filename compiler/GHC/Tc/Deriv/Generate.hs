@@ -54,7 +54,6 @@ import GHC.Core.DataCon
 import GHC.Types.Name
 import GHC.Types.SourceText
 
-import GHC.Driver.Session
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 import GHC.Builtin.Names
@@ -1170,14 +1169,14 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
         where
           lbl_str = unpackFS lbl
           mk_read_field read_field_rdr lbl
-              = nlHsApps read_field_rdr [nlHsLit (mkHsString lbl)]
+              = nlHsApps read_field_rdr [nlHsLit (mkHsStringFS lbl)]
           read_field
               | isSym lbl_str
-              = mk_read_field readSymField_RDR lbl_str
+              = mk_read_field readSymField_RDR lbl
               | Just (ss, '#') <- snocView lbl_str -- #14918
-              = mk_read_field readFieldHash_RDR ss
+              = mk_read_field readFieldHash_RDR (mkFastString ss)
               | otherwise
-              = mk_read_field readField_RDR lbl_str
+              = mk_read_field readField_RDR lbl
 
 {-
 ************************************************************************
@@ -2156,9 +2155,9 @@ fiddling around.
 
 -- | Generate the full code for an auxiliary binding.
 -- See @Note [Auxiliary binders] (Wrinkle: Reducing code duplication)@.
-genAuxBindSpecOriginal :: DynFlags -> SrcSpan -> AuxBindSpec
+genAuxBindSpecOriginal :: SrcSpan -> AuxBindSpec
                        -> (LHsBind GhcPs, LSig GhcPs)
-genAuxBindSpecOriginal dflags loc spec
+genAuxBindSpecOriginal loc spec
   = (gen_bind spec,
      L loca (TypeSig noAnn [L locn (auxBindSpecRdrName spec)]
            (genAuxBindSpecSig loc spec)))
@@ -2183,11 +2182,10 @@ genAuxBindSpecOriginal dflags loc spec
       = mkHsVarBind loc dataT_RDR rhs
       where
         tc_name = tyConName tycon
-        tc_name_string = occNameString (getOccName tc_name)
-        definition_mod_name = moduleNameString (moduleName (expectJust "gen_bind DerivDataDataType" $ nameModule_maybe tc_name))
-        ctx = initDefaultSDocContext dflags
+        tc_name_string = occNameFS (getOccName tc_name)
+        definition_mod_name = moduleNameFS (moduleName (expectJust "gen_bind DerivDataDataType" $ nameModule_maybe tc_name))
         rhs = nlHsVar mkDataType_RDR
-              `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (text definition_mod_name <> dot <> text tc_name_string)))
+              `nlHsApp` nlHsLit (mkHsStringFS (concatFS [definition_mod_name, fsLit ".", tc_name_string]))
               `nlHsApp` nlList (map nlHsVar dataC_RDRs)
 
     gen_bind (DerivDataConstr dc dataC_RDR dataT_RDR)
@@ -2197,12 +2195,12 @@ genAuxBindSpecOriginal dflags loc spec
 
         constr_args
            = [ nlHsVar dataT_RDR                            -- DataType
-             , nlHsLit (mkHsString (occNameString dc_occ))  -- Constructor name
+             , nlHsLit (mkHsStringFS (occNameFS dc_occ))    -- Constructor name
              , nlHsIntLit (toInteger (dataConTag dc))       -- Constructor tag
              , nlList  labels                               -- Field labels
              , nlHsVar fixity ]                             -- Fixity
 
-        labels   = map (nlHsLit . mkHsString . unpackFS . field_label . flLabel)
+        labels   = map (nlHsLit . mkHsStringFS . field_label . flLabel)
                        (dataConFieldLabels dc)
         dc_occ   = getOccName dc
         is_infix = isDataSymOcc dc_occ
@@ -2243,9 +2241,9 @@ genAuxBindSpecSig loc spec = case spec of
 -- | Take a 'Bag' of 'AuxBindSpec's and generate the code for auxiliary
 -- bindings based on the declarative descriptions in the supplied
 -- 'AuxBindSpec's. See @Note [Auxiliary binders]@.
-genAuxBinds :: DynFlags -> SrcSpan -> Bag AuxBindSpec
+genAuxBinds :: SrcSpan -> Bag AuxBindSpec
             -> Bag (LHsBind GhcPs, LSig GhcPs)
-genAuxBinds dflags loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
+genAuxBinds loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
  where
   -- Perform a CSE-like pass over the generated auxiliary bindings to avoid
   -- code duplication, as described in
@@ -2259,7 +2257,7 @@ genAuxBinds dflags loc = snd . foldr gen_aux_bind_spec (emptyOccEnv, emptyBag)
     case lookupOccEnv original_rdr_name_env spec_occ of
       Nothing
         -> ( extendOccEnv original_rdr_name_env spec_occ spec_rdr_name
-           , genAuxBindSpecOriginal dflags loc spec `consBag` spec_bag )
+           , genAuxBindSpecOriginal loc spec `consBag` spec_bag )
       Just original_rdr_name
         -> ( original_rdr_name_env
            , genAuxBindSpecDup loc original_rdr_name spec `consBag` spec_bag )
@@ -2363,7 +2361,7 @@ mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
                             (replicate arity nlWildPat)
                             (error_Expr str) emptyLocalBinds]
               else matches
-   str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
+   str = fsLit "Void " `appendFS` occNameFS (rdrNameOcc fun_rdr)
 
 
 box ::         String           -- The class involved
@@ -2550,8 +2548,8 @@ nested_compose_Expr (e:es)
 
 -- impossible_Expr is used in case RHSs that should never happen.
 -- We generate these to keep the desugarer from complaining that they *might* happen!
-error_Expr :: String -> LHsExpr GhcPs
-error_Expr string = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString string))
+error_Expr :: FastString -> LHsExpr GhcPs
+error_Expr string = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsStringFS string))
 
 -- illegal_Expr is used when signalling error conditions in the RHS of a derived
 -- method. It is currently only used by Enum.{succ,pred}

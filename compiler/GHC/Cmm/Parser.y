@@ -450,7 +450,7 @@ cmmproc :: { CmmParse () }
                          platform <- getPlatform;
                          ctx      <- getContext;
                          formals <- sequence (fromMaybe [] $3);
-                         withName (showSDocOneLine ctx (pprCLabel platform CStyle entry_ret_label))
+                         withName (showSDocOneLine ctx (pprCLabel platform entry_ret_label))
                            $4;
                          return (entry_ret_label, info, stk_formals, formals) }
                      let do_layout = isJust $3

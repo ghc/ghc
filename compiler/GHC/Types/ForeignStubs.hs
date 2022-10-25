@@ -44,7 +44,7 @@ functionCStub platform clbl declarations body =
   where
     body' = vcat
         [ declarations
-        , hsep [text "void", pprCLabel platform CStyle clbl, text "(void)"]
+        , hsep [text "void", pprCLabel platform clbl, text "(void)"]
         , braces body
         ]
 
