@@ -71,7 +71,7 @@ module GHC.Utils.Ppr (
         -- * Constructing documents
 
         -- ** Converting values into documents
-        char, text, ftext, stext, ptext, ztext, sizedText, zeroWidthText, emptyText,
+        char, text, ftext, ptext, ztext, sizedText, zeroWidthText, emptyText,
         int, integer, float, double, rational, hex,
 
         -- ** Simple derived documents
@@ -115,7 +115,6 @@ import GHC.Prelude.Basic hiding (error)
 
 import GHC.Utils.BufHandle
 import GHC.Data.FastString
-import GHC.Data.ShortText as ST
 import GHC.Utils.Panic.Plain
 import System.IO
 import Numeric (showHex)
@@ -264,14 +263,14 @@ type RDoc = Doc
 --
 -- A TextDetails represents a fragment of text that will be
 -- output at some point.
-data TextDetails
-  = Chr  {-# UNPACK #-} !Char                     -- ^ A single Char fragment
-  | Str  String                                   -- ^ A whole String fragment
-  | SText ShortText                               -- ^ A ShortText
-  | PStr FastString                               -- a hashed string
-  | ZStr FastZString                              -- a z-encoded string
-  | LStr {-# UNPACK #-} !PtrString                -- a '\0'-terminated array of bytes
-  | RStr {-# UNPACK #-} !Int {-# UNPACK #-} !Char -- a repeated character (e.g., ' ')
+data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
+                 | Str  String -- ^ A whole String fragment
+                 | PStr FastString                      -- a hashed string
+                 | ZStr FastZString                     -- a z-encoded string
+                 | LStr {-# UNPACK #-} !PtrString
+                   -- a '\0'-terminated array of bytes
+                 | RStr {-# UNPACK #-} !Int {-# UNPACK #-} !Char
+                   -- a repeated character (e.g., ' ')
 
 instance Show Doc where
   showsPrec _ doc cont = fullRender (mode style) (lineLength style)
@@ -318,10 +317,6 @@ text s = textBeside_ (Str s) (length s) Empty
 
 ftext :: FastString -> Doc
 ftext s = textBeside_ (PStr s) (lengthFS s) Empty
-
-stext :: ShortText -> Doc
-stext s = textBeside_ (SText s) (codepointLength s) Empty
-
 
 ptext :: PtrString -> Doc
 ptext s = textBeside_ (LStr s) (lengthPS s) Empty
@@ -966,7 +961,6 @@ txtPrinter :: TextDetails -> String -> String
 txtPrinter (Chr c)    s  = c:s
 txtPrinter (Str s1)   s2 = s1 ++ s2
 txtPrinter (PStr s1)  s2 = unpackFS s1 ++ s2
-txtPrinter (SText s1) s2 = ST.unpack s1 ++ s2
 txtPrinter (ZStr s1)  s2 = zString s1 ++ s2
 txtPrinter (LStr s1)  s2 = unpackPtrString s1 ++ s2
 txtPrinter (RStr n c) s2 = replicate n c ++ s2
@@ -1090,7 +1084,6 @@ printDoc_ mode pprCols hdl doc
   where
     put (Chr c)    next = hPutChar hdl c >> next
     put (Str s)    next = hPutStr  hdl s >> next
-    put (SText s)  next = hPutStr  hdl (ST.unpack s) >> next
     put (PStr s)   next = hPutStr  hdl (unpackFS s) >> next
                           -- NB. not hPutFS, we want this to go through
                           -- the I/O library's encoding layer. (#3398)
@@ -1146,20 +1139,19 @@ bufLeftRender :: BufHandle -> Doc -> IO ()
 bufLeftRender b doc = layLeft b (reduceDoc doc)
 
 layLeft :: BufHandle -> Doc -> IO ()
-layLeft !_ NoDoc              = error "layLeft: NoDoc"
-layLeft b (Union p q)         = layLeft b $! first p q
-layLeft b (Nest _ p)          = layLeft b $! p
-layLeft b Empty               = bPutChar b '\n'
-layLeft b (NilAbove !p)       = bPutChar b '\n' >> layLeft b p
-layLeft b (TextBeside !s _ p) = put b s >> layLeft b p
+layLeft !_ NoDoc             = error "layLeft: NoDoc"
+layLeft b (Union p q)        = layLeft b $! first p q
+layLeft b (Nest _ p)         = layLeft b $! p
+layLeft b Empty              = bPutChar b '\n'
+layLeft b (NilAbove p)       = bPutChar b '\n' >> layLeft b p
+layLeft b (TextBeside s _ p) = put b s >> layLeft b p
  where
-    put !b (Chr c)    = bPutChar b c
-    put  b (Str s)    = bPutStr  b s
-    put  b (PStr s)   = bPutFS   b s
-    put  b (ZStr s)   = bPutFZS  b s
-    put  b (LStr s)   = bPutPtrString b s
-    put  b (SText s)  = bPutShortText b s
-    put  b (RStr n c) = bPutReplicate b n c
+    put !b (Chr c)   = bPutChar b c
+    put b (Str s)    = bPutStr  b s
+    put b (PStr s)   = bPutFS   b s
+    put b (ZStr s)   = bPutFZS  b s
+    put b (LStr s)   = bPutPtrString b s
+    put b (RStr n c) = bPutReplicate b n c
 layLeft _ _                  = panic "layLeft: Unhandled case"
 
 -- Define error=panic, for easier comparison with libraries/pretty.

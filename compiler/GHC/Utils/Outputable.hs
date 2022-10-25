@@ -115,7 +115,6 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
 import GHC.Utils.BufHandle (BufHandle)
 import GHC.Data.FastString
-import GHC.Data.ShortText (ShortText)
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
@@ -630,7 +629,6 @@ empty    :: SDoc
 char     :: Char       -> SDoc
 text     :: String     -> SDoc
 ftext    :: FastString -> SDoc
-stext    :: ShortText  -> SDoc
 ptext    :: PtrString  -> SDoc
 ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
@@ -650,8 +648,6 @@ text s      = docToSDoc $ Pretty.text s
 
 {-# INLINE CONLIKE ftext #-}
 ftext s     = docToSDoc $ Pretty.ftext s
-{-# INLINE CONLIKE stext #-}
-stext s     = docToSDoc $ Pretty.stext s
 {-# INLINE CONLIKE ptext #-}
 ptext s     = docToSDoc $ Pretty.ptext s
 {-# INLINE CONLIKE ztext #-}
@@ -1009,9 +1005,6 @@ instance Outputable FastString where
 
 deriving newtype instance Outputable NonDetFastString
 deriving newtype instance Outputable LexicalFastString
-
-instance Outputable ShortText where
-    ppr s = stext s
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
