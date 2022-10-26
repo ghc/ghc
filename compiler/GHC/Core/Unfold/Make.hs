@@ -227,14 +227,15 @@ specUnfolding to specialise its unfolding.  Some important points:
   This happens with Control.Monad.liftM3, and can cause a lot more
   allocation as a result (nofib n-body shows this).
 
-  Moreover, keeping the stable unfoldign isn't much help, because
+  Moreover, keeping the stable unfolding isn't much help, because
   the specialised function (probably) isn't overloaded any more.
 
-  TL;DR: we simply drop the stable unfolding when specialising. It's
-  not really a complete solution; ignoring specialisation for now,
-  INLINABLE functions don't get properly strictness analysed, for
-  example. But it works well for examples involving specialisation,
-  which is the dominant use of INLINABLE.
+  TL;DR: we simply drop the stable unfolding when specialising. It's not
+  really a complete solution; ignoring specialisation for now, INLINABLE
+  functions don't get properly strictness analysed, for example.
+  Moreover, it means that the specialised function has an INLINEABLE
+  pragma, but no stable unfolding. But it works well for examples
+  involving specialisation, which is the dominant use of INLINABLE.
 
 Note [Honour INLINE on 0-ary bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -436,4 +436,5 @@ test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O 
 test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-O -dno-typeable-binds -dsuppress-uniques'])
 
 test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
+test('T22357',  normal, compile, ['-O'])
 
