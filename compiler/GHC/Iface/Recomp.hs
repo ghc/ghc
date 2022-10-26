@@ -589,7 +589,7 @@ checkDependencies hsc_env summary iface
         liftIO $
           check_mods (sort hs) prev_dep_mods
           `recompThen`
-            let allPkgDeps = sortBy (comparing snd) $ nubOrdOn snd (ps ++ implicit_deps ++ bkpk_units)
+            let allPkgDeps = sortBy (comparing snd) $ nubOrdOn snd (ps ++ implicit_deps)
             in check_packages allPkgDeps prev_dep_pkgs
  where
 
@@ -613,7 +613,6 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))
-   bkpk_units    = map ((fsLit "Signature",) . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
 
    implicit_deps = map (fsLit "Implicit",) (implicitPackageDeps dflags)
 

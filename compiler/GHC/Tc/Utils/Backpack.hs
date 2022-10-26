@@ -856,7 +856,6 @@ mergeSignatures
         -- we hope that we get lucky / the overlapping instances never
         -- get used, but it is not a very good situation to be in.
         --
-        hsc_env <- getTopEnv
         let merge_inst (insts, inst_env) inst
                 | memberInstEnv inst_env inst -- test DFun Type equality
                 = (insts, inst_env)
@@ -867,18 +866,17 @@ mergeSignatures
             (insts, inst_env) = foldl' merge_inst
                                     (tcg_insts tcg_env, tcg_inst_env tcg_env)
                                     (instEnvElts $ md_insts details)
-            -- This is a HACK to prevent calculateAvails from including imp_mod
-            -- in the listing.  We don't want it because a module is NOT
+            -- Use mi_deps directly rather than calculateAvails.
+            -- because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
-            iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
-            home_unit = hsc_home_unit hsc_env
-            other_home_units = hsc_all_home_unit_ids hsc_env
-            avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails home_unit other_home_units iface' False NotBoot ImportedBySystem
+            avails = tcg_imports tcg_env
+            deps = mi_deps iface
+            avails_with_trans = addTransitiveDepInfo avails deps
+
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
-            tcg_imports  = avails,
+            tcg_imports  = avails_with_trans,
             tcg_merged   =
                 if outer_mod == mi_module iface
                     -- Don't add ourselves!
@@ -911,6 +909,20 @@ mergeSignatures
     addDependentFiles src_files
 
     return tcg_env
+
+-- | Add on the necessary transitive information from the merged signature to
+-- the 'ImportAvails' of the result of merging. This propagates the orphan instances
+-- which were in the transitive closure of the signature through the merge.
+addTransitiveDepInfo :: ImportAvails -- ^ From the signature resulting from the merge
+                     -> Dependencies -- ^ From the original signature
+                     -> ImportAvails
+addTransitiveDepInfo avails deps =
+  -- Avails for the merged in signature
+  -- Add on transitive information from the signature but nothing else..
+  -- because we do not "import" the signature.
+  avails { imp_orphs = imp_orphs avails ++ dep_orphs deps
+         , imp_finsts = imp_finsts avails ++ dep_finsts deps
+         , imp_sig_mods = imp_sig_mods avails ++ dep_sig_mods deps }
 
 -- | Top-level driver for signature instantiation (run when compiling
 -- an @hsig@ file.)
