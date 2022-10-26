@@ -2,7 +2,7 @@ test('ghcilink001',
      [extra_files(['TestLink.hs', 'f.c']),
       when(ghc_dynamic(), expect_fail), # dynamic ghci can't load '.a's
       unless(doing_ghci, skip),
-      js_skip],                         # JS backend doesn't use ghci
+      req_interp],                         # JS backend doesn't use ghci
      makefile_test, ['ghcilink001'])
 
 test('ghcilink002', [extra_files(['TestLink.hs', 'f.c']),
@@ -17,7 +17,7 @@ test('ghcilink003',
        # anymore. Will produce:
        #   dlopen(libstdc++.dylib, 5): image not found
        when(opsys('darwin'), fragile(16083)),
-       js_skip
+       req_interp
      ], makefile_test, ['ghcilink003'])
 
 test('ghcilink004',
@@ -32,7 +32,7 @@ test('ghcilink005',
       when(unregisterised(), fragile(16085)),
       unless(doing_ghci, skip),
       req_dynamic_lib_support,
-      js_skip],
+      req_interp],
      makefile_test, ['ghcilink005'])
 
 test('ghcilink006',
@@ -41,7 +41,7 @@ test('ghcilink006',
        # anymore. Will produce:
        #   dlopen(libstdc++.dylib, 5): image not found
        when(opsys('darwin'), fragile(16083)),
-       js_skip
+       req_interp
      ], makefile_test, ['ghcilink006'])
 
 test('T3333',
