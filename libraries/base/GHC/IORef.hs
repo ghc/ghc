@@ -51,7 +51,7 @@ readIORef  (IORef var) = stToIO (readSTRef var)
 writeIORef  :: IORef a -> a -> IO ()
 writeIORef (IORef var) v = stToIO (writeSTRef var v)
 
--- Atomically apply a function to the contents of an 'IORef',
+-- | Atomically apply a function to the contents of an 'IORef',
 -- installing its first component in the 'IORef' and returning
 -- the old contents and the result of applying the function.
 -- The result of the function application (the pair) is not forced.
@@ -62,7 +62,7 @@ atomicModifyIORef2Lazy (IORef (STRef r#)) f =
   IO (\s -> case atomicModifyMutVar2# r# f s of
               (# s', old, res #) -> (# s', (old, res) #))
 
--- Atomically apply a function to the contents of an 'IORef',
+-- | Atomically apply a function to the contents of an 'IORef',
 -- installing its first component in the 'IORef' and returning
 -- the old contents and the result of applying the function.
 -- The result of the function application (the pair) is forced,
