@@ -571,12 +571,24 @@ resolvePackageImport unit_st mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
   providers <- Map.filter originVisible <$> Map.lookup mn (moduleNameProvidersMap unit_st)
   -- 2. Get the UnitIds of the candidates
-  let candidates_uid = map (toUnitId . moduleUnit) $ Map.keys providers
+  let candidates_uid = concatMap to_uid $ Map.assocs providers
   -- 3. Get the package names of the candidates
   let candidates_units = map (\ui -> ((unitPackageName ui), unitId ui))
                               $ mapMaybe (\uid -> Map.lookup uid (unitInfoMap unit_st)) candidates_uid
   -- 4. Check to see if the PackageName helps us disambiguate any candidates.
   lookup pn candidates_units
+
+  where
+
+    -- Get the UnitId from which a visible identifier is from
+    to_uid :: (Module, ModuleOrigin) -> [UnitId]
+    to_uid (mod, ModOrigin mo re_exps _ _) =
+      case mo of
+        -- Available directly, but also potentially from re-exports
+        Just True ->  (toUnitId (moduleUnit mod)) : map unitId re_exps
+        -- Just available from these re-exports
+        _ -> map unitId re_exps
+    to_uid _ = []
 
 -- | Create a Map UnitId UnitInfo
 --

@@ -136,13 +136,13 @@ lookupFileCache (FinderCache _ ref) key = do
 -- that package is searched for the module.
 
 findImportedModule :: HscEnv -> ModuleName -> PkgQual -> IO FindResult
-findImportedModule hsc_env mod fs =
+findImportedModule hsc_env mod pkg_qual =
   let fc        = hsc_FC hsc_env
       mhome_unit = hsc_home_unit_maybe hsc_env
       dflags    = hsc_dflags hsc_env
       fopts     = initFinderOpts dflags
   in do
-    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod fs
+    findImportedModuleNoHsc fc fopts (hsc_unit_env hsc_env) mhome_unit mod pkg_qual
 
 findImportedModuleNoHsc
   :: FinderCache
