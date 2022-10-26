@@ -173,7 +173,7 @@ extern void yieldThread           ( void );
 
 typedef void* OSThreadProcAttr OSThreadProc(void *);
 
-extern int  createOSThread        ( OSThreadId* tid, char *name,
+extern int  createOSThread        ( OSThreadId* tid, const char *name,
                                     OSThreadProc *startProc, void *param);
 extern bool osThreadIsAlive       ( OSThreadId id );
 extern void interruptOSThread     ( OSThreadId id );

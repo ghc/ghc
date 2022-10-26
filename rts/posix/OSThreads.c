@@ -215,7 +215,7 @@ start_thread (void *param)
 }
 
 int
-createOSThread (OSThreadId* pId, char *name STG_UNUSED,
+createOSThread (OSThreadId* pId, const char *name,
                 OSThreadProc *startProc, void *param)
 {
   struct ThreadDesc *desc = stgMallocBytes(sizeof(struct ThreadDesc), "createOSThread");
