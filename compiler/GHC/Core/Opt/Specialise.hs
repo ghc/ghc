@@ -1627,8 +1627,8 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
            ; (rhs_body', rhs_uds) <- specExpr rhs_env2 rhs_body
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 -- to the rhs_uds; see Note [Specialising Calls]
-           ; let rhs_uds_w_dx = foldr consDictBind rhs_uds dx_binds
-                 spec_rhs_bndrs  = spec_bndrs1 ++ leftover_bndrs
+           ; let rhs_uds_w_dx   = dx_binds `consDictBinds` rhs_uds
+                 spec_rhs_bndrs = spec_bndrs1 ++ leftover_bndrs
                  (spec_uds, dumped_dbs) = dumpUDs spec_rhs_bndrs rhs_uds_w_dx
                  spec_rhs1 = mkLams spec_rhs_bndrs $
                              wrapDictBindsE dumped_dbs rhs_body'
@@ -1671,7 +1671,10 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 
                 --------------------------------------
                 -- Add a suitable unfolding; see Note [Inline specialisations]
-                spec_unf = specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
+                -- The wrap_unf_body applies the original unfolding to the specialised
+                -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
+                wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
+                spec_unf = specUnfolding simpl_opts spec_bndrs wrap_unf_body
                                          rule_lhs_args fn_unf
 
                 spec_inl_prag
@@ -3047,11 +3050,6 @@ snocDictBinds :: UsageDetails -> [DictBind] -> UsageDetails
 snocDictBinds uds@MkUD{ud_binds=FDB{ fdb_binds = binds, fdb_bndrs = bs }} dbs
   = uds { ud_binds = FDB { fdb_binds = binds `appOL`        (toOL dbs)
                          , fdb_bndrs = bs    `extendVarSetList` bindersOfDictBinds dbs } }
-
-consDictBind :: DictBind -> UsageDetails -> UsageDetails
-consDictBind db uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs=bs}}
-  = uds { ud_binds = FDB { fdb_binds = db `consOL` binds
-                         , fdb_bndrs = bs `extendVarSetList` bindersOfDictBind db } }
 
 consDictBinds :: [DictBind] -> UsageDetails -> UsageDetails
 consDictBinds dbs uds@MkUD{ud_binds=FDB{fdb_binds = binds, fdb_bndrs = bs}}
