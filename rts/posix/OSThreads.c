@@ -198,20 +198,24 @@ struct ThreadDesc {
 static void *
 start_thread (void *param)
 {
-    struct ThreadDesc desc = *(struct ThreadDesc *) param;
-    stgFree(param);
+    struct ThreadDesc *desc = (struct ThreadDesc *) param;
+    OSThreadProc *startProc = desc->startProc;
+    void *startParam = desc->param;
 
 #if defined(HAVE_PTHREAD_SET_NAME_NP)
-    pthread_set_name_np(pthread_self(), desc.name);
+    pthread_set_name_np(pthread_self(), desc->name);
 #elif defined(HAVE_PTHREAD_SETNAME_NP)
-    pthread_setname_np(pthread_self(), desc.name);
+    pthread_setname_np(pthread_self(), desc->name);
 #elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
-    pthread_setname_np(desc.name);
+    pthread_setname_np(desc->name);
 #elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
-    pthread_setname_np(pthread_self(), "%s", desc.name);
+    pthread_setname_np(pthread_self(), "%s", desc->name);
 #endif
 
-    return desc.startProc(desc.param);
+    stgFree(desc->name);
+    stgFree(desc);
+
+    return startProc(startParam);
 }
 
 int
@@ -221,12 +225,14 @@ createOSThread (OSThreadId* pId, const char *name,
   struct ThreadDesc *desc = stgMallocBytes(sizeof(struct ThreadDesc), "createOSThread");
   desc->startProc = startProc;
   desc->param = param;
-  desc->name = name;
+  desc->name = stgMallocBytes(strlen(name) + 1, "createOSThread");
+  strcpy(desc->name, name);
 
   int result = pthread_create(pId, NULL, start_thread, desc);
   if (!result) {
       pthread_detach(*pId);
   } else {
+      stgFree(desc->name);
       stgFree(desc);
   }
   return result;
