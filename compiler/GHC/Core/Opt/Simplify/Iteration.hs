@@ -22,7 +22,7 @@ import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
-import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutBinderSwap_maybe )
+import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs )
 import GHC.Core.Make       ( FloatBind, mkImpossibleExpr, castBottomExpr )
 import qualified GHC.Core.Make
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
@@ -3286,21 +3286,19 @@ zapIdOccInfoAndSetEvald str v =
                          -- see Note [Case alternative occ info]
 
 addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplM SimplEnv
-addAltUnfoldings env mb_scrut case_bndr con_app
+addAltUnfoldings env scrut case_bndr con_app
   = do { let con_app_unf = mk_simple_unf con_app
              env1 = addBinderUnfolding env case_bndr con_app_unf
 
              -- See Note [Add unfolding for scrutinee]
-             env2 | Just scrut <- mb_scrut
-                  , Just (v,mco) <- scrutBinderSwap_maybe scrut
-                  = addBinderUnfolding env1 v $
-                       if isReflMCo mco  -- isReflMCo: avoid calling mk_simple_unf
-                       then con_app_unf  --            twice in the common case
-                       else mk_simple_unf (mkCastMCo con_app mco)
-
+             env2 | Many <- idMult case_bndr = case scrut of
+                      Just (Var v)           -> addBinderUnfolding env1 v con_app_unf
+                      Just (Cast (Var v) co) -> addBinderUnfolding env1 v $
+                                                mk_simple_unf (Cast con_app (mkSymCo co))
+                      _                      -> env1
                   | otherwise = env1
 
-       ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr mb_scrut, ppr con_app])
+       ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
   where
     -- Force the opts, so that the whole SimplEnv isn't retained
@@ -3363,6 +3361,9 @@ it's also good for case-elimination -- suppose that 'f' was inlined
 and did multi-level case analysis, then we'd solve it in one
 simplifier sweep instead of two.
 
+Exactly the same issue arises in GHC.Core.Opt.SpecConstr;
+see Note [Add scrutinee to ValueEnv too] in GHC.Core.Opt.SpecConstr
+
 HOWEVER, given
   case x of y { Just a -> r1; Nothing -> r2 }
 we do not want to add the unfolding x -> y to 'x', which might seem cool,
@@ -3373,11 +3374,8 @@ piece of information.
 So instead we add the unfolding x -> Just a, and x -> Nothing in the
 respective RHSs.
 
-Since this transformation is tantamount to a binder swap, we use
-GHC.Core.Opt.OccurAnal.scrutBinderSwap_maybe to do the check.
-
-Exactly the same issue arises in GHC.Core.Opt.SpecConstr;
-see Note [Add scrutinee to ValueEnv too] in GHC.Core.Opt.SpecConstr
+Since this transformation is tantamount to a binder swap, the same caveat as in
+Note [Suppressing binder-swaps on linear case] in OccurAnal apply.
 
 
 ************************************************************************
