@@ -11,7 +11,7 @@ test('T1407',
       unless(doing_ghci, skip),
       pre_cmd('$MAKE -s --no-print-directory compile_libT1407'),
       extra_hc_opts('-L"$PWD/T1407dir"'),
-      js_skip],
+      js_broken(22359)],
      makefile_test, [])
 
 test('T3242',

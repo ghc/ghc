@@ -3,5 +3,5 @@ test('caf_crash',
       when(ghc_dynamic(), skip),
       extra_ways(['ghci-ext']),
       omit_ways(['ghci']),
-      js_skip],
+      js_broken(22359)],
      ghci_script, ['caf_crash.script'])
