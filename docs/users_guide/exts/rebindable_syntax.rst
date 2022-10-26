@@ -14,9 +14,7 @@ Rebindable syntax and the implicit Prelude import
 
 GHC normally imports ``Prelude.hi`` files for
 you. If you'd rather it didn't, then give it a ``-XNoImplicitPrelude``
-option. The idea is that you can then import a Prelude of your own. (But
-don't call it ``Prelude``; the Haskell module namespace is flat, and you
-must not conflict with any Prelude module.)
+option. The idea is that you can then import a Prelude of your own.
 
 .. extension:: RebindableSyntax
     :shortdesc: Employ rebindable syntax.
@@ -90,6 +88,47 @@ any of the types: ::
 Be warned: this is an experimental facility, with fewer checks than
 usual. Use ``-dcore-lint`` to typecheck the desugared program. If Core
 Lint is happy you should be all right.
+
+Custom Prelude modules named ``Prelude``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you call your custom Prelude module ``Prelude`` and place it in a file called
+``Prelude.hs``, then your custom Prelude will be implicitly imported instead of
+the default Prelude.
+
+Here is an example that compiles: ::
+
+    $ cat Prelude.hs
+    module Prelude where
+
+    a = ()
+
+    $ cat B.hs
+    module B where
+
+    foo = a
+
+    $ ghc Prelude.hs B.hs
+    [1 of 2] Compiling Prelude          ( Prelude.hs, Prelude.o )
+    [2 of 2] Compiling B                ( B.hs, B.o )
+
+The new ``Prelude`` is implicitly imported in ``B.hs``.
+
+Here is an example that does not compile: ::
+
+    $ cat Prelude.hs
+    module Prelude where
+
+    foo = True
+
+    $ ghc Prelude.hs
+    [1 of 1] Compiling Prelude          ( Prelude.hs, Prelude.o )
+
+    Prelude.hs:3:7: error: Data constructor not in scope: True
+
+The original ``Prelude`` module is shadowed by the custom Prelude in this case.
+To include the original Prelude in your custom Prelude, you can explicitly
+import it with the ``-XPackageImports`` option and ``import "base" Prelude``.
 
 Things unaffected by :extension:`RebindableSyntax`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
