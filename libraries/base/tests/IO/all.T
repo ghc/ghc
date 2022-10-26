@@ -69,7 +69,7 @@ test('openFile004', [], compile_and_run, [''])
 test('openFile005', js_skip, compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', js_skip, compile_and_run, [''])
-test('openFile008', [when(platform('js-unknown-ghcjs'), skip), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
+test('openFile008', [js_broken(22349), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
 test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
