@@ -142,9 +142,9 @@ test('rtsopts001',
   [ extra_files(['rtsOpts.hs'])
   , js_skip # JS RTS doesn't support -rtsopts
   ], makefile_test, [])
-test('rtsopts002', js_skip, makefile_test, [])
+test('rtsopts002', js_broken(22370), makefile_test, [])
 
-test('withRtsOpts', js_skip, makefile_test, [])
+test('withRtsOpts', js_broken(22370), makefile_test, [])
 
 test('T3389', when(arch('i386'), expect_broken_for(17256, ['hpc'] + prof_ways)), compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])

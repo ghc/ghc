@@ -7,7 +7,7 @@ test('T21336b',
      makefile_test, [])
 test('T21336c',
      [ unless(opsys('linux') or opsys('freebsd'), skip)
-     , js_skip
+     , js_broken(22370)
      ],
      makefile_test, [])
 
