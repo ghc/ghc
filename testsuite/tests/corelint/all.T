@@ -7,6 +7,6 @@ test('T21152', normal, compile, ['-g3'])
 setTestOpts(extra_hc_opts('-package ghc'))
 setTestOpts(extra_run_opts('"' + config.libdir + '"'))
 
-test('LintEtaExpand', js_skip, compile_and_run, [''])
+test('LintEtaExpand', js_broken(22362), compile_and_run, [''])
 ## These tests use the GHC API.
 ## Test cases which don't use the GHC API should be added nearer the top.
