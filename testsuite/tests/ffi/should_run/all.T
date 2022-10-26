@@ -154,7 +154,7 @@ test('T5402', [ omit_ways(['ghci']),
                   # T5402_stub.h before compiling T5402_main.c, which
                   # needs it.
                 pre_cmd('$MAKE -s --no-print-directory T5402_setup'),
-                js_skip
+                req_c
               ],
               compile_and_run, ["-no-hs-main T5402_main.c"])
 
@@ -163,7 +163,7 @@ test('T5594', [ omit_ways(['ghci']),
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
                 # needs it.
-                js_skip
+                req_c
               ],
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
