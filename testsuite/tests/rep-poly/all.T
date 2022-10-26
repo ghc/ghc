@@ -95,7 +95,7 @@ test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 ##                                                                           ##
 ## These tests work!                                                         ##
                                                                              ##
-test('T13105', js_skip, compile, [''])                                       ##
+test('T13105', js_broken(22364), compile, [''])                                       ##
 test('T17536b', normal, compile, [''])                                       ##
                                                                              ##
 ## These don't!                                                              ##
