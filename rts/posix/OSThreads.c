@@ -222,16 +222,25 @@ int
 createOSThread (OSThreadId* pId, const char *name,
                 OSThreadProc *startProc, void *param)
 {
-  struct ThreadDesc *desc = stgMallocBytes(sizeof(struct ThreadDesc), "createOSThread");
+  int result = createAttachedOSThread(pId, name, startProc, param);
+  if (!result) {
+    pthread_detach(*pId);
+  }
+  return result;
+}
+
+int
+createAttachedOSThread (OSThreadId *pId, const char *name,
+                        OSThreadProc *startProc, void *param)
+{
+  struct ThreadDesc *desc = stgMallocBytes(sizeof(struct ThreadDesc), "createAttachedOSThread");
   desc->startProc = startProc;
   desc->param = param;
-  desc->name = stgMallocBytes(strlen(name) + 1, "createOSThread");
+  desc->name = stgMallocBytes(strlen(name) + 1, "createAttachedOSThread");
   strcpy(desc->name, name);
 
   int result = pthread_create(pId, NULL, start_thread, desc);
-  if (!result) {
-      pthread_detach(*pId);
-  } else {
+  if (result) {
       stgFree(desc->name);
       stgFree(desc);
   }

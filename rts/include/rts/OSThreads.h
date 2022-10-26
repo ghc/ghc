@@ -175,6 +175,10 @@ typedef void* OSThreadProcAttr OSThreadProc(void *);
 
 extern int  createOSThread        ( OSThreadId* tid, const char *name,
                                     OSThreadProc *startProc, void *param);
+#if !defined(mingw32_HOST_OS)
+extern int  createAttachedOSThread( OSThreadId *tid, const char *name,
+                                    OSThreadProc *startProc, void *param);
+#endif
 extern bool osThreadIsAlive       ( OSThreadId id );
 extern void interruptOSThread     ( OSThreadId id );
 extern void joinOSThread          ( OSThreadId id );

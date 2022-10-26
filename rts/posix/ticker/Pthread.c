@@ -188,15 +188,6 @@ initTicker (Time interval, TickProc handle_tick)
 #endif
 
     /*
-     * We can't use the RTS's createOSThread here as we need to remain attached
-     * to the thread we create so we can later join to it if requested
-     *
-     * On FreeBSD 12.2 pthread_set_name_np() is unconditionally declared in
-     * <pthread_np.h>, while pthread_setname_np() is conditionally declared in
-     * <pthread.h> when _POSIX_SOURCE is not defined, but we're including
-     * <rts/PosixSource.h>, so must use pthread_set_name_np() instead.  See
-     * similar code in "rts/posix/OSThreads.c".
-     *
      * Create the thread with all blockable signals blocked, leaving signal
      * handling to the main and/or other threads.  This is especially useful in
      * the non-threaded runtime, where applications might expect sigprocmask(2)
@@ -206,23 +197,13 @@ initTicker (Time interval, TickProc handle_tick)
     sigfillset(&mask);
     sigret = pthread_sigmask(SIG_SETMASK, &mask, &omask);
 #endif
-    ret = pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick);
+    ret = createAttachedOSThread(&thread, "ghc_ticker", itimer_thread_func, (void*)handle_tick);
 #if defined(HAVE_SIGNAL_H)
     if (sigret == 0)
         pthread_sigmask(SIG_SETMASK, &omask, NULL);
 #endif
 
-    if (ret == 0) {
-#if defined(HAVE_PTHREAD_SET_NAME_NP)
-        pthread_set_name_np(thread, "ghc_ticker");
-#elif defined(HAVE_PTHREAD_SETNAME_NP)
-        pthread_setname_np(thread, "ghc_ticker");
-#elif defined(HAVE_PTHREAD_SETNAME_NP_DARWIN)
-        pthread_setname_np("ghc_ticker");
-#elif defined(HAVE_PTHREAD_SETNAME_NP_NETBSD)
-        pthread_setname_np(thread, "%s", "ghc_ticker");
-#endif
-    } else {
+    if (ret != 0) {
         barf("Ticker: Failed to spawn thread: %s", strerror(errno));
     }
 }
