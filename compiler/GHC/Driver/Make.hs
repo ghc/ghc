@@ -1682,9 +1682,9 @@ downsweep_imports hsc_env old_summaries excl_mods allow_dup_roots (root_errs, ro
           :: DownsweepCache
           -> IO ()
         checkDuplicates root_map
-           | allow_dup_roots = return ()
-           | null dup_roots  = return ()
-           | otherwise       = liftIO $ multiRootsErr (head dup_roots)
+           | not allow_dup_roots
+           , dup_root:_ <- dup_roots = liftIO $ multiRootsErr dup_root
+           | otherwise = pure ()
            where
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights (M.elems root_map)
