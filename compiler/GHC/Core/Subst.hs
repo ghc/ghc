@@ -26,8 +26,7 @@ module GHC.Core.Subst (
         extendIdSubstWithClone,
         extendSubst, extendSubstList, extendSubstWithVar,
         extendSubstInScope, extendSubstInScopeList, extendSubstInScopeSet,
-        isInScope, setInScope, getSubstInScope,
-        extendTvSubst, extendCvSubst,
+        isInScope, setInScope, extendTvSubst, extendCvSubst,
         delBndr, delBndrs, zapSubst,
 
         -- ** Substituting and cloning binders
