@@ -8,15 +8,15 @@ test('driver014', [extra_files(['A014.hs'])], makefile_test, ['test014'])
 
 test('driver015', [extra_files(['A015.hs'])], makefile_test, ['test015'])
 
-test('driver016', [js_skip, extra_files(['F016.hs'])], makefile_test, ['test016']) # JS backend doesn't support foreign export yet
+test('driver016', [req_ffi_exports, extra_files(['F016.hs'])], makefile_test, ['test016']) # JS backend doesn't support foreign export yet
 
-test('driver017', [js_skip, extra_files(['F017.hs'])], makefile_test, ['test017']) # JS backend doesn't support foreign export yet
+test('driver017', [req_ffi_exports, extra_files(['F017.hs'])], makefile_test, ['test017']) # JS backend doesn't support foreign export yet
 
 test('driver018', [extra_files(['F018.hs'])], makefile_test, ['test018'])
 
 test('driver018a', [extra_files(['F018a.hs'])], makefile_test, ['test018a'])
 
-test('driver019', [js_skip, extra_files(['F019.hs'])], makefile_test, ['test019']) # JS backend doesn't support foreign export yet
+test('driver019', [req_ffi_exports, extra_files(['F019.hs'])], makefile_test, ['test019']) # JS backend doesn't support foreign export yet
 
 test('driver021', [extra_files(['B021/'])], makefile_test, ['test021'])
 
@@ -32,9 +32,9 @@ test('driver025', [extra_files(['B025/'])], makefile_test, ['test025'])
 
 test('driver026', [extra_files(['d026/'])], makefile_test, ['test026'])
 
-test('driver027', [js_skip, extra_files(['B027/'])], makefile_test, ['test027']) # JS backend doesn't support foreign export yet
+test('driver027', [req_ffi_exports, extra_files(['B027/'])], makefile_test, ['test027']) # JS backend doesn't support foreign export yet
 
-test('driver028', [js_skip, extra_files(['B028/'])], makefile_test, ['test028']) # JS backend doesn't support foreign export yet
+test('driver028', [req_ffi_exports, extra_files(['B028/'])], makefile_test, ['test028']) # JS backend doesn't support foreign export yet
 
 test('driver031', [extra_files(['A031.hs'])], makefile_test, ['test031'])
 
@@ -42,9 +42,9 @@ test('driver032', [extra_files(['A032.hs'])], makefile_test, ['test032'])
 
 test('driver033', [extra_files(['A033.hs'])], makefile_test, ['test033'])
 
-test('driver034', [js_skip, extra_files(['F034.hs'])], makefile_test, ['test034']) # JS backend doesn't support foreign export yet
+test('driver034', [req_ffi_exports, extra_files(['F034.hs'])], makefile_test, ['test034']) # JS backend doesn't support foreign export yet
 
-test('driver035', [js_skip, extra_files(['F035.hs'])], makefile_test, ['test035']) # JS backend doesn't support foreign export yet
+test('driver035', [req_ffi_exports, extra_files(['F035.hs'])], makefile_test, ['test035']) # JS backend doesn't support foreign export yet
 
 test('driver041', [extra_files(['B041/'])], makefile_test, ['test041'])
 
@@ -54,9 +54,9 @@ test('driver042stub', [extra_files(['B042stub/'])], makefile_test, ['test042stub
 
 test('driver043', [extra_files(['B043/'])], makefile_test, ['test043'])
 
-test('driver044', [js_skip, extra_files(['B044/'])], makefile_test, ['test044']) # JS backend doesn't support foreign export yet
+test('driver044', [req_ffi_exports, extra_files(['B044/'])], makefile_test, ['test044']) # JS backend doesn't support foreign export yet
 
-test('driver045', [js_skip, extra_files(['B045/'])], makefile_test, ['test045']) # JS backend doesn't support foreign export yet
+test('driver045', [req_ffi_exports, extra_files(['B045/'])], makefile_test, ['test045']) # JS backend doesn't support foreign export yet
 
 test('driver051', [extra_files(['d051_1/', 'd051_2/'])], makefile_test, ['test051'])
 
@@ -64,9 +64,9 @@ test('driver052', [extra_files(['d052_1/', 'd052_2/'])], makefile_test, ['test05
 
 test('driver053', [extra_files(['d053_1/', 'd053_2/'])], makefile_test, ['test053'])
 
-test('driver061a', [js_skip, extra_files(['A061a.hs']), when(unregisterised(), skip)], makefile_test, ['test061a']) # JS backend doesn't support foreign export yet
+test('driver061a', [req_ffi_exports, extra_files(['A061a.hs']), when(unregisterised(), skip)], makefile_test, ['test061a']) # JS backend doesn't support foreign export yet
 
-test('driver061b', [js_skip, extra_files(['A061b.hs']), when(unregisterised(), skip)], makefile_test, ['test061b']) # JS backend doesn't support foreign export yet
+test('driver061b', [req_ffi_exports, extra_files(['A061b.hs']), when(unregisterised(), skip)], makefile_test, ['test061b']) # JS backend doesn't support foreign export yet
 
 
 test('driver062a', [], makefile_test, ['test062a'])
@@ -85,13 +85,13 @@ test('driver066', [extra_files(['A066.hs'])], makefile_test, ['test066'])
 
 test('driver067', [extra_files(['A067.hs'])], makefile_test, ['test067'])
 
-test('driver070', [js_skip, extra_files(['A070.hs']), when(unregisterised(), skip)], makefile_test, ['test070']) # JS backend doesn't support foreign export yet
+test('driver070', [req_ffi_exports, extra_files(['A070.hs']), when(unregisterised(), skip)], makefile_test, ['test070']) # JS backend doesn't support foreign export yet
 
-test('driver071', [js_skip, extra_files(['A071.hs']), when(unregisterised(), skip)], makefile_test, ['test071']) # JS backend doesn't support foreign export yet
+test('driver071', [req_ffi_exports, extra_files(['A071.hs']), when(unregisterised(), skip)], makefile_test, ['test071']) # JS backend doesn't support foreign export yet
 
 test('driver081a', [], makefile_test, ['test081a'])
 
-test('driver081b', [js_skip], makefile_test, ['test081b']) # JS backend doesn't support foreign export yet
+test('driver081b', [req_ffi_exports], makefile_test, ['test081b']) # JS backend doesn't support foreign export yet
 
 test('driver100', [extra_files(['overlap/'])], makefile_test, ['test100'])
 

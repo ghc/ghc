@@ -278,6 +278,13 @@ def req_c( name, opts ):
     # JS backend doesn't support C (yet)
     js_skip(name, opts)
 
+def req_ffi_exports( name, opts):
+    """
+    Mark a test as requiring FFI exports
+    """
+    # JS backend doesn't support FFI exports (yet)
+    js_skip(name, opts)
+
 def req_th( name, opts ):
     """
     Mark a test as requiring TemplateHaskell. In addition to having interpreter
