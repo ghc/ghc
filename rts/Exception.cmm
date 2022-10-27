@@ -17,6 +17,31 @@ import CLOSURE ghczmprim_GHCziTypes_True_closure;
 import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
 import CLOSURE base_GHCziExceptionziType_underflowException_closure;
 import CLOSURE base_GHCziExceptionziType_overflowException_closure;
+#if !defined(UnregisterisedCompiler)
+import CLOSURE CATCHF_PUSHED_ctr;
+import CLOSURE RtsFlags;
+import CLOSURE SLOW_CALL_fast_pv_ctr;
+import CLOSURE SLOW_CALL_fast_v_ctr;
+import CLOSURE STK_CHK_ctr;
+import CLOSURE UNKNOWN_CALL_ctr;
+import CLOSURE g0;
+import CLOSURE large_alloc_lim;
+import CLOSURE no_break_on_exception;
+import CLOSURE rts_breakpoint_io_action;
+import CLOSURE rts_stop_on_exception;
+import CLOSURE stg_END_TSO_QUEUE_closure;
+import CLOSURE stg_NO_TREC_closure;
+import CLOSURE stg_ap_n_info;
+import CLOSURE stg_ap_ppv_info;
+import CLOSURE stg_ap_v_info;
+import CLOSURE stg_catch_frame_info;
+import CLOSURE stg_enter_info;
+import CLOSURE stg_maskAsyncExceptionszh_ret_info;
+import CLOSURE stg_maskUninterruptiblezh_ret_info;
+import CLOSURE stg_raise_ret_info;
+import CLOSURE stg_ret_p_info;
+import CLOSURE stg_unmaskAsyncExceptionszh_ret_info;
+#endif
 
 /* -----------------------------------------------------------------------------
    Exception Primitives

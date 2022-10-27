@@ -16,6 +16,13 @@
 
 #include "Updates.h"
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE UPD_CON_IN_NEW_ctr;
+import CLOSURE UPD_OLD_IND_ctr;
+import CLOSURE UPD_NEW_IND_ctr;
+import CLOSURE stg_BLACKHOLE_info;
+#endif
+
 /*
  * The update code is PERFORMANCE CRITICAL, if you make any changes
  * here make sure you eyeball the assembly and check that the fast

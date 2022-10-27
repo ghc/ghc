@@ -12,6 +12,11 @@
 
 #include "Cmm.h"
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE CCS_SYSTEM;
+import CLOSURE stg_dead_thread_info;
+#endif
+
 /*
  * This module contains the two entry points and the final exit point
  * to/from the Haskell world.  We can enter either by:

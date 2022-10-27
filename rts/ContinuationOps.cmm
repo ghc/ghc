@@ -13,6 +13,23 @@
 #include "Cmm.h"
 
 import CLOSURE base_ControlziExceptionziBase_noMatchingContinuationPrompt_closure;
+#if !defined(UnregisterisedCompiler)
+import CLOSURE ALLOC_RTS_ctr;
+import CLOSURE ALLOC_RTS_tot;
+import CLOSURE ENT_CONTINUATION_ctr;
+import CLOSURE HEAP_CHK_ctr;
+import CLOSURE RtsFlags;
+import CLOSURE SLOW_CALL_fast_pv_ctr;
+import CLOSURE SLOW_CALL_fast_v_ctr;
+import CLOSURE STK_CHK_ctr;
+import CLOSURE UNKNOWN_CALL_ctr;import CLOSURE stg_PROMPT_TAG_info;
+import CLOSURE stg_ap_pv_info;
+import CLOSURE stg_ap_v_info;
+import CLOSURE stg_maskAsyncExceptionszh_ret_info;
+import CLOSURE stg_maskUninterruptiblezh_ret_info;
+import CLOSURE stg_prompt_frame_info;
+import CLOSURE stg_unmaskAsyncExceptionszh_ret_info;
+#endif
 
 /* --------------------------------------------------------------------------
                          Prompts and prompt tags

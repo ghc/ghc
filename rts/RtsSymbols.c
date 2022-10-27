@@ -995,14 +995,14 @@ extern char **environ;
       SymI_HasDataProto(stg_waitWritezh)                                    \
       SymI_HasDataProto(stg_writeTVarzh)                                    \
       SymI_HasDataProto(stg_yieldzh)                                        \
-      SymI_NeedsDataProto(stg_badAlignment_entry)                           \
-      SymI_NeedsDataProto(stg_interp_constr1_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr2_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr3_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr4_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr5_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr6_entry)                         \
-      SymI_NeedsDataProto(stg_interp_constr7_entry)                         \
+      SymI_NeedsProto(stg_badAlignment_entry)                           \
+      SymI_NeedsProto(stg_interp_constr1_entry)                         \
+      SymI_NeedsProto(stg_interp_constr2_entry)                         \
+      SymI_NeedsProto(stg_interp_constr3_entry)                         \
+      SymI_NeedsProto(stg_interp_constr4_entry)                         \
+      SymI_NeedsProto(stg_interp_constr5_entry)                         \
+      SymI_NeedsProto(stg_interp_constr6_entry)                         \
+      SymI_NeedsProto(stg_interp_constr7_entry)                         \
       SymI_HasDataProto(stg_arg_bitmaps)                                    \
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \

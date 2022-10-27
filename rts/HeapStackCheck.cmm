@@ -20,6 +20,28 @@ import pthread_mutex_unlock;
 import AcquireSRWLockExclusive;
 import ReleaseSRWLockExclusives;
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE g0;
+import CLOSURE large_alloc_lim;
+import CLOSURE stg_MSG_THROWTO_info;
+import CLOSURE stg_MVAR_DIRTY_info;
+import CLOSURE stg_WHITEHOLE_info;
+import CLOSURE stg_arg_bitmaps;
+import CLOSURE stg_block_putmvar_info;
+import CLOSURE stg_block_readmvar_info;
+import CLOSURE stg_block_takemvar_info;
+import CLOSURE stg_block_throwto_info;
+import CLOSURE stg_enter_info;
+import CLOSURE stg_gc_fun_info;
+import CLOSURE stg_gc_prim_p_ll_info;
+import CLOSURE stg_gc_prim_pp_ll_info;
+import CLOSURE stg_ret_d_info;
+import CLOSURE stg_ret_f_info;
+import CLOSURE stg_ret_l_info;
+import CLOSURE stg_ret_n_info;
+import CLOSURE stg_ret_p_info;
+#endif
+
 /* Stack/Heap Check Failure
  * ------------------------
  *

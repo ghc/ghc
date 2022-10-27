@@ -13,8 +13,13 @@
 #include "Cmm.h"
 #include "Updates.h"
 
-import ghczmprim_GHCziCString_unpackCStringzh_info;
-import ghczmprim_GHCziCString_unpackCStringUtf8zh_info;
+import CLOSURE ghczmprim_GHCziCString_unpackCStringzh_info;
+import CLOSURE ghczmprim_GHCziCString_unpackCStringUtf8zh_info;
+#if !defined(UnregisterisedCompiler)
+import CLOSURE STK_CHK_ctr;
+import CLOSURE stg_bh_upd_frame_info;
+import CLOSURE stg_upd_frame_info;
+#endif
 
 /* -----------------------------------------------------------------------------
    The code for a thunk that simply extracts a field from a
@@ -385,4 +390,3 @@ INFO_TABLE(stg_unpack_cstring_utf8, 0, 0, THUNK_STATIC, "stg_unpack_cstring_utf8
         jump stg_do_unpack_cstring_utf8(node, newCAF_ret);
     }
 }
-

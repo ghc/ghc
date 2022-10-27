@@ -40,6 +40,60 @@ import CLOSURE ghczmprim_GHCziTypes_False_closure;
 import CLOSURE CCS_MAIN;
 #endif
 
+#if !defined(UnregisterisedCompiler)
+import CLOSURE ALLOC_RTS_ctr;
+import CLOSURE ALLOC_RTS_tot;
+import CLOSURE CCS_SYSTEM;
+import CLOSURE HEAP_CHK_ctr;
+import CLOSURE RtsFlags;
+import CLOSURE STK_CHK_ctr;
+import CLOSURE blocked_queue_hd;
+import CLOSURE blocked_queue_tl;
+import CLOSURE g0;
+import CLOSURE large_alloc_lim;
+import CLOSURE n_capabilities;
+import CLOSURE sleeping_queue;
+import CLOSURE stable_name_table;
+import CLOSURE stable_ptr_table;
+import CLOSURE stg_AP_STACK_info;
+import CLOSURE stg_AP_info;
+import CLOSURE stg_ARR_WORDS_info;
+import CLOSURE stg_BCO_info;
+import CLOSURE stg_C_FINALIZER_LIST_info;
+import CLOSURE stg_DEAD_WEAK_info;
+import CLOSURE stg_END_STM_WATCH_QUEUE_closure;
+import CLOSURE stg_END_TSO_QUEUE_closure;
+import CLOSURE stg_IND_info;
+import CLOSURE stg_MSG_NULL_info;
+import CLOSURE stg_MUT_ARR_PTRS_DIRTY_info;
+import CLOSURE stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+import CLOSURE stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+import CLOSURE stg_MUT_VAR_CLEAN_info;
+import CLOSURE stg_MUT_VAR_DIRTY_info;
+import CLOSURE stg_MVAR_CLEAN_info;
+import CLOSURE stg_MVAR_DIRTY_info;
+import CLOSURE stg_MVAR_TSO_QUEUE_info;
+import CLOSURE stg_NO_FINALIZER_closure;
+import CLOSURE stg_NO_TREC_closure;
+import CLOSURE stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
+import CLOSURE stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
+import CLOSURE stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
+import CLOSURE stg_STABLE_NAME_info;
+import CLOSURE stg_TREC_HEADER_info;
+import CLOSURE stg_TVAR_DIRTY_info;
+import CLOSURE stg_WEAK_info;
+import CLOSURE stg_WHITEHOLE_info;
+import CLOSURE stg_ap_2_upd_info;
+import CLOSURE stg_atomically_frame_info;
+import CLOSURE stg_atomically_waiting_frame_info;
+import CLOSURE stg_catch_retry_frame_info;
+import CLOSURE stg_catch_stm_frame_info;
+import CLOSURE stg_keepAlive_frame_info;
+import CLOSURE stg_noDuplicate_info;
+import CLOSURE stg_ret_p_info;
+import CLOSURE stg_sel_0_upd_info;
+#endif
+
 #if defined(DEBUG)
 #define ASSERT_IN_BOUNDS(ind, sz) \
     if (ind >= sz) { ccall rtsOutOfBoundsAccess(); }

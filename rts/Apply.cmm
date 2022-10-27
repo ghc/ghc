@@ -12,6 +12,40 @@
 
 #include "Cmm.h"
 
+/*
+Note [import CLOSURE annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the Cmm syntax refers to an undefined symbol without a corresponding import
+statement, the parser always creates a CLabel with function kind, even if it
+refers to data instead (e.g. info tables or static closures). This is a huge
+trouble for backends which have zero tolerance in CLabel kind error. The issue
+has been tracked at #22368, and for the time being, we need to add explicit
+"import CLOSURE" statements for all undefined data symbols used in hand-written
+Cmm files.
+
+We also need the !defined(UnregisterisedCompiler) CPP guard, since otherwise it
+causes trouble for the unregisterised backend: they conflict with existing
+declarations in MiscClosures.h, and gcc will start to throw errors like "error:
+conflicting types for ‘__stg_EAGER_BLACKHOLE_info’; have ‘StgWordArray’ {aka
+‘long unsigned int[]’}".
+*/
+
+#if !defined(UnregisterisedCompiler)
+import CLOSURE CCS_OVERHEAD;
+import CLOSURE ENT_AP_ctr;
+import CLOSURE ENT_PAP_ctr;
+import CLOSURE ENT_VIA_NODE_ctr;
+import CLOSURE RtsFlags;
+import CLOSURE STK_CHK_ctr;
+import CLOSURE __stg_EAGER_BLACKHOLE_info;
+import CLOSURE stg_AP_STACK_info;
+import CLOSURE stg_PAP_info;
+import CLOSURE stg_WHITEHOLE_info;
+import CLOSURE stg_ap_0_ret_str;
+import CLOSURE stg_restore_cccs_eval_info;
+#endif
+
 /* ----------------------------------------------------------------------------
  * Evaluate a closure and return it.
  *
