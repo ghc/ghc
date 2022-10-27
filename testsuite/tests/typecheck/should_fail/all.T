@@ -413,7 +413,7 @@ test('T11990b', normal, compile_fail, [''])
 test('T12035', [], multimod_compile_fail, ['T12035', '-v0'])
 test('T12035j', [ extra_files(['T12035.hs', 'T12035a.hs', 'T12035.hs-boot'])
                 , req_smp
-                , js_skip
+                , js_broken(22261)
                 ], multimod_compile_fail, ['T12035', '-j2 -v0'])
 test('T12045b', normal, compile_fail, [''])
 test('T12045c', normal, compile_fail, [''])

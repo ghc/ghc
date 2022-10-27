@@ -262,7 +262,7 @@ test('T7037', js_skip, makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', [ omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc'])
-              , js_skip
+              , js_broken(22261)
               ], compile_and_run, [''])
 
 test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
@@ -336,7 +336,7 @@ test('T11108', normal, compile_and_run, [''])
 
 test('GcStaticPointers', [ when(doing_ghci()
                          , extra_hc_opts('-fobject-code'))
-                         , js_skip
+                         , js_broken(22261)
                          ],
      compile_and_run, [''])
 test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
@@ -358,7 +358,7 @@ def grep_stderr(pattern):
 test('T9839_01',
      [ omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp
      , grep_stderr('given an argument when none was expected')
-     , js_skip
+     , js_broken(22261)
      ],
      compile_and_run, [''])
 

@@ -536,7 +536,7 @@ test('T16190',
 test ('T16473',
       [ collect_stats('bytes allocated',5)
       , only_ways(['normal'])
-      , js_skip
+      , js_broken(22261)
       ],
       compile_and_run,
       ['-O2 -flate-specialise'])
