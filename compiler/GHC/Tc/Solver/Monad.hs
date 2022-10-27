@@ -658,13 +658,11 @@ lookupFamAppInert rewrite_pred fam_tc tys
   = do { IS { inert_cans = IC { inert_funeqs = inert_funeqs } } <- getTcSInerts
        ; return (lookup_inerts inert_funeqs) }
   where
-    fam_app = mkTyConApp fam_tc tys
     lookup_inerts inert_funeqs
       | Just ecl <- findFunEq inert_funeqs fam_tc tys
       , Just (CEqCan { cc_ev = ctev, cc_rhs = rhs })
           <- find (rewrite_pred . ctFlavourRole) ecl
-      = Just (mkReduction fam_app (mkDehydrateCo (ctEvCoercion ctev)) rhs -- SLD TODO: avoid dehydrating?
-             ,ctEvFlavourRole ctev)
+      = Just (mkReduction (ctEvCoercion ctev) rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
@@ -704,7 +702,8 @@ lookupFamAppCache fam_tc tys
            Nothing -> return Nothing }
 
 extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
-extendFamAppCache tc xi_args stuff@(Reduction _ _ ty)
+-- NB: co :: rhs ~ F tys, to match expectations of rewriter
+extendFamAppCache tc xi_args stuff@(Reduction _ ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
     do { traceTcS "extendFamAppCache" (vcat [ ppr tc <+> ppr xi_args
@@ -722,7 +721,7 @@ dropFromFamAppCache varset
   where
     check :: Reduction -> Bool
     check redn
-      = not (anyFreeVarsOfDCo (`elemVarSet` varset) $ reductionDCoercion redn)
+      = not (anyFreeVarsOfCo (`elemVarSet` varset) $ reductionCoercion redn)
 
 {- *********************************************************************
 *                                                                      *
@@ -782,17 +781,12 @@ data TcSEnv
     }
 
 ---------------
-newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
+newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
 
 -- | Smart constructor for 'TcS', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a
 mkTcS f = TcS (oneShot f)
-
--- Use the one-shot trick for the functor instance of 'TcS'.
-instance Functor TcS where
-  fmap f m = mkTcS $ \env ->
-    fmap f $ unTcS m env
 
 instance Applicative TcS where
   pure x = mkTcS $ \_ -> return x
@@ -1862,7 +1856,7 @@ matchFamTcM tycon args
        ; return match_fam_result }
   where
     ppr_res Nothing = text "Match failed"
-    ppr_res (Just (Reduction _ co ty))
+    ppr_res (Just (Reduction co ty))
       = hang (text "Match succeeded:")
           2 (vcat [ text "Rewrites to:" <+> ppr ty
                   , text "Coercion:" <+> ppr co ])
@@ -1955,22 +1949,20 @@ breakTyEqCycle_maybe ev cte_result lhs rhs
 
       | otherwise
       = do { arg_redns <- unzipRedns <$> mapM go tys
-           ; return $ mkTyConAppRedn_MightBeSynonym Nominal tc arg_redns }
+           ; return $ mkTyConAppRedn Nominal tc arg_redns }
 
     go (Rep.AppTy ty1 ty2)
       = mkAppRedn <$> go ty1 <*> go ty2
     go (Rep.FunTy vis w arg res)
-      = mkFunRedn vis <$> go w <*> pure mkReflDCo <*> pure mkReflDCo <*> go arg <*> go res
-        -- These ReflDCos assume that homogeneity, which might not be true (see #21099).
-
+      = mkFunRedn Nominal vis <$> go w <*> go arg <*> go res
     go (Rep.CastTy ty cast_co)
-      = mkCastRedn1 cast_co <$> go ty
+      = mkCastRedn1 Nominal ty cast_co <$> go ty
     go ty@(Rep.TyVarTy {})    = skip ty
     go ty@(Rep.LitTy {})      = skip ty
     go ty@(Rep.ForAllTy {})   = skip ty  -- See Detail (1) of Note
     go ty@(Rep.CoercionTy {}) = skip ty  -- See Detail (2) of Note
 
-    skip ty = return $ mkReflRedn ty
+    skip ty = return $ mkReflRedn Nominal ty
 
     emit_work :: TcKind         -- of the function application
               -> TcType         -- original function application
@@ -1988,14 +1980,14 @@ breakTyEqCycle_maybe ev cte_result lhs rhs
            ; updInertTcS $ \is ->
                is { inert_cycle_breakers = insertCycleBreakerBinding new_tv fun_app
                                              (inert_cycle_breakers is) }
-           ; return $ mkReflRedn new_ty }
+           ; return $ mkReflRedn Nominal new_ty }
                 -- Why reflexive? See Detail (4) of the Note
 
       Wanted ->
         do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
            ; let new_ty = mkTyVarTy new_tv
            ; co <- emitNewWantedEq new_loc (ctEvRewriters ev) Nominal new_ty fun_app
-           ; return $ mkReduction fun_app (mkDehydrateCo (mkSymCo co)) new_ty }
+           ; return $ mkReduction (mkSymCo co) new_ty }
 
       -- See Detail (7) of the Note
     new_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin

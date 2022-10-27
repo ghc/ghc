@@ -656,7 +656,7 @@ coVarKindsTypesRole cv
 
 coVarKind :: CoVar -> Type
 coVarKind cv
-  = assert (isCoVar cv)
+  = assert (isCoVar cv )
     varType cv
 
 coVarRole :: CoVar -> Role
@@ -700,7 +700,6 @@ isReflCoVar_maybe cv
 isGReflCo :: Coercion -> Bool
 isGReflCo (GRefl{}) = True
 isGReflCo (Refl{})  = True -- Refl ty == GRefl N ty MRefl
-isGReflCo (HydrateDCo _ _ dco _) = isGReflDCo dco
 isGReflCo _         = False
 
 -- | Tests if this coercion is obviously reflexive. Guaranteed to work
@@ -709,7 +708,6 @@ isGReflCo _         = False
 isReflCo :: Coercion -> Bool
 isReflCo (Refl{}) = True
 isReflCo (GRefl _ _ mco) | isGReflMCo mco = True
-isReflCo (HydrateDCo _ _ dco _) = isReflDCo dco
 isReflCo _ = False
 
 -- | Returns the type coerced if this coercion is a generalized reflexive
@@ -717,9 +715,6 @@ isReflCo _ = False
 isGReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isGReflCo_maybe (GRefl r ty _) = Just (ty, r)
 isGReflCo_maybe (Refl ty)      = Just (ty, Nominal)
-isGReflCo_maybe (HydrateDCo r ty dco _)
-  | isGReflDCo dco
-  = Just (ty, r)
 isGReflCo_maybe _ = Nothing
 
 -- | Returns the type coerced if this coercion is reflexive. Guaranteed
@@ -728,9 +723,6 @@ isGReflCo_maybe _ = Nothing
 isReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
-isReflCo_maybe (HydrateDCo r ty dco _)
-  | isReflDCo dco
-  = Just (ty, r)
 isReflCo_maybe _ = Nothing
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,

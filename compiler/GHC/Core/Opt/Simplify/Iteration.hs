@@ -3168,10 +3168,9 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
            -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
-  | Just redn@(Reduction _ _ ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
+  | Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") Many ty2
-        ; let co   = mkHydrateReductionDCoercion Representational redn
-              rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
 

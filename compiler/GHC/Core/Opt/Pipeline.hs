@@ -215,8 +215,7 @@ getCoreToDo dflags rule_base extra_vars
         runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $ CoreAddLateCcs
 
     core_todo =
-      [
-
+     [
     -- We want to do the static argument transform before full laziness as it
     -- may expose extra opportunities to float things outwards. However, to fix
     -- up the output of the transformation we need at do at least one simplify
@@ -225,7 +224,6 @@ getCoreToDo dflags rule_base extra_vars
 
         -- initial simplify: mk specialiser happy: minimum effort please
         runWhen do_presimplify simpl_gently,
-
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
@@ -373,7 +371,6 @@ getCoreToDo dflags rule_base extra_vars
         maybe_rule_check FinalPhase,
 
         add_caller_ccs,
-
         add_late_ccs
      ]
 
