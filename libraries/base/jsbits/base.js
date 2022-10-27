@@ -11,7 +11,7 @@ function h$logIO() { h$log.apply(h$log, arguments); }
 #endif
 
 function h$base_access(file, file_off, mode, c) {
-    TRACE_IO("base_access");
+    TRACE_IO("base_access")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.stat(fd, function(err, fs) {
@@ -27,7 +27,7 @@ function h$base_access(file, file_off, mode, c) {
 }
 
 function h$base_chmod(file, file_off, mode, c) {
-    TRACE_IO("base_chmod");
+    TRACE_IO("base_chmod")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.chmod(h$decodeUtf8z(file, file_off), mode, function(err) {
@@ -39,23 +39,23 @@ function h$base_chmod(file, file_off, mode, c) {
 }
 
 function h$base_close(fd, c) {
-    TRACE_IO("base_close fd: " + fd);
+    TRACE_IO("base_close fd: " + fd)
     var fdo = h$base_fds[fd];
     if(fdo) {
         delete h$base_fds[fd];
         if(--fdo.refs < 1) {
-          TRACE_IO("base_close: closing underlying fd");
+          TRACE_IO("base_close: closing underlying fd")
           if(fdo.close) {
             fdo.close(fd, fdo, c);
           } else {
             c(0);
           }
         } else {
-          TRACE_IO("base_close: remaining references, not closing underlying fd");
+          TRACE_IO("base_close: remaining references, not closing underlying fd")
           c(0);
         }
     } else {
-        TRACE_IO("base_close: file descriptor not found, already closed?");
+        TRACE_IO("base_close: file descriptor not found, already closed?")
         h$errno = CONST_EINVAL;
         c(-1);
     }
@@ -67,7 +67,7 @@ function h$base_dup(fd, c) {
 }
 
 function h$base_dup2(fd, new_fd, c) {
-   TRACE_IO("base_dup2 " + fd + " " + new_fd);
+   TRACE_IO("base_dup2 " + fd + " " + new_fd)
    // if(new_fd >= 0 && new_fd <= 2) {
 
    // }
@@ -86,7 +86,7 @@ function h$base_dup2(fd, new_fd, c) {
      */
     var fdo = h$base_fds[fd];
     if(!fdo) {
-      TRACE_IO("file descriptor not found");
+      TRACE_IO("file descriptor not found")
       h$errno = CONST_EINVAL;
       c(-1);
     } else {
@@ -97,7 +97,7 @@ function h$base_dup2(fd, new_fd, c) {
         c(new_fd);
       }
       if(new_fdo) {
-        TRACE_IO("closing existing fd");
+        TRACE_IO("closing existing fd")
         h$base_close(new_fd, f);
       } else {
         f();
@@ -106,7 +106,7 @@ function h$base_dup2(fd, new_fd, c) {
 }
 
 function h$base_fstat(fd, stat, stat_off, c) {
-    TRACE_IO("base_stat");
+    TRACE_IO("base_stat")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.fstat(fd, function(err, fs) {
@@ -123,7 +123,7 @@ function h$base_fstat(fd, stat, stat_off, c) {
 }
 
 function h$base_isatty(fd) {
-    TRACE_IO("base_isatty " + fd);
+    TRACE_IO("base_isatty " + fd)
     //  return 1; // fixme debug
     var fdo = h$base_fds[fd];
     if(fdo && typeof fdo.isatty !== 'undefined') {
@@ -171,7 +171,7 @@ function h$long_from_number(f,c) {
 }
 
 function h$base_lseek(fd, pos_h, pos_l, whence, c) {
-    TRACE_IO("base_lseek");
+    TRACE_IO("base_lseek")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var p = CLOSEST_FLOAT_NUMBER(pos_h,pos_l);
@@ -215,7 +215,7 @@ function h$base_lseek(fd, pos_h, pos_l, whence, c) {
 }
 
 function h$base_lstat(file, file_off, stat, stat_off, c) {
-    TRACE_IO("base_lstat");
+    TRACE_IO("base_lstat")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.lstat(h$decodeUtf8z(file, file_off), function(err, fs) {
@@ -235,7 +235,7 @@ function h$base_open(file, file_off, how, mode, c) {
     if(h$isNode()) {
         var flags, off;
         var fp   = h$decodeUtf8z(file, file_off);
-        TRACE_IO("base_open: " + fp);
+        TRACE_IO("base_open: " + fp)
         var acc  = how & h$base_o_accmode;
         // passing a number lets node.js use it directly as the flags (undocumented)
         if(acc === h$base_o_rdonly) {
@@ -262,7 +262,7 @@ function h$base_open(file, file_off, how, mode, c) {
                                      , pos:   p
                                      , refs:  1
                                      };
-                    TRACE_IO("base_open: " + fp + " -> " + fd);
+                    TRACE_IO("base_open: " + fp + " -> " + fd)
                     c(fd);
                 }
                 if(off === -1) {
@@ -279,7 +279,7 @@ function h$base_open(file, file_off, how, mode, c) {
         h$unsupported(-1, c);
 }
 function h$base_read(fd, buf, buf_off, n, c) {
-    TRACE_IO("base_read: " + fd);
+    TRACE_IO("base_read: " + fd)
     var fdo = h$base_fds[fd];
     if(fdo && fdo.read) {
         fdo.read(fd, fdo, buf, buf_off, n, c);
@@ -290,7 +290,7 @@ function h$base_read(fd, buf, buf_off, n, c) {
     }
 }
 function h$base_stat(file, file_off, stat, stat_off, c) {
-    TRACE_IO("base_stat");
+    TRACE_IO("base_stat")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.stat(h$decodeUtf8z(file, file_off), function(err, fs) {
@@ -306,7 +306,7 @@ function h$base_stat(file, file_off, stat, stat_off, c) {
         h$unsupported(-1, c);
 }
 function h$base_umask(mode) {
-    TRACE_IO("base_umask: " + mode);
+    TRACE_IO("base_umask: " + mode)
 #ifndef GHCJS_BROWSER
     if(h$isNode()) return process.umask(mode);
 #endif
@@ -319,7 +319,7 @@ function h$base_write(fd, buf, buf_off, n, c) {
 // buf_off: offset in the buffer
 // n: number of bytes to write
 // c: continuation
-    TRACE_IO("base_write: " + fd);
+    TRACE_IO("base_write: " + fd)
 
     var fdo = h$base_fds[fd];
 
@@ -333,7 +333,7 @@ function h$base_write(fd, buf, buf_off, n, c) {
 }
 
 function h$base_ftruncate(fd, pos_h, pos_l, c) {
-    TRACE_IO("base_ftruncate");
+    TRACE_IO("base_ftruncate")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.ftruncate(fd, CLOSEST_FLOAT_NUMBER(pos_h,pos_l), function(err) {
@@ -344,7 +344,7 @@ function h$base_ftruncate(fd, pos_h, pos_l, c) {
         h$unsupported(-1, c);
 }
 function h$base_unlink(file, file_off, c) {
-    TRACE_IO("base_unlink");
+    TRACE_IO("base_unlink")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.unlink(h$decodeUtf8z(file, file_off), function(err) {
@@ -355,14 +355,14 @@ function h$base_unlink(file, file_off, c) {
         h$unsupported(-1, c);
 }
 function h$base_getpid() {
-    TRACE_IO("base_getpid");
+    TRACE_IO("base_getpid")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) return process.pid;
 #endif
     return 0;
 }
 function h$base_link(file1, file1_off, file2, file2_off, c) {
-    TRACE_IO("base_link");
+    TRACE_IO("base_link")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.link(h$decodeUtf8z(file1, file1_off), h$decodeUtf8z(file2, file2_off), function(err) {
@@ -394,7 +394,7 @@ function h$base_tcsetattr(attr, val, termios, termios_off) {
     return 0;
 }
 function h$base_utime(file, file_off, timbuf, timbuf_off, c) {
-    TRACE_IO("base_utime");
+    TRACE_IO("base_utime")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         h$fs.fstat(h$decodeUtf8z(file, file_off), function(err, fs) {
@@ -543,11 +543,11 @@ function h$base_get_saved_termios(r) {
 
 // fixme
 function h$lockFile(fd, dev, ino, for_writing) {
-    TRACE_IO("lockFile:" + fd);
+    TRACE_IO("lockFile:" + fd)
     return 0;
 }
 function h$unlockFile(fd) {
-    TRACE_IO("unlockFile:" + fd);
+    TRACE_IO("unlockFile:" + fd)
     return 0;
 }
 
@@ -588,7 +588,7 @@ var h$base_process_stdin = function() {
 
 if(h$isNode()) {
     h$base_closeFile = function(fd, fdo, c) {
-        TRACE_IO("base_closeFile: " + fd + " (" + fdo.fd + ")");
+        TRACE_IO("base_closeFile: " + fd + " (" + fdo.fd + ")")
         var real_fd = typeof fdo.fd === 'number' ? fdo.fd : fd;
         h$fs.close(real_fd, function(err) {
             delete h$base_fds[fd];
@@ -598,7 +598,7 @@ if(h$isNode()) {
 
     h$base_readFile = function(fd, fdo, buf, buf_offset, n, c) {
         var pos = typeof fdo.pos === 'number' ? fdo.pos : null;
-        TRACE_IO("base_readFile: " + fd + " (" + fdo.fd + ") " + pos + " " + buf_offset + " " + n);
+        TRACE_IO("base_readFile: " + fd + " (" + fdo.fd + ") " + pos + " " + buf_offset + " " + n)
         var real_fd = typeof fdo.fd === 'number' ? fdo.fd : fd;
         h$fs.read(real_fd, Buffer.alloc(n), 0, n, pos, function(err, bytesRead, nbuf) {
             if(err) {
@@ -613,26 +613,26 @@ if(h$isNode()) {
     }
 
     h$base_readStdin = function(fd, fdo, buf, buf_offset, n, c) {
-        TRACE_IO("read stdin");
+        TRACE_IO("read stdin")
         h$base_stdin_waiting.enqueue({buf: buf, off: buf_offset, n: n, c: c});
         h$base_process_stdin();
     }
 
     h$base_closeStdin = function(fd, fdo, c) {
-        TRACE_IO("close stdin");
+        TRACE_IO("close stdin")
         // process.stdin.close(); fixme
         c(0);
     }
 
     h$base_writeFile = function(fd, fdo, buf, buf_offset, n, c) {
         var pos = typeof fdo.pos === 'number' ? fdo.pos : null;
-        TRACE_IO("base_writeFile: " + fd + " (" + fdo.fd + ") " + pos + " " + buf_offset + " " + n);
+        TRACE_IO("base_writeFile: " + fd + " (" + fdo.fd + ") " + pos + " " + buf_offset + " " + n)
         var nbuf = Buffer.alloc(n);
         for(var i=0;i<n;i++) nbuf[i] = buf.u8[i+buf_offset];
         var real_fd = typeof fdo.fd === 'number' ? fdo.fd : fd;
         if(typeof fdo.pos === 'number') fdo.pos += n;
         h$fs.write(real_fd, nbuf, 0, n, pos, function(err, bytesWritten) {
-            TRACE_IO("written file: " + fd + " (" + fdo.fd + ")");
+            TRACE_IO("written file: " + fd + " (" + fdo.fd + ")")
             if(err) {
                 h$setErrno(err);
                 if(typeof fdo.pos === 'number') fdo.pos -= n;
@@ -647,23 +647,23 @@ if(h$isNode()) {
     }
 
     h$base_writeStdout = function(fd, fdo, buf, buf_offset, n, c) {
-        TRACE_IO("write stdout");
+        TRACE_IO("write stdout")
         h$base_writeFile(1, fdo, buf, buf_offset, n, c);
     }
 
     h$base_closeStdout = function(fd, fdo, c) {
-        TRACE_IO("close stdout");
+        TRACE_IO("close stdout")
 	      // not actually closed, fixme?
         c(0);
     }
 
     h$base_writeStderr = function(fd, fdo, buf, buf_offset, n, c) {
-        TRACE_IO("write stderr");
+        TRACE_IO("write stderr")
         h$base_writeFile(2, fdo, buf, buf_offset, n, c);
     }
 
     h$base_closeStderr = function(fd, fdo, c) {
-        TRACE_IO("close stderr");
+        TRACE_IO("close stderr")
 	// not actually closed, fixme?
         c(0);
     }
