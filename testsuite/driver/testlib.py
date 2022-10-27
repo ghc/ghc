@@ -1241,14 +1241,23 @@ def do_test(name: TestName,
             dst_makefile.write_text(makefile, encoding='UTF-8')
 
     if opts.pre_cmd:
+        stdout_path = in_testdir(name, 'pre_cmd_stdout')
+        stderr_path = in_testdir(name, 'pre_cmd_stderr')
         exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
-                           stderr = subprocess.STDOUT,
+                           stdout = stdout_path,
+                           stderr = stderr_path,
                            print_output = config.verbose >= 3)
 
         # If user used expect_broken then don't record failures of pre_cmd
         if exit_code != 0 and opts.expect not in ['fail']:
             framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
             if_verbose(1, '** pre_cmd was "{0}".'.format(override_options(opts.pre_cmd)))
+            stderr_contents = stderr_path.read_text(encoding='UTF-8', errors='replace')
+            stdout_contents = stdout_path.read_text(encoding='UTF-8', errors='replace')
+            if_verbose(1, 'stdout: {0}'.format(stdout_contents))
+            if_verbose(1, 'stderr: {0}'.format(stderr_contents))
+            # Don't continue and try to run the test if the pre_cmd fails.
+            return
 
     result = func(*[name,way] + args)
 
