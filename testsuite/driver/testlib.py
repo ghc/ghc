@@ -300,12 +300,6 @@ def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
-def req_js_compactor( name, opts ):
-    """
-    Mark a test as requiring the JS Compactor optimization.
-    """
-    js_skip(name, opts)
-
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 

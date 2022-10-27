@@ -1,5 +1,5 @@
 test('seward-space-leak', [extra_files(['Main.lhs'])
                           , when(fast(), skip)
-                          , req_js_compactor
+                          , js_broken(22352)
                           ], multimod_compile_and_run,
      ['Main', ''])

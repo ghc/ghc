@@ -15,7 +15,7 @@ else:
 
 test('recompChangedPackage',
      [ extra_files(['q', 'Main.hs', 'Setup.hs', 'PLib1.hs']),
-       req_js_compactor,
+       js_broken(22352),
        when(fast(), skip)
      ],
      run_command,
