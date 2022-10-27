@@ -836,13 +836,11 @@ embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
               { cppUseCc       = True
               , cppLinePragmas = False -- LINE pragmas aren't JS compatible
               }
-            extra_opts = []
           doCpp logger
                   tmpfs
                   dflags
                   unit_env
                   cpp_opts
-                  extra_opts
                   pp_fn
                   js_fn
           -- add header to recognize the object as a JS file
