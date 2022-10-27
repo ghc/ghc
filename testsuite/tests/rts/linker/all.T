@@ -20,7 +20,7 @@ test('section_alignment',
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
-       js_skip,
+       js_broken(22374),
        when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
        when(opsys('darwin'), skip),
@@ -115,7 +115,7 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
-                 , js_skip
+                 , js_broken(22374)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
 

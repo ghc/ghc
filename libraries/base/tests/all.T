@@ -238,7 +238,7 @@ test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
-test('T12852', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
+test('T12852', [when(opsys('mingw32'), skip), js_broken(22374)], compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', [req_smp, js_broken(22261)], compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
@@ -249,12 +249,12 @@ test('T13191',
         ],
       compile_and_run,
       ['-O'])
-test('T13525', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
+test('T13525', [when(opsys('mingw32'), skip), js_broken(22374)], compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
      [collect_stats('max_bytes_used',5),
-      js_skip,
+      js_broken(22374),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
@@ -281,7 +281,7 @@ test('T18642',
      [extra_run_opts('+RTS -T -RTS'),
       # The nonmoving GC's residency behavior is very conservative
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity']),
-      js_skip],
+      js_broken(22374)],
      compile_and_run, ['-O2'])
 test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])

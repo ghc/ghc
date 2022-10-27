@@ -141,7 +141,7 @@ test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
 
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
-                 , js_skip
+                 , js_broken(22374)
                  , expect_broken_for(14913, ['ghci'])
                  ], compile_and_run, [''])
 
@@ -423,7 +423,7 @@ test('T12903', [ when(opsys('mingw32'), skip)
                , when(opsys('darwin'), skip)
                , when(arch('i386'), fragile(20377))
                , omit_ways(['ghci', 'profasm'])
-               , js_skip]
+               , js_broken(22374)]
                , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
@@ -513,17 +513,17 @@ test('T17088',
      [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
      compile_and_run, ['-rtsopts -O2'])
 
-test('T15427', js_skip, compile_and_run, [''])
+test('T15427', js_broken(22374), compile_and_run, [''])
 
 test('T19481',
      [extra_run_opts('+RTS -T -RTS'),
-      js_skip,
+      js_broken(22374),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
 test('T19381',
      [extra_run_opts('+RTS -T -RTS'),
-      js_skip,
+      js_broken(22374),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])

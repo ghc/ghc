@@ -64,7 +64,7 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
-test('openFile003', [normalise_win32_io_errors, js_skip], compile_and_run, [''])
+test('openFile003', [normalise_win32_io_errors, js_broken(22374)], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
 test('openFile005', js_skip, compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
@@ -85,7 +85,7 @@ test('readwrite003', [], compile_and_run, [''])
 test('hGetBuf001',
      [ when(fast(), skip)
      , expect_fail_if_windows
-     , js_skip
+     , js_broken(22374)
      ],
      compile_and_run, ['-package unix'])
 
@@ -119,7 +119,7 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', [extra_files(['encoded-data/']), js_skip], compile_and_run, [''])
+test('encoding004', [extra_files(['encoded-data/']), js_broken(22374)], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])
