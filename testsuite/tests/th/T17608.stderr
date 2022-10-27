@@ -24,7 +24,7 @@ T17608.hs:(4,2)-(20,7): Splicing declarations
           infixl 4 `h`
           h :: () -> Bool -> Bool
           h _ _ = True
-        in (h ()) ((g ()) ())
+        in h () (g () ())
       where
           infixl 4 `g`
           g :: () -> () -> Bool

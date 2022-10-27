@@ -8,4 +8,4 @@ T14681.hs:(8,2)-(9,63): Splicing declarations
                          $ VarE '(+) `AppE` LitE (IntegerL (- 1))
                              `AppE` (LitE (IntegerL (- 1)))>]
   ======>
-    g = ((+) (-1)) (-1)
+    g = (+) (-1) (-1)

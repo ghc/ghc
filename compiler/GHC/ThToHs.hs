@@ -979,17 +979,13 @@ cvtl e = wrapLA (cvt e)
           l' <- cvt_lit l
           let e' = mk_expr l'
           if is_compound_lit l' then wrapParLA gHsPar e' else pure e'
-    cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp noComments (mkLHsPar x')
-                                                          (mkLHsPar y')}
-    cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp noComments (mkLHsPar x')
-                                                          (mkLHsPar y')}
-    cvt (AppTypeE e t) = do { e' <- cvtl e
-                            ; t' <- cvtType t
-                            ; let tp = parenthesizeHsType appPrec t'
+    cvt (AppE e1 e2)   = do { e1' <- parenthesizeHsExpr opPrec <$> cvtl e1
+                            ; e2' <- parenthesizeHsExpr appPrec <$> cvtl e2
+                            ; return $ HsApp noComments e1' e2' }
+    cvt (AppTypeE e t) = do { e' <- parenthesizeHsExpr opPrec <$> cvtl e
+                            ; t' <- parenthesizeHsType appPrec <$> cvtType t
                             ; return $ HsAppType noExtField e' noHsTok
-                                     $ mkHsWildCardBndrs tp }
+                                     $ mkHsWildCardBndrs t' }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
