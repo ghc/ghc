@@ -333,6 +333,11 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
+opt_co4 env@(LC _ lift_co_env) sym rep r co@TransCoDCo{}
+  | isEmptyVarEnv lift_co_env =
+    wrapRole rep (coercionRole co) $ wrapSym sym $ substCo (lcSubst env) co
+  | otherwise = error "AMG TODO"
+
 opt_co4 env _sym rep r (NthCo _r n co)
   | Just (ty, _) <- isReflCo_maybe co
   , Just (_tc, args) <- assert (r == _r )

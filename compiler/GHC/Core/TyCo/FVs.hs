@@ -652,6 +652,7 @@ tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
       `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
 tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
+tyCoFVsOfCo (TransCoDCo co1 dco2) fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfDCo dco2) fv_cand in_scope acc
 tyCoFVsOfCo (NthCo _ _ co)      fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
@@ -735,6 +736,9 @@ almost_devoid_co_var_of_co (SymCo co) cv
 almost_devoid_co_var_of_co (TransCo co1 co2) cv
   = almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
+almost_devoid_co_var_of_co (TransCoDCo co1 dco2) cv
+  = almost_devoid_co_var_of_co co1 cv
+  && almost_devoid_co_var_of_dco dco2 cv
 almost_devoid_co_var_of_co (NthCo _ _ co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_co (LRCo _ co) cv

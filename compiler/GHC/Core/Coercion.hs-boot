@@ -24,6 +24,7 @@ mkPhantomCo :: Coercion -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance Coercion -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
+mkTransCoDCo :: Coercion -> DCoercion -> Coercion
 mkNthCo :: HasDebugCallStack => Role -> Int -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion

@@ -247,6 +247,7 @@ tidyCoDCo env@(_, subst) = (go, go_dco)
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
+    go (TransCoDCo co1 dco2) = (TransCoDCo $! go co1) $! go_dco dco2
     go (NthCo r d co)        = NthCo r d $! go co
     go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty

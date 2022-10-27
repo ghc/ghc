@@ -11,6 +11,7 @@ module GHC.Tc.Solver.Rewrite(
 
 import GHC.Prelude
 
+import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCo.Ppr ( pprTyVar )
 import GHC.Tc.Types ( TcGblEnv(tcg_tc_plugin_rewriters),
                       TcPluginRewriter, TcPluginRewriteResult(..),
@@ -42,6 +43,8 @@ import Control.Monad
 import Control.Applicative (liftA3)
 import GHC.Builtin.Types.Prim (tYPETyCon)
 import Data.List ( find )
+
+import GHC.Utils.Trace
 
 {-
 ************************************************************************
@@ -564,7 +567,41 @@ rewrite_co co = liftTcS $ zonkCo co
 rewrite_reduction :: Reduction -> RewriteM Reduction
 rewrite_reduction (Reduction co xi)
   = do { redn <- bumpDepth $ rewrite_one xi
-       ; return $ co `mkTransRedn` redn }
+       ; return $ co `mkTransRednAlt` redn }
+
+
+mkTransRednAlt :: Coercion -> Reduction -> Reduction
+mkTransRednAlt co1 redn@(Reduction co2 _)
+  = redn { reductionCoercion = co1 `mkTransCoAlt` co2 }
+{-# INLINE mkTransRednAlt #-}
+
+-- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
+--   (co1 ; co2)
+mkTransCoAlt :: Coercion -> Coercion -> Coercion
+mkTransCoAlt co1 co2
+  | isReflCo co1 = co2
+  | isReflCo co2 = co1
+mkTransCoAlt (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
+  = GRefl r t1 (MCo $ mkTransCo co1 co2)
+mkTransCoAlt co1@AxiomInstCo{} co2 = TransCoDCo co1 (dehydrateCo co2)
+mkTransCoAlt (TransCo co1 co2) co3 = TransCo co1 (mkTransCoAlt co2 co3)
+mkTransCoAlt co1 co2
+  = pprTrace "mkTransCoAlt" (ppr co1 $$ ppr co2) $ TransCo co1 co2
+
+dehydrateCo :: Coercion -> DCoercion
+dehydrateCo co | isReflCo co = ReflDCo
+dehydrateCo (TyConAppCo _ _ cos) = TyConAppDCo (map dehydrateCo cos)
+dehydrateCo (TransCo co1 co2) = TransDCo (dehydrateCo co1) (dehydrateCo co2)
+dehydrateCo (TransCoDCo co1@AxiomInstCo{} dco2) = TransDCo (splat co1) dco2
+dehydrateCo co = DehydrateCo co
+
+-- Relies on invariant that LHS of TransCoDCo is always an AxiomInstCo with
+-- reflexive coercions
+splat :: Coercion -> DCoercion
+splat (AxiomInstCo ax _ _)
+  | isOpenFamilyTyCon (coAxiomTyCon ax) = AxiomInstDCo ax
+  | otherwise = StepsDCo 1
+
 
 -- rewrite (nested) AppTys
 rewrite_app_tys :: Type -> [Type] -> RewriteM Reduction

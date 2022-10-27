@@ -389,6 +389,7 @@ orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orph
 orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (TransCoDCo co1 dco2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfDCo dco2
 orphNamesOfCo (NthCo _ _ co)        = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
@@ -396,6 +397,21 @@ orphNamesOfCo (KindCo co)           = orphNamesOfCo co
 orphNamesOfCo (SubCo co)            = orphNamesOfCo co
 orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
 orphNamesOfCo (HoleCo _)            = emptyNameSet
+
+orphNamesOfDCo :: DCoercion -> NameSet
+orphNamesOfDCo ReflDCo                   = emptyNameSet
+orphNamesOfDCo (GReflRightDCo co)        = orphNamesOfCo co
+orphNamesOfDCo (GReflLeftDCo co)         = orphNamesOfCo co
+orphNamesOfDCo (TyConAppDCo cos)         = orphNamesOfDCos cos
+orphNamesOfDCo (AppDCo co1 co2)          = orphNamesOfDCo co1 `unionNameSet` orphNamesOfDCo co2
+orphNamesOfDCo (ForAllDCo _ kind_dco co) = orphNamesOfDCo kind_dco `unionNameSet` orphNamesOfDCo co
+orphNamesOfDCo (CoVarDCo _)              = emptyNameSet
+orphNamesOfDCo (AxiomInstDCo con)        = orphNamesOfCoCon con
+orphNamesOfDCo StepsDCo{}                = emptyNameSet
+orphNamesOfDCo (TransDCo co1 co2)        = orphNamesOfDCo co1 `unionNameSet` orphNamesOfDCo co2
+orphNamesOfDCo (DehydrateCo co)          = orphNamesOfCo co
+-- orphNamesOfDCo (UnivDCo p rhs)           = orphNamesOfProv orphNamesOfDCo p `unionNameSet` orphNamesOfType rhs
+orphNamesOfDCo (SubDCo dco)              = orphNamesOfDCo dco
 
 orphNamesOfProv :: UnivCoProvenance KindCoercion -> NameSet
 orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
@@ -405,6 +421,9 @@ orphNamesOfProv (CorePrepProv _)    = emptyNameSet
 
 orphNamesOfCos :: [Coercion] -> NameSet
 orphNamesOfCos = orphNamesOfThings orphNamesOfCo
+
+orphNamesOfDCos :: [DCoercion] -> NameSet
+orphNamesOfDCos = orphNamesOfThings orphNamesOfDCo
 
 orphNamesOfCoCon :: CoAxiom br -> NameSet
 orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })

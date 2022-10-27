@@ -691,6 +691,8 @@ rnIfaceCo (IfaceSymCo c)
     = IfaceSymCo <$> rnIfaceCo c
 rnIfaceCo (IfaceTransCo co1 co2)
     = IfaceTransCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceTransCoDCo co1 dco2)
+    = IfaceTransCoDCo <$> rnIfaceCo co1 <*> rnIfaceDCo dco2
 rnIfaceCo (IfaceInstCo c1 c2)
     = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 rnIfaceCo (IfaceNthCo d c) = IfaceNthCo d <$> rnIfaceCo c

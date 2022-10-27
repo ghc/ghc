@@ -1244,6 +1244,10 @@ data Coercion
     -- Given @co1 :: lhs ~e mid@ and @co2 :: mid ~e rhs@, the composite is
     -- @co1 ; co2 :: lhs ~e rhs@. (We use the notation @;@ instead of @`TransCo`@.)
 
+  | TransCoDCo Coercion DCoercion
+    -- ^ Embed a directed coercion following a coercion (always an AxiomInstCo?).
+    -- TODO: should we cache the RHS?
+
   -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
   | NthCo Role Int Coercion
     -- ^ Decompose a 'TyConAppCo' by projecting out the argument coercion with
@@ -2154,6 +2158,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
                                           `mappend` go_ty env t2
     go_co env (SymCo co)              = go_co env co
     go_co env (TransCo co1 co2)       = go_co env co1 `mappend` go_co env co2
+    go_co env (TransCoDCo co1 dco2)       = go_co env co1 `mappend` go_dco env dco2
     go_co env (AxiomRuleCo _ cos)     = go_cos env cos
     go_co env (NthCo _ _ co)          = go_co env co
     go_co env (LRCo _ co)             = go_co env co
@@ -2241,6 +2246,7 @@ coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize coercionSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (TransCoDCo co1 dco2)   = 1 + coercionSize co1 + dcoercionSize dco2
 coercionSize (NthCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg

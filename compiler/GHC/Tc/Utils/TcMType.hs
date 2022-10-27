@@ -1529,6 +1529,8 @@ collect_cand_qtvs_co_dco orig_ty bound dv = (go_co dv, go_dco dv)
                                         collect_cand_qtvs orig_ty True bound dv2 t2
     go_co dv (SymCo co)            = go_co dv co
     go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (TransCoDCo co1 dco2) = do dv <- go_co dv co1
+                                        go_dco dv dco2
     go_co dv (NthCo _ _ co)        = go_co dv co
     go_co dv (LRCo _ co)           = go_co dv co
     go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]

@@ -1701,6 +1701,8 @@ freeNamesIfCoercion (IfaceSymCo c)
   = freeNamesIfCoercion c
 freeNamesIfCoercion (IfaceTransCo co1 co2)
   = freeNamesIfCoercion co1 &&& freeNamesIfCoercion co2
+freeNamesIfCoercion (IfaceTransCoDCo co1 dco2)
+  = freeNamesIfCoercion co1 &&& freeNamesIfDCoercion dco2
 freeNamesIfCoercion (IfaceNthCo _ co)
   = freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceLRCo _ co)
