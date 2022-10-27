@@ -42,7 +42,6 @@ mkReflDCo :: DCoercion
 mkGReflRightDCo :: CoercionN -> DCoercion
 mkGReflLeftDCo :: CoercionN -> DCoercion
 mkDehydrateCo :: Coercion -> DCoercion
-mkHydrateDCo :: HasDebugCallStack => Role -> Type -> DCoercion -> Maybe Type -> Coercion
 mkCoVarDCo :: CoVar -> DCoercion
 mkUnivDCo :: UnivCoProvenance DCoercion -> Type -> DCoercion
 mkSubDCo :: HasDebugCallStack => Type -> DCoercion -> Type -> DCoercion

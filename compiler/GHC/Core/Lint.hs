@@ -2247,20 +2247,6 @@ lintCoercion co@(FunCo r cow co1 co2)
        ; lintRole (text "lintCoercion FunCo mult") cow expected_mult_role (coercionRole cow)
        ; return (FunCo r cow' co1' co2') }
 
-lintCoercion (HydrateDCo r ty dco rty) =
-  do { ty'   <- lintType ty
-     ; rty'  <- lintType rty
-     ; co    <- lintDCoercion r ty' dco
-     ; let rty = coercionRKind co
-     ; ensureEqTys rty' rty $
-        vcat [ text "Mismatch of cached RHS type in HydrateDCo"
-             , text "dco:" <+> ppr dco
-             , text "stored RHS:" <+> ppr rty'
-             , text "computed RHS:" <+> ppr rty
-             , text "LHS:" <+> ppr ty
-             , text "role:" <+> ppr r ]
-     ; return co }
-
 -- See Note [Bad unsafe coercion]
 lintCoercion (UnivCo prov r ty1 ty2)
   = do { ty1' <- lintType ty1

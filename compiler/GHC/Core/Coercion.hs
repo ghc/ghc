@@ -58,8 +58,8 @@ module GHC.Core.Coercion (
         mkGReflRightDCo,
         mkCoherenceLeftDCo,
         mkCoherenceRightDCo,
-        mkTransDCo, mkHydrateDCo,
-        followDCo, fullyHydrateDCo, hydrateOneLayerDCo,
+        mkTransDCo,
+        followDCo, fullyHydrateDCo,
         expandDCo, expandAxiomInstDCo, expandOneStepDCo,
         mkDehydrateCo,
         mkCoVarDCo,
@@ -1094,66 +1094,9 @@ is always of the expected form for the invariant to be satisfied.
 See Note [The Reduction type] in GHC.Core.Reduction.
 -}
 
--- | Turn a 'DCoercion' into a full 'Coercion' by specifying
--- a 'Role' and the LHS (input) 'Type' of the coercion.
---
--- Optionally: specify a cached RHS type, to avoid having to recompute it later.
---
--- To compute the fully expanded 'Coercion', recursively
--- removing inner directed coercions, use 'fullyHydrateDCo'.
---
--- NB: the LHS type must uphold the invariant of Note [The Hydration invariant]:
--- it must be sufficiently zonked for the structure of the directed coercion to be visible.
-mkHydrateDCo :: HasDebugCallStack => Role -> Type -> DCoercion -> Maybe Type -> Coercion
-mkHydrateDCo r l_ty dco mb_r_ty
-  | debugIsOn
-  -- Check that 'followDCo' does not crash,
-  -- i.e. that the Hydration invariant is satisfied.
-  = check_hydration_invariant r l_ty dco $
-    go r l_ty dco mb_r_ty
-  | otherwise
-  = go r l_ty dco mb_r_ty
-  where
-    go r ty dco _mb_rty =
-      case dco of
-        ReflDCo        -> mkReflCo r ty
-        CoVarDCo cv    -> CoVarCo cv
-        DehydrateCo co -> let co_r = coercionRole co in
-                          assertPpr (r == co_r)
-                            (vcat [ text "mkHydrateCo: role mismatch"
-                                  , text "Expected:" <+> ppr r
-                                  , text "  Actual:" <+> ppr co_r ])
-                        $ co
-        _ -> HydrateDCo r ty dco (fromMaybe (followDCo r ty dco) mb_r_ty)
-
--- | Check that the calling 'followDCo' with the provided arguments
--- does not crash.
-check_hydration_invariant :: HasDebugCallStack => Role -> Type -> DCoercion -> r -> r
-check_hydration_invariant r l_ty dco a =
-  unsafePerformIO $
-    handleGhcException handler
-    (rhs `seq` return a)
-
-  where
-    rhs = followDCo r l_ty dco
-    handler (PprPanic str err) =
-      pprPanic "mkHydrateDCo: Hydration invariant failure" $
-        vcat [ text "r:" <+> ppr r
-             , text "l_ty:" <+> ppr l_ty
-             , text "dco:" <+> ppr dco ]
-        $$ hang (text "original error:")
-            4 (text str $$ err)
-    handler e = throwGhcException e
 
 fullyHydrateDCo :: HasDebugCallStack => Role -> Type -> DCoercion -> Coercion
 fullyHydrateDCo r ty dco = fst $ expandDCo r ty dco
-
-hydrateOneLayerDCo :: HasDebugCallStack => Role -> Type -> DCoercion -> Coercion
-hydrateOneLayerDCo r l_ty dco = fst $ expandDCoWith hydrate r l_ty dco
-  where
-    hydrate r l_ty dco
-      = let co = mkHydrateDCo r l_ty dco Nothing
-        in (co, coercionRKind co)
 
 followDCo :: HasDebugCallStack => Role -> Type -> DCoercion -> Type
 followDCo r ty dco = snd $ expandDCo r ty dco
@@ -1391,7 +1334,6 @@ mkDehydrateCo (SymCo (GRefl _ _ (MCo co)))
                                      = mkGReflLeftDCo  co
 mkDehydrateCo (GRefl _ _ MRefl)      = ReflDCo
 mkDehydrateCo (GRefl _ _ (MCo co))   = mkGReflRightDCo co
-mkDehydrateCo (HydrateDCo _ _ dco _) = dco
 --mkDehydrateCo (TyConAppCo _ _ cos)
 --  = mkTyConAppDCo $ map mkDehydrateCo cos
 --mkDehydrateCo (AppCo co1 co2)
@@ -1649,8 +1591,6 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
-mkSymCo    (HydrateDCo r l_ty (GReflLeftDCo  mco) r_ty) = HydrateDCo r r_ty (GReflRightDCo mco) l_ty
-mkSymCo    (HydrateDCo r l_ty (GReflRightDCo mco) r_ty) = HydrateDCo r r_ty (GReflLeftDCo  mco) l_ty
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -1660,8 +1600,6 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo (HydrateDCo r lhs dco1 _) (HydrateDCo _ _ dco2 rhs)
-  = mkHydrateDCo r lhs (mkTransDCo dco1 dco2) (Just rhs)
 mkTransCo dco1 dco2
   = TransCo dco1 dco2
 
@@ -1706,10 +1644,6 @@ mkNthCo r n co
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth 0 co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go 0 (HydrateDCo _ _ (ForAllDCo tv kind_co _) _)
-      = assert (r == Nominal) $
-        mkHydrateDCo Nominal (tyVarKind tv) kind_co Nothing
-
     go n (FunCo _ w arg res)
       = mkNthCoFunCo n w arg res
 
@@ -1724,21 +1658,6 @@ mkNthCo r n co
 
     go n (SymCo co)  -- Recurse, hoping to get to a TyConAppCo or FunCo
       = mkSymCo (go n co)
-
-    go n (HydrateDCo r0 l_ty (TyConAppDCo arg_dcos) r_ty)
-      | Just (tc, arg_tys) <- splitTyConApp_maybe l_ty
-      , Just (_, rhs_tys) <- splitTyConApp_maybe r_ty
-      = assertPpr (r == nthRole r0 tc n)
-        (vcat [ text "tc:" <+> ppr tc
-              , text "arg_dcos:" <+> ppr arg_dcos
-              , text "r0:" <+> ppr r0
-              , text "n:" <+> ppr n
-              , text "r:" <+> ppr r ]) $
-        mkHydrateDCo
-          (nthRole r0 tc n)
-          (arg_tys `getNth` n)
-          (arg_dcos `getNth` n)
-          (Just $ rhs_tys `getNth` n)
 
     go n co
       = NthCo r n co
@@ -1828,11 +1747,6 @@ mkLRCo lr co
   = mkReflCo eq (pickLR lr (splitAppTy ty))
   | AppCo l r <- co
   = pickLR lr (l,r)
-  | HydrateDCo r l_ty (AppDCo dco1 dco2) r_ty <- co
-  , Just (l_ty_1, l_ty_2) <- splitAppTy_maybe l_ty
-  , Just (r_ty_1, r_ty_2) <- splitAppTy_maybe r_ty
-  = pickLR lr ( mkHydrateDCo r       l_ty_1 dco1 (Just r_ty_1)
-              , mkHydrateDCo Nominal l_ty_2 dco2 (Just r_ty_2) )
   | otherwise
   = LRCo lr co
 
@@ -1884,14 +1798,8 @@ mkCoherenceRightCo r ty co co2
 mkKindCo :: Coercion -> Coercion
 mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
-mkKindCo (HydrateDCo _ _ (GReflRightDCo co) _) = co
-mkKindCo (HydrateDCo _ _ (GReflLeftDCo co) _)  = mkSymCo co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
-mkKindCo (HydrateDCo _ lhs (UnivDCo (PhantomProv h) rhs) _)
-  = mkHydrateDCo Nominal (typeKind lhs) h (Just $ typeKind rhs)
-mkKindCo (HydrateDCo _ lhs (UnivDCo (ProofIrrelProv h) rhs) _)
-  = mkHydrateDCo Nominal (typeKind lhs) h (Just $ typeKind rhs)
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1916,12 +1824,6 @@ mkSubCo (FunCo Nominal w arg res)
           (downgradeRole Representational Nominal arg)
           (downgradeRole Representational Nominal res)
 mkSubCo (UnivCo p Nominal t1 t2) = UnivCo p Representational t1 t2
-mkSubCo (HydrateDCo _r l_ty dco r_ty)
-  = assertPpr (_r == Nominal)
-      (vcat [ text "mkSubCo (HydrateDCo): unexpected role " <+> ppr _r
-            , text "l_ty:" <+> ppr l_ty
-            , text "dco:" <+> ppr dco ])
-  $ mkHydrateDCo Representational l_ty (mkSubDCo l_ty dco r_ty) (Just r_ty)
 mkSubCo co = assertPpr (coercionRole co == Nominal) (ppr co <+> ppr (coercionRole co)) $
              SubCo co
 
@@ -2024,8 +1926,6 @@ setNominalRole_maybe r co
       = NthCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
-    setNominalRole_maybe_helper (HydrateDCo r ty1 dco mrty)
-      = (\ d -> HydrateDCo Nominal ty1 d mrty) <$> setNominalRole_maybe_dco r ty1 dco
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
       | Just prov' <- setNominalRole_maybe_prov prov
       = Just $ UnivCo prov' Nominal co1 co2
@@ -2098,7 +1998,7 @@ applyRoles_dco tc l_tys dcos r_tys
       Representational -> mkSubDCo l_ty dco r_ty
       Phantom          -> mkDehydrateCo $ mkPhantomCo (mkKindCo co) l_ty r_ty
         where
-          co = mkHydrateDCo Nominal l_ty dco (Just r_ty)
+          co = error "TODO: mkHydrateDCo Nominal l_ty dco (Just r_ty)"
 
 -- the Role parameter is the Role of the TyConAppCo
 -- defined here because this is intimately concerned with the implementation
@@ -2186,8 +2086,6 @@ promoteCoercion co = case co of
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
     UnivCo (CorePrepProv _)     _ _ _ -> mkKindCo co
-
-    HydrateDCo {} -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -3022,7 +2920,6 @@ seqCo (FunCo r w co1 co2)       = r `seq` seqCo w `seq` seqCo co1 `seq` seqCo co
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (HoleCo h)                = coHoleCoVar h `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
-seqCo (HydrateDCo r t1 dco rty) = r `seq` seqType t1 `seq` seqDCo dco `seq` seqType rty
 seqCo (UnivCo p r t1 t2)        = seqProv seqCo p `seq` r `seq` seqType t1
                                                           `seq` seqType t2
 seqCo (SymCo co)                = seqCo co
@@ -3107,7 +3004,6 @@ coercionLKind co
     go (FunCo _ w co1 co2)      = mkFunctionType (go w) (go co1) (go co2)
     go (CoVarCo cv)             = coVarLType cv
     go (HoleCo h)               = coVarLType (coHoleCoVar h)
-    go (HydrateDCo _ ty1 _ _)   = ty1
     go (UnivCo _ _ ty1 _)       = ty1
     go (SymCo co)               = coercionRKind co
     go (TransCo co1 _co2)       = go co1
@@ -3163,7 +3059,6 @@ coercionRKind co
     go (CoVarCo cv)             = coVarRType cv
     go (HoleCo h)               = coVarRType (coHoleCoVar h)
     go (FunCo _ w co1 co2)      = mkFunctionType (go w) (go co1) (go co2)
-    go (HydrateDCo _ _ _ rty )  = rty
     go (UnivCo _ _ _ ty2)       = ty2
     go (SymCo co)               = coercionLKind co
     go (TransCo _co1 co2)       = go co2
@@ -3270,7 +3165,6 @@ coercionRole = go
     go (CoVarCo cv) = coVarRole cv
     go (HoleCo h)   = coVarRole (coHoleCoVar h)
     go (AxiomInstCo ax _ _) = coAxiomRole ax
-    go (HydrateDCo r _ _ _) = r
     go (UnivCo _ r _ _)  = r
     go (SymCo co) = go co
     go (TransCo co1 _) = go co1

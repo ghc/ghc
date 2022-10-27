@@ -143,7 +143,6 @@ synonymTyConsOfType ty
      go_co (CoVarCo _)            = emptyNameEnv
      go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
-     go_co (HydrateDCo _ ty dco _)= go ty `plusNameEnv` go_dco dco
      go_co (UnivCo p _ ty ty')    = go_prov go_co p `plusNameEnv` go ty `plusNameEnv` go ty'
      go_co (SymCo co)             = go_co co
      go_co (TransCo co1 co2)      = go_co co1 `plusNameEnv` go_co co2

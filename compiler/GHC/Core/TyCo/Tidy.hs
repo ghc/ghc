@@ -243,7 +243,6 @@ tidyCoDCo env@(_, subst) = (go, go_dco)
     go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (HydrateDCo r t1 dco rty) = ((HydrateDCo r $! tidyType env t1) $! go_dco dco) $! tidyType env rty
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov go p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co

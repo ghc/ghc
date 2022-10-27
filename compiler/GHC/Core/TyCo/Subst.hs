@@ -68,7 +68,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkTyConAppDCo
    , mkAppDCo, mkForAllDCo, mkReflDCo, mkTransDCo
    , mkGReflRightDCo, mkGReflLeftDCo
-   , mkHydrateDCo, mkDehydrateCo, mkUnivDCo
+   , mkDehydrateCo, mkUnivDCo
    , followDCo
    , coercionKind, coercionLKind, coVarKindsTypesRole)
 import GHC.Core.Coercion.Axiom (Role(..))
@@ -917,8 +917,6 @@ subst_co_dco subst = (go, go_dco)
     go (FunCo r w co1 co2)   = ((mkFunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
-    go (HydrateDCo r ty dco rty) = (((mkHydrateDCo $! r) $! go_ty ty) $! go_dco dco) $! Just (go_ty rty)
-      -- Here we can either substitute the RHS or recompute it from the rest of the information.
 
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov go p) $! r) $!
                                 (go_ty t1)) $! (go_ty t2)
@@ -1020,7 +1018,7 @@ substForAllCoTyVarBndrUsing co_or_dco sym sty sco (Subst in_scope idenv tenv cen
       DCo -> noFreeVarsOfDCo old_kind_co
     mk_cast = case co_or_dco of
       Co  -> CastTy
-      DCo -> \ ty dco -> CastTy ty (mkHydrateDCo Nominal new_ki1 dco Nothing)
+      DCo -> \ ty dco -> error "TODO: CastTy ty (mkHydrateDCo Nominal new_ki1 dco Nothing)"
             -- SLD TODO: Hydration invariant?
 
     no_change = no_kind_change && (new_var == old_var)

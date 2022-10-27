@@ -384,7 +384,6 @@ data IfaceCoercion
        -- There are only a fixed number of CoAxiomRules, so it suffices
        -- to use an IfaceLclName to distinguish them.
        -- See Note [Adding built-in type families] in GHC.Builtin.Types.Literals
-  | IfaceHydrateDCo   Role IfaceType IfaceDCoercion
   | IfaceUnivCo       (IfaceUnivCoProv IfaceCoercion) Role IfaceType IfaceType
   | IfaceSymCo        IfaceCoercion
   | IfaceTransCo      IfaceCoercion IfaceCoercion
@@ -602,7 +601,6 @@ substIfaceType env ty
     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
     go_co (IfaceHoleCo cv)           = IfaceHoleCo cv
     go_co (IfaceAxiomInstCo a i cos) = IfaceAxiomInstCo a i (go_cos cos)
-    go_co (IfaceHydrateDCo r t1 dco) = IfaceHydrateDCo r (go t1) (go_dco dco)
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov go_co prov) r (go t1) (go t2)
     go_co (IfaceSymCo co)            = IfaceSymCo (go_co co)
     go_co (IfaceTransCo co1 co2)     = IfaceTransCo (go_co co1) (go_co co2)
@@ -1785,9 +1783,6 @@ ppr_co _ (IfaceFreeCoVar covar) = ppr covar
 ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 
-ppr_co ctxt_prec (IfaceHydrateDCo role ty1 dco)
-  = maybeParen ctxt_prec appPrec $
-    text "Hydrate" <+> (ppr role <+> ppr_ty appPrec ty1 <+> pprParendIfaceDCoercion dco)
 ppr_co _ (IfaceUnivCo prov role ty1 ty2)
   = text "Univ" <> (parens $
       sep [ ppr role <+> pprIfaceUnivCoProv pprParendIfaceCoercion prov
@@ -2187,11 +2182,6 @@ instance Binary IfaceCoercion where
           putByte bh 17
           put_ bh a
           put_ bh b
-  put_ bh (IfaceHydrateDCo r ty dco) = do
-          putByte bh 18
-          put_ bh r
-          put_ bh ty
-          put_ bh dco
   put_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ _  (IfaceHoleCo cv)
@@ -2255,10 +2245,6 @@ instance Binary IfaceCoercion where
            17-> do a <- get bh
                    b <- get bh
                    return $ IfaceAxiomRuleCo a b
-           18-> do r <- get bh
-                   t <- get bh
-                   dco <- get bh
-                   return $ IfaceHydrateDCo r t dco
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceDCoercion where
@@ -2411,7 +2397,6 @@ instance NFData IfaceCoercion where
     IfaceCoVarCo f1 -> rnf f1
     IfaceAxiomInstCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceAxiomRuleCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceHydrateDCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceUnivCo f1 f2 f3 f4 -> rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4
     IfaceSymCo f1 -> rnf f1
     IfaceTransCo f1 f2 -> rnf f1 `seq` rnf f2

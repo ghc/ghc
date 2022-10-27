@@ -646,8 +646,6 @@ tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
   = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
     -- See Note [CoercionHoles and coercion free variables]
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
-tyCoFVsOfCo (HydrateDCo _ t1 dco _) fv_cand in_scope acc
-  = (tyCoFVsOfType t1 `unionFV` tyCoFVsOfDCo dco) fv_cand in_scope acc
 tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
   = (tyCoFVsOfProv tyCoFVsOfCo p
       `unionFV` tyCoFVsOfType t1
@@ -728,9 +726,6 @@ almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
 almost_devoid_co_var_of_co (AxiomInstCo _ _ cos) cv
   = almost_devoid_co_var_of_cos cos cv
-almost_devoid_co_var_of_co (HydrateDCo _ t1 dco _) cv
-  = almost_devoid_co_var_of_type t1 cv
-  && almost_devoid_co_var_of_dco dco cv
 almost_devoid_co_var_of_co (UnivCo p _ t1 t2) cv
   = almost_devoid_co_var_of_prov almost_devoid_co_var_of_co p cv
   && almost_devoid_co_var_of_type t1 cv

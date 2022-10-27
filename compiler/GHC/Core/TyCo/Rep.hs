@@ -1226,18 +1226,6 @@ data Coercion
     -- If there are any left-over coercions past the arity,
     -- we use 'AppCo' for them.
 
-  | HydrateDCo
-    -- ^ Embed a directed coercion into a coercion, by specifying
-    -- the LHS type and role of the directed coercion.
-    --
-    -- The RHS type is also cached, as we often already know the RHS,
-    -- which avoids us computing it anew using 'followDCo'.
-      Role -- ^ `r`
-      Type -- ^ `lhs`: LHS type of the directed coercion
-      DCoercion
-      Type -- ^ Cached RHS type of the directed coercion.
-           -- Can be computed from `r` and `lhs` using 'followDCo'.
-
   -- :: _ -> "e" -> _ -> _ -> e
   | UnivCo (UnivCoProvenance Coercion) Role Type Type
     -- ^ A universal coercion between the two specified types, at the given role.
@@ -2161,7 +2149,6 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (CoVarCo cv)            = covar env cv
     go_co env (AxiomInstCo _ _ args)  = go_cos env args
     go_co env (HoleCo hole)           = cohole env hole
-    go_co env (HydrateDCo _ t1 dco _t2)= go_ty env t1 `mappend` go_dco env dco
     go_co env (UnivCo p _ t1 t2)      = go_prov go_co env p
                                           `mappend` go_ty env t1
                                           `mappend` go_ty env t2
@@ -2251,7 +2238,6 @@ coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (HydrateDCo _ t1 dco t2) = 1 + typeSize t1 + dcoercionSize dco + typeSize t2
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize coercionSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2

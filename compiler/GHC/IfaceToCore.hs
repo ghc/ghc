@@ -1462,11 +1462,6 @@ tcIfaceCo = go
                                         ForAllCo tv' k' <$> go c }
     go (IfaceCoVarCo n)          = CoVarCo <$> go_var n
     go (IfaceAxiomInstCo n i cs) = AxiomInstCo <$> tcIfaceCoAxiom n <*> pure i <*> mapM go cs
-    go (IfaceHydrateDCo r t1 dco)= do { t1 <- tcIfaceType t1
-                                      ; dco <- tcIfaceDCo dco
-                                      ; return $ HydrateDCo r t1 dco (followDCo r t1 dco) }
-    go (IfaceUnivCo p r t1 t2)   = UnivCo <$> tcIfaceUnivCoProv go p <*> pure r
-                                          <*> tcIfaceType t1 <*> tcIfaceType t2
     go (IfaceSymCo c)            = SymCo    <$> go c
     go (IfaceTransCo co1 co2)    = TransCo <$> go co1 <*> go co2
     go (IfaceInstCo c1 t2)       = InstCo   <$> go c1
