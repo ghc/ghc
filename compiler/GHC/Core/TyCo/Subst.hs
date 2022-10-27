@@ -922,7 +922,7 @@ subst_co_dco subst = (go, go_dco)
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! go co1) $! go co2
-    go (TransCoDCo co1 dco2) = (mkTransCoDCo $! go co1) $! go_dco dco2
+    go (TransCoDCo co1 dco2 _) = (mkTransCoDCo $! go co1) $! go_dco dco2
     go (NthCo r d co)        = mkNthCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg

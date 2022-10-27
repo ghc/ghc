@@ -278,6 +278,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
+   , mkTransCoDCo
    , mkKindCo, mkSubCo
    , mkTyConAppDCo
    , mkAppDCo
@@ -622,8 +623,8 @@ expandTypeSynonyms ty
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
       = mkTransCo (go_co subst co1) (go_co subst co2)
-    go_co subst (TransCoDCo co1 dco2)
-      = TransCoDCo (go_co subst co1) (go_dco subst dco2)
+    go_co subst (TransCoDCo co1 dco2 _)
+      = mkTransCoDCo (go_co subst co1) (go_dco subst dco2)
     go_co subst (NthCo r n co)
       = mkNthCo r n (go_co subst co)
     go_co subst (LRCo lr co)
@@ -997,7 +998,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                                     <*> go_ty env t1 <*> go_ty env t2
     go_co env (SymCo co)          = mkSymCo <$> go_co env co
     go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co env (TransCoDCo c1 c2)  = TransCoDCo <$> go_co env c1 <*> go_dco env c2
+    go_co env (TransCoDCo c1 c2 _)  = mkTransCoDCo <$> go_co env c1 <*> go_dco env c2
     go_co env (AxiomRuleCo r cos) = AxiomRuleCo r <$> go_cos env cos
     go_co env (NthCo r i co)      = mkNthCo r i <$> go_co env co
     go_co env (LRCo lr co)        = mkLRCo lr <$> go_co env co
@@ -3472,9 +3473,9 @@ occCheckExpand vs_to_avoid ty
     go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1
                                              ; co2' <- go_co cxt co2
                                              ; return (mkTransCo co1' co2') }
-    go_co cxt (TransCoDCo co1 dco2)     = do { co1' <- go_co cxt co1
+    go_co cxt (TransCoDCo co1 dco2 _)   = do { co1' <- go_co cxt co1
                                              ; dco2' <- go_dco cxt dco2
-                                             ; return (TransCoDCo co1' dco2') }
+                                             ; return (mkTransCoDCo co1' dco2') }
     go_co cxt (NthCo r n co)            = do { co' <- go_co cxt co
                                              ; return (mkNthCo r n co') }
     go_co cxt (LRCo lr co)              = do { co' <- go_co cxt co
@@ -3567,7 +3568,7 @@ tyConsOfType ty
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
      go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
-     go_co (TransCoDCo co1 dco2)   = go_co co1 `unionUniqSets` go_dco dco2
+     go_co (TransCoDCo co1 dco2 _) = go_co co1 `unionUniqSets` go_dco dco2
      go_co (NthCo _ _ co)          = go_co co
      go_co (LRCo _ co)             = go_co co
      go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg

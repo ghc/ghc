@@ -1608,7 +1608,7 @@ mkTransCo dco1 dco2
 mkTransCoDCo :: Coercion -> DCoercion -> Coercion
 mkTransCoDCo co1 dco2 | isReflDCo dco2 = co1
 mkTransCoDCo co1 dco2
-  = TransCoDCo co1 dco2
+  = TransCoDCo co1 dco2 (followDCo (coercionRole co1) (coercionRKind co1) dco2)
 
 
 mkNthCo :: HasDebugCallStack
@@ -1924,8 +1924,8 @@ setNominalRole_maybe r co
       = SymCo <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper (TransCo co1 co2)
       = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
-    setNominalRole_maybe_helper (TransCoDCo co1 dco2)
-      = TransCoDCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_dco r (coercionRKind co1) dco2
+    setNominalRole_maybe_helper (TransCoDCo co1 dco2 _)
+      = mkTransCoDCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_dco r (coercionRKind co1) dco2
     setNominalRole_maybe_helper (AppCo co1 co2)
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper (ForAllCo tv kind_co co)
@@ -2936,7 +2936,7 @@ seqCo (UnivCo p r t1 t2)        = seqProv seqCo p `seq` r `seq` seqType t1
                                                           `seq` seqType t2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
-seqCo (TransCoDCo co1 dco2)     = seqCo co1 `seq` seqDCo dco2
+seqCo (TransCoDCo co1 dco2 ty)  = seqCo co1 `seq` seqDCo dco2 `seq` seqType ty
 seqCo (NthCo r n co)            = r `seq` n `seq` seqCo co
 seqCo (LRCo lr co)              = lr `seq` seqCo co
 seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
@@ -3020,7 +3020,7 @@ coercionLKind co
     go (UnivCo _ _ ty1 _)       = ty1
     go (SymCo co)               = coercionRKind co
     go (TransCo co1 _co2)       = go co1
-    go (TransCoDCo co1 _dco2)   = go co1
+    go (TransCoDCo co1 _dco2 _) = go co1
     go (LRCo lr co)             = pickLR lr (splitAppTy (go co))
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
@@ -3076,7 +3076,7 @@ coercionRKind co
     go (UnivCo _ _ _ ty2)       = ty2
     go (SymCo co)               = coercionLKind co
     go (TransCo _co1 co2)       = go co2
-    go (TransCoDCo co1 dco2)    = followDCo (coercionRole co1) (coercionRKind co1) dco2 -- AMG TODO: cache me?
+    go (TransCoDCo _ _ ty)      = ty
     go (LRCo lr co)             = pickLR lr (splitAppTy (go co))
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
@@ -3183,7 +3183,7 @@ coercionRole = go
     go (UnivCo _ r _ _)  = r
     go (SymCo co) = go co
     go (TransCo co1 _) = go co1
-    go (TransCoDCo co1 _) = go co1
+    go (TransCoDCo co1 _ _) = go co1
     go (NthCo r _d _co) = r
     go (LRCo {}) = Nominal
     go (InstCo co _) = go co

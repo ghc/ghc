@@ -2328,9 +2328,10 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole (text "lintCoercion TransCo") co (coercionRole co1) (coercionRole co2)
        ; return (TransCo co1' co2') }
 
-lintCoercion (TransCoDCo co1 dco2)
+lintCoercion (TransCoDCo co1 dco2 _)
   = do { co1' <- lintCoercion co1
        ; co2' <- lintDCoercion (coercionRole co1') (coercionRKind co1') dco2
+       -- TODO: think about lint; lint cache type?
        ; return (TransCo co1' co2') }
 
 lintCoercion the_co@(NthCo r0 n co)

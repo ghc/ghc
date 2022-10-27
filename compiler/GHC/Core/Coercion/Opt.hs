@@ -335,7 +335,7 @@ opt_co4 env sym rep r (TransCo co1 co2)
 
 opt_co4 env@(LC _ lift_co_env) sym rep r co@TransCoDCo{}
   | isEmptyVarEnv lift_co_env =
-    wrapRole rep (coercionRole co) $ wrapSym sym $ substCo (lcSubst env) co
+    wrapRole rep r $ wrapSym sym $ substCo (lcSubst env) co
   | otherwise = error "AMG TODO"
 
 opt_co4 env _sym rep r (NthCo _r n co)

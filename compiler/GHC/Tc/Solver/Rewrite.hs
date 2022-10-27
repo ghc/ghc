@@ -571,28 +571,28 @@ rewrite_reduction (Reduction co xi)
 
 
 mkTransRednAlt :: Coercion -> Reduction -> Reduction
-mkTransRednAlt co1 redn@(Reduction co2 _)
-  = redn { reductionCoercion = co1 `mkTransCoAlt` co2 }
+mkTransRednAlt co1 redn@(Reduction co2 xi)
+  = redn { reductionCoercion = mkTransCoAlt co1 co2 xi }
 {-# INLINE mkTransRednAlt #-}
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
-mkTransCoAlt :: Coercion -> Coercion -> Coercion
-mkTransCoAlt co1 co2
+mkTransCoAlt :: Coercion -> Coercion -> Type -> Coercion
+mkTransCoAlt co1 co2 _xi
   | isReflCo co1 = co2
   | isReflCo co2 = co1
-mkTransCoAlt (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
+mkTransCoAlt (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2)) _xi
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCoAlt co1@AxiomInstCo{} co2 = TransCoDCo co1 (dehydrateCo co2)
-mkTransCoAlt (TransCo co1 co2) co3 = TransCo co1 (mkTransCoAlt co2 co3)
-mkTransCoAlt co1 co2
-  = pprTrace "mkTransCoAlt" (ppr co1 $$ ppr co2) $ TransCo co1 co2
+mkTransCoAlt co1@AxiomInstCo{} co2 xi = TransCoDCo co1 (dehydrateCo co2) xi
+mkTransCoAlt (TransCo co1 co2) co3 xi = TransCo co1 (mkTransCoAlt co2 co3 xi)
+mkTransCoAlt co1 co2 xi
+  = pprTrace "AMG mkTransCoAlt" (ppr co1 $$ ppr co2 $$ ppr xi) $ TransCo co1 co2
 
 dehydrateCo :: Coercion -> DCoercion
 dehydrateCo co | isReflCo co = ReflDCo
 dehydrateCo (TyConAppCo _ _ cos) = TyConAppDCo (map dehydrateCo cos)
 dehydrateCo (TransCo co1 co2) = TransDCo (dehydrateCo co1) (dehydrateCo co2)
-dehydrateCo (TransCoDCo co1@AxiomInstCo{} dco2) = TransDCo (splat co1) dco2
+dehydrateCo (TransCoDCo co1@AxiomInstCo{} dco2 _) = TransDCo (splat co1) dco2
 dehydrateCo co = DehydrateCo co
 
 -- Relies on invariant that LHS of TransCoDCo is always an AxiomInstCo with
