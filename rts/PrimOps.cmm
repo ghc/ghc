@@ -209,7 +209,10 @@ stg_isByteArrayPinnedzh ( gcptr ba )
     // See the comment in Storage.c:allocatePinned.
     // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
-    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
+
+    // We used to also consider BF_LARGE pinned, but stopped doing so
+    // because it interacted badly with compact regions. See #22255
+    return (flags & BF_PINNED != 0);
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )

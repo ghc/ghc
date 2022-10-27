@@ -21,6 +21,13 @@
 - The `threadLabel#` primop was added, allowing the user to query the label of
   a given `ThreadId#`.
 
+- `isByteArrayPinned#` now only considers an array pinned if it was explicitly pinned
+  by the user. This is required to avoid ghc issue [#22255](https://gitlab.haskell.org/ghc/ghc/-/issues/22255)
+  which showed that the old behaviour could cause segfaults when used in combination
+  with compact regions.
+  We are working on ways to allow users and library authors to get back the
+  performance benefits of the old behaviour where possible.
+
 ## 0.9.0 *August 2022*
 
 - Shipped with GHC 9.4.1
