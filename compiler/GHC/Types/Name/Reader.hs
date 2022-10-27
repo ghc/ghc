@@ -33,7 +33,7 @@ module GHC.Types.Name.Reader (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName, promoteRdrName,
+        rdrNameOcc, rdrNameSpace, demoteRdrName, demoteRdrNameTv, promoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -194,6 +194,12 @@ demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = Nothing
 demoteRdrName (Exact _) = Nothing
+
+demoteRdrNameTv :: RdrName -> Maybe RdrName
+demoteRdrNameTv (Unqual occ) = fmap Unqual (demoteOccTvName occ)
+demoteRdrNameTv (Qual m occ) = fmap (Qual m) (demoteOccTvName occ)
+demoteRdrNameTv (Orig _ _) = Nothing
+demoteRdrNameTv (Exact _) = Nothing
 
 -- promoteRdrName promotes the NameSpace of RdrName.
 -- See Note [Promotion] in GHC.Rename.Env.

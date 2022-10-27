@@ -2355,6 +2355,29 @@ of ``-W(no-)*``.
     triggered whenever this happens, and can be addressed by enabling the
     extension.
 
+.. ghc-flag:: -Wterm-variable-capture
+    :shortdesc: warn when an implicitly quantified type variable captures a term's name
+    :type: dynamic
+    
+    :since: 9.6.1
+
+    In accordance with `GHC Proposal #281
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`__,
+    a new extension ``RequiredTypeArguments`` will be introduced in a future GHC release.
+
+    Under ``RequiredTypeArguments``, implicit quantification of type variables does not take place
+    if there is a term variable of the same name in scope.
+
+    For example: ::
+
+       a = 15
+       f :: a -> a    -- Does ‘a’ refer to the term-level binding
+                      -- or is it implicitly quantified?
+
+    When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
+    that would stop working under ``RequiredTypeArguments``.
+
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)

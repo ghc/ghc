@@ -418,6 +418,11 @@ data GhcHint
     -}
   | SuggestSpecialiseVisibilityHints Name
 
+    {-| Suggest renaming implicitly quantified type variable in case it
+        captures a term's name.
+    -}
+  | SuggestRenameTypeVariable
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

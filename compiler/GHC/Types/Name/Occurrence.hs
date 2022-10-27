@@ -49,6 +49,7 @@ module GHC.Types.Name.Occurrence (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        demoteOccTvName,
         promoteOccName,
         HasOccName(..),
 
@@ -215,6 +216,14 @@ demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
 
+-- demoteTvNameSpace lowers the NameSpace of a type variable.
+-- See Note [Demotion] in GHC.Rename.Env.
+demoteTvNameSpace :: NameSpace -> Maybe NameSpace
+demoteTvNameSpace TvName = Just VarName
+demoteTvNameSpace VarName = Nothing
+demoteTvNameSpace DataName = Nothing
+demoteTvNameSpace TcClsName = Nothing
+
 -- promoteNameSpace promotes the NameSpace as follows.
 -- See Note [Promotion] in GHC.Rename.Env.
 promoteNameSpace :: NameSpace -> Maybe NameSpace
@@ -332,6 +341,11 @@ mkClsOccFS = mkOccNameFS clsName
 demoteOccName :: OccName -> Maybe OccName
 demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
+  return $ OccName space' name
+
+demoteOccTvName :: OccName -> Maybe OccName
+demoteOccTvName (OccName space name) = do
+  space' <- demoteTvNameSpace space
   return $ OccName space' name
 
 -- promoteOccName promotes the NameSpace of OccName.

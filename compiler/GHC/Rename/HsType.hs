@@ -395,6 +395,7 @@ rnImplicitTvOccs :: Maybe assoc
                  -> RnM (a, FreeVars)
 rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
   = do { let implicit_vs = nubN implicit_vs_with_dups
+       ; mapM_ warn_term_var_capture implicit_vs
 
        ; traceRn "rnImplicitTvOccs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
@@ -1151,6 +1152,20 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
         thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                        , hso_bndrs     = exp_bndrs' }
 
+warn_term_var_capture :: LocatedN RdrName -> RnM ()
+warn_term_var_capture lVar = do
+    gbl_env <- getGlobalRdrEnv
+    local_env <- getLocalRdrEnv
+    case demoteRdrNameTv $ unLoc lVar of
+      Nothing           -> return ()
+      Just demoted_name -> do
+        let global_vars = lookupGRE_RdrName demoted_name gbl_env
+        let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
+        case mlocal_var of
+          Just name -> warnCapturedTerm lVar (Right name)
+          Nothing   -> unless (null global_vars) $
+                         warnCapturedTerm lVar (Left global_vars)
+
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
                       -> (HsForAllTelescope GhcRn -> RnM (a, FreeVars))
@@ -1653,6 +1668,11 @@ warnUnusedForAll doc (L loc tv) used_names
               vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
                    , inHsDocContext doc ]
       addDiagnosticAt (locA loc) msg
+
+warnCapturedTerm :: LocatedN RdrName -> Either [GlobalRdrElt] Name -> TcM ()
+warnCapturedTerm (L loc tv) shadowed_term_names
+  = let msg = TcRnCapturedTermName tv shadowed_term_names
+    in addDiagnosticAt (locA loc) msg
 
 {-
 ************************************************************************

@@ -1642,6 +1642,16 @@ data TcRnMessage where
   -}
   TcRnForallIdentifier :: RdrName -> TcRnMessage
 
+  {-| TcRnCapturedTermName is a warning (controlled by -Wterm-variable-capture) that occurs
+    when an implicitly quantified type variable's name is already used for a term.
+    Example:
+      a = 10
+      f :: a -> a
+
+    Test cases: T22513a T22513b T22513c T22513d T22513e T22513f T22513g T22513h T22513i
+ -}
+  TcRnCapturedTermName :: RdrName -> Either [GlobalRdrElt] Name -> TcRnMessage
+
   {-| TcRnTypeEqualityOutOfScope is a warning (controlled by -Wtype-equality-out-of-scope)
       that occurs when the type equality (a ~ b) is not in scope.
 

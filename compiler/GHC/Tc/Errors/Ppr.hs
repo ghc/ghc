@@ -62,7 +62,7 @@ import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( GreName(..), pprNameProvenance
-                             , RdrName, rdrNameOcc, greMangledName )
+                             , RdrName, rdrNameOcc, greMangledName, grePrintableName )
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -1221,6 +1221,18 @@ instance Diagnostic TcRnMessage where
       hang (text "A section must be enclosed in parentheses")
          2 (text "thus:" <+> (parens (ppr expr)))
 
+    TcRnCapturedTermName tv_name shadowed_term_names
+      -> mkSimpleDecorated $
+        text "The type variable" <+> quotes (ppr tv_name) <+>
+          text "is implicitly quantified," $+$
+          text "even though another variable of the same name is in scope:" $+$
+          nest 2 var_names $+$
+          text "This is not forward-compatible with a planned GHC extension, RequiredTypeArguments."
+        where
+          var_names = case shadowed_term_names of
+              Left gbl_names -> vcat (map (\name -> quotes (ppr $ grePrintableName name) <+> pprNameProvenance name) gbl_names)
+              Right lcl_name -> quotes (ppr lcl_name) <+> text "defined at"
+                <+> ppr (nameSrcLoc lcl_name)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1625,6 +1637,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalTupleSection{}
       -> ErrorWithoutFlag
+    TcRnCapturedTermName{}
+      -> WarningWithFlag Opt_WarnTermVariableCapture
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2034,7 +2048,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalTupleSection{}
       -> [suggestExtension LangExt.TupleSections]
-
+    TcRnCapturedTermName{}
+      -> [SuggestRenameTypeVariable]
 
   diagnosticCode = constructorCode
 

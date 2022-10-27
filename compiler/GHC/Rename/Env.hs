@@ -1152,6 +1152,14 @@ its namespace to DataName and do a second lookup.
 The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
 
+Another case of demotion happens when the compiler needs to check
+if a name of a type variable has already been used for a term that is in scope.
+We need to do it to check if a user should change the name
+to make his code compatible with the RequiredTypeArguments extension.
+
+This type of demotion is made via demoteTvNameSpace.
+
+
 Note [Promotion]
 ~~~~~~~~~~~~~~~
 When the user mentions a type constructor or a type variable in a

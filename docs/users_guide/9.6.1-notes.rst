@@ -96,6 +96,9 @@ Compiler
 - The :ghc-flag:`-Woperator-whitespace` warning no longer ignores constructor symbols
   (operators starting with ``:``).
 
+- Added a new warning :ghc-flag:`-Wterm-variable-capture` that helps to make code compatible with 
+  the future extension ``RequiredTypeArguments``.
+
 GHCi
 ~~~~
 

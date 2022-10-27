@@ -628,6 +628,7 @@ data WarningFlag =
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
+   | Opt_WarnTermVariableCapture
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -639,6 +640,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnAlternativeLayoutRuleTransitional       -> "alternative-layout-rule-transitional" :| []
   Opt_WarnAmbiguousFields                         -> "ambiguous-fields" :| []
   Opt_WarnAutoOrphans                             -> "auto-orphans" :| []
+  Opt_WarnTermVariableCapture                     -> "term-variable-capture" :| []
   Opt_WarnCPPUndef                                -> "cpp-undef" :| []
   Opt_WarnUnbangedStrictPatterns                  -> "unbanged-strict-patterns" :| []
   Opt_WarnDeferredTypeErrors                      -> "deferred-type-errors" :| []
