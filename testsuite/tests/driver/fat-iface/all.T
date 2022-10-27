@@ -1,5 +1,5 @@
 test('fat001', [extra_files(['Fat.hs'])], makefile_test, ['fat001'])
-test('fat005', [extra_files(['Fat.hs']), filter_stdout_lines(r'= Proto-BCOs'), js_skip], makefile_test, ['fat005'])
+test('fat005', [extra_files(['Fat.hs']), filter_stdout_lines(r'= Proto-BCOs'), js_broken(22261)], makefile_test, ['fat005'])
 test('fat006', [extra_files(['Fat.hs'])], makefile_test, ['fat006'])
 test('fat006a', [extra_files(['Fat.hs'])], makefile_test, ['fat006a'])
 test('fat007', [extra_files(['Fat.hs'])], makefile_test, ['fat007'])

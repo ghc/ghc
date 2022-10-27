@@ -66,14 +66,14 @@ test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
 test('openFile003', [normalise_win32_io_errors, js_broken(22374)], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
-test('openFile005', js_skip, compile_and_run, [''])
+test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
-test('openFile007', js_skip, compile_and_run, [''])
+test('openFile007', js_broken(22261), compile_and_run, [''])
 test('openFile008', [js_broken(22349), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
 test('openFile009', [], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
-test('readFile001', js_skip, compile_and_run, [''])
+test('readFile001', js_broken(22261), compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
@@ -92,7 +92,7 @@ test('hGetBuf001',
 test('hDuplicateTo001', [fragile_for(16819, concurrent_ways),
                          when(opsys('mingw32'), skip)], compile_and_run, [''])
 
-test('countReaders001', js_skip, compile_and_run, [''])
+test('countReaders001', js_broken(22261), compile_and_run, [''])
 
 test('concio001', [normal, multi_cpu_race],
      makefile_test, ['test.concio001'])

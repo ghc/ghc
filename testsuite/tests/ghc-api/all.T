@@ -30,7 +30,7 @@ test('T18522-dbg-ppr',
   compile_and_run,
   ['-package ghc'])
 test('T19156', [ extra_run_opts('"' + config.libdir + '"')
-               , js_skip
+               , js_broken(22261)
                ],
                compile_and_run,
                ['-package ghc'])

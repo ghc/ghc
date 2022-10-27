@@ -6,5 +6,5 @@ test('T5930',   normal, compile_and_run, [''])
 
 test('system001', [js_broken(22349), when(opsys("mingw32"), skip)], \
 	compile_and_run, [''])
-test('Timeout001', js_skip, compile_and_run, [''])
+test('Timeout001', js_broken(22261), compile_and_run, [''])
 test('T16466', normal, compile_and_run, [''])

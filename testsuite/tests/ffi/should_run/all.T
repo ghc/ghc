@@ -101,7 +101,7 @@ test('ffi018_ghci',
 test('ffi019', [normal, js_broken(22363)], compile_and_run, [''])
 
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
-test('T1679', js_skip, compile_and_run, [''])
+test('T1679', js_broken(22261), compile_and_run, [''])
 
 test('T1288', [omit_ways(['ghci']), req_c], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
@@ -116,7 +116,7 @@ test('T2276_ghci', [ only_ways(['ghci']),
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
-test('T2469', js_skip, compile_and_run, ['-optc-std=gnu99'])
+test('T2469', js_broken(22261), compile_and_run, ['-optc-std=gnu99'])
 
 test('T2594', [omit_ways(['ghci']), req_c], compile_and_run, ['T2594_c.c'])
 
@@ -144,7 +144,7 @@ if config.os == 'mingw32':
 	flagsForT4038 = ['-optl-Wl,--stack,10485760']
 else:
 	flagsForT4038 = ['']
-test('T4038', js_skip, compile_and_run, flagsForT4038)
+test('T4038', js_broken(22261), compile_and_run, flagsForT4038)
 
 test('T4221', [omit_ways(['ghci']),req_c], compile_and_run, ['T4221_c.c'])
 

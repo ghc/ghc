@@ -165,7 +165,7 @@ test('rtsflags001', [ only_ways(['normal']),
                      compile_and_run, [''])
 
 # Crashed with 7.2 and earlier
-test('rtsflags002', [ only_ways(['normal']), js_skip ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
+test('rtsflags002', [ only_ways(['normal']), js_broken(22261) ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
 
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
@@ -396,7 +396,7 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [when(opsys('mingw32'), expect_broken(21361)), js_skip], makefile_test, ['T9405'])
+test('T9405', [when(opsys('mingw32'), expect_broken(21361)), js_broken(22261)], makefile_test, ['T9405'])
 
 test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
@@ -447,7 +447,7 @@ test('T14900',
 test('InternalCounters',
   [ js_skip # JS backend doesn't support internal counters
   ], makefile_test, ['InternalCounters'])
-test('alloccounter1', js_skip, compile_and_run,
+test('alloccounter1', js_broken(22261), compile_and_run,
   [
     # avoid allocating stack chunks, which counts as
     # allocation and messes up the results:

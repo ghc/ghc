@@ -167,7 +167,7 @@ test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
 
-test('T7773', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
+test('T7773', [when(opsys('mingw32'), skip), js_broken(22261)], compile_and_run, [''])
 # Andreas says that T7773 will not (and should not) work on Windows
 
 # Tests for kind-polymorphic Category
@@ -179,17 +179,17 @@ test('T7653', [when(opsys('mingw32'), skip),
                omit_ways(prof_ways+['ghci'])], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
-test('topHandler01', [when(opsys('mingw32'), skip), js_skip], compile_and_run, [''])
+test('topHandler01', [when(opsys('mingw32'), skip), js_broken(22261)], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
       omit_ways(['ghci']),
       signal_exit_code(2),
-      js_skip
+     js_broken(22261)
      ], compile_and_run, [''])
 test('topHandler03',
      [when(opsys('mingw32'), skip), ignore_stderr,
       signal_exit_code(15),
-      js_skip
+     js_broken(22261)
      ], compile_and_run, [''])
 test('topHandler04',
      [when(opsys('mingw32'), skip),
@@ -287,5 +287,5 @@ test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
 test('trace', normal, compile_and_run, [''])
-test('listThreads', js_skip, compile_and_run, [''])
+test('listThreads', js_broken(22261), compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])

@@ -45,7 +45,7 @@ test('throwto002', normal, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
-test('mask002', js_skip, compile_and_run, [''])
+test('mask002', js_broken(22261), compile_and_run, [''])
 
 test('async001', normal, compile_and_run, [''])
 

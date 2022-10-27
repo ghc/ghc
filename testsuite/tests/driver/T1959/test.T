@@ -1,1 +1,1 @@
-test('T1959', [extra_files(['B.hs', 'C.hs', 'D.hs', 'E1.hs', 'E2.hs']), js_skip], makefile_test, ['dotest'])
+test('T1959', [extra_files(['B.hs', 'C.hs', 'D.hs', 'E1.hs', 'E2.hs']), js_broken(22261)], makefile_test, ['dotest'])
