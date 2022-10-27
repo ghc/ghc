@@ -867,7 +867,7 @@ hscRecompStatus
                             -- If missing object code, just say we need to recompile because of object code.
                             (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
                             -- If just missing byte code, just use the object code
-                            -- so you should use -fprefer-byte-code with -fwrite-if-simplfied-core or you'll
+                            -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
                             -- end up using bytecode on recompilation
                             (_, UpToDateItem {} ) -> just_o
 
@@ -876,7 +876,7 @@ hscRecompStatus
                             -- If missing object code, just say we need to recompile because of object code.
                             (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
                             -- If just missing byte code, just use the object code
-                            -- so you should use -fprefer-byte-code with -fwrite-if-simplfied-core or you'll
+                            -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
                             -- end up using bytecode on recompilation
                             (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
 
@@ -1129,7 +1129,7 @@ hscDesugarAndSimplify summary (FrontendTypecheck tc_result) tc_warnings mb_old_h
           return $ HscUpdate iface
 
 
-      -- We are not generating code or writing an interface with simplfied core so we can skip simplification
+      -- We are not generating code or writing an interface with simplified core so we can skip simplification
       -- and generate a simple interface.
       _ -> do
         (iface, _details) <- liftIO $

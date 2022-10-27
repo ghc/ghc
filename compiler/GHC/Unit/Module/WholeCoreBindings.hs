@@ -34,7 +34,7 @@ The lifecycle of a WholeCoreBindings typically proceeds as follows:
 3. Then when bytecode is needed, the LoadedBCOs value is inspected and unpacked and
    the linkable is used as before.
 
-The flag `-fwrite-if-simplfied-core` determines whether the extra information is written
+The flag `-fwrite-if-simplified-core` determines whether the extra information is written
 to an interface file. The program which is written is the core bindings of the module
 after whatever simplification the user requested has been performed. So the simplified core bindings
 of the interface file agree with the optimisation level as reported by the interface
@@ -43,7 +43,7 @@ file.
 Note [Size of Interface Files with Core Definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-How much overhead does `-fwrite-if-simplfied-core` add to a typical interface file?
+How much overhead does `-fwrite-if-simplified-core` add to a typical interface file?
 As an experiment I compiled the `Cabal` library and `ghc` library (Aug 22) with
 
 | Project | .hi  | .hi (fat) | .o   |

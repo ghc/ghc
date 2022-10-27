@@ -641,7 +641,7 @@ Options affecting code generation
     useful if you want to type check over multiple runs of GHC without
     compiling dependencies.
 
-.. ghc-flag:: -fwrite-if-simplfied-core
+.. ghc-flag:: -fwrite-if-simplified-core
     :shortdesc: Write an interface file containing the simplified core of the module.
     :type: dynamic
     :category: codegen
@@ -679,9 +679,9 @@ Options affecting code generation
     :category: codegen
 
     Generate object code and byte-code. This is useful with the flags
-    :ghc-flag:`-fprefer-byte-code` and :ghc-flag:`-fwrite-if-simplfied-core`.
+    :ghc-flag:`-fprefer-byte-code` and :ghc-flag:`-fwrite-if-simplified-core`.
 
-    This flag implies :ghc-flag:`-fwrite-if-simplfied-core`.
+    This flag implies :ghc-flag:`-fwrite-if-simplified-core`.
 
     :ghc-flag:`-fbyte-code` and :ghc-flag:`-fobject-code` disable this flag as
     they specify that GHC should *only* write object code or byte-code respectively.
@@ -787,7 +787,7 @@ Options affecting code generation
     and object file (if that's available) to evaluate and run TH splices.
 
     This is useful with flags such as :ghc-flag:`-fbyte-code-and-object-code`, which
-    tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplfied-core` which
+    tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplified-core` which
     allows byte-code to be generated from an interface file.
 
     This flag also interacts with :ghc-flag:`-fno-code`, if this flag is enabled
