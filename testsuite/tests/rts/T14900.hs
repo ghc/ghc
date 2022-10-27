@@ -13,6 +13,8 @@ newByteArray (I# sz) = IO $ \s -> case newByteArray# sz s of {
   (# s', arr# #) -> case unsafeFreezeByteArray# arr# s of {
   (# s'', barr# #) -> (# s', ByteArray barr# #) }}
 
+-- Currently we expect large/compact regions not to count as pinned.
+-- See #22255 for the reasoning.
 main :: IO ()
 main = do
   ByteArray arr1# <- fmap getCompact $ newByteArray 65000 >>= compact

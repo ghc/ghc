@@ -1,5 +1,5 @@
--- Test that isByteArray# returns True for large but not explicitly pinned byte
--- arrays
+-- Test that isByteArray# returns False for large but not explicitly pinned byte
+-- arrays, see #22255
 
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples  #-}
@@ -15,4 +15,4 @@ main = do
         (# s1, arr# #) ->
             case isMutableByteArrayPinned# arr# of
               n# -> (# s1, isTrue# n# #)
-    unless pinned $ putStrLn "BAD"
+    when pinned $ putStrLn "BAD"
