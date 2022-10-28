@@ -110,8 +110,8 @@ llvmCodeGen' cfg cmm_stream
     header =
       let target  = llvmCgLlvmTarget cfg
           llvmCfg = llvmCgLlvmConfig cfg
-      in     text ("target datalayout = \"" ++ getDataLayout llvmCfg target ++ "\"")
-         $+$ text ("target triple = \"" ++ target ++ "\"")
+      in     (text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\"")
+         $+$ (text "target triple = \"" <> text target <> text "\"")
 
     getDataLayout :: LlvmConfig -> String -> String
     getDataLayout config target =

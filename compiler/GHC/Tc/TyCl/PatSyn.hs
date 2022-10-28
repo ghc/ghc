@@ -787,8 +787,8 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
   = do { let loc' = locA loc
-       ; rr_name <- newNameAt (mkTyVarOcc "rep") loc'
-       ; tv_name <- newNameAt (mkTyVarOcc "r")   loc'
+       ; rr_name <- newNameAt (mkTyVarOccFS (fsLit "rep")) loc'
+       ; tv_name <- newNameAt (mkTyVarOccFS (fsLit "r"))   loc'
        ; let rr_tv  = mkTyVar rr_name runtimeRepTy
              rr     = mkTyVarTy rr_tv
              res_tv = mkTyVar tv_name (mkTYPEapp rr)

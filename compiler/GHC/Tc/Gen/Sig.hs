@@ -26,6 +26,7 @@ module GHC.Tc.Gen.Sig(
    ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -246,7 +247,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   where
     name   = case mb_name of
                Just n  -> n
-               Nothing -> mkUnboundName (mkVarOcc "<expression>")
+               Nothing -> mkUnboundName (mkVarOccFS (fsLit "<expression>"))
 
     ctxt_rrc    = ctxt_fn (lhsSigWcTypeContextSpan hs_sig_ty)
     ctxt_no_rrc = ctxt_fn NoRRC

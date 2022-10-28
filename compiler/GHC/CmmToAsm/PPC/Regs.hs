@@ -47,6 +47,7 @@ module GHC.CmmToAsm.PPC.Regs (
 where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
@@ -133,7 +134,7 @@ data Imm
         = ImmInt        Int
         | ImmInteger    Integer     -- Sigh.
         | ImmCLbl       CLabel      -- AbstractC Label (with baggage)
-        | ImmLit        String
+        | ImmLit        FastString
         | ImmIndex    CLabel Int
         | ImmFloat      Rational
         | ImmDouble     Rational
@@ -146,7 +147,7 @@ data Imm
         | HIGHESTA Imm
 
 
-strImmLit :: String -> Imm
+strImmLit :: FastString -> Imm
 strImmLit s = ImmLit s
 
 

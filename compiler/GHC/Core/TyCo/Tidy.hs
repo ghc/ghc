@@ -17,6 +17,7 @@ module GHC.Core.TyCo.Tidy
   ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
@@ -70,7 +71,7 @@ getHelpfulOccName :: TyCoVar -> OccName
 -- this way is a helpful clue for users
 getHelpfulOccName tv
   | isSystemName name, isTcTyVar tv
-  = mkTyVarOcc (occNameString occ ++ "0")
+  = mkTyVarOccFS (occNameFS occ `appendFS` fsLit "0")
   | otherwise
   = occ
   where

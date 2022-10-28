@@ -19,6 +19,7 @@ module GHC.Iface.Recomp
 where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Driver.Backend
 import GHC.Driver.Config.Finder
@@ -168,7 +169,7 @@ instance Monoid RecompileRequired where
 
 data RecompReason
   = UnitDepRemoved UnitId
-  | ModulePackageChanged String
+  | ModulePackageChanged FastString
   | SourceFileChanged
   | ThisUnitIdChanged
   | ImpurePlugin
@@ -200,7 +201,7 @@ data RecompReason
 instance Outputable RecompReason where
   ppr = \case
     UnitDepRemoved uid       -> ppr uid <+> text "removed"
-    ModulePackageChanged s   -> text s <+> text "package changed"
+    ModulePackageChanged s   -> ftext s <+> text "package changed"
     SourceFileChanged        -> text "Source file changed"
     ThisUnitIdChanged        -> text "-this-unit-id changed"
     ImpurePlugin             -> text "Impure plugin forced recompilation"
@@ -596,7 +597,7 @@ checkDependencies hsc_env summary iface
                       -> [(t, GenLocated l ModuleName)]
                     -> IfG
                        [Either
-                          CompileReason (Either (UnitId, ModuleName) (String, UnitId))]
+                          CompileReason (Either (UnitId, ModuleName) (FastString, UnitId))]
    classify_import find_import imports =
     liftIO $ traverse (\(mb_pkg, L _ mod) ->
            let reason = ModuleChanged mod
@@ -612,9 +613,9 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = map (second gwib_mod) $ Set.toAscList $ dep_direct_mods (mi_deps iface)
    prev_dep_pkgs = Set.toAscList (Set.union (dep_direct_pkgs (mi_deps iface))
                                             (dep_plugin_pkgs (mi_deps iface)))
-   bkpk_units    = map (("Signature",) . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
+   bkpk_units    = map ((fsLit "Signature",) . instUnitInstanceOf . moduleUnit) (requirementMerges units (moduleName (mi_module iface)))
 
-   implicit_deps = map ("Implicit",) (implicitPackageDeps dflags)
+   implicit_deps = map (fsLit "Implicit",) (implicitPackageDeps dflags)
 
    -- GHC.Prim is very special and doesn't appear in ms_textual_imps but
    -- ghc-prim will appear in the package dependencies still. In order to not confuse
@@ -623,12 +624,12 @@ checkDependencies hsc_env summary iface
                               Just home_unit
                                 | homeUnitId home_unit == primUnitId
                                 -> Left (primUnitId, mkModuleName "GHC.Prim")
-                              _ -> Right ("GHC.Prim", primUnitId)
+                              _ -> Right (fsLit "GHC.Prim", primUnitId)
 
 
    classify _ (Found _ mod)
     | (toUnitId $ moduleUnit mod) `elem` all_home_units = Right (Left ((toUnitId $ moduleUnit mod), moduleName mod))
-    | otherwise = Right (Right (moduleNameString (moduleName mod), toUnitId $ moduleUnit mod))
+    | otherwise = Right (Right (moduleNameFS (moduleName mod), toUnitId $ moduleUnit mod))
    classify reason _ = Left (RecompBecause reason)
 
    check_mods :: [(UnitId, ModuleName)] -> [(UnitId, ModuleName)] -> IO RecompileRequired
@@ -649,7 +650,7 @@ checkDependencies hsc_env summary iface
            text " not among previous dependencies"
         return $ needsRecompileBecause $ ModuleAdded new
 
-   check_packages :: [(String, UnitId)] -> [UnitId] -> IO RecompileRequired
+   check_packages :: [(FastString, UnitId)] -> [UnitId] -> IO RecompileRequired
    check_packages [] [] = return UpToDate
    check_packages [] (old:_) = do
      trace_hi_diffs logger $
@@ -661,7 +662,7 @@ checkDependencies hsc_env summary iface
     , new_unit == old = check_packages (dropWhile ((== new_unit) . snd) news) olds'
     | otherwise = do
         trace_hi_diffs logger $
-         text "imported package" <+> text new_name <+> ppr new_unit <+>
+         text "imported package" <+> ftext new_name <+> ppr new_unit <+>
            text "not among previous dependencies"
         return $ needsRecompileBecause $ ModulePackageChanged new_name
 
@@ -1243,7 +1244,7 @@ addFingerprints hsc_env iface0
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash,
                        mi_src_hash iface0,
-                       ann_fn (mkVarOcc "module"),  -- See mkIfaceAnnCache
+                       ann_fn (mkVarOccFS (fsLit "module")),  -- See mkIfaceAnnCache
                        mi_usages iface0,
                        sorted_deps,
                        mi_hpc iface0)
@@ -1638,7 +1639,7 @@ mkIfaceAnnCache anns
     pair (IfaceAnnotation target value) =
       (case target of
           NamedTarget occn -> occn
-          ModuleTarget _   -> mkVarOcc "module"
+          ModuleTarget _   -> mkVarOccFS (fsLit "module")
       , [value])
     -- flipping (++), so the first argument is always short
     env = mkOccEnv_C (flip (++)) (map pair anns)

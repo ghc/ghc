@@ -116,7 +116,7 @@ hpcInitCode _ _ (NoHpcInfo {}) = mempty
 hpcInitCode platform this_mod (HpcInfo tickCount hashNo)
  = initializerCStub platform fn_name decls body
   where
-    fn_name = mkInitializerStubLabel this_mod "hpc"
+    fn_name = mkInitializerStubLabel this_mod (fsLit "hpc")
     decls = text "extern StgWord64 " <> tickboxes <> text "[]" <> semi
     body = text "hs_hpc_module" <>
               parens (hcat (punctuate comma [

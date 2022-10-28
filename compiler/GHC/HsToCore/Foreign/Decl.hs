@@ -16,6 +16,7 @@ module GHC.HsToCore.Foreign.Decl
 where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Tc.Utils.Monad        -- temp
 
@@ -184,7 +185,7 @@ foreignExportsInitialiser platform mod hs_fns =
    -- See Note [Tracking foreign exports] in rts/ForeignExports.c
    initializerCStub platform fn_nm list_decl fn_body
   where
-    fn_nm       = mkInitializerStubLabel mod "fexports"
+    fn_nm       = mkInitializerStubLabel mod (fsLit "fexports")
     mod_str     = pprModuleName (moduleName mod)
     fn_body     = text "registerForeignExports" <> parens (char '&' <> list_symbol) <> semi
     list_symbol = text "stg_exports_" <> mod_str

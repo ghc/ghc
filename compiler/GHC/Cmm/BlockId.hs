@@ -11,6 +11,7 @@ module GHC.Cmm.BlockId
 import GHC.Prelude
 
 import GHC.Cmm.CLabel
+import GHC.Data.FastString
 import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Unique
@@ -43,4 +44,4 @@ blockLbl label = mkLocalBlockLabel (getUnique label)
 
 infoTblLbl :: BlockId -> CLabel
 infoTblLbl label
-  = mkBlockInfoTableLabel (mkFCallName (getUnique label) "block") NoCafRefs
+  = mkBlockInfoTableLabel (mkFCallName (getUnique label) (fsLit "block")) NoCafRefs

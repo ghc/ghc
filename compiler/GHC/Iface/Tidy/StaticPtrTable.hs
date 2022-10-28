@@ -144,6 +144,7 @@ import GHC.Linker.Types
 import GHC.Types.Id
 import GHC.Types.ForeignStubs
 import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import Control.Monad.Trans.State.Strict
 import Data.List (intercalate)
@@ -244,7 +245,7 @@ sptModuleInitCode platform this_mod entries =
     initializerCStub platform init_fn_nm empty init_fn_body `mappend`
     finalizerCStub platform fini_fn_nm empty fini_fn_body
   where
-    init_fn_nm = mkInitializerStubLabel this_mod "spt"
+    init_fn_nm = mkInitializerStubLabel this_mod (fsLit "spt")
     init_fn_body = vcat
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
@@ -260,7 +261,7 @@ sptModuleInitCode platform this_mod entries =
         |  (i, SptEntry n fp) <- zip [0..] entries
         ]
 
-    fini_fn_nm = mkFinalizerStubLabel this_mod "spt"
+    fini_fn_nm = mkFinalizerStubLabel this_mod (fsLit "spt")
     fini_fn_body = vcat
         [  text "StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi

@@ -493,8 +493,8 @@ mkSysTvName :: Unique -> FastString -> Name
 mkSysTvName uniq fs = mkSystemName uniq (mkTyVarOccFS fs)
 
 -- | Make a name for a foreign call
-mkFCallName :: Unique -> String -> Name
-mkFCallName uniq str = mkInternalName uniq (mkVarOcc str) noSrcSpan
+mkFCallName :: Unique -> FastString -> Name
+mkFCallName uniq str = mkInternalName uniq (mkVarOccFS str) noSrcSpan
    -- The encoded string completely describes the ccall
 
 -- When we renumber/rename things, we need to be
