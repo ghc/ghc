@@ -287,6 +287,9 @@ lint-submods:
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
       allow_failure: false
+    # Don't run on nightly because the program needs a base commit to check.
+    - if: $NIGHTLY
+      when: never
     - allow_failure: true
 
 lint-submods-branch:
