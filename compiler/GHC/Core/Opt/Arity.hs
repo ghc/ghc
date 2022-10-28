@@ -1104,22 +1104,6 @@ arityType env (Let (NonRec b r) e)
     cheap_rhs = myExprIsCheap env r (Just (idType b))
     env'      = extendSigEnv env b (arityType env r)
 
-arityType env (Let (Rec pairs) body)
-  | ((j,_):_) <- pairs
-  , isJoinId j
-  = -- See Note [arityType for join bindings]
-    foldr (andArityType env . do_one) (arityType rec_env body) pairs
-  where
-    rec_env = foldl add_bot env pairs
-    add_bot env (j,_) = extendSigEnv env j botArityType
-
-    do_one :: (JoinId, CoreExpr) -> ArityType
-    do_one (j,rhs)
-      | Just arity <- isJoinId_maybe j
-      = arityType rec_env $ snd $ collectNBinders arity rhs
-      | otherwise
-      = pprPanic "arityType:joinrec" (ppr pairs)
-
 arityType env (Let (Rec prs) e)
   = floatIn (all is_cheap prs) (arityType env' e)
   where
