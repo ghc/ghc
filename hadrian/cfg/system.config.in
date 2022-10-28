@@ -51,7 +51,6 @@ hs-cpp-args               = @HaskellCPPArgs@
 # Build options:
 #===============
 
-solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
 ghc-unregisterised   = @Unregisterised@
 tables-next-to-code  = @TablesNextToCode@
 use-libffi-for-adjustors = @UseLibffiForAdjustors@

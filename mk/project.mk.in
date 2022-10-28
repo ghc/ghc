@@ -156,10 +156,6 @@ else
 Windows_Target=NO
 endif
 
-# In case of Solaris OS, does it provide broken shared libs
-# linker or not?
-SOLARIS_BROKEN_SHLD=@SOLARIS_BROKEN_SHLD@
-
 # Is the stage0 compiler affected by Bug #9439?
 GHC_LLVM_AFFECTED_BY_9439 = @GHC_LLVM_AFFECTED_BY_9439@
 
