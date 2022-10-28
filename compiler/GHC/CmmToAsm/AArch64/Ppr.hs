@@ -162,7 +162,7 @@ pprDatas config (CmmStaticsRaw lbl dats)
 
 pprData :: NCGConfig -> CmmStatic -> SDoc
 pprData _config (CmmString str) = pprString str
-pprData _config (CmmFileEmbed path) = pprFileEmbed path
+pprData _config (CmmFileEmbed path _) = pprFileEmbed path
 
 pprData config (CmmUninitialised bytes)
  = let platform = ncgPlatform config

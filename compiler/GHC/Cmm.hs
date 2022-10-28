@@ -282,8 +282,8 @@ data CmmStatic
         -- ^ uninitialised data, N bytes long
   | CmmString ByteString
         -- ^ string of 8-bit values only, not zero terminated.
-  | CmmFileEmbed FilePath
-        -- ^ an embedded binary file
+  | CmmFileEmbed FilePath Int
+        -- ^ an embedded binary file and its byte length
 
 instance OutputableP Platform CmmStatic where
     pdoc = pprStatic
@@ -292,7 +292,7 @@ instance Outputable CmmStatic where
   ppr (CmmStaticLit lit) = text "CmmStaticLit" <+> ppr lit
   ppr (CmmUninitialised n) = text "CmmUninitialised" <+> ppr n
   ppr (CmmString _) = text "CmmString"
-  ppr (CmmFileEmbed fp) = text "CmmFileEmbed" <+> text fp
+  ppr (CmmFileEmbed fp _) = text "CmmFileEmbed" <+> text fp
 
 -- Static data before SRT generation
 data GenCmmStatics (rawOnly :: Bool) where
@@ -444,7 +444,7 @@ pprStatic platform s = case s of
     CmmStaticLit lit   -> nest 4 $ text "const" <+> pdoc platform lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
-    CmmFileEmbed path  -> nest 4 $ text "incbin " <+> text (show path)
+    CmmFileEmbed path _ -> nest 4 $ text "incbin " <+> text (show path)
 
 -- --------------------------------------------------------------------------
 -- data sections

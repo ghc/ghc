@@ -168,7 +168,7 @@ pprDatas platform (CmmStaticsRaw lbl dats) = vcat (pprLabel platform lbl : map (
 pprData :: Platform -> CmmStatic -> SDoc
 pprData platform d = case d of
    CmmString str          -> pprString str
-   CmmFileEmbed path      -> pprFileEmbed path
+   CmmFileEmbed path _    -> pprFileEmbed path
    CmmUninitialised bytes -> text ".space " <> int bytes
    CmmStaticLit lit       -> pprDataItem platform lit
 

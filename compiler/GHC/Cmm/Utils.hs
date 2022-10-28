@@ -197,9 +197,9 @@ mkByteStringCLit lbl bytes
 
 -- | We make a top-level decl for the embedded binary file, and return a label pointing to it
 mkFileEmbedLit
-  :: CLabel -> FilePath -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
-mkFileEmbedLit lbl path
-  = (CmmLabel lbl, CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl [CmmFileEmbed path]))
+  :: CLabel -> FilePath -> Int -> (CmmLit, GenCmmDecl (GenCmmStatics raw) info stmt)
+mkFileEmbedLit lbl path len
+  = (CmmLabel lbl, CmmData (Section ReadOnlyData lbl) (CmmStaticsRaw lbl [CmmFileEmbed path len]))
 
 
 -- | Build a data-segment data block

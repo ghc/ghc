@@ -188,10 +188,10 @@ cgTopBinding logger tmpfs cfg = \case
 
             (lit,decl) = if asString
               then mkByteStringCLit label str
-              else mkFileEmbedLit label $ unsafePerformIO $ do
+              else unsafePerformIO $ do
                      bFile <- newTempName logger tmpfs (stgToCmmTmpDir cfg) TFL_CurrentModule ".dat"
                      BS.writeFile bFile str
-                     return bFile
+                     return $ mkFileEmbedLit label bFile (BS.length str)
         emitDecl decl
         addBindC (litIdInfo (stgToCmmPlatform cfg) id mkLFStringLit lit)
 
