@@ -349,9 +349,6 @@ FP_FIND_ROOT
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
     FP_SETUP_WINDOWS_TOOLCHAIN
 else
-    # Ideally should use AC_CHECK_TARGET_TOOL but our triples
-    # are screwed up. Configure doesn't think they're ever equal and
-    # so never tried without the prefix.
     AC_PATH_TOOL([CC],[gcc], [clang])
     AC_PATH_TOOL([CXX],[g++], [clang++])
     AC_PATH_TOOL([NM],[nm])
