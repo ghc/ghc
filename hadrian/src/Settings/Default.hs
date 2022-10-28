@@ -176,14 +176,16 @@ defaultLibraryWays = Set.fromList <$>
 defaultRtsWays :: Ways
 defaultRtsWays = Set.fromList <$>
   mconcat
-  [ pure [vanilla, threaded]
+  [ pure [vanilla]
   , notStage0 ? pure
-      [ profiling, threadedProfiling, debugProfiling, threadedDebugProfiling
-      , debug, threadedDebug
+      [ profiling, debugProfiling
+      , debug
       ]
+  , notStage0 ? targetSupportsThreadedRts ? pure [threaded, threadedProfiling, threadedDebugProfiling, threadedDebug]
   , notStage0 ? platformSupportsSharedLibs ? pure
-      [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
+      [ dynamic, debugDynamic
       ]
+  , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure [ threadedDynamic, threadedDebugDynamic ]
   ]
 
 -- TODO: Move C source arguments here

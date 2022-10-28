@@ -18,10 +18,13 @@ validateFlavour = enableLinting $ werror $ defaultFlavour
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
                             ]
     , rtsWays = Set.fromList <$>
-                mconcat [ pure [vanilla, threaded, debug, threadedDebug]
+                mconcat [ pure [vanilla, debug]
+                        , targetSupportsThreadedRts ? pure [threaded, threadedDebug]
                         , notStage0 ? platformSupportsSharedLibs ? pure
-                            [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
+                            [ dynamic, debugDynamic
                             ]
+                        , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure
+                            [ threadedDynamic, threadedDebugDynamic ]
                         ]
     , ghcDebugAssertions = (<= Stage1)
     }

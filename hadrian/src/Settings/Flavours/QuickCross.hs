@@ -20,10 +20,13 @@ quickCrossFlavour = defaultFlavour
     , rtsWays     = Set.fromList <$>
                     mconcat
                     [ pure
-                      [ vanilla, threaded, debug, threadedDebug, threaded ]
+                      [ vanilla, debug ]
+                    , targetSupportsThreadedRts ? pure [threaded, threadedDebug]
                     , notStage0 ? platformSupportsSharedLibs ? pure
-                      [ dynamic, debugDynamic, threadedDynamic
-                      , threadedDebugDynamic ]
+                      [ dynamic, debugDynamic ]
+                    , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure [
+                      threadedDynamic, threadedDebugDynamic
+                    ]
                     ] }
 
 quickCrossArgs :: Args

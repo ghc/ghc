@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 
 import Expression
 import Flavour
+import Oracles.Flag
 import Packages
 import {-# SOURCE #-} Settings.Default
 
@@ -13,7 +14,7 @@ developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ stageString ghcStage
     , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
     , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = pure $ Set.fromList [vanilla, debug, threaded, threadedDebug]
+    , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
     , dynamicGhcPrograms = return False
     , ghcDebugAssertions = (>= Stage2) }
     where

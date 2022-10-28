@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 
 import Expression
 import Flavour
+import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
@@ -15,7 +16,7 @@ ghcInGhciFlavour = defaultFlavour
     -- include the dynamic way when we have a dynamic host GHC, but just
     -- checking for Windows seems simpler for now.
     , libraryWays = pure (Set.fromList [vanilla]) <> pure (Set.fromList [ dynamic | not windowsHost ])
-    , rtsWays     = pure (Set.fromList [vanilla, threaded]) <> pure (Set.fromList [ dynamic | not windowsHost ])
+    , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded])) <> pure (Set.fromList [ dynamic | not windowsHost ])
     , dynamicGhcPrograms = return False }
 
 ghciArgs :: Args

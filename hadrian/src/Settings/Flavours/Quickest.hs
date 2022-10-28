@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 
 import Expression
 import Flavour
+import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
@@ -12,7 +13,7 @@ quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
     , libraryWays = pure (Set.fromList [vanilla])
-    , rtsWays     = pure (Set.fromList [vanilla, threaded])
+    , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded]))
     , dynamicGhcPrograms = return False }
 
 quickestArgs :: Args

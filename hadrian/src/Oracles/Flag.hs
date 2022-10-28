@@ -4,6 +4,7 @@ module Oracles.Flag (
     Flag (..), flag, getFlag,
     platformSupportsSharedLibs,
     platformSupportsGhciObjects,
+    targetSupportsThreadedRts,
     targetSupportsSMP,
     useLibffiForAdjustors,
     arSupportsDashL
@@ -84,7 +85,13 @@ platformSupportsSharedLibs = do
     solarisBroken <- flag SolarisBrokenShld
     return $ not (windows || ppc_linux || solaris && solarisBroken)
 
--- | Does the target support the threaded runtime system?
+-- | Does the target support threaded RTS?
+targetSupportsThreadedRts :: Action Bool
+targetSupportsThreadedRts = do
+    wasm <- anyTargetArch [ "wasm32" ]
+    return $ not wasm
+
+-- | Does the target support the -N RTS flag?
 targetSupportsSMP :: Action Bool
 targetSupportsSMP = do
   unreg <- flag GhcUnregisterised

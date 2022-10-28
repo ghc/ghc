@@ -3,6 +3,7 @@ module Settings.Flavours.Benchmark (benchmarkFlavour) where
 import qualified Data.Set as Set
 import Expression
 import Flavour
+import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
 
 -- Please update doc/flavours.md when changing this file.
@@ -11,7 +12,7 @@ benchmarkFlavour = defaultFlavour
     { name = "bench"
     , args = defaultBuilderArgs <> benchmarkArgs <> defaultPackageArgs
     , libraryWays = pure $ Set.fromList [vanilla]
-    , rtsWays = pure $ Set.fromList [vanilla, threaded] }
+    , rtsWays = Set.fromList <$> mconcat [pure [vanilla], targetSupportsThreadedRts ? pure [threaded]] }
 
 benchmarkArgs :: Args
 benchmarkArgs = sourceArgs SourceArgs
@@ -22,4 +23,3 @@ benchmarkArgs = sourceArgs SourceArgs
     -- to benchmark. This has to happen in sync with the Makefile build, though.
     , hsCompiler = mconcat [stage0 ? arg "-O2", notStage0 ? arg "-O0"]
     , hsGhc      = pure ["-O2"] }
-
