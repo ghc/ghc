@@ -28,14 +28,14 @@ test('hGetPosn001', [], compile_and_run, ['-cpp'])
 test('hIsEOF001',   normal, compile_and_run, [''])
 test('hIsEOF002', [], compile_and_run, ['-cpp'])
 
-test('hReady001', js_skip, compile_and_run, ['-cpp'])
+test('hReady001', js_broken(22374), compile_and_run, ['-cpp'])
 
 # hReady002 tests that hReady returns False for a pipe that has no
 # data to read.  It relies on piping input from 'sleep 1', which doesn't
 # work for the 'ghci' way because in that case we already pipe input from
 # a script, so hence omit_ways(['ghci'])
 test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci']),
-                   multi_cpu_race, js_skip],
+                   multi_cpu_race, js_broken(22374)],
      compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
@@ -77,7 +77,7 @@ test('readFile001', js_broken(22261), compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
-test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs'), js_skip],
+test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs'), js_broken(22374)],
      compile_and_run, ['-cpp'])
 
 test('readwrite003', [], compile_and_run, [''])
