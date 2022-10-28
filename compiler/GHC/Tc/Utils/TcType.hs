@@ -428,7 +428,7 @@ Invariants:
   - Flag tcTyConIsPoly = True; this is used only to short-cut zonking
 
   - tyConBinders are still TcTyConBinders, but they are /skolem/ TcTyVars,
-    with fixed kinds: no unification variables here
+    with fixed kinds, and accurate skolem info: no unification variables here
 
     tyConBinders includes the Inferred binders if any
 

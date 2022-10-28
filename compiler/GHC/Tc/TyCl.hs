@@ -411,21 +411,27 @@ TcTyCons are used for two distinct purposes
 2.  When checking a type/class declaration (in module GHC.Tc.TyCl), we come
     upon knowledge of the eventual tycon in bits and pieces, and we use
     a TcTyCon to record what we know before we are ready to build the
-    final TyCon.
+    final TyCon.  Here is the plan:
 
-    We first build a MonoTcTyCon, then generalise to a PolyTcTyCon
-    See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType
-    Specifically:
+    Step 1 (inferInitialKinds, inference only, skipped for checking):
+       Make a MonoTcTyCon whose binders are TcTyVars,
+       which may contain free unification variables
 
-      S1) In kcTyClGroup, we use checkInitialKinds to get the
-          utterly-final Kind of all TyCons in the group that
-            (a) have a kind signature or
-            (b) have a CUSK.
-          This produces a PolyTcTyCon, that is, a TcTyCon in which the binders
-          and result kind are full of TyVars (not TcTyVars).  No unification
-          variables here; everything is in its final form.
+    Step 2 (generaliseTcTyCon)
+       Generalise that MonoTcTyCon to make a PolyTcTyCon
+       Its binders are skolem TcTyVars, with accurate SkolemInfo
 
-      S2) In kcTyClGroup, we use inferInitialKinds to look over the
+    Step 3 (tcTyClDecl)
+       Typecheck the type and class decls to produce a final TyCon
+       Its binders are final TyVars, not TcTyVars
+
+    Note that a MonoTcTyCon can contain unification variables,
+    but a PolyTcTyCon does not: only skolem TcTyVars.  See
+    Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType
+
+    More details about /kind inference/:
+
+      S1) In kcTyClGroup, we use inferInitialKinds to look over the
           declaration of any TyCon that lacks a kind signature or
           CUSK, to determine its "shape"; for example, the number of
           parameters, and any kind signatures.
@@ -434,27 +440,30 @@ TcTyCons are used for two distinct purposes
           "mono" because it has not been been generalised, and its binders
           and result kind may have free unification variables.
 
-      S3) Still in kcTyClGroup, we use kcLTyClDecl to kind-check the
+      S2) Still in kcTyClGroup, we use kcLTyClDecl to kind-check the
           body (class methods, data constructors, etc.) of each of
           these MonoTcTyCons, which has the effect of filling in the
           metavariables in the tycon's initial kind.
 
-      S4) Still in kcTyClGroup, we use generaliseTyClDecl to generalize
-          each MonoTcTyCon to get a PolyTcTyCon, with final TyVars in it,
+      S3) Still in kcTyClGroup, we use generaliseTyClDecl to generalize
+          each MonoTcTyCon to get a PolyTcTyCon, with skolem TcTyVars in it,
           and a final, fixed kind.
 
-      S5) Finally, back in TcTyClDecls, we extend the environment with
+      S4) Finally, back in TcTyClDecls, we extend the environment with
           the PolyTcTyCons, and typecheck each declaration (regardless
           of kind signatures etc) to get final TyCon.
 
-    These TcTyCons are stored in the local environment in GHC.Tc.TyCl,
-    until the real full TyCons can be created during desugaring. A
-    desugared program should never have a TcTyCon.
+    More details about /kind checking/
 
-3.  A MonoTcTyCon can contain unification variables, but a PolyTcTyCon
-    does not: only skolem TcTyVars.
+      S5) In kcTyClGroup, we use checkInitialKinds to get the
+          utterly-final Kind of all TyCons in the group that
+            (a) have a separate kind signature or
+            (b) have a CUSK.
+          This produces a PolyTcTyCon, that is, a TcTyCon in which the binders
+          and result kind are full of TyVars (not TcTyVars).  No unification
+          variables here; everything is in its final form.
 
-4.  tyConScopedTyVars.  A challenging piece in all of this is that we
+3.  tyConScopedTyVars.  A challenging piece in all of this is that we
     end up taking three separate passes over every declaration:
       - one in inferInitialKind (this pass look only at the head, not the body)
       - one in kcTyClDecls (to kind-check the body)
@@ -2425,15 +2434,15 @@ tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> TcM Class
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas -> -- We need the knot because 'clas' is passed into tcClassATs
-    bindTyClTyVars class_name $ \ binders res_kind ->
+    bindTyClTyVars class_name $ \ tc_bndrs res_kind ->
     do { checkClassKindSig res_kind
-       ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
+       ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr tc_bndrs)
        ; let tycon_name = class_name        -- We use the same name
              roles = roles_info tycon_name  -- for TyCon and Class
 
        ; (ctxt, fds, sig_stuff, at_stuff)
-            <- pushLevelAndSolveEqualities skol_info binders $
-               -- The (binderVars binders) is needed bring into scope the
+            <- pushLevelAndSolveEqualities skol_info tc_bndrs $
+               -- The (binderVars tc_bndrs) is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocMA tc_fundep) fundeps
@@ -2458,9 +2467,10 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        -- any unfilled coercion variables unless there is such an error
        -- The zonk also squeeze out the TcTyCons, and converts
        -- Skolems to tyvars.
-       ; ze        <- mkEmptyZonkEnv NoFlexi
-       ; ctxt      <- zonkTcTypesToTypesX ze ctxt
-       ; sig_stuff <- mapM (zonkTcMethInfoToMethInfoX ze) sig_stuff
+       ; ze          <- mkEmptyZonkEnv NoFlexi
+       ; (ze, bndrs) <- zonkTyVarBindersX ze tc_bndrs  -- From TcTyVars to TyVars
+       ; ctxt        <- zonkTcTypesToTypesX ze ctxt
+       ; sig_stuff   <- mapM (zonkTcMethInfoToMethInfoX ze) sig_stuff
          -- ToDo: do we need to zonk at_stuff?
 
        -- TODO: Allow us to distinguish between abstract class,
@@ -2482,8 +2492,8 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   | otherwise
                   = Just (ctxt, at_stuff, sig_stuff, mindef)
 
-       ; clas <- buildClass class_name binders roles fds body
-       ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
+       ; clas <- buildClass class_name bndrs roles fds body
+       ; traceTc "tcClassDecl" (ppr fundeps $$ ppr bndrs $$
                                 ppr fds)
        ; return clas }
   where
@@ -2712,7 +2722,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = bindTyClTyVarsAndZonk tc_name $ \ binders res_kind -> do
+  = bindTyClTyVarsAndZonk tc_name $ \ tc_bndrs res_kind -> do
   { traceTc "tcFamDecl1 data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -2729,8 +2739,8 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   -- See also Note [Datatype return kinds]
   ; checkDataKindSig DataFamilySort res_kind
   ; tc_rep_name <- newTyConRepName tc_name
-  ; let inj   = Injective $ replicate (length binders) True
-        tycon = mkFamilyTyCon tc_name binders
+  ; let inj   = Injective $ replicate (length tc_bndrs) True
+        tycon = mkFamilyTyCon tc_name tc_bndrs
                               res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
@@ -2738,12 +2748,12 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = bindTyClTyVarsAndZonk tc_name $ \ binders res_kind -> do
+  = bindTyClTyVarsAndZonk tc_name $ \ tc_bndrs res_kind -> do
   { traceTc "tcFamDecl1 open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; inj' <- tcInjectivity binders inj
+  ; inj' <- tcInjectivity tc_bndrs inj
   ; checkResultSigFlag tc_name sig  -- check after injectivity for better errors
-  ; let tycon = mkFamilyTyCon tc_name binders res_kind
+  ; let tycon = mkFamilyTyCon tc_name tc_bndrs res_kind
                                (resultVariableName sig) OpenSynFamilyTyCon
                                parent inj'
   ; return tycon }
@@ -2754,10 +2764,10 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
     do { traceTc "tcFamDecl1 Closed type family:" (ppr tc_name)
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
-       ; (inj', binders, res_kind)
-            <- bindTyClTyVarsAndZonk tc_name $ \ binders res_kind ->
-               do { inj' <- tcInjectivity binders inj
-                  ; return (inj', binders, res_kind) }
+       ; (inj', tc_bndrs, res_kind)
+            <- bindTyClTyVarsAndZonk tc_name $ \ tc_bndrs res_kind ->
+               do { inj' <- tcInjectivity tc_bndrs inj
+                  ; return (inj', tc_bndrs, res_kind) }
 
        ; checkFamFlag tc_name -- make sure we have -XTypeFamilies
        ; checkResultSigFlag tc_name sig
@@ -2766,14 +2776,14 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- but eqns might be empty in the Just case as well
        ; case mb_eqns of
            Nothing   ->
-               return $ mkFamilyTyCon tc_name binders res_kind
+               return $ mkFamilyTyCon tc_name tc_bndrs res_kind
                                       (resultVariableName sig)
                                       AbstractClosedSynFamilyTyCon parent
                                       inj'
            Just eqns -> do {
 
          -- Process the equations, creating CoAxBranches
-       ; let tc_fam_tc = mkTcTyCon tc_name binders res_kind
+       ; let tc_fam_tc = mkTcTyCon tc_name tc_bndrs res_kind
                                    noTcTyConScopedTyVars
                                    False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
@@ -2792,7 +2802,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
               | null eqns = Nothing   -- mkBranchedCoAxiom fails on empty list
               | otherwise = Just (mkBranchedCoAxiom co_ax_name fam_tc branches)
 
-             fam_tc = mkFamilyTyCon tc_name binders res_kind (resultVariableName sig)
+             fam_tc = mkFamilyTyCon tc_name tc_bndrs res_kind (resultVariableName sig)
                       (ClosedSynFamilyTyCon mb_co_ax) parent inj'
 
          -- We check for instance validity later, when doing validity
@@ -2853,10 +2863,10 @@ tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
 tcTySynRhs :: RolesInfo -> Name
            -> LHsType GhcRn -> TcM TyCon
 tcTySynRhs roles_info tc_name hs_ty
-  = bindTyClTyVars tc_name $ \ binders res_kind ->
+  = bindTyClTyVars tc_name $ \ tc_bndrs res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
-       ; rhs_ty <- pushLevelAndSolveEqualities skol_info binders $
+       ; rhs_ty <- pushLevelAndSolveEqualities skol_info tc_bndrs $
                    tcCheckLHsType hs_ty (TheKind res_kind)
 
          -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
@@ -2870,11 +2880,11 @@ tcTySynRhs roles_info tc_name hs_ty
                                                  , ppr rhs_ty ] ) }
        ; doNotQuantifyTyVars dvs mk_doc
 
-       ; ze            <- mkEmptyZonkEnv NoFlexi
-       ; (ze, binders) <- zonkTyVarBindersX ze binders
-       ; rhs_ty        <- zonkTcTypeToTypeX ze rhs_ty
+       ; ze          <- mkEmptyZonkEnv NoFlexi
+       ; (ze, bndrs) <- zonkTyVarBindersX ze tc_bndrs
+       ; rhs_ty      <- zonkTcTypeToTypeX ze rhs_ty
        ; let roles = roles_info tc_name
-       ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
+       ; return (buildSynTyCon tc_name bndrs res_kind roles rhs_ty) }
   where
     skol_info = TyConSkol TypeSynonymFlavour tc_name
 
