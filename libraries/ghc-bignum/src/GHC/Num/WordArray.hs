@@ -51,6 +51,7 @@ withNewWordArray# sz act = case runRW# io of (# _, a #) -> a
          case act mwa s          of { s ->
          unsafeFreezeByteArray# mwa s
          }}
+{-# INLINE withNewWordArray# #-}
 
 -- | Create two new WordArray# of the given sizes (*in Word#*) and apply the
 -- action to them before returning them frozen
@@ -86,6 +87,7 @@ withNewWordArrayTrimmed#
 withNewWordArrayTrimmed# sz act = withNewWordArray# sz \mwa s ->
    case act mwa s of
       s' -> mwaTrimZeroes# mwa s'
+{-# INLINE withNewWordArrayTrimmed# #-}
 
 -- | Create two new WordArray# of the given sizes (*in Word#*), apply the action
 -- to them, trim their most significant zeroes, then return them frozen
@@ -101,6 +103,7 @@ withNewWordArray2Trimmed# sz1 sz2 act = withNewWordArray2# sz1 sz2 \mwa1 mwa2 s 
    case act mwa1 mwa2 s of
       s' -> case mwaTrimZeroes# mwa1 s' of
          s'' -> mwaTrimZeroes# mwa2 s''
+{-# INLINE withNewWordArray2Trimmed# #-}
 
 -- | Create a new WordArray# of the given size (*in Word#*), apply the action to
 -- it. If the action returns true#, trim its most significant zeroes, then
@@ -118,6 +121,7 @@ withNewWordArrayTrimmedMaybe# sz act = case runRW# io of (# _, a #) -> a
                (# s, _  #) -> case mwaTrimZeroes# mwa s of
                   s -> case unsafeFreezeByteArray# mwa s of
                      (# s, ba #) -> (# s, (# | ba #) #)
+{-# INLINE withNewWordArrayTrimmedMaybe# #-}
 
 -- | Create a WordArray# from two Word#
 --
@@ -296,6 +300,7 @@ mwaInitArrayBinOp mwa wa wb op s = go 0# s
             case indexWordArray# wa i `op` indexWordArray# wb i of
                v -> case mwaWrite# mwa i v s' of
                   s'' -> go (i +# 1#) s''
+{-# INLINE mwaInitArrayBinOp #-}
 
 -- | Write an element of the MutableWordArray
 mwaWrite# :: MutableWordArray# s -> Int# -> Word# -> State# s -> State# s

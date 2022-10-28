@@ -11,7 +11,8 @@ module GHC.Types.Unique.SlimSet (
     minusUniqSlimSet, unionUniqSlimSet, unionUniqSlimSets,
     ufmDom,
     -- * Querying
-    isEmptyUniqSlimSet, sizeUniqSlimSet, elemUniqSlimSet
+    isEmptyUniqSlimSet, sizeUniqSlimSet, elemUniqSlimSet,
+    nonDetEltsUniqSlimSet, nonDetFoldUniqSlimSet
   ) where
 
 import GHC.Prelude
@@ -75,6 +76,12 @@ unionUniqSlimSet (UniqSlimSet set1) (UniqSlimSet set2) = UniqSlimSet (set1 `S.un
 
 unionUniqSlimSets :: [UniqSlimSet a] -> UniqSlimSet a
 unionUniqSlimSets = foldl' (flip unionUniqSlimSet) emptyUniqSlimSet
+
+nonDetEltsUniqSlimSet :: UniqSlimSet a -> [Unique]
+nonDetEltsUniqSlimSet (UniqSlimSet s) = map mkUniqueGrimily (S.elems s)
+
+nonDetFoldUniqSlimSet :: (Unique -> acc -> acc) -> acc -> UniqSlimSet a -> acc
+nonDetFoldUniqSlimSet f acc (UniqSlimSet s) = S.foldr (f . mkUniqueGrimily) acc s
 
 instance Outputable (UniqSlimSet a) where
     ppr (UniqSlimSet s) = braces $

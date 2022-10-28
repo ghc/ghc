@@ -34,7 +34,7 @@ import GHC.Core.Predicate   ( isDictId )
 import GHC.Core.Type
 import GHC.Core.TyCo.FVs    ( tyCoVarsOfMCo )
 
-import GHC.Data.Maybe( isJust, orElse )
+import GHC.Data.Maybe( isJust, orElse, mapMaybe, expectJust )
 import GHC.Data.Graph.Directed ( SCC(..), Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq
                                , stronglyConnCompFromEdgedVerticesUniqR )
@@ -48,6 +48,7 @@ import GHC.Types.Tickish
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Var
+import GHC.Types.Unique.SlimSet
 import GHC.Types.Demand ( argOneShots, argsOneShots )
 
 import GHC.Utils.Outputable
@@ -58,6 +59,8 @@ import GHC.Utils.Misc
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
+import Data.IntMap.Strict (IntMap)
+import qualified Data.IntMap.Strict as IntMap
 import Data.List (mapAccumL, mapAccumR)
 import Data.List.NonEmpty (NonEmpty (..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
@@ -754,7 +757,8 @@ occAnalNonRecBind !env lvl imp_rule_edges bndr rhs body_usage
   = WithUsageDetails body_usage []
 
   | otherwise                   -- It's mentioned in the body
-  = WithUsageDetails (body_usage' `andUDs` rhs_usage) [NonRec final_bndr rhs']
+  = -- applyWhen (getOccFS bndr `elem` map fsLit ["binder_set","refined_id"]) (pprTrace "NonRec" (ppr bndr $$ ppr body_usage' $$ ppr rhs_usage $$ ppr (body_usage' `andUDs` rhs_usage))) $
+    WithUsageDetails (body_usage' `andUDs` rhs_usage) [NonRec final_bndr rhs']
   where
     (body_usage', tagged_bndr) = tagNonRecBinder lvl body_usage bndr
     final_bndr = tagged_bndr `setIdUnfolding` unf'
@@ -773,13 +777,13 @@ occAnalNonRecBind !env lvl imp_rule_edges bndr rhs body_usage
 
     -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
-    (WithUsageDetails rhs_uds rhs') = occAnalRhs rhs_env NonRecursive mb_join_arity rhs
+    (WithUsageDetails rhs_uds rhs') = occAnalRhs rhs_env lvl NonRecursive mb_join_arity (idOccInfo tagged_bndr) rhs
 
     --------- Unfolding ---------
     -- See Note [Unfoldings and join points]
     unf | isId bndr = idUnfolding bndr
         | otherwise = NoUnfolding
-    (WithUsageDetails unf_uds unf') = occAnalUnfolding rhs_env NonRecursive mb_join_arity unf
+    (WithUsageDetails unf_uds unf') = occAnalUnfolding rhs_env lvl NonRecursive mb_join_arity unf
 
     --------- Rules ---------
     -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
@@ -826,11 +830,13 @@ occAnalRecBind !env lvl imp_rule_edges pairs body_usage
 
     nodes :: [LetrecNode]
     nodes = {-# SCC "occAnalBind.assoc" #-}
-            map (makeNode rhs_env imp_rule_edges bndr_set) pairs
+            map (makeNode rhs_env lvl imp_rule_edges bndr_set) pairs
 
     bndrs    = map fst pairs
     bndr_set = mkVarSet bndrs
-    rhs_env  = env `addInScope` bndrs
+    -- enter the loop here and leave it in makeNode
+    rhs_env  = -- pprTrace "entering" (ppr bndrs) $
+               env `addInScope` bndrs `enterLoop` bndrs
 
 
 -----------------------------
@@ -851,7 +857,7 @@ occAnalRec !_ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
                      (NonRec tagged_bndr rhs : binds)
   where
     (body_uds', tagged_bndr) = tagNonRecBinder lvl body_uds bndr
-    rhs_uds'      = adjustRhsUsage mb_join_arity rhs rhs_uds
+    rhs_uds'      = adjustRhsUsage lvl mb_join_arity (idOccInfo tagged_bndr) rhs rhs_uds
     mb_join_arity = willBeJoinId_maybe tagged_bndr
 
         -- The Rec case is the interesting one
@@ -862,7 +868,8 @@ occAnalRec env lvl (CyclicSCC details_s) (WithUsageDetails body_uds binds)
   = WithUsageDetails body_uds binds     -- See Note [Dead code]
 
   | otherwise   -- At this point we always build a single Rec
-  = -- pprTrace "occAnalRec" (ppr loop_breaker_nodes)
+  -- = -- pprTrace "occAnalRec" (ppr loop_breaker_nodes)
+  = -- applyWhen (any (\bndr -> getOccFS bndr `elem` map fsLit ["search"]) bndrs) (pprTrace "Rec" (ppr bndrs <+> ppr (NE.nonEmpty bndrs >>= (lookupVarEnv (occ_loops env) . NE.head)) $$ ppr body_uds $$ ppr (map nd_uds details_s) $$ ppr final_uds)) $
     WithUsageDetails final_uds (Rec pairs : binds)
 
   where
@@ -1375,10 +1382,10 @@ type NodeScore = ( Int     -- Rank: lower => more likely to be picked as loop br
 rank :: NodeScore -> Int
 rank (r, _, _) = r
 
-makeNode :: OccEnv -> ImpRuleEdges -> VarSet
+makeNode :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
-makeNode !env imp_rule_edges bndr_set (bndr, rhs)
+makeNode !env lvl imp_rule_edges bndr_set (bndr, rhs)
   = DigraphNode { node_payload      = details
                 , node_key          = varUnique bndr
                 , node_dependencies = nonDetKeysUniqSet scope_fvs }
@@ -1398,8 +1405,10 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     bndr' = bndr `setIdUnfolding`      unf'
                  `setIdSpecialisation` mkRuleInfo rules'
 
+    loop_lvl = lookupLoopLevel env bndr
     inl_uds = rhs_uds `andUDs` unf_uds
-    scope_uds = inl_uds `andUDs` rule_uds
+    scope_uds = -- pprTrace "leaving" (ppr bndr <+> ppr loop_lvl) $
+                leaveLoop loop_lvl bndr $ inl_uds `andUDs` rule_uds
                    -- Note [Rules are extra RHSs]
                    -- Note [Rule dependency info]
     scope_fvs = udFreeVars bndr_set scope_uds
@@ -1432,7 +1441,7 @@ makeNode !env imp_rule_edges bndr_set (bndr, rhs)
     -- See Note [Unfoldings and join points]
     unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
                                -- here because that is what we are setting!
-    (WithUsageDetails unf_uds unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
+    (WithUsageDetails unf_uds unf') = occAnalUnfolding rhs_env lvl Recursive mb_join_arity unf
 
     --------- IMP-RULES --------
     is_active     = occ_rule_act env :: Activation -> Bool
@@ -1895,16 +1904,17 @@ of a right hand side is handled by occAnalLam.
 *                                                                      *
 ********************************************************************* -}
 
-occAnalRhs :: OccEnv -> RecFlag -> Maybe JoinArity
+occAnalRhs :: OccEnv -> TopLevelFlag -> RecFlag -> Maybe JoinArity
+           -> OccInfo    -- How often does the binder of the RHS occur?
            -> CoreExpr   -- RHS
            -> WithUsageDetails CoreExpr
-occAnalRhs !env is_rec mb_join_arity rhs
+occAnalRhs !env lvl is_rec mb_join_arity occ rhs
   = let (WithUsageDetails usage rhs1) = occAnalLam env rhs
            -- We call occAnalLam here, not occAnalExpr, so that it doesn't
            -- do the markAllInsideLam and markNonTailCall stuff before
            -- we've had a chance to help with join points; that comes next
         rhs2      = markJoinOneShots is_rec mb_join_arity rhs1
-        rhs_usage = adjustRhsUsage mb_join_arity rhs2 usage
+        rhs_usage = adjustRhsUsage lvl mb_join_arity occ rhs2 usage
     in WithUsageDetails rhs_usage rhs2
 
 
@@ -1928,18 +1938,19 @@ markJoinOneShots _ _ rhs
   = rhs
 
 occAnalUnfolding :: OccEnv
+                 -> TopLevelFlag
                  -> RecFlag
                  -> Maybe JoinArity   -- See Note [Join points and unfoldings/rules]
                  -> Unfolding
                  -> WithUsageDetails Unfolding
 -- Occurrence-analyse a stable unfolding;
 -- discard a non-stable one altogether.
-occAnalUnfolding !env is_rec mb_join_arity unf
+occAnalUnfolding !env lvl is_rec mb_join_arity unf
   = case unf of
       unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
         | isStableSource src ->
             let
-              (WithUsageDetails usage rhs') = occAnalRhs env is_rec mb_join_arity rhs
+              (WithUsageDetails usage rhs') = occAnalRhs env lvl is_rec mb_join_arity noOccInfo rhs
 
               unf' | noBinderSwaps env = unf -- Note [Unfoldings and rules]
                    | otherwise         = unf { uf_tmpl = rhs' }
@@ -2286,7 +2297,7 @@ occAnalApp !env (Var fun, args, ticks)
   --     This caused #18296
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
-  , let (WithUsageDetails usage arg') = occAnalRhs env NonRecursive (Just 1) arg
+  , let (WithUsageDetails usage arg') = occAnalRhs env NotTopLevel NonRecursive (Just 1) IAmDead arg -- IAmDead is OK because we are only interested in whether it is ManyOcc or not
   = WithUsageDetails usage (mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
 
 occAnalApp env (Var fun_id, args, ticks)
@@ -2298,7 +2309,7 @@ occAnalApp env (Var fun_id, args, ticks)
     !(fun', fun_id')  = lookupBndrSwap env fun_id
     !(WithUsageDetails args_uds app') = occAnalArgs env fun' args one_shots
 
-    fun_uds = mkOneOcc fun_id' int_cxt n_args
+    fun_uds = mkOneOcc env fun_id' int_cxt n_args
        -- NB: fun_uds is computed for fun_id', not fun_id
        -- See (BS1) in Note [The binder-swap substitution]
 
@@ -2458,6 +2469,8 @@ scrutinised y).
 data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
+           , occ_cur_lvl    :: !LoopLevel         -- ^ Current loop level
+           , occ_loops      :: !(IdEnv LoopLevel) -- ^ The loop levels of enclosing letrec binders
            , occ_unf_act    :: Id -> Bool          -- Which Id unfoldings are active
            , occ_rule_act   :: Activation -> Bool  -- Which rules are active
              -- See Note [Finding rule RHS free vars]
@@ -2506,6 +2519,8 @@ initOccEnv :: OccEnv
 initOccEnv
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
+           , occ_cur_lvl   = 0
+           , occ_loops     = emptyVarEnv
 
                  -- To be conservative, we say that all
                  -- inlines and rules are active
@@ -2545,6 +2560,11 @@ isRhsEnv (OccEnv { occ_encl = cxt }) = case cxt of
                                           OccRhs -> True
                                           _      -> False
 
+lookupLoopLevel :: OccEnv -> Id -> Int
+lookupLoopLevel (OccEnv { occ_loops = loops }) id
+  | Just lvl <- lookupVarEnv loops id = lvl
+  | otherwise                         = 0
+
 addOneInScope :: OccEnv -> CoreBndr -> OccEnv
 addOneInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndr
   | bndr `elemVarSet` rng_vars = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
@@ -2558,6 +2578,29 @@ addInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndrs
   | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
   | otherwise                         = env { occ_bs_env = swap_env `delVarEnvList` bndrs }
 
+enterLoop :: OccEnv -> [Var] -> OccEnv
+enterLoop env vs
+  = env { occ_cur_lvl = new_lvl
+        , occ_loops   = extendVarEnvList (occ_loops env) [(v,new_lvl) | v<-vs] }
+  where
+    new_lvl = occ_cur_lvl env + 1
+
+leaveLoop :: LoopLevel -> Id -> UsageDetails -> UsageDetails
+leaveLoop loop_lvl bndr ud@UD{ud_loop_info=lli}
+  | loop_lvl > max_lvl = ud
+  | otherwise     = assertPpr (loop_lvl == max_lvl) (text "loop_lvl < max_lvl is wrong" $$ ppr bndr <+> ppr loop_lvl <+> ppr max_lvl $$ ppr ud) $
+                    -- pprTraceWith "leave interesting" (\r -> ppr lvl $$ ppr ud $$ ppr r) $
+                    ud { ud_z_in_lam = ud_z_in_lam ud `plusVarEnv` (ud_env ud `minusVarEnv` nml), ud_loop_info = lli' }
+  where
+    max_lvl = lli_max (ud_loop_info ud)
+    nml = lli_non_max_lvls lli
+    lli' = case IntMap.maxViewWithKey (lli_inv lli) of
+      Nothing -> emptyLoopLevelInfo
+      Just ((new_lvl, new_max_occs), inv') ->
+        lli { lli_max = new_lvl
+            , lli_inv = inv'
+            , lli_non_max_lvls = nonDetFoldUniqSlimSet (\u nml -> delFromUFM_Directly nml u) (lli_non_max_lvls lli) new_max_occs
+            }
 
 --------------------
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
@@ -2975,34 +3018,83 @@ info then simply means setting the corresponding zapped set to the whole
 'OccInfoEnv', a fast O(1) operation.
 -}
 
-type OccInfoEnv = IdEnv OccInfo -- A finite map from ids to their usage
-                -- INVARIANT: never IAmDead
-                -- (Deadness is signalled by not being in the map at all)
+type LoopLevel = Int
+
+-- | Level 0 is the loop level we never exit. Every letrec binder will have loop
+-- level at least 1.
+notLooping :: LoopLevel
+notLooping = 0
+
+type LoopLevelMap = IntMap
+
+type OccInfoEnv = IdEnv OccInfo
+  -- ^ A finite map from ids to their usage.
+  -- INVARIANT: The OccInfo is never IAmDead
+  -- (Deadness is signalled by not being in the map at all)
 
 type ZappedSet = OccInfoEnv -- Values are ignored
 
+-- | Represents an efficient bidirectional mapping between occuring 'Id's
+-- and the maximum 'LoopLevel' of the recursive binders with which they
+-- co-occur.
+data LoopLevelInfo
+  = LLI { lli_max :: !LoopLevel
+        -- ^ Maximum loop level of a rec binder occuring in the expression
+        , lli_non_max_lvls :: !(IdEnv Int)
+        -- ^ Binders that (are not dead, and) do not occur at loop level
+        -- 'lli_max' will have their loop-level stated here.
+        , lli_inv :: !(LoopLevelMap VarSlimSet)
+        -- ^ Inverse mapping of 'lli_non_max_lvls'.
+        -- If a binder has max loop level l, it will be regarded as "used on an
+        -- exit path" wrt. the loop with level l.
+        -- INVARIANT: The sets for different levels are disjoint
+        }
+
+
 data UsageDetails
   = UD { ud_env       :: !OccInfoEnv
+       , ud_loop_info :: !LoopLevelInfo
        , ud_z_many    :: !ZappedSet   -- apply 'markMany' to these
        , ud_z_in_lam  :: !ZappedSet   -- apply 'markInsideLam' to these
        , ud_z_no_tail :: !ZappedSet } -- apply 'markNonTail' to these
   -- INVARIANT: All three zapped sets are subsets of the OccInfoEnv
 
 instance Outputable UsageDetails where
-  ppr ud = ppr (ud_env (flattenUsageDetails ud))
+  ppr ud = ppr (ud_env (flattenUsageDetails ud)) $$ ppr (ud_loop_info ud)
+
+instance Outputable LoopLevelInfo where
+  ppr LLI{lli_max=lvl, lli_non_max_lvls=lvls} = int lvl <> ppr lvls
 
 -------------------
 -- UsageDetails API
 
 andUDs, orUDs
         :: UsageDetails -> UsageDetails -> UsageDetails
-andUDs = combineUsageDetailsWith addOccInfo
-orUDs  = combineUsageDetailsWith orOccInfo
+andUDs = combineUsageDetailsWith addOccInfo andLoopLevelInfo
+orUDs  = combineUsageDetailsWith orOccInfo orLoopLevelInfo
 
-mkOneOcc :: Id -> InterestingCxt -> JoinArity -> UsageDetails
-mkOneOcc id int_cxt arity
+andLoopLevelInfo :: LoopLevel -> OccInfoEnv -> LoopLevelInfo -> LoopLevelInfo
+andLoopLevelInfo lvl _occs lli = markAllLoopLevel lvl lli
+
+orLoopLevelInfo :: LoopLevel -> OccInfoEnv -> LoopLevelInfo -> LoopLevelInfo
+orLoopLevelInfo other_max occs lli
+  | other_max <= our_max = lli
+  | otherwise            = LLI { lli_max = other_max
+                               , lli_non_max_lvls = non_max_lvls'
+                               , lli_inv = inv'
+                               }
+  where
+    our_max = lli_max lli
+    our_max_occs = occs `minusVarEnv` lli_non_max_lvls lli
+    inv' = IntMap.insert our_max (ufmDom our_max_occs) (lli_inv lli)
+    non_max_lvls' = mapVarEnv (const our_max) our_max_occs `plusVarEnv` lli_non_max_lvls lli -- NB: plusVarEnv is right-biased, so lower level wins
+
+mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
+mkOneOcc env id int_cxt arity
   | isLocalId id
-  = emptyDetails { ud_env = unitVarEnv id occ_info }
+  , let !lvl = lookupLoopLevel env id
+  = emptyDetails { ud_env = unitVarEnv id occ_info
+                 , ud_loop_info = emptyLoopLevelInfo { lli_max = lvl } }
   | otherwise
   = emptyDetails
   where
@@ -3037,14 +3129,36 @@ addLamCoVarOccs uds bndrs
 
 delDetails :: UsageDetails -> Id -> UsageDetails
 delDetails ud bndr
-  = ud `alterUsageDetails` (`delVarEnv` bndr)
+  = ud `alterUsageDetails` (`delVarEnv` bndr) `alterLoopLevelInfo` (`delLoopLevel` bndr)
 
 delDetailsList :: UsageDetails -> [Id] -> UsageDetails
 delDetailsList ud bndrs
-  = ud `alterUsageDetails` (`delVarEnvList` bndrs)
+  = ud `alterUsageDetails` (`delVarEnvList` bndrs) `alterLoopLevelInfo` (`delLoopLevelList` bndrs)
+
+delLoopLevel :: LoopLevelInfo -> Id -> LoopLevelInfo
+delLoopLevel lli@(LLI { lli_non_max_lvls = nml, lli_inv = inv }) id
+  | Just lvl <- lookupVarEnv (lli_non_max_lvls lli) id
+  = lli { lli_non_max_lvls = delVarEnv nml id
+        , lli_inv = IntMap.adjust (`delUniqSlimSet` id) lvl inv }
+  | otherwise
+  = lli
+
+delLoopLevelList :: LoopLevelInfo -> [Id] -> LoopLevelInfo
+delLoopLevelList lli@(LLI { lli_non_max_lvls = nml, lli_inv = inv }) ids
+  = lli { lli_non_max_lvls = delVarEnvList nml ids
+        , lli_inv = foldr (IntMap.adjust (`minusUniqSlimSet` ids_set)) inv lvls }
+  where
+    ids_set = mkUniqSlimSet ids
+    lvls = mapMaybe (lookupVarEnv (lli_non_max_lvls lli)) ids
+
+emptyLoopLevelInfo :: LoopLevelInfo
+emptyLoopLevelInfo = LLI { lli_max = notLooping
+                         , lli_non_max_lvls = emptyVarEnv
+                         , lli_inv = IntMap.empty }
 
 emptyDetails :: UsageDetails
 emptyDetails = UD { ud_env       = emptyVarEnv
+                  , ud_loop_info = emptyLoopLevelInfo
                   , ud_z_many    = emptyVarEnv
                   , ud_z_in_lam  = emptyVarEnv
                   , ud_z_no_tail = emptyVarEnv }
@@ -3066,8 +3180,20 @@ markAllInsideLamIf  False ud = ud
 markAllNonTailIf True  ud = markAllNonTail ud
 markAllNonTailIf False ud = ud
 
-
 markAllManyNonTail = markAllMany . markAllNonTail -- effectively sets to noOccInfo
+
+markAllLoopLevel :: LoopLevel -> LoopLevelInfo -> LoopLevelInfo
+markAllLoopLevel lvl lli
+  | lvl >= lli_max lli = LLI { lli_max = lvl, lli_non_max_lvls = emptyVarEnv, lli_inv = IntMap.empty }
+  | otherwise          = LLI { lli_max = lli_max lli
+                             , lli_non_max_lvls = non_max_lvls'
+                             , lli_inv = inv'
+                             }
+  where
+    (lower, mb_exact, higher) = IntMap.splitLookup lvl (lli_inv lli)
+    raised_vars = IntMap.foldr unionUniqSlimSet (mb_exact `orElse` emptyUniqSlimSet) lower
+    inv' = IntMap.insert lvl raised_vars higher
+    non_max_lvls' = nonDetFoldUniqSlimSet (\u lvls -> addToUFM_Directly lvls u lvl) (lli_non_max_lvls lli) raised_vars
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
@@ -3089,15 +3215,32 @@ restrictFreeVars bndrs fvs = restrictUniqSetToUFM bndrs fvs
 -- Auxiliary functions for UsageDetails implementation
 
 combineUsageDetailsWith :: (OccInfo -> OccInfo -> OccInfo)
+                        -> (LoopLevel -> OccInfoEnv -> LoopLevelInfo -> LoopLevelInfo)
                         -> UsageDetails -> UsageDetails -> UsageDetails
-combineUsageDetailsWith plus_occ_info ud1 ud2
+combineUsageDetailsWith plus_occ_info bump_loop_info ud1 ud2
   | isEmptyDetails ud1 = ud2
   | isEmptyDetails ud2 = ud1
   | otherwise
   = UD { ud_env       = plusVarEnv_C plus_occ_info (ud_env ud1) (ud_env ud2)
+       , ud_loop_info = combineLoopLevelInfoWith bump_loop_info (ud_env ud1) (ud_loop_info ud1) (ud_env ud2) (ud_loop_info ud2)
        , ud_z_many    = plusVarEnv (ud_z_many    ud1) (ud_z_many    ud2)
        , ud_z_in_lam  = plusVarEnv (ud_z_in_lam  ud1) (ud_z_in_lam  ud2)
        , ud_z_no_tail = plusVarEnv (ud_z_no_tail ud1) (ud_z_no_tail ud2) }
+
+combineLoopLevelInfoWith :: (LoopLevel -> OccInfoEnv -> LoopLevelInfo -> LoopLevelInfo)
+                         -> OccInfoEnv -> LoopLevelInfo
+                         -> OccInfoEnv -> LoopLevelInfo
+                         -> LoopLevelInfo
+combineLoopLevelInfoWith bump_loop_info u1 lli1 u2 lli2
+  = assert (lli_max lli1' == lli_max lli2') $
+    assert (lli_max lli1' == lli_max lli1 `max` lli_max lli2) $
+    LLI { lli_max = lli_max lli1 `max` lli_max lli2
+        , lli_non_max_lvls = plusVarEnv_C max (lli_non_max_lvls lli1') (lli_non_max_lvls lli2')
+        , lli_inv = IntMap.unionWith unionUniqSlimSet (lli_inv lli1') (lli_inv lli2')
+        }
+  where
+    lli1' = bump_loop_info (lli_max lli2) u1 lli1
+    lli2' = bump_loop_info (lli_max lli1) u2 lli2
 
 doZapping :: UsageDetails -> Var -> OccInfo -> OccInfo
 doZapping ud var occ
@@ -3118,31 +3261,44 @@ doZappingByUnique (UD { ud_z_many = many
 
 alterUsageDetails :: UsageDetails -> (OccInfoEnv -> OccInfoEnv) -> UsageDetails
 alterUsageDetails !ud f
-  = UD { ud_env       = f (ud_env       ud)
+  = ud { ud_env       = f (ud_env       ud)
        , ud_z_many    = f (ud_z_many    ud)
        , ud_z_in_lam  = f (ud_z_in_lam  ud)
        , ud_z_no_tail = f (ud_z_no_tail ud) }
 
+alterLoopLevelInfo :: UsageDetails -> (LoopLevelInfo -> LoopLevelInfo) -> UsageDetails
+alterLoopLevelInfo !ud f
+  = ud { ud_loop_info = f (ud_loop_info ud) }
+
 flattenUsageDetails :: UsageDetails -> UsageDetails
 flattenUsageDetails ud@(UD { ud_env = env })
   = UD { ud_env       = mapUFM_Directly (doZappingByUnique ud) env
+       , ud_loop_info = ud_loop_info ud
        , ud_z_many    = emptyVarEnv
        , ud_z_in_lam  = emptyVarEnv
        , ud_z_no_tail = emptyVarEnv }
 
 -------------------
 -- See Note [Adjusting right-hand sides]
-adjustRhsUsage :: Maybe JoinArity
+adjustRhsUsage :: TopLevelFlag
+               -> Maybe JoinArity
+               -> OccInfo
                -> CoreExpr       -- Rhs, AFTER occ anal
                -> UsageDetails   -- From body of lambda
                -> UsageDetails
-adjustRhsUsage mb_join_arity rhs usage
+adjustRhsUsage lvl mb_join_arity occ rhs usage
   = -- c.f. occAnal (Lam {})
-    markAllInsideLamIf (not one_shot) $
+    -- pprTrace "adjust" (ppr lvl <+> ppr mb_join_arity <+> ppr occ <+> ppr rhs <+> ppr usage) $
+    markAllInsideLamIf (not one_shot && not occ_one_shot) $
     markAllNonTailIf (not exact_join) $
     usage
   where
     one_shot   = isOneShotFun rhs
+    occ_one_shot = not (isTopLevel lvl) && case occ of
+      IAmDead  -> True
+      OneOcc{} -> occ_in_lam occ == NotInsideLam
+      _        -> False
+
     exact_join = exactJoin mb_join_arity bndrs
     (bndrs,_)  = collectBinders rhs
 
@@ -3192,9 +3348,9 @@ tagNonRecBinder lvl usage binder
  = let
      occ     = lookupDetails usage binder
      will_be_join = decideJoinPointHood lvl usage (NE.singleton binder)
-     occ'    | will_be_join = -- must already be marked AlwaysTailCalled
-                              assert (isAlwaysTailCalled occ) occ
-             | otherwise    = markNonTail occ
+     occ' | will_be_join = -- must already be marked AlwaysTailCalled
+                           assert (isAlwaysTailCalled occ) occ
+          | otherwise    = markNonTail occ
      binder' = setBinderOcc occ' binder
      usage'  = usage `delDetails` binder
    in
@@ -3211,20 +3367,20 @@ tagRecBinders :: TopLevelFlag           -- At top level?
 tagRecBinders lvl body_uds details_s
  = let
      bndrs    = map nd_bndr details_s
+     bndrs_ne = expectJust "empty list of bndrs" $ nonEmpty bndrs
      rhs_udss = map nd_uds  details_s
-
+     body_occ = case filter (not . isDeadOcc) (map (lookupDetails body_uds) bndrs) of
+       []   -> IAmDead
+       o:os -> foldr addOccInfo o os
      -- 1. Determine join-point-hood of whole group, as determined by
      --    the *unadjusted* usage details
      unadj_uds     = foldr andUDs body_uds rhs_udss
 
-     -- This is only used in `mb_join_arity`, to adjust each `Details` in `details_s`, thus,
-     -- when `bndrs` is non-empty. So, we only write `maybe False` as `decideJoinPointHood`
-     -- takes a `NonEmpty CoreBndr`; the default value `False` won't affect program behavior.
-     will_be_joins = maybe False (decideJoinPointHood lvl unadj_uds) (nonEmpty bndrs)
+     will_be_joins = decideJoinPointHood lvl unadj_uds bndrs_ne
 
      -- 2. Adjust usage details of each RHS, taking into account the
      --    join-point-hood decision
-     rhs_udss' = [ adjustRhsUsage (mb_join_arity bndr) rhs rhs_uds
+     rhs_udss' = [ adjustRhsUsage lvl (mb_join_arity bndr) body_occ rhs rhs_uds
                  | ND { nd_bndr = bndr, nd_uds = rhs_uds
                       , nd_rhs = rhs } <- details_s ]
 
