@@ -7,7 +7,7 @@
 
 module GHC.Types.Var.Set (
         -- * Var, Id and TyVar set types
-        VarSet, IdSet, TyVarSet, CoVarSet, TyCoVarSet,
+        VarSet, VarSlimSet, IdSet, TyVarSet, CoVarSet, TyCoVarSet,
 
         -- ** Manipulating these sets
         emptyVarSet, unitVarSet, mkVarSet,
@@ -52,6 +52,7 @@ import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import GHC.Types.Unique
 import GHC.Types.Name     ( Name )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.SlimSet
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.FM( disjointUFM, pluralUFM, pprUFM )
 import GHC.Types.Unique.DFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
@@ -65,6 +66,9 @@ import GHC.Utils.Outputable (SDoc)
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code, for example when abstracting variables.
 type VarSet       = UniqSet Var
+
+-- | A slim ('UniqSlimSet') variant of 'VarSet'
+type VarSlimSet   = UniqSlimSet Var
 
 -- | Identifier Set
 type IdSet        = UniqSet Id

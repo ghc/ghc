@@ -20,6 +20,7 @@ import GHC.Types.Id
 import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Core.Utils ( exprIsCheap, exprIsTrivial )
 import GHC.Data.Graph.UnVar
+import GHC.Types.Unique.SlimSet
 import GHC.Types.Demand
 import GHC.Utils.Misc
 
@@ -590,7 +591,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     called_by_v = domRes ae_rhs'
     called_with_v
         | boring    = domRes ae_body
-        | otherwise = calledWith ae_body v `delUnVarSet` v
+        | otherwise = calledWith ae_body v `delUniqSlimSet` v
     final_ae = addCrossCoCalls called_by_v called_with_v $ ae_rhs' `lubRes` resDel v ae_body
 
     v' = v `setIdCallArity` trimmed_arity
@@ -624,7 +625,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
         ae = callArityRecEnv any_boring aes_old ae_body
 
         rerun (i, mbLastRun, rhs)
-            | i `elemVarSet` int_body && not (i `elemUnVarSet` domRes ae)
+            | i `elemVarSet` int_body && not (i `elemUniqSlimSet` domRes ae)
             -- No call to this yet, so do nothing
             = (False, (i, Nothing, rhs))
 
@@ -690,7 +691,7 @@ callArityRecEnv any_boring ae_rhss ae_body
         -- What do we want to know from these?
         -- Which calls can happen next to any recursive call.
         called_with_v
-            = unionUnVarSets $ map (calledWith ae_before_v) vars
+            = unionUniqSlimSets $ map (calledWith ae_before_v) vars
         called_by_v = domRes ae_rhs
 
     ae_new = first (cross_calls `unionUnVarGraph`) ae_combined
@@ -727,8 +728,8 @@ resDelList vs ae = foldl' (flip resDel) ae vs
 resDel :: Var -> CallArityRes -> CallArityRes
 resDel v (!g, !ae) = (g `delNode` v, ae `delVarEnv` v)
 
-domRes :: CallArityRes -> UnVarSet
-domRes (_, ae) = varEnvDom ae
+domRes :: CallArityRes -> UniqSlimSet Var
+domRes (_, ae) = ufmDom ae
 
 -- In the result, find out the minimum arity and whether the variable is called
 -- at most once.
@@ -738,10 +739,10 @@ lookupCallArityRes (g, ae) v
         Just a -> (a, not (g `hasLoopAt` v))
         Nothing -> (0, False)
 
-calledWith :: CallArityRes -> Var -> UnVarSet
+calledWith :: CallArityRes -> Var -> UniqSlimSet Var
 calledWith (g, _) v = neighbors g v
 
-addCrossCoCalls :: UnVarSet -> UnVarSet -> CallArityRes -> CallArityRes
+addCrossCoCalls :: UniqSlimSet Var -> UniqSlimSet Var -> CallArityRes -> CallArityRes
 addCrossCoCalls set1 set2 = first (completeBipartiteGraph set1 set2 `unionUnVarGraph`)
 
 -- Replaces the co-call graph by a complete graph (i.e. no information)

@@ -52,7 +52,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
-import GHC.Data.Graph.UnVar
+import GHC.Types.Unique.SlimSet
 import Data.List (mapAccumL)
 import qualified Data.ByteString as BS
 
@@ -193,7 +193,7 @@ data SimpleOptEnv
         , soe_subst :: Subst
              -- ^ Deals with cloning; includes the InScopeSet
 
-        , soe_rec_ids :: !UnVarSet
+        , soe_rec_ids :: !VarSlimSet
              -- ^ Fast OutVarSet tracking which recursive RHSs we are analysing.
              -- See Note [Eta reduction in recursive RHSs]
         }
@@ -207,7 +207,7 @@ instance Outputable SimpleOptEnv where
 emptyEnv :: SimpleOpts -> SimpleOptEnv
 emptyEnv opts = SOE { soe_inl     = emptyVarEnv
                     , soe_subst   = emptySubst
-                    , soe_rec_ids = emptyUnVarSet
+                    , soe_rec_ids = emptyUniqSlimSet
                     , soe_opts    = opts  }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
@@ -226,7 +226,7 @@ enterRecGroupRHSs :: SimpleOptEnv -> [OutBndr] -> (SimpleOptEnv -> (SimpleOptEnv
 enterRecGroupRHSs env bndrs k
   = (env'{soe_rec_ids = soe_rec_ids env}, r)
   where
-    (env', r) = k env{soe_rec_ids = extendUnVarSetList bndrs (soe_rec_ids env)}
+    (env', r) = k env{soe_rec_ids = extendUniqSlimSetList bndrs (soe_rec_ids env)}
 
 ---------------
 simple_opt_clo :: InScopeSet

@@ -755,6 +755,7 @@ Library
         GHC.Types.Unique.MemoFun
         GHC.Types.Unique.SDFM
         GHC.Types.Unique.Set
+        GHC.Types.Unique.SlimSet
         GHC.Types.Unique.Supply
         GHC.Types.Var
         GHC.Types.Var.Env

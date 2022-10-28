@@ -30,7 +30,8 @@ import GHC.Core
 import GHC.Core.Seq
 import GHC.Core.Opt.WorkWrap.Utils
 
-import GHC.Data.Graph.UnVar -- for UnVarSet
+import GHC.Types.Unique.SlimSet
+import GHC.Types.Var.Set
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -609,7 +610,7 @@ instance Outputable AnalEnv where
 -- See Note [Efficient Top sigs in SigEnv].
 data SigEnv
   = SE
-  { se_tops :: !UnVarSet
+  { se_tops :: !VarSlimSet
   -- ^ All these Ids have 'topCprSig'. Like a 'VarSet', but more efficient.
   , se_sigs :: !(VarEnv CprSig)
   -- ^ Ids that have something other than 'topCprSig'.
@@ -624,7 +625,7 @@ instance Outputable SigEnv where
 emptyAnalEnv :: FamInstEnvs -> AnalEnv
 emptyAnalEnv fam_envs
   = AE
-  { ae_sigs = SE emptyUnVarSet emptyVarEnv
+  { ae_sigs = SE emptyUniqSlimSet emptyVarEnv
   , ae_virgin = True
   , ae_fam_envs = fam_envs
   , ae_rec_dc = memoiseUniqueFun (isRecDataCon fam_envs fuel)
@@ -639,14 +640,14 @@ modifySigEnv f env = env { ae_sigs = f (ae_sigs env) }
 lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
 -- See Note [Efficient Top sigs in SigEnv]
 lookupSigEnv AE{ae_sigs = SE tops sigs} id
-  | id `elemUnVarSet` tops = Just topCprSig
+  | id `elemUniqSlimSet` tops = Just topCprSig
   | otherwise              = lookupVarEnv sigs id
 
 extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
 -- See Note [Efficient Top sigs in SigEnv]
 extendSigEnv env id sig
   | isTopCprSig sig
-  = modifySigEnv (\se -> se{se_tops = extendUnVarSet id (se_tops se)}) env
+  = modifySigEnv (\se -> se{se_tops = extendUniqSlimSet id (se_tops se)}) env
   | otherwise
   = modifySigEnv (\se -> se{se_sigs = extendVarEnv (se_sigs se) id sig}) env
 
@@ -705,7 +706,7 @@ Note [Efficient Top sigs in SigEnv]
 It's pretty common for binders in the SigEnv to have a 'topCprSig'.
 Wide records with 100 fields like in T9675 even will generate code where the
 majority of binders has Top signature. To save some allocations, we store
-those binders with a Top signature in a separate UnVarSet (which is an IntSet
+those binders with a Top signature in a separate VarSlimSet (which is an IntSet
 with a convenient Var-tailored API).
 
 Why store top signatures at all in the SigEnv? After all, when 'cprTransform'
@@ -715,7 +716,7 @@ Well, the problem is when case binders should have a Top signatures. They always
 have an unfolding and thus look to 'cprTransform' as if they bind a data
 structure, Note [CPR for data structures], and thus would always have the CPR
 property. So we need some mechanism to separate data structures from case
-binders with a Top signature, and the UnVarSet provides that in the least
+binders with a Top signature, and the VarSlimSet provides that in the least
 convoluted way I can think of.
 
 Note [CPR for binders that will be unboxed]

@@ -65,7 +65,6 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Data.OrdList
-import GHC.Data.Graph.UnVar
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
 import GHC.Builtin.Types
@@ -83,6 +82,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
+import GHC.Types.Unique.SlimSet
 
 import Data.List ( intersperse, mapAccumL )
 
@@ -171,7 +171,7 @@ data SimplEnv
 
         -- | Fast OutVarSet tracking which recursive RHSs we are analysing.
         -- See Note [Eta reduction in recursive RHSs] in GHC.Core.Opt.Arity.
-      , seRecIds :: !UnVarSet
+      , seRecIds :: !VarSlimSet
 
      ----------- Dynamic part of the environment -----------
      -- Dynamic in the sense of describing the setup where
@@ -498,7 +498,7 @@ mkSimplEnv mode fam_envs
              , seTvSubst   = emptyVarEnv
              , seCvSubst   = emptyVarEnv
              , seIdSubst   = emptyVarEnv
-             , seRecIds    = emptyUnVarSet
+             , seRecIds    = emptyUniqSlimSet
              , seCaseDepth = 0 }
         -- The top level "enclosing CC" is "SUBSUMED".
 
@@ -591,7 +591,7 @@ enterRecGroupRHSs :: SimplEnv -> [OutBndr] -> (SimplEnv -> SimplM (r, SimplEnv))
                   -> SimplM (r, SimplEnv)
 enterRecGroupRHSs env bndrs k = do
   --pprTraceM "enterRecGroupRHSs" (ppr bndrs)
-  (r, env'') <- k env{seRecIds = extendUnVarSetList bndrs (seRecIds env)}
+  (r, env'') <- k env{seRecIds = extendUniqSlimSetList bndrs (seRecIds env)}
   return (r, env''{seRecIds = seRecIds env})
 
 {- Note [Setting the right in-scope set]

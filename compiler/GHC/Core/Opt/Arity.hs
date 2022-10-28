@@ -72,12 +72,12 @@ import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Tickish
+import GHC.Types.Unique.SlimSet
 
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Uniques
 
 import GHC.Data.FastString
-import GHC.Data.Graph.UnVar
 import GHC.Data.Pair
 
 import GHC.Utils.GlobalVars( unsafeHasNoStateHack )
@@ -2602,7 +2602,7 @@ same fix.
 -- according to `sd` and can soundly and gainfully be eta-reduced to `e'`.
 -- See Note [Eta reduction soundness]
 -- and Note [Eta reduction makes sense] when that is the case.
-tryEtaReduce :: UnVarSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
+tryEtaReduce :: VarSlimSet -> [Var] -> CoreExpr -> SubDemand -> Maybe CoreExpr
 -- Return an expression equal to (\bndrs. body)
 tryEtaReduce rec_ids bndrs body eval_sd
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
@@ -2670,7 +2670,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
     -- See Note [Eta reduction soundness], this is THE place to check soundness!
     is_eta_reduction_sound fun =
       -- Don't eta-reduce in fun in its own recursive RHSs
-      not (fun `elemUnVarSet` rec_ids)               -- criterion (R)
+      not (fun `elemUniqSlimSet` rec_ids)            -- criterion (R)
       -- Check that eta-reduction won't make the program stricter...
       && (fun_arity fun >= incoming_arity            -- criterion (A) and (E)
            || all_calls_with_arity incoming_arity)   -- criterion (S)

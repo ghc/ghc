@@ -46,7 +46,6 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.FastString
 import GHC.Data.Pair
-import GHC.Data.Graph.UnVar
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -59,6 +58,7 @@ import GHC.Utils.Logger
 import GHC.Types.Demand
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Id.Make ( realWorldPrimId )
@@ -68,6 +68,7 @@ import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.TyThing
+import GHC.Types.Unique.SlimSet
 import GHC.Types.Unique.Supply
 
 import Data.List        ( unfoldr )
@@ -1771,7 +1772,7 @@ mkFloat env dmd is_unlifted bndr rhs
     is_hnf      = exprIsHNF rhs
     is_strict   = isStrUsedDmd dmd
     ok_for_spec = exprOkForSpecEval (not . is_rec_call) rhs
-    is_rec_call = (`elemUnVarSet` cpe_rec_ids env)
+    is_rec_call = (`elemUniqSlimSet` cpe_rec_ids env)
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
@@ -1983,7 +1984,7 @@ data CorePrepEnv
 
         , cpe_tyco_env :: Maybe CpeTyCoEnv -- See Note [CpeTyCoEnv]
 
-        , cpe_rec_ids         :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
+        , cpe_rec_ids         :: VarSlimSet -- Faster OutIdSet; See Note [Speculative evaluation]
     }
 
 mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
@@ -1991,7 +1992,7 @@ mkInitialCorePrepEnv cfg = CPE
       { cpe_config        = cfg
       , cpe_env           = emptyVarEnv
       , cpe_tyco_env      = Nothing
-      , cpe_rec_ids       = emptyUnVarSet
+      , cpe_rec_ids       = emptyUniqSlimSet
       }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
@@ -2015,7 +2016,7 @@ lookupCorePrepEnv cpe id
 
 enterRecGroupRHSs :: CorePrepEnv -> [OutId] -> CorePrepEnv
 enterRecGroupRHSs env grp
-  = env { cpe_rec_ids = extendUnVarSetList grp (cpe_rec_ids env) }
+  = env { cpe_rec_ids = extendUniqSlimSetList grp (cpe_rec_ids env) }
 
 ------------------------------------------------------------------------------
 --           CpeTyCoEnv
