@@ -298,23 +298,6 @@ then
     exit 1
 fi
 
-# Testing if we shall enable shared libs support on Solaris.
-# Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
-
-SOLARIS_BROKEN_SHLD=NO
-
-case $host in
-     i386-*-solaris2)
-     # here we go with the test
-     MINOR=`uname -r|cut -d '.' -f 2-`
-     if test "$MINOR" -lt "11"; then
-         SOLARIS_BROKEN_SHLD=YES
-     fi
-     ;;
-esac
-
-AC_SUBST(SOLARIS_BROKEN_SHLD)
-
 dnl ** Do an unregisterised build?
 dnl --------------------------------------------------------------
 

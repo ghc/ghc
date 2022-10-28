@@ -28,7 +28,6 @@ data Flag = ArSupportsAtFile
           | GmpInTree
           | GmpFrameworkPref
           | LeadingUnderscore
-          | SolarisBrokenShld
           | UseSystemFfi
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
@@ -60,7 +59,6 @@ flag f = do
             GmpInTree            -> "intree-gmp"
             GmpFrameworkPref     -> "gmp-framework-preferred"
             LeadingUnderscore    -> "leading-underscore"
-            SolarisBrokenShld    -> "solaris-broken-shld"
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
@@ -105,8 +103,7 @@ platformSupportsSharedLibs = do
     ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
     solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
     javascript    <- anyTargetArch     [ "javascript" ]
-    solarisBroken <- flag SolarisBrokenShld
-    return $ not (windows || wasm || javascript || ppc_linux || solaris && solarisBroken)
+    return $ not (windows || wasm || javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool
