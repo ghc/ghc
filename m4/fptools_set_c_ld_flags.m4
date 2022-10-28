@@ -17,6 +17,21 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
     esac
 
+    # See Note [ELF needed shared libs]
+    case $$1 in
+    *-linux|*-freebsd*)
+        FP_LINK_SUPPORTS_NO_AS_NEEDED([$3])
+        ;;
+    esac
+
+    # Emit stack checks
+    # See Note [Windows stack allocations]
+    case $$1 in
+    *-mingw32*)
+        $3="$$3 -fstack-check"
+        ;;
+    esac
+
     case $$1 in
     i386-unknown-mingw32)
         $2="$$2 -march=i686"

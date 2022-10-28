@@ -715,7 +715,6 @@ Library
         GHC.SysTools.BaseDir
         GHC.SysTools.Cpp
         GHC.SysTools.Elf
-        GHC.SysTools.Info
         GHC.SysTools.Process
         GHC.SysTools.Tasks
         GHC.SysTools.Terminal

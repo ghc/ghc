@@ -17,7 +17,6 @@ module GHC.SysTools (
 
         -- * Interface to system tools
         module GHC.SysTools.Tasks,
-        module GHC.SysTools.Info,
 
         -- * Fast file copy
         copyFile,
@@ -35,8 +34,6 @@ import GHC.Prelude
 import GHC.Utils.Panic
 import GHC.Driver.Session
 
-import GHC.Linker.ExtraObj
-import GHC.SysTools.Info
 import GHC.SysTools.Tasks
 import GHC.SysTools.BaseDir
 import GHC.Settings.IO
