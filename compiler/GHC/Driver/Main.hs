@@ -110,7 +110,6 @@ module GHC.Driver.Main
 import GHC.Prelude
 
 import GHC.Platform
-import GHC.Platform.Ways
 
 import GHC.Driver.Plugins
 import GHC.Driver.Session
@@ -345,40 +344,10 @@ initHscEnv mb_top_dir = do
   mySettings <- initSysTools top_dir
   dflags <- initDynFlags (defaultDynFlags mySettings)
   hsc_env <- newHscEnv top_dir dflags
-  checkBrokenTablesNextToCode (hsc_logger hsc_env) dflags
   setUnsafeGlobalDynFlags dflags
    -- c.f. DynFlags.parseDynamicFlagsFull, which
    -- creates DynFlags and sets the UnsafeGlobalDynFlags
   return hsc_env
-
--- | The binutils linker on ARM emits unnecessary R_ARM_COPY relocations which
--- breaks tables-next-to-code in dynamically linked modules. This
--- check should be more selective but there is currently no released
--- version where this bug is fixed.
--- See https://sourceware.org/bugzilla/show_bug.cgi?id=16177 and
--- https://gitlab.haskell.org/ghc/ghc/issues/4210#note_78333
-checkBrokenTablesNextToCode :: Logger -> DynFlags -> IO ()
-checkBrokenTablesNextToCode logger dflags = do
-  let invalidLdErr = "Tables-next-to-code not supported on ARM \
-                     \when using binutils ld (please see: \
-                     \https://sourceware.org/bugzilla/show_bug.cgi?id=16177)"
-  broken <- checkBrokenTablesNextToCode' logger dflags
-  when broken (panic invalidLdErr)
-
-checkBrokenTablesNextToCode' :: Logger -> DynFlags -> IO Bool
-checkBrokenTablesNextToCode' logger dflags
-  | not (isARM arch)               = return False
-  | ways dflags `hasNotWay` WayDyn = return False
-  | not tablesNextToCode           = return False
-  | otherwise                      = do
-    linkerInfo <- liftIO $ GHC.SysTools.getLinkerInfo logger dflags
-    case linkerInfo of
-      GnuLD _  -> return True
-      _        -> return False
-  where platform = targetPlatform dflags
-        arch = platformArch platform
-        tablesNextToCode = platformTablesNextToCode platform
-
 
 -- -----------------------------------------------------------------------------
 

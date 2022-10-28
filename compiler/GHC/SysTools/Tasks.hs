@@ -19,7 +19,6 @@ import GHC.CmmToLlvm.Config (LlvmVersion, llvmVersionStr, supportedLlvmVersionUp
 import GHC.Settings
 
 import GHC.SysTools.Process
-import GHC.SysTools.Info
 
 import GHC.Driver.Session
 
@@ -292,15 +291,12 @@ figureLlvmVersion logger dflags = traceSystoolCommand logger "llc" $ do
 
 runLink :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
 runLink logger tmpfs dflags args = traceSystoolCommand logger "linker" $ do
-  -- See Note [Run-time linker info]
-  --
   -- `-optl` args come at the end, so that later `-l` options
   -- given there manually can fill in symbols needed by
   -- Haskell libraries coming in via `args`.
-  linkargs <- neededLinkArgs `fmap` getLinkerInfo logger dflags
   let (p,args0) = pgm_l dflags
       optl_args = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ linkargs ++ args ++ optl_args
+      args2     = args0 ++ args ++ optl_args
   mb_env <- getGccEnv args2
   runSomethingResponseFile logger tmpfs dflags ld_filter "Linker" p args2 mb_env
   where

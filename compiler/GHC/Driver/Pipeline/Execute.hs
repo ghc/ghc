@@ -287,12 +287,6 @@ runAsPhase :: Bool -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO F
 runAsPhase with_cpp pipe_env hsc_env location input_fn = do
         let dflags     = hsc_dflags   hsc_env
         let logger     = hsc_logger   hsc_env
-        let unit_env   = hsc_unit_env hsc_env
-        let platform   = ue_platform unit_env
-
-        -- LLVM from version 3.0 onwards doesn't support the OS X system
-        -- assembler, so we use clang as the assembler instead. (#5636)
-        let as_prog = applyAssemblerProg $ backendAssemblerProg (backend dflags)
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -310,9 +304,8 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                                 includePathsQuoteImplicit cmdline_include_paths]
         let runAssembler inputFilename outputFilename
               = withAtomicRename outputFilename $ \temp_outputFilename ->
-                    as_prog
+                    runAs
                        logger dflags
-                       platform
                        (local_includes ++ global_includes
                        -- See Note [-fPIC for assembler]
                        ++ map GHC.SysTools.Option pic_c_flags
@@ -391,22 +384,6 @@ runForeignJsPhase pipe_env hsc_env _location input_fn = do
   output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
   embedJsFile logger dflags tmpfs unit_env input_fn output_fn
   return output_fn
-
-
-applyAssemblerProg
-    :: DefunctionalizedAssemblerProg
-    -> Logger -> DynFlags -> Platform -> [Option] -> IO ()
-applyAssemblerProg StandardAssemblerProg logger dflags _platform =
-    runAs logger dflags
-applyAssemblerProg JSAssemblerProg logger dflags _platform =
-    runEmscripten logger dflags
-applyAssemblerProg DarwinClangAssemblerProg logger dflags platform =
-    if platformOS platform == OSDarwin then
-        runClang logger dflags
-    else
-        runAs logger dflags
-
-
 
 runCcPhase :: Phase -> PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
 runCcPhase cc_phase pipe_env hsc_env location input_fn = do
