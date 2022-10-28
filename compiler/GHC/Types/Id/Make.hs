@@ -1320,7 +1320,7 @@ mkFCallId uniq fcall ty
     -- The "occurrence name" of a ccall is the full info about the
     -- ccall; it is encoded, but may have embedded spaces etc!
 
-    name = mkFCallName uniq occ_str
+    name = mkFCallName uniq (mkFastString occ_str)
 
     info = noCafIdInfo
            `setArityInfo`  arity

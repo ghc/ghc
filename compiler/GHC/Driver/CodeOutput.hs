@@ -17,6 +17,7 @@ where
 import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
+import GHC.Data.FastString
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
@@ -331,7 +332,7 @@ profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
    initializerCStub platform fn_name decls body
  where
    pdocC = pprCLabel platform
-   fn_name = mkInitializerStubLabel this_mod "prof_init"
+   fn_name = mkInitializerStubLabel this_mod (fsLit "prof_init")
    decls = vcat
         $  map emit_cc_decl local_CCs
         ++ map emit_ccs_decl singleton_CCSs
@@ -374,7 +375,7 @@ ipInitCode do_info_table platform this_mod
   | not do_info_table = mempty
   | otherwise = initializerCStub platform fn_nm ipe_buffer_decl body
  where
-   fn_nm = mkInitializerStubLabel this_mod "ip_init"
+   fn_nm = mkInitializerStubLabel this_mod (fsLit "ip_init")
 
    body = text "registerInfoProvList" <> parens (text "&" <> ipe_buffer_label) <> semi
 

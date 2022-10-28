@@ -21,6 +21,7 @@ module GHC.Runtime.Loader (
     ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -46,7 +47,7 @@ import GHC.Types.SrcLoc        ( noSrcSpan )
 import GHC.Types.Name    ( Name, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.TyThing
-import GHC.Types.Name.Occurrence ( OccName, mkVarOcc )
+import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
 import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
                                , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
                                , greMangledName, mkRdrQual )
@@ -136,14 +137,14 @@ loadPlugins hsc_env
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
-    loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env
+    loadPlugin = loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName hsc_env
 
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [Linkable], PkgsLoaded)
 loadFrontendPlugin hsc_env mod_name = do
     checkExternalInterpreter hsc_env
     (plugin, _iface, links, pkgs)
-      <- loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+      <- loadPlugin' (mkVarOccFS (fsLit "frontendPlugin")) frontendPluginTyConName
            hsc_env mod_name
     return (plugin, links, pkgs)
 

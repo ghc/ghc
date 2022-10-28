@@ -407,7 +407,7 @@ getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 getRegister' _ platform (CmmReg (CmmGlobal PicBaseReg))
   | OSAIX <- platformOS platform = do
         let code dst = toOL [ LD II32 dst tocAddr ]
-            tocAddr = AddrRegImm toc (ImmLit "ghc_toc_table[TC]")
+            tocAddr = AddrRegImm toc (ImmLit (fsLit "ghc_toc_table[TC]"))
         return (Any II32 code)
   | target32Bit platform = do
       reg <- getPicBaseNat $ archWordFormat (target32Bit platform)

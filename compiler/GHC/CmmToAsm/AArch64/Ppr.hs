@@ -232,7 +232,7 @@ pprImm _ (ImmInt i)     = int i
 pprImm _ (ImmInteger i) = integer i
 pprImm p (ImmCLbl l)    = pprAsmLabel p l
 pprImm p (ImmIndex l i) = pprAsmLabel p l <> char '+' <> int i
-pprImm _ (ImmLit s)     = text s
+pprImm _ (ImmLit s)     = ftext s
 
 -- TODO: See pprIm below for why this is a bad idea!
 pprImm _ (ImmFloat f)

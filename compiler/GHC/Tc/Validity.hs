@@ -21,6 +21,7 @@ module GHC.Tc.Validity (
   ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Data.Maybe
 
@@ -2274,7 +2275,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                    tidyTypes tidy_env2 ax_arg_tys
 
     mk_wildcard at_tv = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
-    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
+    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOccFS (fsLit "_")) noSrcSpan
 
     -- For check_match, bind_me, see
     -- Note [Matching in the consistent-instantiation check]

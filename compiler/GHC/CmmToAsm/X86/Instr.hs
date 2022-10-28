@@ -38,6 +38,7 @@ module GHC.CmmToAsm.X86.Instr
 where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.CmmToAsm.X86.Cond
 import GHC.CmmToAsm.X86.Regs
@@ -868,7 +869,7 @@ mkStackAllocInstr platform amount
         case platformArch platform of
             ArchX86    | needs_probe_call platform amount ->
                            [ MOV II32 (OpImm (ImmInt amount)) (OpReg eax)
-                           , CALL (Left $ strImmLit "___chkstk_ms") [eax]
+                           , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [eax]
                            , SUB II32 (OpReg eax) (OpReg esp)
                            ]
                        | otherwise ->
@@ -877,7 +878,7 @@ mkStackAllocInstr platform amount
                            ]
             ArchX86_64 | needs_probe_call platform amount ->
                            [ MOV II64 (OpImm (ImmInt amount)) (OpReg rax)
-                           , CALL (Left $ strImmLit "___chkstk_ms") [rax]
+                           , CALL (Left $ strImmLit (fsLit "___chkstk_ms")) [rax]
                            , SUB II64 (OpReg rax) (OpReg rsp)
                            ]
                        | otherwise ->

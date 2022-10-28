@@ -82,7 +82,7 @@ import GHC.Builtin.Utils (knownKeyNames)
 import GHC.Tc.Errors.Hole.FitTypes
 import qualified Data.Set as Set
 import GHC.Types.SrcLoc
-import GHC.Data.FastString (unpackFS)
+import GHC.Data.FastString (NonDetFastString(..))
 import GHC.Types.Unique.Map
 
 
@@ -482,15 +482,16 @@ addHoleFitDocs fits =
      Just m  -> Right m
      Nothing ->
        Left $ case nameSrcLoc name of
-         RealSrcLoc r _ -> unpackFS $ srcLocFile r
-         UnhelpfulLoc s -> unpackFS $ s
+         -- Nondeterminism is fine, this is used only to display a warning
+         RealSrcLoc r _ -> NonDetFastString $ srcLocFile r
+         UnhelpfulLoc s -> NonDetFastString s
    report mods = do
      { let warning =
              text "WARNING: Couldn't find any documentation for the following modules:" $+$
              nest 2
-                  (pprWithCommas (either text ppr) (Set.toList mods) $+$
+                  (pprWithCommas (either ppr ppr) (Set.toList mods) $+$
                    text "Make sure the modules are compiled with '-haddock'.")
-     ; warnPprTrace (not $ Set.null mods)"addHoleFitDocs" warning (pure ())
+     ; warnPprTrace (not $ Set.null mods) "addHoleFitDocs" warning (pure ())
      }
 
 -- For pretty printing hole fits, we display the name and type of the fit,

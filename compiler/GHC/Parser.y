@@ -67,7 +67,7 @@ import GHC.Prelude
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS, occNameString)
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -3885,8 +3885,7 @@ modid   :: { LocatedA ModuleName }
         : CONID                 { sL1a $1 $ mkModuleNameFS (getCONID $1) }
         | QCONID                { sL1a $1 $ let (mod,c) = getQCONID $1 in
                                   mkModuleNameFS
-                                   (mkFastString
-                                     (unpackFS mod ++ '.':unpackFS c))
+                                   (concatFS [mod, fsLit ".", c])
                                 }
 
 commas :: { ([SrcSpan],Int) }   -- One or more commas

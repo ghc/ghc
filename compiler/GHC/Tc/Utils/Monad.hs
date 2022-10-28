@@ -1921,7 +1921,7 @@ emitAnonTypeHole extra_constraints tv
                          , hole_loc  = ct_loc }
        ; emitHole hole }
   where
-    occ = mkTyVarOcc "_"
+    occ = mkTyVarOccFS (fsLit "_")
     sort | YesExtraConstraint <- extra_constraints = ConstraintHole
          | otherwise                               = TypeHole
 

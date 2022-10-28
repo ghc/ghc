@@ -49,7 +49,6 @@ import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
 
 import GHC.Driver.Backend
-import GHC.Driver.Ppr
 import GHC.Driver.Session
 
 import GHC.Types.SourceFile ( hscSourceString )
@@ -278,8 +277,8 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
 
   where
     op       = normalise
-    mod      = moduleName (ms_mod mod_summary)
-    mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
+    mod_str  = moduleNameString (moduleName (ms_mod mod_summary)) ++
+               hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = op $ msObjFilePath mod_summary
     files    = [ obj_file ]

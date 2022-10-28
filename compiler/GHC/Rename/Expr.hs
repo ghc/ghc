@@ -28,6 +28,7 @@ module GHC.Rename.Expr (
    ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Rename.Bind ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS
                         , rnMatchGroup, rnGRHS, makeMiniFixityEnv)
@@ -2692,7 +2693,7 @@ getMonadFailOp ctxt
       | (isQualifiedDo || rebindableSyntax) && overloadedStrings = do
         (failExpr, failFvs) <- lookupQualifiedDoExpr ctxt failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxExpr fromStringName
-        let arg_lit = mkVarOcc "arg"
+        let arg_lit = mkVarOccFS (fsLit "arg")
         arg_name <- newSysName arg_lit
         let arg_syn_expr = nlHsVar arg_name
             body :: LHsExpr GhcRn =

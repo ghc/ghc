@@ -432,7 +432,7 @@ pprImm platform = \case
    ImmInteger i        -> integer i
    ImmCLbl l           -> pprAsmLabel platform l
    ImmIndex l i        -> pprAsmLabel platform l <> char '+' <> int i
-   ImmLit s            -> text s
+   ImmLit s            -> ftext s
    ImmFloat f          -> float $ fromRational f
    ImmDouble d         -> double $ fromRational d
    ImmConstantSum a b  -> pprImm platform a <> char '+' <> pprImm platform b

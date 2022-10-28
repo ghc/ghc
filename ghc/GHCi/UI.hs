@@ -2554,7 +2554,7 @@ isSafeModule m = do
                                     (GHC.moduleNameString $ GHC.moduleName m))
 
     (msafe, pkgs) <- GHC.moduleTrustReqs m
-    let trust  = showPpr dflags $ getSafeMode $ GHC.mi_trust $ fromJust iface
+    let trust  = show $ getSafeMode $ GHC.mi_trust $ fromJust iface
         pkg    = if packageTrusted hsc_env m then "trusted" else "untrusted"
         (good, bad) = tallyPkgs hsc_env pkgs
 
@@ -2998,7 +2998,7 @@ showOptions show_all
                    then text "none."
                    else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
            ))
-       getDynFlags >>= liftIO . showDynFlags show_all
+       liftIO $ showDynFlags show_all dflags
 
 
 showDynFlags :: Bool -> DynFlags -> IO ()
@@ -3215,9 +3215,9 @@ unsetOptions str
          no_flag ('-':'X':rest) = return ("-XNo" ++ rest)
          no_flag f = throwGhcException (ProgramError ("don't know how to reverse " ++ f))
 
-     in if (not (null rest3))
-           then liftIO (putStrLn ("unknown option: '" ++ head rest3 ++ "'"))
-           else do
+     in case rest3 of
+          opt:_ -> liftIO (putStrLn ("unknown option: '" ++ opt ++ "'"))
+          [] -> do
              mapM_ (fromJust.flip lookup defaulters) other_opts
 
              mapM_ unsetOpt plus_opts

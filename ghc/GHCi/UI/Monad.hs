@@ -502,8 +502,8 @@ initInterpBuffering = do
       mkHelperExpr occ =
         GHC.compileParsedExprRemote
         $ GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS occ
-  nobuf <- mkHelperExpr $ mkVarOcc "disableBuffering"
-  flush <- mkHelperExpr $ mkVarOcc "flushAll"
+  nobuf <- mkHelperExpr $ mkVarOccFS (fsLit "disableBuffering")
+  flush <- mkHelperExpr $ mkVarOccFS (fsLit "flushAll")
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
@@ -532,7 +532,7 @@ mkEvalWrapper progname' args' =
   where
     nlHsString = nlHsLit . mkHsString
     evalWrapper' =
-      GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOcc "evalWrapper")
+      GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOccFS (fsLit "evalWrapper"))
 
 -- | Run a 'GhcMonad' action to compile an expression for internal usage.
 runInternal :: GhcMonad m => m a -> m a

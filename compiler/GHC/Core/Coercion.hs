@@ -146,6 +146,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Basic
 import GHC.Types.Unique
+import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Types.SrcLoc
 import GHC.Builtin.Names
@@ -286,7 +287,7 @@ tidyCoAxBndrsForUser init_env tcvs
         (env', bndr') = tidyVarBndr env bndr
         env_wild = (occ_env, extendVarEnv subst bndr wild_bndr)
         wild_bndr = setVarName bndr $
-                    tidyNameOcc (varName bndr) (mkTyVarOcc "_")
+                    tidyNameOcc (varName bndr) (mkTyVarOccFS (fsLit "_"))
                     -- Tidy the binder to "_"
 
     is_wildcard :: Var -> Bool

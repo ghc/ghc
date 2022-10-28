@@ -50,6 +50,7 @@ import GHC.Core.RoughMap
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
+import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Types.Var
 import GHC.Types.SrcLoc
@@ -686,7 +687,7 @@ mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
     -- See Note [Tidy axioms when we build them]
     -- See also Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom
 
-    init_occ_env = initTidyOccEnv [mkTyVarOcc "_"]
+    init_occ_env = initTidyOccEnv [mkTyVarOccFS (fsLit "_")]
     init_tidy_env = mkEmptyTidyEnv init_occ_env
     -- See Note [Always number wildcard types in CoAxBranch]
 

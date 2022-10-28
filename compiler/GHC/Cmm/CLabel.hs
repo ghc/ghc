@@ -300,19 +300,19 @@ instance Show CLabel where
   show = showPprUnsafe . pprDebugCLabel genericPlatform
 
 data ModuleLabelKind
-    = MLK_Initializer String
+    = MLK_Initializer LexicalFastString
     | MLK_InitializerArray
-    | MLK_Finalizer String
+    | MLK_Finalizer LexicalFastString
     | MLK_FinalizerArray
     | MLK_IPEBuffer
     deriving (Eq, Ord)
 
 instance Outputable ModuleLabelKind where
-    ppr MLK_InitializerArray = text "init_arr"
-    ppr (MLK_Initializer s)  = text ("init__" ++ s)
-    ppr MLK_FinalizerArray   = text "fini_arr"
-    ppr (MLK_Finalizer s)    = text ("fini__" ++ s)
-    ppr MLK_IPEBuffer        = text "ipe_buf"
+    ppr MLK_InitializerArray                    = text "init_arr"
+    ppr (MLK_Initializer (LexicalFastString s)) = text "init__" <> ftext s
+    ppr MLK_FinalizerArray                      = text "fini_arr"
+    ppr (MLK_Finalizer (LexicalFastString s))   = text "fini__" <> ftext s
+    ppr MLK_IPEBuffer                           = text "ipe_buf"
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -885,15 +885,15 @@ mkDeadStripPreventer lbl        = DeadStripPreventer lbl
 mkStringLitLabel :: Unique -> CLabel
 mkStringLitLabel                = StringLitLabel
 
-mkInitializerStubLabel :: Module -> String -> CLabel
-mkInitializerStubLabel mod s    = ModuleLabel mod (MLK_Initializer s)
+mkInitializerStubLabel :: Module -> FastString -> CLabel
+mkInitializerStubLabel mod s    = ModuleLabel mod (MLK_Initializer (LexicalFastString s))
 
 mkInitializerArrayLabel :: Module -> CLabel
 mkInitializerArrayLabel mod     = ModuleLabel mod MLK_InitializerArray
 
 
-mkFinalizerStubLabel :: Module -> String -> CLabel
-mkFinalizerStubLabel mod s      = ModuleLabel mod (MLK_Finalizer s)
+mkFinalizerStubLabel :: Module -> FastString -> CLabel
+mkFinalizerStubLabel mod s      = ModuleLabel mod (MLK_Finalizer (LexicalFastString s))
 
 mkFinalizerArrayLabel :: Module -> CLabel
 mkFinalizerArrayLabel mod       = ModuleLabel mod MLK_FinalizerArray
