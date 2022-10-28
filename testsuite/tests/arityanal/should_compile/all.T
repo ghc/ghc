@@ -16,6 +16,7 @@ test('Arity13', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dn
 test('Arity14', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
 test('Arity15', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
 test('Arity16', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
+test('Arity17', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-package ghc -dcore-lint -O2'])
 
 # Regression tests
 test('T18793', [ only_ways(['optasm']), grep_errmsg('Arity=') ], compile, ['-dno-typeable-binds -ddump-simpl -dppr-cols=99999 -dsuppress-uniques'])
