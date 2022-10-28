@@ -76,7 +76,6 @@ initSettings top_dir = do
       getToolSetting :: String -> ExceptT SettingsError m String
       getToolSetting key = expandToolDir useInplaceMinGW mtool_dir <$> getSetting key
   targetPlatformString <- getSetting "target platform string"
-  myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   cc_prog <- getToolSetting "C compiler command"
   cxx_prog <- getToolSetting "C++ compiler command"
   cc_args_str <- getToolSetting "C compiler flags"
@@ -93,6 +92,16 @@ initSettings top_dir = do
       cpp_args = map Option (words cpp_args_str)
       cc_args  = words cc_args_str ++ unreg_cc_args
       cxx_args = words cxx_args_str
+
+      -- The extra flags we need to pass gcc when we invoke it to compile .hc code.
+      --
+      -- -fwrapv is needed for gcc to emit well-behaved code in the presence of
+      -- integer wrap around (#952).
+      extraGccViaCFlags = if platformUnregisterised platform
+                            -- configure guarantees cc support these flags
+                            then ["-fwrapv", "-fno-builtin"]
+                            else []
+
   ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
   ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
   ldSupportsResponseFiles <- getBooleanSetting "ld supports response files"
@@ -204,7 +213,7 @@ initSettings top_dir = do
       , toolSettings_opt_lc      = []
       , toolSettings_opt_i       = []
 
-      , toolSettings_extraGccViaCFlags = words myExtraGccViaCFlags
+      , toolSettings_extraGccViaCFlags = extraGccViaCFlags
       }
 
     , sTargetPlatform = platform
