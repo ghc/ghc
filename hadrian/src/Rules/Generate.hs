@@ -411,8 +411,7 @@ generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
     settings <- traverse sequence $
-        [ ("GCC extra via C opts", expr $ lookupSystemConfig "gcc-extra-via-c-opts")
-        , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
+        [ ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
         , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
         , ("C++ compiler command", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerCommand)
         , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)

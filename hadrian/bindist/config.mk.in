@@ -234,7 +234,6 @@ GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 s390x),@UseL
 # might become redundant.
 # See Note [tooldir: How GHC finds mingw on Windows]
 
-GccExtraViaCOpts = @GccExtraViaCOpts@
 LdHasFilelist = @LdHasFilelist@
 LdSupportsResponseFiles = @LdSupportsResponseFiles@
 LdHasBuildId = @LdHasBuildId@

@@ -622,13 +622,14 @@ FP_GCC_VERSION
 dnl ** See whether cc supports -no-pie
 FP_GCC_SUPPORTS_NO_PIE
 
+dnl ** Check support for the extra flags passed by GHC when compiling via C
+FP_GCC_SUPPORTS_VIA_C_FLAGS
+
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends. Also determines whether
 dnl    linking to libatomic is required for atomic operations, e.g. on
 dnl    RISCV64 GCC.
 FP_CC_SUPPORTS__ATOMICS
-
-FP_GCC_EXTRA_FLAGS
 
 dnl ** look to see if we have a C compiler using an llvm back end.
 dnl
