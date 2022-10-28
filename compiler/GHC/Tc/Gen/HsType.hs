@@ -3489,6 +3489,8 @@ bindTyClTyVars tycon_name thing_inside
 bindTyClTyVarsAndZonk :: Name -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
 -- Like bindTyClTyVars, but in addition
 -- zonk the skolem TcTyVars of a PolyTcTyCon to TyVars
+-- We always do this same zonking after a call to bindTyClTyVars, but
+-- here we do it right away because there are no more unifications to come
 bindTyClTyVarsAndZonk tycon_name thing_inside
   = bindTyClTyVars tycon_name $ \ tc_bndrs tc_kind ->
     do { ze          <- mkEmptyZonkEnv NoFlexi

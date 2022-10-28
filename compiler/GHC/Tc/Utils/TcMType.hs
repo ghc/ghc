@@ -1735,12 +1735,6 @@ quantifyTyVars skol_info ns_strat dvs
       = return Nothing   -- this can happen for a covar that's associated with
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
 
--- Omit: no TyVars now
---      | not (isTcTyVar tkv)
---      = return (Just tkv)  -- For associated types in a class with a standalone
---                           -- kind signature, we have the class variables in
---                           -- scope, and they are TyVars not TcTyVars
-
       | otherwise
       = Just <$> skolemiseQuantifiedTyVar skol_info tkv
 
@@ -1785,12 +1779,18 @@ skolemiseQuantifiedTyVar :: SkolemInfo -> TcTyVar -> TcM TcTyVar
 
 skolemiseQuantifiedTyVar skol_info tv
   = case tcTyVarDetails tv of
-      SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
-                        ; return (setTyVarKind tv kind) }
-        -- It might be a skolem type variable,
-        -- for example from a user type signature
-
       MetaTv {} -> skolemiseUnboundMetaTyVar skol_info tv
+
+      SkolemTv _ lvl _  -- It might be a skolem type variable,
+                        -- for example from a user type signature
+        -- But it might also be a shared meta-variable across several
+        -- type declarations, each with its own skol_info. The first
+        -- will skolemise it, but the other uses must update its
+        -- skolem info (#22379)
+        -> do { kind <- zonkTcType (tyVarKind tv)
+              ; let details = SkolemTv skol_info lvl False
+                    name = tyVarName tv
+              ; return (mkTcTyVar name kind details) }
 
       _other -> pprPanic "skolemiseQuantifiedTyVar" (ppr tv) -- RuntimeUnk
 
