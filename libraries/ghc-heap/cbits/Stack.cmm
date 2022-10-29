@@ -135,21 +135,26 @@ getUpdateFrameTypezh(P_ stack, W_ index){
 // Reduce duplication by using offsets instead on pointer macros.
 unpackClosureReferencedByFramezh(W_ offset, P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime, codePtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
+  closurePtr = (StgStack_sp(stack) + WDS(index) + offset);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  codePtr = StgCatchSTMFrame_code(closurePtr);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(codePtr));
-  jump stg_unpackClosurezh(codePtr);
+  jump stg_unpackClosurezh(closurePtr);
 }
 
 getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
-  P_ closurePtr, closurePtrPrime, updateePtr;
+  P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(index));
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
 
   W_ exceptions_blocked;
   exceptions_blocked = StgCatchFrame_exceptions_blocked(closurePtr);
   return (exceptions_blocked);
+}
+
+// TODO: Rename: index -> wordOffset, offset -> byteOffset
+getWordzh(P_ stack, W_ index, W_ offset){
+  P_ wordAddr;
+  wordAddr = (StgStack_sp(stack) + WDS(index) + offset);
+  return (W_[wordAddr]);
 }
 
 getUnderflowFrameNextChunkzh(P_ stack, W_ index){

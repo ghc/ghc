@@ -149,11 +149,20 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         in
           UnderflowFrame (StackSnapshot nextChunk#)
      STOP_FRAME ->  StopFrame
-     ATOMICALLY_FRAME ->  AtomicallyFrame
-     CATCH_RETRY_FRAME ->  CatchRetryFrame
+     ATOMICALLY_FRAME -> let
+          c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgAtomicallyFrameCode)) sfi
+          r = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgAtomicallyFrameResult)) sfi
+       in
+         AtomicallyFrame c r
+     CATCH_RETRY_FRAME ->  let
+        running_alt_code = W# (getWord# s# i# (intToWord# offsetStgCatchRetryFrameRunningAltCode))
+        first_code = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchRetryFrameRunningFirstCode)) sfi
+        alt_code = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchRetryFrameRunningAltCode)) sfi
+       in
+         CatchRetryFrame running_alt_code first_code alt_code
      CATCH_STM_FRAME -> let
           c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameCode)) sfi
-          h = toClosure  (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameHandler)) sfi
+          h = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameHandler)) sfi
         in
           CatchStmFrame c h
      x -> error $ "Unexpected closure type on stack: " ++ show x
@@ -199,6 +208,8 @@ foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBl
 
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
+foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
+
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
 instance Show BitmapPayload where
@@ -207,7 +218,7 @@ instance Show BitmapPayload where
 
 -- TODO There are likely more. See MiscClosures.h
 data SpecialRetSmall =
-  -- TODO: Shoudn't `None` be better `Maybe ...`
+  -- TODO: Shoudn't `None` be better `Maybe ...`?
   None |
   ApV |
   ApF |
@@ -240,8 +251,8 @@ data StackFrame =
   UpdateFrame { knownUpdateFrameType :: UpdateFrameType, updatee :: CL.Closure } |
   CatchFrame { exceptions_blocked :: Word,  handler :: CL.Closure } |
   CatchStmFrame { code :: CL.Closure, handler :: CL.Closure  } |
-  CatchRetryFrame |
-  AtomicallyFrame |
+  CatchRetryFrame {running_alt_code :: Word, first_code :: CL.Closure, alt_code :: CL.Closure} |
+  AtomicallyFrame { code :: CL.Closure, result :: CL.Closure} |
   UnderflowFrame { nextChunk:: StackSnapshot } |
   StopFrame |
   RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
