@@ -37,6 +37,7 @@ module GHC.Unit.Env
     , addHomeModInfoToHug
     -- * UnitEnvGraph
     , UnitEnvGraph (..)
+    , UnitEnvGraphKey
     , unitEnv_insert
     , unitEnv_delete
     , unitEnv_adjust
