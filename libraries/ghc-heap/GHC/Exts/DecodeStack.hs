@@ -19,6 +19,7 @@ module GHC.Exts.DecodeStack (
   decodeStack
                             ) where
 
+import GHC.Exts.StackConstants
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import Data.Maybe
 import Data.Bits
@@ -134,12 +135,12 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
      RET_FUN ->  RetFun
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
-        c = toClosure unpackUpdateeFromUpdateFrame# sfi
+        c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgUpdateFrameUpdatee)) sfi
         !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
        in
         UpdateFrame t c
      CATCH_FRAME -> let
-        c = toClosure unpackHandlerFromCatchFrame# sfi
+        c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchFrameHandler)) sfi
         exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
        in
         CatchFrame exceptionsBlocked c
@@ -151,8 +152,8 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
      ATOMICALLY_FRAME ->  AtomicallyFrame
      CATCH_RETRY_FRAME ->  CatchRetryFrame
      CATCH_STM_FRAME -> let
-          c = toClosure unpackCodeFromCatchSTMFrame# sfi
-          h = toClosure unpackHandlerFromCatchSTMFrame# sfi
+          c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameCode)) sfi
+          h = toClosure  (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameHandler)) sfi
         in
           CatchStmFrame c h
      x -> error $ "Unexpected closure type on stack: " ++ show x
@@ -178,6 +179,9 @@ sizeofByteArray arr# = I# (sizeofByteArray# arr#)
 toInt# :: Int -> Int#
 toInt# (I# i) = i
 
+intToWord# :: Int -> Word#
+intToWord# i = int2Word# (toInt# i)
+
 -- TODO: Is the function type below needed? (Was proposed by Ben)
 -- derefStackPtr :: StackSnapshot# -> Int# -> a
 
@@ -189,11 +193,7 @@ foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word
 
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
 
-foreign import prim "unpackHandlerFromCatchFramezh" unpackHandlerFromCatchFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
-foreign import prim "unpackHandlerFromCatchSTMFramezh" unpackHandlerFromCatchSTMFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
-foreign import prim "unpackCodeFromCatchSTMFramezh" unpackCodeFromCatchSTMFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 

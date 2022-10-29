@@ -8,6 +8,10 @@
 #error Unknown word size
 #endif
 
+// TODO: comment out
+// Uncomment to enable assertions during development
+#define DEBUG 1
+
 advanceStackFrameIterzh (P_ stack, W_ index) {
   P_ newStack;
   W_ newIndex;
@@ -109,22 +113,13 @@ getLargeBitmapzh(P_ stack, W_ index){
   return (stgArrBytes, size);
 }
 
+// TODO: Use generalized version unpackClosureReferencedByFramezh with offset=0
 unpackClosureFromStackFramezh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime;
   closurePtr = (StgStack_sp(stack) + WDS(index));
   closurePtrPrime = P_[closurePtr];
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
   jump stg_unpackClosurezh(closurePtrPrime);
-}
-
-unpackUpdateeFromUpdateFramezh(P_ stack, W_ index){
-  P_ closurePtr, closurePtrPrime, updateePtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  updateePtr = StgUpdateFrame_updatee(closurePtr);
-  // ccall debugBelch("unpackUpdateeFromUpdateFramezh - frame %p, updateePtr %p\n", closurePtr, updateePtr);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(updateePtr));
-  jump stg_unpackClosurezh(updateePtr);
 }
 
 getUpdateFrameTypezh(P_ stack, W_ index){
@@ -137,33 +132,14 @@ getUpdateFrameTypezh(P_ stack, W_ index){
   return (type);
 }
 
-unpackHandlerFromCatchFramezh(P_ stack, W_ index){
-  P_ closurePtr, closurePtrPrime, handlerPtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  handlerPtr = StgCatchFrame_handler(closurePtr);
-  // ccall debugBelch("unpackUpdateeFromUpdateFramezh - frame %p, updateePtr %p\n", closurePtr, updateePtr);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(handlerPtr));
-  jump stg_unpackClosurezh(handlerPtr);
-}
-
 // Reduce duplication by using offsets instead on pointer macros.
-unpackCodeFromCatchSTMFramezh(P_ stack, W_ index){
+unpackClosureReferencedByFramezh(W_ offset, P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime, codePtr;
   closurePtr = (StgStack_sp(stack) + WDS(index));
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
   codePtr = StgCatchSTMFrame_code(closurePtr);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(codePtr));
   jump stg_unpackClosurezh(codePtr);
-}
-
-unpackHandlerFromCatchSTMFramezh(P_ stack, W_ index){
-  P_ closurePtr, closurePtrPrime, handlerPtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  handlerPtr = StgCatchSTMFrame_handler(closurePtr);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(handlerPtr));
-  jump stg_unpackClosurezh(handlerPtr);
 }
 
 getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){

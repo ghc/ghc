@@ -69,7 +69,7 @@ test('stack_big_ret',
         ignore_stderr
      ],
      compile_and_run,
-     [''])
+     ['-debug'])
 
 # Options:
 #   - `-kc512B -kb64B`: Make stack chunk size small to provoke underflow stack frames.
@@ -80,7 +80,7 @@ test('stack_underflow',
         ignore_stdout,
         ignore_stderr
      ],
-     compile_and_run, ['-rtsopts'])
+     compile_and_run, ['-debug -rtsopts'])
 
 test('stack_stm_frames',
      [
