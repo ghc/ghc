@@ -21,7 +21,7 @@
 #if defined(NEED_M32)
 #define M32_NO_RETURN    /* Nothing */
 #else
-#define M32_NO_RETURN    GNUC3_ATTRIBUTE(__noreturn__)
+#define M32_NO_RETURN    STG_NORETURN
 #endif
 
 struct m32_allocator_t;

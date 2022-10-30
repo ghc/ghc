@@ -121,7 +121,7 @@ extern "C" {
    -------------------------------------------------------------------------- */
 
 void _assertFail(const char *filename, unsigned int linenum)
-   GNUC3_ATTRIBUTE(__noreturn__);
+   STG_NORETURN;
 
 void _warnFail(const char *filename, unsigned int linenum);
 
@@ -290,7 +290,7 @@ DLL_IMPORT_RTS extern char  *prog_name;
 void reportStackOverflow(StgTSO* tso);
 void reportHeapOverflow(void);
 
-void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
+void stg_exit(int n) STG_NORETURN;
 
 #if !defined(mingw32_HOST_OS)
 int stg_sig_install (int, int, void *);

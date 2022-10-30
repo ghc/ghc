@@ -61,7 +61,7 @@ struct _StgMutArrPtrs *listThreads               (Capability *cap);
 pid_t  forkProcess     (HsStablePtr *entry);
 #else
 pid_t  forkProcess     (HsStablePtr *entry)
-    GNU_ATTRIBUTE(__noreturn__);
+    STG_NORETURN;
 #endif
 
 HsBool rtsSupportsBoundThreads (void);

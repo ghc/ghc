@@ -241,6 +241,8 @@
 #define STG_PRINTF_ATTR(fmt_arg, rest) GNUC3_ATTRIBUTE(format(printf, fmt_arg, rest))
 #endif
 
+#define STG_NORETURN GNU_ATTRIBUTE(__noreturn__)
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */

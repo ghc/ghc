@@ -31,15 +31,15 @@
  * expected to return.
  */
 void barf(const char *s, ...)
-   GNUC3_ATTRIBUTE(__noreturn__)
+   STG_NORETURN
    STG_PRINTF_ATTR(1, 2);
 
 void vbarf(const char *s, va_list ap)
-   GNUC3_ATTRIBUTE(__noreturn__);
+   STG_NORETURN;
 
 // declared in Rts.h:
 // extern void _assertFail(const char *filename, unsigned int linenum)
-//    GNUC3_ATTRIBUTE(__noreturn__);
+//    STG_NORETURN;
 
 /*
  * An error condition which is caused by and/or can be corrected by

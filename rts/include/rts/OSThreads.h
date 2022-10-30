@@ -168,7 +168,7 @@ typedef SRWLOCK Mutex;
 // General thread operations
 //
 extern OSThreadId osThreadId      ( void );
-extern void shutdownThread        ( void )   GNUC3_ATTRIBUTE(__noreturn__);
+extern void shutdownThread        ( void )   STG_NORETURN;
 extern void yieldThread           ( void );
 
 typedef void* OSThreadProcAttr OSThreadProc(void *);

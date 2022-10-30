@@ -1971,7 +1971,7 @@ void * loadNativeObj (pathchar *path, char **errmsg)
    return r;
 }
 #else
-void * GNU_ATTRIBUTE(__noreturn__)
+void * STG_NORETURN
 loadNativeObj (pathchar *path, char **errmsg)
 {
    UNUSED(path);

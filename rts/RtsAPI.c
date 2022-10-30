@@ -862,7 +862,7 @@ void rts_listMiscRoots (ListRootsCb cb, void *user)
 }
 
 #else
-PauseToken GNU_ATTRIBUTE(__noreturn__)
+PauseToken STG_NORETURN
 *rts_pause (void)
 {
     errorBelch("Warning: Pausing the RTS is only possible for "
@@ -870,7 +870,7 @@ PauseToken GNU_ATTRIBUTE(__noreturn__)
     stg_exit(EXIT_FAILURE);
 }
 
-void GNU_ATTRIBUTE(__noreturn__)
+void STG_NORETURN
 rts_resume (PauseToken *pauseToken STG_UNUSED)
 {
     errorBelch("Warning: Resuming the RTS is only possible for "

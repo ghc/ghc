@@ -119,7 +119,7 @@ static bool read_heap_profiling_flag(const char *arg);
 static void read_trace_flags(const char *arg);
 #endif
 
-static void errorUsage (void) GNU_ATTRIBUTE(__noreturn__);
+static void errorUsage (void) STG_NORETURN;
 
 #if defined(mingw32_HOST_OS)
 static char** win32_full_utf8_argv;
@@ -2421,7 +2421,7 @@ static void read_trace_flags(const char *arg)
 }
 #endif
 
-static void GNU_ATTRIBUTE(__noreturn__)
+static void STG_NORETURN
 bad_option(const char *s)
 {
   errorBelch("bad RTS option: %s", s);

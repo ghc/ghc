@@ -139,7 +139,7 @@ isGUIApp(void)
 }
 #endif
 
-void GNU_ATTRIBUTE(__noreturn__)
+void STG_NORETURN
 rtsFatalInternalErrorFn(const char *s, va_list ap)
 {
 #if defined(mingw32_HOST_OS)
@@ -322,7 +322,7 @@ rtsDebugMsgFn(const char *s, va_list ap)
 
 
 // Used in stg_badAlignment_entry defined in StgStartup.cmm.
-void rtsBadAlignmentBarf(void) GNUC3_ATTRIBUTE(__noreturn__);
+void rtsBadAlignmentBarf(void) STG_NORETURN;
 
 void
 rtsBadAlignmentBarf()
@@ -331,7 +331,7 @@ rtsBadAlignmentBarf()
 }
 
 // Used by code generator
-void rtsOutOfBoundsAccess(void) GNUC3_ATTRIBUTE(__noreturn__);
+void rtsOutOfBoundsAccess(void) STG_NORETURN;
 
 void
 rtsOutOfBoundsAccess()

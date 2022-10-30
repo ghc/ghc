@@ -45,7 +45,7 @@ HpcModuleInfo *modules = 0;
 
 static char *tixFilename = NULL;
 
-static void GNU_ATTRIBUTE(__noreturn__)
+static void STG_NORETURN
 failure(char *msg) {
   debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
   fprintf(stderr,"Hpc failure: %s\n",msg);
