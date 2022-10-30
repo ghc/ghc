@@ -18,12 +18,12 @@ void initAllocator(void);
 void shutdownAllocator(void);
 
 void *stgMallocBytes(size_t n, char *msg)
-    GNUC3_ATTRIBUTE(__malloc__);
+    STG_MALLOC;
 
 void *stgReallocBytes(void *p, size_t n, char *msg);
 
 void *stgCallocBytes(size_t count, size_t size, char *msg)
-     GNUC3_ATTRIBUTE(__malloc__);
+    STG_MALLOC;
 
 char *stgStrndup(const char *s, size_t n);
 

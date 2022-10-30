@@ -244,6 +244,8 @@
 
 #define STG_NORETURN GNU_ATTRIBUTE(__noreturn__)
 
+#define STG_MALLOC GNUC3_ATTRIBUTE(__malloc__)
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
