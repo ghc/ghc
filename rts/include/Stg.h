@@ -294,6 +294,15 @@
 # define STG_ALLOC_SIZE2(position1, position2)
 #endif
 
+/*
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-returns_005fnonnull-function-attribute
+ */
+#if stg__has_attribute(__returns_nonnull__)
+# define STG_RETURNS_NONNULL __attribute__((__returns_nonnull__))
+#else
+# define STG_RETURNS_NONNULL
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
