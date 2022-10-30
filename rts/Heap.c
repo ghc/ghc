@@ -278,7 +278,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     for (StgWord i = 0; i<nptrs; i++) {
         arr->payload[i] = ptrs[i];
     }
-    free(ptrs);
+    stgFree(ptrs);
 
     return arr;
 }

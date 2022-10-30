@@ -17,17 +17,24 @@
 void initAllocator(void);
 void shutdownAllocator(void);
 
-void *stgMallocBytes(size_t n, char *msg)
-    STG_MALLOC;
+void stgFree(void* p);
 
-void *stgReallocBytes(void *p, size_t n, char *msg);
+void *stgMallocBytes(size_t n, char *msg)
+    STG_MALLOC STG_MALLOC1(stgFree);
+
+void *stgReallocBytes(void *p, size_t n, char *msg)
+    STG_MALLOC1(stgFree);
+/* Note: `stgRallocBytes` can *not* be tagged as `STG_MALLOC`
+ * since its return value *can* alias an existing pointer (i.e.,
+ * the given pointer `p`).
+ * See the documentation of the `malloc` attribute in the GCC manual
+ * for more information.
+ */
 
 void *stgCallocBytes(size_t count, size_t size, char *msg)
-    STG_MALLOC;
+    STG_MALLOC STG_MALLOC1(stgFree);
 
 char *stgStrndup(const char *s, size_t n);
-
-void stgFree(void* p);
 
 /* -----------------------------------------------------------------------------
  * Misc other utilities

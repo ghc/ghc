@@ -246,6 +246,43 @@
 
 #define STG_MALLOC GNUC3_ATTRIBUTE(__malloc__)
 
+/* Instead of relying on GCC version checks to expand attributes,
+ * use `__has_attribute` which is supported by GCC >= 5 and Clang. Hence, the
+ * following macros won't expand on older compiler versions, but since they're
+ * purely for optimization or static analysis purposes, there's no harm done.
+ *
+ * See: https://gcc.gnu.org/onlinedocs/cpp/_005f_005fhas_005fattribute.html
+ * See: https://clang.llvm.org/docs/LanguageExtensions.html#has-attribute
+ */
+#ifdef __has_attribute
+# define stg__has_attribute(attr) __has_attribute(attr)
+#else
+# define stg__has_attribute(attr) (0)
+#endif
+
+#ifdef __GNUC__
+# define STG_GNUC_GUARD_VERSION(major, minor) \
+    ((__GNUC__ > (major)) || \
+      ((__GNUC__ == (major)) && (__GNUC_MINOR__ >= (minor))))
+#else
+# define STG_GNUC_GUARD_VERSION(major, minor) (0)
+#endif
+
+/*
+ * The versions of the `__malloc__` attribute which take arguments are only
+ * supported in GCC 11 and later.
+ *
+ * See: https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-malloc-function-attribute
+ * See: https://developers.redhat.com/blog/2021/04/30/detecting-memory-management-bugs-with-gcc-11-part-1-understanding-dynamic-allocation#attribute_malloc
+ */
+#if stg__has_attribute(__malloc__) && STG_GNUC_GUARD_VERSION(11, 0)
+# define STG_MALLOC1(deallocator) __attribute__((__malloc__(deallocator)))
+# define STG_MALLOC2(deallocator, ptrIndex) __attribute__((__malloc__(deallocator, ptrIndex)))
+#else
+# define STG_MALLOC1(deallocator)
+# define STG_MALLOC2(deallocator, ptrIndex)
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
