@@ -45,7 +45,8 @@ void *stgCallocBytes(size_t count, size_t size, char *msg)
     STG_ALLOC_SIZE2(1, 2)
     STG_RETURNS_NONNULL;
 
-char *stgStrndup(const char *s, size_t n);
+char *stgStrndup(const char *s, size_t n)
+    STG_MALLOC STG_MALLOC1(stgFree);
 
 /* -----------------------------------------------------------------------------
  * Misc other utilities
