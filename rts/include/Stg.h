@@ -220,6 +220,7 @@
 #endif
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
+#define STG_USED      GNUC3_ATTRIBUTE(__used__)
 
 /* Prevent functions from being optimized.
    See Note [Windows Stack allocations] */

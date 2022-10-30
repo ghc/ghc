@@ -163,7 +163,7 @@ StgFunPtr StgReturn(void)
  * */
 
 
-static void GNUC3_ATTRIBUTE(used)
+static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
@@ -372,7 +372,7 @@ stack unwinding.
 */
 
 
-static void GNUC3_ATTRIBUTE(used)
+static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
@@ -595,7 +595,7 @@ StgRunIsImplementedInAssembler(void)
 
 // This version is for PowerPC Linux.
 
-static void GNUC3_ATTRIBUTE(used)
+static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
         __asm__ volatile (
@@ -698,7 +698,7 @@ StgRunIsImplementedInAssembler(void)
  * the TOC pointer from the function descriptor upon a call to StgReturn.
  * That TOC pointer is the same as the TOC pointer in StgRun.
  */
-static void GNUC3_ATTRIBUTE(used)
+static void STG_USED
 StgRunIsImplementedInAssembler(void)
 {
         __asm__ volatile (
