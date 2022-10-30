@@ -519,7 +519,7 @@ rnPatAndThen mk (LitPat x lit)
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)
        ; if ovlStr
          then rnPatAndThen mk
-                           (mkNPat (noLocA (mkHsIsString src s))
+                           (mkNPat (noLocI (mkHsIsString src s))
                                       Nothing noAnn)
          else normal_lit }
   | otherwise = normal_lit
@@ -780,7 +780,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                               { hfbLHS =
                                   (L loc (FieldOcc _ (L ll lbl)))
                               , hfbRHS = arg
-                              , hfbPun      = pun }))
+                              , hfbPun = pun }))
       = do { sel <- setSrcSpanA loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
@@ -893,14 +893,14 @@ rnHsRecUpdFields flds
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (l2l loc) (HsVar noExtField
-                                              (L (l2ln loc) arg_rdr))) }
+                                              (L (l2l loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
            ; let (lbl', fvs') = case mb_sel of
                    UnambiguousGre gname -> let sel_name = greNameMangledName gname
-                                           in (Unambiguous sel_name (L (l2ln loc) lbl), fvs `addOneFV` sel_name)
-                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2ln loc) lbl), fvs)
+                                           in (Unambiguous sel_name (L (l2l loc) lbl), fvs `addOneFV` sel_name)
+                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2l loc) lbl), fvs)
 
            ; return (L l (HsFieldBind { hfbAnn = noAnn
                                       , hfbLHS = L loc lbl'

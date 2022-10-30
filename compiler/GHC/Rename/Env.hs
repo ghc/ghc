@@ -290,13 +290,13 @@ lookupLocatedTopConstructorRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopConstructorRn = wrapLocM (lookupTopBndrRn WL_Constructor)
 
 lookupLocatedTopConstructorRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopConstructorRnN = wrapLocMN (lookupTopBndrRn WL_Constructor)
+lookupLocatedTopConstructorRnN = wrapLocMA (lookupTopBndrRn WL_Constructor)
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM (lookupTopBndrRn WL_Anything)
 
 lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopBndrRnN = wrapLocMN (lookupTopBndrRn WL_Anything)
+lookupLocatedTopBndrRnN = wrapLocMA (lookupTopBndrRn WL_Anything)
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
@@ -390,7 +390,7 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
-  = wrapLocMN (lookupInstDeclBndr cls (text "associated type")) tc_rdr
+  = wrapLocMA (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRnConstr tc_rdr
 
@@ -973,18 +973,18 @@ we'll miss the fact that the qualified import is redundant.
 
 lookupLocatedOccRn :: LocatedN RdrName
                    -> TcRn (LocatedN Name)
-lookupLocatedOccRn = wrapLocMN lookupOccRn
+lookupLocatedOccRn = wrapLocMA lookupOccRn
 
 lookupLocatedOccRnConstr :: LocatedN RdrName
                          -> TcRn (LocatedN Name)
-lookupLocatedOccRnConstr = wrapLocMN lookupOccRnConstr
+lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
 
-lookupLocatedOccRnRecField :: GenLocated (SrcSpanAnn' ann) RdrName
-                           -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnRecField :: GenLocated (EpAnnS ann) RdrName
+                           -> TcRn (GenLocated (EpAnnS ann) Name)
 lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
 
-lookupLocatedOccRnNone :: GenLocated (SrcSpanAnn' ann) RdrName
-                       -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnNone :: GenLocated (EpAnnS ann) RdrName
+                       -> TcRn (GenLocated (EpAnnS ann) Name)
 lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
@@ -1783,7 +1783,7 @@ lookupSigCtxtOccRnN :: HsSigCtxt
                                    -- like "type family"
                     -> LocatedN RdrName -> RnM (LocatedN Name)
 lookupSigCtxtOccRnN ctxt what
-  = wrapLocMN $ \ rdr_name ->
+  = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
            Left err   -> do { addErr (mkTcRnNotInScope rdr_name err)

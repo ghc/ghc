@@ -668,7 +668,7 @@ zonkLTcSpecPrags env ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
             => ZonkEnv
             -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
             -> MatchGroup GhcTc (LocatedA (body GhcTc))
@@ -683,7 +683,7 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty' origin
                      }) }
 
-zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
           => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
@@ -695,7 +695,7 @@ zonkMatch env zBody (L loc match@(Match { m_pats = pats
         ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
           => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
@@ -1147,7 +1147,7 @@ zonkStmt env zBody (RecStmt { recS_stmts = L _ segStmts, recS_later_ids = lvs
        ; new_later_rets <- mapM (zonkExpr env5) later_rets
        ; new_rec_rets <- mapM (zonkExpr env5) rec_rets
        ; return (extendIdZonkEnvRec env3 new_lvs,     -- Only the lvs are needed
-                 RecStmt { recS_stmts = noLocA new_segStmts
+                 RecStmt { recS_stmts = noLocI new_segStmts
                          , recS_later_ids = new_lvs
                          , recS_rec_ids = new_rvs, recS_ret_fn = new_ret_id
                          , recS_mfix_fn = new_mfix_id, recS_bind_fn = new_bind_id
@@ -1276,6 +1276,7 @@ zonkRecFields env (HsRecFields flds dd)
   = do  { flds' <- mapM zonk_rbind flds
         ; return (HsRecFields flds' dd) }
   where
+    zonk_rbind :: LHsRecField GhcTc (LHsExpr GhcTc) -> TcM (LHsRecField GhcTc (LHsExpr GhcTc)) -- AZ temporary
     zonk_rbind (L l fld)
       = do { new_id   <- wrapLocMA (zonkFieldOcc env) (hfbLHS fld)
            ; new_expr <- zonkLExpr env (hfbRHS fld)

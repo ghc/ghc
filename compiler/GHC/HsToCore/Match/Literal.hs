@@ -575,7 +575,7 @@ tidyNPat (OverLit (OverLitTc False _ ty) val) mb_neg _eq outer_ty
                    _ -> Nothing
 
 tidyNPat over_lit mb_neg eq outer_ty
-  = NPat outer_ty (noLocA over_lit) mb_neg eq
+  = NPat outer_ty (noLocI over_lit) mb_neg eq
 
 {-
 ************************************************************************

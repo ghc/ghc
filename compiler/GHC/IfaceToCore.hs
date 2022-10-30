@@ -281,7 +281,7 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = BF.mkOr [noLocA bf1, noLocA bf2]
+                ifMinDef = BF.mkOr [noLocI bf1, noLocI bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when

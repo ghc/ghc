@@ -949,7 +949,7 @@ getLocalNonValBinders fixity_env
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     hs_boot_sig_bndrs :: [LocatedN RdrName]
-    hs_boot_sig_bndrs = [ L (l2ln decl_loc) (unLoc n)
+    hs_boot_sig_bndrs = [ L (l2l decl_loc) (unLoc n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
@@ -962,7 +962,7 @@ getLocalNonValBinders fixity_env
            -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_tc dup_fields_ok has_sel tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
-             ; names@(main_name : sub_names) <- mapM (newTopSrcBinder . l2n) bndrs
+             ; names@(main_name : sub_names) <- mapM (newTopSrcBinder . la2la ) bndrs
              ; flds' <- mapM (newRecordSelector dup_fields_ok has_sel sub_names) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
@@ -1040,7 +1040,7 @@ getLocalNonValBinders fixity_env
     new_di dup_fields_ok has_sel mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
-             ; sub_names <- mapM (newTopSrcBinder .l2n) bndrs
+             ; sub_names <- mapM (newTopSrcBinder . la2la) bndrs
              ; flds' <- mapM (newRecordSelector dup_fields_ok has_sel sub_names) flds
              ; let avail    = availTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
@@ -1054,7 +1054,7 @@ getLocalNonValBinders fixity_env
 newRecordSelector :: DuplicateRecordFields -> FieldSelectors -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector dup_fields_ok has_sel (dc:_) (L loc (FieldOcc _ (L _ fld)))
-  = do { selName <- newTopSrcBinder $ L (l2ln loc) $ field
+  = do { selName <- newTopSrcBinder $ L (l2l loc) $ field
        ; return $ FieldLabel { flLabel = fieldLabelString
                              , flHasDuplicateRecordFields = dup_fields_ok
                              , flHasFieldSelector = has_sel
@@ -1933,7 +1933,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
            ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
                  lies = map (L l) (concatMap (to_ie iface) used_avails)
-           ; return (L l (decl { ideclImportList = Just (Exactly, L (l2l l) lies) })) }
+           ; return (L l (decl { ideclImportList = Just (Exactly, L (nn2la l) lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
@@ -1983,7 +1983,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
         idecl = unLoc decl
 
     merge :: NonEmpty (LImportDecl GhcRn) -> LImportDecl GhcRn
-    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
+    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpanI (locA l)) lies) })
       where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) $ NE.toList decls
 
 
@@ -2015,14 +2015,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise             = L l (IEName    noExtField         (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (EpaSpan $ la2r l) (L (l2l l) n))
+  | otherwise             = L l (IEName    noExtField         (L (l2l l) n))
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise                   = L l (IEName noExtField         (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (EpaSpan $ la2r l) (L (l2l l) n))
+  | otherwise                   = L l (IEName noExtField         (L (l2l l) n))
   where occ = occName n
 
 {-

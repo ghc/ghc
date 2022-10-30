@@ -311,9 +311,9 @@ lexLHsDocString = fmap lexHsDocString
 -- Imports cannot have documentation comments anyway.
 instance HasHaddock (LocatedL [LocatedA (IE GhcPs)]) where
   addHaddock (L l_exports exports) =
-    extendHdkA (locA l_exports) $ do
+    extendHdkA (locI l_exports) $ do
       exports' <- addHaddockInterleaveItems NoLayoutInfo mkDocIE exports
-      registerLocHdkA (srcLocSpan (srcSpanEnd (locA l_exports))) -- Do not consume comments after the closing parenthesis
+      registerLocHdkA (srcLocSpan (srcSpanEnd (locI l_exports))) -- Do not consume comments after the closing parenthesis
       pure $ L l_exports exports'
 
 -- Needed to use 'addHaddockInterleaveItems' in 'instance HasHaddock (Located [LIE GhcPs])'.
@@ -431,7 +431,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -> Bool -- ^ Comment on Bool
   --
   addHaddock (SigD _ (TypeSig x names t)) = do
-      traverse_ registerHdkN names
+      traverse_ registerHdkA names
       t' <- addHaddock t
       pure (SigD noExtField (TypeSig x names t'))
 
@@ -442,7 +442,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -> Maybe Bool -- ^ Comment on Maybe Bool
   --
   addHaddock (SigD _ (PatSynSig x names t)) = do
-    traverse_ registerHdkN names
+    traverse_ registerHdkA names
     t' <- addHaddock t
     pure (SigD noExtField (PatSynSig x names t'))
 
@@ -458,7 +458,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --        -> IO ()   -- ^ Comment on IO ()
   --
   addHaddock (SigD _ (ClassOpSig x is_dflt names t)) = do
-    traverse_ registerHdkN names
+    traverse_ registerHdkA names
     t' <- addHaddock t
     pure (SigD noExtField (ClassOpSig x is_dflt names t'))
 
@@ -481,7 +481,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD x decl)
     | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn } <- decl
     = do
-        registerHdkN tcdLName
+        registerHdkA tcdLName
         defn' <- addHaddock defn
         pure $
           TyClD x (DataDecl {
@@ -502,7 +502,7 @@ instance HasHaddock (HsDecl GhcPs) where
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
                   tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
     = do
-        registerHdkN tcdLName
+        registerHdkA tcdLName
         -- todo: register keyword location of 'where', see Note [Register keyword location]
         where_cls' <-
           addHaddockInterleaveItems tcdLayout (mkDocHsDecl tcdLayout) $
@@ -530,7 +530,7 @@ instance HasHaddock (HsDecl GhcPs) where
       dfid_eqn' <- case dfid_eqn of
         FamEqn { feqn_ext, feqn_tycon, feqn_bndrs, feqn_pats, feqn_fixity, feqn_rhs }
           -> do
-            registerHdkN feqn_tycon
+            registerHdkA feqn_tycon
             feqn_rhs' <- addHaddock feqn_rhs
             pure $ FamEqn {
                 feqn_ext,
@@ -547,7 +547,7 @@ instance HasHaddock (HsDecl GhcPs) where
   addHaddock (TyClD _ decl)
     | SynDecl { tcdSExt, tcdLName, tcdTyVars, tcdFixity, tcdRhs } <- decl
     = do
-        registerHdkN tcdLName
+        registerHdkA tcdLName
         -- todo: register keyword location of '=', see Note [Register keyword location]
         tcdRhs' <- addHaddock tcdRhs
         pure $
@@ -563,7 +563,7 @@ instance HasHaddock (HsDecl GhcPs) where
   --        -> IO Float  -- ^ The output float
   --
   addHaddock (ForD _ decl) = do
-    registerHdkN (fd_name decl)
+    registerHdkA (fd_name decl)
     fd_sig_ty' <- addHaddock (fd_sig_ty decl)
     pure $ ForD noExtField (decl{ fd_sig_ty = fd_sig_ty' })
 
@@ -615,7 +615,7 @@ instance HasHaddock (Located [LocatedAn NoEpAnns (HsDerivingClause GhcPs)]) wher
 -- Not used for standalone deriving.
 instance HasHaddock (LocatedAn NoEpAnns (HsDerivingClause GhcPs)) where
   addHaddock lderiv =
-    extendHdkA (getLocA lderiv) $
+    extendHdkA (getLocI lderiv) $
     for @(LocatedAn NoEpAnns) lderiv $ \deriv ->
     case deriv of
       HsDerivingClause { deriv_clause_ext, deriv_clause_strategy, deriv_clause_tys } -> do
@@ -629,8 +629,8 @@ instance HasHaddock (LocatedAn NoEpAnns (HsDerivingClause GhcPs)) where
           (register_strategy_before, register_strategy_after) =
             case deriv_clause_strategy of
               Nothing -> (pure (), pure ())
-              Just (L l (ViaStrategy _)) -> (pure (), registerLocHdkA (locA l))
-              Just (L l _) -> (registerLocHdkA (locA l), pure ())
+              Just (L l (ViaStrategy _)) -> (pure (), registerLocHdkA (locI l))
+              Just (L l _) -> (registerLocHdkA (locI l), pure ())
         register_strategy_before
         deriv_clause_tys' <- addHaddock deriv_clause_tys
         register_strategy_after
@@ -651,7 +651,7 @@ instance HasHaddock (LocatedAn NoEpAnns (HsDerivingClause GhcPs)) where
 --                   )
 instance HasHaddock (LocatedC (DerivClauseTys GhcPs)) where
   addHaddock (L l_dct dct) =
-    extendHdkA (locA l_dct) $
+    extendHdkA (locI l_dct) $
     case dct of
       DctSingle x ty -> do
         ty' <- addHaddock ty
@@ -989,7 +989,7 @@ instance HasHaddock (LocatedA (HsType GhcPs)) where
 
       -- (Eq a, Num a) => t
       HsQualTy x lhs rhs -> do
-        registerHdkA lhs
+        registerHdkI lhs
         rhs' <- addHaddock rhs
         pure $ L l (HsQualTy x lhs rhs')
 
@@ -1155,11 +1155,11 @@ registerLocHdkA l = HdkA (getBufSpan l) (pure ())
 -- A small wrapper over registerLocHdkA.
 --
 -- See Note [Adding Haddock comments to the syntax tree].
-registerHdkA :: GenLocated (SrcSpanAnn' a) e -> HdkA ()
+registerHdkA :: GenLocated (EpAnnS a) e -> HdkA ()
 registerHdkA a = registerLocHdkA (getLocA a)
 
-registerHdkN :: GenLocated (EpAnnS a) e -> HdkA ()
-registerHdkN a = registerLocHdkA (getLocN a)
+registerHdkI :: GenLocated (SrcSpanAnn'  a) e -> HdkA ()
+registerHdkI a = registerLocHdkA (getLocI a)
 
 -- Modify the action of a HdkA computation.
 hoistHdkA :: (HdkM a -> HdkM b) -> HdkA a -> HdkA b
@@ -1520,7 +1520,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
     mapLL (\d -> DocD noExtField d) all_docs
   ]
 
-cmpBufSpanA :: GenLocated (SrcSpanAnn' a1) a2 -> GenLocated (SrcSpanAnn' a3) a2 -> Ordering
+cmpBufSpanA :: GenLocated (EpAnnS a1) a2 -> GenLocated (EpAnnS a3) a2 -> Ordering
 cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 
 {- *********************************************************************

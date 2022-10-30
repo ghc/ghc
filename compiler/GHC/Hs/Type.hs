@@ -149,7 +149,7 @@ getBangStrictness _ = (HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict)
 -}
 
 fromMaybeContext :: Maybe (LHsContext (GhcPass p)) -> HsContext (GhcPass p)
-fromMaybeContext mctxt = unLoc $ fromMaybe (noLocA []) mctxt
+fromMaybeContext mctxt = unLoc $ fromMaybe (noLocI []) mctxt
 
 type instance XHsForAllVis   (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '->'
@@ -436,7 +436,7 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
   = kvs ++ hsLTyVarNames tvs
 
 hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> LocatedN (IdP (GhcPass p))
-hsLTyVarLocName (L l a) = L (l2ln l) (hsTyVarName a)
+hsLTyVarLocName (L l a) = L (l2ll l) (hsTyVarName a)
 
 hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [LocatedN (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
@@ -514,19 +514,22 @@ splitHsFunType ::
      , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType ty = go ty
   where
+    go :: LHsType (GhcPass p)
+       -> ( [AddEpAnn], EpAnnComments
+         , [HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p)) -- AZ temporary
     go (L l (HsParTy an ty))
       = let
           (anns, cs, args, res) = splitHsFunType ty
           anns' = anns ++ annParen2AddEpAnn an
-          cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
+          cs' = cs S.<> s_comments l S.<> epAnnComments an
         in (anns', cs', args, res)
 
     go (L ll (HsFunTy (EpAnn _ _ cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
+      = (anns, csy S.<> s_comments ll, HsScaled mult x':args, res)
       where
         L l t = x
-        x' = L (addCommentsToSrcAnn l cs) t
+        x' = L (addCommentsToEpAnnS l cs) t
 
     go other = ([], emptyComments, [], other)
 
@@ -1343,5 +1346,5 @@ type instance Anno (HsOuterTyVarBndrs _ (GhcPass _)) = SrcSpanAnnA
 type instance Anno HsIPName = SrcAnn NoEpAnns
 type instance Anno (ConDeclField (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno (FieldOcc (GhcPass p)) = SrcAnn NoEpAnns
-type instance Anno (AmbiguousFieldOcc (GhcPass p)) = SrcAnn NoEpAnns
+type instance Anno (FieldOcc (GhcPass p)) = EpAnnS NoEpAnns
+type instance Anno (AmbiguousFieldOcc (GhcPass p)) = EpAnnS NoEpAnns
