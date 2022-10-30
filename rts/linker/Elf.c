@@ -2054,7 +2054,7 @@ struct piterate_cb_info {
 };
 
 static int loadNativeObjCb_(struct dl_phdr_info *info,
-    size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
+    size_t _size STG_UNUSED, void *data) {
   struct piterate_cb_info *s = (struct piterate_cb_info *) data;
 
   // This logic mimicks _dl_addr_inside_object from glibc

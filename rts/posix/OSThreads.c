@@ -445,7 +445,7 @@ setThreadAffinity (uint32_t n, uint32_t m)
 #elif defined(darwin_HOST_OS) && defined(THREAD_AFFINITY_POLICY)
 // Schedules the current thread in the affinity set identified by tag n.
 void
-setThreadAffinity (uint32_t n, uint32_t m GNUC3_ATTRIBUTE(__unused__))
+setThreadAffinity (uint32_t n, uint32_t m STG_UNUSED)
 {
     thread_affinity_policy_data_t policy;
 
