@@ -24,6 +24,104 @@
 #include "sm/GC.h" // for evac_fn
 #include "posix/Select.h" // for LowResTime TODO: switch to normal Time
 
+/* The ./configure gives us a set of CPP flags, one for each named I/O manager:
+ * IOMGR_BUILD_<name>                : which ones should be built (some)
+ * IOMGR_DEFAULT_NON_THREADED_<name> : which one is default (exactly one)
+ * IOMGR_DEFAULT_THREADED_<name>     : which one is default (exactly one)
+ *
+ * The IOMGR_BUILD_<name> flags just says that an I/O manager should be built
+ * for _some_ RTS way (i.e. threaded or non-threaded). What we need however are
+ * flags to use for conditional compilation of I/O manager code. These flags
+ * must take into account whether the particular I/O manager is enabled for the
+ * RTS way we're currently building, in particular taking into account if we're
+ * building for a threaded or non-threaded RTS.
+ *
+ * So here we define a set of derived flags IOMGR_ENABLED_<name> which says if
+ * each I/O manager is enabled in the RTS way we're building now. We'll then
+ * use these flags everywhere else for conditional compilation.
+ */
+
+#if defined(IOMGR_BUILD_SELECT) && !defined(THREADED_RTS)
+    #define IOMGR_ENABLED_SELECT
+#endif
+#if defined(IOMGR_BUILD_MIO) && defined(THREADED_RTS)
+/* For MIO, it is really two separate I/O manager implementations: one for
+ * Windows and one for non-Windows. This is clear from both the C code on the
+ * RTS side and the Haskell code in the base library. By treating them as
+ * such leads to simpler I/O manager dispatch code.
+ *
+ * These two implementations do share a common architecture, and so we still
+ * use a single name in public interfaces like ./configure and the RTS flags.
+ */
+#if defined(mingw32_HOST_OS)
+    #define IOMGR_ENABLED_MIO_WIN32
+#else
+    #define IOMGR_ENABLED_MIO_POSIX
+#endif
+#endif
+#if defined(IOMGR_BUILD_WINIO)
+    #define IOMGR_ENABLED_WINIO
+#endif
+#if defined(IOMGR_BUILD_WIN32_LEGACY) && !defined(THREADED_RTS)
+    #define IOMGR_ENABLED_WIN32_LEGACY
+#endif
+
+/* To provide a string to use for output of +RTS -? we use the
+ * IOMGR_DEFAULT_{NON_}THREADED_<name> flags to derived a CPP variable
+ * IOMGR_DEFAULT_STR with the string name of the default I/O manager for the
+ * _current_ RTS way. At the same time we can do a sanity check that there is
+ * actually a default.
+ */
+#if defined(THREADED_RTS)
+#if   defined(IOMGR_DEFAULT_THREADED_MIO)
+    #define IOMGR_DEFAULT_STR "mio"
+#elif defined(IOMGR_DEFAULT_THREADED_WINIO)
+    #define IOMGR_DEFAULT_STR "winio"
+#else
+#error No I/O default manager. See IOMGR_DEFAULT_THREADED_ flags
+#endif
+#else // !defined(THREADED_RTS)
+#if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
+    #define IOMGR_DEFAULT_STR "select"
+#elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
+    #define IOMGR_DEFAULT_STR "winio"
+#elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
+    #define IOMGR_DEFAULT_STR "win32-legacy"
+#else
+#error No I/O default manager. See IOMGR_DEFAULT_NON_THREADED_ flags
+#endif
+#endif
+
+/* To help with error messages we provide a macro IOMGRS_ENABLED_STR that is
+ * the stringy list of all enabled I/O managers (with leading and separating
+ * spaces)
+ */
+#if defined(IOMGR_ENABLED_SELECT)
+    #define IOMGR_ENABLED_STR_SELECT " select"
+#else
+    #define IOMGR_ENABLED_STR_SELECT ""
+#endif
+#if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
+    #define IOMGR_ENABLED_STR_MIO " mio"
+#else
+    #define IOMGR_ENABLED_STR_MIO ""
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+    #define IOMGR_ENABLED_STR_WINIO " winio"
+#else
+    #define IOMGR_ENABLED_STR_WINIO ""
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+    #define IOMGR_ENABLED_STR_WIN32_LEGACY " win32-legacy"
+#else
+    #define IOMGR_ENABLED_STR_WIN32_LEGACY ""
+#endif
+#define IOMGRS_ENABLED_STR \
+          IOMGR_ENABLED_STR_SELECT \
+          IOMGR_ENABLED_STR_MIO \
+          IOMGR_ENABLED_STR_WINIO \
+          IOMGR_ENABLED_STR_WIN32_LEGACY
+
 
 /* The per-capability data structures belonging to the I/O manager.
  *

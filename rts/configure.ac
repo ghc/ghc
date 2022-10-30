@@ -351,6 +351,93 @@ AS_IF(
   [test "$CABAL_FLAG_libnuma" = 1],
   [AC_CHECK_HEADERS([numa.h numaif.h])])
 
+
+dnl ** I/O managers
+dnl --------------------------------------------------------------
+dnl
+dnl The scheme here is that every I/O manager can be enabled/disabled
+dnl at GHC build time (subject to some constraints). More than one I/O
+dnl manager can be enabled to be built. At least one I/O manager
+dnl supporting the threaded RTS must be enabled as well as at least
+dnl one supporting the non-threaded RTS. The I/O managers enabled here
+dnl become the choices available at runtime at RTS startup. The choice
+dnl can be made with RTS flags. There are separate choices for the
+dnl threaded and non-threaded RTS ways, because most I/O managers are
+dnl specific to these ways. Furthermore we must establish a default I/O
+dnl manager for the threaded and non-threaded RTS.
+dnl
+dnl Most I/O managers are platform-specific so there are checks to
+dnl ensure each one can be enabled on the platform. Such checks are
+dnl also where any system dependencies (e.g. libraries) can be checked.
+dnl
+dnl The output is a set of CPP flags, with one flag per named I/O manager:
+dnl * IOMGR_BUILD_<name>                : which ones should be built (some)
+dnl * IOMGR_DEFAULT_NON_THREADED_<name> : which one is default (exactly one)
+dnl * IOMGR_DEFAULT_THREADED_<name>     : which one is default (exactly one)
+dnl
+dnl Note that IOMGR_BUILD_<name> just says that an I/O manager will be
+dnl built for _some_ RTS way (i.e. threaded or non-threaded). There is
+dnl a set of derived flags IOMGR_ENABLED_<name> in IOManager.h which says
+dnl if each I/O manager is enabled in the "current" RTS way. These are
+dnl the ones used for conditional compilation of the I/O manager code.
+dnl -------------------------------------------------------------------
+
+dnl Here we check for platform constraints. The result is the CPP flag
+dnl IOMGR_BUILD_<name> and a EnableIOManager<Name> var for use here later.
+
+GHC_IOMANAGER_ENABLE([select], [EnableIOManagerSelect], [IOMGR_BUILD_SELECT],
+  [if test "$HostOS" = "mingw32"; then
+       EnableIOManagerSelect=NO
+   else
+       AC_CHECK_HEADER([sys/select.h],
+           [EnableIOManagerSelect=YES],
+           [AC_MSG_ERROR([sys/select.h required by select I/O manager])],[])
+   fi])
+
+GHC_IOMANAGER_ENABLE([mio], [EnableIOManagerMIO], [IOMGR_BUILD_MIO],
+  [EnableIOManagerMIO=YES])
+
+GHC_IOMANAGER_ENABLE([win32-legacy], [EnableIOManagerWin32Legacy], [IOMGR_BUILD_WIN32_LEGACY],
+  [if test "$HostOS" = "mingw32"; then EnableIOManagerWin32Legacy=YES; fi])
+
+GHC_IOMANAGER_ENABLE([winio], [EnableIOManagerWinIO], [IOMGR_BUILD_WINIO],
+  [if test "$HostOS" = "mingw32"; then EnableIOManagerWinIO=YES; fi])
+
+dnl Now we establish a default I/O manager for the threaded and non-threaded
+dnl RTS. We select the default based on which I/O managers are enabled. They
+dnl are checked in reverse order of priority, the last enabled one wins:
+if test "$HostOS" = "mingw32"; then
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [winio], [EnableIOManagerWinIO],)
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [win32-legacy], [EnableIOManagerWin32Legacy])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [winio], [EnableIOManagerWinIO])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
+else
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerNonThreadedDefault], [select], [EnableIOManagerSelect])
+  GHC_IOMANAGER_DEFAULT_SELECT([IOManagerThreadedDefault], [mio], [EnableIOManagerMIO])
+fi
+GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerNonThreadedDefault],[non-threaded])
+GHC_IOMANAGER_DEFAULT_CHECK_NOT_EMPTY([IOManagerThreadedDefault],[threaded])
+
+AC_MSG_NOTICE(default I/O manager for the non-threaded RTS: ${IOManagerNonThreadedDefault})
+AC_MSG_NOTICE(default I/O manager for the threaded RTS: ${IOManagerThreadedDefault})
+
+dnl Now define CPP vars for the default ones (threaded and non-threaded)
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [select], [IOMGR_DEFAULT_NON_THREADED_SELECT])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [winio], [IOMGR_DEFAULT_NON_THREADED_WINIO])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerNonThreadedDefault], [non-threaded],
+                                [win32-legacy], [IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
+                                [mio], [IOMGR_DEFAULT_THREADED_MIO])
+
+GHC_IOMANAGER_DEFAULT_AC_DEFINE([IOManagerThreadedDefault], [threaded],
+                                [winio], [IOMGR_DEFAULT_THREADED_WINIO])
+
+
 dnl ** Write config files
 dnl --------------------------------------------------------------
 
