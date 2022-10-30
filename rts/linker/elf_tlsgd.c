@@ -161,7 +161,7 @@ typedef struct tls_sym {
 typedef struct dl_phdr_info dlpi;
 
 static int
-find_tls_sym(dlpi *info, size_t sz __attribute__((unused)), void *data)
+find_tls_sym(dlpi *info, size_t sz STG_UNUSED, void *data)
 {
     tls_sym *wanted = (tls_sym *)data;
     const Elf_Addr base = info->dlpi_addr;

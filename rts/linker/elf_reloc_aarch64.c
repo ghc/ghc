@@ -51,8 +51,8 @@ bool isVectorOp(addr_t p) {
 typedef uint32_t inst_t;
 
 int64_t
-decodeAddendAarch64(Section * section __attribute__((unused)),
-                    Elf_Rel * rel __attribute__((unused)))
+decodeAddendAarch64(Section * section STG_UNUSED,
+                    Elf_Rel * rel STG_UNUSED)
 {
     abort(/* we don't support Rel locations yet. */);
 }
