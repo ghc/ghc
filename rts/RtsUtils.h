@@ -20,10 +20,12 @@ void shutdownAllocator(void);
 void stgFree(void* p);
 
 void *stgMallocBytes(size_t n, char *msg)
-    STG_MALLOC STG_MALLOC1(stgFree);
+    STG_MALLOC STG_MALLOC1(stgFree)
+    STG_ALLOC_SIZE1(1);
 
 void *stgReallocBytes(void *p, size_t n, char *msg)
-    STG_MALLOC1(stgFree);
+    STG_MALLOC1(stgFree)
+    STG_ALLOC_SIZE1(2);
 /* Note: `stgRallocBytes` can *not* be tagged as `STG_MALLOC`
  * since its return value *can* alias an existing pointer (i.e.,
  * the given pointer `p`).
@@ -32,7 +34,8 @@ void *stgReallocBytes(void *p, size_t n, char *msg)
  */
 
 void *stgCallocBytes(size_t count, size_t size, char *msg)
-    STG_MALLOC STG_MALLOC1(stgFree);
+    STG_MALLOC STG_MALLOC1(stgFree)
+    STG_ALLOC_SIZE2(1, 2);
 
 char *stgStrndup(const char *s, size_t n);
 

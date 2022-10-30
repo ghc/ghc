@@ -283,6 +283,17 @@
 # define STG_MALLOC2(deallocator, ptrIndex)
 #endif
 
+/*
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#index-alloc_005fsize-function-attribute
+ */
+#if stg__has_attribute(__alloc_size__)
+# define STG_ALLOC_SIZE1(position) __attribute__((__alloc_size__(position)))
+# define STG_ALLOC_SIZE2(position1, position2) __attribute__((__alloc_size__(position1, position2)))
+#else
+# define STG_ALLOC_SIZE1(position)
+# define STG_ALLOC_SIZE2(position1, position2)
+#endif
+
 /* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
