@@ -1330,10 +1330,10 @@ mkDehydrateCo :: Coercion -> DCoercion
 mkDehydrateCo co | isReflCo co       = ReflDCo
 mkDehydrateCo (SymCo (GRefl _ _ MRefl))
                                      = ReflDCo
-mkDehydrateCo (SymCo (GRefl _ _ (MCo co)))
-                                     = mkGReflLeftDCo  co
+--mkDehydrateCo (SymCo (GRefl _ _ (MCo co)))
+--                                     = mkGReflLeftDCo  co
 mkDehydrateCo (GRefl _ _ MRefl)      = ReflDCo
-mkDehydrateCo (GRefl _ _ (MCo co))   = mkGReflRightDCo co
+--mkDehydrateCo (GRefl _ _ (MCo co))   = mkGReflRightDCo co
 --mkDehydrateCo (TyConAppCo _ _ cos)
 --  = mkTyConAppDCo $ map mkDehydrateCo cos
 --mkDehydrateCo (AppCo co1 co2)
@@ -1349,10 +1349,10 @@ mkDehydrateCo (AxiomInstCo coax _branch cos)
 mkDehydrateCo (AxiomRuleCo _coax cos)
   | all isReflCo cos  -- AMG TODO: can we avoid the need for this check?
   = singleStepDCo
-mkDehydrateCo (CoVarCo cv)
-  = CoVarDCo cv
-mkDehydrateCo (SubCo co)
-  = mkSubDCo (coercionLKind co) (mkDehydrateCo co) (coercionRKind co)
+--mkDehydrateCo (CoVarCo cv)
+--  = CoVarDCo cv
+--mkDehydrateCo (SubCo co)
+--  = mkSubDCo (coercionLKind co) (mkDehydrateCo co) (coercionRKind co)
 --mkDehydrateCo (TransCo co1 co2)
 --  = mkTransDCo (mkDehydrateCo co1) (mkDehydrateCo co2)
 mkDehydrateCo co

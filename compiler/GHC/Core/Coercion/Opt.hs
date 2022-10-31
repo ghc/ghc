@@ -159,6 +159,10 @@ type NormalCo    = Coercion
 
 type NormalNonIdCo = NormalCo  -- Extra invariant: not the identity
 
+type NormalDCo = DCoercion
+
+type NormalNonIdDCo = NormalDCo
+
 -- | Do we apply a @sym@ to the result?
 type SymFlag = Bool
 
@@ -333,10 +337,14 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
-opt_co4 env@(LC _ lift_co_env) sym rep r co@TransCoDCo{}
-  | isEmptyVarEnv lift_co_env =
-    wrapRole rep r $ wrapSym sym $ substCo (lcSubst env) co
-  | otherwise = error "AMG TODO"
+opt_co4 env sym rep r (TransCoDCo co1 dco2 _)
+  = wrapSym sym $ mkTransCoDCo co1' dco2' -- TODO: any optimizations at this level? Use RHS type?
+     -- TODO handle roles properly here
+     -- TODO if we had PeakCo we could push Sym inside more easily
+  where
+    co1' = opt_co4_wrap env False rep r co1
+    dco2' = opt_dco4 env False rep r dco2
+    -- in_scope = lcInScopeSet env
 
 opt_co4 env _sym rep r (NthCo _r n co)
   | Just (ty, _) <- isReflCo_maybe co
@@ -493,6 +501,22 @@ chances of floating the Refl upwards; e.g. Maybe c --> Refl (Maybe t)
 We do so here in optCoercion, not in mkCoVarCo; see Note [mkCoVarCo]
 in GHC.Core.Coercion.
 -}
+
+
+opt_dco4 :: LiftingContext -> SymFlag -> ReprFlag -> Role -> DCoercion -> NormalDCo
+
+opt_dco4 _ _   _ _ dco@ReflDCo = dco  -- TODO: role change?
+
+opt_dco4 env sym rep r (TyConAppDCo dcos) = mkTyConAppDCo (map (opt_dco4 env sym rep r) dcos) -- TODO: roles
+
+opt_dco4 _ _ _ _ dco@AxiomInstDCo{} = dco
+opt_dco4 _ _ _ _ dco@StepsDCo{} = dco
+opt_dco4 env sym rep r (TransDCo dco1 dco2) = opt_trans_dco in_scope (opt_dco4 env sym rep r dco1) (opt_dco4 env sym rep r dco2)
+  where
+    in_scope = lcInScopeSet env
+opt_dco4 env sym rep r (DehydrateCo co) = mkDehydrateCo (opt_co4_wrap env sym rep r co)
+opt_dco4 _ _ _ _ dco = pprTrace "opt_dco4" (ppr dco) $ dco
+
 
 -------------
 -- | Optimize a phantom coercion. The input coercion may not necessarily
@@ -895,6 +919,55 @@ opt_trans_rule_app is orig_co1 orig_co2 co1a co1bs co2a co2bs
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res
   = Just res
+
+
+opt_transList_dco :: HasDebugCallStack => InScopeSet -> [NormalDCo] -> [NormalDCo] -> [NormalDCo]
+opt_transList_dco is = zipWithEqual "opt_transList_dco" (opt_trans_dco is)
+
+opt_trans_dco :: InScopeSet -> NormalDCo -> NormalDCo -> NormalDCo
+opt_trans_dco is co1 co2
+  | isReflDCo co1 = co2
+    -- optimize when co1 is a Refl Co
+  | otherwise    = opt_trans1_dco is co1 co2
+
+opt_trans1_dco :: InScopeSet -> NormalNonIdDCo -> NormalDCo -> NormalDCo
+-- First arg is not the identity
+opt_trans1_dco is co1 co2
+  | isReflDCo co2 = co1
+    -- optimize when co2 is a Refl Co
+  | otherwise    = opt_trans2_dco is co1 co2
+
+opt_trans2_dco :: InScopeSet -> NormalNonIdDCo -> NormalNonIdDCo -> NormalDCo
+-- Neither arg is the identity
+opt_trans2_dco is (TransDCo co1a co1b) co2
+    -- Don't know whether the sub-coercions are the identity
+  = opt_trans_dco is co1a (opt_trans_dco is co1b co2)
+
+opt_trans2_dco is co1 co2
+  | Just co <- opt_trans_rule_dco is co1 co2
+  = co
+
+opt_trans2_dco is co1 (TransDCo co2a co2b)
+  | Just co1_2a <- opt_trans_rule_dco is co1 co2a
+  = opt_trans_dco is co1_2a co2b
+
+opt_trans2_dco _ co1 co2
+  = mkTransDCo co1 co2
+
+
+opt_trans_rule_dco :: InScopeSet -> NormalNonIdDCo -> NormalNonIdDCo -> Maybe NormalDCo
+
+-- Push transitivity down through matching top-level constructors.
+-- Unlike TyConAppCo, we can't have a type synonym in a TyConAppDCo so the head constructors must match
+opt_trans_rule_dco is (TyConAppDCo cos1) (TyConAppDCo cos2)
+  = Just $ mkTyConAppDCo (opt_transList_dco is cos1 cos2)
+
+-- TODO: DehydrateCo, maybe Identity rule with LHS/RHS types pushed in?
+
+opt_trans_rule_dco _ _ _ = Nothing
+
+
+
 
 {-
 Note [Conflict checking with AxiomInstCo]

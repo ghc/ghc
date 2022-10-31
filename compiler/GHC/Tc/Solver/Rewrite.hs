@@ -585,6 +585,7 @@ mkTransCoAlt (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2)) _xi
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCoAlt co1@AxiomInstCo{} co2 xi = TransCoDCo co1 (dehydrateCo co2) xi
 mkTransCoAlt (TransCo co1 co2) co3 xi = TransCo co1 (mkTransCoAlt co2 co3 xi)
+mkTransCoAlt co1@CoVarCo{} co2 _xi = TransCo co1 co2
 mkTransCoAlt co1 co2 xi
   = pprTrace "AMG mkTransCoAlt" (ppr co1 $$ ppr co2 $$ ppr xi) $ TransCo co1 co2
 
