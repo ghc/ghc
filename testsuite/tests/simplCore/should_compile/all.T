@@ -438,3 +438,7 @@ test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-
 test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
 test('T22357',  normal, compile, ['-O'])
 
+# T17366: expecting to see a rule
+#    Rule fired: SPEC/T17366 f @(Tagged tag) @_ (T17366)
+test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings'])
+test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings'])
