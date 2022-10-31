@@ -2,6 +2,7 @@ module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.Profile.Class
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
@@ -10,7 +11,6 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
-import GHC.StgToCmm.Config
 import GHC.StgToCmm.Lit (newByteStringCLit)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
@@ -24,14 +24,14 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as BSL
 
-emitIpeBufferListNode :: Module
+emitIpeBufferListNode :: (ContainsPlatformProfile c, ContainsSDocContext c)
+                      => Module
                       -> [InfoProvEnt]
-                      -> FCode ()
+                      -> FCode' c ()
 emitIpeBufferListNode _ [] = return ()
 emitIpeBufferListNode this_mod ents = do
-    cfg <- getStgToCmmConfig
-    let ctx      = stgToCmmContext  cfg
-        platform = stgToCmmPlatform cfg
+    ctx      <- getContext
+    platform <- getPlatform
 
     let (cg_ipes, strtab) = flip runState emptyStringTable $ do
             module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)

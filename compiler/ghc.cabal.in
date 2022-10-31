@@ -181,6 +181,8 @@ Library
         GHC.ByteCode.Types
         GHC.Cmm
         GHC.Cmm.BlockId
+        GHC.Cmm.Builder.Config
+        GHC.Cmm.Builder.ExtCode
         GHC.Cmm.CallConv
         GHC.Cmm.CLabel
         GHC.Cmm.CommonBlockElim
@@ -397,6 +399,7 @@ Library
         GHC.Driver.CodeOutput
         GHC.Driver.Config
         GHC.Driver.Config.Cmm
+        GHC.Driver.Config.Cmm.Builder
         GHC.Driver.Config.Cmm.Parser
         GHC.Driver.Config.CmmToAsm
         GHC.Driver.Config.CmmToLlvm
@@ -421,6 +424,7 @@ Library
         GHC.Driver.Config.Stg.Pipeline
         GHC.Driver.Config.Stg.Ppr
         GHC.Driver.Config.StgToCmm
+        GHC.Driver.Config.StgToCmm.Ticky
         GHC.Driver.Config.Tidy
         GHC.Driver.Env
         GHC.Driver.Env.KnotVars
@@ -613,7 +617,6 @@ Library
         GHC.StgToCmm.DataCon
         GHC.StgToCmm.Env
         GHC.StgToCmm.Expr
-        GHC.StgToCmm.ExtCode
         GHC.StgToCmm.Foreign
         GHC.StgToCmm.Heap
         GHC.StgToCmm.Hpc
@@ -626,6 +629,7 @@ Library
         GHC.StgToCmm.Sequel
         GHC.StgToCmm.TagCheck
         GHC.StgToCmm.Ticky
+        GHC.StgToCmm.Ticky.Config
         GHC.StgToCmm.Types
         GHC.StgToCmm.Utils
         GHC.Stg.Unarise

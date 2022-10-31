@@ -78,6 +78,7 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.StgToCmm.Types
 import GHC.StgToCmm.Sequel
+import GHC.StgToCmm.Ticky.Config
 
 import GHC.Types.CostCentre
 import GHC.Cmm.BlockId
@@ -555,7 +556,7 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
                 -- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || stgToCmmDoTicky cfg -- to catch double entry
+  | updatable || cmmTickyEnable (cmmTickyConfig cfg) -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
          if we enter the same thunk multiple times, so the optimisation

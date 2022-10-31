@@ -5,8 +5,10 @@ module GHC.StgToCmm.Config
   , stgToCmmPlatform
   ) where
 
-import GHC.Platform.Profile
 import GHC.Platform
+import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
+import GHC.StgToCmm.Ticky.Config
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.TmpFs
@@ -33,16 +35,8 @@ data StgToCmmConfig = StgToCmmConfig
                                                  -- [Embedding large binary blobs] in GHC.CmmToAsm.Ppr, and
                                                  -- @cgTopBinding@ in GHC.StgToCmm.
   , stgToCmmMaxInlAllocSize :: !Int              -- ^ Max size, in bytes, of inline array allocations.
-  ------------------------------ Ticky Options ----------------------------------
-  , stgToCmmDoTicky        :: !Bool              -- ^ Ticky profiling enabled (cf @-ticky@)
-  , stgToCmmTickyAllocd    :: !Bool              -- ^ True indicates ticky prof traces allocs of each named
-                                                 -- thing in addition to allocs _by_ that thing
-  , stgToCmmTickyLNE       :: !Bool              -- ^ True indicates ticky uses name-specific counters for
-                                                 -- join-points (let-no-escape)
-  , stgToCmmTickyDynThunk  :: !Bool              -- ^ True indicates ticky uses name-specific counters for
-                                                 -- dynamic thunks
-  , stgToCmmTickyTag       :: !Bool              -- ^ True indicates ticky will count number of avoided tag checks by tag inference.
   ---------------------------------- Flags --------------------------------------
+  , stgToCmmTickyCfg       :: !CmmTickyConfig    -- ^ Flags related to ticky
   , stgToCmmLoopification  :: !Bool              -- ^ Loopification enabled (cf @-floopification@)
   , stgToCmmAlignCheck     :: !Bool              -- ^ Insert alignment check (cf @-falignment-sanitisation@)
   , stgToCmmOptHpc         :: !Bool              -- ^ perform code generation for code coverage
@@ -82,3 +76,10 @@ data StgToCmmConfig = StgToCmmConfig
 
 stgToCmmPlatform :: StgToCmmConfig -> Platform
 stgToCmmPlatform = profilePlatform . stgToCmmProfile
+
+
+instance ContainsPlatformProfile StgToCmmConfig where
+  platformProfile = stgToCmmProfile
+
+instance ContainsCmmTickyConfig StgToCmmConfig where
+  cmmTickyConfig = stgToCmmTickyCfg

@@ -49,6 +49,7 @@ module GHC.StgToCmm.Utils (
 import GHC.Prelude hiding ( head, init, last, tail )
 
 import GHC.Platform
+import GHC.Platform.Profile.Class
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Lit (mkSimpleLit, newStringCLit)
@@ -163,20 +164,23 @@ emitBarf msg = do
   strLbl <- newStringCLit msg
   emitRtsCall rtsUnitId (fsLit "barf") [(CmmLit strLbl,AddrHint)] False
 
-emitRtsCall :: UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCall :: ContainsPlatformProfile c
+        => UnitId -> FastString -> [(CmmExpr,ForeignHint)] -> Bool -> FCode' c ()
 emitRtsCall pkg fun = emitRtsCallGen [] (mkCmmCodeLabel pkg fun)
 
-emitRtsCallWithResult :: LocalReg -> ForeignHint -> UnitId -> FastString
-        -> [(CmmExpr,ForeignHint)] -> Bool -> FCode ()
+emitRtsCallWithResult :: ContainsPlatformProfile c
+        => LocalReg -> ForeignHint -> UnitId -> FastString
+        -> [(CmmExpr,ForeignHint)] -> Bool -> FCode' c ()
 emitRtsCallWithResult res hint pkg = emitRtsCallGen [(res,hint)] . mkCmmCodeLabel pkg
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
-   :: [(LocalReg,ForeignHint)]
+   :: ContainsPlatformProfile c
+   => [(LocalReg,ForeignHint)]
    -> CLabel
    -> [(CmmExpr,ForeignHint)]
    -> Bool -- True <=> CmmSafe call
-   -> FCode ()
+   -> FCode' c ()
 emitRtsCallGen res lbl args safe
   = do { platform <- getPlatform
        ; updfr_off <- getUpdFrameOff
@@ -257,7 +261,7 @@ callerRestoreGlobalReg platform reg
 -------------------------------------------------------------------------
 
 -- | Emit a data-segment data block
-emitDataLits :: CLabel -> [CmmLit] -> FCode ()
+emitDataLits :: CLabel -> [CmmLit] -> FCode' c ()
 emitDataLits lbl lits = emitDecl (mkDataLits (Section Data lbl) lbl lits)
 
 -- | Emit a read-only data block
@@ -563,7 +567,7 @@ assignTemp' e
 -- Pushing to the update remembered set
 ---------------------------------------------------------------------------
 
-whenUpdRemSetEnabled :: FCode a -> FCode ()
+whenUpdRemSetEnabled :: ContainsPlatformProfile c => FCode' c a -> FCode' c ()
 whenUpdRemSetEnabled code = do
     platform <- getPlatform
     do_it <- getCode code
@@ -586,8 +590,9 @@ emitUpdRemSetPush ptr =
        (ptr, AddrHint)]
       False
 
-emitUpdRemSetPushThunk :: CmmExpr -- ^ the thunk
-                       -> FCode ()
+emitUpdRemSetPushThunk :: ContainsPlatformProfile c
+                       => CmmExpr -- ^ the thunk
+                       -> FCode' c ()
 emitUpdRemSetPushThunk ptr =
     emitRtsCall
       rtsUnitId

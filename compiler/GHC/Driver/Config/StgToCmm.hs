@@ -4,6 +4,7 @@ module GHC.Driver.Config.StgToCmm
 
 import GHC.StgToCmm.Config
 
+import GHC.Driver.Config.StgToCmm.Ticky
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
@@ -26,11 +27,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmBinBlobThresh = b_blob
   , stgToCmmMaxInlAllocSize = maxInlineAllocSize           dflags
   -- ticky options
-  , stgToCmmDoTicky       = gopt Opt_Ticky                 dflags
-  , stgToCmmTickyAllocd   = gopt Opt_Ticky_Allocd          dflags
-  , stgToCmmTickyLNE      = gopt Opt_Ticky_LNE             dflags
-  , stgToCmmTickyDynThunk = gopt Opt_Ticky_Dyn_Thunk       dflags
-  , stgToCmmTickyTag      = gopt Opt_Ticky_Tag             dflags
+  , stgToCmmTickyCfg      = initCmmTickyConfig             dflags
   -- flags
   , stgToCmmLoopification = gopt Opt_Loopification         dflags
   , stgToCmmAlignCheck    = gopt Opt_AlignmentSanitisation dflags

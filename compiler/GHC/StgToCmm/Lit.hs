@@ -34,12 +34,12 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
 import Data.Char (ord)
 
-newStringCLit :: String -> FCode CmmLit
+newStringCLit :: String -> FCode' c CmmLit
 -- ^ Make a global definition for the string,
 -- and return its label
 newStringCLit str = newByteStringCLit (BS8.pack str)
 
-newByteStringCLit :: ByteString -> FCode CmmLit
+newByteStringCLit :: ByteString -> FCode' c CmmLit
 newByteStringCLit bytes
   = do  { uniq <- newUnique
         ; let (lit, decl) = mkByteStringCLit (mkStringLitLabel uniq) bytes

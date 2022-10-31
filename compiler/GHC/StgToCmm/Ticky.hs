@@ -117,6 +117,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
 
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
@@ -125,6 +126,7 @@ import {-# SOURCE #-} GHC.StgToCmm.Foreign   ( emitPrimCall )
 import GHC.StgToCmm.Lit       ( newStringCLit )
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
+import GHC.StgToCmm.Ticky.Config
 
 import GHC.Stg.Syntax
 import GHC.Cmm.Expr
@@ -230,11 +232,11 @@ withNewTickyCounterFun single_entry f fvs args = withNewTickyCounter (TickyFun s
 
 withNewTickyCounterLNE :: Id  ->  [NonVoid Id] -> FCode a -> FCode a
 withNewTickyCounterLNE nm args code = do
-  b <- isEnabled stgToCmmTickyLNE
+  b <- isEnabled cmmTickyLNE
   if not b then code else withNewTickyCounter (TickyLNE args) nm code
 
 thunkHasCounter :: Bool -> FCode Bool
-thunkHasCounter isStatic = (not isStatic &&) <$> isEnabled stgToCmmTickyDynThunk
+thunkHasCounter isStatic = (not isStatic &&) <$> isEnabled cmmTickyDynThunk
 
 withNewTickyCounterThunk
   :: Bool -- ^ static
@@ -522,7 +524,7 @@ tickyEnterLNE = ifTicky $ do
 -- since the counter was registered already upon being alloc'd
 registerTickyCtrAtEntryDyn :: CLabel -> FCode ()
 registerTickyCtrAtEntryDyn ctr_lbl = do
-  already_registered <- isEnabled stgToCmmTickyAllocd
+  already_registered <- isEnabled cmmTickyAllocd
   unless already_registered $ registerTickyCtr ctr_lbl
 
 -- | Register a ticky counter.
@@ -684,9 +686,12 @@ tickyDynAlloc mb_id rep lf = ifTicky $ do
 
 
 tickyAllocHeap ::
+  ( ContainsCmmTickyConfig c
+  , ContainsPlatformProfile c
+  ) =>
   Bool -> -- is this a genuine allocation? As opposed to
           -- GHC.StgToCmm.Layout.adjustHpBackwards
-  VirtualHpOffset -> FCode ()
+  VirtualHpOffset -> FCode' c ()
 -- Called when doing a heap check [TICK_ALLOC_HEAP]
 -- Must be lazy in the amount of allocation!
 tickyAllocHeap genuine hp
@@ -720,32 +725,41 @@ tickyAllocHeap genuine hp
 
 -- the units are bytes
 
-tickyAllocPrim :: CmmExpr  -- ^ size of the full header, in bytes
+tickyAllocPrim :: ( ContainsPlatformProfile c
+                  , ContainsCmmTickyConfig c
+                  )
+               => CmmExpr  -- ^ size of the full header, in bytes
                -> CmmExpr  -- ^ size of the payload, in bytes
-               -> CmmExpr -> FCode ()
+               -> CmmExpr -> FCode' c ()
 tickyAllocPrim _hdr _goods _slop = ifTicky $ do
   bumpTickyCounter    (fsLit "ALLOC_PRIM_ctr")
   bumpTickyCounterByE (fsLit "ALLOC_PRIM_adm") _hdr
   bumpTickyCounterByE (fsLit "ALLOC_PRIM_gds") _goods
   bumpTickyCounterByE (fsLit "ALLOC_PRIM_slp") _slop
 
-tickyAllocThunk :: CmmExpr -> CmmExpr -> FCode ()
+tickyAllocThunk :: ( ContainsPlatformProfile c
+                   , ContainsCmmTickyConfig c
+                   )
+                => CmmExpr -> CmmExpr -> FCode' c ()
 tickyAllocThunk _goods _slop = ifTicky $ do
     -- TODO is it ever called with a Single-Entry thunk?
   bumpTickyCounter    (fsLit "ALLOC_UP_THK_ctr")
   bumpTickyCounterByE (fsLit "ALLOC_THK_gds") _goods
   bumpTickyCounterByE (fsLit "ALLOC_THK_slp") _slop
 
-tickyAllocPAP :: CmmExpr -> CmmExpr -> FCode ()
+tickyAllocPAP :: ( ContainsPlatformProfile c
+                 , ContainsCmmTickyConfig c
+                 )
+              => CmmExpr -> CmmExpr -> FCode' c ()
 tickyAllocPAP _goods _slop = ifTicky $ do
   bumpTickyCounter    (fsLit "ALLOC_PAP_ctr")
   bumpTickyCounterByE (fsLit "ALLOC_PAP_gds") _goods
   bumpTickyCounterByE (fsLit "ALLOC_PAP_slp") _slop
 
-tickyHeapCheck :: FCode ()
+tickyHeapCheck :: (ContainsPlatformProfile c, ContainsCmmTickyConfig c) => FCode' c ()
 tickyHeapCheck = ifTicky $ bumpTickyCounter (fsLit "HEAP_CHK_ctr")
 
-tickyStackCheck :: FCode ()
+tickyStackCheck :: (ContainsPlatformProfile c, ContainsCmmTickyConfig c) => FCode' c ()
 tickyStackCheck = ifTicky $ bumpTickyCounter (fsLit "STK_CHK_ctr")
 
 -- -----------------------------------------------------------------------------
@@ -772,34 +786,36 @@ tickyTagSkip unique id = ifTickyTag $ do
 -- -----------------------------------------------------------------------------
 -- Ticky utils
 
-isEnabled :: (StgToCmmConfig -> Bool) -> FCode Bool
-isEnabled = flip fmap getStgToCmmConfig
+isEnabled :: ContainsCmmTickyConfig c
+          => (CmmTickyConfig -> Bool) -> FCode' c Bool
+isEnabled f = f . cmmTickyConfig <$> getConfig
 
-runIfFlag :: (StgToCmmConfig -> Bool) -> FCode () -> FCode ()
-runIfFlag f = whenM (f <$> getStgToCmmConfig)
+runIfFlag :: ContainsCmmTickyConfig c
+          => (CmmTickyConfig -> Bool) -> FCode' c () -> FCode' c ()
+runIfFlag f = whenM (isEnabled f)
 
-ifTicky :: FCode () -> FCode ()
-ifTicky = runIfFlag stgToCmmDoTicky
+ifTicky :: ContainsCmmTickyConfig c => FCode' c () -> FCode' c ()
+ifTicky = runIfFlag cmmTickyEnable
 
-ifTickyTag :: FCode () -> FCode ()
-ifTickyTag = runIfFlag stgToCmmTickyTag
+ifTickyTag :: ContainsCmmTickyConfig c => FCode' c () -> FCode' c ()
+ifTickyTag = runIfFlag cmmTickyTag
 
-ifTickyAllocd :: FCode () -> FCode ()
-ifTickyAllocd = runIfFlag stgToCmmTickyAllocd
+ifTickyAllocd :: ContainsCmmTickyConfig c => FCode' c () -> FCode' c ()
+ifTickyAllocd = runIfFlag cmmTickyAllocd
 
-ifTickyLNE :: FCode () -> FCode ()
-ifTickyLNE = runIfFlag stgToCmmTickyLNE
+ifTickyLNE :: ContainsCmmTickyConfig c => FCode' c () -> FCode' c ()
+ifTickyLNE = runIfFlag cmmTickyLNE
 
-ifTickyDynThunk :: FCode () -> FCode ()
-ifTickyDynThunk = runIfFlag stgToCmmTickyDynThunk
+ifTickyDynThunk :: ContainsCmmTickyConfig c => FCode' c () -> FCode' c ()
+ifTickyDynThunk = runIfFlag cmmTickyDynThunk
 
-bumpTickyCounter :: FastString -> FCode ()
+bumpTickyCounter :: ContainsPlatformProfile c => FastString -> FCode' c ()
 bumpTickyCounter = bumpTickyLbl . mkRtsCmmDataLabel
 
-bumpTickyCounterBy :: FastString -> Int -> FCode ()
+bumpTickyCounterBy :: ContainsPlatformProfile c => FastString -> Int -> FCode' c ()
 bumpTickyCounterBy = bumpTickyLblBy . mkRtsCmmDataLabel
 
-bumpTickyCounterByE :: FastString -> CmmExpr -> FCode ()
+bumpTickyCounterByE :: ContainsPlatformProfile c => FastString -> CmmExpr -> FCode' c ()
 bumpTickyCounterByE lbl = bumpTickyLblByE (mkRtsCmmDataLabel lbl)
 
 bumpTickyEntryCount :: CLabel -> FCode ()
@@ -817,24 +833,24 @@ bumpTickyTagSkip lbl = do
   platform <- getPlatform
   bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform))) 1
 
-bumpTickyLbl :: CLabel -> FCode ()
+bumpTickyLbl :: ContainsPlatformProfile c => CLabel -> FCode' c ()
 bumpTickyLbl lhs = bumpTickyLitBy (cmmLabelOffB lhs 0) 1
 
-bumpTickyLblBy :: CLabel -> Int -> FCode ()
+bumpTickyLblBy :: ContainsPlatformProfile c => CLabel -> Int -> FCode' c ()
 bumpTickyLblBy lhs = bumpTickyLitBy (cmmLabelOffB lhs 0)
 
-bumpTickyLblByE :: CLabel -> CmmExpr -> FCode ()
+bumpTickyLblByE :: ContainsPlatformProfile c => CLabel -> CmmExpr -> FCode' c ()
 bumpTickyLblByE lhs = bumpTickyLitByE (cmmLabelOffB lhs 0)
 
 bumpTickyLit :: CmmLit -> FCode ()
 bumpTickyLit lhs = bumpTickyLitBy lhs 1
 
-bumpTickyLitBy :: CmmLit -> Int -> FCode ()
+bumpTickyLitBy :: ContainsPlatformProfile c => CmmLit -> Int -> FCode' c ()
 bumpTickyLitBy lhs n = do
   platform <- getPlatform
   emit (addToMem (bWord platform) (CmmLit lhs) n)
 
-bumpTickyLitByE :: CmmLit -> CmmExpr -> FCode ()
+bumpTickyLitByE :: ContainsPlatformProfile c => CmmLit -> CmmExpr -> FCode' c ()
 bumpTickyLitByE lhs e = do
   platform <- getPlatform
   emit (addToMemE (bWord platform) (CmmLit lhs) e)

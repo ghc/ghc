@@ -208,7 +208,7 @@ import qualified Prelude -- for happy-generated code
 import GHC.Platform
 import GHC.Platform.Profile
 
-import GHC.StgToCmm.ExtCode
+import GHC.Cmm.Builder.ExtCode
 import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Monad hiding ( getCode, getCodeR, getCodeScoped, emitLabel, emit
                                  , emitStore, emitAssign, emitOutOfLine, withUpdFrameOff
@@ -219,13 +219,13 @@ import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Expr
 import GHC.StgToCmm.Lit
 import GHC.StgToCmm.Closure
-import GHC.StgToCmm.Config
 import GHC.StgToCmm.Layout     hiding (ArgRep(..))
 import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Prof
 import GHC.StgToCmm.Bind  ( emitBlackHoleCode, emitUpdateFrame )
 import GHC.StgToCmm.InfoTableProv
 
+import GHC.Cmm.Builder.Config
 import GHC.Cmm.Opt
 import GHC.Cmm.Graph
 import GHC.Cmm
@@ -1162,7 +1162,7 @@ stmtMacro fun args_code = do
         args <- sequence args_code
         code (fcode args)
 
-stmtMacros :: UniqFM FastString ([CmmExpr] -> FCode ())
+stmtMacros :: UniqFM FastString ([CmmExpr] -> FCode' CmmBuilderConfig ())
 stmtMacros = listToUFM [
   ( fsLit "CCS_ALLOC",             \[words,ccs]  -> profAlloc words ccs ),
   ( fsLit "ENTER_CCS_THUNK",       \[e] -> enterCostCentreThunk e ),
@@ -1205,10 +1205,12 @@ stmtMacros = listToUFM [
                                         tickyAllocPAP goods slop ),
   ( fsLit "TICK_ALLOC_UP_THK",     \[goods,slop] ->
                                         tickyAllocThunk goods slop ),
-  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> emitBlackHoleCode reg )
+  ( fsLit "UPD_BH_UPDATABLE",      \[reg] -> do
+      cfg <- getConfig
+      emitBlackHoleCode reg $ cmmBuilderEagerBlackHole cfg)
  ]
 
-emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode ()
+emitPushUpdateFrame :: CmmExpr -> CmmExpr -> FCode' CmmBuilderConfig ()
 emitPushUpdateFrame sp e = do
   emitUpdateFrame sp mkUpdInfoLabel e
 
@@ -1522,10 +1524,10 @@ parseCmmFile cmmpConfig this_mod home_unit filename = do
                     | do_ipe    = map (cmmInfoTableToInfoProvEnt this_mod) (mapMaybe topInfoTable cmm)
                     | otherwise = []
                     where
-                      do_ipe = stgToCmmInfoTableMap $ cmmpStgToCmmConfig cmmpConfig
+                      do_ipe = cmmBuilderInfoTableMap $ cmmpCmmBuilderConfig cmmpConfig
               ((), cmm2) <- getCmm $ emitIpeBufferListNode this_mod used_info
               return (cmm ++ cmm2, used_info)
-            (cmm, _) = runC (cmmpStgToCmmConfig cmmpConfig) fstate st fcode
+            (cmm, _) = runC (cmmpCmmBuilderConfig cmmpConfig) fstate st fcode
             (warnings,errors) = getPsMessages pst
         if not (isEmptyMessages errors)
          then return (warnings, errors, Nothing)

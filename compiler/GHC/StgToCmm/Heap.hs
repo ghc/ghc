@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.StgToCmm.Heap (
@@ -25,12 +27,14 @@ module GHC.StgToCmm.Heap (
 import GHC.Prelude hiding ((<*>))
 
 import GHC.Stg.Syntax
+import GHC.Cmm.Builder.Config
 import GHC.Cmm.CLabel
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Prof (profDynAlloc, dynProfHdr, staticProfHdr)
 import GHC.StgToCmm.Ticky
+import GHC.StgToCmm.Ticky.Config
 import GHC.StgToCmm.Closure
 
 import GHC.Cmm.Graph
@@ -46,6 +50,7 @@ import GHC.Types.Id ( Id )
 import GHC.Unit
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
 import GHC.Data.FastString( mkFastString, fsLit )
 import GHC.Utils.Panic( sorry )
 
@@ -140,7 +145,8 @@ allocHeapClosure rep info_ptr use_cc payload = do
   return base
 
 
-emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitSetDynHdr :: ContainsPlatformProfile c
+              => CmmExpr -> CmmExpr -> CmmExpr -> FCode' c ()
 emitSetDynHdr base info_ptr ccs
   = do profile <- getProfile
        hpStore base (zip (header profile) [0, profileWordSizeInBytes profile ..])
@@ -151,7 +157,7 @@ emitSetDynHdr base info_ptr ccs
         -- No ticky header
 
 -- Store the item (expr,off) in base[off]
-hpStore :: CmmExpr -> [(CmmExpr, ByteOff)] -> FCode ()
+hpStore :: ContainsPlatformProfile c => CmmExpr -> [(CmmExpr, ByteOff)] -> FCode' c ()
 hpStore base vals = do
   platform <- getPlatform
   sequence_ $
@@ -347,12 +353,16 @@ entryHeapCheck cl_info nodeSet arity args code = do
   entryHeapCheck' is_fastf node arity args code
 
 -- | lower-level version for "GHC.Cmm.Parser"
-entryHeapCheck' :: Bool           -- is a known function pattern
+entryHeapCheck' :: ( ContainsPlatformProfile c
+                   , ContainsCmmTickyConfig c
+                   , ContainsOmitYields c
+                   )
+                => Bool           -- is a known function pattern
                 -> CmmExpr        -- expression for the closure pointer
                 -> Int            -- Arity -- not same as len args b/c of voids
                 -> [LocalReg]     -- Non-void args (empty for thunk)
-                -> FCode ()
-                -> FCode ()
+                -> FCode' c ()
+                -> FCode' c ()
 entryHeapCheck' is_fastf node arity args code
   = do profile <- getProfile
        let is_thunk = arity == 0
@@ -519,7 +529,9 @@ mkGcLabel :: String -> CmmExpr
 mkGcLabel s = CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit s)))
 
 -------------------------------
-heapCheck :: Bool -> Bool -> CmmAGraph -> FCode a -> FCode a
+heapCheck
+  :: (ContainsPlatformProfile c, ContainsCmmTickyConfig c, ContainsOmitYields c)
+  => Bool -> Bool -> CmmAGraph -> FCode' c a -> FCode' c a
 heapCheck checkStack checkYield do_gc code
   = getHeapUsage $ \ hpHw ->
     -- Emit heap checks, but be sure to do it lazily so
@@ -546,7 +558,12 @@ heapCheck checkStack checkYield do_gc code
         ; setRealHp hpHw
         ; code }
 
-heapStackCheckGen :: Maybe CmmExpr -> Maybe CmmExpr -> FCode ()
+heapStackCheckGen
+  :: ( ContainsPlatformProfile c
+     , ContainsCmmTickyConfig c
+     , ContainsOmitYields c
+     )
+  => Maybe CmmExpr -> Maybe CmmExpr -> FCode' c ()
 heapStackCheckGen stk_hwm mb_bytes
   = do updfr_sz <- getUpdFrameOff
        lretry <- newBlockId
@@ -600,14 +617,18 @@ heapStackCheckGen stk_hwm mb_bytes
 --     Just (CmmLit 8)  or some other fixed valuet
 -- If it is Nothing, we don't generate a stack check at all.
 
-do_checks :: Maybe CmmExpr    -- Should we check the stack?
+do_checks :: ( ContainsPlatformProfile c
+             , ContainsCmmTickyConfig c
+             , ContainsOmitYields c
+             )
+          => Maybe CmmExpr    -- Should we check the stack?
                               -- See Note [Stack usage]
           -> Bool             -- Should we check for preemption?
           -> Maybe CmmExpr    -- Heap headroom (bytes)
           -> CmmAGraph        -- What to do on failure
-          -> FCode ()
+          -> FCode' c ()
 do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
-  omit_yields <- stgToCmmOmitYields <$> getStgToCmmConfig
+  omit_yields <- omitYields <$> getConfig
   platform    <- getPlatform
   gc_id       <- newBlockId
 
@@ -692,3 +713,13 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 --     true is when compiling stack and heap checks at the entry to a
 --     function. This is the only situation when we want to emit a self-loop
 --     label.
+
+class ContainsOmitYields c where
+  -- | true means omit heap checks when no allocation is performed
+  omitYields :: c -> Bool
+
+instance ContainsOmitYields CmmBuilderConfig where
+  omitYields = cmmBuilderOmitYields
+
+instance ContainsOmitYields StgToCmmConfig where
+  omitYields = stgToCmmOmitYields

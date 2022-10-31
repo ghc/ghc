@@ -24,6 +24,7 @@ import GHC.Stg.Syntax
 
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
 
 import GHC.Builtin.Names (unpackCStringName, unpackCStringUtf8Name)
 
@@ -33,7 +34,8 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.DataCon
 import GHC.StgToCmm.Heap
-import GHC.StgToCmm.Prof (ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
+import GHC.StgToCmm.Prof (ContainsSCCProfiling,
+                   ldvEnterClosure, enterCostCentreFun, enterCostCentreThunk,
                    initUpdFrameProf)
 import GHC.StgToCmm.TagCheck
 import GHC.StgToCmm.Ticky
@@ -666,15 +668,15 @@ thunkCode cl_info fv_details _cc node body
 blackHoleIt :: LocalReg -> FCode ()
 -- Only called for closures with no args
 -- Node points to the closure
-blackHoleIt node_reg
-  = emitBlackHoleCode (CmmReg (CmmLocal node_reg))
-
-emitBlackHoleCode :: CmmExpr -> FCode ()
-emitBlackHoleCode node = do
+blackHoleIt node_reg = do
   cfg <- getStgToCmmConfig
-  let profile     = stgToCmmProfile  cfg
-      platform    = stgToCmmPlatform cfg
-      is_eager_bh = stgToCmmEagerBlackHole cfg
+  let is_eager_bh = stgToCmmEagerBlackHole cfg
+  emitBlackHoleCode (CmmReg (CmmLocal node_reg)) is_eager_bh
+
+emitBlackHoleCode :: ContainsPlatformProfile c => CmmExpr -> Bool -> FCode' c ()
+emitBlackHoleCode node is_eager_bh = do
+  profile <- getProfile
+  let platform    = profilePlatform profile
 
   -- Eager blackholing is normally disabled, but can be turned on with
   -- -feager-blackholing.  When it is on, we replace the info pointer
@@ -759,7 +761,8 @@ pushUpdateFrame lbl updatee body
        emitUpdateFrame (CmmStackSlot Old frame) lbl updatee
        withUpdFrameOff frame body
 
-emitUpdateFrame :: CmmExpr -> CLabel -> CmmExpr -> FCode ()
+emitUpdateFrame :: (ContainsPlatformProfile c, ContainsSCCProfiling c)
+                => CmmExpr -> CLabel -> CmmExpr -> FCode' c ()
 emitUpdateFrame frame lbl updatee = do
   profile <- getProfile
   let

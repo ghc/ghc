@@ -11,7 +11,7 @@
 -- to collect declarations as we parse the proc, and feed the environment
 -- back in circularly (to avoid a two-pass algorithm).
 
-module GHC.StgToCmm.ExtCode (
+module GHC.Cmm.Builder.ExtCode (
         CmmParse, unEC,
         Named(..), Env,
 
@@ -45,15 +45,16 @@ import GHC.Platform
 import GHC.Platform.Profile
 
 import qualified GHC.StgToCmm.Monad as F
-import GHC.StgToCmm.Monad (FCode, newUnique)
+import GHC.StgToCmm.Monad (FCode', newUnique)
 
 import GHC.Cmm
+import GHC.Cmm.Builder.Config
 import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
 
 import GHC.Cmm.BlockId
 import GHC.Data.FastString
-import GHC.Unit.Module
+import GHC.Unit.Module (UnitId, rtsUnitId)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
@@ -78,7 +79,7 @@ type Decls      = [(FastString,Named)]
 -- | Does a computation in the FCode monad, with a current environment
 --      and a list of local declarations. Returns the resulting list of declarations.
 newtype CmmParse a
-        = EC { unEC :: String -> Env -> Decls -> FCode (Decls, a) }
+        = EC { unEC :: String -> Env -> Decls -> FCode' CmmBuilderConfig (Decls, a) }
     deriving (Functor)
 
 type ExtCode = CmmParse ()
@@ -217,7 +218,7 @@ lookupName name = do
 
 
 -- | Lift an FCode computation into the CmmParse monad
-code :: FCode a -> CmmParse a
+code :: FCode' CmmBuilderConfig a -> CmmParse a
 code fc = EC $ \_ _ s -> do
                 r <- fc
                 return (s, r)

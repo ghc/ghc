@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -12,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module GHC.StgToCmm.Monad (
-        FCode,        -- type
+        type FCode,
+        type FCode',
 
         initC, initFCodeState, runC, fixC,
         newUnique,
@@ -54,19 +56,24 @@ module GHC.StgToCmm.Monad (
         getModuleName,
 
         -- ideally we wouldn't export these, but some other modules access internal state
-        getState, setState, getSelfLoop, withSelfLoop, getStgToCmmConfig,
+        getState, setState, getSelfLoop, withSelfLoop,
+        getConfig, getStgToCmmConfig,
 
         -- more localised access to monad state
         CgIdInfo(..),
         getBinds, setBinds,
         -- out of general friendliness, we also export ...
-        StgToCmmConfig(..), CgState(..) -- non-abstract
+        StgToCmmConfig(..), CgState(..), -- non-abstract
+
+        ContainsSDocContext(..),
     ) where
 
 import GHC.Prelude hiding( sequence, succ )
 
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
+import GHC.Cmm.Builder.Config
 import GHC.Cmm
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Closure
@@ -125,11 +132,13 @@ import Data.List (mapAccumL)
 
 --------------------------------------------------------
 
-newtype FCode a = FCode' { doFCode :: StgToCmmConfig -> FCodeState -> CgState -> (a, CgState) }
+newtype FCode' c a = FCode0 { doFCode :: c -> FCodeState -> CgState -> (a, CgState) }
+
+type FCode = FCode' StgToCmmConfig
 
 -- Not derived because of #18202.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
-instance Functor FCode where
+instance Functor (FCode' c) where
   fmap f (FCode m) =
     FCode $ \cfg fst state ->
       case m cfg fst state of
@@ -140,20 +149,20 @@ instance Functor FCode where
 -- See #18202.
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 {-# COMPLETE FCode #-}
-pattern FCode :: (StgToCmmConfig -> FCodeState -> CgState -> (a, CgState))
-              -> FCode a
-pattern FCode m <- FCode' m
+pattern FCode :: (c -> FCodeState -> CgState -> (a, CgState))
+              -> FCode' c a
+pattern FCode m <- FCode0 m
   where
-    FCode m = FCode' $ oneShot (\cfg -> oneShot
+    FCode m = FCode0 $ oneShot (\cfg -> oneShot
                                  (\fstate -> oneShot
                                    (\state -> m cfg fstate state)))
 
-instance Applicative FCode where
+instance Applicative (FCode' c) where
     pure val = FCode (\_cfg _fstate state -> (val, state))
     {-# INLINE pure #-}
     (<*>) = ap
 
-instance Monad FCode where
+instance Monad (FCode' c) where
     FCode m >>= k = FCode $
         \cfg fstate state ->
             case m cfg fstate state of
@@ -162,7 +171,7 @@ instance Monad FCode where
                    FCode kcode -> kcode cfg fstate new_state
     {-# INLINE (>>=) #-}
 
-instance MonadUnique FCode where
+instance MonadUnique (FCode' c) where
   getUniqueSupplyM = cgs_uniqs <$> getState
   getUniqueM = FCode $ \_ _ st ->
     let (u, us') = takeUniqFromSupply (cgs_uniqs st)
@@ -172,10 +181,10 @@ initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
-runC :: StgToCmmConfig -> FCodeState -> CgState -> FCode a -> (a, CgState)
+runC :: c -> FCodeState -> CgState -> FCode' c a -> (a, CgState)
 runC cfg fst st fcode = doFCode fcode cfg fst st
 
-fixC :: (a -> FCode a) -> FCode a
+fixC :: (a -> FCode' c a) -> FCode' c a
 fixC fcode = FCode $
     \cfg fstate state ->
       let (v, s) = doFCode (fcode v) cfg fstate state
@@ -386,60 +395,60 @@ hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
 -- Operators for getting and setting the state and "stgToCmmConfig".
 --------------------------------------------------------
 
-getState :: FCode CgState
+getState :: FCode' c CgState
 getState = FCode $ \_cfg _fstate state -> (state, state)
 
-setState :: CgState -> FCode ()
+setState :: CgState -> FCode' c ()
 setState state = FCode $ \_cfg _fstate _ -> ((), state)
 
-getHpUsage :: FCode HeapUsage
+getHpUsage :: FCode' c HeapUsage
 getHpUsage = do
         state <- getState
         return $ cgs_hp_usg state
 
-setHpUsage :: HeapUsage -> FCode ()
+setHpUsage :: HeapUsage -> FCode' c ()
 setHpUsage new_hp_usg = do
         state <- getState
         setState $ state {cgs_hp_usg = new_hp_usg}
 
-setVirtHp :: VirtualHpOffset -> FCode ()
+setVirtHp :: VirtualHpOffset -> FCode' c ()
 setVirtHp new_virtHp
   = do  { hp_usage <- getHpUsage
         ; setHpUsage (hp_usage {virtHp = new_virtHp}) }
 
-getVirtHp :: FCode VirtualHpOffset
+getVirtHp :: FCode' c VirtualHpOffset
 getVirtHp
   = do  { hp_usage <- getHpUsage
         ; return (virtHp hp_usage) }
 
-setRealHp ::  VirtualHpOffset -> FCode ()
+setRealHp ::  VirtualHpOffset -> FCode' c ()
 setRealHp new_realHp
   = do  { hp_usage <- getHpUsage
         ; setHpUsage (hp_usage {realHp = new_realHp}) }
 
-getBinds :: FCode CgBindings
+getBinds :: FCode' c CgBindings
 getBinds = do
         state <- getState
         return $ cgs_binds state
 
-setBinds :: CgBindings -> FCode ()
+setBinds :: CgBindings -> FCode' c ()
 setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
 
-withCgState :: FCode a -> CgState -> FCode (a,CgState)
+withCgState :: FCode' c a -> CgState -> FCode' c (a,CgState)
 withCgState (FCode fcode) newstate = FCode $ \cfg fstate state ->
   case fcode cfg fstate newstate of
     (retval, state2) -> ((retval,state2), state)
 
-newUniqSupply :: FCode UniqSupply
+newUniqSupply :: FCode' c UniqSupply
 newUniqSupply = do
         state <- getState
         let (us1, us2) = splitUniqSupply (cgs_uniqs state)
         setState $ state { cgs_uniqs = us1 }
         return us2
 
-newUnique :: FCode Unique
+newUnique :: FCode' c Unique
 newUnique = do
         state <- getState
         let (u,us') = takeUniqFromSupply (cgs_uniqs state)
@@ -460,17 +469,17 @@ initFCodeState p =
                , fcs_tickscope     = GlobalScope
                }
 
-getFCodeState :: FCode FCodeState
+getFCodeState :: FCode' c FCodeState
 getFCodeState = FCode $ \_ fstate state -> (fstate,state)
 
 -- basically local for the reader monad
-withFCodeState :: FCode a -> FCodeState -> FCode a
+withFCodeState :: FCode' c a -> FCodeState -> FCode' c a
 withFCodeState (FCode fcode) fst = FCode $ \cfg _ state -> fcode cfg fst state
 
-getSelfLoop :: FCode (Maybe SelfLoopInfo)
+getSelfLoop :: FCode' c (Maybe SelfLoopInfo)
 getSelfLoop = fcs_selfloop <$> getFCodeState
 
-withSelfLoop :: SelfLoopInfo -> FCode a -> FCode a
+withSelfLoop :: SelfLoopInfo -> FCode' c a -> FCode' c a
 withSelfLoop self_loop code = do
         fstate <- getFCodeState
         withFCodeState code (fstate {fcs_selfloop = Just self_loop})
@@ -478,13 +487,13 @@ withSelfLoop self_loop code = do
 -- ----------------------------------------------------------------------------
 -- Get/set the end-of-block info
 
-withSequel :: Sequel -> FCode a -> FCode a
+withSequel :: Sequel -> FCode' c a -> FCode' c a
 withSequel sequel code
   = do  { fstate <- getFCodeState
         ; withFCodeState code (fstate { fcs_sequel = sequel
                                       , fcs_selfloop = Nothing }) }
 
-getSequel :: FCode Sequel
+getSequel :: FCode' c Sequel
 getSequel = fcs_sequel <$> getFCodeState
 
 -- ----------------------------------------------------------------------------
@@ -497,21 +506,21 @@ getSequel = fcs_sequel <$> getFCodeState
 -- Note: I'm including the size of the original return address
 -- in the size of the update frame -- hence the default case on `get'.
 
-withUpdFrameOff :: UpdFrameOffset -> FCode a -> FCode a
+withUpdFrameOff :: UpdFrameOffset -> FCode' c a -> FCode' c a
 withUpdFrameOff size code
   = do  { fstate <- getFCodeState
         ; withFCodeState code (fstate {fcs_upframeoffset = size }) }
 
-getUpdFrameOff :: FCode UpdFrameOffset
+getUpdFrameOff :: FCode' c UpdFrameOffset
 getUpdFrameOff = fcs_upframeoffset <$> getFCodeState
 
 -- ----------------------------------------------------------------------------
 -- Get/set the current ticky counter label
 
-getTickyCtrLabel :: FCode CLabel
+getTickyCtrLabel :: FCode' c CLabel
 getTickyCtrLabel = fcs_ticky <$> getFCodeState
 
-setTickyCtrLabel :: CLabel -> FCode a -> FCode a
+setTickyCtrLabel :: CLabel -> FCode' c a -> FCode' c a
 setTickyCtrLabel ticky code = do
         fstate <- getFCodeState
         withFCodeState code (fstate {fcs_ticky = ticky})
@@ -520,18 +529,18 @@ setTickyCtrLabel ticky code = do
 -- Manage tick scopes
 
 -- | The current tick scope. We will assign this to generated blocks.
-getTickScope :: FCode CmmTickScope
+getTickScope :: FCode' c CmmTickScope
 getTickScope = fcs_tickscope <$> getFCodeState
 
 -- | Places blocks generated by the given code into a fresh
 -- (sub-)scope. This will make sure that Cmm annotations in our scope
 -- will apply to the Cmm blocks generated therein - but not the other
 -- way around.
-tickScope :: FCode a -> FCode a
+tickScope :: ContainsEmitDebugInfo c => FCode' c a -> FCode' c a
 tickScope code = do
-        cfg <- getStgToCmmConfig
+        cfg <- getConfig
         fstate <- getFCodeState
-        if not $ stgToCmmEmitDebugInfo cfg then code else do
+        if not $ emitDebugInfo cfg then code else do
           u <- newUnique
           let scope' = SubScope u (fcs_tickscope fstate)
           withFCodeState code fstate{ fcs_tickscope = scope' }
@@ -539,17 +548,20 @@ tickScope code = do
 -- ----------------------------------------------------------------------------
 -- Config related helpers
 
+getConfig :: FCode' c c
+getConfig = FCode $ \cfg _ state -> (cfg,state)
+
 getStgToCmmConfig :: FCode StgToCmmConfig
-getStgToCmmConfig = FCode $ \cfg _ state -> (cfg,state)
+getStgToCmmConfig = getConfig
 
-getProfile :: FCode Profile
-getProfile = stgToCmmProfile <$> getStgToCmmConfig
+getProfile :: ContainsPlatformProfile c => FCode' c Profile
+getProfile = platformProfile <$> getConfig
 
-getPlatform :: FCode Platform
+getPlatform :: ContainsPlatformProfile c => FCode' c Platform
 getPlatform = profilePlatform <$> getProfile
 
-getContext :: FCode SDocContext
-getContext = stgToCmmContext <$> getStgToCmmConfig
+getContext :: ContainsSDocContext c => FCode' c SDocContext
+getContext = sdocContext <$> getConfig
 
 -- ----------------------------------------------------------------------------
 -- Get the current module name
@@ -562,7 +574,9 @@ getModuleName = stgToCmmThisModule <$> getStgToCmmConfig
 --                 Forking
 --------------------------------------------------------
 
-forkClosureBody :: FCode () -> FCode ()
+forkClosureBody
+  :: ContainsPlatformProfile c
+  => FCode' c () -> FCode' c ()
 -- forkClosureBody compiles body_code in environment where:
 --   - sequel, update stack frame and self loop info are
 --     set to fresh values
@@ -572,7 +586,7 @@ forkClosureBody :: FCode () -> FCode ()
 
 forkClosureBody body_code
   = do  { platform <- getPlatform
-        ; cfg      <- getStgToCmmConfig
+        ; cfg      <- getConfig
         ; fstate   <- getFCodeState
         ; us       <- newUniqSupply
         ; state    <- getState
@@ -584,7 +598,7 @@ forkClosureBody body_code
               ((),fork_state_out) = doFCode body_code cfg fcs fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
-forkLneBody :: FCode a -> FCode a
+forkLneBody :: FCode' c a -> FCode' c a
 -- 'forkLneBody' takes a body of let-no-escape binding and compiles
 -- it in the *current* environment, returning the graph thus constructed.
 --
@@ -592,7 +606,7 @@ forkLneBody :: FCode a -> FCode a
 -- the successor.  In particular, any heap usage from the enclosed
 -- code is discarded; it should deal with its own heap consumption.
 forkLneBody body_code
-  = do  { cfg   <- getStgToCmmConfig
+  = do  { cfg   <- getConfig
         ; us    <- newUniqSupply
         ; state <- getState
         ; fstate <- getFCodeState
@@ -601,12 +615,12 @@ forkLneBody body_code
         ; setState $ state `addCodeBlocksFrom` fork_state_out
         ; return result }
 
-codeOnly :: FCode () -> FCode ()
+codeOnly :: FCode' c () -> FCode' c ()
 -- Emit any code from the inner thing into the outer thing
 -- Do not affect anything else in the outer state
 -- Used in almost-circular code to prevent false loop dependencies
 codeOnly body_code
-  = do  { cfg   <- getStgToCmmConfig
+  = do  { cfg   <- getConfig
         ; us    <- newUniqSupply
         ; state <- getState
         ; fstate <- getFCodeState
@@ -615,14 +629,14 @@ codeOnly body_code
                 ((), fork_state_out) = doFCode body_code cfg fstate fork_state_in
         ; setState $ state `addCodeBlocksFrom` fork_state_out }
 
-forkAlts :: [FCode a] -> FCode [a]
+forkAlts :: [FCode' c a] -> FCode' c [a]
 -- (forkAlts' bs d) takes fcodes 'bs' for the branches of a 'case', and
 -- an fcode for the default case 'd', and compiles each in the current
 -- environment.  The current environment is passed on unmodified, except
 -- that the virtual Hp is moved on to the worst virtual Hp for the branches
 
 forkAlts branch_fcodes
-  = do  { cfg   <- getStgToCmmConfig
+  = do  { cfg   <- getConfig
         ; us    <- newUniqSupply
         ; state <- getState
         ; fstate <- getFCodeState
@@ -639,7 +653,7 @@ forkAlts branch_fcodes
                 -- NB foldl.  state is the *left* argument to stateIncUsage
         ; return branch_results }
 
-forkAltPair :: FCode a -> FCode a -> FCode (a,a)
+forkAltPair :: FCode' c a -> FCode' c a -> FCode' c (a,a)
 -- Most common use of 'forkAlts'; having this helper function avoids
 -- accidental use of failible pattern-matches in @do@-notation
 forkAltPair x y = do
@@ -649,18 +663,18 @@ forkAltPair x y = do
     _ -> panic "forkAltPair"
 
 -- collect the code emitted by an FCode computation
-getCodeR :: FCode a -> FCode (a, CmmAGraph)
+getCodeR :: FCode' c a -> FCode' c (a, CmmAGraph)
 getCodeR fcode
   = do  { state1 <- getState
         ; (a, state2) <- withCgState fcode (state1 { cgs_stmts = mkNop })
         ; setState $ state2 { cgs_stmts = cgs_stmts state1  }
         ; return (a, cgs_stmts state2) }
 
-getCode :: FCode a -> FCode CmmAGraph
+getCode :: FCode' c a -> FCode' c CmmAGraph
 getCode fcode = do { (_,stmts) <- getCodeR fcode; return stmts }
 
 -- | Generate code into a fresh tick (sub-)scope and gather generated code
-getCodeScoped :: FCode a -> FCode (a, CmmAGraphScoped)
+getCodeScoped :: ContainsEmitDebugInfo c => FCode' c a -> FCode' c (a, CmmAGraphScoped)
 getCodeScoped fcode
   = do  { state1 <- getState
         ; ((a, tscope), state2) <-
@@ -682,9 +696,9 @@ getCodeScoped fcode
 --
 -- Note the slightly subtle fixed point behaviour needed here
 
-getHeapUsage :: (VirtualHpOffset -> FCode a) -> FCode a
+getHeapUsage :: (VirtualHpOffset -> FCode' c a) -> FCode' c a
 getHeapUsage fcode
-  = do  { cfg <- getStgToCmmConfig
+  = do  { cfg <- getConfig
         ; state <- getState
         ; fcstate <- getFCodeState
         ; let   fstate_in = state { cgs_hp_usg  = initHpUsage }
@@ -697,62 +711,63 @@ getHeapUsage fcode
 -- ----------------------------------------------------------------------------
 -- Combinators for emitting code
 
-emitCgStmt :: CgStmt -> FCode ()
+emitCgStmt :: CgStmt -> FCode' c ()
 emitCgStmt stmt
   = do  { state <- getState
         ; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
         }
 
-emitLabel :: BlockId -> FCode ()
+emitLabel :: BlockId -> FCode' c ()
 emitLabel id = do tscope <- getTickScope
                   emitCgStmt (CgLabel id tscope)
 
-emitComment :: FastString -> FCode ()
+emitComment :: FastString -> FCode' c ()
 emitComment s
   | debugIsOn = emitCgStmt (CgStmt (CmmComment s))
   | otherwise = return ()
 
-emitTick :: CmmTickish -> FCode ()
+emitTick :: CmmTickish -> FCode' c ()
 emitTick = emitCgStmt . CgStmt . CmmTick
 
-emitUnwind :: [(GlobalReg, Maybe CmmExpr)] -> FCode ()
+emitUnwind :: ContainsEmitDebugInfo c => [(GlobalReg, Maybe CmmExpr)] -> FCode' c ()
 emitUnwind regs = do
-  debug <- stgToCmmEmitDebugInfo <$> getStgToCmmConfig
+  debug <- emitDebugInfo <$> getConfig
   when debug $
      emitCgStmt $ CgStmt $ CmmUnwind regs
 
-emitAssign :: CmmReg  -> CmmExpr -> FCode ()
+emitAssign :: CmmReg  -> CmmExpr -> FCode' c ()
 emitAssign l r = emitCgStmt (CgStmt (CmmAssign l r))
 
 -- | Assumes natural alignment.
-emitStore :: CmmExpr -> CmmExpr -> FCode ()
+emitStore :: CmmExpr -> CmmExpr -> FCode' c ()
 emitStore = emitStore' NaturallyAligned
 
-emitStore' :: AlignmentSpec -> CmmExpr -> CmmExpr -> FCode ()
+emitStore' :: AlignmentSpec -> CmmExpr -> CmmExpr -> FCode' c ()
 emitStore' alignment l r = emitCgStmt (CgStmt (CmmStore l r alignment))
 
-emit :: CmmAGraph -> FCode ()
+emit :: CmmAGraph -> FCode' c ()
 emit ag
   = do  { state <- getState
         ; setState $ state { cgs_stmts = cgs_stmts state CmmGraph.<*> ag } }
 
-emitDecl :: CmmDecl -> FCode ()
+emitDecl :: CmmDecl -> FCode' c ()
 emitDecl decl
   = do  { state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
 
-emitOutOfLine :: BlockId -> CmmAGraphScoped -> FCode ()
+emitOutOfLine :: BlockId -> CmmAGraphScoped -> FCode' c ()
 emitOutOfLine l (stmts, tscope) = emitCgStmt (CgFork l stmts tscope)
 
 emitProcWithStackFrame
-   :: Convention                        -- entry convention
+   :: ContainsPlatformProfile c
+   => Convention                        -- entry convention
    -> Maybe CmmInfoTable                -- info table?
    -> CLabel                            -- label for the proc
    -> [CmmFormal]                       -- stack frame
    -> [CmmFormal]                       -- arguments
    -> CmmAGraphScoped                   -- code
    -> Bool                              -- do stack layout?
-   -> FCode ()
+   -> FCode' c ()
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { platform <- getPlatform
@@ -767,15 +782,16 @@ emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         }
 emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"
 
-emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
+emitProcWithConvention :: ContainsPlatformProfile c
+                       => Convention -> Maybe CmmInfoTable -> CLabel
                        -> [CmmFormal]
                        -> CmmAGraphScoped
-                       -> FCode ()
+                       -> FCode' c ()
 emitProcWithConvention conv mb_info lbl args blocks
   = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
 emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
-         -> Int -> Bool -> FCode ()
+         -> Int -> Bool -> FCode' c ()
 emitProc mb_info lbl live blocks offset do_layout
   = do  { l <- newBlockId
         ; let
@@ -796,7 +812,7 @@ emitProc mb_info lbl live blocks offset do_layout
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
-getCmm :: FCode a -> FCode (a, CmmGroup)
+getCmm :: FCode' c a -> FCode' c (a, CmmGroup)
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)
@@ -807,11 +823,11 @@ getCmm code
         ; return (a, fromOL (cgs_tops state2)) }
 
 
-mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> FCode CmmAGraph
+mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> FCode' c CmmAGraph
 mkCmmIfThenElse e tbranch fbranch = mkCmmIfThenElse' e tbranch fbranch Nothing
 
 mkCmmIfThenElse' :: CmmExpr -> CmmAGraph -> CmmAGraph
-                 -> Maybe Bool -> FCode CmmAGraph
+                 -> Maybe Bool -> FCode' c CmmAGraph
 mkCmmIfThenElse' e tbranch fbranch likely = do
   tscp  <- getTickScope
   endif <- newBlockId
@@ -832,19 +848,19 @@ mkCmmIfThenElse' e tbranch fbranch likely = do
                       , mkLabel tid tscp, then_, mkBranch endif
                       , mkLabel fid tscp, else_, mkLabel endif tscp ]
 
-mkCmmIfGoto :: CmmExpr -> BlockId -> FCode CmmAGraph
+mkCmmIfGoto :: CmmExpr -> BlockId -> FCode' c CmmAGraph
 mkCmmIfGoto e tid = mkCmmIfGoto' e tid Nothing
 
-mkCmmIfGoto' :: CmmExpr -> BlockId -> Maybe Bool -> FCode CmmAGraph
+mkCmmIfGoto' :: CmmExpr -> BlockId -> Maybe Bool -> FCode' c CmmAGraph
 mkCmmIfGoto' e tid l = do
   endif <- newBlockId
   tscp  <- getTickScope
   return $ catAGraphs [ mkCbranch e tid endif l, mkLabel endif tscp ]
 
-mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode CmmAGraph
+mkCmmIfThen :: CmmExpr -> CmmAGraph -> FCode' c CmmAGraph
 mkCmmIfThen e tbranch = mkCmmIfThen' e tbranch Nothing
 
-mkCmmIfThen' :: CmmExpr -> CmmAGraph -> Maybe Bool -> FCode CmmAGraph
+mkCmmIfThen' :: CmmExpr -> CmmAGraph -> Maybe Bool -> FCode' c CmmAGraph
 mkCmmIfThen' e tbranch l = do
   endif <- newBlockId
   tid   <- newBlockId
@@ -852,8 +868,9 @@ mkCmmIfThen' e tbranch l = do
   return $ catAGraphs [ mkCbranch e tid endif l
                       , mkLabel tid tscp, tbranch, mkLabel endif tscp ]
 
-mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmExpr]
-       -> UpdFrameOffset -> [CmmExpr] -> FCode CmmAGraph
+mkCall :: ContainsPlatformProfile c
+       => CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmExpr]
+       -> UpdFrameOffset -> [CmmExpr] -> FCode' c CmmAGraph
 mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   profile <- getProfile
   k       <- newBlockId
@@ -863,8 +880,9 @@ mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
       copyout = mkCallReturnsTo profile f callConv actuals k off updfr_off extra_stack
   return $ catAGraphs [copyout, mkLabel k tscp, copyin]
 
-mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmExpr] -> UpdFrameOffset
-          -> FCode CmmAGraph
+mkCmmCall :: ContainsPlatformProfile c
+          => CmmExpr -> [CmmFormal] -> [CmmExpr] -> UpdFrameOffset
+          -> FCode' c CmmAGraph
 mkCmmCall f results actuals updfr_off
    = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off []
 
@@ -872,7 +890,28 @@ mkCmmCall f results actuals updfr_off
 -- ----------------------------------------------------------------------------
 -- turn CmmAGraph into CmmGraph, for making a new proc.
 
-aGraphToGraph :: CmmAGraphScoped -> FCode CmmGraph
+aGraphToGraph :: CmmAGraphScoped -> FCode' c CmmGraph
 aGraphToGraph stmts
   = do  { l <- newBlockId
         ; return (labelAGraph l stmts) }
+
+-- ----------------------------------------------------------------------------
+
+class ContainsEmitDebugInfo c where
+  emitDebugInfo :: c -> Bool
+
+instance ContainsEmitDebugInfo CmmBuilderConfig where
+  emitDebugInfo = cmmBuilderEmitDebugInfo
+
+instance ContainsEmitDebugInfo StgToCmmConfig where
+  emitDebugInfo = stgToCmmEmitDebugInfo
+
+class ContainsSDocContext c where
+  sdocContext :: c -> SDocContext
+
+instance ContainsSDocContext CmmBuilderConfig where
+  sdocContext = cmmBuilderContext
+
+instance ContainsSDocContext StgToCmmConfig where
+  sdocContext = stgToCmmContext
+

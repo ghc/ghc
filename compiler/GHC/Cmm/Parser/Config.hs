@@ -5,12 +5,9 @@ module GHC.Cmm.Parser.Config (
 
 import GHC.Prelude
 
-import GHC.Platform.Profile
-
-import GHC.StgToCmm.Config
-
+import GHC.Cmm.Builder.Config
 import GHC.Parser.Lexer
-
+import GHC.Platform.Profile
 
 data PDConfig = PDConfig
   { pdProfile :: !Profile
@@ -20,5 +17,5 @@ data PDConfig = PDConfig
 data CmmParserConfig = CmmParserConfig
   { cmmpParserOpts :: !ParserOpts
   , cmmpPDConfig :: !PDConfig
-  , cmmpStgToCmmConfig :: !StgToCmmConfig
+  , cmmpCmmBuilderConfig :: !CmmBuilderConfig
   }

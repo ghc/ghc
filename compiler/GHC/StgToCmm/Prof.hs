@@ -23,13 +23,16 @@ module GHC.StgToCmm.Prof (
         saveCurrentCostCentre, restoreCurrentCostCentre,
 
         -- Lag/drag/void stuff
-        ldvEnter, ldvEnterClosure, ldvRecordCreate
+        ldvEnter, ldvEnterClosure, ldvRecordCreate,
+
+        ContainsSCCProfiling (..),
   ) where
 
 import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.InfoTableProv
@@ -38,6 +41,7 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Lit
 import GHC.Runtime.Heap.Layout
 
+import GHC.Cmm.Builder.Config
 import GHC.Cmm.Graph
 import GHC.Cmm
 import GHC.Cmm.Utils
@@ -99,7 +103,7 @@ dynProfHdr profile ccs
   | otherwise                  = []
 
 -- | Initialise the profiling field of an update frame
-initUpdFrameProf :: CmmExpr -> FCode ()
+initUpdFrameProf :: (ContainsPlatformProfile c, ContainsSCCProfiling c) => CmmExpr -> FCode' c ()
 initUpdFrameProf frame
   = ifProfiling $        -- frame->header.prof.ccs = CCCS
     do platform <- getPlatform
@@ -170,7 +174,9 @@ profDynAlloc rep ccs
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
 -- in words.
-profAlloc :: CmmExpr -> CmmExpr -> FCode ()
+profAlloc
+  :: (ContainsPlatformProfile c, ContainsSCCProfiling c)
+  => CmmExpr -> CmmExpr -> FCode' c ()
 profAlloc words ccs
   = ifProfiling $
         do profile <- getProfile
@@ -187,7 +193,9 @@ profAlloc words ccs
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
 
-enterCostCentreThunk :: CmmExpr -> FCode ()
+enterCostCentreThunk
+  :: (ContainsPlatformProfile c, ContainsSCCProfiling c)
+  => CmmExpr -> FCode' c ()
 enterCostCentreThunk closure =
   ifProfiling $ do
       platform <- getPlatform
@@ -204,8 +212,8 @@ enterCostCentreFun ccs closure = ifProfiling $
          False
        -- otherwise we have a top-level function, nothing to do
 
-ifProfiling :: FCode () -> FCode ()
-ifProfiling = whenM (stgToCmmSCCProfiling <$> getStgToCmmConfig)
+ifProfiling :: ContainsSCCProfiling c => FCode' c () -> FCode' c ()
+ifProfiling = whenM (sccProfiling <$> getConfig)
 
 ---------------------------------------------------------------
 --        Initialising Cost Centres & CCSs
@@ -342,7 +350,7 @@ dynLdvInit platform =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
 --
 -- Initialise the LDV word of a new closure
 --
-ldvRecordCreate :: CmmExpr -> FCode ()
+ldvRecordCreate :: ContainsPlatformProfile c => CmmExpr -> FCode' c ()
 ldvRecordCreate closure = do
   platform <- getPlatform
   emit $ mkStore (ldvWord platform closure) (dynLdvInit platform)
@@ -359,7 +367,7 @@ ldvEnterClosure closure_info node_reg = do
     -- don't forget to subtract node's tag
     ldvEnter (cmmOffsetB platform (CmmReg node_reg) (-tag))
 
-ldvEnter :: CmmExpr -> FCode ()
+ldvEnter :: (ContainsPlatformProfile c, ContainsSCCProfiling c) => CmmExpr -> FCode' c ()
 -- Argument is a closure pointer
 ldvEnter cl_ptr = do
     platform <- getPlatform
@@ -389,3 +397,18 @@ loadEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platfor
 ldvWord :: Platform -> CmmExpr -> CmmExpr
 ldvWord platform closure_ptr
     = cmmOffsetB platform closure_ptr (pc_OFFSET_StgHeader_ldvw (platformConstants platform))
+
+-----------------------------------------------------------------------------
+--
+--                Utilities
+--
+-----------------------------------------------------------------------------
+
+class ContainsSCCProfiling c where
+  sccProfiling :: c -> Bool
+
+instance ContainsSCCProfiling CmmBuilderConfig where
+  sccProfiling = cmmBuilderSCCProfiling
+
+instance ContainsSCCProfiling StgToCmmConfig where
+  sccProfiling = stgToCmmSCCProfiling

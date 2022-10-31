@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 -----------------------------------------------------------------------------
 --
 -- Code generation for foreign calls.
@@ -26,6 +28,7 @@ import GHC.Prelude hiding( succ, (<*>) )
 
 import GHC.Platform
 import GHC.Platform.Profile
+import GHC.Platform.Profile.Class
 
 import GHC.Stg.Syntax
 import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
@@ -207,17 +210,19 @@ emitCCall hinted_results fn hinted_args
     fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn
 
 
-emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
+emitPrimCall :: ContainsPlatformProfile c
+             => [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode' c ()
 emitPrimCall res op args
   = void $ emitForeignCall PlayRisky res (PrimTarget op) args
 
 -- alternative entry point, used by GHC.Cmm.Parser
 emitForeignCall
-        :: Safety
+        :: ContainsPlatformProfile c
+        => Safety
         -> [CmmFormal]          -- where to put the results
         -> ForeignTarget        -- the op
         -> [CmmActual]          -- arguments
-        -> FCode ReturnKind
+        -> FCode' c ReturnKind
 emitForeignCall safety results target args
   | not (playSafe safety) = do
     platform <- getPlatform
@@ -254,7 +259,8 @@ emitForeignCall safety results target args
            )
     return (ReturnedTo k off)
 
-load_target_into_temp :: ForeignTarget -> FCode ForeignTarget
+load_target_into_temp :: ContainsPlatformProfile c
+                      => ForeignTarget -> FCode' c ForeignTarget
 load_target_into_temp (ForeignTarget expr conv) = do
   tmp <- maybe_assign_temp expr
   return (ForeignTarget tmp conv)
@@ -272,7 +278,8 @@ load_target_into_temp other_target@(PrimTarget _) =
 -- on GHC.Cmm.Sink to clean it up later.  (Yuck, ToDo).  The generated code
 -- ends up being the same, at least for the RTS .cmm code.
 --
-maybe_assign_temp :: CmmExpr -> FCode CmmExpr
+maybe_assign_temp :: ContainsPlatformProfile c
+                  => CmmExpr -> FCode' c CmmExpr
 maybe_assign_temp e = do
   platform <- getPlatform
   reg <- newTemp (cmmExprType platform e)
@@ -285,7 +292,7 @@ maybe_assign_temp e = do
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
 
-emitSaveThreadState :: FCode ()
+emitSaveThreadState :: ContainsPlatformProfile c => FCode' c ()
 emitSaveThreadState = do
   profile <- getProfile
   code <- saveThreadState profile
@@ -327,7 +334,7 @@ saveThreadState profile = do
 -- loaded any live STG registers into variables for us, but in
 -- hand-written low-level Cmm code where we don't know which registers
 -- are live, we might have to save them all.
-emitSaveRegs :: FCode ()
+emitSaveRegs :: ContainsPlatformProfile c => FCode' c ()
 emitSaveRegs = do
    platform <- getPlatform
    let regs = realArgRegsCover platform
@@ -335,7 +342,7 @@ emitSaveRegs = do
    emit save
 
 -- | Restore STG registers (see 'emitSaveRegs')
-emitRestoreRegs :: FCode ()
+emitRestoreRegs :: ContainsPlatformProfile c => FCode' c ()
 emitRestoreRegs = do
    platform <- getPlatform
    let regs    = realArgRegsCover platform
@@ -364,7 +371,8 @@ emitRestoreRegs = do
 --
 -- See Note [GHCi tuple layout]
 
-emitPushTupleRegs :: CmmExpr -> FCode ()
+emitPushTupleRegs :: ContainsPlatformProfile c
+                  => CmmExpr -> FCode' c ()
 emitPushTupleRegs regs_live = do
   platform <- getPlatform
   let regs = zip (tupleRegsCover platform) [0..]
@@ -382,7 +390,7 @@ emitPushTupleRegs regs_live = do
   emit . catAGraphs =<< mapM save_arg (reverse regs)
 
 -- | Pop a subset of STG registers from the stack (see 'emitPushTupleRegs')
-emitPopTupleRegs :: CmmExpr -> FCode ()
+emitPopTupleRegs :: ContainsPlatformProfile c => CmmExpr -> FCode' c ()
 emitPopTupleRegs regs_live = do
   platform <- getPlatform
   let regs = zip (tupleRegsCover platform) [0..]
@@ -400,7 +408,7 @@ emitPopTupleRegs regs_live = do
   emit . catAGraphs =<< mapM save_arg regs
 
 
-emitCloseNursery :: FCode ()
+emitCloseNursery :: ContainsPlatformProfile c => FCode' c ()
 emitCloseNursery = do
   profile <- getProfile
   let platform = profilePlatform profile
@@ -455,7 +463,7 @@ closeNursery profile tso = do
                                , CmmMachOp (mo_WordTo64 platform) [alloc] ])
    ]
 
-emitLoadThreadState :: FCode ()
+emitLoadThreadState :: ContainsPlatformProfile c => FCode' c ()
 emitLoadThreadState = do
   profile <- getProfile
   code <- loadThreadState profile
@@ -491,7 +499,7 @@ loadThreadState profile = do
    ]
 
 
-emitOpenNursery :: FCode ()
+emitOpenNursery :: ContainsPlatformProfile c => FCode' c ()
 emitOpenNursery = do
   profile <- getProfile
   let platform = profilePlatform profile
