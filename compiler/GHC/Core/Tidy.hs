@@ -34,7 +34,6 @@ import GHC.Types.Tickish
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import Data.List (mapAccumL)
--- import GHC.Utils.Trace
 import GHC.Utils.Outputable
 import GHC.Types.RepType (typePrimRep)
 import GHC.Utils.Panic

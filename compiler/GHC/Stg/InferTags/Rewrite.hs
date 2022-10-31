@@ -52,9 +52,6 @@ import GHC.Stg.InferTags.Types
 
 import Control.Monad
 
--- import GHC.Utils.Trace
--- import GHC.Driver.Ppr
-
 newtype RM a = RM { unRM :: (State (UniqFM Id TagSig, UniqSupply, Module, IdSet) a) }
     deriving (Functor, Monad, Applicative)
 

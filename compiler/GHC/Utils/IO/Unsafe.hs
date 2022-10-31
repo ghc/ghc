@@ -9,7 +9,7 @@ module GHC.Utils.IO.Unsafe
    )
 where
 
-import GHC.Prelude ()
+import GHC.Prelude.Basic ()
 
 import GHC.Exts
 import GHC.IO   (IO(..))

@@ -46,7 +46,6 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
 import GHC.Cmm.Reg
-import GHC.Utils.Trace (pprTrace)
 import GHC.Utils.Panic (panic)
 import GHC.Utils.Outputable
 

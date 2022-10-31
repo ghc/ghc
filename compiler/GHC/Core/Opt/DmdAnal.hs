@@ -46,8 +46,6 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
 
-import GHC.Utils.Trace
-_ = pprTrace -- Tired of commenting out the import all the time
 
 {-
 ************************************************************************

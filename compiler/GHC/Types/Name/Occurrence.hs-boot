@@ -1,6 +1,6 @@
 module GHC.Types.Name.Occurrence where
 
-import GHC.Data.FastString
+import GHC.Data.FastString ( FastString )
 
 data OccName
 

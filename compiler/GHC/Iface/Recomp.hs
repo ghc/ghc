@@ -50,7 +50,6 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
 import GHC.Utils.Logger
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Trace
 
 import GHC.Types.Annotations
 import GHC.Types.Name

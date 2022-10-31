@@ -154,7 +154,6 @@ import Data.Maybe
 import qualified Data.Char
 import Control.Monad ( when, unless )
 import GHC.Types.Id.Info
-import GHC.Utils.Trace
 import GHC.StgToCmm.Env (getCgInfo_maybe)
 import Data.Coerce (coerce)
 import GHC.Utils.Json

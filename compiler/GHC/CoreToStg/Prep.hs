@@ -55,7 +55,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
 import GHC.Utils.Monad  ( mapAccumLM )
 import GHC.Utils.Logger
-import GHC.Utils.Trace
 
 import GHC.Types.Demand
 import GHC.Types.Var

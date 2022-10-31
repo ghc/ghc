@@ -2,6 +2,8 @@ module GHC.Driver.Config.StgToCmm
   ( initStgToCmmConfig
   ) where
 
+import GHC.Prelude.Basic
+
 import GHC.StgToCmm.Config
 
 import GHC.Driver.Backend
@@ -11,9 +13,6 @@ import GHC.Platform.Profile
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Utils.Outputable
-
-import Data.Maybe
-import Prelude
 
 initStgToCmmConfig :: DynFlags -> Module -> StgToCmmConfig
 initStgToCmmConfig dflags mod = StgToCmmConfig

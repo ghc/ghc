@@ -22,7 +22,7 @@ module GHC.Utils.GlobalVars
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import GHC.Conc.Sync ( sharedCAF )
 

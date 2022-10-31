@@ -108,7 +108,7 @@ module GHC.Data.FastString
         lengthPS
        ) where
 
-import GHC.Prelude as Prelude
+import GHC.Prelude.Basic as Prelude
 
 import GHC.Utils.Encoding
 import GHC.Utils.IO.Unsafe

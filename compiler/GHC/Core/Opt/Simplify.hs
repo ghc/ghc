@@ -27,7 +27,6 @@ import GHC.Utils.Error  ( withTiming )
 import GHC.Utils.Logger as Logger
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Trace
 
 import GHC.Unit.Env ( UnitEnv, ueEPS )
 import GHC.Unit.External

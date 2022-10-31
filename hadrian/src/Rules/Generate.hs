@@ -384,7 +384,7 @@ generateConfigHs = do
         , "  , cStage"
         , "  ) where"
         , ""
-        , "import GHC.Prelude"
+        , "import GHC.Prelude.Basic"
         , ""
         , "import GHC.Version"
         , ""

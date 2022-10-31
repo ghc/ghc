@@ -4,7 +4,7 @@ module GHC.Data.Bool
   )
 where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 data OverridingBool
   = Auto

@@ -165,6 +165,7 @@ GHC.Platform.Ways
 GHC.Platform.X86
 GHC.Platform.X86_64
 GHC.Prelude
+GHC.Prelude.Basic
 GHC.Runtime.Context
 GHC.Runtime.Eval.Types
 GHC.Runtime.Heap.Layout
