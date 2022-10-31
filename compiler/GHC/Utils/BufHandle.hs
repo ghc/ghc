@@ -24,7 +24,7 @@ module GHC.Utils.BufHandle (
         bFlush,
   ) where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import GHC.Data.FastString
 import GHC.Data.FastMutInt

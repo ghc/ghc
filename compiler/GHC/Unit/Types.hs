@@ -89,6 +89,7 @@ module GHC.Unit.Types
 where
 
 import GHC.Prelude
+
 import GHC.Types.Unique
 import GHC.Types.Unique.DSet
 import GHC.Utils.Binary

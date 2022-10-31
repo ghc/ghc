@@ -116,7 +116,7 @@ generateConfigHs settings = either error id $ do
         , "  , cStage"
         , "  ) where"
         , ""
-        , "import GHC.Prelude"
+        , "import GHC.Prelude.Basic"
         , ""
         , "import GHC.Version"
         , ""

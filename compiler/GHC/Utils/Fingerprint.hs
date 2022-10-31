@@ -22,7 +22,7 @@ module GHC.Utils.Fingerprint (
         getFileHash
    ) where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import Foreign
 import GHC.IO

@@ -81,7 +81,6 @@ import GHC.Utils.Monad
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Logger
-import GHC.Utils.Trace
 
 import Data.IORef
 import qualified Data.Set as Set

@@ -8,7 +8,7 @@ module GHC.Utils.Exception
     )
     where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import GHC.IO (catchException)
 import Control.Exception as CE hiding (assert)

@@ -124,7 +124,7 @@ module GHC.Utils.Misc (
         HasDebugCallStack,
     ) where
 
-import GHC.Prelude hiding ( head, init, last, tail )
+import GHC.Prelude.Basic hiding ( head, init, last, tail )
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain

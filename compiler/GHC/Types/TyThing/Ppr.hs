@@ -31,7 +31,6 @@ import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
 import GHC.Iface.Make ( tyThingToIfaceDecl )
 
 import GHC.Utils.Outputable
-import GHC.Utils.Trace
 
 import Data.Maybe ( isJust )
 

@@ -8,7 +8,7 @@ module GHC.Utils.Constants
   )
 where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 {-
 

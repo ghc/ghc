@@ -28,7 +28,7 @@ import GHC.Settings.Config
 import GHC.Utils.Constants
 import GHC.Utils.Exception as Exception
 import GHC.Stack
-import GHC.Prelude
+import GHC.Prelude.Basic
 import System.IO.Unsafe
 
 -- | This type is very similar to 'GHC.Utils.Panic.GhcException', but it omits

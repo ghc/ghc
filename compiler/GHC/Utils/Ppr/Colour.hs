@@ -1,5 +1,5 @@
 module GHC.Utils.Ppr.Colour where
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import Data.Maybe (fromMaybe)
 import GHC.Data.Bool

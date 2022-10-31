@@ -13,7 +13,7 @@ module GHC.Data.FastMutInt(
         atomicFetchAddFastMut
   ) where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import GHC.Base
 

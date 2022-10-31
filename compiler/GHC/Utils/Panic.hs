@@ -52,7 +52,7 @@ module GHC.Utils.Panic
    )
 where
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 import GHC.Stack
 
 import GHC.Utils.Outputable

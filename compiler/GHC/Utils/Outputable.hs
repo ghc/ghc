@@ -108,7 +108,7 @@ module GHC.Utils.Outputable (
 
 import Language.Haskell.Syntax.Module.Name ( ModuleName(..) )
 
-import GHC.Prelude
+import GHC.Prelude.Basic
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )

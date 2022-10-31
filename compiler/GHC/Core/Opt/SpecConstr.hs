@@ -73,7 +73,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Monad
-import GHC.Utils.Trace
 
 import GHC.Builtin.Names ( specTyConKey )
 

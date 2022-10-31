@@ -97,9 +97,6 @@ import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
 
-import GHC.Utils.Trace
-_ = pprTrace -- to silence unused import warnings
-
 --
 -- * Main exports
 --

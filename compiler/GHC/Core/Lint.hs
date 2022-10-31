@@ -86,7 +86,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
-import GHC.Utils.Trace
 import GHC.Utils.Error
 import qualified GHC.Utils.Error as Err
 import GHC.Utils.Logger

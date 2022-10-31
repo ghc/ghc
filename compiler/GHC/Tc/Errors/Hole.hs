@@ -82,7 +82,6 @@ import GHC.Builtin.Utils (knownKeyNames)
 import GHC.Tc.Errors.Hole.FitTypes
 import qualified Data.Set as Set
 import GHC.Types.SrcLoc
-import GHC.Utils.Trace (warnPprTrace)
 import GHC.Data.FastString (unpackFS)
 import GHC.Types.Unique.Map
 

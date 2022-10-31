@@ -80,7 +80,6 @@ import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Trace
 
 import Control.Monad
 

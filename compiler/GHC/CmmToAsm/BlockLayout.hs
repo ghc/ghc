@@ -35,7 +35,6 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps (removeDups)
 import GHC.Data.OrdList
 
-import GHC.Utils.Trace
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain

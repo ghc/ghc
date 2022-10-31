@@ -53,7 +53,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad.State.Strict (State (..), runState, state)
 import GHC.Utils.Misc
-import GHC.Utils.Trace
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS

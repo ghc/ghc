@@ -54,7 +54,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
-import GHC.Utils.Trace
 
 import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )

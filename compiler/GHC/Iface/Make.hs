@@ -79,7 +79,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Utils.Logger
-import GHC.Utils.Trace
 
 import GHC.Data.FastString
 import GHC.Data.Maybe

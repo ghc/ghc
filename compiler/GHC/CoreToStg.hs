@@ -56,7 +56,6 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc (HasDebugCallStack)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Trace
 
 import Control.Monad (ap)
 import Data.Maybe (fromMaybe)

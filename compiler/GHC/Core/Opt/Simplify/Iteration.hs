@@ -68,7 +68,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Constants (debugIsOn)
-import GHC.Utils.Trace
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Utils.Logger
 import GHC.Utils.Misc

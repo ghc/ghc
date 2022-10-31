@@ -106,9 +106,6 @@ import GHC.Utils.Panic.Plain
 import Data.Coerce (coerce)
 import Data.Function
 
-import GHC.Utils.Trace
-_ = pprTrace -- Tired of commenting out the import all the time
-
 {-
 ************************************************************************
 *                                                                      *

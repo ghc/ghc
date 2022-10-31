@@ -13,7 +13,18 @@ module GHC.Utils.Trace
   )
 where
 
-import GHC.Prelude
+{- Note [Exporting pprTrace from GHC.Prelude]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For our own sanity we want to export pprTrace from GHC.Prelude.
+Since calls to traces should never be performance sensitive it's okay for these
+to be source imports/exports. However we still need to make sure that all
+transitive imports from Trace.hs-boot do not import GHC.Prelude.
+
+To get there we import the basic GHC.Prelude.Basic prelude instead of GHC.Prelude
+within the transitive dependencies of Trace.hs
+-}
+
+import GHC.Prelude.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
 import GHC.Utils.Panic

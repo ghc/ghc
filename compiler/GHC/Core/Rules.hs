@@ -78,7 +78,6 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 
 import GHC.Utils.Misc as Utils
-import GHC.Utils.Trace
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)

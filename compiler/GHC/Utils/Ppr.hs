@@ -111,7 +111,7 @@ module GHC.Utils.Ppr (
 
   ) where
 
-import GHC.Prelude hiding (error)
+import GHC.Prelude.Basic hiding (error)
 
 import GHC.Utils.BufHandle
 import GHC.Data.FastString

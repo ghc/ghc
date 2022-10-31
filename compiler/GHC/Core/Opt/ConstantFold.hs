@@ -70,7 +70,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Utils.Trace
 
 import Control.Applicative ( Alternative(..) )
 import Control.Monad

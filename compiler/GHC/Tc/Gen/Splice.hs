@@ -118,7 +118,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 
 import GHC.Utils.Misc
-import GHC.Utils.Trace
 import GHC.Utils.Panic as Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Lexeme
