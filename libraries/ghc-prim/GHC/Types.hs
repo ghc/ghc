@@ -132,8 +132,9 @@ type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity wher
 ********************************************************************* -}
 
 -- | (Kind) This is the kind of type-level symbols.
--- Declared here because class IP needs it
 data Symbol
+
+-- Symbol is declared here because class IP needs it
 
 {- *********************************************************************
 *                                                                      *
