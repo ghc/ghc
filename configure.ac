@@ -918,6 +918,11 @@ AC_CHECK_DECLS([ctime_r], , ,
 #define _POSIX_C_SOURCE 199506L
 #include <time.h>])
 
+dnl On Linux we should have program_invocation_short_name
+AC_CHECK_DECLS([program_invocation_short_name], , ,
+[#define _GNU_SOURCE 1
+#include <errno.h>])
+
 dnl ** check for mingwex library
 AC_CHECK_LIB(
   [mingwex],

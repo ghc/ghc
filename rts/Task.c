@@ -477,7 +477,7 @@ startWorkerTask (Capability *cap)
   // Set the name of the worker thread to the original process name followed by
   // ":w", but only if we're on Linux where the program_invocation_short_name
   // global is available.
-#if defined(linux_HOST_OS)
+#if defined(HAVE_PROGRAM_INVOCATION_SHORT_NAME)
   size_t procname_len = strlen(program_invocation_short_name);
   char worker_name[16];
   // The kernel only allocates 16 bytes for thread names, so we truncate if the
