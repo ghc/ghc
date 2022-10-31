@@ -46,7 +46,6 @@ import GHC.Types.ForeignStubs (ForeignStubs (..), getCHeader, getCStub)
 import GHC.Types.RepType
 import GHC.Types.Id
 import GHC.Types.Unique
-import GHC.Types.TyThing
 
 import GHC.Data.FastString
 import GHC.Utils.Encoding
@@ -289,14 +288,13 @@ genToplevelDecl i rhs = do
 
 genToplevelConEntry :: Id -> CgStgRhs -> G JStat
 genToplevelConEntry i rhs = case rhs of
-  StgRhsCon _cc con _mu _ts _args
-    | i `elem` [ i' | AnId i' <- dataConImplicitTyThings con ]
-    -> genSetConInfo i con (stgRhsLive rhs) -- NoSRT
-  StgRhsClosure _ _cc _upd_flag _args body
-    | StgConApp dc _n _cargs _tys <- removeTick body
-    , i `elem` [ i' | AnId i' <- dataConImplicitTyThings dc ]
-    -> genSetConInfo i dc (stgRhsLive rhs) -- srt
-  _ -> pure mempty
+   StgRhsCon _cc con _mu _ts _args
+     | isDataConWorkId i
+       -> genSetConInfo i con (stgRhsLive rhs) -- NoSRT
+   StgRhsClosure _ _cc _upd_flag _args _body
+     | Just dc <- isDataConWorkId_maybe i
+       -> genSetConInfo i dc (stgRhsLive rhs) -- srt
+   _ -> pure mempty
 
 genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStat
 genSetConInfo i d l {- srt -} = do
