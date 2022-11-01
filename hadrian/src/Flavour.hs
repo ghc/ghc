@@ -11,6 +11,7 @@ module Flavour
   , viaLlvmBackend
   , enableProfiledGhc
   , disableDynamicGhcPrograms
+  , disableDynamicLibs
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
@@ -38,26 +39,27 @@ import Oracles.Setting
 
 flavourTransformers :: Map String (Flavour -> Flavour)
 flavourTransformers = M.fromList
-    [ "werror" =: werror
-    , "debug_info" =: enableDebugInfo
-    , "ticky_ghc" =: enableTickyGhc
-    , "ticky_ghc0" =: enableTickyGhc0
-    , "split_sections" =: splitSections
+    [ "werror"           =: werror
+    , "debug_info"       =: enableDebugInfo
+    , "ticky_ghc"        =: enableTickyGhc
+    , "ticky_ghc0"       =: enableTickyGhc0
+    , "split_sections"   =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
-    , "llvm" =: viaLlvmBackend
-    , "profiled_ghc" =: enableProfiledGhc
-    , "no_dynamic_ghc" =: disableDynamicGhcPrograms
+    , "llvm"             =: viaLlvmBackend
+    , "profiled_ghc"     =: enableProfiledGhc
+    , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
+    , "no_dynamic_libs"  =: disableDynamicLibs
     , "no_profiled_libs" =: disableProfiledLibs
-    , "omit_pragmas" =: omitPragmas
-    , "ipe" =: enableIPE
-    , "fully_static" =: fullyStatic
-    , "collect_timings" =: collectTimings
-    , "assertions" =: enableAssertions
-    , "debug_ghc" =: debugGhc Stage1
+    , "omit_pragmas"     =: omitPragmas
+    , "ipe"              =: enableIPE
+    , "fully_static"     =: fullyStatic
+    , "collect_timings"  =: collectTimings
+    , "assertions"       =: enableAssertions
+    , "debug_ghc"        =: debugGhc Stage1
     , "debug_stage1_ghc" =: debugGhc stage0InTree
-    , "lint" =: enableLinting
-    , "haddock" =: enableHaddock
-    , "late_ccs" =: enableLateCCS
+    , "lint"             =: enableLinting
+    , "haddock"          =: enableHaddock
+    , "late_ccs"         =: enableLateCCS
     ]
   where (=:) = (,)
 
@@ -221,6 +223,16 @@ enableProfiledGhc flavour =
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
 disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
+
+-- | Don't build libraries in profiled 'Way's.
+disableDynamicLibs :: Flavour -> Flavour
+disableDynamicLibs flavour =
+  flavour { libraryWays = prune $ libraryWays flavour
+          }
+  where
+    prune :: Ways -> Ways
+    prune = fmap $ Set.filter (not . wayUnit Dynamic)
+
 
 -- | Don't build libraries in profiled 'Way's.
 disableProfiledLibs :: Flavour -> Flavour
