@@ -10,6 +10,7 @@ module Flavour
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc
+  , enableO2Stage0
   , disableDynamicGhcPrograms
   , disableDynamicLibs
   , disableProfiledLibs
@@ -43,6 +44,7 @@ flavourTransformers = M.fromList
     , "debug_info"       =: enableDebugInfo
     , "ticky_ghc"        =: enableTickyGhc
     , "ticky_ghc0"       =: enableTickyGhc0
+    , "optimize_stage0"  =: enableO2Stage0
     , "split_sections"   =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm"             =: viaLlvmBackend
@@ -72,7 +74,7 @@ parseFlavour :: [Flavour]  -- ^ base flavours
 parseFlavour baseFlavours transformers str =
     case P.runParser parser () "" str of
       Left perr -> Left $ unlines $
-                    [ "error parsing flavour specifier: " ++ show perr
+                   [ "error parsing flavour specifier: " ++ show perr
                     , ""
                     , "known flavours:"
                     ] ++
@@ -108,6 +110,9 @@ parseFlavour baseFlavours transformers str =
 addArgs :: Args -> Flavour -> Flavour
 addArgs args' fl = fl { args = args fl <> args' }
 
+onArgs :: (Args -> Args) -> Flavour -> Flavour
+onArgs f fl = fl { args = f $ args fl}
+
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
@@ -129,6 +134,11 @@ enableTickyGhc =
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
       ]
+
+-- | Enable the ticky-ticky profiler in stage1 GHC
+enableO2Stage0 :: Flavour -> Flavour
+enableO2Stage0 fl = onArgs ensureO2 fl
+  where ensureO2 as = (builder Ghc ? stage0 ? arg "-O2") <> remove ["-O"] as
 
 -- | Enable the ticky-ticky profiler in stage1 GHC
 enableTickyGhc0 :: Flavour -> Flavour
