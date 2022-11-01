@@ -13,7 +13,7 @@ foreign import ccall "dynamic" callF :: FunPtr Fun -> Fun
 -- This test should create 5 OS threads only:
 --   one for main
 --   worker 1 for the IO manager
---   worker 1 for the timeout manager
+--   worker 2 for the timeout manager
 --   worker 3 to run the first forkIO
 --   worker 4 created when worker 2 makes its foreign call
 
