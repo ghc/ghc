@@ -591,14 +591,7 @@ However, if the modules are not *completely* re-exported, for example:
     import C (a, b)
 
 then Haddock behaves as if the set of entities re-exported from ``B``
-and ``C`` had been listed explicitly in the export list [#notImplemented]_.
-
-.. Comment: was this ever implemented? Perhaps this part of the docs
-   should just be removed until it is implemented?
-
-.. [#notImplemented] This is not implemented at the time of writing
-   (Haddock version 2.17.3 with GHC 8.0.2). At the moment, Haddock
-   always inserts a module cross-reference.
+and ``C`` had been listed explicitly in the export list.
 
 The exception to this rule is when the re-exported module is declared
 with the ``hide`` attribute (see :ref:`module-attrs`), in which
