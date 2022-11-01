@@ -1120,7 +1120,9 @@ class Applicative f => Alternative f where
         some_v = liftA2 (:) v many_v
 
 
--- | @since 2.01
+-- | Picks the leftmost 'Just' value, or, alternatively, 'Nothing'.
+--
+-- @since 2.01
 instance Alternative Maybe where
     empty = Nothing
     Nothing <|> r = r
@@ -1152,7 +1154,9 @@ class (Alternative m, Monad m) => MonadPlus m where
    mplus :: m a -> m a -> m a
    mplus = (<|>)
 
--- | @since 2.01
+-- | Picks the leftmost 'Just' value, or, alternatively, 'Nothing'.
+--
+-- @since 2.01
 instance MonadPlus Maybe
 
 ---------------------------------------------
@@ -1214,12 +1218,16 @@ instance Monad []  where
     {-# INLINE (>>) #-}
     (>>) = (*>)
 
--- | @since 2.01
+-- | Combines lists by concatenation, starting from the empty list.
+--
+-- @since 2.01
 instance Alternative [] where
     empty = []
     (<|>) = (++)
 
--- | @since 2.01
+-- | Combines lists by concatenation, starting from the empty list.
+--
+-- @since 2.01
 instance MonadPlus []
 
 {-
@@ -1602,12 +1610,18 @@ instance  Monad IO  where
     (>>)      = (*>)
     (>>=)     = bindIO
 
--- | @since 4.9.0.0
+-- | Takes the first non-throwing 'IO' action\'s result.
+-- 'empty' throws an exception.
+--
+-- @since 4.9.0.0
 instance Alternative IO where
     empty = failIO "mzero"
     (<|>) = mplusIO
 
--- | @since 4.9.0.0
+-- | Takes the first non-throwing 'IO' action\'s result.
+-- 'mzero' throws an exception.
+--
+-- @since 4.9.0.0
 instance MonadPlus IO
 
 returnIO :: a -> IO a

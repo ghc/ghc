@@ -733,12 +733,16 @@ thenSTM (STM m) k = STM ( \s ->
 returnSTM :: a -> STM a
 returnSTM x = STM (\s -> (# s, x #))
 
--- | @since 4.8.0.0
+-- | Takes the first non-'retry'ing 'STM' action.
+--
+-- @since 4.8.0.0
 instance Alternative STM where
   empty = retry
   (<|>) = orElse
 
--- | @since 4.3.0.0
+-- | Takes the first non-'retry'ing 'STM' action.
+--
+-- @since 4.3.0.0
 instance MonadPlus STM
 
 -- | Unsafely performs IO in the STM monad.  Beware: this is a highly
