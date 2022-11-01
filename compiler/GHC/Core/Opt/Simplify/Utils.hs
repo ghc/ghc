@@ -2315,16 +2315,25 @@ Example with the "Merge Nested Cases" optimization (from #12877):
       3##     -> ...
       DEFAULT -> ...
 
-There are some wrinkles
+There are some wrinkles.
 
-* Do not apply caseRules if there is just a single DEFAULT alternative
+Wrinkle 1:
+  Do not apply caseRules if there is just a single DEFAULT alternative,
+  unless the case-binder is dead. Example:
      case e +# 3# of b { DEFAULT -> rhs }
   If we applied the transformation here we would (stupidly) get
-     case a of b' { DEFAULT -> let b = e +# 3# in rhs }
+     case e of b' { DEFAULT -> let b = b' +# 3# in rhs }
   and now the process may repeat, because that let will really
-  be a case.
+  be a case. But if the original case binder b is dead, we instead get
+     case e of b' { DEFAULT -> rhs }
+  and there is no such problem.
 
-* The type of the scrutinee might change.  E.g.
+  See Note [Example of case-merging and caseRules] for a compelling
+  example of why this dead-binder business can be really important.
+
+
+Wrinkle 2:
+  The type of the scrutinee might change.  E.g.
         case tagToEnum (x :: Int#) of (b::Bool)
           False -> e1
           True -> e2
@@ -2333,7 +2342,8 @@ There are some wrinkles
           DEFAULT -> e1
           1#      -> e2
 
-* The case binder may be used in the right hand sides, so we need
+Wrinkle 3:
+  The case binder may be used in the right hand sides, so we need
   to make a local binding for it, if it is alive.  e.g.
          case e +# 10# of b
            DEFAULT -> blah...b...
@@ -2347,8 +2357,87 @@ There are some wrinkles
   whereas in the DEFAULT case we must reconstruct the original value.
   But NB: we use b'; we do not duplicate 'e'.
 
-* In dataToTag we might need to make up some fake binders;
+Wrinkle 4:
+  In dataToTag we might need to make up some fake binders;
   see Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold
+
+
+
+Note [Example of case-merging and caseRules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The case-transformation rules are quite powerful. Here's a
+subtle example from #22375.  We start with
+
+  data T = A | B | ...
+    deriving Eq
+
+  f :: T -> String
+  f x = if | x==A -> "one"
+           | x==B -> "two"
+           | ...
+
+In Core after a bit of simplification we get:
+
+    f x = case dataToTag# x of a# { _DEFAULT ->
+          case a# of
+            _DEFAULT -> case dataToTag# x of b# { _DEFAULT ->
+                        case b# of
+                           _DEFAULT -> ...
+                           1# -> "two"
+                        }
+            0# -> "one"
+          }
+
+Now consider what mkCase does to these case expressions.
+The case-merge transformation Note [Merge Nested Cases]
+does this (affecting both pairs of cases):
+
+    f x = case dataToTag# x of a# {
+             _DEFAULT -> case dataToTag# x of b# {
+                          _DEFAULT -> ...
+                          1# -> "two"
+                         }
+             0# -> "one"
+          }
+
+Now Note [caseRules for dataToTag] does its work, again
+on both dataToTag# cases:
+
+    f x = case x of x1 {
+             _DEFAULT -> case dataToTag# x1 of a# { _DEFAULT ->
+                         case x of x2 {
+                           _DEFAULT -> case dataToTag# x2 of b# { _DEFAULT -> ... }
+                           B -> "two"
+                         }}
+             A -> "one"
+          }
+
+
+The new dataToTag# calls come from the "reconstruct scrutinee" part of
+caseRules (note that a# and b# were not dead in the original program
+before all this merging).  However, since a# and b# /are/ in fact dead
+in the resulting program, we are left with redundant dataToTag# calls.
+But they are easily eliminated by doing caseRules again, in
+the next Simplifier iteration, this time noticing that a# and b# are
+dead.  Hence the "dead-binder" sub-case of Wrinkle 1 of Note
+[Scrutinee Constant Folding] above.  Once we do this we get
+
+    f x = case x of x1 {
+             _DEFAULT -> case x1 of x2 { _DEFAULT ->
+                         case x1 of x2 {
+                            _DEFAULT -> case x2 of x3 { _DEFAULT -> ... }
+                            B -> "two"
+                         }}
+             A -> "one"
+          }
+
+and now we can do case-merge again, getting the desired
+
+    f x = case x of
+            A -> "one"
+            B -> "two"
+            ...
+
 -}
 
 mkCase, mkCase1, mkCase2, mkCase3
@@ -2450,8 +2539,8 @@ mkCase1 mode scrut bndr alts_ty alts = mkCase2 mode scrut bndr alts_ty alts
 
 mkCase2 mode scrut bndr alts_ty alts
   | -- See Note [Scrutinee Constant Folding]
-    case alts of  -- Not if there is just a DEFAULT alternative
-      [Alt DEFAULT _ _] -> False
+    case alts of
+      [Alt DEFAULT _ _] -> isDeadBinder bndr -- see wrinkle 1
       _                 -> True
   , sm_case_folding mode
   , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
@@ -2473,13 +2562,9 @@ mkCase2 mode scrut bndr alts_ty alts
     -- binder if the latter isn't dead. Hence we wrap rhs of alternatives with
     -- "let bndr = ... in":
     --
-    --     case v + 10 of y        =====> case v of y
-    --        20      -> e1                 10      -> let y = 20     in e1
-    --        DEFAULT -> e2                 DEFAULT -> let y = v + 10 in e2
-    --
-    -- Other transformations give: =====> case v of y'
-    --                                      10      -> let y = 20      in e1
-    --                                      DEFAULT -> let y = y' + 10 in e2
+    --     case v + 10 of y        =====> case v of y'
+    --        20      -> e1                 10      -> let y = 20      in e1
+    --        DEFAULT -> e2                 DEFAULT -> let y = y' + 10 in e2
     --
     -- This wrapping is done in tx_alt; we use mk_orig, returned by caseRules,
     -- to construct an expression equivalent to the original one, for use
