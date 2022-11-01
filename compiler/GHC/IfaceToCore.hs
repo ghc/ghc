@@ -240,9 +240,9 @@ typecheckIface iface
     }
 
 typecheckWholeCoreBindings :: IORef TypeEnv ->  WholeCoreBindings -> IfG [CoreBind]
-typecheckWholeCoreBindings type_var (WholeCoreBindings prepd_binding this_mod _) =
+typecheckWholeCoreBindings type_var (WholeCoreBindings tidy_bindings this_mod _) =
   initIfaceLcl this_mod (text "typecheckWholeCoreBindings") NotBoot $ do
-    tcTopIfaceBindings type_var prepd_binding
+    tcTopIfaceBindings type_var tidy_bindings
 
 
 {-
