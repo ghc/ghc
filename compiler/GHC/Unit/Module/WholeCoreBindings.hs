@@ -57,7 +57,7 @@ the object files.
 -}
 
 data WholeCoreBindings = WholeCoreBindings
-            { wcb_bindings :: [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
-            , wcb_module   :: Module
-            , wcb_mod_location :: ModLocation
+            { wcb_bindings :: [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -- ^ serialised tidied core bindings.
+            , wcb_module   :: Module  -- ^ The module which the bindings are for
+            , wcb_mod_location :: ModLocation -- ^ The location where the sources reside.
             }
