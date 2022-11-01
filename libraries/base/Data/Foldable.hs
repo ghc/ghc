@@ -1175,7 +1175,7 @@ sequence_ = foldr c (return ())
   where c m k = m >> k
         {-# INLINE c #-}
 
--- | The sum of a collection of actions, generalizing 'concat'.
+-- | The sum of a collection of actions using '(<|>)', generalizing 'concat'.
 --
 -- 'asum' is just like 'msum', but generalised to 'Alternative'.
 --
@@ -1189,10 +1189,16 @@ asum :: (Foldable t, Alternative f) => t (f a) -> f a
 {-# INLINE asum #-}
 asum = foldr (<|>) empty
 
--- | The sum of a collection of actions, generalizing 'concat'.
+-- | The sum of a collection of actions using '(<|>)', generalizing 'concat'.
 --
 -- 'msum' is just like 'asum', but specialised to 'MonadPlus'.
 --
+-- ==== __Examples__
+--
+-- Basic usage, using the 'MonadPlus' instance for 'Maybe':
+--
+-- >>> msum [Just "Hello", Nothing, Just "World"]
+-- Just "Hello"
 msum :: (Foldable t, MonadPlus m) => t (m a) -> m a
 {-# INLINE msum #-}
 msum = asum
