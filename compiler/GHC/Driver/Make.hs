@@ -741,8 +741,8 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
                     Just n  -> return n
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
-    hsc_env <- getSession
-    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $
+    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $ do
+      hsc_env <- getSession
       liftIO $ upsweep n_jobs hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
     setSession hsc_env1
     case upsweep_ok of
