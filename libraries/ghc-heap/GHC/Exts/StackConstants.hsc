@@ -34,3 +34,12 @@ offsetStgCatchRetryFrameRunningFirstCode = (#const OFFSET_StgCatchRetryFrame_fir
 
 offsetStgCatchRetryFrameAltCode :: Int
 offsetStgCatchRetryFrameAltCode = (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
+
+offsetStgRetFunFrameSize :: Int
+offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size) + (#size StgHeader)
+
+offsetStgRetFunFrameFun :: Int
+offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun) + (#size StgHeader)
+
+offsetStgRetFunFramePayload :: Int
+offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload) + (#size StgHeader)

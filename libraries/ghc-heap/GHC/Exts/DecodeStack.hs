@@ -65,7 +65,11 @@ foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> 
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
+foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
+
 foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word#, Word# #)
+
+foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
 data BitmapEntry = BitmapEntry {
     closureFrame :: StackFrameIter,
@@ -132,7 +136,13 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                     payloads = map toBitmapPayload bes
                 in
                   RetBig payloads
-     RET_FUN ->  RetFun
+     RET_FUN -> let
+        t = getRetFunType# s# i#
+        size =  W# (getWord# s# i# (intToWord# offsetStgRetFunFrameSize))
+        fun = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetFunFrameFun)) sfi
+        payload :: [CL.Closure]
+       in
+        RetFun t size fun payload
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
         c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgUpdateFrameUpdatee)) sfi
@@ -141,6 +151,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         UpdateFrame t c
      CATCH_FRAME -> let
         c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchFrameHandler)) sfi
+        -- TODO: Replace with getWord# expression
         exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
        in
         CatchFrame exceptionsBlocked c
@@ -210,6 +221,8 @@ foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :
 
 foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
 
+foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
+
 data BitmapPayload = Closure CL.Closure | Primitive Word
 
 instance Show BitmapPayload where
@@ -257,9 +270,41 @@ data StackFrame =
   StopFrame |
   RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
   RetBig { payload :: [BitmapPayload] } |
-  RetFun |
+  RetFun { retFunType :: RetFunType, size :: Word, fun :: CL.Closure, payload :: [CL.Closure]} |
   RetBCO
   deriving (Show)
+
+data RetFunType =
+      ARG_GEN     |
+      ARG_GEN_BIG |
+      ARG_BCO     |
+      ARG_NONE    |
+      ARG_N       |
+      ARG_P       |
+      ARG_F       |
+      ARG_D       |
+      ARG_L       |
+      ARG_V16     |
+      ARG_V32     |
+      ARG_V64     |
+      ARG_NN      |
+      ARG_NP      |
+      ARG_PN      |
+      ARG_PP      |
+      ARG_NNN     |
+      ARG_NNP     |
+      ARG_NPN     |
+      ARG_NPP     |
+      ARG_PNN     |
+      ARG_PNP     |
+      ARG_PPN     |
+      ARG_PPP     |
+      ARG_PPPP    |
+      ARG_PPPPP   |
+      ARG_PPPPPP  |
+      ARG_PPPPPPP |
+      ARG_PPPPPPPP
+      deriving (Show, Eq, Enum)
 
 #if defined(DEBUG)
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()

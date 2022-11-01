@@ -99,6 +99,18 @@ getSmallBitmapzh(P_ stack, W_ index) {
   return (bitmap, size, specialType);
 }
 
+getRetFunSmallBitmapzh(P_ stack, W_ index) {
+  P_ c;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ bitmap, size, specialType;
+  (bitmap) = ccall getRetFunBitmapWord(c);
+  (size) = ccall getRetFunBitmapSize(c);
+
+  return (bitmap, size);
+}
+
 getLargeBitmapzh(P_ stack, W_ index){
   P_ c, stgArrBytes;
   W_ size;
@@ -109,6 +121,18 @@ getLargeBitmapzh(P_ stack, W_ index){
   (size) = ccall getLargeBitmapSize(c);
 
   // ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
+
+  return (stgArrBytes, size);
+}
+
+getRetFunLargeBitmapzh(P_ stack, W_ index){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getRetFunLargeBitmaps(MyCapability(), c);
+  (size) = ccall getRetFunSize(c);
 
   return (stgArrBytes, size);
 }
@@ -166,4 +190,14 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ index){
   (next_chunk) = ccall getUnderflowFrameNextChunk(closurePtr);
   ASSERT(LOOKS_LIKE_CLOURE_PTR(next_chunk));
   return (next_chunk);
+}
+
+getRetFunTypezh(P_ stack, W_ index){
+  P_ c;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ type;
+  (type) = ccall getRetFunType(c);
+  return (type);
 }

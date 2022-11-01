@@ -484,6 +484,10 @@ wanteds os = concat
           ,closureField C "StgCatchFrame" "handler"
           ,closureField C "StgCatchFrame" "exceptions_blocked"
 
+          ,closureField C "StgRetFun" "size"
+          ,closureField C "StgRetFun" "fun"
+          ,closureField C "StgRetFun" "payload"
+
           ,closureSize       C "StgPAP"
           ,closureField      C "StgPAP" "n_args"
           ,closureFieldGcptr C "StgPAP" "fun"
