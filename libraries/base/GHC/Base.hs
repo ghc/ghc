@@ -599,6 +599,15 @@ class Functor f where
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
     --
+    -- ==== __Examples__
+    --
+    -- Perform a computation with 'Maybe' and replace the result with a
+    -- constant value if it is 'Just':
+    --
+    -- >>> 'a' <$ Just 2
+    -- Just 'a'
+    -- >>> 'a' <$ Nothing
+    -- Nothing
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
