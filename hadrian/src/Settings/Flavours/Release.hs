@@ -11,4 +11,5 @@ releaseJsFlavour = disableDynamicLibs
                    . disableDynamicGhcPrograms
                    . disableProfiledLibs
                    . enableO2Stage0
+                   . useNativeBignum
                    $ performanceFlavour { name = "release-js" }

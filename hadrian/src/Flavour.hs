@@ -16,6 +16,8 @@ module Flavour
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
+  , useNativeBignum
+  , omitPragmas
 
   , completeSetting
   , applySettings
@@ -51,6 +53,7 @@ flavourTransformers = M.fromList
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
     , "no_dynamic_libs"  =: disableDynamicLibs
+    , "native_bignum"    =: useNativeBignum
     , "no_profiled_libs" =: disableProfiledLibs
     , "omit_pragmas"     =: omitPragmas
     , "ipe"              =: enableIPE
@@ -253,6 +256,11 @@ disableProfiledLibs flavour =
   where
     prune :: Ways -> Ways
     prune = fmap $ Set.filter (not . wayUnit Profiling)
+
+useNativeBignum :: Flavour -> Flavour
+useNativeBignum flavour =
+  flavour { bignumBackend = "native"
+          }
 
 -- | Build stage2 compiler with -fomit-interface-pragmas to reduce
 -- recompilation.
