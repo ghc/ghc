@@ -597,7 +597,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- For some reason we don't have a location for the equation
          -- itself, so we make do with the location of family name
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (nn2la $ getLoc fam_lname) eqn)
+                                        (L (l2l $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
@@ -2322,7 +2322,7 @@ Note that
 
 tcSpecInstPrags :: DFunId -> InstBindings GhcRn
                 -> TcM ([LTcSpecPrag], TcPragEnv)
-tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
+tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags ::[LSig GhcRn]})
   = do { spec_inst_prags <- mapM (wrapLocAM (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods

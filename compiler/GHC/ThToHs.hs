@@ -140,7 +140,7 @@ getL = CvtM (\_ loc -> Right (loc,loc))
 setL :: SrcSpan -> CvtM ()
 setL loc = CvtM (\_ _ -> Right (loc, ()))
 
-returnLA :: (Monoid ann) => e -> CvtM (GenLocated (EpAnnS  ann) e)
+returnLA :: (Monoid ann) => e -> CvtM (LocatedAnS  ann e)
 returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnLL :: e -> CvtM (LocatedAn ann e)
@@ -1141,7 +1141,7 @@ which we don't want.
 -}
 
 cvtFld :: (RdrName -> CvtM t) -> (TH.Name, TH.Exp)
-       -> CvtM (LHsFieldBind GhcPs (GenLocated (EpAnnS NoEpAnns) t) (LHsExpr GhcPs))
+       -> CvtM (LHsFieldBind GhcPs (LocatedAnS NoEpAnns t) (LHsExpr GhcPs))
 cvtFld f (v,e)
   = do  { v' <- vNameL v
         ; lhs' <- traverse f v'

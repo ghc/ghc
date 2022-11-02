@@ -1013,11 +1013,11 @@ tcInferOverLit lit@(OverLit { ol_val = val
                                                            (1, []) from_ty
 
        ; co <- unifyType mb_thing (hsLitType hs_lit) (scaledThing sarg_ty)
-       ; let lit_expr = L (nn2la loc) $ mkHsWrapCo co $
+       ; let lit_expr = L (l2l loc) $ mkHsWrapCo co $
                         HsLit noAnn hs_lit
              from_expr = mkHsWrap (wrap2 <.> wrap1) $
                          HsVar noExtField (L loc from_id)
-             witness = HsApp noAnn (L (nn2la loc) from_expr) lit_expr
+             witness = HsApp noAnn (L (l2l loc) from_expr) lit_expr
              lit' = lit { ol_ext = OverLitTc { ol_rebindable = rebindable
                                              , ol_witness = witness
                                              , ol_type = res_ty } }

@@ -63,7 +63,7 @@ module GHC.Tc.Utils.Monad(
   -- * Error management
   getSrcSpanM, setSrcSpan, setSrcSpanA, setSrcSpanI, setSrcSpanN, addLocM, addLocMA, addLocMN,
   inGeneratedCode,
-  wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
+  wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocFstMI, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_, wrapLocMA, wrapLocMI,
   getErrsVar, setErrsVar,
   addErr,
@@ -997,7 +997,7 @@ setSrcSpanN l = setSrcSpan (locN l)
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
-addLocMA :: (a -> TcM b) -> GenLocated (EpAnnS ann) a -> TcM b
+addLocMA :: (a -> TcM b) -> LocatedAnS ann a -> TcM b
 addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
 
 addLocMN :: (a -> TcM b) -> LocatedN a -> TcM b
@@ -1007,10 +1007,10 @@ wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
 
-wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
-wrapLocAM fn a = wrapLocM fn (reLocI a)
+wrapLocAM :: (a -> TcM b) -> LocatedAnS ann a -> TcM (Located b)
+wrapLocAM fn a = wrapLocM fn (reLoc a)
 
-wrapLocMA :: (a -> TcM b) -> GenLocated (EpAnnS ann) a -> TcRn (GenLocated (EpAnnS ann) b)
+wrapLocMA :: (a -> TcM b) -> LocatedAnS ann a -> TcRn (LocatedAnS ann b)
 wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
                                               ; return (L loc b) }
 
@@ -1029,9 +1029,15 @@ wrapLocFstM fn (L loc a) =
 --    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedN    a -> TcM (LocatedN    b, c)
 --    wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAn t a -> TcM (LocatedAn t b, c)
 -- and so on.
-wrapLocFstMA :: (a -> TcM (b,c)) -> GenLocated (EpAnnS ann) a -> TcM (GenLocated (EpAnnS ann) b, c)
+wrapLocFstMA :: (a -> TcM (b,c)) -> LocatedAnS ann a -> TcM (LocatedAnS ann b, c)
 wrapLocFstMA fn (L loc a) =
   setSrcSpanA loc $ do
+    (b,c) <- fn a
+    return (L loc b, c)
+
+wrapLocFstMI :: (a -> TcM (b,c)) -> GenLocated (SrcAnn ann) a -> TcM (GenLocated (SrcAnn ann) b, c)
+wrapLocFstMI fn (L loc a) =
+  setSrcSpanI loc $ do
     (b,c) <- fn a
     return (L loc b, c)
 
@@ -1046,7 +1052,7 @@ wrapLocSndM fn (L loc a) =
 --    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedN    a -> TcM (b, LocatedN    c)
 --    wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedAn t a -> TcM (b, LocatedAn t c)
 -- and so on.
-wrapLocSndMA :: (a -> TcM (b, c)) -> GenLocated (EpAnnS ann) a -> TcM (b, GenLocated (EpAnnS ann) c)
+wrapLocSndMA :: (a -> TcM (b, c)) -> LocatedAnS ann a -> TcM (b, LocatedAnS ann c)
 wrapLocSndMA fn (L loc a) =
   setSrcSpanA loc $ do
     (b,c) <- fn a

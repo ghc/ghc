@@ -277,7 +277,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              local_dm_ty = instantiateMethod clas global_dm_id (mkTyVarTys tyvars)
 
-             lm_bind     = dm_bind { fun_id = L (la2na bind_loc) local_dm_name }
+             lm_bind     = dm_bind { fun_id = L (l2l bind_loc) local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 
@@ -341,7 +341,7 @@ tcClassMinimalDef _clas sigs op_info
   where
     -- By default require all methods without a default implementation
     defMindef :: ClassMinimalDef
-    defMindef = mkAnd [ noLocA (mkVar name)
+    defMindef = mkAnd [ noLocI (mkVar name)
                       | (name, _, Nothing) <- op_info ]
 
 instantiateMethod :: Class -> TcId -> [TcType] -> TcType

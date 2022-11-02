@@ -1370,7 +1370,7 @@ desugarRecordUpd record_expr rbnds res_ty
              ds_expr = HsLet noExtField noHsTok let_binds noHsTok (L gen case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase noExtField record_expr (mkMatchGroup Generated (wrapGenSpan matches))
+             case_expr = HsCase noExtField record_expr (mkMatchGroup Generated (wrapGenSpanI matches))
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat relevant_cons
 
@@ -1521,7 +1521,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
                , hfbLHS
-                       = L (l2l loc) (Unambiguous i (L (l2ln loc) lbl))
+                       = L (l2l loc) (Unambiguous i (L (l2l loc) lbl))
                , hfbRHS = hfbRHS upd
                , hfbPun = hfbPun upd
                }

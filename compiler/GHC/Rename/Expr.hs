@@ -243,7 +243,7 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (L (la2na l) name), unitFV name) }
+      ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v = do
@@ -265,7 +265,7 @@ rnExpr (HsVar _ (L l v))
               -> rnExpr (ExplicitList noAnn [])
 
               | otherwise
-              -> finishHsVar (L (nn2la l) name) ;
+              -> finishHsVar (L (l2l l) name) ;
             Just (FieldGreName fl)
               -> do { let sel_name = flSelector fl
                     ; this_mod <- getModule
@@ -937,7 +937,7 @@ methodNamesGRHSs (GRHSs _ grhss _) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
 
-methodNamesGRHS :: LocatedAn NoEpAnns (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
+methodNamesGRHS :: LocatedAnS NoEpAnns (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
 methodNamesGRHS (L _ (GRHS _ _ rhs)) = methodNamesLCmd rhs
 
 ---------------------------------------------------
@@ -1092,7 +1092,7 @@ rnStmtsWithFreeVars ctxt _ [] thing_inside
 rnStmtsWithFreeVars mDoExpr@(HsDoStmt MDoExpr{}) rnBody stmts thing_inside    -- Deal with mdo
   = -- Behave like do { rec { ...all but last... }; last }
     do { ((stmts1, (stmts2, thing)), fvs)
-           <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocA all_but_last)) $ \ _ ->
+           <- rnStmt mDoExpr rnBody (noLocA $ mkRecStmt noAnn (noLocI all_but_last)) $ \ _ ->
               do { last_stmt' <- checkLastStmt mDoExpr last_stmt
                  ; rnStmt mDoExpr rnBody last_stmt' thing_inside }
         ; return (((stmts1 ++ stmts2), thing), fvs) }
@@ -1603,7 +1603,7 @@ segmentRecStmts loc ctxt empty_rec_stmt segs (fvs_later, might_be_more_fvs_later
 
   | otherwise
   = ([ L (noAnnSrcSpan loc) $
-       empty_rec_stmt { recS_stmts = noLocA ss
+       empty_rec_stmt { recS_stmts = noLocI ss
                       , recS_later_ids = nameSetElemsStable final_fvs_later
                       , recS_rec_ids   = nameSetElemsStable
                                            (defs `intersectNameSet` uses) }]
@@ -1766,7 +1766,7 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
     new_stmt | non_rec   = head ss
              | otherwise = L (getLoc (head ss)) rec_stmt
-    rec_stmt = empty_rec_stmt { recS_stmts     = noLocA ss
+    rec_stmt = empty_rec_stmt { recS_stmts     = noLocI ss
                               , recS_later_ids = nameSetElemsStable used_later
                               , recS_rec_ids   = nameSetElemsStable fwds }
           -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]

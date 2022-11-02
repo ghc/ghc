@@ -34,6 +34,7 @@ module GHC.Parser.Annotation (
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
   SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnN,
   SrcSpanAnn'(..), SrcAnn,
+  LocatedAnS,
 
   -- ** Annotation data types used in 'GenLocated'
 
@@ -86,7 +87,8 @@ module GHC.Parser.Annotation (
   noAnnSrcSpan, noAnnSrcSpanN, noAnnSrcSpanI,
 
   -- ** Working with comments in annotations
-  noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
+  noComments, comment, addCommentsToSrcAnn,
+  setCommentsSrcAnn, setCommentsEpAnnS,
   addCommentsToEpAnnS,
   addCommentsToEpAnn, setCommentsEpAnn,
   transferAnnsA, commentsOnlyA, commentsOnlyI,
@@ -625,6 +627,8 @@ type SrcSpanAnnC = SrcAnn AnnContext
 -- parameterised annotation type.
 type LocatedAn an = GenLocated (SrcAnn an)
 
+type LocatedAnS an = GenLocated (EpAnnS an)
+
 {-
 Note [XRec and Anno in the AST]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -895,10 +899,10 @@ knowing that in most cases the original list is empty.
 l2n :: LocatedAn a1 a2 -> LocatedN a2
 l2n (L la a) = L (noAnnSrcSpanN (locI la)) a
 
-n2l :: GenLocated (EpAnnS ann1) a -> LocatedAn ann a
+n2l :: LocatedAnS ann1 a -> LocatedAn ann a
 n2l (L la a) = L (nn2la la) a
 
-la2la :: (Monoid ann) => GenLocated (EpAnnS ann1) a -> GenLocated (EpAnnS ann) a
+la2la :: (Monoid ann) => LocatedAnS ann1 a -> LocatedAnS ann a
 la2la (L (EpAnnS anc _ cs) a) = L (EpAnnS anc mempty cs) a
 
 -- |Helper function (temporary) during transition of names
@@ -946,7 +950,7 @@ locN a = RealSrcSpan $ anchor $ s_entry a
 locA :: EpAnnS ann -> SrcSpan
 locA a = RealSrcSpan $ anchor $ s_entry a
 
-reLoc :: GenLocated (EpAnnS ann) e -> Located e
+reLoc :: LocatedAnS ann e -> Located e
 reLoc (L la a) = L (RealSrcSpan $ anchor $ s_entry la ) a
 
 reLocI :: LocatedAn a e -> Located e
@@ -955,7 +959,7 @@ reLocI (L (SrcSpanAnn _ l) a) = L l a
 reLocE :: Located e -> LocatedAn ann e
 reLocE (L l a) = (L (SrcSpanAnn EpAnnNotUsed l) a)
 
-reLocA :: (Monoid ann) => Located e -> GenLocated (EpAnnS ann) e
+reLocA :: (Monoid ann) => Located e -> LocatedAnS ann e
 reLocA (L l a) = (L (noAnnSrcSpan l) a)
 
 reLocL :: LocatedN e -> LocatedA e
@@ -1004,14 +1008,14 @@ noLocI :: a -> LocatedAn an a
 noLocI = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
 
 -- noLocA :: a -> LocatedA a
-noLocA :: (Monoid ann) => a -> GenLocated (EpAnnS ann) a
+noLocA :: (Monoid ann) => a -> LocatedAnS ann a
 noLocA = L (EpAnnS (spanAsAnchor noSrcSpan) mempty emptyComments)
 
 -- AZ:TODO merge getLocN and getLocA
-getLocA :: GenLocated (EpAnnS a) e -> SrcSpan
+getLocA :: LocatedAnS a e -> SrcSpan
 getLocA (L (EpAnnS anc _ _) _) = RealSrcSpan $ anchor anc
 
-getLocN :: GenLocated (EpAnnS an) a -> SrcSpan
+getLocN :: LocatedAnS an a -> SrcSpan
 getLocN (L l _) = locN l
 
 noLocN :: a -> LocatedN a
@@ -1102,13 +1106,13 @@ epAnnComments EpAnnNotUsed = EpaComments []
 epAnnComments (EpAnn _ _ cs) = cs
 
 -- ---------------------------------------------------------------------
-sortLocatedA :: [GenLocated (EpAnnS a) e] -> [GenLocated (EpAnnS a) e]
+sortLocatedA :: [LocatedAnS a e] -> [LocatedAnS a e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
 
 sortLocatedI :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedI = sortBy (leftmost_smallest `on` getLocI)
 
-mapLocA :: (Monoid ann) => (a -> b) -> GenLocated SrcSpan a -> GenLocated (EpAnnS ann) b
+mapLocA :: (Monoid ann) => (a -> b) -> GenLocated SrcSpan a -> LocatedAnS ann b
 mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 mapLocI :: (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
@@ -1116,7 +1120,7 @@ mapLocI f (L l a) = L (noAnnSrcSpanI l) (f a)
 
 -- AZ:TODO: move this somewhere sane
 
-combineLocsA :: Semigroup a => GenLocated (EpAnnS a) e1 -> GenLocated (EpAnnS a) e2 -> EpAnnS a
+combineLocsA :: Semigroup a => LocatedAnS a e1 -> LocatedAnS a e2 -> EpAnnS a
 combineLocsA (L a _) (L b _) = combineSrcSpansA a b
 
 combineLocsI :: Semigroup a => GenLocated (SrcAnn a) e1 -> GenLocated (SrcAnn a) e2 -> SrcAnn a
@@ -1136,14 +1140,14 @@ combineSrcSpansI (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
 
 -- | Combine locations from two 'Located' things and add them to a third thing
 addCLocA :: (Monoid ann)
-  => GenLocated (EpAnnS a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (EpAnnS ann) e3
+  => LocatedAnS a e1 -> GenLocated SrcSpan e2 -> e3 -> LocatedAnS ann e3
 addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
 
 -- | Combine locations from two 'Located' things and add them to a third thing
 addCLocI :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcAnn ann) e3
 addCLocI a b c = L (noAnnSrcSpanI $ combineSrcSpans (locI $ getLoc a) (getLoc b)) c
 
-addCLocAA :: GenLocated (EpAnnS a1) e1 -> GenLocated (EpAnnS a2) e2 -> e3 -> GenLocated (EpAnnS AnnListItem) e3
+addCLocAA :: LocatedAnS a1 e1 -> LocatedAnS a2 e2 -> e3 -> LocatedAnS AnnListItem e3
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
 
 addCLocII :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3 -> GenLocated (SrcAnn ann) e3
@@ -1208,6 +1212,12 @@ setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
   = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
   = SrcSpanAnn (EpAnn a an cs) loc
+
+-- | Replace any existing comments on a 'SrcAnn', used for manipulating the
+-- AST prior to exact printing the changed one.
+setCommentsEpAnnS :: EpAnnS ann -> EpAnnComments -> EpAnnS ann
+setCommentsEpAnnS (EpAnnS a an _) cs = (EpAnnS a an cs)
+
 
 -- | Add additional comments, used for manipulating the
 -- AST prior to exact printing the changed one.
@@ -1363,8 +1373,8 @@ instance Outputable EpAnnComments where
 instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
   getName (L l a) = getName (L (locI l) a)
 
-instance (NamedThing (Located a)) => NamedThing (LocatedN a) where
-  getName (L l a) = getName (L (locN l) a)
+instance (NamedThing (Located a)) => NamedThing (LocatedAnS an a) where
+  getName (L l a) = getName (L (locA l) a)
 
 instance Outputable AnnContext where
   ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
@@ -1398,7 +1408,7 @@ instance (Outputable a) => Outputable (EpAnnS a) where
   ppr (EpAnnS anc an cs) = text "EpAnnS" <+> ppr anc <+> ppr an <+> ppr cs
 
 instance (Outputable a, Outputable e)
-     => Outputable (GenLocated (EpAnnS a) e) where
+     => Outputable (LocatedAnS a e) where
   ppr = pprLocated
 
 instance (Outputable a, OutputableBndr e)
@@ -1407,7 +1417,7 @@ instance (Outputable a, OutputableBndr e)
   pprPrefixOcc = pprPrefixOcc . unLoc
 
 instance (Outputable a, OutputableBndr e)
-     => OutputableBndr (GenLocated (EpAnnS a) e) where
+     => OutputableBndr (LocatedAnS a e) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
 

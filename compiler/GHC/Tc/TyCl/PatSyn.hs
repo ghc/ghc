@@ -831,12 +831,12 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
-                    MG{ mg_alts = L (l2l $ getLoc lpat) cases
+                    MG{ mg_alts = L (nn2la $ getLoc lpat) cases
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty Generated
                       }
              body' = noLocA $
                      HsLam noExtField $
-                     MG{ mg_alts = noLocA [mkSimpleMatch LambdaExpr
+                     MG{ mg_alts = noLocI [mkSimpleMatch LambdaExpr
                                                          args body]
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty Generated
                        }
@@ -845,7 +845,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-             mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
+             mg = MG{ mg_alts = L (nn2la $ getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty Generated
                     }
              matcher_arity = length req_theta + 3
@@ -983,9 +983,9 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup Generated (noLocA [builder_match])
+    mk_mg body = mkMatchGroup Generated (noLocI [builder_match])
           where
-            builder_args  = [L (nn2la loc) (VarPat noExtField (L loc n))
+            builder_args  = [L (l2l loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body
@@ -1042,7 +1042,7 @@ tcPatToExpr name args pat = go pat
                     -> Either SDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; let con = L (nn2la loc) (HsVar noExtField lcon)
+           ; let con = L (l2l loc) (HsVar noExtField lcon)
            ; return (unLoc $ mkHsApps con exprs)
            }
 

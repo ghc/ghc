@@ -979,12 +979,12 @@ lookupLocatedOccRnConstr :: LocatedN RdrName
                          -> TcRn (LocatedN Name)
 lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
 
-lookupLocatedOccRnRecField :: GenLocated (EpAnnS ann) RdrName
-                           -> TcRn (GenLocated (EpAnnS ann) Name)
+lookupLocatedOccRnRecField :: LocatedAnS ann RdrName
+                           -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
 
-lookupLocatedOccRnNone :: GenLocated (EpAnnS ann) RdrName
-                       -> TcRn (GenLocated (EpAnnS ann) Name)
+lookupLocatedOccRnNone :: LocatedAnS ann RdrName
+                       -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)

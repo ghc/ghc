@@ -2168,6 +2168,21 @@ type instance Anno FastString                      = SrcAnn NoEpAnns
 
 type instance Anno (DotFieldOcc (GhcPass p))       = SrcAnn NoEpAnns
 
-instance (Anno a ~ SrcSpanAnn' (EpAnn an))
-   => WrapXRec (GhcPass p) a where
+-- instance (Anno a ~ SrcSpanAnn' (EpAnn an))
+--    => WrapXRec (GhcPass p) a where
+--   wrapXRec = noLocI
+
+-- instance WrapXRec (GhcPass idR) [LStmtLR (GhcPass idL) (GhcPass idR) body] where
+instance (Anno
+          [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)] ~ SrcAnn an,
+           IsPass idL, IsPass idR)
+  => WrapXRec (GhcPass idL) [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)]  where
   wrapXRec = noLocI
+  -- wrapXRec = undefined
+
+-- instance (Anno       [LocatedL (StmtLR (GhcPass idL) GhcPs bodyR)] ~ SrcSpanAnnL)
+--   => (WrapXRec GhcPs [LocatedL (StmtLR (GhcPass idL) GhcPs bodyR)]) where
+--   wrapXRec = noLocI
+
+instance WrapXRec (GhcPass p) (HsType (GhcPass p)) where
+  wrapXRec = noLocA

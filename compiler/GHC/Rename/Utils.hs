@@ -19,7 +19,7 @@ module GHC.Rename.Utils (
         checkUnusedRecordWildcard,
         mkFieldEnv,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
+        wrapGenSpan, wrapGenSpanI, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
@@ -664,7 +664,7 @@ checkCTupSize tup_size
 *                                                                      *
 ********************************************************************* -}
 
-wrapGenSpan :: (Monoid an) => a -> GenLocated (EpAnnS an) a
+wrapGenSpan :: (Monoid an) => a -> LocatedAnS an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x

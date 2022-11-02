@@ -434,7 +434,7 @@ mkRoleAnnotDecl loc tycon roles anns
     possible_roles = [(fsFromRole role, role) | role <- all_roles]
 
     parse_role :: GenLocated SrcSpan (Maybe FastString)
-                      -> P (GenLocated (EpAnnS NoEpAnns) (Maybe Role)) -- AZ temporary
+                      -> P (LocatedAnS NoEpAnns (Maybe Role)) -- AZ temporary
     parse_role (L loc_role Nothing) = return $ L (noAnnSrcSpan loc_role) Nothing
     parse_role (L loc_role (Just role))
       = case lookup role possible_roles of

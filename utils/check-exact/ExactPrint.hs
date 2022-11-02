@@ -1099,11 +1099,10 @@ markLensKwM (EpAnn anc a cs) l kw = do
 
 -- ---------------------------------------------------------------------
 
-markALocatedA :: (Monad m, Monoid w) => EpAnn AnnListItem -> EP w m (EpAnn AnnListItem)
-markALocatedA EpAnnNotUsed  = return EpAnnNotUsed
-markALocatedA (EpAnn anc a cs) = do
+markALocatedA :: (Monad m, Monoid w) => EpAnnS AnnListItem -> EP w m (EpAnnS AnnListItem)
+markALocatedA (EpAnnS anc a cs) = do
   t <- markTrailing (lann_trailing a)
-  return (EpAnn anc (a { lann_trailing = t }) cs)
+  return (EpAnnS anc (a { lann_trailing = t }) cs)
 
 markEpAnnL :: (Monad m, Monoid w)
   => EpAnn ann -> Lens ann [AddEpAnn] -> AnnKeywordId -> EP w m (EpAnn ann)
@@ -1341,15 +1340,23 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
-    ann' <- markALocatedA (ann la)
-    return (L (la { ann = ann'}) a')
+    la' <- markALocatedA la
+    return (L la' a')
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor la anc cs = setAnchorAnI la anc cs
+  exact (L la a) = do
+    a' <- markAnnotated a
+    return (L la a')
+
+instance (ExactPrint a) => ExactPrint (LocatedAnS NoEpAnns a) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor la anc cs = setAnchorAn la anc cs
   exact (L la a) = do
     a' <- markAnnotated a
     return (L la a')
+
 
 instance (ExactPrint a) => ExactPrint [a] where
   getAnnotationEntry = const NoEntryVal
@@ -1417,8 +1424,8 @@ instance ExactPrint ModuleName where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
 
   exact (L (SrcSpanAnn an l) (WarningTxt (L la src) ws)) = do
     an0 <- markAnnOpenP an src "{-# WARNING"
@@ -2059,8 +2066,8 @@ instance ExactPrint (TyFamInstDecl GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedP OverlapMode) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
 
   -- NOTE: NoOverlap is only used in the typechecker
   exact (L (SrcSpanAnn an l) (NoOverlap src)) = do
@@ -2377,8 +2384,8 @@ prepareListAnnotationF an ls = map (\b -> (realSrcSpan $ getLocA b, go b)) ls
       d' <- markAnnotated (DataFamInstDeclWithContext an NotTopLevel a)
       return (toDyn (L l (dc_d d')))
 
-prepareListAnnotationA :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
-  => [LocatedAn an a] -> [(RealSrcSpan,EP w m Dynamic)]
+prepareListAnnotationA :: (Monad m, Monoid w, ExactPrint (LocatedAnS an a))
+  => [LocatedAnS an a] -> [(RealSrcSpan,EP w m Dynamic)]
 prepareListAnnotationA ls = map (\b -> (realSrcSpan $ getLocA b,go b)) ls
   where
     go b = do
@@ -2935,7 +2942,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsUntypedBracket an (DecBrL a e)) = do
     an0 <- markEpAnnLMS an lidl AnnOpen (Just "[d|")
-    an1 <- markEpAnnL an lidl AnnOpenC
+    an1 <- markEpAnnL an0 lidl AnnOpenC
     e' <- markAnnotated e
     an2 <- markEpAnnL an1 lidl AnnCloseC
     an3 <- markEpAnnL an2 lidl AnnCloseQ -- "|]"
@@ -3008,7 +3015,7 @@ exactMdo an (Just module_name) kw = markEpAnnLMS an lal_rest kw (Just n)
 markMaybeDodgyStmts :: (Monad m, Monoid w, ExactPrint (LocatedAn an a))
   => EpAnn AnnList -> LocatedAn an a -> EP w m (EpAnn AnnList, LocatedAn an a)
 markMaybeDodgyStmts an stmts =
-  if isGoodSrcSpan (getLocA stmts)
+  if isGoodSrcSpan (getLocI stmts)
     then do
       r <- markAnnotatedWithLayout stmts
       return (an, r)
@@ -3063,7 +3070,7 @@ instance ExactPrint (MatchGroup GhcPs (LocatedA (HsExpr GhcPs))) where
   setAnnotationAnchor a _ _ = a
   exact (MG x matches) = do
     -- TODO:AZ use SortKey, in MG ann.
-    matches' <- if isGoodSrcSpan (getLocA matches)
+    matches' <- if isGoodSrcSpan (getLocI matches)
       then markAnnotated matches
       else return matches
     return (MG x matches')
@@ -3073,7 +3080,7 @@ instance ExactPrint (MatchGroup GhcPs (LocatedA (HsCmd GhcPs))) where
   setAnnotationAnchor a _ _ = a
   exact (MG x matches) = do
     -- TODO:AZ use SortKey, in MG ann.
-    matches' <- if isGoodSrcSpan (getLocA matches)
+    matches' <- if isGoodSrcSpan (getLocI matches)
       then markAnnotated matches
       else return matches
     return (MG x matches')
@@ -3095,7 +3102,7 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint body)
-    => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (FieldOcc GhcPs)) body) where
+    => ExactPrint (HsFieldBind (LocatedAnS NoEpAnns (FieldOcc GhcPs)) body) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
   setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
@@ -3125,10 +3132,26 @@ instance (ExactPrint body)
       return (an0, arg')
     return (HsFieldBind an0 f' arg' isPun)
 
+-- Odd that we need this one too.
+instance (ExactPrint body)
+    => ExactPrint (HsFieldBind (LocatedAnS NoEpAnns (FieldLabelStrings GhcPs)) body) where
+  getAnnotationEntry x = fromAnn (hfbAnn x)
+  setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
+
+  exact (HsFieldBind an f arg isPun) = do
+    debugM $ "HsFieldBind FieldLabelStrings"
+    f' <- markAnnotated f
+    (an0, arg') <- if isPun then return (an, arg)
+             else do
+      an0 <- markEpAnnL an lidl AnnEqual
+      arg' <- markAnnotated arg
+      return (an0, arg')
+    return (HsFieldBind an0 f' arg' isPun)
+
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint (LocatedA body))
-    => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
+    => ExactPrint (HsFieldBind (LocatedAnS NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
   setAnnotationAnchor (HsFieldBind an f arg isPun) anc cs = (HsFieldBind (setAnchorEpa an anc cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
@@ -3142,11 +3165,14 @@ instance (ExactPrint (LocatedA body))
     return (HsFieldBind an0 f' arg' isPun)
 
 -- ---------------------------------------------------------------------
+
 instance
-    (ExactPrint (HsFieldBind (LocatedAn NoEpAnns (a GhcPs)) body),
+    (Typeable a, Typeable b, Typeable body,
+     ExactPrint (HsFieldBind (LocatedAnS NoEpAnns (a GhcPs)) body),
+     ExactPrint (HsFieldBind (LocatedAnS NoEpAnns (b GhcPs)) body),
      ExactPrint (HsFieldBind (LocatedAn NoEpAnns (b GhcPs)) body))
     => ExactPrint
-         (Either [LocatedA (HsFieldBind (LocatedAn NoEpAnns (a GhcPs)) body)]
+         (Either [LocatedA (HsFieldBind (LocatedAnS NoEpAnns (a GhcPs)) body)]
                  [LocatedA (HsFieldBind (LocatedAn NoEpAnns (b GhcPs)) body)]) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ = a
@@ -4009,7 +4035,7 @@ instance ExactPrint (DerivStrategy GhcPs) where
 
 instance (ExactPrint a) => ExactPrint (LocatedC a) where
   getAnnotationEntry (L sann _) = fromAnn sann
-  setAnnotationAnchor = setAnchorAn
+  setAnnotationAnchor = setAnchorAnI
 
   exact (L (SrcSpanAnn EpAnnNotUsed l) a) = do
     a' <- markAnnotated a
@@ -4052,7 +4078,7 @@ instance ExactPrint (HsSigType GhcPs) where
 
 instance ExactPrint (LocatedN RdrName) where
   getAnnotationEntry (L sann _) = fromAnn sann
-  setAnnotationAnchor = setAnchorAnN
+  setAnnotationAnchor = setAnchorAn
 
   exact (L (EpAnnS anc ann cs) n) = do
     ann' <-
@@ -4330,8 +4356,8 @@ instance (ExactPrint a) => ExactPrint (HsScaled GhcPs a) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedP CType) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
 
   exact x@(L (SrcSpanAnn EpAnnNotUsed _) ct) = withPpr ct >> return x
   exact (L (SrcSpanAnn an ll)
@@ -4370,8 +4396,8 @@ instance ExactPrint (SourceText, RuleName) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedL [LocatedA (IE GhcPs)]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
 
   exact (L (SrcSpanAnn an l) ies) = do
     debugM $ "LocatedL [LIE"
@@ -4383,8 +4409,8 @@ instance ExactPrint (LocatedL [LocatedA (IE GhcPs)]) where
 
 instance (ExactPrint (Match GhcPs (LocatedA body)))
    => ExactPrint (LocatedL [LocatedA (Match GhcPs (LocatedA body))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
   exact (L la a) = do
     let an = ann la
     debugM $ "LocatedL [LMatch"
@@ -4397,8 +4423,8 @@ instance (ExactPrint (Match GhcPs (LocatedA body)))
     return (L (la { ann = an3}) a')
 
 instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr GhcPs)))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
   exact (L (SrcSpanAnn an l) stmts) = do
     debugM $ "LocatedL [ExprLStmt"
     (an'', stmts') <- markAnnList True an $ do
@@ -4414,8 +4440,8 @@ instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr Gh
 
 -- instance ExactPrint (LocatedL [CmdLStmt GhcPs]) where
 instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd GhcPs)))]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
   exact (L (SrcSpanAnn ann l) es) = do
     debugM $ "LocatedL [CmdLStmt"
     an0 <- markLensMAA ann lal_open
@@ -4424,16 +4450,16 @@ instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsCmd Ghc
     return (L (SrcSpanAnn an1 l) es')
 
 instance ExactPrint (LocatedL [LocatedA (ConDeclField GhcPs)]) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
   exact (L (SrcSpanAnn an l) fs) = do
     debugM $ "LocatedL [LConDeclField"
     (an', fs') <- markAnnList True an (markAnnotated fs)
     return (L (SrcSpanAnn an' l) fs')
 
 instance ExactPrint (LocatedL (BF.BooleanFormula (LocatedN RdrName))) where
-  getAnnotationEntry = entryFromLocatedA
-  setAnnotationAnchor = setAnchorAn
+  getAnnotationEntry = entryFromLocatedI
+  setAnnotationAnchor = setAnchorAnI
   exact (L (SrcSpanAnn an l) bf) = do
     debugM $ "LocatedL [LBooleanFormula"
     (an', bf') <- markAnnList True an (markAnnotated bf)
@@ -4739,8 +4765,11 @@ exactConArgs (RecCon rpats) = do
 
 -- ---------------------------------------------------------------------
 
-entryFromLocatedA :: LocatedAn ann a -> Entry
+entryFromLocatedA :: LocatedAnS ann a -> Entry
 entryFromLocatedA (L la _) = fromAnn la
+
+entryFromLocatedI :: LocatedAn ann a -> Entry
+entryFromLocatedI (L la _) = fromAnn la
 
 -- =====================================================================
 -- Utility stuff

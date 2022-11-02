@@ -1450,7 +1450,7 @@ repMaybeLTy m = do
   k_ty <- wrapName kindTyConName
   repMaybeT k_ty repLTy m
 
-repRole :: LocatedAn NoEpAnns (Maybe Role) -> MetaM (Core TH.Role)
+repRole :: LocatedAnS NoEpAnns (Maybe Role) -> MetaM (Core TH.Role)
 repRole (L _ (Just Nominal))          = rep2_nw nominalRName []
 repRole (L _ (Just Representational)) = rep2_nw representationalRName []
 repRole (L _ (Just Phantom))          = rep2_nw phantomRName []

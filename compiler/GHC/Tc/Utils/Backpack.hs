@@ -611,7 +611,7 @@ mergeSignatures
                       -- a signature package (i.e., does not expose any
                       -- modules.)  If so, we can thin it.
                       | isFromSignaturePackage
-                      -> setSrcSpanA loc $ do
+                      -> setSrcSpanI loc $ do
                         -- Suppress missing errors; they might be used to refer
                         -- to entities from other signatures we are merging in.
                         -- If an identifier truly doesn't exist in any of the
@@ -665,7 +665,7 @@ mergeSignatures
                                             is_mod  = mod_name,
                                             is_as   = mod_name,
                                             is_qual = False,
-                                            is_dloc = locA loc
+                                            is_dloc = locI loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
                             setGblEnv tcg_env {

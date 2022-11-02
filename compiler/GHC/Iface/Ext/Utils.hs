@@ -537,7 +537,7 @@ mkScope _ = NoScope
 mkLScope :: Located a -> Scope
 mkLScope = mkScope . getLoc
 
-mkLScopeA :: GenLocated (EpAnnS a) e -> Scope
+mkLScopeA :: LocatedAnS a e -> Scope
 mkLScopeA = mkScope . locA . getLoc
 
 mkLScopeI :: GenLocated (SrcAnn a) e -> Scope

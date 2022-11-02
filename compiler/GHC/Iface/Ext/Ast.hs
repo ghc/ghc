@@ -401,9 +401,6 @@ processGrp grp = concatM
 getRealSpanA :: EpAnnS ann -> Maybe Span
 getRealSpanA la = getRealSpan (locA la)
 
-getRealSpanI :: SrcSpanAnn' ann -> Maybe Span
-getRealSpanI la = getRealSpan (locI la)
-
 getRealSpan :: SrcSpan -> Maybe Span
 getRealSpan (RealSrcSpan sp) = Just sp
 getRealSpan _ = Nothing
@@ -1093,7 +1090,7 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
 instance ( ToHie (LocatedA (body (GhcPass p)))
          , HiePass p
          , AnnoBody p body
-         ) => ToHie (GenLocated (EpAnnS NoEpAnns) (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))) where
+         ) => ToHie (LocatedAnS NoEpAnns (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span g) = concatM $ makeNodeA g span : case g of
     GRHS _ guards body ->
       [ toHie $ listScopes (mkLScopeA body) guards
@@ -1374,14 +1371,14 @@ instance ( ToHie (RFContext label)
       , toHie expr
       ]
 
-instance HiePass p => ToHie (RFContext (GenLocated (EpAnnS NoEpAnns) (FieldOcc (GhcPass p)))) where
+instance HiePass p => ToHie (RFContext (LocatedAnS NoEpAnns (FieldOcc (GhcPass p)))) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
     FieldOcc fld _ ->
       case hiePass @p of
         HieRn -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
         HieTc -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
 
-instance HiePass p => ToHie (RFContext (GenLocated (EpAnnS NoEpAnns) (AmbiguousFieldOcc (GhcPass p)))) where
+instance HiePass p => ToHie (RFContext (LocatedAnS NoEpAnns (AmbiguousFieldOcc (GhcPass p)))) where
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
     Unambiguous fld _ ->
       case hiePass @p of
@@ -1411,7 +1408,7 @@ instance ToHie (HsConDeclGADTDetails GhcRn) where
   toHie (PrefixConGADT args) = toHie args
   toHie (RecConGADT rec _) = toHie rec
 
-instance HiePass p => ToHie (GenLocated (EpAnnS NoEpAnns) (HsCmdTop (GhcPass p))) where
+instance HiePass p => ToHie (LocatedAnS NoEpAnns (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNodeA top span : case top of
     HsCmdTop _ cmd ->
       [ toHie cmd

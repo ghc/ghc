@@ -326,16 +326,16 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
-setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
-setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
+setAnchorAnI :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAnI (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
   = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
+setAnchorAnI (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorAnN :: LocatedN a -> Anchor -> EpAnnComments -> LocatedN a
-setAnchorAnN (L (EpAnnS _ an _) a) anc cs = (L (EpAnnS anc an cs) a)
+setAnchorAn :: LocatedAnS an a -> Anchor -> EpAnnComments -> LocatedAnS an a
+setAnchorAn (L (EpAnnS _ an _) a) anc cs = (L (EpAnnS anc an cs) a)
 
 setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
 setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
@@ -354,7 +354,7 @@ setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn =
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
 moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
-moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
+moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpanI l
 moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc mempty cs) l
 
 -- ---------------------------------------------------------------------

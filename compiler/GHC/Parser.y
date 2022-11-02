@@ -4001,7 +4001,7 @@ comb2 :: Located a -> Located b -> SrcSpan
 comb2 a b = a `seq` b `seq` combineLocs a b
 
 -- Utilities for combining source spans
-comb2A :: (Monoid t) => Located a -> GenLocated (EpAnnS t) b -> SrcSpan
+comb2A :: (Monoid t) => Located a -> LocatedAnS t b -> SrcSpan
 comb2A a b = a `seq` b `seq` combineLocs a (reLoc b)
 
 comb2N :: Located a -> LocatedN b -> SrcSpan
@@ -4046,7 +4046,7 @@ sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1A #-}
 -- sL1A :: LocatedAn t a -> b -> Located b
-sL1A :: GenLocated (EpAnnS t) a -> b -> Located b
+sL1A :: LocatedAnS t a -> b -> Located b
 sL1A x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1N #-}
@@ -4055,7 +4055,7 @@ sL1N x = sL (getLocN x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1a #-}
 -- sL1a :: Located a -> b -> LocatedAn t b
-sL1a :: (Monoid t) => Located a -> b -> GenLocated (EpAnnS t) b
+sL1a :: (Monoid t) => Located a -> b -> LocatedAnS t b
 sL1a x = sL (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1i #-}
@@ -4081,7 +4081,7 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLa #-}
 -- sLLa :: Located a -> Located b -> c -> LocatedAn t c
-sLLa :: (Monoid t) => Located a -> Located b -> c -> GenLocated (EpAnnS t) c
+sLLa :: (Monoid t) => Located a -> Located b -> c -> LocatedAnS t c
 sLLa x y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLi #-}
@@ -4090,11 +4090,11 @@ sLLi x y = sL (noAnnSrcSpanI $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLlA #-}
 -- sLLlA :: Located a -> LocatedAn t b -> c -> Located c
-sLLlA :: (Monoid t) => Located a -> GenLocated (EpAnnS t) b -> c -> Located c
+sLLlA :: (Monoid t) => Located a -> LocatedAnS t b -> c -> Located c
 sLLlA x y = sL (comb2A x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLAl #-}
-sLLAl :: (Monoid t) => GenLocated (EpAnnS t) a -> Located b -> c -> Located c
+sLLAl :: (Monoid t) => LocatedAnS t a -> Located b -> c -> Located c
 sLLAl x y = sL (comb2 y (reLoc x)) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLIl #-}
@@ -4102,7 +4102,7 @@ sLLIl :: LocatedAn t a -> Located b -> c -> Located c
 sLLIl x y = sL (comb2 y (reLocI x)) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLAsl #-}
-sLLAsl :: (Monoid t) => [GenLocated (EpAnnS t) a] -> Located b -> c -> Located c
+sLLAsl :: (Monoid t) => [LocatedAnS t a] -> Located b -> c -> Located c
 sLLAsl [] = sL1
 sLLAsl (x:_) = sLLAl x
 
@@ -4265,7 +4265,7 @@ toUnicode t = if isUnicode t then UnicodeSyntax else NormalSyntax
 gl :: GenLocated l a -> l
 gl = getLoc
 
-glA :: GenLocated (EpAnnS t) a -> SrcSpan
+glA :: LocatedAnS t a -> SrcSpan
 glA = getLocA
 
 glI :: LocatedAn t a -> SrcSpan
@@ -4283,7 +4283,7 @@ glAA = EpaSpan <$> realSrcSpan . getLoc
 glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan . getLoc
 
-glAR :: GenLocated (EpAnnS t) a -> Anchor
+glAR :: LocatedAnS t a -> Anchor
 glAR la = Anchor (realSrcSpan $ getLocA la) UnchangedAnchor
 
 glIR :: LocatedAn t a -> Anchor
@@ -4318,14 +4318,14 @@ acsFinal a = do
   return (a (cs Semi.<> csf Semi.<> ce))
 
 -- acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
-acsa :: (Monoid t, MonadP m) => (EpAnnComments -> GenLocated (EpAnnS t) a) -> m (GenLocated (EpAnnS t) a)
+acsa :: (Monoid t, MonadP m) => (EpAnnComments -> LocatedAnS t a) -> m (LocatedAnS t a)
 acsa a = do
   let (L l _) = a emptyComments
   cs <- getCommentsFor (locA l)
   return (a cs)
 
 -- acsA :: MonadP m => (EpAnnComments -> Located a) -> m (LocatedAn t a)
-acsA :: (Monoid t, MonadP m) => (EpAnnComments -> Located a) -> m (GenLocated (EpAnnS t) a)
+acsA :: (Monoid t, MonadP m) => (EpAnnComments -> Located a) -> m (LocatedAnS t a)
 acsA a = reLocA <$> acs a
 
 acsI :: MonadP m => (EpAnnComments -> Located a) -> m (LocatedAn t a)
@@ -4386,7 +4386,7 @@ mos,mcs :: Located Token -> AddEpAnn
 mos ll = mj AnnOpenS ll
 mcs ll = mj AnnCloseS ll
 
-pvA :: (Monoid t) => MonadP m => m (Located a) -> m (GenLocated (EpAnnS t) a)
+pvA :: (Monoid t) => MonadP m => m (Located a) -> m (LocatedAnS t a)
 pvA a = do { av <- a
            ; return (reLocA av) }
 
@@ -4423,7 +4423,7 @@ commentsI loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
 -- between top level declarations.
-commentsPA :: (Monoid ann) => GenLocated (EpAnnS ann) a -> P (GenLocated (EpAnnS ann) a)
+commentsPA :: (Monoid ann) => LocatedAnS ann a -> P (LocatedAnS ann a)
 commentsPA la@(L l a) = do
   cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToEpAnnS l cs) a)
@@ -4437,7 +4437,7 @@ hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locI ll)) Nothing Nothing [AddEpAnn kw (EpaSpan $ rs l)] []
 
 -- listAsAnchor :: [LocatedAn t a] -> Anchor
-listAsAnchor :: [GenLocated (EpAnnS t) a] -> Anchor
+listAsAnchor :: [LocatedAnS t a] -> Anchor
 listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 

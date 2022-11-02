@@ -286,7 +286,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                                      ++ import_decls))
         ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclImportList = Just (Exactly, noLocA [])}}
+                  { ideclImportList = Just (Exactly, noLocI [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
                   ++ withReason "is directly imported" import_decls
@@ -2514,7 +2514,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLocA (mkLastStmt ret_expr)]
 
       ; return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLocA (HsDo io_ret_ty GhciStmtCtxt (noLocA stmts)))
+                     noLocA (HsDo io_ret_ty GhciStmtCtxt (noLocI stmts)))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
