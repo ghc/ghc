@@ -33,8 +33,6 @@ import GHC.StgToJS.Object
 import GHC.Unit.Types
 import GHC.Utils.Outputable (hsep,Outputable(..),text,ppr)
 
-import Control.Monad
-
 import Data.Map.Strict      (Map)
 import qualified Data.Map.Strict as M
 import Data.Set             (Set)
@@ -50,20 +48,11 @@ import Prelude
 --------------------------------------------------------------------------------
 
 data JSLinkConfig = JSLinkConfig
-  { lcNativeExecutables  :: Bool
-  , lcNativeToo          :: Bool
-  , lcBuildRunner        :: Bool
-  , lcNoJSExecutables    :: Bool
+  { lcNoJSExecutables    :: Bool
   , lcNoHsMain           :: Bool
-  , lcStripProgram       :: Maybe FilePath
-  , lcLogCommandLine     :: Maybe FilePath
-  , lcGhc                :: Maybe FilePath
   , lcOnlyOut            :: Bool
   , lcNoRts              :: Bool
   , lcNoStats            :: Bool
-  , lcLinkJsLib          :: Maybe String
-  , lcJsLibOutputDir     :: Maybe FilePath
-  , lcJsLibSrcs          :: [FilePath]
   }
 
 -- | we generate a runnable all.js only if we link a complete application,
@@ -73,20 +62,11 @@ generateAllJs s = not (lcOnlyOut s) && not (lcNoRts s)
 
 instance Monoid JSLinkConfig where
   mempty = JSLinkConfig
-            { lcNativeExecutables  = False
-            , lcNativeToo          = False
-            , lcBuildRunner        = False
-            , lcNoJSExecutables    = False
+            { lcNoJSExecutables    = False
             , lcNoHsMain           = False
-            , lcStripProgram       = Nothing
-            , lcLogCommandLine     = Nothing
-            , lcGhc                = Nothing
             , lcOnlyOut            = False
             , lcNoRts              = False
             , lcNoStats            = False
-            , lcLinkJsLib          = Nothing
-            , lcJsLibOutputDir     = Nothing
-            , lcJsLibSrcs          = mempty
             }
 
 instance Semigroup JSLinkConfig where
@@ -94,20 +74,11 @@ instance Semigroup JSLinkConfig where
     let comb :: (a -> a -> a) -> (JSLinkConfig -> a) -> a
         comb f a = f (a c1) (a c2)
     in JSLinkConfig
-            { lcNativeExecutables  = comb (||) lcNativeExecutables
-            , lcNativeToo          = comb (||) lcNativeToo
-            , lcBuildRunner        = comb (||) lcBuildRunner
-            , lcNoJSExecutables    = comb (||) lcNoJSExecutables
+            { lcNoJSExecutables    = comb (||) lcNoJSExecutables
             , lcNoHsMain           = comb (||) lcNoHsMain
-            , lcStripProgram       = comb mplus lcStripProgram
-            , lcLogCommandLine     = comb mplus lcLogCommandLine
-            , lcGhc                = comb mplus lcGhc
             , lcOnlyOut            = comb (||) lcOnlyOut
             , lcNoRts              = comb (||) lcNoRts
             , lcNoStats            = comb (||) lcNoStats
-            , lcLinkJsLib          = comb (<>) lcLinkJsLib
-            , lcJsLibOutputDir     = comb (<>) lcJsLibOutputDir
-            , lcJsLibSrcs          = comb (<>) lcJsLibSrcs
             }
 
 --------------------------------------------------------------------------------
