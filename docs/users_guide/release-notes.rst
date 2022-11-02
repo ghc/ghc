@@ -8,3 +8,4 @@ Release notes
    9.2.2-notes
    9.2.3-notes
    9.2.4-notes
+   9.2.5-notes

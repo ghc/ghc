@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.4.0 *Nov 2022*
+
+  * Shipped with GHC 9.2.5
+
+  * Fix races in IOManager (setNumCapabilities,closeFdWith) (#21651)
+
+  * winio: do not re-translate input when handle is uncooked
+
 ## 4.16.3.0 *May 2022*
 
   * Shipped with GHC 9.2.4
