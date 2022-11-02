@@ -78,7 +78,6 @@ import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
 import GHC.Rename.Names
-import GHC.SysTools.Cpp
 import GHC.StgToJS.Linker.Linker (embedJsFile)
 
 import Language.Haskell.Syntax.Module.Name
