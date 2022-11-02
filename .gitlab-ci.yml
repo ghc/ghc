@@ -347,7 +347,10 @@ hlint-ghc-and-base:
 
 hadrian-ghc-in-ghci:
   stage: quick-build
-  needs: [lint-linters, lint-submods]
+  needs:
+    - job: lint-linters
+    - job: lint-submods
+      optional: true
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
