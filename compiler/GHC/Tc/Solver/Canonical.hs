@@ -1073,7 +1073,8 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
 
 -- See Note [Canonicalising type applications] about why we require rewritten types
 -- Use tcSplitAppTy, not matching on AppTy, to catch oversaturated type families
--- NB: Only decompose AppTy for nominal equality. See Note [Decomposing equality]
+-- NB: Only decompose AppTy for nominal equality.
+--     See Note [Decomposing AppTy equalities]
 can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
   | Just (t1, s1) <- tcSplitAppTy_maybe ty1
   , Just (t2, s2) <- tcSplitAppTy_maybe ty2
@@ -1350,6 +1351,8 @@ zonk_eq_types = go
 
 {- See Note [Unwrap newtypes first]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Decomposing newtype equalities]
+
 Consider
   newtype N m a = MkN (m a)
 Then N will get a conservative, Nominal role for its second parameter 'a',
@@ -1463,7 +1466,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 
 -- AppTys only decompose for nominal equality, so this case just leads
 -- to an irreducible constraint; see typecheck/should_compile/T10494
--- See Note [Decomposing AppTy at representational role]
+-- See Note [Decomposing AppTy equalities]
 can_eq_app ev s1 t1 s2 t2
   | CtWanted { ctev_dest = dest, ctev_rewriters = rewriters } <- ev
   = do { co_s <- unifyWanted rewriters loc Nominal s1 s2
@@ -1530,8 +1533,9 @@ canTyConApp :: CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
--- See Note [Decomposing TyConApps]
--- Neither tc1 nor tc2 is a saturated funTyCon
+-- See Note [Decomposing TyConApp equalities]
+-- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
+-- But they can be data families.
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
@@ -1561,13 +1565,17 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
     ty1 = mkTyConApp tc1 tys1
     ty2 = mkTyConApp tc2 tys2
 
-    loc  = ctEvLoc ev
-    pred = ctEvPred ev
-
-     -- See Note [Decomposing equality]
+     -- See Note [Decomposing TyConApp equalities]
+     -- Note [Decomposing newtypes a bit more aggressively]
     can_decompose inerts
       =  isInjectiveTyCon tc1 (eqRelRole eq_rel)
-      || (ctEvFlavour ev /= Given && isEmptyBag (matchableGivens loc pred inerts))
+      || (assert (eq_rel == ReprEq) $
+          -- assert: isInjectiveTyCon is always True for Nominal except
+          --   for type synonyms/families, neither of which happen here
+          -- Moreover isInjectiveTyCon is True for Representational
+          --   for algebraic data types.  So we are down to newtypes
+          --   and data families.
+          ctEvFlavour ev == Wanted && noGivenIrreds inerts)
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]
@@ -1601,219 +1609,329 @@ For example, see typecheck/should_compile/T10493, repeated here:
 That should compile, but only because we use canEqFailure and not
 canEqHardFailure.
 
-Note [Decomposing equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have a constraint (of any flavour and role) that looks like
-T tys1 ~ T tys2, what can we conclude about tys1 and tys2? The answer,
-of course, is "it depends". This Note spells it all out.
+Note [Fast path when decomposing TyConApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
+  (s1 ~ s2, t1 ~ t2)
+and push those back into the work list.  But if
+  s1 = K k1    s2 = K k2
+then we will just decompose s1~s2, and it might be better to
+do so on the spot.  An important special case is where s1=s2,
+and we get just Refl.
 
-In this Note, "decomposition" refers to taking the constraint
-  [fl] (T tys1 ~X T tys2)
-(for some flavour fl and some role X) and replacing it with
-  [fls'] (tys1 ~Xs' tys2)
-where that notation indicates a list of new constraints, where the
-new constraints may have different flavours and different roles.
+So canDecomposableTyConAppOK uses unifyWanted etc to short-cut that work.
 
-The key property to consider is injectivity. When decomposing a Given, the
-decomposition is sound if and only if T is injective in all of its type
-arguments. When decomposing a Wanted, the decomposition is sound (assuming the
-correct roles in the produced equality constraints), but it may be a guess --
-that is, an unforced decision by the constraint solver. Decomposing Wanteds
-over injective TyCons does not entail guessing. But sometimes we want to
-decompose a Wanted even when the TyCon involved is not injective! (See below.)
+Note [Decomposing TyConApp equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+        [G/W] T ty1 ~r T ty2
+Can we decompose it, and replace it by
+        [G/W] ty1 ~r' ty2
+and if so what role is r'?  (In this Note, all the "~" are primitive
+equalities "~#", but I have dropped the noisy "#" symbols.)  Lots of
+background in the paper "Safe zero-cost coercions for Haskell".
 
-So, in broad strokes, we want this rule:
+This Note covers the topic for
+  * Datatypes
+  * Newtypes
+  * Data families
+For the rest:
+  * Type synonyms: are always expanded
+  * Type families: see Note [Decomposing type family applications]
+  * AppTy:         see Note [Decomposing AppTy equalities].
 
-(*) Decompose a constraint (T tys1 ~X T tys2) if and only if T is injective
-at role X.
+---- Roles of the decomposed constraints ----
+For a start, the role r' will always be defined like this:
+  * If r=N then r' = N
+  * If r=R then r' = role of T's first argument
 
-Pursuing the details requires exploring three axes:
-* Flavour: Given vs. Wanted
-* Role: Nominal vs. Representational
-* TyCon species: datatype vs. newtype vs. data family vs. type family vs. type variable
+For example:
+   data TR a = MkTR a       -- Role of T's first arg is Representational
+   data TN a = MkTN (F a)   -- Role of T's first arg is Nominal
 
-(A type variable isn't a TyCon, of course, but it's convenient to put the AppTy case
-in the same table.)
+The function tyConRolesX :: Role -> TyCon -> [Role] gets the argument
+role r' for a TyCon T at role r.  E.g.
+   tyConRolesX Nominal          TR = [Nominal]
+   tyConRolesX Representational TR = [Representational]
 
-Here is a table (discussion following) detailing where decomposition of
-   (T s1 ... sn) ~r (T t1 .. tn)
-is allowed.  The first four lines (Data types ... type family) refer
-to TyConApps with various TyCons T; the last line is for AppTy, covering
-both where there is a type variable at the head and the case for an over-
-saturated type family.
+---- Soundness and completeness ----
+For Givens, for /soundness/ of decomposition we need, forall ty1,ty2:
+    T ty1 ~r T ty2   ===>    ty1 ~r' ty2
+Here "===>" means "implies".  That is, given evidence for (co1 : T ty1 ~r T co2)
+we can produce evidence for (co2 : ty1 ~r' ty2).  But in the solver we
+/replace/ co1 with co2 in the inert set, and we don't want to lose any proofs
+thereby. So for /completeness/ of decomposition we also need the reverse:
+    ty1 ~r' ty2   ===>    T ty1 ~r T ty2
 
-NOMINAL               GIVEN        WANTED                         WHERE
+For Wanteds, for /soundness/ of decomposition we need:
+    ty1 ~r' ty2   ===>    T ty1 ~r T ty2
+because if we do decompose we'll get evidence (co2 : ty1 ~r' ty2) and
+from that we want to derive evidence (T co2 : T ty1 ~r T ty2).
+For /completeness/ of decomposition we need the reverse implication too,
+else we may decompose to a new proof obligation that is stronger than
+the one we started with.  See Note [Decomposing newtype equalities].
 
-Datatype               YES          YES                           canTyConApp
-Newtype                YES          YES                           canTyConApp
-Data family            YES          YES                           canTyConApp
-Type family            NO{1}        YES, in injective args{1}     canEqCanLHS2
-AppTy                  YES          YES                           can_eq_app
+---- Injectivity ----
+When do these bi-implications hold? In one direction it is easy.
+We /always/ have
+    ty1 ~r'  ty2   ===>    T ty1 ~r T ty2
+This is the CO_TYCONAPP rule of the paper (Fig 5); see also the
+TyConAppCo case of GHC.Core.Lint.lintCoercion.
 
-REPRESENTATIONAL      GIVEN        WANTED
+In the other direction, we have
+    T ty1 ~r T ty2   ==>   ty1 ~r' ty2  if T is /injective at role r/
+This is the very /definition/ of injectivity: injectivity means result
+is the same => arguments are the same, modulo the role shift.
+See comments on GHC.Core.TyCon.isInjectiveTyCon.  This is also
+the CO_NTH rule in Fig 5 of the paper, except in the paper only
+newtypes are non-injective at representation role, so the rule says "H
+is not a newtype".
 
-Datatype               YES          YES                           canTyConApp
-Newtype                NO{2}       MAYBE{2}                canTyConApp(can_decompose)
-Data family            NO{3}       MAYBE{3}                canTyConApp(can_decompose)
-Type family            NO           NO                            canEqCanLHS2
-AppTy                  NO{4}        NO{4}                         can_eq_nc'
+Injectivity is a bit subtle:
+                 Nominal   Representational
+   Datatype        YES        YES
+   Newtype         YES        NO{1}
+   Data family     YES        NO{2}
 
-{1}: Type families can be injective in some, but not all, of their arguments,
-so we want to do partial decomposition. This is quite different than the way
-other decomposition is done, where the decomposed equalities replace the original
-one. We thus proceed much like we do with superclasses, emitting new Wanteds
-when "decomposing" a partially-injective type family Wanted. Injective type
-families have no corresponding evidence of their injectivity, so we cannot
-decompose an injective-type-family Given.
+{1} Consider newtype N a = MkN (F a)   -- Arg has Nominal role
+    Is it true that (N t1) ~R (N t2)   ==>   t1 ~N t2  ?
+    No, absolutely not.  E.g.
+       type instance F Int = Int; type instance F Bool = Char
+       Then (N Int) ~R (N Bool), by unwrapping, but we don't want Int~Char!
 
-{2}: See Note [Decomposing newtypes at representational role]
+    See Note [Decomposing newtype equalities]
 
-{3}: Because of the possibility of newtype instances, we must treat
-data families like newtypes. See also
-Note [Decomposing newtypes at representational role]. See #10534 and
-test case typecheck/should_fail/T10534.
+{2} We must treat data families precisely like newtypes, because of the
+    possibility of newtype instances. See also
+    Note [Decomposing newtype equalities]. See #10534 and
+    test case typecheck/should_fail/T10534.
 
-{4}: See Note [Decomposing AppTy at representational role]
+---- Takeaway summary -----
+For sound and complete decomposition, we simply need injectivity;
+that is for isInjectiveTyCon to be true:
 
-   Because type variables can stand in for newtypes, we conservatively do not
-   decompose AppTys over representational equality. Here are two examples that
-   demonstrate why we can't:
+* At Nominal role, isInjectiveTyCon is True for all the TyCons we are
+  considering in this Note: datatypes, newtypes, and data families.
 
-   4a: newtype Phant a = MkPhant Int
-       [W] alpha Int ~R beta Bool
+* For Givens, injectivity is necessary for soundness; completeness has no
+  side conditions.
 
-   If we eventually solve alpha := Phant and beta := Phant, then we can solve
-   this equality by unwrapping. But it would have been disastrous to decompose
-   the wanted to produce Int ~ Bool, which is definitely insoluble.
+* For Wanteds, soundness has no side conditions; but injectivity is needed
+  for completeness. See Note [Decomposing newtype equalities]
 
-   4b: newtype Age = MkAge Int
-       [W] alpha Age ~R Maybe Int
+This is implemented in `can_decompose` in `canTyConApp`; it looks at
+injectivity, just as specified above.
 
-   First, a question: if we know that ty1 ~R ty2, can we conclude that
-   a ty1 ~R a ty2? Not for all a. This is precisely why we need role annotations
-   on type constructors. So, if we were to decompose, we would need to
-   decompose to [W] alpha ~R Maybe and [W] Age ~ Int. On the other hand, if we
-   later solve alpha := Maybe, then we would decompose to [W] Age ~R Int, and
-   that would be soluble.
 
-In the implementation of can_eq_nc and friends, we don't directly pattern
-match using lines like in the tables above, as those tables don't cover
-all cases (what about PrimTyCon? tuples?). Instead we just ask about injectivity,
-boiling the tables above down to rule (*). The exceptions to rule (*) are for
-injective type families, which are handled separately from other decompositions,
-and the MAYBE entries above.
+Note [Decomposing type family applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Supose we have
+   [G/W]  (F ty1) ~r  (F ty2)
+This is handled by the TyFamLHS/TyFamLHS case of canEqCanLHS2.
 
-Note [Decomposing newtypes at representational role]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This note discusses the 'newtype' line in the REPRESENTATIONAL table
-in Note [Decomposing equality]. (At nominal role, newtypes are fully
-decomposable.)
+We never decompose to
+   [G/W]  ty1 ~r' ty2
 
-Here is a representative example of why representational equality over
-newtypes is tricky:
+Instead
 
-  newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
-  type role Nt representational  -- but the user gives it an R role anyway
+* For Givens we do nothing. Injective type families have no corresponding
+  evidence of their injectivity, so we cannot decompose an
+  injective-type-family Given.
 
-If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
-[W] alpha ~R beta, because it's possible that alpha and beta aren't
-representationally equal. Here's another example.
+* For Wanteds, for the Nominal role only, we emit new Wanteds rather like
+  functional dependencies, for each injective argument position.
 
-  newtype Nt a = MkNt (Id a)
-  type family Id a where Id a = a
+  E.g type family F a b   -- injective in first arg, but not second
+      [W] (F s1 t1) ~N (F s2 t2)
+  Emit new Wanteds
+      [W] s1 ~N s2
+  But retain the existing, unsolved constraint.
 
-  [W] Nt Int ~R Nt Age
+Note [Decomposing newtype equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note also applies to data families, which we treat like
+newtype in case of 'newtype instance'.
 
-Because of its use of a type family, Nt's parameter will get inferred to have
-a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age, which
-is unsatisfiable. Unwrapping, though, leads to a solution.
+As Note [Decomposing TyConApp equalities] describes, if N is injective
+at role r, we can do this decomposition?
+   [G/W] (N ty1) ~r (N ty2)    to     [G/W]  ty1 ~r' ty2
 
-Conclusion:
- * Unwrap newtypes before attempting to decompose them.
-   This is done in can_eq_nc'.
+For a Given with r=R, the answer is a solid NO: newtypes are not injective at
+representational role, and we must not decompose, or we lose soundness.
+Example is wrinkle {1} in Note [Decomposing TyConApp equalities].
 
-It all comes from the fact that newtypes aren't necessarily injective
-w.r.t. representational equality.
+For a Wanted with r=R, since newtypes are not injective at representational
+role, decomposition is sound, but we may lose completeness.  Nevertheless,
+if the newtype is abstraction (so can't be unwrapped) we can only solve
+the equality by (a) using a Given or (b) decomposition.  If (a) is impossible
+(e.g. no Givens) then (b) is safe.
 
-Furthermore, as explained in Note [SelCo and newtypes] in GHC.Core.TyCo.Rep, we can't use
-SelCo on representational coercions over newtypes. SelCo comes into play
-only when decomposing givens.
+Conclusion: decompose newtypes (at role R) only if there are no usable Givens.
 
-Conclusion:
- * Do not decompose [G] N s ~R N t
+* Incompleteness example (EX1)
+      newtype Nt a = MkNt (Id a)
+      type family Id a where Id a = a
 
-Is it sensible to decompose *Wanted* constraints over newtypes?  Yes!
-It's the only way we could ever prove (IO Int ~R IO Age), recalling
-that IO is a newtype.
+      [W] Nt Int ~R Nt Age
 
-However we must be careful.  Consider
+  Because of its use of a type family, Nt's parameter will get inferred to
+  have a nominal role. Thus, decomposing the wanted will yield [W] Int ~N Age,
+  which is unsatisfiable. Unwrapping, though, leads to a solution.
 
-  type role Nt representational
+  Conclusion: always unwrap newtypes before attempting to decompose
+  them.  This is done in can_eq_nc'.  Of course, we can't unwrap if the data
+  constructor isn't in scope.  See See Note [Unwrap newtypes first].
 
-  [G] Nt a ~R Nt b       (1)
-  [W] NT alpha ~R Nt b   (2)
-  [W] alpha ~ a          (3)
+* Incompleteness example (EX2)
+      newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
+      type role Nt representational  -- but the user gives it an R role anyway
 
-If we focus on (3) first, we'll substitute in (2), and now it's
-identical to the given (1), so we succeed.  But if we focus on (2)
-first, and decompose it, we'll get (alpha ~R b), which is not soluble.
-This is exactly like the question of overlapping Givens for class
-constraints: see Note [Instance and Given overlap] in GHC.Tc.Solver.Interact.
+  If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
+  [W] alpha ~R beta, because it's possible that alpha and beta aren't
+  representationally equal.
 
-Conclusion:
-  * Decompose [W] N s ~R N t  iff there no given constraint that could
-    later solve it.
+  and maybe there is a Given (Nt t1 ~R Nt t2), just waiting to be used, if we
+  figure out (elsewhere) that alpha:=t1 and beta:=t2.  This is somewhat
+  similar to the question of overlapping Givens for class constraints: see
+  Note [Instance and Given overlap] in GHC.Tc.Solver.Interact.
 
-Note [Decomposing AppTy at representational role]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never decompose AppTy at a representational role. For Givens, doing
-so is simply unsound: the LRCo coercion former requires a nominal-roled
-arguments. (See (1) for an example of why.) For Wanteds, decomposing
-would be sound, but it would be a guess, and a non-confluent one at that.
+  Conclusion: don't decompose [W] N s ~R N t, if there are any Given
+  equalities that could later solve it.
 
-Here is an example:
+  But what does "any Given equalities that could later solve it" mean, precisely?
+  It must be a Given constraint that could turn into N s ~ N t.  But that
+  could include [G] (a b) ~ (c d), or even just [G] c.  But it'll definitely
+  be an CIrredCan.  So we settle for having no CIrredCans at all, which is
+  conservative but safe. See noGivenIrreds and #22331.
+
+  Well not 100.0% safe. There could be a CDictCan with some un-expanded
+  superclasses; but only in some very obscure recursive-superclass
+  situations.
+
+If there are no Irred Givens (which is quite common) then we will
+successfuly decompose [W] (IO Age) ~R (IO Int), and solve it.  But
+that won't happen and [W] (IO Age) ~R (IO Int) will be stuck.
+We /could/, however, be a bit more aggressive about decomposition;
+see Note [Decomposing newtypes a bit more aggressively].
+
+Remember: decomposing Wanteds is always /sound/. This Note is
+only about /completeness/.
+
+Note [Decomposing newtypes a bit more aggressively]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+c.f. https://github.com/ghc-proposals/ghc-proposals/pull/549
+and discussion on !9282.
+
+Consider [G] c, [W] (IO Int) ~R (IO Age)
+where IO is abstract, and
+   newtype Age = MkAge Int   -- Not abstract
+With the above rules, if there any Given Irreds,
+the Wanted is insoluble because we can't decompose it.  But in fact,
+if we look at the defn of IO, roughly,
+    newtype IO a = State# -> (State#, a)
+we can see that decomposing [W] (IO Int) ~R (IO Age) to
+    [W] Int ~R Age
+definitely does not lose completeness. Why not? Because the role of
+IO's argment is representational.  Hence:
+
+  DecomposeNewtypeIdea:
+     decompose [W] (N s1 .. sn) ~R (N t1 .. tn)
+     if the roles of all N's arguments are representational
+
+If N's arguments really /are/ representational this will not lose
+completeness.  Here "really are representational" means "if you expand
+all newtypes in N's RHS, we'd infer a representational role for each
+of N's type variables in that expansion".  See Note [Role inference]
+in GHC.Tc.TyCl.Utils.
+
+But the user might /override/ a phantom role with an explicit role
+annotation, and then we could (obscurely) get incompleteness.
+Consider
+
+   module A( silly, T ) where
+     newtype T a = MkT Int
+     type role T representational  -- Override phantom role
+
+     silly :: Coercion (T Int) (T Bool)
+     silly = Coercion  -- Typechecks by unwrapping the newtype
+
+     data Coercion a b where  -- Actually defined in Data.Type.Coercion
+       Coercion :: Coercible a b => Coercion a b
+
+   module B where
+     import A
+     f :: T Int -> T Bool
+     f = case silly of Coercion -> coerce
+
+Here the `coerce` gives [W] (T Int) ~R (T Bool) which, if we decompose,
+we'll get stuck with (Int ~R Bool).  Instead we want to use the
+[G] (T Int) ~R (T Bool), which will be in the Irreds.
+
+Summary: we could adopt (DecomposeNewtypeIdea), at the cost of a very
+obscure incompleteness (above).  But no one is reporting a problem from
+the lack of decompostion, so we'll just leave it for now.  This long
+Note is just to record the thinking for our future selves.
+
+Note [Decomposing AppTy equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For AppTy all the same questions arise as in
+Note [Decomposing TyConApp equalities]. We have
+
+    s1 ~r s2,  t1 ~N t2   ==>   s1 t1 ~r s2 t2       (rule CO_APP)
+    s1 t1 ~N s2 t2        ==>   s1 ~N s2,  t1 ~N t2  (CO_LEFT, CO_RIGHT)
+
+In the first of these, why do we need Nominal equality in (t1 ~N t2)?
+See {2} below.
+
+For sound and complete solving, we need both directions to decompose. So:
+* At nominal role, all is well: we have both directions.
+* At representational role, decomposition of Givens is unsound (see {1} below),
+  and decomposition of Wanteds is incomplete.
+
+Here is an example of the incompleteness for Wanteds:
 
     [G] g1 :: a ~R b
     [W] w1 :: Maybe b ~R alpha a
-    [W] w2 :: alpha ~ Maybe
+    [W] w2 :: alpha ~N Maybe
 
-Suppose we see w1 before w2. If we were to decompose, we would decompose
-this to become
+Suppose we see w1 before w2. If we decompose, using AppCo to prove w1, we get
 
+    w1 := AppCo w3 w4
     [W] w3 :: Maybe ~R alpha
-    [W] w4 :: b ~ a
+    [W] w4 :: b ~N a
 
 Note that w4 is *nominal*. A nominal role here is necessary because AppCo
-requires a nominal role on its second argument. (See (2) for an example of
-why.) If we decomposed w1 to w3,w4, we would then get stuck, because w4
-is insoluble. On the other hand, if we see w2 first, setting alpha := Maybe,
-all is well, as we can decompose Maybe b ~R Maybe a into b ~R a.
+requires a nominal role on its second argument. (See {2} for an example of
+why.) Now we are stuck, because w4 is insoluble. On the other hand, if we
+see w2 first, setting alpha := Maybe, all is well, as we can decompose
+Maybe b ~R Maybe a into b ~R a.
 
 Another example:
-
     newtype Phant x = MkPhant Int
-
     [W] w1 :: Phant Int ~R alpha Bool
     [W] w2 :: alpha ~ Phant
 
 If we see w1 first, decomposing would be disastrous, as we would then try
 to solve Int ~ Bool. Instead, spotting w2 allows us to simplify w1 to become
-
     [W] w1' :: Phant Int ~R Phant Bool
 
 which can then (assuming MkPhant is in scope) be simplified to Int ~R Int,
 and all will be well. See also Note [Unwrap newtypes first].
 
-Bottom line: never decompose AppTy with representational roles.
+Bottom line:
+* Always decompose AppTy at nominal role: can_eq_app
+* Never decompose AppTy at representational role (neither Given nor Wanted):
+  the lack of an equation in can_eq_nc'
 
-(1) Decomposing a Given AppTy over a representational role is simply
-unsound. For example, if we have co1 :: Phant Int ~R a Bool (for
-the newtype Phant, above), then we surely don't want any relationship
-between Int and Bool, lest we also have co2 :: Phant ~ a around.
+Extra points
+{1}  Decomposing a Given AppTy over a representational role is simply
+     unsound. For example, if we have co1 :: Phant Int ~R a Bool (for
+     the newtype Phant, above), then we surely don't want any relationship
+     between Int and Bool, lest we also have co2 :: Phant ~ a around.
 
-(2) The role on the AppCo coercion is a conservative choice, because we don't
-know the role signature of the function. For example, let's assume we could
-have a representational role on the second argument of AppCo. Then, consider
+{2} The role on the AppCo coercion is a conservative choice, because we don't
+    know the role signature of the function. For example, let's assume we could
+    have a representational role on the second argument of AppCo. Then, consider
 
     data G a where    -- G will have a nominal role, as G is a GADT
       MkG :: G Int
@@ -1823,9 +1941,8 @@ have a representational role on the second argument of AppCo. Then, consider
     co2 :: Age ~R Int    -- by newtype axiom
     co3 = AppCo co1 co2 :: G Age ~R a Int    -- by our broken AppCo
 
-and now co3 can be used to cast MkG to have type G Age, in violation of
-the way GADTs are supposed to work (which is to use nominal equality).
-
+    and now co3 can be used to cast MkG to have type G Age, in violation of
+    the way GADTs are supposed to work (which is to use nominal equality).
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -1842,6 +1959,7 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                   -- we are guaranteed that cos has the same length
                   -- as tys1 and tys2
              -> do { cos <- zipWith4M (unifyWanted rewriters) new_locs tc_roles tys1 tys2
+                            -- See Note [Fast path when decomposing TyConApps]
                    ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
            CtGiven { ctev_evar = evar }
@@ -1945,19 +2063,6 @@ canEqHardFailure ev ty1 ty2
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
 {-
-Note [Decomposing TyConApps]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we see (T s1 t1 ~ T s2 t2), then we can just decompose to
-  (s1 ~ s2, t1 ~ t2)
-and push those back into the work list.  But if
-  s1 = K k1    s2 = K k2
-then we will just decompose s1~s2, and it might be better to
-do so on the spot.  An important special case is where s1=s2,
-and we get just Refl.
-
-So canDecomposableTyCon is a fast-path decomposition that uses
-unifyWanted etc to short-cut that work.
-
 Note [Canonicalising type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given (s1 t1) ~ ty2, how should we proceed?
@@ -2192,6 +2297,7 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
   | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyFamLHS fun_tc2 fun_args2 <- lhs2
+  -- See Note [Decomposing type family applications]
   = do { traceTcS "canEqCanLHS2 two type families" (ppr lhs1 $$ ppr lhs2)
 
          -- emit wanted equalities for injective type families

@@ -1391,7 +1391,7 @@ We generate these Wanteds in three places, depending on how we notice the
 injectivity.
 
 1. When we have a [W] F tys1 ~ F tys2. This is handled in canEqCanLHS2, and
-described in Note [Decomposing equality] in GHC.Tc.Solver.Canonical.
+described in Note [Decomposing type family applications] in GHC.Tc.Solver.Canonical.
 
 2. When we have [W] F tys1 ~ T and [W] F tys2 ~ T. Note that neither of these
 constraints rewrites the other, as they have different LHSs. This is done
@@ -2283,11 +2283,9 @@ matchClassInst dflags inerts clas tys loc
 -- See Note [Instance and Given overlap]
   | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
-  , let matchable_givens = matchableGivens loc pred inerts
-  , not (isEmptyBag matchable_givens)
+  , not (noMatchableGivenDicts inerts loc clas tys)
   = do { traceTcS "Delaying instance application" $
-           vcat [ text "Work item=" <+> pprClassPred clas tys
-                , text "Potential matching givens:" <+> ppr matchable_givens ]
+           vcat [ text "Work item=" <+> pprClassPred clas tys ]
        ; return NotSure }
 
   | otherwise

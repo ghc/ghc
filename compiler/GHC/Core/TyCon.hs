@@ -2118,12 +2118,13 @@ isTypeDataTyCon (AlgTyCon {algTcRhs = DataTyCon {is_type_data = type_data }})
 isTypeDataTyCon _              = False
 
 -- | 'isInjectiveTyCon' is true of 'TyCon's for which this property holds
--- (where X is the role passed in):
---   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
--- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
--- See also Note [Decomposing equality] in "GHC.Tc.Solver.Canonical"
+-- (where r is the role passed in):
+--   If (T a1 b1 c1) ~r (T a2 b2 c2), then (a1 ~r1 a2), (b1 ~r2 b2), and (c1 ~r3 c2)
+-- (where r1, r2, and r3, are the roles given by tyConRolesX tc r)
+-- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Canonical"
 isInjectiveTyCon :: TyCon -> Role -> Bool
-isInjectiveTyCon _                             Phantom          = False
+isInjectiveTyCon _ Phantom = True  -- Vacuously; (t1 ~P t2) holes for all t1, t2!
+
 isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
 isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
   = isGenInjAlgRhs rhs
@@ -2139,9 +2140,9 @@ isInjectiveTyCon (TcTyCon {})                  _                = True
   -- See Note [How TcTyCons work] item (1) in GHC.Tc.TyCl
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
--- (where X is the role passed in):
---   If (T tys ~X t), then (t's head ~X T).
--- See also Note [Decomposing equality] in "GHC.Tc.Solver.Canonical"
+-- (where r is the role passed in):
+--   If (T tys ~r t), then (t's head ~r T).
+-- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Canonical"
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
 isGenerativeTyCon (FamilyTyCon {}) _ = False

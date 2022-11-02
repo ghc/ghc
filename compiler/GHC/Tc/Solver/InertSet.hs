@@ -20,7 +20,8 @@ module GHC.Tc.Solver.InertSet (
     emptyInert,
     addInertItem,
 
-    matchableGivens,
+    noMatchableGivenDicts,
+    noGivenIrreds,
     mightEqualLater,
     prohibitedSuperClassSolve,
 
@@ -53,6 +54,7 @@ import GHC.Core.Reduction
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
 import qualified GHC.Core.TyCo.Rep as Rep
+import GHC.Core.Class( Class )
 import GHC.Core.TyCon
 import GHC.Core.Unify
 
@@ -1535,25 +1537,20 @@ isOuterTyVar tclvl tv
     -- becomes "outer" even though its level numbers says it isn't.
   | otherwise  = False  -- Coercion variables; doesn't much matter
 
--- | Returns Given constraints that might,
--- potentially, match the given pred. This is used when checking to see if a
+noGivenIrreds :: InertSet -> Bool
+noGivenIrreds (IS { inert_cans = inert_cans })
+  = isEmptyBag (inert_irreds inert_cans)
+
+-- | Returns True iff there are no Given constraints that might,
+-- potentially, match the given class consraint. This is used when checking to see if a
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
 -- in "GHC.Tc.Solver.Interact"
-matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
-matchableGivens loc_w pred_w inerts@(IS { inert_cans = inert_cans })
-  = filterBag matchable_given all_relevant_givens
+noMatchableGivenDicts :: InertSet -> CtLoc -> Class -> [TcType] -> Bool
+noMatchableGivenDicts inerts@(IS { inert_cans = inert_cans }) loc_w clas tys
+  = not $ anyBag matchable_given $
+    findDictsByClass (inert_dicts inert_cans) clas
   where
-    -- just look in class constraints and irreds. matchableGivens does get called
-    -- for ~R constraints, but we don't need to look through equalities, because
-    -- canonical equalities are used for rewriting. We'll only get caught by
-    -- non-canonical -- that is, irreducible -- equalities.
-    all_relevant_givens :: Cts
-    all_relevant_givens
-      | Just (clas, _) <- getClassPredTys_maybe pred_w
-      = findDictsByClass (inert_dicts inert_cans) clas
-        `unionBags` inert_irreds inert_cans
-      | otherwise
-      = inert_irreds inert_cans
+    pred_w = mkClassPred clas tys
 
     matchable_given :: Ct -> Bool
     matchable_given ct
