@@ -10,7 +10,7 @@ module Flavour
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc
-  , enableO2Stage0
+  , perfStage0
   , disableDynamicGhcPrograms
   , disableDynamicLibs
   , disableProfiledLibs
@@ -39,6 +39,7 @@ import Control.Monad.Except
 import UserSettings
 import Oracles.Setting
 
+import {-# SOURCE #-} Settings.Default
 
 flavourTransformers :: Map String (Flavour -> Flavour)
 flavourTransformers = M.fromList
@@ -46,7 +47,7 @@ flavourTransformers = M.fromList
     , "debug_info"       =: enableDebugInfo
     , "ticky_ghc"        =: enableTickyGhc
     , "ticky_ghc0"       =: enableTickyGhc0
-    , "optimize_stage0"  =: enableO2Stage0
+    , "perf_stage0"      =: perfStage0
     , "split_sections"   =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm"             =: viaLlvmBackend
@@ -139,9 +140,14 @@ enableTickyGhc =
       ]
 
 -- | Enable the ticky-ticky profiler in stage1 GHC
-enableO2Stage0 :: Flavour -> Flavour
-enableO2Stage0 fl = onArgs ensureO2 fl
-  where ensureO2 as = (builder Ghc ? stage0 ? arg "-O2") <> remove ["-O"] as
+perfStage0 :: Flavour -> Flavour
+perfStage0 fl = onArgs (const args) fl
+  where args      = sourceArgs SourceArgs
+          { hsDefault  = mconcat [ arg "-O2", arg "-H64m"]
+          , hsLibrary  = arg "-O2"
+          , hsCompiler = arg "-O2"
+          , hsGhc      = arg "-O2"
+          }
 
 -- | Enable the ticky-ticky profiler in stage1 GHC
 enableTickyGhc0 :: Flavour -> Flavour
