@@ -86,7 +86,7 @@ instance Diagnostic DsMessage where
               hang (text "Top-level" <+> text desc <+> text "aren't allowed:") 2 (ppr bind)
     DsUselessSpecialiseForClassMethodSelector poly_id
       -> mkSimpleDecorated $
-           text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
+           text "Ignoring useless SPECIALISE pragma for class selector:" <+> quotes (ppr poly_id)
     DsUselessSpecialiseForNoInlineFunction poly_id
       -> mkSimpleDecorated $
           text "Ignoring useless SPECIALISE pragma for NOINLINE function:" <+> quotes (ppr poly_id)
