@@ -114,9 +114,6 @@ parseFlavour baseFlavours transformers str =
 addArgs :: Args -> Flavour -> Flavour
 addArgs args' fl = fl { args = args fl <> args' }
 
-onArgs :: (Args -> Args) -> Flavour -> Flavour
-onArgs f fl = fl { args = f $ args fl}
-
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
@@ -141,8 +138,14 @@ enableTickyGhc =
 
 -- | Enable the ticky-ticky profiler in stage1 GHC
 perfStage0 :: Flavour -> Flavour
-perfStage0 fl = onArgs (const args) fl
-  where args      = sourceArgs SourceArgs
+perfStage0 fl = addArgs args fl
+  -- This is a bit sloppy because it does not preclude any predicates that turn
+  -- on (or off) optimizations that were added be the flavor or by another
+  -- transformer. Luckily though if we're using this transformer then we want O2
+  -- for each subsequent stage and ghc doesn't choke on the redundant flags
+  -- There is the remove in Hadrian.Expression but it doesn't handle predicates
+  where 
+        args           = sourceArgs SourceArgs
           { hsDefault  = mconcat [ arg "-O2", arg "-H64m"]
           , hsLibrary  = arg "-O2"
           , hsCompiler = arg "-O2"

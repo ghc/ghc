@@ -23,7 +23,6 @@ import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
 import Settings.Flavours.Validate
 import Settings.Flavours.Release
-import Settings.Flavours.JavaScript
 
 
 getArgs :: Args
@@ -54,12 +53,10 @@ hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ benchmarkFlavour, defaultFlavour, developmentFlavour Stage1
     , developmentFlavour Stage2, performanceFlavour
-    , releaseFlavour, releaseJsFlavour
+    , releaseFlavour
     , quickFlavour, quickValidateFlavour, quickDebugFlavour
     , quickestFlavour
     , quickCrossFlavour
-    , quickJsFlavour
-    , perfJsFlavour
     , ghcInGhciFlavour, validateFlavour, slowValidateFlavour
     ]
 
