@@ -125,6 +125,7 @@ executable hadrian
                        , Settings.Flavours.Quickest
                        , Settings.Flavours.Validate
                        , Settings.Flavours.Release
+                       , Settings.Flavours.JavaScript
                        , Settings.Packages
                        , Settings.Parser
                        , Settings.Program

@@ -1,5 +1,6 @@
+{-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE LambdaCase                 #-}
 module Way.Type where
 
 import Data.IntSet (IntSet)
