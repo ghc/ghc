@@ -1520,6 +1520,9 @@ $wtheresCrud = \ ww ww1 ->
       ...
 ```
 This is currently a bug that we willingly accept and it's documented in #21128.
+
+See also Note [indexError] in base:GHC.Ix, which describes how we use
+SPECIALISE to mitigate this problem for indexError.
 -}
 
 {- *********************************************************************

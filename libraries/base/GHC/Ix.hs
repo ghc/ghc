@@ -140,12 +140,30 @@ Note [Out-of-bounds error messages]
 The default method for 'index' generates hoplelessIndexError, because
 Ix doesn't have Show as a superclass.  For particular base types we
 can do better, so we override the default method for index.
+
+Note [indexError]
+~~~~~~~~~~~~~~~~~
+We abstract the guts of constructing an out-of-bounds error into `indexError`.
+We give it a NOINLINE pragma, because we don't want to duplicate this
+cold-path code.
+
+We give it a SPECIALISE pragma because we really want it to take
+its arguments unboxed, to avoid reboxing code in the caller, and
+perhaps even some reboxing code in the hot path of a caller.
+See Note [Boxity for bottoming functions] in GHC.Core.Opt.DmdAnal.
+
+The SPECIALISE pragma means that at least the Int-indexed case
+of indexError /will/ unbox its arguments.
+
+The [2] phase is because if we don't give an activation we'll get
+the one from the inline pragama (i.e. never) which is a bit silly.
+See Note [Activation pragmas for SPECIALISE] in GHC.HsToCore.Binds.
 -}
 
--- Abstract these errors from the relevant index functions so that
--- the guts of the function will be small enough to inline.
-
+-- indexError: see Note [indexError]
 {-# NOINLINE indexError #-}
+{-# SPECIALISE [2] indexError :: (Int,Int) -> Int -> String -> b #-}
+
 indexError :: Show a => (a,a) -> a -> String -> b
 indexError rng i tp
   = errorWithoutStackTrace (showString "Ix{" . showString tp . showString "}.index: Index " .
