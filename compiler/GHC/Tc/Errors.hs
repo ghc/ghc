@@ -5,7 +5,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
-{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module GHC.Tc.Errors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
@@ -69,7 +68,6 @@ import GHC.Utils.Error  (diagReasonSeverity,  pprLocMsgEnvelope )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as O
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.FV ( fvVarList, unionFV )
 
 import GHC.Data.Bag
@@ -81,7 +79,7 @@ import Control.Monad      ( unless, when, foldM, forM_ )
 import Data.Foldable      ( toList )
 import Data.Function      ( on )
 import Data.List          ( partition, sort, sortBy )
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord           ( comparing )
 import qualified Data.Semigroup as S
@@ -791,7 +789,7 @@ Currently, the constraints to ignore are:
 --------------------------------------------
 
 type Reporter
-  = SolverReportErrCtxt -> [ErrorItem] -> TcM ()
+  = SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM ()
 type ReporterSpec
   = ( String                      -- Name
     , ErrorItem -> Pred -> Bool  -- Pick these ones
@@ -802,10 +800,10 @@ mkSkolReporter :: Reporter
 -- Suppress duplicates with either the same LHS, or same location
 -- Pre-condition: all items are equalities
 mkSkolReporter ctxt items
-  = mapM_ (reportGroup mkEqErr ctxt) (group items)
+  = mapM_ (reportGroup mkEqErr ctxt) (group (toList items))
   where
      group [] = []
-     group (item:items) = (item : yeses) : group noes
+     group (item:items) = (item :| yeses) : group noes
         where
           (yeses, noes) = partition (group_with item) items
 
@@ -914,7 +912,7 @@ machinery, in cases where it is definitely going to be a no-op.
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
   = mapM_ $ \item -> do { let err = important ctxt $ mkUserTypeError item
-                        ; maybeReportError ctxt [item] err
+                        ; maybeReportError ctxt (item :| []) err
                         ; addDeferredBinding ctxt err item }
 
 mkUserTypeError :: ErrorItem -> TcSolverReportMsg
@@ -925,7 +923,7 @@ mkUserTypeError item =
 
 mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]
-mkGivenErrorReporter ctxt items
+mkGivenErrorReporter ctxt (item:|_)
   = do { (ctxt, relevant_binds, item) <- relevantBindings True ctxt item
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenErrorReporter is called
@@ -942,7 +940,6 @@ mkGivenErrorReporter ctxt items
        ; msg <- mkErrorReport (ctLocEnv loc') msg (Just ctxt) supplementary
        ; reportDiagnostic msg }
   where
-    (item : _ )  = items    -- Never empty
     (ty1, ty2)   = getEqPredTys (errorItemPred item)
 
 ignoreErrorReporter :: Reporter
@@ -987,13 +984,13 @@ pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}
 
-mkGroupReporter :: (SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport)
+mkGroupReporter :: (SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport)
                              -- Make error message for a group
                 -> Reporter  -- Deal with lots of constraints
 -- Group together errors from same location,
 -- and report only the first (to avoid a cascade)
 mkGroupReporter mk_err ctxt items
-  = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc items)
+  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc (toList items))
 
 eq_lhs_type :: ErrorItem -> ErrorItem -> Bool
 eq_lhs_type item1 item2
@@ -1009,7 +1006,7 @@ cmp_loc item1 item2 = get item1 `compare` get item2
              -- Reduce duplication by reporting only one error from each
              -- /starting/ location even if the end location differs
 
-reportGroup :: (SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport) -> Reporter
+reportGroup :: (SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport) -> Reporter
 reportGroup mk_err ctxt items
   = do { err <- mk_err ctxt items
        ; traceTc "About to maybeReportErr" $
@@ -1033,11 +1030,11 @@ nonDeferrableOrigin (FRROrigin {})          = True
 nonDeferrableOrigin _                       = False
 
 maybeReportError :: SolverReportErrCtxt
-                 -> [ErrorItem]     -- items covered by the Report
+                 -> NonEmpty ErrorItem     -- items covered by the Report
                  -> SolverReport -> TcM ()
-maybeReportError ctxt items@(item1:_) (SolverReport { sr_important_msg = important
-                                                    , sr_supplementary = supp
-                                                    , sr_hints = hints })
+maybeReportError ctxt items@(item1:|_) (SolverReport { sr_important_msg = important
+                                                     , sr_supplementary = supp
+                                                     , sr_hints = hints })
   = unless (cec_suppress ctxt  -- Some worse error has occurred, so suppress this diagnostic
          || all ei_suppress items) $
                            -- if they're all to be suppressed, report nothing
@@ -1050,7 +1047,6 @@ maybeReportError ctxt items@(item1:_) (SolverReport { sr_important_msg = importa
            diag = TcRnSolverReport important reason hints
        msg <- mkErrorReport (ctLocEnv (errorItemCtLoc item1)) diag (Just ctxt) supp
        reportDiagnostic msg
-maybeReportError _ _ _ = panic "maybeReportError"
 
 addDeferredBinding :: SolverReportErrCtxt -> SolverReport -> ErrorItem -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
@@ -1109,11 +1105,10 @@ tryReporters ctxt reporters items
                 -- But suppress their error messages
 
 tryReporter :: SolverReportErrCtxt -> ReporterSpec -> [ErrorItem] -> TcM (SolverReportErrCtxt, [ErrorItem])
-tryReporter ctxt (str, keep_me,  suppress_after, reporter) items
-  | null yeses
-  = return (ctxt, items)
-  | otherwise
-  = do { traceTc "tryReporter{ " (text str <+> ppr yeses)
+tryReporter ctxt (str, keep_me,  suppress_after, reporter) items = case nonEmpty yeses of
+    Nothing -> pure (ctxt, items)
+    Just yeses -> do
+       { traceTc "tryReporter{ " (text str <+> ppr yeses)
        ; (_, no_errs) <- askNoErrs (reporter ctxt yeses)
        ; let suppress_now   = not no_errs && suppress_after
                             -- See Note [Suppressing error messages]
@@ -1253,23 +1248,14 @@ coercion.
 ************************************************************************
 -}
 
-mkIrredErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
+mkIrredErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkIrredErr ctxt items
   = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
        ; let msg = important ctxt $ mkPlainMismatchMsg $
                    CouldNotDeduce (getUserGivens ctxt) (item1 :| others) Nothing
        ; return $ add_relevant_bindings binds msg  }
   where
-    (item1:others) = final_items
-
-    filtered_items = filter (not . ei_suppress) items
-    final_items | null filtered_items = items
-                    -- they're all suppressed; must report *something*
-                    -- NB: even though reportWanteds asserts that not
-                    -- all items are suppressed, it's possible all the
-                    -- irreducibles are suppressed, and so this function
-                    -- might get all suppressed items
-                | otherwise           = filtered_items
+    item1:|others = tryFilter (not . ei_suppress) items
 
 {- Note [Constructing Hole Errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1444,16 +1430,14 @@ givenConstraints ctxt
 
 ----------------
 
-mkIPErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
+mkIPErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 -- What would happen if an item is suppressed because of
 -- Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint? Very unclear
 -- what's best. Let's not worry about this.
-mkIPErr ctxt items
+mkIPErr ctxt (item1:|others)
   = do { (ctxt, binds, item1) <- relevantBindings True ctxt item1
        ; let msg = important ctxt $ UnboundImplicitParams (item1 :| others)
        ; return $ add_relevant_bindings binds msg }
-  where
-    item1:others = items
 
 ----------------
 
@@ -1462,7 +1446,7 @@ mkIPErr ctxt items
 -- but doesn't.
 --
 -- See Note [Reporting representation-polymorphism errors] in GHC.Tc.Types.Origin.
-mkFRRErr :: HasDebugCallStack => SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
+mkFRRErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkFRRErr ctxt items
   = do { -- Process the error items.
        ; (_tidy_env, frr_infos) <-
@@ -1470,8 +1454,8 @@ mkFRRErr ctxt items
             -- Zonk/tidy to show useful variable names.
           nubOrdBy (nonDetCmpType `on` (frr_type . frr_info_origin)) $
             -- Remove duplicates: only one representation-polymorphism error per type.
-          map (expectJust "mkFRRErr" . fixedRuntimeRepOrigin_maybe)
-          items
+          map (expectJust "mkFRRErr" . fixedRuntimeRepOrigin_maybe) $
+          toList items
        ; return $ important ctxt $ FixedRuntimeRepError frr_infos }
 
 -- | Whether to report something using the @FixedRuntimeRep@ mechanism.
@@ -1546,17 +1530,14 @@ any more.  So we don't assert that it is.
 
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
-mkEqErr :: SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
-mkEqErr ctxt items
-  | item:_ <- filter (not . ei_suppress) items
+mkEqErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
+mkEqErr ctxt items@(item:|_)
+  | item:_ <- filter (not . ei_suppress) (toList items)
   = mkEqErr1 ctxt item
 
-  | item:_ <- items  -- they're all suppressed. still need an error message
+  | otherwise  -- they're all suppressed. still need an error message
                      -- for -fdefer-type-errors though
   = mkEqErr1 ctxt item
-
-  | otherwise
-  = panic "mkEqErr"  -- guaranteed to have at least one item
 
 mkEqErr1 :: SolverReportErrCtxt -> ErrorItem -> TcM SolverReport
 mkEqErr1 ctxt item   -- Wanted only
@@ -1991,13 +1972,22 @@ mkMismatchMsg item ty1 ty2 =
         , teq_mismatch_expected = uo_expected
         , teq_mismatch_what     = mb_thing
         , teq_mb_same_occ       = sameOccExtras ty2 ty1 })
-    KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k ->
-      (mkBasicMismatchMsg NoEA item ty1 ty2)
-        { mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
-        , mismatch_mb_same_occ  = mb_same_occ }
-    _ ->
-      (mkBasicMismatchMsg NoEA item ty1 ty2)
-        { mismatch_mb_same_occ  = mb_same_occ }
+    KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k -> BasicMismatch
+      { mismatch_ea           = NoEA
+      , mismatch_item         = item
+      , mismatch_ty1          = ty1
+      , mismatch_ty2          = ty2
+      , mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
+      , mismatch_mb_same_occ  = mb_same_occ
+      }
+    _ -> BasicMismatch
+      { mismatch_ea           = NoEA
+      , mismatch_item         = item
+      , mismatch_ty1          = ty1
+      , mismatch_ty2          = ty2
+      , mismatch_whenMatching = Nothing
+      , mismatch_mb_same_occ  = mb_same_occ
+      }
   where
     orig = errorItemOrigin item
     mb_same_occ = sameOccExtras ty2 ty1
@@ -2121,10 +2111,9 @@ Warn of loopy local equalities that were dropped.
 ************************************************************************
 -}
 
-mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> [ErrorItem] -> TcM SolverReport
+mkDictErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
 mkDictErr ctxt orig_items
-  = assert (not (null items)) $
-    do { inst_envs <- tcGetInstEnvs
+  = do { inst_envs <- tcGetInstEnvs
        ; let min_items = elim_superclasses items
              lookups = map (lookup_cls_inst inst_envs) min_items
              (no_inst_items, overlap_items) = partition is_no_inst lookups
@@ -2137,10 +2126,7 @@ mkDictErr ctxt orig_items
        ; err <- mk_dict_err ctxt (head (no_inst_items ++ overlap_items))
        ; return $ important ctxt err }
   where
-    filtered_items = filter (not . ei_suppress) orig_items
-    items | null filtered_items = orig_items  -- all suppressed, but must report
-                                              -- something for -fdefer-type-errors
-          | otherwise           = filtered_items  -- common case
+    items = tryFilter (not . ei_suppress) orig_items
 
     no_givens = null (getUserGivens ctxt)
 
@@ -2158,7 +2144,7 @@ mkDictErr ctxt orig_items
     -- When simplifying [W] Ord (Set a), we need
     --    [W] Eq a, [W] Ord a
     -- but we really only want to report the latter
-    elim_superclasses items = mkMinimalBySCs errorItemPred items
+    elim_superclasses = mkMinimalBySCs errorItemPred . toList
 
 -- Note [mk_dict_err]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -2493,3 +2479,9 @@ solverReportMsg_ExpectedActuals
         CouldNotDeduce {} ->
           []
     _ -> []
+
+-- | Filter the list by the given predicate, but if that would be empty,
+-- just give back the original list.
+-- We use this as we must report something for fdefer-type-errors.
+tryFilter :: (a -> Bool) -> NonEmpty a -> NonEmpty a
+tryFilter f as = fromMaybe as $ nonEmpty (filter f (toList as))
