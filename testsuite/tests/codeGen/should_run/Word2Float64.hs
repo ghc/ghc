@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module Main (main) where
 
-import GHC.Exts (Double(D#), Float(F#), word2Double#, word2Float#)
+import GHC.Exts (Double(D#), Float(F#), Word(W#), word2Double#, word2Float#)
 
 main :: IO ()
 main = do
@@ -15,3 +15,14 @@ main = do
     -- stored in a 32-bit IEEE floating-point value without loss of
     -- precision
     print (F# (word2Float# 16777216##))
+
+    -- We also want to check for sane behaviour for cases that lose precision
+    let W# max_word = (maxBound :: Word)
+    print (F# (word2Float# max_word))
+    print (D# (word2Double# max_word))
+
+    -- 2^63 is the first value that requires the halve-and-double path
+    -- (see Note [Word-to-float conversion on x86-64] in GHC.CmmToAsm.X86.CodeGen)
+    let W# two63 = 0x8000000000000000
+    print (F# (word2Float# two63))
+    print (D# (word2Double# two63))

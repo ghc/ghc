@@ -417,8 +417,8 @@ instance NonLocal CmmNode where
 --------------------------------------------------
 -- Various helper types
 
-type CmmActual = CmmExpr
-type CmmFormal = LocalReg
+type CmmActual = CmmExpr  -- ^ Usually used to refer to arguments
+type CmmFormal = LocalReg -- ^ Usually used to refer to result registers.
 
 type UpdFrameOffset = ByteOff
 
