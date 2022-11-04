@@ -101,7 +101,7 @@ data Opsys
 data LinuxDistro
   = Debian11 | Debian10 | Debian9 | Fedora33 | Ubuntu2004 | Centos7 | Alpine deriving (Eq)
 
-data Arch = Amd64 | AArch64 | ARMv7 | I386
+data Arch = Amd64 | AArch64 | I386
 
 data BignumBackend = Native | Gmp deriving Eq
 
@@ -230,7 +230,6 @@ runnerTag arch (Linux distro) =
   case arch of
     Amd64   -> "x86_64-linux"
     AArch64 -> "aarch64-linux"
-    ARMv7   -> "armv7-linux"
     I386    -> "x86_64-linux"
 runnerTag AArch64 Darwin = "aarch64-darwin"
 runnerTag Amd64 Darwin = "x86_64-darwin-m1"
@@ -260,7 +259,6 @@ opsysName Windows = "windows"
 archName :: Arch -> String
 archName Amd64 = "x86_64"
 archName AArch64 = "aarch64"
-archName ARMv7 = "armv7"
 archName I386  = "i386"
 
 binDistName :: Arch -> Opsys -> BuildConfig -> String
@@ -347,18 +345,6 @@ opsysVariables _ FreeBSD13 = mconcat
   , "GHC_VERSION" =: "9.2.2"
   , "CABAL_INSTALL_VERSION" =: "3.6.2.0"
   ]
-opsysVariables ARMv7 (Linux distro) =
-  distroVariables distro <>
-  mconcat [ "CONFIGURE_ARGS" =: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
-            -- N.B. We disable ld.lld explicitly here because it appears to fail
-            -- non-deterministically on ARMv7. See #18280.
-          , "LD" =: "ld.gold"
-          , "GccUseLdOpt" =: "-fuse-ld=gold"
-            -- Awkwardly, this appears to be necessary to work around a
-            -- live-lock exhibited by the CPython (at least in 3.9 and 3.8)
-            -- interpreter on ARMv7
-          , "HADRIAN_ARGS" =: "--test-verbose=3"
-          ]
 opsysVariables _ (Linux distro) = distroVariables distro
 opsysVariables AArch64 (Darwin {}) =
   mconcat [ "NIX_SYSTEM" =: "aarch64-darwin"
@@ -525,7 +511,6 @@ data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
           | Nightly      -- ^ Only run this job in the nightly pipeline
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
           | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
-          | ARMLabel    -- ^ Only run this job when the "ARM" label is set.
           | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
@@ -546,8 +531,6 @@ ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
 ruleString Off LLVMBackend = true
 ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
 ruleString Off FreeBSDLabel = true
-ruleString On ARMLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*ARM.*/"
-ruleString Off ARMLabel = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
@@ -824,7 +807,6 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
-     , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
      , standardBuilds I386 (Linux Debian9)
      , standardBuildsWithConfig Amd64 (Linux Alpine) static
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
