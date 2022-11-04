@@ -147,7 +147,7 @@ data Flavour = Flavour BaseFlavour [FlavourTrans]
 
 data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser
 
-data BaseFlavour = Release | Validate | SlowValidate | PerfJS
+data BaseFlavour = Release | Validate | SlowValidate
 
 -----------------------------------------------------------------------------
 -- Build Configs
@@ -282,7 +282,6 @@ flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . fl
     baseString Release = "release"
     baseString Validate = "validate"
     baseString SlowValidate = "slow-validate"
-    baseString PerfJS = "perf-js"
 
     flavourString Llvm = "llvm"
     flavourString Dwarf = "debug_info"
@@ -823,7 +822,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" Nothing (Just "emconfigure")
         )
         { bignumBackend = Native
-        , buildFlavour  = PerfJS
+        , buildFlavour  = Release
         }
      ]
 

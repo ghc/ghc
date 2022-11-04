@@ -1328,7 +1328,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js": {
+  "nightly-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1338,7 +1338,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js.tar.xz",
+        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1380,12 +1380,12 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js",
-      "BUILD_FLAVOUR": "perf-js",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_TARGET": "js-unknown-ghcjs",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js",
+      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release",
       "XZ_OPT": "-9"
     }
   },
@@ -3871,7 +3871,7 @@
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
   },
-  "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js": {
+  "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -3881,7 +3881,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js.tar.xz",
+        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -3923,12 +3923,12 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js",
-      "BUILD_FLAVOUR": "perf-js",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release",
+      "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_TARGET": "js-unknown-ghcjs",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-perf-js"
+      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release"
     }
   },
   "x86_64-linux-deb11-validate": {
