@@ -86,3 +86,5 @@ test('T21128', [ grep_errmsg(r'let { y = I\#') ], multimod_compile, ['T21128', '
 test('T21265', normal, compile, [''])
 test('EtaExpansion', normal, compile, [''])
 test('T22039', normal, compile, [''])
+# T22388: Should see $winteresting but not $wboring
+test('T22388', [ grep_errmsg(r'^\S+\$w\S+') ], compile, ['-dsuppress-uniques -ddump-simpl'])

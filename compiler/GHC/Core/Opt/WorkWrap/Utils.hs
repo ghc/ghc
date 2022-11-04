@@ -15,7 +15,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    , findTypeShape, IsRecDataConResult(..), isRecDataCon
    , mkAbsentFiller
    , isWorkerSmallEnough, dubiousDataConInstArgTys
-   , isGoodWorker, badWorker , goodWorker
+   , badWorker , goodWorker
    )
 where
 
@@ -585,10 +585,6 @@ badWorker = False
 goodWorker :: Bool
 goodWorker = True
 
-isGoodWorker :: Bool -> Bool
-isGoodWorker = id
-
-
 -- | Unwraps the 'Boxity' decision encoded in the given 'SubDemand' and returns
 -- a 'DataConPatContext' as well the nested demands on fields of the 'DataCon'
 -- to unbox.
@@ -913,7 +909,7 @@ mkWWstr_one opts arg str_mark =
     do_nothing = return (badWorker, [(arg,arg_str)], nop_fn, varToCoreExpr arg)
 
 unbox_one_arg :: WwOpts
-              -> Var-> DataConPatContext Demand
+              -> Var -> DataConPatContext Demand
               -> UniqSM (Bool, [(Var,StrictnessMark)], CoreExpr -> CoreExpr, CoreExpr)
 unbox_one_arg opts arg_var
               DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
@@ -939,13 +935,14 @@ unbox_one_arg opts arg_var
              -- See Note [Call-by-value for worker args]
              all_str_marks = (map (const NotMarkedStrict) ex_tvs') ++ con_str_marks
 
-       ; (_sub_args_quality, worker_args, wrap_fn, wrap_args)
+       ; (nested_useful, worker_args, wrap_fn, wrap_args)
              <- mkWWstr opts (ex_tvs' ++ arg_ids') all_str_marks
 
        ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
-
-       ; return (goodWorker, worker_args, unbox_fn . wrap_fn, wrap_arg) }
-                          -- Don't pass the arg, rebox instead
+       -- See Note [Unboxing through unboxed tuples]
+       ; return $ if isUnboxedTupleDataCon dc && not nested_useful
+                     then (badWorker, [(arg_var,NotMarkedStrict)], nop_fn, varToCoreExpr arg_var)
+                     else (goodWorker, worker_args, unbox_fn . wrap_fn, wrap_arg) }
 
 -- | Tries to find a suitable absent filler to bind the given absent identifier
 -- to. See Note [Absent fillers].
@@ -1194,6 +1191,26 @@ fragile
        ...f (MkT a (absentError Int# "blah"))...
    because `MkT` is strict in its Int# argument, so we get an absentError
    exception when we shouldn't.  Very annoying!
+
+Note [Unboxing through unboxed tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We should not to a worker/wrapper split just for unboxing the components of
+an unboxed tuple (in the result *or* argument, #22388). Consider
+  boring_res x y = (# y, x #)
+It's entirely pointless to split for the constructed unboxed pair to
+  $wboring_res x y = (# y, x #)
+  boring_res = case $wboring_res x y of (# a, b #) -> (# a, b #)
+`boring_res` will immediately simplify to an alias for `$wboring_res`!
+
+Similarly, the unboxed tuple might occur in argument position
+  boring_arg (# x, y, z #) = (# z, x, y #)
+It's entirely pointless to "unbox" the triple
+  $wboring_arg x y z = (# z, x, y #)
+  boring_arg (# x, y, z #) = $wboring_arg x y z
+because after unarisation, `boring_arg` is just an alias for `$wboring_arg`.
+
+Conclusion: Only consider unboxing an unboxed tuple useful when we will
+also unbox its components. That is governed by the `goodWorker` mechanism.
 
 ************************************************************************
 *                                                                      *
@@ -1467,8 +1484,7 @@ unbox_one_result opts res_bndr
       -- this_work_unbox_res alt = (case res_bndr |> co of C a b -> <alt>[a,b])
       this_work_unbox_res = mkUnpackCase (Var res_bndr) co cprCaseBndrMult dc arg_ids
 
-  -- Don't try to WW an unboxed tuple return type when there's nothing inside
-  -- to unbox further.
+  -- See Note [Unboxing through unboxed tuples]
   return $ if isUnboxedTupleDataCon dc && not nested_useful
               then ( badWorker, unitOL res_bndr, Var res_bndr, nop_fn )
               else ( goodWorker
