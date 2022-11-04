@@ -212,15 +212,6 @@ The supported transformers are listed below:
         <td>Compile the GHC executable with Ticky-Ticky profiler support.</td>
     </tr>
     <tr>
-        <td><code>ticky_ghc0</code></td>
-        <td>Compile the stage0 GHC executable with Ticky-Ticky profiler support. Useful for cross-compilers, which are always stage1 compilers</td>
-    </tr>
-    <tr>
-        <td><code>perf_stage0</code></td>
-        <td>Ensure that the `-O2` flags are passed to the stage0 build thus yielding an optimised stage1 compiler. Useful for cross-compilers, which are always stage1 compilers
-        </td>
-    </tr>
-    <tr>
         <td><code>split_sections</code></td>
         <td>Enable section splitting for all libraries (except for the GHC
             library due to the long linking times that this causes).</td>

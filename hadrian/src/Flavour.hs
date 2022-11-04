@@ -10,7 +10,6 @@ module Flavour
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc
-  , perfStage0
   , disableDynamicGhcPrograms
   , disableDynamicLibs
   , disableProfiledLibs
@@ -39,15 +38,11 @@ import Control.Monad.Except
 import UserSettings
 import Oracles.Setting
 
-import {-# SOURCE #-} Settings.Default
-
 flavourTransformers :: Map String (Flavour -> Flavour)
 flavourTransformers = M.fromList
     [ "werror"           =: werror
     , "debug_info"       =: enableDebugInfo
     , "ticky_ghc"        =: enableTickyGhc
-    , "ticky_ghc0"       =: enableTickyGhc0
-    , "perf_stage0"      =: perfStage0
     , "split_sections"   =: splitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm"             =: viaLlvmBackend
@@ -131,31 +126,7 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
 enableTickyGhc =
-    addArgs $ stage1 ? mconcat
-      [ builder (Ghc CompileHs) ? tickyArgs
-      , builder (Ghc LinkHs) ? tickyArgs
-      ]
-
--- | Enable the ticky-ticky profiler in stage1 GHC
-perfStage0 :: Flavour -> Flavour
-perfStage0 fl = addArgs args fl
-  -- This is a bit sloppy because it does not preclude any predicates that turn
-  -- on (or off) optimizations that were added be the flavor or by another
-  -- transformer. Luckily though if we're using this transformer then we want O2
-  -- for each subsequent stage and ghc doesn't choke on the redundant flags
-  -- There is the remove in Hadrian.Expression but it doesn't handle predicates
-  where 
-        args           = sourceArgs SourceArgs
-          { hsDefault  = mconcat [ arg "-O2", arg "-H64m"]
-          , hsLibrary  = arg "-O2"
-          , hsCompiler = arg "-O2"
-          , hsGhc      = arg "-O2"
-          }
-
--- | Enable the ticky-ticky profiler in stage1 GHC
-enableTickyGhc0 :: Flavour -> Flavour
-enableTickyGhc0 =
-    addArgs $ stage0 ? mconcat
+    addArgs $ orM [stage1, cross] ? mconcat
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
       ]

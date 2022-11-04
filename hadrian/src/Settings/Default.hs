@@ -176,10 +176,13 @@ defaultLibraryWays = Set.fromList <$>
 defaultRtsWays :: Ways
 defaultRtsWays = Set.fromList <$>
   mconcat
-  [ pure [vanilla, threaded]
+  [ pure [vanilla]
+  , targetSupportsSMP ? pure [threaded]
   , notStage0 ? pure
-      [ profiling, threadedProfiling, debugProfiling, threadedDebugProfiling
-      , debug, threadedDebug
+      [ profiling, debugProfiling, debug
+      ]
+  , notStage0 ? targetSupportsSMP ? pure
+      [ threadedProfiling, threadedDebugProfiling, threadedDebug
       ]
   , notStage0 ? platformSupportsSharedLibs ? pure
       [ dynamic, threadedDynamic, debugDynamic, threadedDebugDynamic
