@@ -45,6 +45,7 @@ import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
+import GHC.Types.RepType
 
 
 {-
@@ -1762,7 +1763,7 @@ Note [Worker argument budget]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In 'finaliseArgBoxities' we don't want to generate workers with zillions of
 argument when, say given a strict record with zillions of fields.  So we
-limit the maximum number of worker args to the maximum of
+limit the maximum number of worker args ('max_wkr_args') to the maximum of
   - -fmax-worker-args=N
   - The number of args in the original function; if it already has has
     zillions of arguments we don't want to seek /fewer/ args in the worker.
@@ -1771,10 +1772,91 @@ limit the maximum number of worker args to the maximum of
 We pursue a "layered" strategy for unboxing: we unbox the top level of the
 argument(s), subject to budget; if there are any arguments left we unbox the
 next layer, using that depleted budget.
+Unboxing an argument *increases* the budget for the inner layer roughly
+according to how many registers that argument takes (unboxed tuples take
+multiple registers, see below), as determined by 'unariseArity'.
+Budget is spent when we have to pass a non-absent field as a parameter.
 
 To achieve this, we use the classic almost-circular programming technique in
 which we we write one pass that takes a lazy list of the Budgets for every
-layer.
+layer. The effect is that of a breadth-first search (over argument type and
+demand structure) to compute Budgets followed by a depth-first search to
+construct the product demands, but laziness allows us to do it all in one
+pass and without intermediate data structures.
+
+Suppose we have -fmax-worker-args=4 for the remainder of this Note.
+Then consider this example function:
+
+  boxed :: (Int, Int) -> (Int, (Int, Int, Int)) -> Int
+  boxed (a,b) (c, (d,e,f)) = a + b + c + d + e + f
+
+With a budget of 4 args to spend (number of args is only 2), we'd be served well
+to unbox both pairs, but not the triple. Indeed, that is what the algorithm
+computes, and the following pictogram shows how the budget layers are computed.
+Each layer is started with `n ~>`, where `n` is the budget at the start of the
+layer. We write -n~> when we spend budget (and n is the remaining budget) and
++n~> when we earn budget. We separate unboxed args with ][ and indicate
+inner budget threads becoming negative in braces {{}}, so that we see which
+unboxing decision we do *not* commit to. Without further ado:
+
+  4 ~> ][     (a,b) -3~>               ][     (c, ...) -2~>
+       ][      | |                     ][      |   |
+       ][      | +-------------+       ][      |   +-----------------+
+       ][      |               |       ][      |                     |
+       ][      v               v       ][      v                     v
+  2 ~> ][ +3~> a  -2~> ][      b  -1~> ][ +2~> c  -1~> ][        (d, e, f) -0~>
+       ][      |       ][      |       ][      |       ][ {{      |  |  |                          }}
+       ][      |       ][      |       ][      |       ][ {{      |  |  +----------------+         }}
+       ][      v       ][      v       ][      v       ][ {{      v  +------v            v         }}
+  0 ~> ][ +1~> I# -0~> ][ +1~> I# -0~> ][ +1~> I# -0~> ][ {{ +1~> d -0~> ][ e -(-1)~> ][ f -(-2)~> }}
+
+Unboxing increments the budget we have on the next layer (because we don't need
+to retain the boxed arg), but in turn the inner layer must afford to retain all
+non-absent fields, each decrementing the budget. Note how the budget becomes
+negative when trying to unbox the triple and the unboxing decision is "rolled
+back". This is done by the 'positiveTopBudget' guard.
+
+There's a bit of complication as a result of handling unboxed tuples correctly;
+specifically, handling nested unboxed tuples. Consider (#21737)
+
+  unboxed :: (Int, Int) -> (# Int, (# Int, Int, Int #) #) -> Int
+  unboxed (a,b) (# c, (# d, e, f #) #) = a + b + c + d + e + f
+
+Recall that unboxed tuples will be flattened to individual arguments during
+unarisation. Here, `unboxed` will have 5 arguments at runtime because of the
+nested unboxed tuple, which will be flattened to 4 args. So it's best to leave
+`(a,b)` boxed (because we already are above our arg threshold), but unbox `c`
+through `f` because that doesn't increase the number of args post unarisation.
+
+Note that the challenge is that syntactically, `(# d, e, f #)` occurs in a
+deeper layer than `(a, b)`. Treating unboxed tuples as a regular data type, we'd
+make the same unboxing decisions as for `boxed` above; although our starting
+budget is 5 (Here, the number of args is greater than -fmax-worker-args), it's
+not enough to unbox the triple (we'd finish with budget -1). So we'd unbox `a`
+through `c`, but not `d` through `f`, which is silly, because then we'd end up
+having 6 arguments at runtime, of which `d` through `f` weren't unboxed.
+
+Hence we pretend that the fields of unboxed tuples appear in the same budget
+layer as the tuple itself. For example at the top-level, `(# x,y #)` is to be
+treated just like two arguments `x` and `y`.
+Of course, for that to work, our budget calculations must initialise
+'max_wkr_args' to 5, based on the 'unariseArity' of each Core arg: That would be
+1 for the pair and 4 for the unboxed pair. Then when we decide whether to unbox
+the unboxed pair, we *directly* recurse into the fields, spending our budget
+on retaining `c` and (after recursing once more) `d` through `f` as arguments,
+depleting our budget completely in the first layer. Pictorially:
+
+  5 ~> ][         (a,b) -4~>             ][         (# c, ... #)
+       ][ {{      | |                 }} ][      c  -3~> ][ (# d, e, f #)
+       ][ {{      | +-------+         }} ][      |       ][      d  -2~> ][      e  -1~> ][      f  -0~>
+       ][ {{      |         |         }} ][      |       ][      |       ][      |       ][      |
+       ][ {{      v         v         }} ][      v       ][      v       ][      v       ][      v
+  0 ~> ][ {{ +1~> a -0~> ][ b -(-1)~> }} ][ +1~> I# -0~> ][ +1~> I# -0~> ][ +1~> I# -0~> ][ +1~> I# -0~>
+
+As you can see, we have no budget left to justify unboxing `(a,b)` on the second
+layer, which is good, because it would increase the number of args. Also note
+that we can still unbox `c` through `f` in this layer, because doing so has a
+net zero effect on budget.
 
 Note [The OPAQUE pragma and avoiding the reboxing of arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1795,10 +1877,17 @@ W/W-transformation code that boxed arguments of 'f' must definitely be passed
 along in boxed form and as such dissuade the creation of reboxing workers.
 -}
 
-data Budgets = MkB Arity Budgets   -- An infinite list of arity budgets
+-- | How many registers does this type take after unarisation?
+unariseArity :: Type -> Arity
+unariseArity ty = length (typePrimRep ty)
 
-incTopBudget :: Budgets -> Budgets
-incTopBudget (MkB n bg) = MkB (n+1) bg
+data Budgets = MkB !Arity Budgets   -- An infinite list of arity budgets
+
+earnTopBudget :: Budgets -> Budgets
+earnTopBudget (MkB n bg) = MkB (n+1) bg
+
+spendTopBudget :: Arity -> Budgets -> Budgets
+spendTopBudget m (MkB n bg) = MkB (n-m) bg
 
 positiveTopBudget :: Budgets -> Bool
 positiveTopBudget (MkB n _) = n >= 0
@@ -1811,7 +1900,8 @@ finaliseArgBoxities env fn arity rhs div
              -- Then there are no binders; we don't worker/wrapper; and we
              -- simply want to give f the same demand signature as g
 
-  | otherwise
+  | otherwise -- NB: arity is the threshold_arity, which might be less than
+              -- manifest arity for join points
   = -- pprTrace "finaliseArgBoxities" (
     --   vcat [text "function:" <+> ppr fn
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
@@ -1823,8 +1913,10 @@ finaliseArgBoxities env fn arity rhs div
   where
     opts            = ae_opts env
     (bndrs, _body)  = collectBinders rhs
-    max_wkr_args    = dmd_max_worker_args opts `max` arity
-                      -- See Note [Worker argument budget]
+    unarise_arity   = sum [ unariseArity (idType b) | b <- bndrs, isId b ]
+    max_wkr_args    = dmd_max_worker_args opts `max` unarise_arity
+                      -- This is the budget initialisation step of
+                      -- Note [Worker argument budget]
 
     -- This is the key line, which uses almost-circular programming
     -- The remaining budget from one layer becomes the initial
@@ -1868,22 +1960,49 @@ finaliseArgBoxities env fn arity rhs div
       = case wantToUnboxArg env ty str_mark dmd of
           DropAbsent -> (bg, dmd)
 
-          DontUnbox | is_bot_fn, isTyVarTy ty -> (decremented_bg, dmd)
-                    | otherwise               -> (decremented_bg, trimBoxity dmd)
+          DontUnbox | is_bot_fn, isTyVarTy ty -> (retain_budget, dmd)
+                    | otherwise               -> (retain_budget, trimBoxity dmd)
             -- If bot: Keep deep boxity even though WW won't unbox
             -- See Note [Boxity for bottoming functions] case (A)
             -- trimBoxity: see Note [No lazy, Unboxed demands in demand signature]
-
-          DoUnbox triples -> (MkB (bg_top-1) final_bg_inner, final_dmd)
             where
-              (bg_inner', dmds') = go_args (incTopBudget bg_inner) triples
-                     -- incTopBudget: give one back for the arg we are unboxing
+              retain_budget = spendTopBudget (unariseArity ty) bg
+                -- spendTopBudget: spend from our budget the cost of the
+                -- retaining the arg
+                -- The unboxed case does happen here, for example
+                --   app g x = g x :: (# Int, Int #)
+                -- here, `x` is used `L`azy and thus Boxed
+
+          DoUnbox triples
+            | isUnboxedTupleType ty
+            , (bg', dmds') <- go_args bg triples
+            -> (bg', n :* (mkProd Unboxed $! dmds'))
+                     -- See Note [Worker argument budget]
+                     -- unboxed tuples are always unboxed, deeply
+                     -- NB: Recurse with bg, *not* bg_inner! The unboxed fields
+                     -- are at the same budget layer.
+
+            | isUnboxedSumType ty
+            -> pprPanic "Unboxing through unboxed sum" (ppr fn <+> ppr ty)
+                     -- We currently don't return DoUnbox for unboxed sums.
+                     -- But hopefully we will at some point. When that happens,
+                     -- it would still be impossible to predict the effect
+                     -- of dropping absent fields and unboxing others on the
+                     -- unariseArity of the sum without losing sanity.
+                     -- We could overwrite bg_top with the one from
+                     -- retain_budget while still unboxing inside the alts as in
+                     -- the tuple case for a conservative solution, though.
+
+            | otherwise
+            -> (spendTopBudget 1 (MkB bg_top final_bg_inner), final_dmd)
+            where
+              (bg_inner', dmds') = go_args (earnTopBudget bg_inner) triples
+                     -- earnTopBudget: give back the cost of retaining the
+                     -- arg we are insted unboxing.
               dmd' = n :* (mkProd Unboxed $! dmds')
-              (final_bg_inner, final_dmd)
+              ~(final_bg_inner, final_dmd) -- "~": This match *must* be lazy!
                  | positiveTopBudget bg_inner' = (bg_inner', dmd')
                  | otherwise                   = (bg_inner,  trimBoxity dmd)
-      where
-        decremented_bg = MkB (bg_top-1) bg_inner
 
     add_demands :: [Demand] -> CoreExpr -> CoreExpr
     -- Attach the demands to the outer lambdas of this expression
