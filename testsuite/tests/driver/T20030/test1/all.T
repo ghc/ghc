@@ -10,6 +10,5 @@ test('T20030_test1j',
                    , 'D.hs' , 'E.hs-boot' , 'E.hs' , 'F.hs' , 'G.hs' , 'H.hs'
                    , 'I.hs', 'J.hs-boot', 'J.hs', 'K.hs' ])
      , req_smp
-     , js_broken(22261)
      ],
      multimod_compile, ['I.hs K.hs', '-v1 -j'])
