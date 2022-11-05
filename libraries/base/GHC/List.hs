@@ -83,6 +83,8 @@ head (x:_)              =  x
 head []                 =  badHead
 {-# NOINLINE [1] head #-}
 
+{-# WARNING in "x-partial" head "This is a partial function, it throws an error on empty lists. Use pattern matching or Data.List.uncons instead. Consider refactoring to use Data.List.NonEmpty." #-}
+
 badHead :: HasCallStack => a
 badHead = errorEmptyList "head"
 
@@ -128,6 +130,8 @@ uncons (x:xs)           = Just (x, xs)
 tail                    :: HasCallStack => [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
+
+{-# WARNING in "x-partial" tail "This is a partial function, it throws an error on empty lists. Replace it with drop 1, or use pattern matching or Data.List.uncons instead. Consider refactoring to use Data.List.NonEmpty." #-}
 
 -- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
 -- finite and non-empty.

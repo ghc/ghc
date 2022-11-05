@@ -1,6 +1,9 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.19.0.0 *TBA*
+  * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
+    Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
+    ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/87) and [#114](https://github.com/haskell/core-libraries-committee/issues/114))
   * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
   * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
     types significantly.
