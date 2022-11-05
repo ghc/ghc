@@ -953,6 +953,7 @@ exprMacros profile align_check = listToUFM [
     platform = profilePlatform profile
 
 -- we understand a subset of C-- primitives:
+machOps :: UniqFM FastString (Width -> MachOp)
 machOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "add",        MO_Add ),
@@ -1073,37 +1074,27 @@ callishMachOps platform = listToUFM $
         ( "suspendThread", (MO_SuspendThread,) ),
         ( "resumeThread",  (MO_ResumeThread,) ),
 
-        ("prefetch0", (MO_Prefetch_Data 0,)),
-        ("prefetch1", (MO_Prefetch_Data 1,)),
-        ("prefetch2", (MO_Prefetch_Data 2,)),
-        ("prefetch3", (MO_Prefetch_Data 3,)),
-
-        ( "popcnt8",  (MO_PopCnt W8,)),
-        ( "popcnt16", (MO_PopCnt W16,)),
-        ( "popcnt32", (MO_PopCnt W32,)),
-        ( "popcnt64", (MO_PopCnt W64,)),
-
-        ( "pdep8",  (MO_Pdep W8,)),
-        ( "pdep16", (MO_Pdep W16,)),
-        ( "pdep32", (MO_Pdep W32,)),
-        ( "pdep64", (MO_Pdep W64,)),
-
-        ( "pext8",  (MO_Pext W8,)),
-        ( "pext16", (MO_Pext W16,)),
-        ( "pext32", (MO_Pext W32,)),
-        ( "pext64", (MO_Pext W64,)),
-
-        ( "cmpxchg8",  (MO_Cmpxchg W8,)),
-        ( "cmpxchg16", (MO_Cmpxchg W16,)),
-        ( "cmpxchg32", (MO_Cmpxchg W32,)),
-        ( "cmpxchg64", (MO_Cmpxchg W64,)),
-
-        ( "xchg8",  (MO_Xchg W8,)),
-        ( "xchg16", (MO_Xchg W16,)),
-        ( "xchg32", (MO_Xchg W32,)),
-        ( "xchg64", (MO_Xchg W64,))
+        ( "prefetch0", (MO_Prefetch_Data 0,)),
+        ( "prefetch1", (MO_Prefetch_Data 1,)),
+        ( "prefetch2", (MO_Prefetch_Data 2,)),
+        ( "prefetch3", (MO_Prefetch_Data 3,))
+    ] ++ concat
+    [ allWidths "popcnt" MO_PopCnt
+    , allWidths "pdep" MO_Pdep
+    , allWidths "pext" MO_Pext
+    , allWidths "cmpxchg" MO_Cmpxchg
+    , allWidths "xchg" MO_Xchg
     ]
   where
+    allWidths
+        :: String
+        -> (Width -> CallishMachOp)
+        -> [(FastString, a -> (CallishMachOp, a))]
+    allWidths name f =
+        [ (mkFastString $ name ++ show (widthInBits w), (f w,))
+        | w <- [W8, W16, W32, W64]
+        ]
+
     memcpyLikeTweakArgs :: (Int -> CallishMachOp) -> [CmmExpr] -> (CallishMachOp, [CmmExpr])
     memcpyLikeTweakArgs op [] = pgmError "memcpy-like function requires at least one argument"
     memcpyLikeTweakArgs op args@(_:_) =
