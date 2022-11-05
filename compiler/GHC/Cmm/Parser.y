@@ -194,6 +194,20 @@ convention. Note if a field is longer than a word (e.g. a D_ on
 a 32-bit machine) then the call will push as many words as
 necessary to the stack to accommodate it (e.g. 2).
 
+Memory ordering
+---------------
+
+Cmm respects the C11 memory model and distinguishes between non-atomic and
+atomic memory accesses. In C11 fashion, atomic accesses can provide a number of
+memory ordering guarantees. These are supported in Cmm syntax as follows:
+
+    W_[ptr] = ...;            // a non-atomic store
+    %relaxed W_[ptr] = ...;   // an atomic store with relaxed ordering semantics
+    %release W_[ptr] = ...;   // an atomic store with release ordering semantics
+
+    x = W_(ptr);                     // a non-atomic load
+    (x) = prim %load_relaxed64(ptr); // a 64-bit atomic load with relaxed ordering
+    (x) = prim %load_acquire64(ptr); // a 64-bit atomic load with acquire ordering
 
 ----------------------------------------------------------------------------- -}
 
@@ -313,6 +327,10 @@ import qualified Data.ByteString.Char8 as BS8
         'True'  { L _ (CmmT_True ) }
         'False' { L _ (CmmT_False) }
         'likely'{ L _ (CmmT_likely)}
+        'relaxed'{ L _ (CmmT_Relaxed)}
+        'acquire'{ L _ (CmmT_Acquire)}
+        'release'{ L _ (CmmT_Release)}
+        'seq_cst'{ L _ (CmmT_SeqCst)}
 
         'CLOSURE'       { L _ (CmmT_CLOSURE) }
         'INFO_TABLE'    { L _ (CmmT_INFO_TABLE) }
@@ -627,8 +645,10 @@ stmt    :: { CmmParse () }
 
         | lreg '=' expr ';'
                 { do reg <- $1; e <- $3; withSourceNote $2 $4 (emitAssign reg e) }
+        | mem_ordering type '[' expr ']' '=' expr ';'
+                { do mord <- $1; withSourceNote $3 $8 (doStore (Just mord) $2 $4 $7) }
         | type '[' expr ']' '=' expr ';'
-                { withSourceNote $2 $7 (doStore $1 $3 $6) }
+                { withSourceNote $2 $7 (doStore Nothing $1 $3 $6) }
 
         -- Gah! We really want to say "foreign_results" but that causes
         -- a shift/reduce conflict with assignment.  We either
@@ -677,6 +697,14 @@ unwind_regs
                 { do e <- $3; rest <- $5; return (($1, e) : rest) }
         | GLOBALREG '=' expr_or_unknown
                 { do e <- $3; return [($1, e)] }
+
+-- | A memory ordering
+mem_ordering :: { CmmParse MemoryOrdering }
+mem_ordering
+        : 'relaxed' { do return MemOrderRelaxed }
+        | 'release' { do return MemOrderRelease }
+        | 'acquire' { do return MemOrderAcquire }
+        | 'seq_cst' { do return MemOrderSeqCst }
 
 -- | Used by unwind to indicate unknown unwinding values.
 expr_or_unknown
@@ -1084,6 +1112,11 @@ callishMachOps platform = listToUFM $
     , allWidths "pext" MO_Pext
     , allWidths "cmpxchg" MO_Cmpxchg
     , allWidths "xchg" MO_Xchg
+    , allWidths "load_relaxed" (\w -> MO_AtomicRead w MemOrderAcquire)
+    , allWidths "load_acquire" (\w -> MO_AtomicRead w MemOrderAcquire)
+    , allWidths "load_seqcst" (\w -> MO_AtomicRead w MemOrderSeqCst)
+    , allWidths "store_release" (\w -> MO_AtomicWrite w MemOrderRelease)
+    , allWidths "store_seqcst" (\w -> MO_AtomicWrite w MemOrderSeqCst)
     ]
   where
     allWidths
@@ -1338,8 +1371,12 @@ primCall results_code name args_code
                 let (p, args') = f args
                 code (emitPrimCall (map fst results) p args')
 
-doStore :: CmmType -> CmmParse CmmExpr  -> CmmParse CmmExpr -> CmmParse ()
-doStore rep addr_code val_code
+doStore :: Maybe MemoryOrdering
+        -> CmmType
+        -> CmmParse CmmExpr   -- ^ address
+        -> CmmParse CmmExpr   -- ^ value
+        -> CmmParse ()
+doStore mem_ord rep addr_code val_code
   = do platform <- getPlatform
        addr <- addr_code
        val <- val_code
@@ -1353,7 +1390,7 @@ doStore rep addr_code val_code
        let coerce_val
                 | val_width /= rep_width = CmmMachOp (MO_UU_Conv val_width rep_width) [val]
                 | otherwise              = val
-       emitStore addr coerce_val
+       emitStore mem_ord addr coerce_val
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions

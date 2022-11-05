@@ -231,8 +231,12 @@ emitLabel = code . F.emitLabel
 emitAssign :: CmmReg  -> CmmExpr -> CmmParse ()
 emitAssign l r = code (F.emitAssign l r)
 
-emitStore :: CmmExpr  -> CmmExpr -> CmmParse ()
-emitStore l r = code (F.emitStore l r)
+emitStore :: Maybe MemoryOrdering -> CmmExpr  -> CmmExpr -> CmmParse ()
+emitStore (Just mem_ord) l r = do
+  platform <- getPlatform
+  let w = typeWidth $ cmmExprType platform r
+  emit $ mkUnsafeCall (PrimTarget $ MO_AtomicWrite w mem_ord) [] [l,r]
+emitStore Nothing l r = code (F.emitStore l r)
 
 getCode :: CmmParse a -> CmmParse CmmAGraph
 getCode (EC ec) = EC $ \c e s -> do
