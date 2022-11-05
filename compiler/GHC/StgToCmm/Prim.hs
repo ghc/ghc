@@ -3011,7 +3011,7 @@ doAtomicReadAddr
 doAtomicReadAddr res addr ty =
     emitPrimCall
         [ res ]
-        (MO_AtomicRead (typeWidth ty))
+        (MO_AtomicRead (typeWidth ty) MemOrderSeqCst)
         [ addr ]
 
 -- | Emit an atomic write to a byte array that acts as a memory barrier.
@@ -3039,7 +3039,7 @@ doAtomicWriteAddr
 doAtomicWriteAddr addr ty val =
     emitPrimCall
         [ {- no results -} ]
-        (MO_AtomicWrite (typeWidth ty))
+        (MO_AtomicWrite (typeWidth ty) MemOrderSeqCst)
         [ addr, val ]
 
 doCasByteArray
