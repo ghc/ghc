@@ -1304,7 +1304,7 @@ lower_CallishMachOp lbl (MO_AtomicRMW w0 op) rs xs =
     CmmMayReturn
     rs
     xs
-lower_CallishMachOp lbl (MO_AtomicRead w0) [reg] [ptr] = do
+lower_CallishMachOp lbl (MO_AtomicRead w0 _) [reg] [ptr] = do
   SomeWasmExpr ty (WasmExpr ret_instr) <-
     lower_CmmLoad
       lbl
@@ -1313,7 +1313,7 @@ lower_CallishMachOp lbl (MO_AtomicRead w0) [reg] [ptr] = do
       NaturallyAligned
   ri <- onCmmLocalReg_Typed ty reg
   pure $ WasmStatements $ ret_instr `WasmConcat` WasmLocalSet ty ri
-lower_CallishMachOp lbl (MO_AtomicWrite _) [] [ptr, val] =
+lower_CallishMachOp lbl (MO_AtomicWrite _ _) [] [ptr, val] =
   lower_CmmStore lbl ptr val NaturallyAligned
 lower_CallishMachOp lbl (MO_Cmpxchg w0) rs xs = lower_MO_Cmpxchg lbl w0 rs xs
 lower_CallishMachOp lbl (MO_Xchg w0) rs xs =
