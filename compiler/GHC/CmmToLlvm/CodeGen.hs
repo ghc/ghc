@@ -46,7 +46,7 @@ import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
-type Atomic = Bool
+type Atomic = Maybe MemoryOrdering
 type LlvmStatements = OrdList LlvmStatement
 
 data Signage = Signed | Unsigned deriving (Eq, Show)
@@ -266,9 +266,9 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
     retVar <- doExprW targetTy $ AtomicRMW op ptrVar nVar SyncSeqCst
     statement $ Store retVar dstVar Nothing
 
-genCall (PrimTarget (MO_AtomicRead _ _)) [dst] [addr] = runStmtsDecls $ do
+genCall (PrimTarget (MO_AtomicRead _ mem_ord)) [dst] [addr] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
-    v1 <- genLoadW True addr (localRegType dst) NaturallyAligned
+    v1 <- genLoadW (Just mem_ord) addr (localRegType dst) NaturallyAligned
     statement $ Store v1 dstV Nothing
 
 genCall (PrimTarget (MO_Cmpxchg _width))
@@ -295,13 +295,14 @@ genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
     resVar <- doExprW (getVarType valVar) (AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst)
     statement $ Store resVar dstV Nothing
 
-genCall (PrimTarget (MO_AtomicWrite _width _)) [] [addr, val] = runStmtsDecls $ do
+genCall (PrimTarget (MO_AtomicWrite _width mem_ord)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
     let ptrTy = pLift $ getVarType valVar
         ptrExpr = Cast LM_Inttoptr addrVar ptrTy
     ptrVar <- doExprW ptrTy ptrExpr
-    statement $ Expr $ AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst
+    let ordering = convertMemoryOrdering mem_ord
+    statement $ Expr $ AtomicRMW LAO_Xchg ptrVar valVar ordering
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
@@ -1369,7 +1370,7 @@ exprToVarOpt opt e = case e of
         -> genLit opt lit
 
     CmmLoad e' ty align
-        -> genLoad False e' ty align
+        -> genLoad Nothing e' ty align
 
     -- Cmmreg in expression is the value, so must load. If you want actual
     -- reg pointer, call getCmmReg directly.
@@ -1901,7 +1902,8 @@ case we will need a more granular way of specifying alignment.
 
 mkLoad :: Atomic -> LlvmVar -> AlignmentSpec -> LlvmExpression
 mkLoad atomic vptr alignment
-  | atomic      = ALoad SyncSeqCst False vptr
+  | Just mem_ord <- atomic
+                = ALoad (convertMemoryOrdering mem_ord) False vptr
   | otherwise   = Load vptr align
   where
     ty = pLower (getVarType vptr)
@@ -2037,6 +2039,12 @@ genLit _ CmmHighStackMark
 -- -----------------------------------------------------------------------------
 -- * Misc
 --
+
+convertMemoryOrdering :: MemoryOrdering -> LlvmSyncOrdering
+convertMemoryOrdering MemOrderRelaxed = SyncUnord
+convertMemoryOrdering MemOrderAcquire = SyncAcquire
+convertMemoryOrdering MemOrderRelease = SyncRelease
+convertMemoryOrdering MemOrderSeqCst  = SyncSeqCst
 
 -- | Find CmmRegs that get assigned and allocate them on the stack
 --
