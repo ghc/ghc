@@ -1174,7 +1174,7 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                           (n_reg, n_code) <- getSomeReg n
                           return  (op dst dst (RIReg n_reg), n_code)
 
-genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
+genCCall (PrimTarget (MO_AtomicRead width _)) [dst] [addr]
  = do let fmt      = intFormat width
           reg_dst  = getLocalRegReg dst
           form     = if widthInBits width == 64 then DS else D
@@ -1201,7 +1201,7 @@ genCCall (PrimTarget (MO_AtomicRead width)) [dst] [addr]
 -- This is also what gcc does.
 
 
-genCCall (PrimTarget (MO_AtomicWrite width)) [] [addr, val] = do
+genCCall (PrimTarget (MO_AtomicWrite width _)) [] [addr, val] = do
     code <- assignMem_IntCode (intFormat width) addr val
     return $ unitOL HWSYNC `appOL` code
 
@@ -2068,8 +2068,8 @@ genCCall' config gcp target dest_regs args
                     MO_AtomicRMW {} -> unsupported
                     MO_Cmpxchg w -> (cmpxchgLabel w, False)
                     MO_Xchg w    -> (xchgLabel w, False)
-                    MO_AtomicRead _  -> unsupported
-                    MO_AtomicWrite _ -> unsupported
+                    MO_AtomicRead _ _  -> unsupported
+                    MO_AtomicWrite _ _ -> unsupported
 
                     MO_S_Mul2    {}  -> unsupported
                     MO_S_QuotRem {}  -> unsupported

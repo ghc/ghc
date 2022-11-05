@@ -266,7 +266,7 @@ genCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n] = runStmtsDecls $
     retVar <- doExprW targetTy $ AtomicRMW op ptrVar nVar SyncSeqCst
     statement $ Store retVar dstVar Nothing
 
-genCall (PrimTarget (MO_AtomicRead _)) [dst] [addr] = runStmtsDecls $ do
+genCall (PrimTarget (MO_AtomicRead _ _)) [dst] [addr] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
     v1 <- genLoadW True addr (localRegType dst) NaturallyAligned
     statement $ Store v1 dstV Nothing
@@ -295,7 +295,7 @@ genCall (PrimTarget (MO_Xchg _width)) [dst] [addr, val] = runStmtsDecls $ do
     resVar <- doExprW (getVarType valVar) (AtomicRMW LAO_Xchg ptrVar valVar SyncSeqCst)
     statement $ Store resVar dstV Nothing
 
-genCall (PrimTarget (MO_AtomicWrite _width)) [] [addr, val] = runStmtsDecls $ do
+genCall (PrimTarget (MO_AtomicWrite _width _)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
     let ptrTy = pLift $ getVarType valVar
@@ -1013,11 +1013,11 @@ cmmPrimOpFunctions mop = do
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported
 
-    MO_AtomicRead _  -> unsupported
-    MO_AtomicRMW _ _ -> unsupported
-    MO_AtomicWrite _ -> unsupported
-    MO_Cmpxchg _     -> unsupported
-    MO_Xchg _        -> unsupported
+    MO_AtomicRead _ _  -> unsupported
+    MO_AtomicRMW _ _   -> unsupported
+    MO_AtomicWrite _ _ -> unsupported
+    MO_Cmpxchg _       -> unsupported
+    MO_Xchg _          -> unsupported
 
     MO_I64_ToI       -> dontReach64
     MO_I64_FromI     -> dontReach64

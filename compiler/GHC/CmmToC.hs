@@ -949,8 +949,9 @@ pprCallishMachOp_for_C mop
         MO_AtomicRMW w amop -> ftext (atomicRMWLabel w amop)
         MO_Cmpxchg w        -> ftext (cmpxchgLabel w)
         MO_Xchg w           -> ftext (xchgLabel w)
-        MO_AtomicRead w     -> ftext (atomicReadLabel w)
-        MO_AtomicWrite w    -> ftext (atomicWriteLabel w)
+        -- TODO: handle orderings
+        MO_AtomicRead w _   -> ftext (atomicReadLabel w)
+        MO_AtomicWrite w _  -> ftext (atomicWriteLabel w)
         MO_UF_Conv w        -> ftext (word2FloatLabel w)
 
         MO_S_Mul2     {} -> unsupported

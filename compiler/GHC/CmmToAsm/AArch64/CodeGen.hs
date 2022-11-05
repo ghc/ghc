@@ -1535,8 +1535,8 @@ genCCall target dest_regs arg_regs bid = do
 
         -- -- Atomic read-modify-write.
         MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
-        MO_AtomicRead w     -> mkCCall (atomicReadLabel w)
-        MO_AtomicWrite w    -> mkCCall (atomicWriteLabel w)
+        MO_AtomicRead w _   -> mkCCall (atomicReadLabel w)
+        MO_AtomicWrite w _  -> mkCCall (atomicWriteLabel w)
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
         -- -- Should be an AtomicRMW variant eventually.
         -- -- Sequential consistent.

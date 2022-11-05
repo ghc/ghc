@@ -24,6 +24,7 @@ module GHC.Cmm.MachOp
     , machOpMemcpyishAlign
 
     -- Atomic read-modify-write
+    , MemoryOrdering(..)
     , AtomicMachOp(..)
    )
 where
@@ -666,10 +667,12 @@ data CallishMachOp
   | MO_BSwap Width
   | MO_BRev Width
 
-  -- Atomic read-modify-write.
+  -- | Atomic read-modify-write. Arguments are @[dest, n]@.
   | MO_AtomicRMW Width AtomicMachOp
-  | MO_AtomicRead Width
-  | MO_AtomicWrite Width
+  -- | Atomic read. Arguments are @[addr]@.
+  | MO_AtomicRead Width MemoryOrdering
+  -- | Atomic write. Arguments are @[addr, value]@.
+  | MO_AtomicWrite Width MemoryOrdering
   -- | Atomic compare-and-swap. Arguments are @[dest, expected, new]@.
   -- Sequentially consistent.
   -- Possible future refactoring: should this be an'MO_AtomicRMW' variant?
@@ -683,6 +686,14 @@ data CallishMachOp
   | MO_SuspendThread
   | MO_ResumeThread
   deriving (Eq, Show)
+
+-- | C11 memory ordering semantics.
+data MemoryOrdering
+  = MemOrderRelaxed  -- ^ relaxed ordering
+  | MemOrderAcquire  -- ^ acquire ordering
+  | MemOrderRelease  -- ^ release ordering
+  | MemOrderSeqCst   -- ^ sequentially consistent
+  deriving (Eq, Ord, Show)
 
 -- | The operation to perform atomically.
 data AtomicMachOp =
