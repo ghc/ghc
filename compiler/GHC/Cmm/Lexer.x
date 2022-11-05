@@ -94,6 +94,10 @@ $white_no_nl+           ;
   "!="                  { kw CmmT_Ne }
   "&&"                  { kw CmmT_BoolAnd }
   "||"                  { kw CmmT_BoolOr }
+  "%relaxed"            { kw CmmT_Relaxed }
+  "%acquire"            { kw CmmT_Acquire }
+  "%release"            { kw CmmT_Release }
+  "%seq_cst"            { kw CmmT_SeqCst  }
 
   "True"                { kw CmmT_True  }
   "False"               { kw CmmT_False }
@@ -183,6 +187,10 @@ data CmmToken
   | CmmT_False
   | CmmT_True
   | CmmT_likely
+  | CmmT_Relaxed
+  | CmmT_Acquire
+  | CmmT_Release
+  | CmmT_SeqCst
   deriving (Show)
 
 -- -----------------------------------------------------------------------------
