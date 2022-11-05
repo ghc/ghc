@@ -588,6 +588,7 @@ library
                  Trace.c
                  TraverseHeap.c
                  TraverseHeapTest.c
+                 TSANUtils.c
                  WSDeque.c
                  Weak.c
                  eventlog/EventLog.c

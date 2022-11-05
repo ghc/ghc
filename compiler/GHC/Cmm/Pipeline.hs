@@ -19,6 +19,7 @@ import GHC.Cmm.LayoutStack
 import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
+import GHC.Cmm.ThreadSanitizer
 
 import GHC.Types.Unique.Supply
 
@@ -97,6 +98,13 @@ cpsTop logger platform cfg proc =
                   runUniqSM $ cmmImplementSwitchPlans platform g
              else pure g
       dump Opt_D_dump_cmm_switch "Post switch plan" g
+
+      ----------- ThreadSanitizer instrumentation -----------------------------
+      g <- {-# SCC "annotateTSAN" #-}
+          if cmmOptThreadSanitizer cfg
+          then runUniqSM $ annotateTSAN platform g
+          else return g
+      dump Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
 
       ----------- Proc points -------------------------------------------------
       let

@@ -551,6 +551,13 @@ These flags dump various phases of GHC's C-\\- pipeline.
 
     Dump the results of the C-\\- control flow optimisation pass.
 
+.. ghc-flag:: -ddump-cmm-thread-sanitizer
+    :shortdesc: Dump the results of the C-\\- ThreadSanitizer elaboration pass.
+    :type: dynamic
+
+    Dump the results of the C-\\- pass responsible for adding instrumentation
+    added by :ghc-flag:`-fcmm-thread-sanitizer`.
+
 .. ghc-flag:: -ddump-cmm-cbe
     :shortdesc: Dump the results of common block elimination
     :type: dynamic
@@ -1074,6 +1081,15 @@ Checking for consistency
 
     Note that this is only intended to be used as a debugging measure, not as
     the primary means of catching out-of-bounds accesses.
+
+.. ghc-flag:: -fcmm-thread-sanitizer
+    :shortdesc: Enable ThreadSanitizer instrumentation of memory accesses.
+    :type: dynamic
+
+    This enables generation of `ThreadSanitizer
+    <https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual>`
+    instrumentation of memory accesses. Requires use of ``-fsanitize=thread``
+    or similar when compiling and linking.
 
 .. _checking-determinism:
 
