@@ -19,6 +19,7 @@ data CmmConfig = CmmConfig
   , cmmDoLinting           :: !Bool    -- ^ Do Cmm Linting Optimization or not
   , cmmOptElimCommonBlks   :: !Bool    -- ^ Eliminate common blocks or not
   , cmmOptSink             :: !Bool    -- ^ Perform sink after stack layout or not
+  , cmmOptThreadSanitizer  :: !Bool    -- ^ Instrument memory accesses for ThreadSanitizer
   , cmmGenStackUnwindInstr :: !Bool    -- ^ Generate stack unwinding instructions (for debugging)
   , cmmExternalDynamicRefs :: !Bool    -- ^ Generate code to link against dynamic libraries
   , cmmDoCmmSwitchPlans    :: !Bool    -- ^ Should the Cmm pass replace Stg switch statements

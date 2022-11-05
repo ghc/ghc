@@ -2438,6 +2438,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_cps)
   , make_ord_flag defGhcFlag "ddump-cmm-opt"
         (setDumpFlag Opt_D_dump_opt_cmm)
+  , make_ord_flag defGhcFlag "ddump-cmm-thread-sanitizer"
+        (setDumpFlag Opt_D_dump_cmm_thread_sanitizer)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
@@ -3515,8 +3517,8 @@ fFlagsDeps = [
         unless (platformOS (targetPlatform dflags) == OSDarwin && turn_on)
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
         return dflags)),
-  flagSpec "show-error-context"               Opt_ShowErrorContext
-
+  flagSpec "show-error-context"               Opt_ShowErrorContext,
+  flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer
   ]
   ++ fHoleFlags
 

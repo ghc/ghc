@@ -65,3 +65,10 @@ void AnnotateBenignRaceSized(const char *file,
 
 #define TSAN_ANNOTATE_BENIGN_RACE(addr,desc)                            \
     TSAN_ANNOTATE_BENIGN_RACE_SIZED((void*)(addr), sizeof(*addr), desc)
+
+
+uint64_t ghc_tsan_atomic64_compare_exchange(uint64_t *ptr, uint64_t expected, uint64_t new_value, int success_memorder, int failure_memorder);
+uint32_t ghc_tsan_atomic32_compare_exchange(uint32_t *ptr, uint32_t expected, uint32_t new_value, int success_memorder, int failure_memorder);
+uint16_t ghc_tsan_atomic16_compare_exchange(uint16_t *ptr, uint16_t expected, uint16_t new_value, int success_memorder, int failure_memorder);
+uint8_t ghc_tsan_atomic8_compare_exchange(uint8_t *ptr, uint8_t expected, uint8_t new_value, int success_memorder, int failure_memorder);
+
