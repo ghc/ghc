@@ -516,7 +516,7 @@ library
           c-sources: adjustor/NativeIA64.c
 
       -- Use assembler STG entrypoint on architectures where it is used
-      if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64)
+      if arch(ppc) || arch(ppc64) || arch(s390x) || arch(riscv64) || arch(loongarch64)
         asm-sources: StgCRunAsm.S
 
       c-sources: Adjustor.c

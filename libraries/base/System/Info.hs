@@ -89,6 +89,8 @@ os = HOST_OS
 --    * "powerpc64le"
 --    * "riscv32"
 --    * "riscv64"
+--    * "loongarch32"
+--    * "loongarch64"
 --    * "rs6000"
 --    * "s390"
 --    * "s390x"

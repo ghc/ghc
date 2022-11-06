@@ -56,6 +56,12 @@ case "$1" in
   riscv|riscv32*)
     $2="riscv32"
     ;;
+  loongarch64*)
+    $2="loongarch64"
+    ;;
+  loongarch32*)
+    $2="loongarch32"
+    ;;
   rs6000)
     $2="rs6000"
     ;;

@@ -162,6 +162,7 @@ GHC.Platform
 GHC.Platform.AArch64
 GHC.Platform.ARM
 GHC.Platform.Constants
+GHC.Platform.LoongArch64
 GHC.Platform.NoRegs
 GHC.Platform.PPC
 GHC.Platform.Profile

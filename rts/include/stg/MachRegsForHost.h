@@ -79,6 +79,10 @@
 #define MACHREGS_NO_REGS 1
 #endif
 
+#if defined(loongarch64_HOST_ARCH)
+#define MACHREGS_loongarch64  1
+#endif
+
 #endif
 
 #include "MachRegs.h"

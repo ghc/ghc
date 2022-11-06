@@ -44,6 +44,7 @@ data Arch
    | ArchMipseb
    | ArchMipsel
    | ArchRISCV64
+   | ArchLoongArch64
    | ArchJavaScript
    | ArchWasm32
    deriving (Read, Show, Eq, Ord)
@@ -134,6 +135,7 @@ stringEncodeArch = \case
   ArchMipseb        -> "mipseb"
   ArchMipsel        -> "mipsel"
   ArchRISCV64       -> "riscv64"
+  ArchLoongArch64   -> "loongarch64"
   ArchJavaScript    -> "js"
   ArchWasm32        -> "wasm32"
 

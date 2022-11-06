@@ -263,6 +263,7 @@ platformCConvNeedsExtension platform = case platformArch platform of
   ArchPPC_64 _ -> True
   ArchS390X    -> True
   ArchRISCV64  -> True
+  ArchLoongArch64 -> True
   ArchAArch64
       -- Apple's AArch64 ABI requires that the caller sign-extend
       -- small integer arguments. See

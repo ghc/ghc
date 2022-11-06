@@ -1015,6 +1015,7 @@ llvmOptions llvm_config dflags =
         abi :: String
         abi = case platformArch (targetPlatform dflags) of
                 ArchRISCV64 -> "lp64d"
+                ArchLoongArch64 -> "lp64d"
                 _           -> ""
 
 -- | What phase to run after one of the backend code generators has run

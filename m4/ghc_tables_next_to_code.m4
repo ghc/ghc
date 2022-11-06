@@ -17,7 +17,7 @@ AC_DEFUN([GHC_TABLES_NEXT_TO_CODE],
   case "$Unregisterised" in
       NO)
           case "$TargetArch" in
-              ia64|powerpc64|powerpc64le|s390x|wasm32)
+              ia64|powerpc64|powerpc64le|s390x|wasm32|loongarch64)
                   TablesNextToCodeDefault=NO
                   AC_MSG_RESULT([no])
                   ;;

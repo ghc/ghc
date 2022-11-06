@@ -118,6 +118,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
@@ -152,6 +153,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
@@ -185,6 +187,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")

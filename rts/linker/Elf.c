@@ -417,6 +417,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                      oc->fileName);
           return 0;
 #endif
+#if defined(EM_LOONGARCH)
+      case EM_LOONGARCH:  IF_DEBUG(linker,debugBelch( "loongarch64" ));
+          errorBelch("%s: RTS linker not implemented on loongarch64",
+                     oc->fileName);
+          return 0;
+#endif
        default:       IF_DEBUG(linker,debugBelch( "unknown" ));
                      errorBelch("%s: unknown architecture (e_machine == %d)"
                                 , oc->fileName, ehdr->e_machine);

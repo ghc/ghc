@@ -45,7 +45,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
         wasm32)
             test -z "[$]2" || eval "[$]2=ArchWasm32"
             ;;
-        hppa|hppa1_1|ia64|m68k|nios2|riscv32|rs6000|s390|sh4|vax)
+        loongarch64)
+            test -z "[$]2" || eval "[$]2=ArchLoongArch64"
+            ;;
+        hppa|hppa1_1|ia64|m68k|nios2|riscv32|loongarch32|rs6000|s390|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         js)

@@ -118,7 +118,8 @@ targetSupportsSMP = do
                             , "arm"
                             , "aarch64"
                             , "s390x"
-                            , "riscv64"]
+                            , "riscv64"
+                            , "loongarch64"]
   if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
        -- Unregisterised mode doesn't allow that.
      | unreg                -> return False

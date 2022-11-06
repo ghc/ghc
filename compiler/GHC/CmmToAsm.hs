@@ -166,6 +166,7 @@ nativeCodeGen logger config modLoc h us cmms
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchRISCV64   -> panic "nativeCodeGen: No NCG for RISCV64"
+      ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
       ArchWasm32    -> Wasm32.ncgWasm platform us modLoc h cmms

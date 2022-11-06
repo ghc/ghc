@@ -82,6 +82,9 @@ TARGETS=(
     # Linux riscv64
     "riscv64-unknown-linux-gnu"
     "riscv64-unknown-linux"
+    # Linux loongarch64
+    "loongarch64-unknown-linux-gnu"
+    "loongarch64-unknown-linux"
 
     #########################
     # Darwin

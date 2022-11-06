@@ -224,6 +224,7 @@ linearRegAlloc config entry_ids block_live sccs
       ArchMipseb     -> panic "linearRegAlloc ArchMipseb"
       ArchMipsel     -> panic "linearRegAlloc ArchMipsel"
       ArchRISCV64    -> panic "linearRegAlloc ArchRISCV64"
+      ArchLoongArch64-> panic "linearRegAlloc ArchLoongArch64"
       ArchJavaScript -> panic "linearRegAlloc ArchJavaScript"
       ArchWasm32     -> panic "linearRegAlloc ArchWasm32"
       ArchUnknown    -> panic "linearRegAlloc ArchUnknown"

@@ -5,7 +5,7 @@ AC_DEFUN([GHC_UNREGISTERISED],
 [
   AC_MSG_CHECKING(whether target supports a registerised ABI)
   case "$TargetArch" in
-      i386|x86_64|powerpc|powerpc64|powerpc64le|s390x|arm|aarch64|riscv64|wasm32|js)
+      i386|x86_64|powerpc|powerpc64|powerpc64le|s390x|arm|aarch64|riscv64|wasm32|js|loongarch64)
           UnregisterisedDefault=NO
           AC_MSG_RESULT([yes])
           ;;

@@ -370,6 +370,126 @@ StgReturn:
 	ret
 	.cfi_endproc
 	.size StgReturn, .-StgReturn
+
+#elif defined(loongarch64_HOST_ARCH)
+# define STACK_FRAME_SIZE (RESERVED_C_STACK_BYTES+160)
+	.text
+	.align 1
+	.globl StgRun
+	.type StgRun, @function
+StgRun:
+	.cfi_startproc
+	addi.d	$sp,$sp,-160
+	.cfi_def_cfa_offset 160
+	/* save callee-saved registers plus ra */
+	st.d	$ra,$sp,152
+	st.d    $fp,$sp,144
+	st.d	$s0,$sp,136
+	st.d	$s1,$sp,128
+	st.d	$s2,$sp,120
+	st.d	$s3,$sp,112
+	st.d	$s4,$sp,104
+	st.d	$s5,$sp,96
+	st.d	$s6,$sp,88
+	st.d	$s7,$sp,80
+	st.d	$s8,$sp,72
+	fst.d	$fs0,$sp,56
+	fst.d	$fs1,$sp,48
+	fst.d	$fs2,$sp,40
+	fst.d	$fs3,$sp,32
+	fst.d	$fs4,$sp,24
+	fst.d	$fs5,$sp,16
+	fst.d	$fs6,$sp,8
+	fst.d	$fs7,$sp,0
+	/* allocate stack frame */
+	li.d	$t0,RESERVED_C_STACK_BYTES
+	sub.d	$sp,$sp,$t0
+	.cfi_def_cfa_offset STACK_FRAME_SIZE
+	.cfi_offset 1, -8
+	.cfi_offset 22, -16
+	.cfi_offset 23, -24
+	.cfi_offset 24, -32
+	.cfi_offset 25, -40
+	.cfi_offset 26, -48
+	.cfi_offset 27, -56
+	.cfi_offset 28, -64
+	.cfi_offset 29, -72
+	.cfi_offset 30, -80
+	.cfi_offset 31, -88
+	.cfi_offset 56, -104
+	.cfi_offset 57, -112
+	.cfi_offset 58, -120
+	.cfi_offset 59, -128
+	.cfi_offset 60, -136
+	.cfi_offset 61, -144
+	.cfi_offset 62, -152
+	.cfi_offset 63, -160
+	/* set STGs BaseReg from LoongArch a1 */
+	move	$s0,$a1
+	/* jump to STG function */
+	jr	$a0
+	.cfi_endproc
+	.size StgRun, .-StgRun
+
+	.text
+	.align 2
+	.globl StgReturn
+	.type StgReturn, @function
+StgReturn:
+	.cfi_startproc
+	/* set return value from STGs R1 (LoongArch64 s3) */
+	move	$a0,$s3
+	/* deallocate stack frame */
+	li.d	$t0,RESERVED_C_STACK_BYTES
+	add.d	$sp,$sp,$t0
+	.cfi_def_cfa_offset 160
+	/* restore callee-saved registers and ra */
+	ld.d	$ra,$sp,152
+	.cfi_restore 1
+	ld.d	$fp,$sp,144
+	.cfi_restore 22
+	ld.d	$s0,$sp,136
+	.cfi_restore 23 
+	ld.d	$s1,$sp,128
+	.cfi_restore 24
+	ld.d	$s2,$sp,120
+	.cfi_restore 25
+	ld.d	$s3,$sp,112
+	.cfi_restore 26
+	ld.d	$s4,$sp,104
+	.cfi_restore 27
+	ld.d	$s5,$sp,96
+	.cfi_restore 28
+	ld.d	$s6,$sp,88
+	.cfi_restore 29
+	ld.d	$s7,$sp,80
+	.cfi_restore 30
+	ld.d	$s8,$sp,72
+	.cfi_restore 31
+	fld.d	$fs0,$sp,56
+	.cfi_restore 56
+	fld.d	$fs1,$sp,48
+	.cfi_restore 57
+	fld.d	$fs2,$sp,40
+	.cfi_restore 58
+	fld.d	$fs3,$sp,32
+	.cfi_restore 59
+	fld.d	$fs4,$sp,24
+	.cfi_restore 60
+	fld.d	$fs5,$sp,16
+	.cfi_restore 61
+	fld.d	$fs6,$sp,8
+	.cfi_restore 62
+	fld.d	$fs7,$sp,0
+	.cfi_restore 63
+	addi.d	$sp,$sp,160
+	.cfi_def_cfa_offset 0
+	/* jump back to caller of StgRun() */
+	ret
+	.cfi_endproc
+	.size StgReturn, .-StgReturn
+
+	.section	.note.GNU-stack,"",@progbits
 #endif
 
 #endif /* !USE_MINIINTERPRETER */
