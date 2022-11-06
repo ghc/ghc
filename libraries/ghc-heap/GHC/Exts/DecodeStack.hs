@@ -137,10 +137,27 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                 in
                   RetBig payloads
      RET_FUN -> let
-        t = getRetFunType# s# i#
+        t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
         size =  W# (getWord# s# i# (intToWord# offsetStgRetFunFrameSize))
         fun = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetFunFrameFun)) sfi
-        payload :: [CL.Closure]
+        payload =
+          -- TODO: Much duplication with RET_SMALL and RET_BIG
+          case t of
+              ARG_GEN_BIG ->
+                let
+                  !(# bitmapArray#, size# #) = getRetFunLargeBitmap# s# i#
+                  bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
+                  bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 2## #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
+                  payloads = map toBitmapPayload bes
+                in
+                  payloads
+              _ ->
+                let
+                  !(# bitmap#, size# #) = getRetFunSmallBitmap# s# i#
+                  bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 2## #))(W# bitmap#) (W# size#)
+                  payloads = map toBitmapPayload bes
+                in
+                  payloads
        in
         RetFun t size fun payload
      -- TODO: Decode update frame type
@@ -207,8 +224,6 @@ intToWord# i = int2Word# (toInt# i)
 
 foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
-foreign import prim "unpackUpdateeFromUpdateFramezh" unpackUpdateeFromUpdateFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
@@ -270,7 +285,7 @@ data StackFrame =
   StopFrame |
   RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
   RetBig { payload :: [BitmapPayload] } |
-  RetFun { retFunType :: RetFunType, size :: Word, fun :: CL.Closure, payload :: [CL.Closure]} |
+  RetFun { retFunType :: RetFunType, size :: Word, fun :: CL.Closure, payload :: [BitmapPayload]} |
   RetBCO
   deriving (Show)
 

@@ -1,4 +1,8 @@
+{-# LANGUAGE CPP #-}
 module GHC.Exts.StackConstants where
+
+-- TODO: Better expression to allow is only for the latest (this branch) GHC?
+#if MIN_VERSION_base(4,17,0)
 
 import           Prelude
 
@@ -43,3 +47,4 @@ offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun) + (#size StgHeader)
 
 offsetStgRetFunFramePayload :: Int
 offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload) + (#size StgHeader)
+#endif
