@@ -580,9 +580,8 @@ function test_hadrian() {
       local instdir="$TOP/_build/install"
       local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
       install_bindist _build/bindist/ghc-*/ "$instdir"
-      echo 'main = putStrLn "hello world"' > hello.hs
-      echo "hello world" > expected
-      run "$test_compiler" hello.hs
+      echo 'main = putStrLn "hello world"' > expected
+      run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
       $CROSS_EMULATOR ./hello > actual
       run diff expected actual
     else
