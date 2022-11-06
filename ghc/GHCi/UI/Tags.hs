@@ -61,7 +61,7 @@ data TagsKind = ETags | CTagsWithLineNumbers | CTagsWithRegExes
 
 ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
-  liftIO $ putStrLn "Tags generation from GHCi will be deprecated in future releases"
+  liftIO $ putStrLn "Tags generation from GHCi will be deprecated in GHC 9.8"
   liftIO $ putStrLn "Use the method described in https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/GHCi/Tags"
   createTagsFile kind file
 
