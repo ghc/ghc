@@ -37,10 +37,10 @@ import GHC.Generics ( Generic )
 -- reason/explanation from a WARNING or DEPRECATED pragma
 data WarningTxt pass
    = WarningTxt
-      (Located SourceText)
+      SourceText
       [Located (WithHsDocIdentifiers StringLiteral pass)]
    | DeprecatedTxt
-      (Located SourceText)
+      SourceText
       [Located (WithHsDocIdentifiers StringLiteral pass)]
   deriving Generic
 
@@ -49,12 +49,12 @@ deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
 instance Outputable (WarningTxt pass) where
     ppr (WarningTxt    lsrc ws)
-      = case unLoc lsrc of
+      = case lsrc of
           NoSourceText   -> pp_ws ws
           SourceText src -> text src <+> pp_ws ws <+> text "#-}"
 
     ppr (DeprecatedTxt lsrc  ds)
-      = case unLoc lsrc of
+      = case lsrc of
           NoSourceText   -> pp_ws ds
           SourceText src -> text src <+> pp_ws ds <+> text "#-}"
 
@@ -157,4 +157,3 @@ plusWarns NoWarnings d = d
 plusWarns _ (WarnAll t) = WarnAll t
 plusWarns (WarnAll t) _ = WarnAll t
 plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
-

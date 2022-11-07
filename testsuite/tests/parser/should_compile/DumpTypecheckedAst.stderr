@@ -3,12 +3,26 @@
 
 {Bag(LocatedA (HsBind Var)):
  [(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tcT}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -18,7 +32,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -28,7 +49,14 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -38,7 +66,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -48,7 +83,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -58,7 +100,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -68,14 +117,28 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsLit
                   (EpAnn
                    (Anchor
@@ -86,7 +149,14 @@
                     []))
                   {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -97,21 +167,49 @@
                   []))
                 {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -121,14 +219,28 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -144,7 +256,14 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsLit
           (EpAnn
            (Anchor
@@ -155,19 +274,47 @@
             []))
           {HsInt{64}Prim (1) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'MkT}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -177,7 +324,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -187,7 +341,14 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -197,7 +358,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -207,7 +375,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -217,7 +392,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -227,14 +409,28 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsLit
                   (EpAnn
                    (Anchor
@@ -245,7 +441,14 @@
                     []))
                   {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -256,21 +459,49 @@
                   []))
                 {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -280,14 +511,28 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -303,7 +548,14 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsLit
           (EpAnn
            (Anchor
@@ -314,19 +566,47 @@
             []))
           {HsInt{64}Prim (3) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tcPeano}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -336,7 +616,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -346,7 +633,14 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -356,7 +650,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -366,7 +667,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -376,7 +684,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -386,14 +701,28 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsLit
                   (EpAnn
                    (Anchor
@@ -404,7 +733,14 @@
                     []))
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -415,21 +751,49 @@
                   []))
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -439,14 +803,28 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -462,7 +840,14 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsLit
           (EpAnn
            (Anchor
@@ -473,19 +858,47 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: GHC.Types.krep$*})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'Zero}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -495,7 +908,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -505,7 +925,14 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -515,7 +942,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -525,7 +959,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -535,7 +976,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -545,14 +993,28 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsLit
                   (EpAnn
                    (Anchor
@@ -563,7 +1025,14 @@
                     []))
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -574,21 +1043,49 @@
                   []))
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -598,14 +1095,28 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -621,7 +1132,14 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsLit
           (EpAnn
            (Anchor
@@ -632,19 +1150,47 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'Succ}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -654,7 +1200,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -664,7 +1217,14 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -674,7 +1234,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -684,7 +1251,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -694,7 +1268,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -704,14 +1285,28 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsLit
                   (EpAnn
                    (Anchor
@@ -722,7 +1317,14 @@
                     []))
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -733,21 +1335,49 @@
                   []))
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -757,14 +1387,28 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsLit
                 (EpAnn
                  (Anchor
@@ -780,7 +1424,14 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsLit
           (EpAnn
            (Anchor
@@ -791,19 +1442,47 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -813,14 +1492,28 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsLit
         (EpAnn
          (Anchor
@@ -836,12 +1529,26 @@
           (False)
           (2)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -851,14 +1558,28 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsLit
         (EpAnn
          (Anchor
@@ -874,12 +1595,26 @@
           (False)
           (1)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -889,14 +1624,28 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsLit
         (EpAnn
          (Anchor
@@ -912,12 +1661,26 @@
           (False)
           (0)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -927,7 +1690,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -937,33 +1707,82 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -973,7 +1792,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -983,33 +1809,82 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: GHC.Types.krep$*})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1019,7 +1894,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1029,33 +1911,82 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1065,7 +1996,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1075,33 +2013,82 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1111,7 +2098,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1121,33 +2115,82 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (NameAnnTrailing
+            [])
+           (EpaComments
+            [])))
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1157,7 +2200,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1167,28 +2217,63 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: DumpTypecheckedAst.$tcT})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsPar
         (EpAnnNotUsed)
         (L
          (NoTokenLoc)
          (HsTok))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -1198,7 +2283,14 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -1208,7 +2300,14 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (XExpr
               (WrapExpr
                (HsWrap
@@ -1222,21 +2321,49 @@
                   []
                   []))))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (NameAnnTrailing
+                  [])
+                 (EpaComments
+                  [])))
                {Var: $krep})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsPar
             (EpAnnNotUsed)
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsApp
               (EpAnn
                (Anchor
@@ -1246,7 +2373,14 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsApp
                 (EpAnn
                  (Anchor
@@ -1256,7 +2390,14 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (XExpr
                   (WrapExpr
                    (HsWrap
@@ -1270,21 +2411,49 @@
                       []
                       []))))))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsVar
                   (NoExtField)
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   ((EpAnnS
+                     (Anchor
+                      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                      (UnchangedAnchor))
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      [])))
                    {Var: $krep})))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               ((EpAnnS
+                 (Anchor
+                  { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])))
                (HsPar
                 (EpAnnNotUsed)
                 (L
                  (NoTokenLoc)
                  (HsTok))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 ((EpAnnS
+                   (Anchor
+                    { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                    (UnchangedAnchor))
+                   (AnnListItem
+                    [])
+                   (EpaComments
+                    [])))
                  (HsApp
                   (EpAnn
                    (Anchor
@@ -1294,7 +2463,14 @@
                    (EpaComments
                     []))
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   ((EpAnnS
+                     (Anchor
+                      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                      (UnchangedAnchor))
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])))
                    (HsApp
                     (EpAnn
                      (Anchor
@@ -1304,7 +2480,14 @@
                      (EpaComments
                       []))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                     ((EpAnnS
+                       (Anchor
+                        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                        (UnchangedAnchor))
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
                      (XExpr
                       (WrapExpr
                        (HsWrap
@@ -1318,14 +2501,35 @@
                           []
                           []))))))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                     ((EpAnnS
+                       (Anchor
+                        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                        (UnchangedAnchor))
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
                      (HsVar
                       (NoExtField)
                       (L
-                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       ((EpAnnS
+                         (Anchor
+                          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                          (UnchangedAnchor))
+                         (NameAnnTrailing
+                          [])
+                         (EpaComments
+                          [])))
                        {Var: $krep})))))
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   ((EpAnnS
+                     (Anchor
+                      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                      (UnchangedAnchor))
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])))
                    (XExpr
                     (WrapExpr
                      (HsWrap
@@ -1348,12 +2552,26 @@
          (NoTokenLoc)
          (HsTok))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1363,7 +2581,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1373,21 +2598,49 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (NameAnnTrailing
+              [])
+             (EpaComments
+              [])))
            {Var: DumpTypecheckedAst.$tcPeano})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (XExpr
         (WrapExpr
          (HsWrap
@@ -1401,12 +2654,26 @@
             []
             []))))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   ((EpAnnS
+     (Anchor
+      { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$trModule}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     ((EpAnnS
+       (Anchor
+        { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+        (UnchangedAnchor))
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
      (HsApp
       (EpAnn
        (Anchor
@@ -1416,7 +2683,14 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsApp
         (EpAnn
          (Anchor
@@ -1426,21 +2700,42 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsPar
           (EpAnnNotUsed)
           (L
            (NoTokenLoc)
            (HsTok))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsApp
             (EpAnn
              (Anchor
@@ -1450,14 +2745,28 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (XExpr
               (ConLikeTc
                ({abstract:ConLike})
                []
                [])))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             ((EpAnnS
+               (Anchor
+                { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (HsLit
               (EpAnn
                (Anchor
@@ -1473,14 +2782,28 @@
            (NoTokenLoc)
            (HsTok))))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       ((EpAnnS
+         (Anchor
+          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+          (UnchangedAnchor))
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
        (HsPar
         (EpAnnNotUsed)
         (L
          (NoTokenLoc)
          (HsTok))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         ((EpAnnS
+           (Anchor
+            { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+            (UnchangedAnchor))
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
          (HsApp
           (EpAnn
            (Anchor
@@ -1490,14 +2813,28 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (XExpr
             (ConLikeTc
              ({abstract:ConLike})
              []
              [])))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           ((EpAnnS
+             (Anchor
+              { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+              (UnchangedAnchor))
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
            (HsLit
             (EpAnn
              (Anchor
@@ -1513,7 +2850,14 @@
          (NoTokenLoc)
          (HsTok))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+   ((EpAnnS
+     (Anchor
+      { DumpTypecheckedAst.hs:19:1-23 }
+      (UnchangedAnchor))
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
    (XHsBindsLR
     (AbsBinds
      []
@@ -1527,20 +2871,27 @@
      [({abstract:TcEvBinds})]
      {Bag(LocatedA (HsBind Var)):
       [(L
-        (SrcSpanAnn (EpAnn
-                     (Anchor
-                      { DumpTypecheckedAst.hs:19:1-23 }
-                      (UnchangedAnchor))
-                     (AnnListItem
-                      [])
-                     (EpaComments
-                      [])) { DumpTypecheckedAst.hs:19:1-23 })
+        ((EpAnnS
+          (Anchor
+           { DumpTypecheckedAst.hs:19:1-23 }
+           (UnchangedAnchor))
+          (AnnListItem
+           [])
+          (EpaComments
+           [])))
         (FunBind
          ((,)
           (WpHole)
           [])
          (L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+          ((EpAnnS
+            (Anchor
+             { DumpTypecheckedAst.hs:19:1-4 }
+             (UnchangedAnchor))
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             [])))
           {Var: main})
          (MG
           (MatchGroupTc
@@ -1554,12 +2905,26 @@
           (L
            (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
            [(L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+             ((EpAnnS
+               (Anchor
+                { DumpTypecheckedAst.hs:19:1-23 }
+                (UnchangedAnchor))
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
              (Match
               (EpAnnNotUsed)
               (FunRhs
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+                ((EpAnnS
+                  (Anchor
+                   { DumpTypecheckedAst.hs:19:1-4 }
+                   (UnchangedAnchor))
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   [])))
                 {Var: main})
                (Prefix)
                (NoSrcStrict))
@@ -1568,25 +2933,57 @@
                (EpaComments
                 [])
                [(L
-                 (SrcSpanAnn
-                  (EpAnnNotUsed)
-                  { DumpTypecheckedAst.hs:19:6-23 })
+                 (EpAnnS
+                  (Anchor
+                   { DumpTypecheckedAst.hs:19:6-23 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
                  (GRHS
                   (EpAnnNotUsed)
                   []
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-23 })
+                   ((EpAnnS
+                     (Anchor
+                      { DumpTypecheckedAst.hs:19:8-23 }
+                      (UnchangedAnchor))
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])))
                    (HsApp
                     (EpAnnNotUsed)
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-15 })
+                     ((EpAnnS
+                       (Anchor
+                        { DumpTypecheckedAst.hs:19:8-15 }
+                        (UnchangedAnchor))
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
                      (HsVar
                       (NoExtField)
                       (L
-                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       ((EpAnnS
+                         (Anchor
+                          { realSrcSpan:from:UnhelpfulSpan UnhelpfulNoLocationInfo:-1:-1 }
+                          (UnchangedAnchor))
+                         (NameAnnTrailing
+                          [])
+                         (EpaComments
+                          [])))
                        {Var: putStrLn})))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:17-23 })
+                     ((EpAnnS
+                       (Anchor
+                        { DumpTypecheckedAst.hs:19:17-23 }
+                        (UnchangedAnchor))
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
                      (HsLit
                       (EpAnn
                        (Anchor
@@ -1601,5 +2998,3 @@
                (EmptyLocalBinds
                 (NoExtField)))))]))))]}
      (False))))]}
-
-

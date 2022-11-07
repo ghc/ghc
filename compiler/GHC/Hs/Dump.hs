@@ -298,8 +298,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             srcSpanAnnC :: SrcSpanAnn' (EpAnn AnnContext) -> SDoc
             srcSpanAnnC = locatedAnn'' (text "SrcSpanAnnC")
 
-            srcSpanAnnN :: SrcSpanAnn' (EpAnn NameAnn) -> SDoc
-            srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
+            srcSpanAnnN :: EpAnnS NameAnn -> SDoc
+            srcSpanAnnN = locatedEpAnn'' (text "SrcSpanAnnN")
 
             locatedAnn'' :: forall a. (Typeable a, Data a)
               => SDoc -> SrcSpanAnn' a -> SDoc
@@ -319,13 +319,13 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               => SDoc -> EpAnnS a -> SDoc
             locatedEpAnn'' tag ss = parens $
               case cast ss of
-                Just (EpAnnS anc an cs :: EpAnnS a) ->
+                Just (anns :: EpAnnS a) ->
                   case ba of
                     BlankEpAnnotations
                       -> parens (text "blanked:" <+> tag)
                     NoBlankEpAnnotations
-                      -- -> showAstData' ann
-                      -> parens (text "EpAnnS" <+> showAstData' anc <+> showAstData' an <+> showAstData' cs)
+                      -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
                 Nothing -> text "locatedEpAnn:unmatched" <+> tag
                            <+> (parens $ text (showConstr (toConstr ss)))
 

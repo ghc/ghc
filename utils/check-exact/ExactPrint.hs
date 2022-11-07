@@ -485,7 +485,7 @@ printSourceText (SourceText   txt) _ =  printStringAdvance txt >> return ()
 -- ---------------------------------------------------------------------
 
 printStringAtSs :: (Monad m, Monoid w) => SrcSpan -> String -> EP w m ()
-printStringAtSs ss str = printStringAtRs (realSrcSpan ss) str >> return ()
+printStringAtSs ss str = printStringAtRs (realSrcSpan "aa" ss) str >> return ()
 
 printStringAtRs :: (Monad m, Monoid w) => RealSrcSpan -> String -> EP w m EpaLocation
 printStringAtRs pa str = printStringAtRsC CaptureComments pa str
@@ -566,8 +566,8 @@ printStringAtAAC capture (EpaDelta d cs) s = do
 -- ---------------------------------------------------------------------
 
 markExternalSourceText :: (Monad m, Monoid w) => SrcSpan -> SourceText -> String -> EP w m ()
-markExternalSourceText l NoSourceText txt   = printStringAtRs (realSrcSpan l) txt >> return ()
-markExternalSourceText l (SourceText txt) _ = printStringAtRs (realSrcSpan l) txt >> return ()
+markExternalSourceText l NoSourceText txt   = printStringAtRs (realSrcSpan "aa" l) txt >> return ()
+markExternalSourceText l (SourceText txt) _ = printStringAtRs (realSrcSpan "aa" l) txt >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -1427,21 +1427,21 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
   getAnnotationEntry = entryFromLocatedI
   setAnnotationAnchor = setAnchorAnI
 
-  exact (L (SrcSpanAnn an l) (WarningTxt (L la src) ws)) = do
+  exact (L (SrcSpanAnn an l) (WarningTxt src ws)) = do
     an0 <- markAnnOpenP an src "{-# WARNING"
     an1 <- markEpAnnL an0 lapr_rest AnnOpenS
     ws' <- markAnnotated ws
     an2 <- markEpAnnL an1 lapr_rest AnnCloseS
     an3 <- markAnnCloseP an2
-    return (L (SrcSpanAnn an3 l) (WarningTxt (L la src) ws'))
+    return (L (SrcSpanAnn an3 l) (WarningTxt src ws'))
 
-  exact (L (SrcSpanAnn an l) (DeprecatedTxt (L ls src) ws)) = do
+  exact (L (SrcSpanAnn an l) (DeprecatedTxt src ws)) = do
     an0 <- markAnnOpenP an src "{-# DEPRECATED"
     an1 <- markEpAnnL an0 lapr_rest AnnOpenS
     ws' <- markAnnotated ws
     an2 <- markEpAnnL an1 lapr_rest AnnCloseS
     an3 <- markAnnCloseP an2
-    return (L (SrcSpanAnn an3 l) (DeprecatedTxt (L ls src) ws'))
+    return (L (SrcSpanAnn an3 l) (DeprecatedTxt src ws'))
 
 -- ---------------------------------------------------------------------
 
@@ -2378,7 +2378,7 @@ instance ExactPrint HsIPName where
 
 prepareListAnnotationF :: (Monad m, Monoid w) =>
   EpAnn [AddEpAnn] -> [LDataFamInstDecl GhcPs] -> [(RealSrcSpan,EP w m Dynamic)]
-prepareListAnnotationF an ls = map (\b -> (realSrcSpan $ getLocA b, go b)) ls
+prepareListAnnotationF an ls = map (\b -> (realSrcSpan "aa" $ getLocA b, go b)) ls
   where
     go (L l a) = do
       d' <- markAnnotated (DataFamInstDeclWithContext an NotTopLevel a)
@@ -2386,7 +2386,7 @@ prepareListAnnotationF an ls = map (\b -> (realSrcSpan $ getLocA b, go b)) ls
 
 prepareListAnnotationA :: (Monad m, Monoid w, ExactPrint (LocatedAnS an a))
   => [LocatedAnS an a] -> [(RealSrcSpan,EP w m Dynamic)]
-prepareListAnnotationA ls = map (\b -> (realSrcSpan $ getLocA b,go b)) ls
+prepareListAnnotationA ls = map (\b -> (realSrcSpan "aa" $ getLocA b,go b)) ls
   where
     go b = do
       b' <- markAnnotated b

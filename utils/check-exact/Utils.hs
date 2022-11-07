@@ -321,7 +321,7 @@ name2String = showPprUnsafe
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
+locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan "locatedAnAnchor" l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------

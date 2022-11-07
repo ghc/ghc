@@ -62,7 +62,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" (Just addLocaLDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" (Just addLocaLDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
@@ -202,6 +202,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/Test20239.hs" Nothing
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
+ -- "../../testsuite/tests/hiefile/should_compile/hie003.hs" Nothing
+ "../../testsuite/tests/th/TH_dataD1.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -893,7 +895,7 @@ addHiding1 _libdir (L l p) = do
           n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar noExtField (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar noExtField (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2)))
-          impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan l0) m0)
+          impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan "aa" l0) m0)
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))
@@ -919,7 +921,7 @@ addHiding2 _libdir top = do
         let
           [L li imp1] = hsmodImports p
           Just (_,L lh ns) = ideclImportList imp1
-          lh' = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan (locI lh)) m0)
+          lh' = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan "aa" (locI lh)) m0)
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))

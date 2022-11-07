@@ -1,4 +1,4 @@
-
+{-# LANGUAGE TemplateHaskell #-}
 module TH_dataD1 where
 
 import Language.Haskell.TH
@@ -9,4 +9,3 @@ ds = [d|
                              [normalC (mkName "K") []] []
                ; return [d]})
        |]
-

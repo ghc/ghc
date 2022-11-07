@@ -57,12 +57,12 @@ module GHC.Parser.Annotation (
   reLoc, reLocI, reLocA, reLocE, reLocL, reLocC, reLocN,
   locN, locA,
 
-  la2r, lo2r, realSrcSpan,
+  la2r, realSrcSpan,
 
   -- ** Building up annotations
   extraToAnnList, reAnn,
   reAnnL, reAnnC,
-  addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorR, widenLocatedAn,
+  addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorS, widenLocatedAn,
   widenEpAnnS,
 
   -- ** Querying annotations
@@ -463,7 +463,7 @@ epaLocationRealSrcSpan (EpaSpan r) = r
 epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
-epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l)
+epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan "epaLocationFromSrcAnn" l)
 epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
 
 epaLocationFromEpAnnS :: EpAnnS ann -> EpaLocation
@@ -563,7 +563,9 @@ data AnchorOperation = UnchangedAnchor
 
 
 spanAsAnchor :: SrcSpan -> Anchor
-spanAsAnchor s  = Anchor (realSrcSpan s) UnchangedAnchor
+-- spanAsAnchor (RealSrcSpan s)  = Anchor s UnchangedAnchor
+-- spanAsAnchor _  = panic "spanAsAnchor"
+spanAsAnchor s  = Anchor (realSrcSpan "spanAsAnchor" s) UnchangedAnchor
 
 realSpanAsAnchor :: RealSrcSpan -> Anchor
 realSpanAsAnchor s  = Anchor s UnchangedAnchor
@@ -973,17 +975,16 @@ reLocN (L ln a) = L (locN ln) a
 
 -- ---------------------------------------------------------------------
 
-realSrcSpan :: SrcSpan -> RealSrcSpan
-realSrcSpan (RealSrcSpan s) = s
-realSrcSpan _ = mkRealSrcSpan l l Strict.Nothing -- AZ temporary
+realSrcSpan :: String -> SrcSpan -> RealSrcSpan
+realSrcSpan _ (RealSrcSpan s) = s
+realSrcSpan src s = mkRealSrcSpan l l Strict.Nothing -- AZ temporary
   where
-    l = mkRealSrcLoc (fsLit "from UnhelpfulSpan") (-1) (-1)
-
-lo2r :: SrcSpanAnn' a -> RealSrcSpan
-lo2r l = realSrcSpan (locI l)
+    -- l = mkRealSrcLoc (fsLit "from UnhelpfulSpan") (-1) (-1)
+    l = mkRealSrcLoc (fsLit ("realSrcSpan:from:" ++ show src)) (-1) (-1)
+    -- l = seq s $ error $ ("realSrcSpan:from:" ++ show src)
 
 la2r :: EpAnnS a -> RealSrcSpan
-la2r l = realSrcSpan (locA l)
+la2r l = realSrcSpan "la2r" (locA l)
 
 
 extraToAnnList :: AnnList -> [AddEpAnn] -> AnnList
@@ -1077,8 +1078,9 @@ widenRealSpan s as = foldl combineRealSrcSpans s (go as)
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
 
-widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
-widenAnchorR (Anchor s op) r = Anchor (combineRealSrcSpans s r) op
+widenAnchorS :: Anchor -> SrcSpan -> Anchor
+widenAnchorS (Anchor s op) (RealSrcSpan r) = Anchor (combineRealSrcSpans s r) op
+widenAnchorS anc _ = anc
 
 widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
 widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
@@ -1135,7 +1137,7 @@ combineSrcSpansI (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
   = case SrcSpanAnn (aa <> ab) (combineSrcSpans la lb) of
       SrcSpanAnn EpAnnNotUsed l -> SrcSpanAnn EpAnnNotUsed l
       SrcSpanAnn (EpAnn anc an cs) l ->
-        SrcSpanAnn (EpAnn (widenAnchorR anc (realSrcSpan l)) an cs) l
+        SrcSpanAnn (EpAnn (widenAnchorS anc l) an cs) l
 
 
 -- | Combine locations from two 'Located' things and add them to a third thing
@@ -1196,7 +1198,7 @@ comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
 -- AST prior to exact printing the changed one.
 addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan "addCommentsToSrcAnn" loc) UnchangedAnchor) mempty cs) loc
 addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
   = SrcSpanAnn (EpAnn a an (cs <> cs')) loc
 
@@ -1209,7 +1211,7 @@ addCommentsToEpAnnS (EpAnnS a an cs) cs' = (EpAnnS a an (cs <> cs'))
 -- AST prior to exact printing the changed one.
 setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan "setCommentsSrcAnn" loc) UnchangedAnchor) mempty cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
   = SrcSpanAnn (EpAnn a an cs) loc
 
@@ -1224,7 +1226,7 @@ setCommentsEpAnnS (EpAnnS a an _) cs = (EpAnnS a an cs)
 addCommentsToEpAnn :: (Monoid a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 addCommentsToEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+  = EpAnn (Anchor (realSrcSpan "addCommentsToEpAnn" loc) UnchangedAnchor) mempty cs
 addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
@@ -1232,7 +1234,7 @@ addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 setCommentsEpAnn :: (Monoid a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 setCommentsEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+  = EpAnn (Anchor (realSrcSpan "setCommentsEpAnn" loc) UnchangedAnchor) mempty cs
 setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
 -- | Transfer comments and trailing items from the annotations in the
