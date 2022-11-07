@@ -4275,10 +4275,10 @@ glN :: LocatedN a -> SrcSpan
 glN = getLocN
 
 glR :: Located a -> Anchor
-glR la = Anchor (realSrcSpan "glR" $ getLoc la) UnchangedAnchor
+glR la = spanAsAnchor$ getLoc la
 
 glRM :: Located a -> Maybe Anchor
-glRM (L (RealSrcSpan la) _) = Just $ Anchor la UnchangedAnchor
+glRM (L (RealSrcSpan la) _) = Just $ EpaSpan la
 glRM _ = Nothing
 
 glAA :: Located a -> EpaLocation
@@ -4288,19 +4288,19 @@ glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan "glRR" . getLoc
 
 glAR :: LocatedAnS t a -> Anchor
-glAR la = Anchor (realSrcSpan "glAR" $ getLocA la) UnchangedAnchor
+glAR la = spanAsAnchor $ getLocA la
 
 glIR :: LocatedAn t a -> Anchor
-glIR la = Anchor (realSrcSpan "glIR" $ getLocI la) UnchangedAnchor
+glIR la = spanAsAnchor $ getLocI la
 
 glNR :: LocatedN a -> Anchor
-glNR ln = Anchor (realSrcSpan "glNR" $ getLocN ln) UnchangedAnchor
+glNR ln = spanAsAnchor $ getLocN ln
 
 glNRR :: LocatedN a -> EpaLocation
 glNRR = EpaSpan <$> realSrcSpan "glNRR" . getLocN
 
 anc :: RealSrcSpan -> Anchor
-anc r = Anchor r UnchangedAnchor
+anc r = EpaSpan r
 
 acs :: MonadP m => (EpAnnComments -> Located a) -> m (Located a)
 acs a = do
@@ -4419,10 +4419,10 @@ parseModule :: P (Located (HsModule GhcPs))
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
 
 commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> (EpAnnS ann)
-commentsA loc cs = (EpAnnS (Anchor (rs loc) UnchangedAnchor) mempty cs)
+commentsA loc cs = (EpAnnS (spanAsAnchor loc) mempty cs)
 
 commentsI :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
-commentsI loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
+commentsI loc cs = SrcSpanAnn (EpAnn (spanAsAnchor loc) mempty cs) loc
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments

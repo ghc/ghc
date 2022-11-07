@@ -19,9 +19,11 @@ module GHC.Parser.Annotation (
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
+  anchor, anchor_op,
   EpAnnS(..),
   spanAsAnchor, realSpanAsAnchor,
   spanFromAnchor,
+  noSpanAnchor,
   noAnn,
 
   -- ** Comments in Annotations
@@ -417,7 +419,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- sort the relative order.
 data EpaLocation = EpaSpan !RealSrcSpan
                  | EpaDelta !DeltaPos ![LEpaComment]
-               deriving (Data,Eq)
+               deriving (Data,Eq,Show)
 
 -- | Tokens embedded in the AST have an EpaLocation, unless they come from
 -- generated code (e.g. by TH).
@@ -463,11 +465,11 @@ epaLocationRealSrcSpan (EpaSpan r) = r
 epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
-epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan "epaLocationFromSrcAnn" l)
-epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
+epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = spanAsAnchor l
+epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = anc
 
 epaLocationFromEpAnnS :: EpAnnS ann -> EpaLocation
-epaLocationFromEpAnnS (EpAnnS anc _ _) = EpaSpan (anchor anc)
+epaLocationFromEpAnnS (EpAnnS anc _ _) = anc
 
 
 instance Outputable EpaLocation where
@@ -545,12 +547,23 @@ data EpAnnS ann
                -- this `EpAnn` is attached to
             } deriving (Data, Eq, Functor)
 
-data Anchor = Anchor        { anchor :: !RealSrcSpan
-                                 -- ^ Base location for the start of
-                                 -- the syntactic element holding
-                                 -- the annotations.
-                            , anchor_op :: !AnchorOperation }
-        deriving (Data, Eq, Show)
+-- data Anchor = Anchor        { anchor :: !RealSrcSpan
+--                                  -- ^ Base location for the start of
+--                                  -- the syntactic element holding
+--                                  -- the annotations.
+--                             , anchor_op :: !AnchorOperation }
+--         deriving (Data, Eq, Show)
+
+type Anchor = EpaLocation -- Transitional
+
+anchor :: Anchor -> RealSrcSpan
+anchor (EpaSpan r) = r
+-- anchor (EpaDelta _ _) = panic "anchor"
+anchor (EpaDelta _ _) = placeholderRealSpan
+
+anchor_op :: Anchor -> AnchorOperation
+anchor_op (EpaSpan _) = UnchangedAnchor
+anchor_op (EpaDelta dp _) = MovedAnchor dp
 
 -- | If tools modify the parsed source, the 'MovedAnchor' variant can
 -- directly provide the spacing for this item relative to the previous
@@ -565,13 +578,18 @@ data AnchorOperation = UnchangedAnchor
 spanAsAnchor :: SrcSpan -> Anchor
 -- spanAsAnchor (RealSrcSpan s)  = Anchor s UnchangedAnchor
 -- spanAsAnchor _  = panic "spanAsAnchor"
-spanAsAnchor s  = Anchor (realSrcSpan "spanAsAnchor" s) UnchangedAnchor
+spanAsAnchor (RealSrcSpan s)  = EpaSpan s
+spanAsAnchor _  = noSpanAnchor
 
 realSpanAsAnchor :: RealSrcSpan -> Anchor
-realSpanAsAnchor s  = Anchor s UnchangedAnchor
+realSpanAsAnchor s = EpaSpan s
 
 spanFromAnchor :: Anchor -> SrcSpan
-spanFromAnchor (Anchor r _) = RealSrcSpan r
+spanFromAnchor (EpaSpan r) = RealSrcSpan r
+spanFromAnchor (EpaDelta _ _) = UnhelpfulSpan (UnhelpfulOther (fsLit "spanFromAnchor"))
+
+noSpanAnchor :: Anchor
+noSpanAnchor =  EpaDelta (SameLine 0) []
 
 -- ---------------------------------------------------------------------
 
@@ -947,13 +965,13 @@ nn2li (EpAnnS anc _ cs) = EpAnnS anc (AnnListItem []) cs
 
 -- TODO:AZ merge locN into locA
 locN :: EpAnnS ann -> SrcSpan
-locN a = RealSrcSpan $ anchor $ s_entry a
+locN a = spanFromAnchor $ s_entry a
 
 locA :: EpAnnS ann -> SrcSpan
-locA a = RealSrcSpan $ anchor $ s_entry a
+locA a = spanFromAnchor $ s_entry a
 
 reLoc :: LocatedAnS ann e -> Located e
-reLoc (L la a) = L (RealSrcSpan $ anchor $ s_entry la ) a
+reLoc (L la a) = L (spanFromAnchor $ s_entry la ) a
 
 reLocI :: LocatedAn a e -> Located e
 reLocI (L (SrcSpanAnn _ l) a) = L l a
@@ -980,8 +998,8 @@ realSrcSpan _ (RealSrcSpan s) = s
 realSrcSpan src s = mkRealSrcSpan l l Strict.Nothing -- AZ temporary
   where
     -- l = mkRealSrcLoc (fsLit "from UnhelpfulSpan") (-1) (-1)
-    l = mkRealSrcLoc (fsLit ("realSrcSpan:from:" ++ show src)) (-1) (-1)
-    -- l = seq s $ error $ ("realSrcSpan:from:" ++ show src)
+    -- l = mkRealSrcLoc (fsLit ("realSrcSpan:from:" ++ show src)) (-1) (-1)
+    l = seq s $ error $ ("realSrcSpan:from:" ++ show src)
 
 la2r :: EpAnnS a -> RealSrcSpan
 la2r l = realSrcSpan "la2r" (locA l)
@@ -1014,7 +1032,7 @@ noLocA = L (EpAnnS (spanAsAnchor noSrcSpan) mempty emptyComments)
 
 -- AZ:TODO merge getLocN and getLocA
 getLocA :: LocatedAnS a e -> SrcSpan
-getLocA (L (EpAnnS anc _ _) _) = RealSrcSpan $ anchor anc
+getLocA (L (EpAnnS anc _ _) _) = spanFromAnchor anc
 
 getLocN :: LocatedAnS an a -> SrcSpan
 getLocN (L l _) = locN l
@@ -1050,7 +1068,7 @@ addAnns (EpAnn l as1 cs) as2 cs2
   = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
 addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
 addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
-addAnns EpAnnNotUsed as cs = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
+addAnns EpAnnNotUsed as cs = EpAnn (widenAnchor noSpanAnchor as) as cs
 
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
@@ -1075,11 +1093,25 @@ widenRealSpan s as = foldl combineRealSrcSpans s (go as)
     go (AddEpAnn _ (EpaSpan s):rest) = s : go rest
     go (AddEpAnn _ (EpaDelta _ _):rest) =     go rest
 
+realSpanFromAnns :: [AddEpAnn] -> Maybe RealSrcSpan
+realSpanFromAnns as = go Nothing as
+  where
+    combine Nothing r = Just r
+    combine (Just l) r = Just $ combineRealSrcSpans l r
+
+    go acc [] = acc
+    go acc (AddEpAnn _ (EpaSpan s):rest)    = go (combine acc s) rest
+    go acc (AddEpAnn _ (EpaDelta _ _):rest) = go acc rest
+
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
-widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
+widenAnchor (EpaSpan s) as = EpaSpan (widenRealSpan s as)
+widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
+                                    Nothing -> a
+                                    Just r -> EpaSpan r
 
 widenAnchorS :: Anchor -> SrcSpan -> Anchor
-widenAnchorS (Anchor s op) (RealSrcSpan r) = Anchor (combineRealSrcSpans s r) op
+widenAnchorS (EpaSpan s) (RealSrcSpan r) = EpaSpan (combineRealSrcSpans s r)
+widenAnchorS (EpaDelta _ _) (RealSrcSpan r) = EpaSpan r
 widenAnchorS anc _ = anc
 
 widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
@@ -1181,14 +1213,14 @@ data NoEpAnns = NoEpAnns
   deriving (Data,Eq,Ord)
 
 noComments ::EpAnnCO
-noComments = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) NoEpAnns emptyComments
+noComments = EpAnn noSpanAnchor NoEpAnns emptyComments
 
 -- TODO:AZ get rid of this
 placeholderRealSpan :: RealSrcSpan
 placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1)) Strict.Nothing
 
 comment :: RealSrcSpan -> EpAnnComments -> EpAnnCO
-comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
+comment loc cs = EpAnn (EpaSpan loc) NoEpAnns cs
 
 -- ---------------------------------------------------------------------
 -- Utilities for managing comments in an `EpAnn a` structure.
@@ -1198,7 +1230,7 @@ comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
 -- AST prior to exact printing the changed one.
 addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan "addCommentsToSrcAnn" loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (spanAsAnchor loc) mempty cs) loc
 addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
   = SrcSpanAnn (EpAnn a an (cs <> cs')) loc
 
@@ -1211,7 +1243,7 @@ addCommentsToEpAnnS (EpAnnS a an cs) cs' = (EpAnnS a an (cs <> cs'))
 -- AST prior to exact printing the changed one.
 setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan "setCommentsSrcAnn" loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (spanAsAnchor  loc) mempty cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
   = SrcSpanAnn (EpAnn a an cs) loc
 
@@ -1226,7 +1258,7 @@ setCommentsEpAnnS (EpAnnS a an _) cs = (EpAnnS a an cs)
 addCommentsToEpAnn :: (Monoid a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 addCommentsToEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan "addCommentsToEpAnn" loc) UnchangedAnchor) mempty cs
+  = EpAnn (spanAsAnchor loc) mempty cs
 addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
@@ -1234,7 +1266,7 @@ addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 setCommentsEpAnn :: (Monoid a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 setCommentsEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan "setCommentsEpAnn" loc) UnchangedAnchor) mempty cs
+  = EpAnn (spanAsAnchor loc) mempty cs
 setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
 -- | Transfer comments and trailing items from the annotations in the
@@ -1290,11 +1322,15 @@ instance (Semigroup a) => Semigroup (EpAnnS a) where
    -- largest span
 
 
-instance Ord Anchor where
-  compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
+-- instance Ord Anchor where
+--   compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
 
 instance Semigroup Anchor where
-  Anchor r1 o1 <> Anchor r2 _ = Anchor (combineRealSrcSpans r1 r2) o1
+  EpaSpan r1       <> EpaSpan r2        = EpaSpan (combineRealSrcSpans r1 r2)
+  EpaSpan r1       <> _                 = EpaSpan r1
+  _                <> EpaSpan r2        = EpaSpan r2
+  EpaDelta dp1 cs1 <> EpaDelta _dp2 cs2 = EpaDelta dp1 (cs1<>cs2)
+
 
 instance Semigroup EpAnnComments where
   EpaComments cs1 <> EpaComments cs2 = EpaComments (cs1 ++ cs2)
@@ -1354,8 +1390,8 @@ instance (Outputable a) => Outputable (EpAnn a) where
 instance Outputable NoEpAnns where
   ppr NoEpAnns = text "NoEpAnns"
 
-instance Outputable Anchor where
-  ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
+-- instance Outputable Anchor where
+--   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
 
 instance Outputable AnchorOperation where
   ppr UnchangedAnchor   = text "UnchangedAnchor"

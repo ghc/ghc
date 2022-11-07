@@ -228,11 +228,11 @@ instance HasEntry (SrcSpanAnn' (EpAnn an)) where
   fromAnn (SrcSpanAnn an _) = fromAnn an
 
 instance HasEntry (EpAnn a) where
-  fromAnn (EpAnn anchor _ cs) = mkEntry anchor cs
+  fromAnn (EpAnn anc _ cs) = mkEntry anc cs
   fromAnn EpAnnNotUsed = NoEntryVal
 
 instance HasEntry (EpAnnS a) where
-  fromAnn (EpAnnS anchor _ cs) = mkEntry anchor cs
+  fromAnn (EpAnnS anc _ cs) = mkEntry anc cs
 
 -- ---------------------------------------------------------------------
 
@@ -331,10 +331,10 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   setExtraDP Nothing
   let edp = case med of
         Nothing -> edp''
-        Just (Anchor _ (MovedAnchor dp)) -> dp
+        Just (EpaDelta dp _) -> dp
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
-        Just (Anchor r _) -> dp
+        Just (EpaSpan r) -> dp
           where
             dp = adjustDeltaForOffset
                    off (ss2delta priorEndAfterComments r)
@@ -371,7 +371,8 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
       mapM_ printOneComment (map tokComment $ getFollowingComments cs)
       debugM $ "ending trailing comments"
 
-  let newAchor = anchor' { anchor_op = MovedAnchor edp }
+  -- let newAchor = anchor' { anchor_op = MovedAnchor edp }
+  let newAchor = EpaDelta edp []
   let r = case canUpdateAnchor of
             CanUpdateAnchor -> setAnnotationAnchor a' newAchor (mkEpaComments (priorCs++ postCs) [])
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor emptyComments
@@ -1246,7 +1247,7 @@ printOneComment c@(Comment _str loc _r _mo) = do
         adjustDeltaForOffsetM dp
   mep <- getExtraDP
   dp' <- case mep of
-    Just (Anchor _ (MovedAnchor edp)) -> do
+    Just (EpaDelta edp _) -> do
       debugM $ "printOneComment:edp=" ++ show edp
       ddd <- fmap unTweakDelta $ adjustDeltaForOffsetM edp
       debugM $ "printOneComment:ddd=" ++ show ddd
@@ -1272,7 +1273,8 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
   -- debugM $ "updateAndApplyComment: (dp,anc',co)=" ++ showAst (dp,anc',co)
   applyComment (Comment str anc' pp mo)
   where
-    anc' = anc { anchor_op = op}
+    -- anc' = anc { anchor_op = op}
+    anc' = op
 
     (r,c) = ss2posEnd pp
     la = anchor anc
@@ -1284,13 +1286,12 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
              else dp''
     op' = case dp' of
             SameLine n -> if n >= 0
-                            then MovedAnchor dp'
-                            else MovedAnchor dp
-            _ -> MovedAnchor dp'
-    op = if str == "" && op' == MovedAnchor (SameLine 0) -- EOF comment
-           then MovedAnchor dp
-           -- else op'
-           else MovedAnchor dp
+                            then EpaDelta dp' []
+                            else EpaDelta dp  []
+            _ -> EpaDelta dp' []
+    op = if str == "" && op' == EpaDelta (SameLine 0) [] -- EOF comment
+           then EpaDelta dp []
+           else EpaDelta dp []
 
 -- ---------------------------------------------------------------------
 
@@ -4136,7 +4137,7 @@ printUnicode anc n = do
   loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
   case loc of
     EpaSpan _ -> return anc
-    EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp }
+    EpaDelta dp [] -> return $ EpaDelta dp []
     EpaDelta _ _cs -> error "printUnicode should not capture comments"
 
 
@@ -4582,9 +4583,9 @@ instance ExactPrint (Pat GhcPs) where
   setAnnotationAnchor (SigPat an a b)          anc cs = (SigPat (setAnchorEpa an anc cs) a b)
 
   exact (WildPat w) = do
-    anchor <- getAnchorU
-    debugM $ "WildPat:anchor=" ++ show anchor
-    _ <- printStringAtRs anchor "_"
+    anc <- getAnchorU
+    debugM $ "WildPat:anc=" ++ show anc
+    _ <- printStringAtRs anc "_"
     return (WildPat w)
   exact (VarPat x n) = do
     -- The parser inserts a placeholder value for a record pun rhs. This must be

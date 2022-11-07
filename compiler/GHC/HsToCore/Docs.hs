@@ -252,7 +252,9 @@ mkMaps env instances decls =
     mappings (L (EpAnnS anc _ _ ) decl, doc) =
            (dm, am)
       where
-        l = anchor anc
+        l = case anc of
+          EpaSpan s -> Just s
+          EpaDelta _ _ -> Nothing
         args = declTypeDocs decl
 
         subs :: [(Name, [HsDoc GhcRn], IntMap (HsDoc GhcRn))]
@@ -268,9 +270,10 @@ mkMaps env instances decls =
     instanceMap :: Map RealSrcSpan Name
     instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l <- [getSrcSpan n] ]
 
-    names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
+    names :: Maybe RealSrcSpan -> HsDecl GhcRn -> [Name]
     names _ (InstD _ d) = maybeToList $ lookupSrcSpan (getInstLoc d) instanceMap
-    names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
+    names (Just l) (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
+    names Nothing  (DerivD {}) = []
     names _ decl = getMainDeclBinder env decl
 
 {-

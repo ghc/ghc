@@ -610,7 +610,7 @@ instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
 instance ToHie (IEContext (LocatedA ModuleName)) where
-  toHie (IEC c (L (EpAnnS (Anchor span _) _ _) mname)) = do
+  toHie (IEC c (L (EpAnnS (EpaSpan span) _ _) mname)) = do
       org <- ask
       pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
