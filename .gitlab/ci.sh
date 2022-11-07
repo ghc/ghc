@@ -250,6 +250,11 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
+  case $CONFIGURE_WRAPPER in
+    emconfigure) time_it "setup" setup_emscripten ;;
+    *) ;;
+  esac
+
   case $toolchain_source in
     extracted) time_it "setup" setup_toolchain ;;
     *) ;;
@@ -364,6 +369,15 @@ function setup_toolchain() {
 
   info "Building alex..."
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
+}
+
+function setup_emscripten() {
+  git clone https://github.com/emscripten-core/emsdk.git
+  cd emsdk
+  ./emsdk install latest
+  ./emsdk activate latest
+  source ./emsdk_env.sh
+  cd ..
 }
 
 function cleanup_submodules() {
