@@ -109,6 +109,11 @@ bignumString :: BignumBackend -> String
 bignumString Gmp = "gmp"
 bignumString Native = "native"
 
+data CrossEmulator
+  = NoEmulator
+  | NoEmulatorNeeded
+  | Emulator String
+
 -- | A BuildConfig records all the options which can be modified to affect the
 -- bindists produced by the compiler.
 data BuildConfig
@@ -120,7 +125,7 @@ data BuildConfig
                 , withAssertions :: Bool
                 , withNuma       :: Bool
                 , crossTarget    :: Maybe String
-                , crossEmulator  :: Maybe String
+                , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
@@ -164,7 +169,7 @@ vanilla = BuildConfig
   , withAssertions = False
   , withNuma = False
   , crossTarget = Nothing
-  , crossEmulator = Nothing
+  , crossEmulator = NoEmulator
   , configureWrapper = Nothing
   , fullyStatic = False
   , tablesNextToCode = True
@@ -197,7 +202,7 @@ staticNativeInt :: BuildConfig
 staticNativeInt = static { bignumBackend = Native }
 
 crossConfig :: String       -- ^ target triple
-            -> Maybe String -- ^ emulator for testing
+            -> CrossEmulator -- ^ emulator for testing
             -> Maybe String -- ^ Configure wrapper
             -> BuildConfig
 crossConfig triple emulator configure_wrapper =
@@ -642,7 +647,12 @@ job arch opsys buildConfig = (jobName, Job {..})
       , "CONFIGURE_ARGS" =: configureArgsStr buildConfig
       , maybe mempty ("CONFIGURE_WRAPPER" =:) (configureWrapper buildConfig)
       , maybe mempty ("CROSS_TARGET" =:) (crossTarget buildConfig)
-      , maybe mempty ("CROSS_EMULATOR" =:) (crossEmulator buildConfig)
+      , case crossEmulator buildConfig of
+          NoEmulator       -> case crossTarget buildConfig of
+            Nothing -> mempty
+            Just _  -> "CROSS_EMULATOR" =: "NOT_SET" -- we need an emulator but it isn't set. Won't run the testsuite
+          Emulator s       -> "CROSS_EMULATOR" =: s
+          NoEmulatorNeeded -> "CROSS_EMULATOR" =: "NOT_NEEDED"
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
       ]
 
@@ -818,8 +828,8 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" (Just "") (Just "emconfigure")
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure")
         )
         { bignumBackend = Native
         , buildFlavour  = Release

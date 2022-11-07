@@ -594,20 +594,18 @@ function test_hadrian() {
   fi
 
 
-  if [ -n "${CROSS_TARGET:-}" ]; then
-    if [ -n "${CROSS_EMULATOR:-}" ]; then
-      local instdir="$TOP/_build/install"
-      local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
-      install_bindist _build/bindist/ghc-*/ "$instdir"
-      echo 'main = putStrLn "hello world"' > hello.hs
-      echo "hello world" > expected
-      run "$test_compiler" hello.hs
-      $CROSS_EMULATOR ./hello > actual
-      run diff expected actual
-    else
-      info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
-      return
-    fi
+  if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
+    info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
+    return
+  elif[[ "${CROSS_EMULATOR:-}" != "NOT_NEEDED" ]]; then
+    local instdir="$TOP/_build/install"
+    local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
+    install_bindist _build/bindist/ghc-*/ "$instdir"
+    echo 'main = putStrLn "hello world"' > hello.hs
+    echo "hello world" > expected
+    run "$test_compiler" hello.hs
+    $CROSS_EMULATOR ./hello > actual
+    run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian \
       test \
