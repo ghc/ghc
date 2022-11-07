@@ -628,6 +628,12 @@ libraries/ghc-prim/dist-install/package-data.mk : inplace/lib/package.conf.d/sys
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist-install/package.conf.inplace
+
+# Force these two packages to be registered sequentially so that they are not
+# registered in parallel.  For more details, see:
+#
+# https://gitlab.haskell.org/ghc/ghc/-/issues/22099
+inplace/lib/package.conf.d/system-cxx-std-lib-1.0.conf : rts/dist-install/package.conf.inplace
 endif
 
 # --------------------------------
