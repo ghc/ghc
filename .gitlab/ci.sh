@@ -376,7 +376,6 @@ function setup_emscripten() {
   cd emsdk
   ./emsdk install latest
   ./emsdk activate latest
-  source ./emsdk_env.sh
   cd ..
 }
 
@@ -417,6 +416,11 @@ EOF
 }
 
 function configure() {
+  case $CONFIGURE_WRAPPER in
+    emconfigure) source emsdk/emsdk_env.sh ;;
+    *) ;;
+  esac
+
   if [[ -z "${NO_BOOT:-}" ]]; then
     start_section "booting"
     run python3 boot
