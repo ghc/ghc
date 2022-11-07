@@ -113,7 +113,17 @@ addArgs args' fl = fl { args = args fl <> args' }
 -- in unix and/or hsc2hs to make cross-compiling unix completely free
 -- from warnings.
 werror :: Flavour -> Flavour
-werror = addArgs (builder Ghc ? notStage0 ? mconcat [arg "-Werror", flag CrossCompiling ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]])
+werror =
+  addArgs
+    ( builder Ghc
+        ? notStage0
+        ? mconcat
+          [ arg "-Werror",
+            flag CrossCompiling
+              ? package unix
+              ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]
+          ]
+    )
 
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
