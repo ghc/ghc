@@ -819,7 +819,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Just "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" Nothing (Just "emconfigure")
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" (Just "") (Just "emconfigure")
         )
         { bignumBackend = Native
         , buildFlavour  = Release
