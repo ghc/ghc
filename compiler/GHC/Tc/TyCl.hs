@@ -2981,9 +2981,10 @@ tcDataDefn err_ctxt roles_info tc_name
       = return AbstractTyCon
 
     mk_tc_rhs _ tycon data_cons = case data_cons of
-          DataTypeCons _ data_cons -> return $
+          DataTypeCons is_type_data data_cons -> return $
                         mkLevPolyDataTyConRhs
                           (isFixedRuntimeRepKind (tyConResKind tycon))
+                          is_type_data
                           data_cons
           NewTypeCon data_con -> mkNewTyConRhs tc_name tycon data_con
 

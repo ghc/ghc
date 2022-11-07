@@ -230,7 +230,7 @@ toIfaceTyCon tc
   where
     tc_name = tyConName tc
     info    = mkIfaceTyConInfo promoted sort
-    promoted | isPromotedDataCon tc = IsPromoted
+    promoted | isDataKindsPromotedDataCon tc = IsPromoted
              | otherwise            = NotPromoted
 
     tupleSort :: TyCon -> Maybe IfaceTyConSort

@@ -2036,7 +2036,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
 {-
 Note [Type data declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With the TypeData extension (GHC proposal #106), one can write "type data"
+With the TypeData extension (GHC proposal #106), one can write `type data`
 declarations, like
 
     type data Nat = Zero | Succ Nat
@@ -2047,17 +2047,18 @@ or equivalently in GADT style:
         Zero :: Nat
         Succ :: Nat -> Nat
 
-This defines the constructors Zero and Succ in the TcCls namespace
+This defines the constructors `Zero` and `Succ` in the TcCls namespace
 (type constructors and classes) instead of the Data namespace (data
-constructors).  This contrasts with the DataKinds extension, which allows
-constructors defined in the Data namespace to be promoted to the TcCls
-namespace at the point of use in a type.
+constructors).  This contrasts with the DataKinds extension, which
+allows constructors defined in the Data namespace to be promoted to the
+TcCls namespace at the point of use in a type.
 
-Type data declarations have the syntax of data declarations, either
-ordinary algebraic data types or GADTs, preceded by "type", with the
-following restrictions:
+Type data declarations have the syntax of `data` declarations (but not
+`newtype` declarations), either ordinary algebraic data types or GADTs,
+preceded by `type`, with the following restrictions:
 
-(R1) There are data type contexts (even with the DatatypeContexts extension).
+(R1) There are no data type contexts (even with the DatatypeContexts
+     extension).
 
 (R2) There are no labelled fields.  Perhaps these could be supported
      using type families, but they are omitted for now.
@@ -2078,14 +2079,15 @@ following restrictions:
 
 The main parts of the implementation are:
 
-* The Bool argument to DataTypeCons (in Language.Haskell.Syntax.Decls)
-  distinguishes "type data" declarations from ordinary "data" declarations.
+* The parser recognizes `type data` (but not `type newtype`).
 
-* This flag is set, and the constructor names placed in the
-  TcCls namespace, during the initial construction of the AST in
-  GHC.Parser.PostProcess.checkNewOrData.
+* During the initial construction of the AST,
+  GHC.Parser.PostProcess.checkNewOrData sets the `Bool` argument of the
+  `DataTypeCons` inside a `HsDataDefn` to mark a `type data` declaration.
+  It also puts the the constructor names (`Zero` and `Succ` in our
+  example) in the TcCls namespace.
 
-* GHC.Rename.Module.rnDataDefn calls check_type_data on these
+* GHC.Rename.Module.rnDataDefn calls `check_type_data` on these
   declarations, which checks that the TypeData extension is enabled and
   checks restrictions (R1), (R2), (R3) and (R5).  They could equally
   well be checked in the typechecker, but we err on the side of catching
@@ -2094,19 +2096,40 @@ The main parts of the implementation are:
 * GHC.Tc.TyCl.checkValidDataCon checks restriction (R4) on these declarations.
 
 * When beginning to type check a mutually recursive group of declarations,
-  the "type data" constructors are added to the type-checker environment
-  as APromotionErr TyConPE by GHC.Tc.TyCl.mkPromotionErrorEnv, so they
-  cannot be used within the recursive group.  This mirrors the DataKinds
-  behaviour described at Note [Recursion and promoting data constructors]
-  in GHC.Tc.TyCl.  For example, this is rejected:
+  the `type data` constructors (`Zero` and `Succ` in our example) are
+  added to the type-checker environment as `APromotionErr TyConPE` by
+  GHC.Tc.TyCl.mkPromotionErrorEnv, so they cannot be used within the
+  recursive group.  This mirrors the DataKinds behaviour described
+  at Note [Recursion and promoting data constructors] in GHC.Tc.TyCl.
+  For example, this is rejected:
 
-    type data T f = K (f (K Int))
+    type data T f = K (f (K Int)) -- illegal: tycon K is recursively defined
 
-* After a "type data" declaration has been type-checked, the type-checker
-  environment entry for each constructor (which can be recognized
-  by being in the TcCls namespace) is just the promoted type
-  constructor, not the bundle required for a data constructor.
-  (GHC.Types.TyThing.implicitTyConThings)
+* The `type data` data type, such as `Nat` in our example, is represented
+  by a `TyCon` that is an `AlgTyCon`, but its `AlgTyConRhs` has the
+  `is_type_data` field set.
+
+* The constructors of the data type, `Zero` and `Succ` in our example,
+  are each represented by a `DataCon` as usual.  That `DataCon`'s
+  `dcPromotedField` is a `TyCon` (for `Zero`, say) that you can use
+  in a type.
+
+* After a `type data` declaration has been type-checked, the type-checker
+  environment entry for each constructor (`Zero` and `Succ` in our
+  example) is just the promoted type constructor, not the bundle required
+  for a data constructor.  (GHC.Types.TyThing.implicitTyConThings)
+
+* GHC.Core.TyCon.isDataKindsPromotedDataCon ignores promoted constructors
+  from `type data`, which do not use the distinguishing quote mark added
+  to constructors promoted by DataKinds.
+
+* GHC.Core.TyCon.isDataTyCon ignores types coming from a `type data`
+  declaration (by checking the `is_type_data` field), so that these do
+  not contribute executable code such as constructor wrappers.
+
+* The `is_type_data` field is copied into a Boolean argument
+  of the `IfDataTyCon` constructor of `IfaceConDecls` by
+  GHC.Iface.Make.tyConToIfaceDecl.
 
 -}
 

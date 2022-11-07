@@ -352,9 +352,13 @@ for the purposes of pretty-printing.
 See Note [The equality types story] in GHC.Builtin.Types.Prim.
 -}
 
-data IfaceTyConInfo   -- Used to guide pretty-printing
-                      -- and to disambiguate D from 'D (they share a name)
+data IfaceTyConInfo   -- Used only to guide pretty-printing
   = IfaceTyConInfo { ifaceTyConIsPromoted :: PromotionFlag
+                      -- A PromotionFlag value of IsPromoted indicates
+                      -- that the type constructor came from a data
+                      -- constructor promoted by -XDataKinds, and thus
+                      -- should be printed as 'D to distinguish it from
+                      -- an existing type constructor D.
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
 

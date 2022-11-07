@@ -1638,7 +1638,7 @@ isNewDataCon dc = isNewTyCon (dataConTyCon dc)
 -- | Is this data constructor in a "type data" declaration?
 -- See Note [Type data declarations] in GHC.Rename.Module.
 isTypeDataCon :: DataCon -> Bool
-isTypeDataCon dc = isTcClsNameSpace (nameNameSpace (getName dc))
+isTypeDataCon dc = isTypeDataTyCon (dataConTyCon dc)
 
 -- | Should this DataCon be allowed in a type even without -XDataKinds?
 -- Currently, only Lifted & Unlifted

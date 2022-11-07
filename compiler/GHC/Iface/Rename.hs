@@ -543,8 +543,8 @@ rnIfaceTyConParent (IfDataInstance n tc args)
 rnIfaceTyConParent IfNoParent = pure IfNoParent
 
 rnIfaceConDecls :: Rename IfaceConDecls
-rnIfaceConDecls (IfDataTyCon ds)
-    = IfDataTyCon <$> mapM rnIfaceConDecl ds
+rnIfaceConDecls (IfDataTyCon type_data ds)
+    = IfDataTyCon type_data <$> mapM rnIfaceConDecl ds
 rnIfaceConDecls (IfNewTyCon d) = IfNewTyCon <$> rnIfaceConDecl d
 rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 

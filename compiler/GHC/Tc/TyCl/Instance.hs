@@ -772,9 +772,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               ; rep_tc_name <- newFamInstTyConName lfam_name pats
               ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
               ; tc_rhs <- case data_cons of
-                     DataTypeCons _ data_cons -> return $
+                     DataTypeCons type_data data_cons -> return $
                         mkLevPolyDataTyConRhs
                           (isFixedRuntimeRepKind res_kind)
+                          type_data
                           data_cons
                      NewTypeCon data_con -> mkNewTyConRhs rep_tc_name rec_rep_tc data_con
 

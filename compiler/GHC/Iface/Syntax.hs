@@ -236,7 +236,9 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars    :: [IfaceTvBndr]
 
 data IfaceConDecls
   = IfAbstractTyCon -- c.f TyCon.AbstractTyCon
-  | IfDataTyCon [IfaceConDecl] -- Data type decls
+  | IfDataTyCon !Bool [IfaceConDecl] -- Data type decls
+        -- The Bool is True for "type data" declarations.
+        -- see Note [Type data declarations] in GHC.Rename.Module
   | IfNewTyCon  IfaceConDecl   -- Newtype decls
 
 -- For IfDataTyCon and IfNewTyCon we store:
@@ -450,7 +452,7 @@ See [https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/recompilation-
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
-visibleIfConDecls (IfDataTyCon cs)     = cs
+visibleIfConDecls (IfDataTyCon _ cs)   = cs
 visibleIfConDecls (IfNewTyCon c)       = [c]
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
@@ -459,18 +461,23 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 -- especially the question of whether there's a wrapper for a datacon
 -- See Note [Implicit TyThings] in GHC.Driver.Env
 
--- N.B. the set of names returned here *must* match the set of
--- TyThings returned by GHC.Driver.Env.implicitTyThings, in the sense that
+-- N.B. the set of names returned here *must* match the set of TyThings
+-- returned by GHC.Types.TyThing.implicitTyThings, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
--- This invariant is used in GHC.IfaceToCore.tc_iface_decl_fingerprint (see note
--- [Tricky iface loop])
+-- This invariant is used in GHC.IfaceToCore.tc_iface_decl_fingerprint
+-- (see Note [Tricky iface loop] in GHC.Types.TyThing.)
 -- The order of the list does not matter.
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
       IfAbstractTyCon {} -> []
       IfNewTyCon  cd     -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
-      IfDataTyCon cds    -> concatMap ifaceConDeclImplicitBndrs cds
+      IfDataTyCon type_data cds
+        | type_data ->
+          -- Constructors in "type data" declarations have no implicits.
+          -- see Note [Type data declarations] in GHC.Rename.Module
+          [occName con_name | IfCon { ifConName = con_name } <- cds]
+        | otherwise -> concatMap ifaceConDeclImplicitBndrs cds
 
 ifaceDeclImplicitBndrs (IfaceClass { ifBody = IfAbstractClass })
   = []
@@ -907,6 +914,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_nd = case condecls of
               IfAbstractTyCon{} -> text "data"
+              IfDataTyCon True _ -> text "type data"
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 
@@ -1633,8 +1641,8 @@ freeNamesDM (Just (GenericDM ty)) = freeNamesIfType ty
 freeNamesDM _                     = emptyNameSet
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
-freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
-freeNamesIfConDecls (IfNewTyCon  c) = freeNamesIfConDecl c
+freeNamesIfConDecls (IfDataTyCon _ cs) = fnList freeNamesIfConDecl cs
+freeNamesIfConDecls (IfNewTyCon    c)  = freeNamesIfConDecl c
 freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
@@ -2118,14 +2126,16 @@ instance Binary IfaceAxBranch where
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon  = putByte bh 0
-    put_ bh (IfDataTyCon cs) = putByte bh 1 >> put_ bh cs
-    put_ bh (IfNewTyCon c)   = putByte bh 2 >> put_ bh c
+    put_ bh (IfDataTyCon False cs) = putByte bh 1 >> put_ bh cs
+    put_ bh (IfDataTyCon True cs) = putByte bh 2 >> put_ bh cs
+    put_ bh (IfNewTyCon c)   = putByte bh 3 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfAbstractTyCon
-            1 -> liftM IfDataTyCon (get bh)
-            2 -> liftM IfNewTyCon (get bh)
+            1 -> liftM (IfDataTyCon False) (get bh)
+            2 -> liftM (IfDataTyCon True) (get bh)
+            3 -> liftM IfNewTyCon (get bh)
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
@@ -2624,7 +2634,7 @@ instance NFData IfaceTyConParent where
 instance NFData IfaceConDecls where
   rnf = \case
     IfAbstractTyCon -> ()
-    IfDataTyCon f1 -> rnf f1
+    IfDataTyCon _ f1 -> rnf f1
     IfNewTyCon f1 -> rnf f1
 
 instance NFData IfaceConDecl where

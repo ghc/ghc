@@ -338,7 +338,7 @@ d1 `withRolesFrom` d2
     mergeRoles roles1 roles2 = zipWithEqual "mergeRoles" max roles1 roles2
 
 isRepInjectiveIfaceDecl :: IfaceDecl -> Bool
-isRepInjectiveIfaceDecl IfaceData{ ifCons = IfDataTyCon _ } = True
+isRepInjectiveIfaceDecl IfaceData{ ifCons = IfDataTyCon{} } = True
 isRepInjectiveIfaceDecl IfaceFamily{ ifFamFlav = IfaceDataFamilyTyCon } = True
 isRepInjectiveIfaceDecl _ = False
 
@@ -1083,11 +1083,12 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
   = case if_cons of
         IfAbstractTyCon
           -> return AbstractTyCon
-        IfDataTyCon cons
+        IfDataTyCon type_data cons
           -> do  { data_cons  <- mapM tc_con_decl cons
                  ; return $
                      mkLevPolyDataTyConRhs
                        (isFixedRuntimeRepKind $ tyConResKind tycon)
+                       type_data
                        data_cons }
         IfNewTyCon con
           -> do  { data_con  <- tc_con_decl con
@@ -1957,11 +1958,12 @@ tcIfaceGlobal name
 -- this expression *after* typechecking T.
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon (IfaceTyCon name info)
+tcIfaceTyCon (IfaceTyCon name _info)
   = do { thing <- tcIfaceGlobal name
-       ; return $ case ifaceTyConIsPromoted info of
-           NotPromoted -> tyThingTyCon thing
-           IsPromoted  -> promoteDataCon $ tyThingDataCon thing }
+       ; case thing of
+              ATyCon tc -> return tc
+              AConLike (RealDataCon dc) -> return (promoteDataCon dc)
+              _ -> pprPanic "tcIfaceTyCon" (ppr thing) }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
 tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name

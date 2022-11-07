@@ -649,7 +649,7 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
   where
     n_kind_vars = length $ filter isNamedTyConBinder (tyConBinders tycon)
     tycon_str = add_tick (occNameString (getOccName tycon))
-    add_tick s | isPromotedDataCon tycon = '\'' : s
+    add_tick s | isDataKindsPromotedDataCon tycon = '\'' : s
                | otherwise               = s
 
     -- This must match the computation done in

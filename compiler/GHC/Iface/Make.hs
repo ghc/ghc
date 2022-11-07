@@ -550,7 +550,7 @@ tyConToIfaceDecl env tycon
                   ifCType      = Nothing,
                   ifRoles      = tyConRoles tycon,
                   ifCtxt       = [],
-                  ifCons       = IfDataTyCon [],
+                  ifCons       = IfDataTyCon False [],
                   ifGadtSyntax = False,
                   ifParent     = IfNoParent })
   where
@@ -584,9 +584,10 @@ tyConToIfaceDecl env tycon
             axn  = coAxiomName ax
 
     ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon [ifaceConDecl con]
-    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (DataTyCon { data_cons = cons, is_type_data = type_data })
+      = IfDataTyCon type_data (map ifaceConDecl cons)
+    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon False [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon False (map ifaceConDecl cons)
     ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.

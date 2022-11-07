@@ -56,10 +56,12 @@ module GHC.Core.TyCon(
         isTypeSynonymTyCon,
         mustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
+        isDataKindsPromotedDataCon,
         isKindTyCon, isLiftedTypeKindTyConName,
         isTauTyCon, isFamFreeTyCon, isForgetfulSynTyCon,
 
         isDataTyCon,
+        isTypeDataTyCon,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
@@ -147,7 +149,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConFieldLabels
    , dataConTyCon, dataConFullSig
-   , isUnboxedSumDataCon )
+   , isUnboxedSumDataCon, isTypeDataCon )
 import {-# SOURCE #-} GHC.Core.Type
    ( isLiftedTypeKind )
 import GHC.Builtin.Uniques
@@ -1138,6 +1140,9 @@ data AlgTyConRhs
                           -- ^ Cached value: length data_cons
         is_enum :: Bool,  -- ^ Cached value: is this an enumeration type?
                           --   See Note [Enumeration types]
+        is_type_data :: Bool,
+                        -- from a "type data" declaration
+                        -- See Note [Type data declarations] in GHC.Rename.Module
         data_fixed_lev :: Bool
                         -- ^ 'True' if the data type constructor has
                         -- a known, fixed levity when fully applied
@@ -1218,14 +1223,18 @@ mkSumTyConRhs data_cons = SumTyCon data_cons (length data_cons)
 -- | Create an 'AlgTyConRhs' from the data constructors,
 -- for a potentially levity-polymorphic datatype (with `UnliftedDatatypes`).
 mkLevPolyDataTyConRhs :: Bool -- ^ whether the 'DataCon' has a fixed levity
+                      -> Bool -- ^ True if this is a "type data" declaration
+                              -- See Note [Type data declarations]
+                              -- in GHC.Rename.Module
                       -> [DataCon]
                       -> AlgTyConRhs
-mkLevPolyDataTyConRhs fixed_lev cons
+mkLevPolyDataTyConRhs fixed_lev type_data cons
   = DataTyCon {
         data_cons = cons,
         data_cons_size = length cons,
         is_enum = not (null cons) && all is_enum_con cons,
                   -- See Note [Enumeration types] in GHC.Core.TyCon
+        is_type_data = type_data,
         data_fixed_lev = fixed_lev
     }
   where
@@ -1236,9 +1245,10 @@ mkLevPolyDataTyConRhs fixed_lev cons
 
 -- | Create an 'AlgTyConRhs' from the data constructors.
 --
--- Use 'mkLevPolyDataConRhs' if the datatype can be levity-polymorphic.
+-- Use 'mkLevPolyDataConRhs' if the datatype can be levity-polymorphic
+-- or if it comes from a "data type" declaration
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
-mkDataTyConRhs = mkLevPolyDataTyConRhs True
+mkDataTyConRhs = mkLevPolyDataTyConRhs True False
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -2133,10 +2143,20 @@ isDataTyCon (AlgTyCon {algTcRhs = rhs})
         TupleTyCon { tup_sort = sort }
                            -> isBoxed (tupleSortBoxity sort)
         SumTyCon {}        -> False
-        DataTyCon {}       -> True
+            -- Constructors from "type data" declarations exist only at
+            -- the type level.
+            -- See Note [Type data declarations] in GHC.Rename.Module.
+        DataTyCon { is_type_data = type_data } -> not type_data
         NewTyCon {}        -> False
         AbstractTyCon {}   -> False      -- We don't know, so return False
 isDataTyCon _ = False
+
+-- | Was this 'TyCon' declared as "type data"?
+-- See Note [Type data declarations] in GHC.Rename.Module.
+isTypeDataTyCon :: TyCon -> Bool
+isTypeDataTyCon (AlgTyCon {algTcRhs = DataTyCon {is_type_data = type_data }})
+  = type_data
+isTypeDataTyCon _              = False
 
 -- | 'isInjectiveTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
@@ -2384,6 +2404,19 @@ isPromotedTupleTyCon tyCon
 isPromotedDataCon :: TyCon -> Bool
 isPromotedDataCon (PromotedDataCon {}) = True
 isPromotedDataCon _                    = False
+
+-- | This function identifies PromotedDataCon's from data constructors in
+-- `data T = K1 | K2`, promoted by -XDataKinds.  These type constructors
+-- are printed with a tick mark 'K1 and 'K2, and similarly have a tick
+-- mark added to their OccName's.
+--
+-- In contrast, constructors in `type data T = K1 | K2` are printed and
+-- represented with their original undecorated names.
+-- See Note [Type data declarations] in GHC.Rename.Module
+isDataKindsPromotedDataCon :: TyCon -> Bool
+isDataKindsPromotedDataCon (PromotedDataCon { dataCon = dc })
+  = not (isTypeDataCon dc)
+isDataKindsPromotedDataCon _ = False
 
 -- | Retrieves the promoted DataCon if this is a PromotedDataCon;
 isPromotedDataCon_maybe :: TyCon -> Maybe DataCon
@@ -2921,9 +2954,10 @@ tcFlavourIsOpen TypeSynonymFlavour      = False
 pprPromotionQuote :: TyCon -> SDoc
 -- Promoted data constructors already have a tick in their OccName
 pprPromotionQuote tc
-  = case tc of
-      PromotedDataCon {} -> char '\'' -- Always quote promoted DataCons in types
-      _                  -> empty
+        -- Always quote promoted DataCons in types, unless they come
+        -- from "type data" declarations.
+  | isDataKindsPromotedDataCon tc = char '\''
+  | otherwise = empty
 
 instance NamedThing TyCon where
     getName = tyConName
