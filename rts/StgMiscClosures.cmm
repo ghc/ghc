@@ -528,14 +528,19 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     TICK_ENT_DYN_IND(); /* tick */
 
 retry:
-    prim_read_barrier;
-    p = StgInd_indirectee(node);
+#if defined(TSAN_ENABLED)
+    // See Note [ThreadSanitizer and fences]
+    W_ unused; unused = %acquire GET_INFO(node);
+#endif
+    // Synchronizes with the release-store in updateWithIndirection.
+    // See Note [Heap memory barriers] in SMP.h.
+    ACQUIRE_FENCE;
+    p = %relaxed StgInd_indirectee(node);
     if (GETTAG(p) != 0) {
         return (p);
     }
 
-    info = StgHeader_info(p);
-    prim_read_barrier;
+    info = GET_INFO(p);
     if (info == stg_IND_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in

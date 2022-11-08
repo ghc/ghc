@@ -277,18 +277,20 @@
 // because LDV profiling relies on entering closures to mark them as
 // "used".
 
-#define LOAD_INFO(ret,x)                        \
-    info = %INFO_PTR(UNTAG(x));
+#define LOAD_INFO_ACQUIRE(ret,x)                \
+    info = %INFO_PTR(UNTAG(x));                 \
+    prim_read_barrier;
 
 #define UNTAG_IF_PROF(x) UNTAG(x)
 
 #else
 
-#define LOAD_INFO(ret,x)                        \
+#define LOAD_INFO_ACQUIRE(ret,x)                \
   if (GETTAG(x) != 0) {                         \
       ret(x);                                   \
   }                                             \
-  info = %INFO_PTR(x);
+  info = %INFO_PTR(x);                          \
+  prim_read_barrier;
 
 #define UNTAG_IF_PROF(x) (x) /* already untagged */
 
@@ -316,9 +318,8 @@
 #define ENTER_(ret,x)                                   \
  again:                                                 \
   W_ info;                                              \
-  LOAD_INFO(ret,x)                                      \
   /* See Note [Heap memory barriers] in SMP.h */        \
-  prim_read_barrier;                                    \
+  LOAD_INFO_ACQUIRE(ret,x);                             \
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]            \
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {       \
   case                                                  \
@@ -594,8 +595,9 @@
 
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
-#define SET_INFO_RELEASE(p,info) prim_write_barrier; StgHeader_info(p) = info
+#define SET_INFO_RELEASE(p,info) %release StgHeader_info(p) = info
 #define GET_INFO(p) StgHeader_info(p)
+#define GET_INFO_ACQUIRE(p) %acquire GET_INFO(p)
 
 /* Determine the size of an ordinary closure from its info table */
 #define sizeW_fromITBL(itbl) \
@@ -663,19 +665,32 @@
 #define IS_STACK_CLEAN(stack) \
     ((TO_W_(StgStack_dirty(stack)) & STACK_DIRTY) == 0)
 
+/* Note [ThreadSanitizer and fences]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Sadly ThreadSanitizer currently doesn't support analysis of fences.
+ * Consequently, to avoid false-positive data-race reports cases which rely
+ * on fences for ordering should (when TSAN_ENABLED is defined) also provide
+ * explicit ordered accesses to make ordering apparent to TSAN.
+ */
+
 // Memory barriers.
 // For discussion of how these are used to fence heap object
 // accesses see Note [Heap memory barriers] in SMP.h.
 #if defined(THREADED_RTS)
 #define prim_read_barrier prim %read_barrier()
-#else
-#define prim_read_barrier /* nothing */
-#endif
-#if defined(THREADED_RTS)
 #define prim_write_barrier prim %write_barrier()
+
+// See Note [ThreadSanitizer and fences]
+#define RELEASE_FENCE prim %write_barrier()
+#define ACQUIRE_FENCE prim %read_barrier()
+
 #else
+
+#define prim_read_barrier /* nothing */
 #define prim_write_barrier /* nothing */
-#endif
+#define RELEASE_FENCE /* nothing */
+#define ACQUIRE_FENCE /* nothing */
+#endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------
    Ticky macros

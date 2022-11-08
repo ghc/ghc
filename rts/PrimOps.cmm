@@ -977,8 +977,7 @@ stg_deRefWeakzh ( gcptr w )
     W_ code, info;
     gcptr val;
 
-    info = GET_INFO(w);
-    prim_read_barrier;
+    info = GET_INFO_ACQUIRE(w);
 
     if (info == stg_WHITEHOLE_info) {
         // w is locked by another thread. Now it's not immediately clear if w is
@@ -1763,8 +1762,7 @@ loop:
         updateRemembSetPushPtr(val);
         return (val);
     }
-    qinfo = StgHeader_info(q);
-    prim_read_barrier;
+    qinfo = GET_INFO_ACQUIRE(q);
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
         q = StgInd_indirectee(q);
@@ -1831,8 +1829,7 @@ loop:
         return (1, val);
     }
 
-    qinfo = StgHeader_info(q);
-    prim_read_barrier;
+    qinfo = GET_INFO_ACQUIRE(q);
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
@@ -1934,8 +1931,7 @@ loop:
         return ();
     }
 
-    qinfo = StgHeader_info(q);
-    prim_read_barrier;
+    qinfo = GET_INFO_ACQUIRE(q);
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
@@ -2024,8 +2020,7 @@ loop:
         return (1);
     }
 
-    qinfo = StgHeader_info(q);
-    prim_read_barrier;
+    qinfo = GET_INFO_ACQUIRE(q);
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {

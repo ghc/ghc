@@ -47,8 +47,6 @@
  */
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
-                                                                \
-    prim_write_barrier;                                         \
     bd = Bdescr(p1);                                            \
     if (bdescr_gen_no(bd) != 0 :: bits16) {                     \
       IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
@@ -59,8 +57,9 @@
     } else {                                                    \
       TICK_UPD_NEW_IND();                                       \
     }                                                           \
+                                                                \
     OVERWRITING_CLOSURE(p1);                                    \
-    StgInd_indirectee(p1) = p2;                                 \
+    %relaxed StgInd_indirectee(p1) = p2;                        \
     SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
