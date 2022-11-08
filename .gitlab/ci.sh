@@ -250,7 +250,7 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
-  case $CONFIGURE_WRAPPER in
+  case "${CONFIGURE_WRAPPER:-}" in
     emconfigure) time_it "setup" setup_emscripten ;;
     *) ;;
   esac
@@ -416,7 +416,7 @@ EOF
 }
 
 function configure() {
-  case $CONFIGURE_WRAPPER in
+  case "${CONFIGURE_WRAPPER:-}" in
     emconfigure) source emsdk/emsdk_env.sh ;;
     *) ;;
   esac
