@@ -493,7 +493,8 @@ contextSwitchCapability (Capability *cap, bool immediately)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {
-    // This may race with writes to putMVars and inbox but this harmless for the
+    // See Note [Heap memory barriers], section "Barriers on Messages".
+    // This may race with writes to putMVars but this harmless for the
     // intended uses of this function.
     TSAN_ANNOTATE_BENIGN_RACE(&cap->putMVars, "emptyInbox(cap->putMVars)");
     return (RELAXED_LOAD(&cap->inbox) == (Message*)END_TSO_QUEUE &&

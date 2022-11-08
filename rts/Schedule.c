@@ -1030,6 +1030,8 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
         // never goes idle if the inbox is non-empty, which is why we
         // use cap->lock (cap->lock is released as the last thing
         // before going idle; see Capability.c:releaseCapability()).
+        //
+        // See Note [Heap memory barriers], section "Barriers on messages"
         r = TRY_ACQUIRE_LOCK(&cap->lock);
         if (r != 0) return;
 

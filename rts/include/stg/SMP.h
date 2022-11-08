@@ -108,93 +108,128 @@ EXTERN_INLINE void load_load_barrier(void);
  * Note [Heap memory barriers]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Machines with weak memory ordering semantics have consequences for how
- * closures are observed and mutated. For example, consider a thunk that needs
- * to be updated to an indirection. In order for the indirection to be safe for
- * concurrent observers to enter, said observers must read the indirection's
- * info table before they read the indirectee. Furthermore, the indirectee must
- * be set before the info table pointer. This ensures that if the observer sees
- * an IND info table then the indirectee is valid.
+ * closures are observed and mutated. In particular, when we
+ * expose a new (or mutated) object to another core we must ensure that the
+ * stores which formed the new object are visible (e.g. stores are flushed from
+ * cache and the relevant cachelines invalidated in other cores).
  *
- * When a closure is updated with an indirection, both its info table and its
- * indirectee must be written. With weak memory ordering, these two writes can
- * be arbitrarily reordered, and perhaps even interleaved with other threads'
- * reads and writes (in the absence of memory barrier instructions). Consider
- * this example of a bad reordering:
+ * To ensure this we must use memory barriers. Which barriers are required to
+ * access a field depends upon the type of the field. In general, fields come
+ * in three flavours:
  *
- * - An updater writes to a closure's info table (INFO_TYPE is now IND).
- * - A concurrent observer branches upon reading the closure's INFO_TYPE as IND.
- * - A concurrent observer reads the closure's indirectee and enters it.
- * - An updater writes the closure's indirectee.
+ *  * Mutable GC Pointers (C type StgClosure*, Cmm type StgPtr)
+ *  * Immutable GC Pointers (C type MUT_FIELD StgClosure*, Cmm type StgPtr)
+ *  * Non-pointers (C type StgWord, Cmm type StdWord)
  *
- * Here the update to the indirectee comes too late and the concurrent observer
- * has jumped off into the abyss. Speculative execution can also cause us
- * issues, consider:
+ * Note that Addr# fields are *not* GC pointers and therefore are classified
+ * as non-pointers. Responsibility for barriers lies with the party
+ * dereferencing the pointer.
  *
- * - an observer is about to case on a value in closure's info table.
- * - the observer speculatively reads one or more of closure's fields.
- * - an updater writes to closure's info table.
- * - the observer takes a branch based on the new info table value, but with the
- *   old closure fields!
- * - the updater writes to the closure's other fields, but its too late.
+ * Also note that we are only concerned with mutation by the mutator. The GC
+ * is free to change nearly any field as this is necessary for a moving GC.
+ * Naturally, doing this safely requires care which we discuss in section
+ * below.
  *
- * Because of these effects, reads and writes to a closure's info table must be
- * ordered carefully with respect to reads and writes to the closure's other
- * fields, and memory barriers must be placed to ensure that reads and writes
- * occur in program order. Specifically, updates to an already existing closure
- * must follow the following pattern:
+ * Immutable pointer fields are those which the mutator cannot change after
+ * an object is made visible on the heap. Most objects' fields are of this
+ * flavour (e.g. all data constructor fields). As these fields are written
+ * precisely once, no write barriers are needed on writes nor reads. This is
+ * safe due to an argument hinging on causality: Consider an immutable field F
+ * of an object O refers to object O'. Naturally, O' must have been visible to
+ * the creator of O when O was constructed. Consequently, if O is visible to a
+ * reader, O' must also be visible.
  *
- * - Update the closure's (non-info table) fields.
- * - Write barrier.
- * - Update the closure's info table.
+ * Mutable pointer fields are those which can be modified by the mutator. These
+ * require a bit more care as they may break the causality argument given
+ * above. For instance, consider an object O (e.g. a MUT_VAR) with a mutable
+ * field F. A thread may allocate a new object O' and store a reference to O'
+ * into F. Without explicit synchronization O' may not be visible to another
+ * thread attempting to dereference F.
  *
- * Observing the fields of an updateable closure (e.g. a THUNK) must follow the
- * following pattern:
+ * Mutable fields include:
  *
- * - Read the closure's info pointer.
- * - Read barrier.
- * - Read the closure's (non-info table) fields.
+ *   - StgMutVar: var
+ *   - StgWeak: finalizer
+ *   - StgMVar: head, tail, value
+ *   - StgMVarTSOQueue: link
+ *   - StgTVar: current_value, first_watch_queue_entry
+ *   - StgTVarWatchQueue: {next,prev}_queue_entry
+ *   - StgTRecChunk: TODO
+ *   - StgMutArrPtrs: payload
+ *   - StgSmallMutArrPtrs: payload
+ *   - StgThunk although this is a somewhat special case; see below
  *
- * We must also take care when we expose a newly-allocated closure to other cores
- * by writing a pointer to it to some shared data structure (e.g. an MVar#, a Message,
- * or MutVar#). Specifically, we need to ensure that all writes constructing the
- * closure are visible *before* the write exposing the new closure is made visible:
+ * Writing to a mutable pointer field must be done via a release-store.
+ * Reading from such a field is done via an acquire-load.
  *
- * - Allocate memory for the closure
- * - Write the closure's info pointer and fields (ordering between this doesn't
- *   matter since the closure isn't yet visible to anyone else).
- * - Write barrier
- * - Make closure visible to other cores
+ * Finally, non-pointer fields can be safely mutated without barriers as
+ * they do not refer to other memory. Technically, concurrent accesses to
+ * non-pointer fields still do need to be atomic in many cases to avoid torn
+ * accesses. However, this is something that we generally avoid by locking
+ * closures prior to mutating non-pointer fields (see Locking closures below).
  *
- * Note that thread stacks are inherently thread-local and consequently allocating an
- * object and introducing a reference to it to our stack needs no barrier.
+ * Note that MUT_VARs offer both synchronized and unsynchronized primops.
+ * Consequently, in these cases there is a burden on the user to ensure that
+ * synchronization is provided where necessary.
  *
- * There are several ways in which the mutator may make a newly-allocated
- * closure visible to other cores:
+ * Locking closures
+ * ----------------
+ * Several primops temporarily turn closures into WHITEHOLEs to ensure that
+ * they have exclusive access (see SMPClosureOps.h:reallyLockClosure).
+ * Locking is done via an atomic exchange operation on the closure's info table
+ * pointer with sequential consistency (although only acquire ordering is
+ * needed). This acquire ensures that we synchronize with any previous thread
+ * that had locked the closure. Consequently, it is important that we take great
+ * care in examining the mutable fields of a lockable closure prior to having
+ * locked it.
  *
- *  - Eager blackholing a THUNK:
- *    This is protected by an explicit write barrier in the eager blackholing
- *    code produced by the codegen. See GHC.StgToCmm.Bind.emitBlackHoleCode.
+ * Naturally, unlocking is done via a release-store to restore the closure's
+ * original info table pointer.
  *
- *  - Lazy blackholing a THUNK:
- *    This is is protected by an explicit write barrier in the thread suspension
- *    code. See ThreadPaused.c:threadPaused.
+ * Thunks
+ * ------
+ * As noted above, thunks are a rather special (yet quite common) case. In
+ * particular, they have the unique property of being updatable, transforming
+ * from a thunk to an indirection. This transformation requires its own
+ * synchronization protocol. In particular, we must ensure that a reader
+ * examining a thunk being updated can see the indirectee. Consequently, a
+ * thunk update (see rts/Updates.h) does the following:
  *
- *  - Updating a BLACKHOLE:
- *    This case is protected by explicit write barriers in the update frame
- *    entry code (see rts/Updates.h).
+ *  1. Use a release-fence to ensure that the indirectee is visible
+ *  2. Use a relaxed-store to place the new indirectee into the thunk's
+ *     indirectee field
+ *  3. use a release-store to set the info table to stg_BLACKHOLE (which
+ *     represents an indirection)
  *
- *  - Blocking on an MVar# (e.g. takeMVar#):
- *    In this case the appropriate MVar primops (e.g. stg_takeMVarzh).  include
- *    explicit memory barriers to ensure that the newly-allocated
- *    MVAR_TSO_QUEUE is visible to other cores.
+ * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
+ * or lazily, by ThreadPaused.c:threadPaused) is done similarly.
  *
- *  - Write to an MVar# (e.g. putMVar#):
- *    This protected by the full barrier implied by the CAS in putMVar#.
+ * Conversely, thunk entry (see the entry code of stg_BLACKHOLE in
+ * rts/StgMiscClosure) does the following:
+ *
+ *  1. We jump into the entry code for stg_BLACKHOLE; this of course implies
+ *     that we have already read the thunk's info table pointer, which is done
+ *     with a relaxed load.
+ *  2. use an acquire-fence to ensure that our view on the thunk is
+ *     up-to-date. This synchronizes with step (3) in the update
+ *     procedure.
+ *  3. relaxed-load the indirectee. Since thunks are updated at most
+ *     once we know that the fence in the last step has given us
+ *     an up-to-date view of the indirectee closure.
+ *  4. enter the indirectee (or block if the indirectee is a TSO)
+ *
+ * Other closures
+ * --------------
+ * Below is a summary of the barriers which are necessary to make GHC's
+ * primitive types respect the above rules:
+ *
+ *  - MVar# operations.
+ *    The MVar# primops lock the MVar prior to reading or writing any MVar fix.
  *
  *  - Write to a TVar#:
  *    This is protected by the full barrier implied by the CAS in STM.c:lock_stm.
  *
- *  - Write to an Array#, ArrayArray#, or SmallArray#:
+ *  - Write to an Array# or SmallArray#:
  *    This case is protected by an explicit write barrier in the code produced
  *    for this primop by the codegen. See GHC.StgToCmm.Prim.doWritePtrArrayOp and
  *    GHC.StgToCmm.Prim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
@@ -211,14 +246,57 @@ EXTERN_INLINE void load_load_barrier(void);
  *    This is protected by the acquition and release of the target capability's
  *    lock in Messages.c:sendMessage.
  *
- * Finally, we must ensure that we flush all cores store buffers before
- * entering and leaving GC, since stacks may be read by other cores. This
- * happens as a side-effect of taking and release mutexes (which implies
- * acquire and release barriers, respectively).
- *
  * N.B. recordClosureMutated places a reference to the mutated object on
  * the capability-local mut_list. Consequently this does not require any memory
  * barrier.
+ *
+ * Barriers in thread migration
+ * ----------------------------
+ * When a thread is migrated from one capability to another we must take care
+ * that the new capability synchronizes with the old (e.g. to ensure that
+ * the state of the thread's stack is visible to the new executor).
+ * This is ensured by the barriers implied in sending the MessageWakeup.
+ *
+ * Barriers on Messages
+ * --------------------
+ * The RTS uses the Message mechanism to convey information between capabilities.
+ * To send a message (see Messages.c:sendMessage) the sender must first take
+ * the `lock` of the recipient capability. The Message can then be linked
+ * onto the recipient's `inbox` list and release the lock (implying a release
+ * barrier).
+ *
+ * To process its inbox (see Schedule.c:scheduleProcessInbox) the recipient must
+ * take the capability lock before examining the inbox. This implies an acquire
+ * barrier, ensuring that the messages in the inbox are visible.
+ *
+ * Under the above story there is no need for accesses to `inbox` to be
+ * atomic at all as all accesses are under the capability lock. However, there
+ * is a slight wrinkle here:
+ * Capability.h:emptyInbox wants to test whether `inbox` is empty without
+ * holding the capability lock. Consequently, accesses to `inbox` must be
+ * atomic, although may use the relaxed ordering.
+ *
+ * Barriers during GC
+ * ------------------
+ * Entering the garbage collector implies an acquire barrier across all
+ * capabilities as all capabilities obey the following protocol when entering
+ * `gcWorkerThread`:
+ *
+ *  1. acquire gc_entry_mutex
+ *  2. signal gc_entry_arrived_cv to let the GC leader know
+ *     that we have started to synchronize
+ *  3. wait on gc_entry_start_now_cv, releasing
+ *     gc_entry_mutex; this implies a release barrier
+ *  4. after all threads have synchronized, the leader will
+ *     broadcast signal gc_entry_start_now_cv
+ *  5. each of the waiting workers will acquire
+ *     gc_entry_mutex, implying an acquire barrier which will
+ *     synchronize with all of the other workers' releases in
+ *     (3).
+ *
+ * Similarly, leaving the garbage collector implies a release
+ * barrier as gcWorkerThread blocks on gc_exit_leave_now_cv
+ * with a similar protocol.
  *
  * During parallel GC we need to be careful during evacuation: before replacing
  * a closure with a forwarding pointer we must commit a write barrier to ensure

@@ -13,6 +13,13 @@
  * compiling for: profiling, parallel, ticky, etc.
  */
 
+/*
+ * Used to mark GC-pointer fields which can be modified by the mutator after
+ * an object is made visible on the heap. See Note [Heap memory barriers] in
+ * SMP.h for details.
+ */
+#define MUT_FIELD
+
 /* -----------------------------------------------------------------------------
    The profiling header
    -------------------------------------------------------------------------- */
@@ -43,7 +50,7 @@ typedef struct {
    -------------------------------------------------------------------------- */
 
 typedef struct {
-    StgWord pad;
+    StgWord pad MUT_FIELD;
 } StgSMPThunkHeader;
 
 /* -----------------------------------------------------------------------------
@@ -210,7 +217,7 @@ typedef struct _StgMutArrPtrs {
     StgHeader   header;
     StgWord     ptrs;
     StgWord     size; // ptrs plus card table
-    StgClosure *payload[];
+    StgClosure *payload[] MUT_FIELD;
     // see also: StgMutArrPtrs macros in ClosureMacros.h
 } StgMutArrPtrs;
 
@@ -222,7 +229,7 @@ typedef struct _StgMutArrPtrs {
 typedef struct {
     StgHeader   header;
     StgWord     ptrs;
-    StgClosure *payload[];
+    StgClosure *payload[] MUT_FIELD;
 } StgSmallMutArrPtrs;
 
 
@@ -231,7 +238,7 @@ typedef struct {
 // Closure types: MUT_VAR_CLEAN, MUT_VAR_DIRTY
 typedef struct {
     StgHeader   header;
-    StgClosure *var;
+    StgClosure *var MUT_FIELD;
 } StgMutVar;
 
 
@@ -349,7 +356,7 @@ typedef struct _StgWeak {
   // C finalizers, see StgCFinalizerList below
   //
   // Points to stg_NO_FINALIZER_closure to indicate no c finalizers.
-  StgClosure *cfinalizers;
+  StgClosure *cfinalizers MUT_FIELD;
 
   StgClosure *key;
   StgClosure *value; // the actual value references by the weak reference
@@ -371,7 +378,7 @@ typedef struct _StgWeak {
 // Closure type: CONSTR
 typedef struct _StgCFinalizerList {
   StgHeader header;
-  StgClosure *link; // the next finaliser
+  StgClosure *link MUT_FIELD; // the next finaliser
 
   // function to call
   //
@@ -448,11 +455,11 @@ typedef struct {
     StgHeader                header;
 
     // threads that are waiting on this MVar
-    struct StgMVarTSOQueue_ *head;
-    struct StgMVarTSOQueue_ *tail;
+    struct StgMVarTSOQueue_ *head MUT_FIELD;
+    struct StgMVarTSOQueue_ *tail MUT_FIELD;
 
     // The value in the MVar if filled
-    StgClosure*              value;
+    StgClosure*              value MUT_FIELD;
 } StgMVar;
 
 
@@ -493,8 +500,8 @@ typedef struct StgTVarWatchQueue_ {
 
 typedef struct {
   StgHeader                  header;
-  StgClosure                *current_value; /* accessed via atomics */
-  StgTVarWatchQueue         *first_watch_queue_entry; /* accessed via atomics */
+  StgClosure                *current_value MUT_FIELD; /* accessed via atomics */
+  StgTVarWatchQueue         *first_watch_queue_entry MUT_FIELD; /* accessed via atomics */
   StgInt                     num_updates; /* accessed via atomics */
 } StgTVar;
 
@@ -533,7 +540,7 @@ typedef enum {
 struct StgTRecHeader_ {
   StgHeader                  header;
   struct StgTRecHeader_     *enclosing_trec;
-  StgTRecChunk              *current_chunk;
+  StgTRecChunk              *current_chunk MUT_FIELD;
   TRecState                  state;
 };
 
@@ -623,7 +630,7 @@ typedef struct StgCompactNFDataBlock_ {
        // the fixup implementation.
     struct StgCompactNFData_ *owner;
        // the closure who owns this block (used in objectGetCompact)
-    struct StgCompactNFDataBlock_ *next;
+    struct StgCompactNFDataBlock_ *next MUT_FIELD;
        // chain of blocks used for serialization and freeing
 } StgCompactNFDataBlock;
 
@@ -645,7 +652,7 @@ typedef struct StgCompactNFData_ {
       // the nursery pointer below during compaction.
     StgCompactNFDataBlock *nursery;
       // where to (try to) allocate from when appending
-    StgCompactNFDataBlock *last;
+    StgCompactNFDataBlock *last MUT_FIELD;
       // the last block of the chain (to know where to append new
       // blocks for resize)
     struct hashtable *hash;
