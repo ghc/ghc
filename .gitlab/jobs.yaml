@@ -1384,7 +1384,6 @@
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
-      "CROSS_EMULATOR": "NOT_NEEDED",
       "CROSS_TARGET": "js-unknown-ghcjs",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release",
       "XZ_OPT": "-9"
@@ -3928,7 +3927,6 @@
       "BUILD_FLAVOUR": "release",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
-      "CROSS_EMULATOR": "NOT_NEEDED",
       "CROSS_TARGET": "js-unknown-ghcjs",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-release"
     }

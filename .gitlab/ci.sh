@@ -597,7 +597,7 @@ function test_hadrian() {
   if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
-  elif [[ "${CROSS_EMULATOR:-}" != "NOT_NEEDED" ]]; then
+  elif [ -n "${CROSS_EMULATOR:-}" ]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"

@@ -652,7 +652,7 @@ job arch opsys buildConfig = (jobName, Job {..})
             Nothing -> mempty
             Just _  -> "CROSS_EMULATOR" =: "NOT_SET" -- we need an emulator but it isn't set. Won't run the testsuite
           Emulator s       -> "CROSS_EMULATOR" =: s
-          NoEmulatorNeeded -> "CROSS_EMULATOR" =: "NOT_NEEDED"
+          NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
       ]
 
