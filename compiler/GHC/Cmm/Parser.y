@@ -205,9 +205,16 @@ memory ordering guarantees. These are supported in Cmm syntax as follows:
     %relaxed W_[ptr] = ...;   // an atomic store with relaxed ordering semantics
     %release W_[ptr] = ...;   // an atomic store with release ordering semantics
 
-    x = W_(ptr);                     // a non-atomic load
-    (x) = prim %load_relaxed64(ptr); // a 64-bit atomic load with relaxed ordering
-    (x) = prim %load_acquire64(ptr); // a 64-bit atomic load with acquire ordering
+    x = W_(ptr);              // a non-atomic load
+    x = %relaxed W_[ptr];     // an atomic load with relaxed ordering
+    x = %acquire W_[ptr];     // an atomic load with acquire ordering
+    // or equivalently...
+    x = prim %load_acquire64(ptr);
+
+Here we used W_ as an example but these operations can be used on all Cmm
+types.
+
+See Note [Heap memory barriers] in SMP.h for details.
 
 ----------------------------------------------------------------------------- -}
 
@@ -650,6 +657,19 @@ stmt    :: { CmmParse () }
 
         | lreg '=' expr ';'
                 { do reg <- $1; e <- $3; withSourceNote $2 $4 (emitAssign reg e) }
+
+        -- Use lreg instead of local_reg to avoid ambiguity
+        | lreg '=' mem_ordering type '[' expr ']' ';'
+                { do reg <- $1;
+                     let lreg = case reg of
+                                  { CmmLocal r -> r
+                                  ; other -> pprPanic "CmmParse:" (ppr reg <> text "not a local register")
+                                  } ;
+                     mord <- $3;
+                     let { ty = $4; w = typeWidth ty };
+                     e <- $6;
+                     let op = MO_AtomicRead w mord;
+                     withSourceNote $2 $7 $ code (emitPrimCall [lreg] op [e]) }
         | mem_ordering type '[' expr ']' '=' expr ';'
                 { do mord <- $1; withSourceNote $3 $8 (doStore (Just mord) $2 $4 $7) }
         | type '[' expr ']' '=' expr ';'
