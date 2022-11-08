@@ -18,15 +18,15 @@ AC_DEFUN([FIND_LLVM_PROG],[
         AS_IF([test x"$PROG_VERSION" = x],
           [AC_MSG_RESULT(no)
            $1=""
-           AC_MSG_NOTICE([We only support llvm $3 to $4 (no version found).])],
+           AC_MSG_NOTICE([We only support llvm $3 upto $4 (non-inclusive) (no version found).])],
           [AC_MSG_CHECKING([$$1 version ($PROG_VERSION) is between $3 and $4])
            AX_COMPARE_VERSION([$PROG_VERSION], [lt], [$3],
             [AC_MSG_RESULT(no)
              $1=""
-             AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+             AC_MSG_NOTICE([We only support llvm $3 upto $4 (non-inclusive) (found $PROG_VERSION).])],
             [AX_COMPARE_VERSION([$PROG_VERSION], [ge], [$4],
              [AC_MSG_RESULT(no)
               $1=""
-              AC_MSG_NOTICE([We only support llvm $3 to $4 (found $PROG_VERSION).])],
+              AC_MSG_NOTICE([We only support llvm $3 upto $4 (non-inclusive) (found $PROG_VERSION).])],
              [AC_MSG_RESULT(yes)])])])])
 ])
