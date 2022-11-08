@@ -1580,9 +1580,8 @@ stg_readTVarIOzh ( P_ tvar /* :: TVar a */ )
     W_ result, resultinfo;
 
 again:
-    result = StgTVar_current_value(tvar);
+    result = %acquire StgTVar_current_value(tvar);
     resultinfo = %INFO_PTR(result);
-    prim_read_barrier;
     if (resultinfo == stg_TREC_HEADER_info) {
         goto again;
     }
