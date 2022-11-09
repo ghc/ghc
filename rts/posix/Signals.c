@@ -202,7 +202,7 @@ ioManagerDie (void)
 
     {
         // Shut down IO managers
-        for (i=0; i < n_capabilities; i++) {
+        for (i=0; i < getNumCapabilities(); i++) {
             const int fd = RELAXED_LOAD(&capabilities[i]->io_manager_control_wr_fd);
             if (0 <= fd) {
                 r = write(fd, &byte, 1);

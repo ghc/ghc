@@ -978,7 +978,7 @@ compact(StgClosure *static_objects,
 
     // mutable lists
     for (W_ g = 1; g < RtsFlags.GcFlags.generations; g++) {
-        for (W_ n = 0; n < n_capabilities; n++) {
+        for (W_ n = 0; n < getNumCapabilities(); n++) {
             for (bdescr *bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (P_ p = bd->start; p < bd->free; p++) {
@@ -1024,7 +1024,7 @@ compact(StgClosure *static_objects,
         debugTrace(DEBUG_gc, "update_fwd:  %d", g);
 
         update_fwd(gen->blocks);
-        for (W_ n = 0; n < n_capabilities; n++) {
+        for (W_ n = 0; n < getNumCapabilities(); n++) {
             update_fwd(gc_threads[n]->gens[g].todo_bd);
             update_fwd(gc_threads[n]->gens[g].part_list);
         }

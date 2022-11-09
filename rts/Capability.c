@@ -131,7 +131,7 @@ findSpark (Capability *cap)
           retry = true;
       }
 
-      if (n_capabilities == 1) { return NULL; } // makes no sense...
+      if (getNumCapabilities() == 1) { return NULL; } // makes no sense...
 
       debugTrace(DEBUG_sched,
                  "cap %d: Trying to steal work from other capabilities",
@@ -139,7 +139,7 @@ findSpark (Capability *cap)
 
       /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
       start at a random place instead of 0 as well.  */
-      for ( i=0 ; i < n_capabilities ; i++ ) {
+      for ( i=0 ; i < getNumCapabilities() ; i++ ) {
           robbed = capabilities[i];
           if (cap == robbed)  // ourselves...
               continue;
@@ -182,7 +182,7 @@ anySparks (void)
 {
     uint32_t i;
 
-    for (i=0; i < n_capabilities; i++) {
+    for (i=0; i < getNumCapabilities(); i++) {
         if (!emptySparkPoolCap(capabilities[i])) {
             return true;
         }
@@ -465,15 +465,15 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 void contextSwitchAllCapabilities(void)
 {
     uint32_t i;
-    for (i=0; i < n_capabilities; i++) {
-        contextSwitchCapability(capabilities[i]);
+    for (i=0; i < getNumCapabilities(); i++) {
+        contextSwitchCapability(capabilities[i], true);
     }
 }
 
 void interruptAllCapabilities(void)
 {
     uint32_t i;
-    for (i=0; i < n_capabilities; i++) {
+    for (i=0; i < getNumCapabilities(); i++) {
         interruptCapability(capabilities[i]);
     }
 }
@@ -1250,7 +1250,7 @@ void
 shutdownCapabilities(Task *task, bool safe)
 {
     uint32_t i;
-    for (i=0; i < n_capabilities; i++) {
+    for (i=0; i < getNumCapabilities(); i++) {
         ASSERT(task->incall->tso == NULL);
         shutdownCapability(capabilities[i], task, safe);
     }
@@ -1277,7 +1277,7 @@ freeCapabilities (void)
 {
 #if defined(THREADED_RTS)
     uint32_t i;
-    for (i=0; i < n_capabilities; i++) {
+    for (i=0; i < getNumCapabilities(); i++) {
         freeCapability(capabilities[i]);
         if (capabilities[i] != &MainCapability)
             stgFree(capabilities[i]);
@@ -1331,7 +1331,7 @@ void
 markCapabilities (evac_fn evac, void *user)
 {
     uint32_t n;
-    for (n = 0; n < n_capabilities; n++) {
+    for (n = 0; n < getNumCapabilities(); n++) {
         markCapability(evac, user, capabilities[n], false);
     }
 }
@@ -1343,7 +1343,7 @@ bool checkSparkCountInvariant (void)
     StgWord64 remaining = 0;
     uint32_t i;
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         sparks.created   += capabilities[i]->spark_stats.created;
         sparks.dud       += capabilities[i]->spark_stats.dud;
         sparks.overflowed+= capabilities[i]->spark_stats.overflowed;

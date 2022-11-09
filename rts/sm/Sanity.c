@@ -622,7 +622,7 @@ void checkNonmovingHeap (const struct NonmovingHeap *heap)
         const struct NonmovingAllocator *alloc = heap->allocators[i];
         checkNonmovingSegments(alloc->filled);
         checkNonmovingSegments(alloc->active);
-        for (unsigned int cap=0; cap < n_capabilities; cap++) {
+        for (unsigned int cap=0; cap < getNumCapabilities(); cap++) {
             checkNonmovingSegments(alloc->current[cap]);
         }
     }
@@ -826,7 +826,7 @@ static void
 checkMutableLists (void)
 {
     uint32_t i;
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         checkLocalMutableLists(i);
     }
 }
@@ -945,7 +945,7 @@ static void checkGeneration (generation *gen,
 
     checkHeapChain(gen->blocks);
 
-    for (n = 0; n < n_capabilities; n++) {
+    for (n = 0; n < getNumCapabilities(); n++) {
         ws = &gc_threads[n]->gens[gen->no];
         checkHeapChain(ws->todo_bd);
         checkHeapChain(ws->part_list);
@@ -970,7 +970,7 @@ static void checkFullHeap (bool after_major_gc)
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         checkGeneration(&generations[g], after_major_gc);
     }
-    for (n = 0; n < n_capabilities; n++) {
+    for (n = 0; n < getNumCapabilities(); n++) {
         checkNurserySanity(&nurseries[n]);
     }
 }
@@ -1018,7 +1018,7 @@ findMemoryLeak (void)
 {
     uint32_t g, i, j;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < getNumCapabilities(); i++) {
             markBlocks(capabilities[i]->mut_lists[g]);
             markBlocks(gc_threads[i]->gens[g].part_list);
             markBlocks(gc_threads[i]->gens[g].scavd_list);
@@ -1033,7 +1033,7 @@ findMemoryLeak (void)
         markBlocks(nurseries[i].blocks);
     }
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         markBlocks(gc_threads[i]->free_blocks);
         markBlocks(capabilities[i]->pinned_object_block);
         markBlocks(capabilities[i]->upd_rem_set.queue.blocks);
@@ -1049,7 +1049,7 @@ findMemoryLeak (void)
             struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
             markNonMovingSegments(alloc->filled);
             markNonMovingSegments(alloc->active);
-            for (j = 0; j < n_capabilities; j++) {
+            for (j = 0; j < getNumCapabilities(); j++) {
                 markNonMovingSegments(alloc->current[j]);
             }
         }
@@ -1160,7 +1160,7 @@ countNonMovingAllocator(struct NonmovingAllocator *alloc)
 {
     W_ ret = countNonMovingSegments(alloc->filled)
            + countNonMovingSegments(alloc->active);
-    for (uint32_t i = 0; i < n_capabilities; ++i) {
+    for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
         ret += countNonMovingSegments(alloc->current[i]);
     }
     return ret;
@@ -1201,7 +1201,7 @@ memInventory (bool show)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       gen_blocks[g] = 0;
-      for (i = 0; i < n_capabilities; i++) {
+      for (i = 0; i < getNumCapabilities(); i++) {
           gen_blocks[g] += countBlocks(capabilities[i]->mut_lists[g]);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
@@ -1214,7 +1214,7 @@ memInventory (bool show)
       ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
       nursery_blocks += nurseries[i].n_blocks;
   }
-  for (i = 0; i < n_capabilities; i++) {
+  for (i = 0; i < getNumCapabilities(); i++) {
       W_ n = countBlocks(gc_threads[i]->free_blocks);
       gc_free_blocks += n;
       if (capabilities[i]->pinned_object_block != NULL) {
@@ -1240,7 +1240,7 @@ memInventory (bool show)
   free_blocks = countFreeList();
 
   // count UpdRemSet blocks
-  for (i = 0; i < n_capabilities; ++i) {
+  for (i = 0; i < getNumCapabilities(); ++i) {
       upd_rem_set_blocks += countBlocks(capabilities[i]->upd_rem_set.queue.blocks);
   }
   upd_rem_set_blocks += countBlocks(upd_rem_set_block_list);

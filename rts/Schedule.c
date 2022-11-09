@@ -728,7 +728,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 {
 #if defined(THREADED_RTS)
 
-    Capability *free_caps[n_capabilities], *cap0;
+    Capability *free_caps[getNumCapabilities()], *cap0;
     uint32_t i, n_wanted_caps, n_free_caps;
 
     uint32_t spare_threads = cap->n_run_queue > 0 ? cap->n_run_queue - 1 : 0;
@@ -745,9 +745,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     // First grab as many free Capabilities as we can.  ToDo: we should use
     // capabilities on the same NUMA node preferably, but not exclusively.
-    for (i = (cap->no + 1) % n_capabilities, n_free_caps=0;
+    for (i = (cap->no + 1) % getNumCapabilities(), n_free_caps=0;
          n_free_caps < n_wanted_caps && i != cap->no;
-         i = (i + 1) % n_capabilities) {
+         i = (i + 1) % getNumCapabilities()) {
         cap0 = capabilities[i];
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
@@ -1513,9 +1513,9 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
     uint32_t i;
 
     ASSERT(SEQ_CST_LOAD(&pending_sync) != NULL);
-    for (i=0; i < n_capabilities; i++) {
-        debugTrace(DEBUG_sched, "grabbing all the capabilies (%d/%d)",
-                   i, n_capabilities);
+    for (i=0; i < getNumCapabilities(); i++) {
+        debugTrace(DEBUG_sched, "grabbing all the capabilities (%d/%d)",
+                   i, getNumCapabilities());
         tmpcap = capabilities[i];
         if (tmpcap != cap) {
             // we better hope this task doesn't get migrated to
@@ -1654,7 +1654,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
 
             // We need an array of size n_capabilities, but since this may
             // change each time around the loop we must allocate it afresh.
-            idle_cap = (bool *)stgMallocBytes(n_capabilities *
+            idle_cap = (bool *)stgMallocBytes(getNumCapabilities() *
                                               sizeof(bool),
                                               "scheduleDoGC");
             sync.idle = idle_cap;
@@ -1663,7 +1663,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             // GC.  The best bet is to choose some inactive ones, so we look for
             // those first:
             uint32_t n_idle = need_idle;
-            for (i=0; i < n_capabilities; i++) {
+            for (i=0; i < getNumCapabilities(); i++) {
                 if (capabilities[i]->disabled) {
                     idle_cap[i] = true;
                 } else if (n_idle > 0 &&
@@ -1677,7 +1677,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             }
             // If we didn't find enough inactive capabilities, just pick some
             // more to be idle.
-            for (i=0; n_idle > 0 && i < n_capabilities; i++) {
+            for (i=0; n_idle > 0 && i < getNumCapabilities(); i++) {
                 if (!idle_cap[i] && i != cap->no) {
                     idle_cap[i] = true;
                     n_idle--;
@@ -1711,7 +1711,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
 
     stat_startGCSync(gc_threads[cap->no]);
 
-    unsigned int old_n_capabilities = n_capabilities;
+    unsigned int old_n_capabilities = getNumCapabilities();
 
     interruptAllCapabilities();
 

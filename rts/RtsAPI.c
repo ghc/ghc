@@ -772,7 +772,7 @@ void rts_resume (PauseToken *pauseToken)
 
     // releaseAllCapabilities will not block because the current task owns all
     // capabilities.
-    releaseAllCapabilities(n_capabilities, NULL, task);
+    releaseAllCapabilities(getNumCapabilities(), NULL, task);
     exitMyTask();
     stgFree(pauseToken);
 }
@@ -810,7 +810,7 @@ static void assert_isPausedOnMyTask(const char *functionName)
     }
 
     // Check that we own all capabilities.
-    for (unsigned int i = 0; i < n_capabilities; i++)
+    for (unsigned int i = 0; i < getNumCapabilities(); i++)
     {
         Capability *cap = capabilities[i];
         if (cap->running_task != task)

@@ -56,7 +56,7 @@ nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_wo
         }
     }
 
-    for (unsigned int cap=0; cap < n_capabilities; cap++)
+    for (unsigned int cap=0; cap < getNumCapabilities(); cap++)
     {
         struct NonmovingSegment *seg = alloc->current[cap];
         unsigned int n = nonmovingSegmentBlockCount(seg);

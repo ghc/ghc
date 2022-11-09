@@ -323,7 +323,7 @@ void nonmovingBeginFlush(Task *task)
     // task suspended due to a foreign call) in which case our requestSync
     // logic won't have been hit. Make sure that everyone so far has flushed.
     // Ideally we want to mark asynchronously with syncing.
-    for (uint32_t i = 0; i < n_capabilities; i++) {
+    for (uint32_t i = 0; i < getNumCapabilities(); i++) {
         nonmovingFlushCapUpdRemSetBlocks(capabilities[i]);
     }
 }
@@ -335,7 +335,7 @@ bool nonmovingWaitForFlush()
 {
     ACQUIRE_LOCK(&upd_rem_set_lock);
     debugTrace(DEBUG_nonmoving_gc, "Flush count %d", upd_rem_set_flush_count);
-    bool finished = upd_rem_set_flush_count == n_capabilities;
+    bool finished = upd_rem_set_flush_count == getNumCapabilities();
     if (!finished) {
         waitCondition(&upd_rem_set_flushed_cond, &upd_rem_set_lock);
     }
@@ -398,7 +398,7 @@ bool nonmovingWaitForFlush()
 void nonmovingFinishFlush(Task *task)
 {
     // See Note [Unintentional marking in resurrectThreads]
-    for (uint32_t i = 0; i < n_capabilities; i++) {
+    for (uint32_t i = 0; i < getNumCapabilities(); i++) {
         reset_upd_rem_set(&capabilities[i]->upd_rem_set);
     }
     // Also reset upd_rem_set_block_list in case some of the UpdRemSets were
@@ -409,7 +409,7 @@ void nonmovingFinishFlush(Task *task)
     debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
     traceConcSyncEnd();
     stat_endNonmovingGcSync();
-    releaseAllCapabilities(n_capabilities, NULL, task);
+    releaseAllCapabilities(getNumCapabilities(), NULL, task);
 }
 #endif
 
@@ -1358,7 +1358,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     else if (bd->flags & BF_PINNED) {
 #if defined(DEBUG)
         bool found_it = false;
-        for (uint32_t i = 0; i < n_capabilities; ++i) {
+        for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
             if (capabilities[i]->pinned_object_block == bd) {
                 found_it = true;
                 break;

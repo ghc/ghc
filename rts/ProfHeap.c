@@ -1310,7 +1310,7 @@ void heapCensus (Time t)
       heapCensusChain( census, generations[g].large_objects );
       heapCensusCompactList ( census, generations[g].compact_objects );
 
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           ws = &gc_threads[n]->gens[g];
           heapCensusChain(census, ws->todo_bd);
           heapCensusChain(census, ws->part_list);

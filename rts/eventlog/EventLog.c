@@ -351,7 +351,8 @@ get_n_capabilities(void)
 {
 #if defined(THREADED_RTS)
     // XXX n_capabilities may not have been initialized yet
-    return (n_capabilities != 0) ? n_capabilities : RtsFlags.ParFlags.nCapabilities;
+    unsigned int n = getNumCapabilities();
+    return (n != 0) ? n : RtsFlags.ParFlags.nCapabilities;
 #else
     return 1;
 #endif
@@ -450,7 +451,7 @@ finishCapEventLogging(void)
     if (eventlog_enabled) {
         // Flush all events remaining in the capabilities' buffers and free them.
         // N.B. at this point we hold all capabilities.
-        for (uint32_t c = 0; c < n_capabilities; ++c) {
+        for (uint32_t c = 0; c < getNumCapabilities(); ++c) {
             if (capEventBuf[c].begin != NULL) {
                 printAndClearEventBuf(&capEventBuf[c]);
                 stgFree(capEventBuf[c].begin);
@@ -1558,7 +1559,7 @@ void flushAllCapsEventsBufs()
     printAndClearEventBuf(&eventBuf);
     RELEASE_LOCK(&eventBufMutex);
 
-    for (unsigned int i=0; i < n_capabilities; i++) {
+    for (unsigned int i=0; i < getNumCapabilities(); i++) {
         flushLocalEventsBuf(capabilities[i]);
     }
     flushEventLogWriter();
@@ -1578,7 +1579,7 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
     Task *task = getMyTask();
     stopAllCapabilitiesWith(cap, task, SYNC_FLUSH_EVENT_LOG);
     flushAllCapsEventsBufs();
-    releaseAllCapabilities(n_capabilities, cap ? *cap : NULL, task);
+    releaseAllCapabilities(getNumCapabilities(), cap ? *cap : NULL, task);
 #else
     flushLocalEventsBuf(capabilities[0]);
 #endif
