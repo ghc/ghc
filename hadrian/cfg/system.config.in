@@ -40,6 +40,7 @@ python         = @PythonCmd@
 #============================
 
 ar-supports-at-file       = @ArSupportsAtFile@
+system-ar-supports-at-file = @ArSupportsAtFile_STAGE0@
 ar-supports-dash-l        = @ArSupportsDashL@
 system-ar-supports-dash-l = @ArSupportsDashL_STAGE0@
 cc-llvm-backend           = @CcLlvmBackend@
