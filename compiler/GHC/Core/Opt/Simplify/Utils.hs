@@ -425,12 +425,22 @@ decArgCount :: RewriteCall -> RewriteCall
 decArgCount (TryRules n rules) = TryRules (n-1) rules
 decArgCount rew                = rew
 
-mkTryRules :: [CoreRule] -> RewriteCall
+mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- See Note [Rewrite rules and inlining] in GHC.Core.Opt.Simplify.Iteration
-mkTryRules [] = TryInlining
-mkTryRules rs = TryRules n_required rs
+-- We try to skip any unnecessary stages:
+--    No rules     => skip TryRules
+--    No unfolding => skip TryInlining
+-- This skipping is "just" for efficiency.  But rebuildCall is
+-- quite a heavy hammer, so skipping stages is a good plan.
+-- And it's extremely simple to do.
+mkRewriteCall fun rule_env
+  | not (null rules) = TryRules n_required rules
+  | canUnfold unf    = TryInlining
+  | otherwise        = TryNothing
   where
-    n_required = maximum (map ruleArity rs)
+    n_required = maximum (map ruleArity rules)
+    rules = getRules rule_env fun
+    unf   = idUnfolding fun
 
 {-
 ************************************************************************
@@ -604,21 +614,23 @@ mkArgInfo :: SimplEnv -> RuleEnv -> Id -> SimplCont -> ArgInfo
 mkArgInfo env rule_base fun cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = []
-            , ai_rewrite = fun_rules
+            , ai_rewrite = fun_rewrite
             , ai_encl = False
             , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun   = fun
             , ai_args  = []
-            , ai_rewrite = fun_rules
-            , ai_encl  = notNull rules || contHasRules cont
+            , ai_rewrite = fun_rewrite
+            , ai_encl  = fun_has_rules || contHasRules cont
             , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
-    rules      = getRules rule_base fun
-    fun_rules  = mkTryRules rules
-    n_val_args = countValArgs cont
+    n_val_args    = countValArgs cont
+    fun_rewrite   = mkRewriteCall fun rule_base
+    fun_has_rules = case fun_rewrite of
+                      TryRules {} -> True
+                      _           -> False
 
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0

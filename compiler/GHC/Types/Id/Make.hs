@@ -585,6 +585,7 @@ mkDataConWorkId wkr_name data_con
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
+          -- No strictness: see Note [Data-con worker strictness] in GHC.Core.DataCon
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
