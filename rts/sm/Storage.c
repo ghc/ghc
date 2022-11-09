@@ -225,7 +225,7 @@ initStorage (void)
 #endif
 
   if (RtsFlags.GcFlags.useNonmoving)
-      nonmovingAddCapabilities(n_capabilities);
+      nonmovingAddCapabilities(getNumCapabilities());
 
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
@@ -257,7 +257,7 @@ initStorage (void)
   for (n = 0; n < n_numa_nodes; n++) {
       next_nursery[n] = n;
   }
-  storageAddCapabilities(0, n_capabilities);
+  storageAddCapabilities(0, getNumCapabilities());
 
   IF_DEBUG(gc, statDescribeGens());
 
@@ -375,7 +375,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 {
   uint32_t g, i;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (i = 0; i < n_capabilities; i++) {
+      for (i = 0; i < getNumCapabilities(); i++) {
           cb(user, capabilities[i]->mut_lists[g]);
           cb(user, gc_threads[i]->gens[g].part_list);
           cb(user, gc_threads[i]->gens[g].scavd_list);
@@ -387,7 +387,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
   for (i = 0; i < n_nurseries; i++) {
       cb(user, nurseries[i].blocks);
   }
-  for (i = 0; i < n_capabilities; i++) {
+  for (i = 0; i < getNumCapabilities(); i++) {
       if (capabilities[i]->pinned_object_block != NULL) {
           cb(user, capabilities[i]->pinned_object_block);
       }
@@ -816,7 +816,7 @@ resetNurseries (void)
     for (n = 0; n < n_numa_nodes; n++) {
         next_nursery[n] = n;
     }
-    assignNurseriesToCapabilities(0, n_capabilities);
+    assignNurseriesToCapabilities(0, getNumCapabilities());
 
 #if defined(DEBUG)
     bdescr *bd;
@@ -1568,7 +1568,7 @@ calcTotalAllocated (void)
     uint64_t tot_alloc = 0;
     W_ n;
 
-    for (n = 0; n < n_capabilities; n++) {
+    for (n = 0; n < getNumCapabilities(); n++) {
         tot_alloc += capabilities[n]->total_allocated;
 
         traceEventHeapAllocated(capabilities[n],
@@ -1589,7 +1589,7 @@ updateNurseriesStats (void)
     uint32_t i;
     bdescr *bd;
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         // The current nursery block and the current allocate block have not
         // yet been accounted for in cap->total_allocated, so we add them here.
         bd = capabilities[i]->r.rCurrentNursery;

@@ -133,7 +133,7 @@ writeCCSReportJson(FILE *prof_file,
             RtsFlags.ParFlags.nCapabilities);
     fprintf(prof_file, "\"total_time\": %11.2f,\n",
             ((double) totals.total_prof_ticks *
-             (double) RtsFlags.MiscFlags.tickInterval) / (TIME_RESOLUTION * n_capabilities));
+             (double) RtsFlags.MiscFlags.tickInterval) / (TIME_RESOLUTION * getNumCapabilities()));
     fprintf(prof_file, "\"total_ticks\": %lu,\n",
             (unsigned long) totals.total_prof_ticks);
     fprintf(prof_file, "\"tick_interval\": %d,\n",

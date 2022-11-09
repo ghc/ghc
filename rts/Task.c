@@ -529,7 +529,7 @@ void rts_setInCallCapability (
 #if defined(THREADED_RTS)
     if (affinity) {
         if (RtsFlags.ParFlags.setAffinity) {
-            setThreadAffinity(preferred_capability, n_capabilities);
+            setThreadAffinity(preferred_capability, getNumCapabilities());
         }
     }
 #endif

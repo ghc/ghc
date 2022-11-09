@@ -27,7 +27,7 @@ doneWithMsgThrowTo (Capability *cap, MessageThrowTo *m)
 {
     // The message better be locked (unless we are running single-threaded,
     // where we are a bit more lenient (#19075).
-    ASSERT(n_capabilities == 1 || m->header.info == &stg_WHITEHOLE_info);
+    ASSERT(getNumCapabilities() == 1 || m->header.info == &stg_WHITEHOLE_info);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
       updateRemembSetPushMessageThrowTo(cap, m);
     }
