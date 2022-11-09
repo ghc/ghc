@@ -311,8 +311,8 @@ instance H.Builder Builder where
                     Stdout stdout <- cmd' [path] buildArgs
                     writeFileChanged output stdout
             case builder of
-                Ar Pack _ -> do
-                    useTempFile <- flag ArSupportsAtFile
+                Ar Pack stg -> do
+                    useTempFile <- arSupportsAtFile stg
                     if useTempFile then runAr                path buildArgs buildInputs
                                    else runArWithoutTempFile path buildArgs buildInputs
 

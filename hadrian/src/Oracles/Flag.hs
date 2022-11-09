@@ -6,7 +6,8 @@ module Oracles.Flag (
     platformSupportsGhciObjects,
     targetSupportsSMP,
     useLibffiForAdjustors,
-    arSupportsDashL
+    arSupportsDashL,
+    arSupportsAtFile
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -17,6 +18,7 @@ import Oracles.Setting
 
 data Flag = ArSupportsAtFile
           | ArSupportsDashL
+          | SystemArSupportsAtFile
           | SystemArSupportsDashL
           | CrossCompiling
           | CcLlvmBackend
@@ -41,6 +43,7 @@ flag f = do
     let key = case f of
             ArSupportsAtFile     -> "ar-supports-at-file"
             ArSupportsDashL      -> "ar-supports-dash-l"
+            SystemArSupportsAtFile-> "system-ar-supports-at-file"
             SystemArSupportsDashL-> "system-ar-supports-dash-l"
             CrossCompiling       -> "cross-compiling"
             CcLlvmBackend        -> "cc-llvm-backend"
@@ -75,6 +78,10 @@ platformSupportsGhciObjects =
 arSupportsDashL :: Stage -> Action Bool
 arSupportsDashL (Stage0 {}) = flag SystemArSupportsDashL
 arSupportsDashL _           = flag ArSupportsDashL
+
+arSupportsAtFile :: Stage -> Action Bool
+arSupportsAtFile (Stage0 {}) = flag SystemArSupportsAtFile
+arSupportsAtFile _           = flag ArSupportsAtFile
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do
