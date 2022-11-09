@@ -111,6 +111,28 @@ Dumping out compiler intermediate structures
     Show allocation and runtime statistics for various stages of compilation.
     Allocations are measured in bytes. Timings are measured in milliseconds.
 
+.. ghc-flag:: -ddump-make-stats
+    :shortdesc: Dump information about the project build time and build graph.
+    :type: dynamic
+
+    Show some statistics about the project build graph after compilation has finished.
+    These can be useful identifying bottlenecks in your projects module structure.
+
+    The statistics which are currently outputted are:
+
+    * The modules which took longest to compile.
+    * The modules which have the largest "flow". The initial flow is 1, and split
+      evenly between all roots of the dependency graph. The flow is propagated
+      through the graph, accumulated on each node and split evenly on children.
+      The result is that any synchronisation points will have a flow equal to 1,
+      and likewise other important modules will have a high flow value.
+    * The length of the longest (critical) path through the project. This provides
+      a lower bound on the projects compilation time.
+    * The "parallelism score" which is the sum of compiling all nodes divided by
+      the length of the critical path. This should be a more stable metric then
+      critical path length because it doesn't depend on how fast your computer is.
+
+
 GHC is a large program consisting of a number of stages. You can tell GHC to
 dump information from various stages of compilation using the ``-ddump-⟨pass⟩``
 flags listed below. Note that some of these tend to produce a lot of output.

@@ -16,6 +16,8 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -152,6 +154,13 @@ import GHC.Utils.Constants
 import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
 import qualified Data.IntSet as I
 import GHC.Types.Unique
+import Debug.Trace
+import GHC.Utils.Json
+import Data.Functor.Identity
+import Data.Ord
+import Data.List (sortBy)
+import qualified Data.Set as S
+import Text.Printf
 
 
 -- -----------------------------------------------------------------------------
@@ -977,15 +986,25 @@ waitResult :: ResultVar a -> MaybeT IO a
 waitResult (ResultVar f var) = MaybeT (fmap f <$> readMVar var)
 
 data BuildResult = BuildResult { _resultOrigin :: ResultOrigin
+                               , resultMakeId :: MakeActionId -- ^ The corresponding Make action which are going to fill in
                                , resultVar    :: ResultVar (Maybe HomeModInfo, ModuleNameSet)
                                }
 
 -- The origin of this result var, useful for debugging
-data ResultOrigin = NoLoop | Loop ResultLoopOrigin deriving (Show)
+data ResultOrigin = NoLoop | Loop ResultLoopOrigin
 
-data ResultLoopOrigin = Initialise | Rehydrated | Finalised deriving (Show)
+data ResultLoopOrigin = Initialise | Rehydrated | Finalised
 
-mkBuildResult :: ResultOrigin -> ResultVar (Maybe HomeModInfo, ModuleNameSet) -> BuildResult
+instance Outputable ResultLoopOrigin where
+  ppr Initialise = text "Initialise"
+  ppr Rehydrated = text "Rehydrated"
+  ppr Finalised = text "Finalised"
+
+instance Outputable ResultOrigin where
+  ppr (NoLoop) = text "NL"
+  ppr (Loop ro) = text "L(" <> ppr ro <> text ")"
+
+mkBuildResult :: ResultOrigin -> MakeActionId -> ResultVar (Maybe HomeModInfo, ModuleNameSet) -> BuildResult
 mkBuildResult = BuildResult
 
 
@@ -994,6 +1013,7 @@ data BuildLoopState = BuildLoopState { buildDep :: M.Map NodeKey BuildResult
                                           -- the appropriate result of compiling a module  but with
                                           -- cycles there can be additional indirection and can point to the result of typechecking a loop
                                      , nNODE :: Int
+                                     , nMAKE :: Int
                                      , hug_var :: MVar HomeUnitGraph
                                      -- A global variable which is incrementally updated with the result
                                      -- of compiling modules.
@@ -1004,6 +1024,12 @@ nodeId = do
   n <- gets nNODE
   modify (\m -> m { nNODE = n + 1 })
   return n
+
+makeId :: BuildM MakeActionId
+makeId = do
+  n <- gets nMAKE
+  modify (\m -> m { nMAKE = n + 1 })
+  return (MakeActionId n)
 
 
 setModulePipeline :: NodeKey -> BuildResult -> BuildM ()
@@ -1027,8 +1053,8 @@ type BuildM a = StateT BuildLoopState IO a
 data AbstractSem = AbstractSem { acquireSem :: IO ()
                                , releaseSem :: IO () }
 
-withAbstractSem :: AbstractSem -> IO b -> IO b
-withAbstractSem sem = MC.bracket_ (acquireSem sem) (releaseSem sem)
+withAbstractSem :: (MonadIO m, MC.MonadMask m) => AbstractSem -> m b -> m b
+withAbstractSem sem = MC.bracket_ (liftIO $ acquireSem sem) (liftIO $ releaseSem sem)
 
 -- | Environment used when compiling a module
 data MakeEnv = MakeEnv { hsc_env :: !HscEnv -- The basic HscEnv which will be augmented for each module
@@ -1056,7 +1082,7 @@ interpretBuildPlan :: HomeUnitGraph
                          , IO [Maybe (Maybe HomeModInfo)]) -- An action to query to get all the built modules at the end.
 interpretBuildPlan hug mhmi_cache old_hpt plan = do
   hug_var <- newMVar hug
-  ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 hug_var)
+  ((mcycle, plans), build_map) <- runStateT (buildLoop plan) (BuildLoopState M.empty 1 0 hug_var)
   let wait = collect_results (buildDep build_map)
   return (mcycle, plans, wait)
 
@@ -1106,9 +1132,8 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           -- which would retain all the result variables, preventing us from collecting them
           -- after they are no longer used.
           !build_deps = getDependencies direct_deps build_map
-      let build_action =
+      let build_action (hug, deps) =
             withCurrentUnit (moduleGraphNodeUnitId mod) $ do
-            (hug, deps) <- wait_deps_hug hug_var build_deps
             case mod of
               InstantiationNode uid iu -> do
                 executeInstantiationNode mod_idx n_mods hug uid iu
@@ -1131,8 +1156,9 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
 
       res_var <- liftIO newEmptyMVar
       let result_var = mkResultVar res_var
-      setModulePipeline (mkNodeKey mod) (mkBuildResult origin result_var)
-      return $ (MakeAction build_action res_var)
+      make_action <- makeAction (MakeModule (mkNodeKey mod)) build_deps (wait_deps_hug hug_var) build_action res_var
+      setModulePipeline (mkNodeKey mod) (mkBuildResult origin (make_action_id make_action) result_var)
+      return make_action
 
 
     buildOneLoopyModule :: ModuleGraphNodeWithBootFile -> BuildM [MakeAction]
@@ -1163,8 +1189,7 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
       res_var <- liftIO newEmptyMVar
       let
           !build_deps = getDependencies (map gwib_mod deps) build_map
-      let loop_action = do
-            (hug, tdeps) <- wait_deps_hug hug_var build_deps
+      let loop_action (hug, tdeps) = do
             hsc_env <- asks hsc_env
             let new_hsc = setHUG hug hsc_env
                 mns :: [ModuleName]
@@ -1178,6 +1203,8 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
             liftIO $ modifyMVar_ hug_var (\hug -> return $ foldr addHomeModInfoToHug hug hmis')
             return (hmis', tdeps)
 
+      action <- makeAction LoopSync build_deps (wait_deps_hug hug_var) loop_action res_var
+
       let fanout i = first (Just . (!! i)) <$> mkResultVar res_var
       -- From outside the module loop, anyone must wait for the loop to finish and then
       -- use the result of the rehydrated iface. This makes sure that things not in the
@@ -1186,18 +1213,21 @@ interpretBuildPlan hug mhmi_cache old_hpt plan = do
           boot_key (NodeKey_Module m) = NodeKey_Module (m { mnkModuleName = (mnkModuleName m) { gwib_isBoot = IsBoot } } )
           boot_key k = pprPanic "boot_key" (ppr k)
 
+          make_id = make_action_id action
+
           update_module_pipeline (m, i) =
             case gwib_isBoot m of
-              NotBoot -> setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
+              NotBoot -> setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) make_id (fanout i))
               IsBoot -> do
-                setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) (fanout i))
+                setModulePipeline (gwib_mod m) (mkBuildResult (Loop origin) make_id (fanout i))
                 -- SPECIAL: Anything outside the loop needs to see A rather than A.hs-boot
-                setModulePipeline (boot_key (gwib_mod m)) (mkBuildResult (Loop origin) (fanout i))
+                setModulePipeline (boot_key (gwib_mod m)) (mkBuildResult (Loop origin) make_id (fanout i))
 
       let deps_i = zip deps [0..]
       mapM update_module_pipeline deps_i
 
-      return $ MakeAction loop_action res_var
+      return action
+
 
       -- Checks that the interfaces returned from hydration match-up with the names of the
       -- modules which were fed into the function.
@@ -1222,7 +1252,13 @@ upsweep
 upsweep n_jobs hsc_env hmi_cache mHscMessage old_hpt build_plan = do
     (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
     runPipelines n_jobs hsc_env mHscMessage pipelines
-    res <- collect_result
+    res <-
+      if dopt Opt_D_dump_make_stats (hsc_dflags hsc_env)
+        then do
+          let !meta = strictMap make_action_meta pipelines
+          collect_result <* analyseBuildGraph (hsc_logger hsc_env) meta
+        else
+          collect_result
 
     let completed = [m | Just (Just m) <- res]
     let hsc_env' = addDepsToHscEnv completed hsc_env
@@ -2475,7 +2511,7 @@ executeCompileNode :: Int
 executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
   me@MakeEnv{..} <- ask
   -- Rehydrate any dependencies if this module had a boot file or is a signature file.
-  lift $ MaybeT (withAbstractSem compile_sem $ withLoggerHsc k me $ \hsc_env -> do
+  lift $ MaybeT (withLoggerHsc k me $ \hsc_env -> do
      hydrated_hsc_env <- liftIO $ maybeRehydrateBefore (setHUG hug hsc_env) mod fixed_mrehydrate_mods
      let -- Use the cached DynFlags which includes OPTIONS_GHC pragmas
          lcl_dynflags = ms_hspp_opts mod
@@ -2725,7 +2761,7 @@ executeLinkNode hug kn uid deps = do
     let hsc_env' = setHUG hug hsc_env
         msg' = (\messager -> \recomp -> messager hsc_env kn recomp (LinkNode deps uid)) <$> env_messager
 
-    linkresult <- liftIO $ withAbstractSem compile_sem $ do
+    linkresult <- liftIO $
                             link (ghcLink dflags)
                                 (hsc_logger hsc_env')
                                 (hsc_tmpfs hsc_env')
@@ -2789,7 +2825,7 @@ wait_deps_hug hug_var deps = do
         let -- Restrict to things which are in the transitive closure to avoid retaining
             -- reference to loop modules which have already been compiled by other threads.
             -- See Note [ModuleNameSet, efficiency and space leaks]
-            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe I.empty $ M.lookup  uid module_deps)
+            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe I.empty $ M.lookup uid module_deps)
         in hme { homeUnitEnv_hpt = new }
   return (unitEnv_mapWithKey pruneHomeUnitEnv hug, module_deps)
 
@@ -2919,22 +2955,225 @@ runAllPipelines n_jobs env acts = do
 -- semaphore.
 runLoop :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> [MakeAction] -> IO [a]
 runLoop _ _env [] = return []
-runLoop fork_thread env (MakeAction act res_var :acts) = do
-  new_thread <-
-    fork_thread $ \unmask -> (do
-            mres <- (unmask $ run_pipeline (withLocalTmpFS act))
-                      `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
-            putMVar res_var mres)
+runLoop fork_thread env (ma:acts) = do
+  new_thread <- forkMakeAction fork_thread env ma
   threads <- runLoop fork_thread env acts
   return (new_thread : threads)
+
+
+forkMakeAction :: (((forall a. IO a -> IO a) -> IO ()) -> IO a) -> MakeEnv -> MakeAction -> IO a
+forkMakeAction fork_thread env (MakeAction _deps wait act res_var (MakeActionMeta action_name id _ timing_var)) =
+    fork_thread $ \unmask -> (do
+            mres <- (unmask $ run_pipeline (withLocalTmpFS $ do
+                        wait >>= withAbstractSem (compile_sem env)
+                                 . with_timing . act
+
+                    ))
+                      `MC.onException` (putMVar res_var Nothing) -- Defensive: If there's an unhandled exception then still signal the failure.
+            putMVar res_var mres)
   where
       run_pipeline :: RunMakeM a -> IO (Maybe a)
       run_pipeline p = runMaybeT (runReaderT p env)
 
-data MakeAction = forall a . MakeAction (RunMakeM a) (MVar (Maybe a))
+      with_timing = withTimingSilentX (hsc_logger $ hsc_env env)
+                            Opt_D_dump_make_stats
+                            action_herald
+                            (const ())
+                            write_timing_result
+
+      action_herald =  text "MAKE:" <> ppr id <+> ppr action_name
+      write_timing_result = liftIO . writeIORef (getIORefMaybe timing_var) . Just
+
+data MakeActionOrigin = MakeModule NodeKey | LoopSync
+
+instance Outputable MakeActionOrigin where
+  ppr (MakeModule nk) = text "M:" <+> ppr nk
+  ppr LoopSync = text "LoopSync"
+
+newtype MakeActionId = MakeActionId { getMakeActionId :: Int } deriving (Eq, Ord, Show)
+
+instance Outputable MakeActionId where
+  ppr (MakeActionId n) = ppr n
+
+data MakeAction = forall a b . MakeAction { make_deps   :: [BuildResult] -- Dependencies of this action
+                                          , make_wait   :: RunMakeM b    -- The action to run to get the result of these deps
+                                          , make_action :: (b -> RunMakeM a) -- How to build the action once the depenencies are ready
+                                          , make_res_var :: (MVar (Maybe a)) -- Where to put the result of running the action
+                                          , make_action_meta :: MakeActionMeta -- Meta information about the action
+                                          }
+
+makeAction :: MakeActionOrigin -> [BuildResult] -> ([BuildResult] -> RunMakeM b) -> (b -> RunMakeM a) -> (MVar (Maybe a)) -> BuildM MakeAction
+makeAction make_action_meta_origin make_deps make_wait_deps make_action make_res_var = do
+  make_action_meta_id <- makeId
+  make_action_meta_timing <- IORefMaybe <$> liftIO (newIORef Nothing)
+  let make_wait = make_wait_deps make_deps
+      !make_action_meta_dep_ids = strictMap resultMakeId make_deps
+      make_action_meta = MakeActionMeta{..}
+      ma = MakeAction{..}
+  reportNode ma
+  return ma
+
+
+-- | Record a new edge from the build graph
+reportNode :: MakeAction -> BuildM ()
+reportNode ma = do
+  -- TODO: here we emit to eventlog and also store in memory?
+    let mk_int = JSInt . getMakeActionId
+    liftIO $ traceEventIO
+      (showSDocUnsafe $ text "node:" <> renderJSON (JSObject [("node_id", mk_int (make_action_id ma))
+                                             , ("node_deps", JSArray (map (mk_int . resultMakeId) (make_deps ma)))
+                                             , ("node_desc", JSString (showSDocUnsafe (ppr (make_action_origin ma))))
+                                             ]))
 
 waitMakeAction :: MakeAction -> IO ()
-waitMakeAction (MakeAction _ mvar) = () <$ readMVar mvar
+waitMakeAction (MakeAction{make_res_var}) = () <$ readMVar make_res_var
+
+type MakeActionMeta = MakeActionMetaX IORefMaybe
+
+-- | Separate data type as want to avoid retaining MVars pointing to the results.
+data MakeActionMetaX f = MakeActionMeta { make_action_meta_origin :: !MakeActionOrigin -- Where the action originated from
+                                       , make_action_meta_dep_ids :: ![MakeActionId]   -- Ids of the dependencies
+                                       , make_action_meta_id :: !MakeActionId          -- Id of the current action
+                                       , make_action_meta_timing :: !(f TimingInfo)      -- Information about how long the action took
+                                       }
+
+instance Outputable (f TimingInfo) => Outputable (MakeActionMetaX f) where
+  ppr (MakeActionMeta o deps id timing) =
+    text "ActionMeta:" <+> vcat [ text "id:" <+> ppr id
+                                , text "deps:" <+> ppr deps
+                                , text "origin:" <+> ppr o
+                                , text "timing:" <+> ppr timing ]
+
+
+traverseMakeActionMetaX :: Monad m => (forall a . f a -> m (g a)) -> MakeActionMetaX f -> m (MakeActionMetaX g)
+traverseMakeActionMetaX nat (MakeActionMeta{..}) =
+  nat make_action_meta_timing >>= \new -> return $ MakeActionMeta{make_action_meta_timing = new, ..}
+
+newtype IORefMaybe a = IORefMaybe { getIORefMaybe :: IORef (Maybe a)}
+
+make_action_id :: MakeAction -> MakeActionId
+make_action_id = make_action_meta_id . make_action_meta
+make_action_origin :: MakeAction -> MakeActionOrigin
+make_action_origin = make_action_meta_origin . make_action_meta
+
+-- Analysis Scripts
+
+analyseBuildGraph :: Logger -> [MakeActionMeta] -> IO ()
+analyseBuildGraph logger metas_io = do
+    new_metas <- mapM (traverseMakeActionMetaX (readIORef . getIORefMaybe)) metas_io
+    let all_completed = all (isJust . make_action_meta_timing) new_metas
+    when all_completed $ do
+      let Identity new_metas_completed = mapM (traverseMakeActionMetaX (return . Identity . fromJust)) new_metas
+      let -- Longest path to each node
+          lp = longest_path (info_map new_metas_completed)
+          earliest_complete = earliest_finish_time new_metas_completed lp
+          -- Earliest we could possibly finish with infinite processors
+          latest_finish   = maximum earliest_complete
+          -- Total time if we did -j1
+          seq_time = sum (map (timingMillisecs . runIdentity . make_action_meta_timing) new_metas_completed)
+          parrelism_score =
+            seq_time
+            / latest_finish
+
+          im = info_map new_metas_completed
+
+
+          max_flows = sortBy (comparing snd) $ M.assocs (M.map fst lp)
+
+          timing_for_id mid = timingMillisecs $ runIdentity $ make_action_meta_timing (im M.! mid)
+
+          flow_x_time :: MakeActionId -> (Flow, b) -> Double
+          flow_x_time mid (flow, _) = realToFrac (getFlow flow) * timing_for_id mid
+
+          max_flows_x_time = sortBy (comparing snd) $ M.assocs (M.mapWithKey flow_x_time lp)
+
+          max_dur = sortBy (comparing (fmap timingMillisecs . make_action_meta_timing)) new_metas_completed
+
+      -- Printing logic
+      let print_id_pair :: (a -> SDoc) -> (MakeActionId, a) -> SDoc
+          print_id_pair ppr_a (mid, dat) = ppr (make_action_meta_origin info) <+> parens (int (getMakeActionId mid)) <> colon <+> ppr_a dat
+           where
+            info = im M.! mid
+
+
+          header s = text "=====" <+> text s <+> text "====="
+          block s body = vcat [ header s, body ]
+          vcat_numbered docs = vcat $ zipWith (\n doc -> text (printf "%0*d" padding n) <+> doc) [0 :: Int ..] docs
+            where
+              padding = ceiling @Double @Int (logBase 10 (fromIntegral $ length docs))
+
+      logDumpFile logger (mkDumpStyle alwaysQualify) Opt_D_dump_make_stats "make" FormatText $ vcat [
+        block "Maximum Duration" (
+          vcat_numbered  (map (print_id_pair (ppr . runIdentity)) (map ((,) <$> make_action_meta_id <*> make_action_meta_timing) (reverse $ max_dur)))
+          ),
+        block "Maximum Flows"
+          (vcat_numbered (map (print_id_pair ppr) (reverse max_flows))),
+        block "Flows x Time"
+          (vcat_numbered (map (print_id_pair (doublePrec 3)) (reverse max_flows_x_time))),
+        block "Statistics"
+          (vcat [ text "longest path" <> colon <+> doublePrec 3 latest_finish <> text "s"
+               , text "parallelism score" <> colon <+> doublePrec 3 parrelism_score
+               , text "sequential time" <> colon <+> doublePrec 3 seq_time <> text "s"
+               ]) ]
+
+
+
+  where
+
+    MakeActionId last_action_id = make_action_meta_id $ last (sortBy (comparing make_action_meta_id) metas_io)
+
+    first_action_ids = map make_action_meta_id $ (filter (null . make_action_meta_dep_ids) metas_io)
+
+    info_map :: [MakeActionMetaX f] -> M.Map MakeActionId (MakeActionMetaX f)
+    info_map metas = M.fromList [(make_action_meta_id m, m) | m <- metas]
+
+    earliest_finish_time :: [MakeActionMetaX Identity] -> M.Map MakeActionId (Flow, Double) -> M.Map MakeActionId Double
+    earliest_finish_time meta_info m = Map.fromList
+      [(make_action_meta_id, timingMillisecs t + (maybe 0 snd $ M.lookup make_action_meta_id m))
+      | MakeActionMeta{..} <- meta_info
+      , Identity t <- [make_action_meta_timing] ]
+
+    -- Creates a map of "earliest start time"
+    longest_path :: M.Map MakeActionId (MakeActionMetaX Identity) -> M.Map MakeActionId (Flow,  Double)
+    longest_path node_info = foldl' go M.empty (map MakeActionId [0..last_action_id])
+      where
+        reverse_deps :: M.Map MakeActionId (S.Set MakeActionId)
+        reverse_deps = Map.fromListWith (S.union) [(dep, S.singleton make_action_meta_id) | MakeActionMeta{..} <- metas_io, dep <- make_action_meta_dep_ids]
+
+        go :: M.Map MakeActionId (Flow, Double)
+              -> MakeActionId
+              -> M.Map MakeActionId (Flow, Double)
+        go m cur_id =
+          let
+              (flow_to_me, time_to_me, m') = case M.lookup cur_id m of
+                                              Just (flow, time) -> (flow, time, m)
+                                              Nothing -> (initial_flow, 0, M.insert cur_id (initial_flow, 0) m)
+
+              cur_info   = node_info M.! cur_id
+              rev_deps   = fromMaybe S.empty $ M.lookup cur_id reverse_deps
+              Identity cur_time = make_action_meta_timing cur_info
+              out_flow = splitFlow flow_to_me (length rev_deps)
+          in foldl' (update_children out_flow (time_to_me + timingMillisecs cur_time)) m' rev_deps
+
+        update_children new_f new_t m upd_id =
+          M.insertWith comb upd_id (new_f, new_t) m
+
+        comb (a1, b1) (a2, b2) = (a1 `addFlow` a2, max b1 b2)
+
+        initial_flow = splitFlow initialFlow (length first_action_ids)
+
+newtype Flow = Flow { getFlow :: Rational } deriving (Eq, Show, Ord)
+
+instance Outputable Flow where
+  ppr (Flow f) = doublePrec 3 (realToFrac f)
+
+initialFlow :: Flow
+initialFlow = Flow 1
+splitFlow :: Flow -> Int -> Flow
+splitFlow (Flow f) n = Flow (f / fromIntegral n)
+addFlow :: Flow -> Flow -> Flow
+addFlow (Flow f) (Flow g) = Flow (f + g)
+
 
 {- Note [GHC Heap Invariants]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~

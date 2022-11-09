@@ -3,6 +3,7 @@
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE ViewPatterns    #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 {-
 (c) The AQUA Project, Glasgow University, 1994-1998
@@ -54,7 +55,8 @@ module GHC.Utils.Error (
         fatalErrorMsg,
         compilationProgressMsg,
         showPass,
-        withTiming, withTimingSilent,
+        TimingInfo(..), timingMillisecs,
+        withTiming, withTimingSilent, withTimingSilentX,
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -88,7 +90,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (handle)
 import GHC.Conc         ( getAllocationCounter )
-import System.CPUTime
+import Data.Int (Int64)
+import Data.Time (getCurrentTime, UTCTime, diffUTCTime)
 
 data DiagOpts = DiagOpts
   { diag_warning_flags       :: !(EnumSet WarningFlag) -- ^ Enabled warnings
@@ -305,6 +308,20 @@ showPass logger what =
 data PrintTimings = PrintTimings | DontPrintTimings
   deriving (Eq, Show)
 
+-- | The information collected by withTimings
+data TimingInfo = TimingInfo { timingPhase :: SDoc
+                             , timingStart, timingEnd :: UTCTime -- ^ The time in picoseconds
+                             , timingAllocs :: Int64}
+
+instance Outputable TimingInfo where
+  ppr t =
+    text "time:" <+> doublePrec 2 (timingMillisecs t)
+    <+> text "allocs:" <+>  doublePrec 2 (realToFrac (timingAllocs t) / 1024 / 1024)
+
+
+timingMillisecs :: TimingInfo -> Double
+timingMillisecs TimingInfo{..} = realToFrac (timingEnd `diffUTCTime` timingStart) -- / 1000
+
 -- | Time a compilation phase.
 --
 -- When timings are enabled (e.g. with the @-v2@ flag), the allocations
@@ -337,7 +354,7 @@ withTiming :: MonadIO m
            -> m a          -- ^ The body of the phase to be timed
            -> m a
 withTiming logger what force action =
-  withTiming' logger what force PrintTimings action
+  withTiming' logger Opt_D_dump_timings what force PrintTimings defaultTimingOutput action
 
 -- | Same as 'withTiming', but doesn't print timings in the
 --   console (when given @-vN@, @N >= 2@ or @-ddump-timings@).
@@ -352,54 +369,83 @@ withTimingSilent
   -> m a        -- ^ The body of the phase to be timed
   -> m a
 withTimingSilent logger what force action =
-  withTiming' logger what force DontPrintTimings action
+  withTiming' logger Opt_D_dump_timings what force DontPrintTimings defaultTimingOutput action
+
+  -- | Same as 'withTimingSilent' but allows you to pass the continuation about how
+  -- to deal with the timing info at the end. This is used by the --make driver to
+  -- record how long it took to compile a module so we can do some analysis on the timings
+  -- after the build has completed.
+withTimingSilentX :: MonadIO m
+                  => Logger -> DumpFlag -> SDoc -> (a -> ())
+                  -> (TimingInfo -> m ()) -> m a -> m a
+withTimingSilentX logger flag what force k action =
+  withTiming' logger flag what force DontPrintTimings (\_ _ -> k) action
+
+defaultTimingOutput :: MonadIO f => Logger -> PrintTimings -> TimingInfo -> f ()
+defaultTimingOutput logger prtimings tinfo =
+  logTimingInfo logger prtimings tinfo
+  >> dumpTimingInfo logger prtimings tinfo
+
+
+
+logTimingInfo :: MonadIO f => Logger -> PrintTimings -> TimingInfo -> f ()
+logTimingInfo logger prtimings t@(TimingInfo {..}) = do
+    let time = timingMillisecs t
+    when (logVerbAtLeast logger 2 && prtimings == PrintTimings)
+                $ liftIO $ logInfo logger $ withPprStyle defaultUserStyle
+                    (text "!!!" <+> timingPhase <> colon <+> text "finished in"
+                     <+> doublePrec 2 time
+                     <+> text "milliseconds"
+                     <> comma
+                     <+> text "allocated"
+                     <+> doublePrec 3 (realToFrac timingAllocs / 1024 / 1024)
+                     <+> text "megabytes")
+
+dumpTimingInfo :: MonadIO m => Logger -> PrintTimings -> TimingInfo -> m ()
+dumpTimingInfo logger prtimings t@(TimingInfo {..}) = do
+    let ctx = log_default_user_context (logFlags logger)
+    whenPrintTimings $
+      putDumpFileMaybe logger Opt_D_dump_timings "" FormatText
+          $ text $ showSDocOneLine ctx
+          $ hsep [ timingPhase <> colon
+                 , text "alloc=" <> ppr timingAllocs
+                 , text "time=" <> doublePrec 3 (timingMillisecs t)
+                 ]
+  where
+    whenPrintTimings = liftIO . when (prtimings == PrintTimings)
 
 -- | Worker for 'withTiming' and 'withTimingSilent'.
 withTiming' :: MonadIO m
             => Logger
+            -> DumpFlag
             -> SDoc         -- ^ The name of the phase
             -> (a -> ())    -- ^ A function to force the result
                             -- (often either @const ()@ or 'rnf')
             -> PrintTimings -- ^ Whether to print the timings
+            -> (Logger -> PrintTimings -> TimingInfo -> m ()) -- ^ What to do with all the information after it is collected
             -> m a          -- ^ The body of the phase to be timed
             -> m a
-withTiming' logger what force_result prtimings action
-  = if logVerbAtLeast logger 2 || logHasDumpFlag logger Opt_D_dump_timings
+withTiming' logger flag what force_result prtimings output_info action
+  = if logVerbAtLeast logger 2 || logHasDumpFlag logger flag
     then do whenPrintTimings $
               logInfo logger $ withPprStyle defaultUserStyle $
                 text "***" <+> what <> colon
             let ctx = log_default_user_context (logFlags logger)
             alloc0 <- liftIO getAllocationCounter
-            start <- liftIO getCPUTime
+            start <- liftIO getCurrentTime
             eventBegins ctx what
             recordAllocs alloc0
             !r <- action
             () <- pure $ force_result r
             eventEnds ctx what
-            end <- liftIO getCPUTime
+            end <- liftIO getCurrentTime
             alloc1 <- liftIO getAllocationCounter
             recordAllocs alloc1
             -- recall that allocation counter counts down
             let alloc = alloc0 - alloc1
-                time = realToFrac (end - start) * 1e-9
 
-            when (logVerbAtLeast logger 2 && prtimings == PrintTimings)
-                $ liftIO $ logInfo logger $ withPprStyle defaultUserStyle
-                    (text "!!!" <+> what <> colon <+> text "finished in"
-                     <+> doublePrec 2 time
-                     <+> text "milliseconds"
-                     <> comma
-                     <+> text "allocated"
-                     <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
-                     <+> text "megabytes")
+            output_info logger prtimings (TimingInfo what start end alloc)
 
-            whenPrintTimings $
-                putDumpFileMaybe logger Opt_D_dump_timings "" FormatText
-                    $ text $ showSDocOneLine ctx
-                    $ hsep [ what <> colon
-                           , text "alloc=" <> ppr alloc
-                           , text "time=" <> doublePrec 3 time
-                           ]
             pure r
      else action
 

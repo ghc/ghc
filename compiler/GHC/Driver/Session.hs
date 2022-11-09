@@ -2582,6 +2582,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_mod_map)
   , make_ord_flag defGhcFlag "ddump-timings"
         (setDumpFlag Opt_D_dump_timings)
+  , make_ord_flag defGhcFlag "ddump-make-stats"
+        (setDumpFlag Opt_D_dump_make_stats)
   , make_ord_flag defGhcFlag "ddump-view-pattern-commoning"
         (setDumpFlag Opt_D_dump_view_pattern_commoning)
   , make_ord_flag defGhcFlag "ddump-to-file"
