@@ -703,7 +703,7 @@ void printWeakLists()
 {
     debugBelch("======= WEAK LISTS =======\n");
 
-    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+    for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
         debugBelch("Capability %d:\n", cap_idx);
         Capability *cap = capabilities[cap_idx];
         for (StgWeak *weak = cap->weak_ptr_list_hd; weak; weak = weak->link) {
@@ -730,7 +730,7 @@ void printLargeAndPinnedObjects()
 {
     debugBelch("====== PINNED OBJECTS ======\n");
 
-    for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+    for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
         debugBelch("Capability %d: Current pinned object block: %p\n",
@@ -943,7 +943,7 @@ findPtr(P_ p, int follow)
   // We can't search the nursery, because we don't know which blocks contain
   // valid data, because the bd->free pointers in the nursery are only reset
   // just before a block is used.
-  for (n = 0; n < n_capabilities; n++) {
+  for (n = 0; n < getNumCapabilities(); n++) {
       bd = nurseries[i].blocks;
       i = findPtrBlocks(p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
@@ -956,7 +956,7 @@ findPtr(P_ p, int follow)
       bd = generations[g].large_objects;
       i = findPtrBlocks(p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
                             arr, arr_size, i);
           i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
