@@ -345,7 +345,8 @@ instance  Fractional Float  where
     recip x             =  1.0 / x
 
 rationalToFloat :: Integer -> Integer -> Float
-{-# NOINLINE [1] rationalToFloat #-}
+{-# NOINLINE [0] rationalToFloat #-}
+-- Re NOINLINE pragma, see Note [realToFrac natural-to-float]
 rationalToFloat n 0
     | n == 0        = 0/0
     | n < 0         = (-1)/0
@@ -577,7 +578,8 @@ instance  Fractional Double  where
     recip x             =  1.0 / x
 
 rationalToDouble :: Integer -> Integer -> Double
-{-# NOINLINE [1] rationalToDouble #-}
+{-# NOINLINE [0] rationalToDouble #-}
+-- Re NOINLINE pragma, see Note [realToFrac natural-to-float]
 rationalToDouble n 0
     | n == 0        = 0/0
     | n < 0         = (-1)/0
@@ -1488,6 +1490,25 @@ with the native backend, and 0.143 seconds with the C backend.
 
 A few more details in #2251, and the patch message
 "Add RULES for realToFrac from Int".
+
+Note [realToFrac natural-to-float]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (realToFrac @Natural @Float ..dicts.. (NS lit#))
+We want to constant-fold this.  For many types this is guaranteed
+by a RULE for realToFrac: eg. RULE "realToFrac/Float->Double" above.
+
+In case there is a similar rule, we do not inline realToFrac in stage 2.
+But for whatever reason, there is no such RULE for Natural.  So in stage 1
+we end up with
+    rationalToFloat (integerFromNatural (NS lit))
+and that turns into
+    rationalToFloat (IS lit#) (IS 1#)
+
+Now we'd have a BUILTIN constant folding rule for rationalToFloat; but
+to allow that rule to fire reliably we should delay inlining rationalToFloat
+until stage 0.  (It may get an inlining from CPR analysis.)
+
+Hence the NOINLINE[0] rationalToFloat, and similarly rationalToDouble.
 -}
 
 -- Utils
