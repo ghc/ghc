@@ -46,6 +46,7 @@ import GHC.Weak
 
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
+#elif defined(js_HOST_ARCH)
 #else
 import Data.Dynamic (toDyn)
 #endif

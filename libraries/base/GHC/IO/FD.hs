@@ -658,15 +658,13 @@ writeRawBufferPtrNoBlock loc !fd !buf !off !len
     safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
 #endif
 
+#ifndef js_HOST_ARCH
 isNonBlocking :: FD -> Bool
-#ifdef js_HOST_ARCH
-isNonBlocking _  = True
-#else
 isNonBlocking fd = fdIsNonBlocking fd /= 0
-#endif
 
 foreign import ccall unsafe "fdReady"
   unsafe_fdReady :: CInt -> CBool -> Int64 -> CBool -> IO CInt
+#endif
 
 #else /* mingw32_HOST_OS.... */
 
@@ -756,7 +754,9 @@ foreign import WINDOWS_CCONV safe "send"
 
 #endif
 
+#ifndef js_HOST_ARCH
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
+#endif
 
 -- -----------------------------------------------------------------------------
 -- utils

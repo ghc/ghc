@@ -1,8 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, CApiFFI #-}
-##if defined(js_HOST_ARCH)
-{-# LANGUAGE JavaScriptFFI #-}
-##endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -33,30 +30,12 @@ module System.CPUTime
 
 import System.IO.Unsafe (unsafePerformIO)
 
-##if defined(js_HOST_ARCH)
-import qualified System.CPUTime.Unsupported as I
-
-cpuTimePrecision :: Integer
-cpuTimePrecision = toInteger js_cpuTimePrecision
-
-getCPUTime :: IO Integer
-getCPUTime = do
-  t <- js_getCPUTime
-  if t == -1 then I.getCPUTime
-             else pure (1000 * round t)
-
-foreign import javascript unsafe
-  "(() => { return h$cpuTimePrecision; })"
-  js_cpuTimePrecision :: Int
-
-foreign import javascript unsafe
-  "(() => { return h$getCPUTime; })"
-  js_getCPUTime :: IO Double
-
-##else
 -- Here is where we decide which backend to use
 #if defined(mingw32_HOST_OS)
 import qualified System.CPUTime.Windows as I
+
+#elif defined(js_HOST_ARCH)
+import qualified System.CPUTime.Javascript as I
 
 #elif _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0
 import qualified System.CPUTime.Posix.ClockGetTime as I
@@ -89,5 +68,3 @@ cpuTimePrecision = unsafePerformIO I.getCpuTimePrecision
 -- implementation-dependent.
 getCPUTime :: IO Integer
 getCPUTime = I.getCPUTime
-
-##endif

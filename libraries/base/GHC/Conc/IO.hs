@@ -215,13 +215,15 @@ threadDelay time
 -- 2147483647 μs, less than 36 minutes.
 --
 registerDelay :: Int -> IO (TVar Bool)
-registerDelay usecs
+registerDelay _usecs
 #if defined(mingw32_HOST_OS)
-  | isWindowsNativeIO = Windows.registerDelay usecs
-  | threaded          = Windows.registerDelay usecs
+  | isWindowsNativeIO = Windows.registerDelay _usecs
+  | threaded          = Windows.registerDelay _usecs
 #elif !defined(js_HOST_ARCH)
-  | threaded          = Event.registerDelay usecs
+  | threaded          = Event.registerDelay _usecs
 #endif
   | otherwise         = errorWithoutStackTrace "registerDelay: requires -threaded"
 
+#if !defined(js_HOST_ARCH)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
+#endif
