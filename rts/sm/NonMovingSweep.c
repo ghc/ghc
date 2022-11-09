@@ -279,7 +279,7 @@ dirty_BLOCKING_QUEUE:
 /* N.B. This happens during the pause so we own all capabilities. */
 void nonmovingSweepMutLists()
 {
-    for (uint32_t n = 0; n < n_capabilities; n++) {
+    for (uint32_t n = 0; n < getNumCapabilities(); n++) {
         Capability *cap = capabilities[n];
         bdescr *old_mut_list = cap->mut_lists[oldest_gen->no];
         cap->mut_lists[oldest_gen->no] = allocBlockOnNode_lock(cap->node);

@@ -892,7 +892,7 @@ static void report_summary(const RTSSummaryStats* sum)
                 "(%d bound, %d peak workers (%d total), using -N%d)\n\n",
                 taskCount, sum->bound_task_count,
                 peakWorkerCount, workerCount,
-                n_capabilities);
+                getNumCapabilities());
 
     statsPrintf("  SPARKS: %" FMT_Word64
                 " (%" FMT_Word " converted, %" FMT_Word " overflowed, %"
@@ -1133,7 +1133,7 @@ static void report_machine_readable (const RTSSummaryStats * sum)
     MR_STAT("work_balance", "f", sum->work_balance);
 
     // next, globals (other than internal counters)
-    MR_STAT("n_capabilities", FMT_Word32, n_capabilities);
+    MR_STAT("n_capabilities", FMT_Word32, getNumCapabilities());
     MR_STAT("task_count", FMT_Word32, taskCount);
     MR_STAT("peak_worker_count", FMT_Word32, peakWorkerCount);
     MR_STAT("worker_count", FMT_Word32, workerCount);
@@ -1348,7 +1348,7 @@ stat_exitReport (void)
     #if defined(THREADED_RTS)
             sum.bound_task_count = taskCount - workerCount;
 
-            for (uint32_t i = 0; i < n_capabilities; i++) {
+            for (uint32_t i = 0; i < getNumCapabilities(); i++) {
                 sum.sparks.created   += capabilities[i]->spark_stats.created;
                 sum.sparks.dud       += capabilities[i]->spark_stats.dud;
                 sum.sparks.overflowed+=
@@ -1647,7 +1647,7 @@ statDescribeGens(void)
       gen_blocks = genLiveBlocks(gen);
 
       mut = 0;
-      for (i = 0; i < n_capabilities; i++) {
+      for (i = 0; i < getNumCapabilities(); i++) {
           mut += countOccupied(capabilities[i]->mut_lists[g]);
 
           // Add the pinned object block.

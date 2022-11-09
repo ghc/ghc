@@ -16,7 +16,9 @@
  * Arguments are swapped for uniformity with unlockClosure. */
 #if defined(THREADED_RTS)
 #define LOCK_CLOSURE(closure, info)                             \
-    if (CInt[n_capabilities] == 1 :: CInt) {                    \
+    CInt _n_caps;                                                 \
+    _n_caps = %relaxed CInt[n_capabilities];                    \
+    if (_n_caps == 1 :: CInt) {                                 \
         info = GET_INFO(closure);                               \
     } else {                                                    \
         ("ptr" info) = ccall reallyLockClosure(closure "ptr");  \
@@ -75,7 +77,7 @@ EXTERN_INLINE StgInfoTable *reallyLockClosure(StgClosure *p)
 
 INLINE_HEADER StgInfoTable *lockClosure(StgClosure *p)
 {
-    if (n_capabilities == 1) {
+    if (getNumCapabilities() == 1) {
         return (StgInfoTable *)p->header.info;
     }
     else {
@@ -88,7 +90,7 @@ INLINE_HEADER StgInfoTable *lockClosure(StgClosure *p)
 EXTERN_INLINE StgInfoTable *tryLockClosure(StgClosure *p)
 {
     StgWord info;
-    if (n_capabilities == 1) {
+    if (RELAXED_LOAD(&n_capabilities) == 1) {
         return (StgInfoTable *)p->header.info;
     }
     else {

@@ -20,7 +20,7 @@ void LongGCSync (uint32_t me USED_IF_THREADS, Time t STG_UNUSED)
 #if defined(THREADED_RTS)
     {
         uint32_t i;
-        for (i=0; i < n_capabilities; i++) {
+        for (i=0; i < getNumCapabilities(); i++) {
             if (i != me && SEQ_CST_LOAD(&gc_threads[i]->wakeup) == GC_THREAD_STANDING_BY) {
                 debugBelch("Warning: slow GC sync: still waiting for cap %d\n",
                            i);

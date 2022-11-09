@@ -309,7 +309,7 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
 #if defined(PROFILING)
-  CostCentreStack *save_CCS[n_capabilities];
+  CostCentreStack *save_CCS[getNumCapabilities()];
 #endif
 
   ACQUIRE_SM_LOCK;
@@ -340,7 +340,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // attribute any costs to CCS_GC
 #if defined(PROFILING)
-  for (n = 0; n < n_capabilities; n++) {
+  for (n = 0; n < getNumCapabilities(); n++) {
       save_CCS[n] = capabilities[n]->r.rCCCS;
       capabilities[n]->r.rCCCS = CCS_GC;
   }
@@ -396,9 +396,9 @@ GarbageCollect (uint32_t collect_gen,
    * here
   */
   if (gc_type == SYNC_GC_PAR) {
-      n_gc_threads = n_capabilities;
+      n_gc_threads = getNumCapabilities();
       n_gc_idle_threads = 0;
-      for (uint32_t i = 0; i < n_capabilities; ++i) {
+      for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
           if (idle_cap[i]) {
               ASSERT(i != gct->thread_index);
               ++n_gc_idle_threads;
@@ -406,7 +406,7 @@ GarbageCollect (uint32_t collect_gen,
       }
   } else {
       n_gc_threads = 1;
-      n_gc_idle_threads = n_capabilities - 1;
+      n_gc_idle_threads = getNumCapabilities() - 1;
   }
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
       N >= RtsFlags.ParFlags.parGcLoadBalancingGen &&
@@ -429,15 +429,15 @@ GarbageCollect (uint32_t collect_gen,
   SEQ_CST_STORE(&gc_running_threads, 0);
 
   ASSERT(n_gc_threads > 0);
-  ASSERT(n_gc_threads <= n_capabilities);
-  ASSERT(n_gc_idle_threads < n_capabilities);
+  ASSERT(n_gc_threads <= getNumCapabilities());
+  ASSERT(n_gc_idle_threads < getNumCapabilities());
   // If we are work stealing, there better be another(i.e. not us) non-idle gc
   // thread
   ASSERT(!work_stealing || n_gc_threads - 1 > n_gc_idle_threads);
 
 
   debugTrace(DEBUG_gc, "GC (gen %d, using %d thread(s), %s work stealing)",
-             N, (int)n_capabilities - (int)n_gc_idle_threads,
+             N, (int)getNumCapabilities() - (int)n_gc_idle_threads,
              work_stealing ? "with": "without");
 
 #if defined(DEBUG)
@@ -499,7 +499,7 @@ GarbageCollect (uint32_t collect_gen,
   // call back into the GC via mark_root() (due to the gct register
   // variable).
   if (!is_par_gc()) {
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
 #if defined(THREADED_RTS)
           scavenge_capability_mut_Lists1(capabilities[n]);
 #else
@@ -508,7 +508,7 @@ GarbageCollect (uint32_t collect_gen,
       }
   } else {
       scavenge_capability_mut_lists(gct->cap);
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           if (idle_cap[n]) {
               markCapability(mark_root, gct, capabilities[n],
                              true/*don't mark sparks*/);
@@ -524,7 +524,7 @@ GarbageCollect (uint32_t collect_gen,
   // follow all the roots that the application knows about.
   gct->evac_gen_no = 0;
   if (!is_par_gc()) {
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           markCapability(mark_root, gct, capabilities[n],
                          true/*don't mark sparks*/);
       }
@@ -569,11 +569,11 @@ GarbageCollect (uint32_t collect_gen,
 
 #if defined(THREADED_RTS)
   if (!is_par_gc()) {
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           pruneSparkQueue(false, capabilities[n]);
       }
   } else {
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           if (n == cap->no || idle_cap[n]) {
               pruneSparkQueue(false, capabilities[n]);
          }
@@ -679,7 +679,7 @@ GarbageCollect (uint32_t collect_gen,
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
         W_ mut_list_size = 0;
-        for (n = 0; n < n_capabilities; n++) {
+        for (n = 0; n < getNumCapabilities(); n++) {
             mut_list_size += countOccupied(capabilities[n]->mut_lists[g]);
         }
         copied +=  mut_list_size;
@@ -832,7 +832,7 @@ GarbageCollect (uint32_t collect_gen,
     // add in the partial blocks in the gen_workspaces
     {
         uint32_t i;
-        for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < getNumCapabilities(); i++) {
             live_words  += gcThreadLiveWords(i, gen->no);
             live_blocks += gcThreadLiveBlocks(i, gen->no);
         }
@@ -843,7 +843,7 @@ GarbageCollect (uint32_t collect_gen,
   // flushing] in NonMovingMark.c
   if (RtsFlags.GcFlags.useNonmoving) {
       RELEASE_SM_LOCK;
-      for (n = 0; n < n_capabilities; n++) {
+      for (n = 0; n < getNumCapabilities(); n++) {
           nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
       }
       ACQUIRE_SM_LOCK;
@@ -1063,7 +1063,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // restore enclosing cost centre
 #if defined(PROFILING)
-  for (n = 0; n < n_capabilities; n++) {
+  for (n = 0; n < getNumCapabilities(); n++) {
       capabilities[n]->r.rCCCS = save_CCS[n];
   }
 #endif
@@ -1212,7 +1212,7 @@ freeGcThreads (void)
     if (gc_threads != NULL) {
 #if defined(THREADED_RTS)
         uint32_t i;
-        for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < getNumCapabilities(); i++) {
             for (g = 0; g < RtsFlags.GcFlags.generations; g++)
             {
                 freeWSDeque(gc_threads[i]->gens[g].todo_q);
@@ -1442,26 +1442,26 @@ void
 waitForGcThreads (Capability *cap, bool idle_cap[])
 {
     // n_gc_threads is not valid here, we're too early
-    uint32_t n_threads = n_capabilities;
+    uint32_t n_threads = getNumCapabilities();
     const uint32_t me = cap->no;
     uint32_t i, cur_n_gc_entered;
     Time t0, t1, t2;
 
     t0 = t1 = t2 = getProcessElapsedTime();
 
-    for(i = 0; i < n_capabilities; ++i) {
+    for(i = 0; i < getNumCapabilities(); ++i) {
         if (i == me || idle_cap[i]) {
             --n_threads;
         }
     }
 
-    ASSERT(n_threads < n_capabilities); // must be less because we don't count ourself
+    ASSERT(n_threads < getNumCapabilities()); // must be less because we don't count ourself
     if(n_threads == 0) { return; }
 
     ACQUIRE_LOCK(&gc_entry_mutex);
     while((cur_n_gc_entered = SEQ_CST_LOAD(&n_gc_entered)) != n_threads) {
         ASSERT(cur_n_gc_entered < n_threads);
-        for(i = 0; i < n_capabilities; ++i) {
+        for(i = 0; i < getNumCapabilities(); ++i) {
             if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(capabilities[i], cap->running_task);
@@ -1551,7 +1551,7 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS USED_IF_DEBUG,
     }
 #if defined(DEBUG)
     uint32_t i;
-    for (i=0; i < n_capabilities; i++) {
+    for (i=0; i < getNumCapabilities(); i++) {
         if (i == me || idle_cap[i]) continue;
         ASSERT(SEQ_CST_LOAD(&gc_threads[i]->wakeup) == GC_THREAD_WAITING_TO_CONTINUE);
     }
@@ -1564,7 +1564,7 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS USED_IF_DEBUG,
 void
 releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
 {
-    const uint32_t n_threads = n_capabilities;
+    const uint32_t n_threads = getNumCapabilities();
     const uint32_t me = cap->no;
     uint32_t i;
     uint32_t num_idle = 0;
@@ -1616,14 +1616,14 @@ prepare_collected_gen (generation *gen)
 
     if (RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no) {
         // Nonmoving heap's mutable list is always a root.
-        for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < getNumCapabilities(); i++) {
             stash_mut_list(capabilities[i], g);
         }
     } else if (g != 0) {
         // Otherwise throw away the current mutable list. Invariant: the
         // mutable list always has at least one block; this means we can avoid
         // a check for NULL in recordMutable().
-        for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < getNumCapabilities(); i++) {
             bdescr *old = RELAXED_LOAD(&capabilities[i]->mut_lists[g]);
             freeChain(old);
 
@@ -1660,7 +1660,7 @@ prepare_collected_gen (generation *gen)
 
     // grab all the partial blocks stashed in the gc_thread workspaces and
     // move them to the old_blocks list of this gen.
-    for (n = 0; n < n_capabilities; n++) {
+    for (n = 0; n < getNumCapabilities(); n++) {
         ws = &gc_threads[n]->gens[gen->no];
 
         for (bd = ws->part_list; bd != NULL; bd = next) {
@@ -1759,7 +1759,7 @@ prepare_uncollected_gen (generation *gen)
     // save the current mutable lists for this generation, and
     // allocate a fresh block for each one.  We'll traverse these
     // mutable lists as roots early on in the GC.
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         stash_mut_list(capabilities[i], gen->no);
     }
 
@@ -1833,7 +1833,7 @@ collect_pinned_object_blocks (void)
     const bool use_nonmoving = RtsFlags.GcFlags.useNonmoving;
     generation *const gen = (use_nonmoving && major_gc) ? oldest_gen : g0;
 
-    for (uint32_t n = 0; n < n_capabilities; n++) {
+    for (uint32_t n = 0; n < getNumCapabilities(); n++) {
         bdescr *last = NULL;
         if (use_nonmoving && gen == oldest_gen) {
             // Mark objects as belonging to the nonmoving heap
@@ -1949,7 +1949,7 @@ resizeGenerations (void)
     // minimum size for generation zero
     min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
                         RtsFlags.GcFlags.minAllocAreaSize
-                        * (W_)n_capabilities);
+                        * (W_)getNumCapabilities());
 
     // Auto-enable compaction when the residency reaches a
     // certain percentage of the maximum heap size (default: 30%).
@@ -2021,7 +2021,7 @@ static void
 resize_nursery (void)
 {
     const StgWord min_nursery =
-      RtsFlags.GcFlags.minAllocAreaSize * (StgWord)n_capabilities;
+      RtsFlags.GcFlags.minAllocAreaSize * (StgWord)getNumCapabilities();
 
     if (RtsFlags.GcFlags.generations == 1)
     {   // Two-space collector:

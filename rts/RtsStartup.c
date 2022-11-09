@@ -475,7 +475,7 @@ hs_exit_(bool wait_foreign)
     exitScheduler(wait_foreign);
 
     /* run C finalizers for all active weak pointers */
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = 0; i < getNumCapabilities(); i++) {
         runAllCFinalizers(capabilities[i]->weak_ptr_list_hd);
     }
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {

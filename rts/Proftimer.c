@@ -117,7 +117,7 @@ handleProfTick(void)
     total_ticks++;
     if (RELAXED_LOAD(&do_prof_ticks)) {
         uint32_t n;
-        for (n=0; n < n_capabilities; n++) {
+        for (n=0; n < getNumCapabilities(); n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
             traceProfSampleCostCentre(capabilities[n], capabilities[n]->r.rCCCS, total_ticks);
         }

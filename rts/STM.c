@@ -1107,7 +1107,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
       max_commits_at_end = getMaxCommits();
       max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
-                                (n_capabilities * TOKEN_BATCH_SIZE));
+                                (getNumCapabilities() * TOKEN_BATCH_SIZE));
       if (((max_concurrent_commits >> 32) > 0) || shake()) {
         result = false;
       }
