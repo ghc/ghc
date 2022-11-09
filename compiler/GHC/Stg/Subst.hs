@@ -12,6 +12,13 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
+-- TODO: This code might make folly of the work done in CorePrep where
+-- we clone local ids in order to ensure *all* local binders are unique.
+-- It's my understanding that here we use "the rapier"/uniqAway which makes up
+-- uniques based on the ids in scope. Which can give the same unique to different
+-- binders as long as they are in different scopes. A guarantee which isn't
+-- strong enough for code generation in general. See Note [CorePrep Overview].
+
 -- | A renaming substitution from 'Id's to 'Id's. Like 'RnEnv2', but not
 -- maintaining pairs of substitutions. Like 'GHC.Core.Subst.Subst', but
 -- with the domain being 'Id's instead of entire 'CoreExpr'.
