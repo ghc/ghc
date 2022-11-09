@@ -123,6 +123,7 @@ import GHC.Driver.Env.KnotVars
 import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
+import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 
 {-
 This module takes
@@ -930,7 +931,17 @@ tc_iface_binding i IfUseUnfoldingRhs = return (unfoldingTemplate $ realIdUnfoldi
 tc_iface_binding _ (IfRhs rhs) = tcIfaceExpr rhs
 
 mk_top_id :: IfaceTopBndrInfo -> IfL Id
-mk_top_id (IfGblTopBndr gbl_name) = tcIfaceExtId gbl_name
+mk_top_id (IfGblTopBndr gbl_name)
+  -- See Note [Root-main Id]
+  -- This special binding is actually defined in the current module
+  -- (hence don't go looking for it externally) but the module name is rOOT_MAIN
+  -- rather than the current module so we need this special case.
+  -- See some similar logic in `GHC.Rename.Env`.
+  | Just rOOT_MAIN == nameModule_maybe gbl_name
+    = do
+        ATyCon ioTyCon <- tcIfaceGlobal ioTyConName
+        return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
+  | otherwise = tcIfaceExtId gbl_name
 mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
    name <- newIfaceName (mkVarOccFS raw_name)
    ty <- tcIfaceType iface_type
