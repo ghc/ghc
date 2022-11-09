@@ -164,8 +164,6 @@ extern char **environ;
       SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
-      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf_s)) \
-      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf)) \
       RTS_WIN64_ONLY(SymI_HasProto(_errno))  \
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
