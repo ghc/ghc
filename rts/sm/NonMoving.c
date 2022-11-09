@@ -733,7 +733,7 @@ void nonmovingInit(void)
     initMutex(&concurrent_coll_finished_lock);
 #endif
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(n_capabilities);
+        nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(getNumCapabilities());
     }
     nonmovingMarkInitUpdRemSet();
 }
@@ -826,7 +826,7 @@ static void nonmovingPrepareMark(void)
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
 
         // Update current segments' snapshot pointers
-        for (uint32_t cap_n = 0; cap_n < n_capabilities; ++cap_n) {
+        for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
             struct NonmovingSegment *seg = alloca->current[cap_n];
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
@@ -945,7 +945,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // Mark roots
     trace(TRACE_nonmoving_gc, "Marking roots for nonmoving GC");
     markCAFs((evac_fn)markQueueAddRoot, mark_queue);
-    for (unsigned int n = 0; n < n_capabilities; ++n) {
+    for (unsigned int n = 0; n < getNumCapabilities(); ++n) {
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
                 capabilities[n], true/*don't mark sparks*/);
     }
@@ -1190,7 +1190,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // Prune spark lists
     // See Note [Spark management under the nonmoving collector].
 #if defined(THREADED_RTS)
-    for (uint32_t n = 0; n < n_capabilities; n++) {
+    for (uint32_t n = 0; n < getNumCapabilities(); n++) {
         pruneSparkQueue(true, capabilities[n]);
     }
 #endif
@@ -1266,7 +1266,7 @@ void assert_in_nonmoving_heap(StgPtr p)
     bdescr *bd = Bdescr(p);
     if (bd->flags & BF_LARGE) {
         // It should be in a capability (if it's not filled yet) or in non-moving heap
-        for (uint32_t cap = 0; cap < n_capabilities; ++cap) {
+        for (uint32_t cap = 0; cap < getNumCapabilities(); ++cap) {
             if (bd == capabilities[cap]->pinned_object_block) {
                 return;
             }
@@ -1285,7 +1285,7 @@ void assert_in_nonmoving_heap(StgPtr p)
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
         // Search current segments
-        for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
+        for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
             struct NonmovingSegment *seg = alloca->current[cap_idx];
             if (p >= (P_)seg && p < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 return;
@@ -1357,7 +1357,7 @@ void nonmovingPrintAllocator(struct NonmovingAllocator *alloc)
         debugBelch("%p ", (void*)seg);
     }
     debugBelch("\nCurrent segments:\n");
-    for (uint32_t i = 0; i < n_capabilities; ++i) {
+    for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
         debugBelch("%p ", alloc->current[i]);
     }
     debugBelch("\n");
@@ -1368,7 +1368,7 @@ void locate_object(P_ obj)
     // Search allocators
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
-        for (uint32_t cap = 0; cap < n_capabilities; ++cap) {
+        for (uint32_t cap = 0; cap < getNumCapabilities(); ++cap) {
             struct NonmovingSegment *seg = alloca->current[cap];
             if (obj >= (P_)seg && obj < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 debugBelch("%p is in current segment of capability %d of allocator %d at %p\n", obj, cap, alloca_idx, (void*)seg);
@@ -1499,7 +1499,7 @@ void nonmovingPrintSweepList()
 
 void check_in_mut_list(StgClosure *p)
 {
-    for (uint32_t cap_n = 0; cap_n < n_capabilities; ++cap_n) {
+    for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
         for (bdescr *bd = capabilities[cap_n]->mut_lists[oldest_gen->no]; bd; bd = bd->link) {
             for (StgPtr q = bd->start; q < bd->free; ++q) {
                 if (*((StgPtr**)q) == (StgPtr*)p) {

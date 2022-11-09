@@ -153,7 +153,7 @@ void initProfiling (void)
     /* for the benefit of allocate()... */
     {
         uint32_t n;
-        for (n=0; n < n_capabilities; n++) {
+        for (n=0; n < getNumCapabilities(); n++) {
             capabilities[n]->r.rCCCS = CCS_SYSTEM;
         }
     }
