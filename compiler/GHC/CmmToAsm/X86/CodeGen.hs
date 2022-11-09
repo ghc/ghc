@@ -2203,8 +2203,8 @@ genSimplePrim bid (MO_Pdep width)      [dst]   [src,mask]     = genPdep bid widt
 genSimplePrim bid (MO_Pext width)      [dst]   [src,mask]     = genPext bid width dst src mask
 genSimplePrim bid (MO_Clz width)       [dst]   [src]          = genClz bid width dst src
 genSimplePrim bid (MO_UF_Conv width)   [dst]   [src]          = genWordToFloat bid width dst src
-genSimplePrim _   (MO_AtomicRead w _)  [dst]   [addr]         = genAtomicRead w dst addr
-genSimplePrim _   (MO_AtomicWrite w _) []      [addr,val]     = genAtomicWrite w addr val
+genSimplePrim _   (MO_AtomicRead w mo)  [dst]  [addr]         = genAtomicRead w mo dst addr
+genSimplePrim _   (MO_AtomicWrite w mo) []     [addr,val]     = genAtomicWrite w mo addr val
 genSimplePrim bid (MO_Cmpxchg width)   [dst]   [addr,old,new] = genCmpXchg bid width dst addr old new
 genSimplePrim _   (MO_Xchg width)      [dst]   [addr, value]  = genXchg width dst addr value
 genSimplePrim _   (MO_AddWordC w)      [r,c]   [x,y]          = genAddSubRetCarry w ADD_CC (const Nothing) CARRY r c x y
@@ -3962,15 +3962,20 @@ genWordToFloat bid width dst src =
   -- TODO: generate assembly instead
   genPrimCCall bid (word2FloatLabel width) [dst] [src]
 
-genAtomicRead :: Width -> LocalReg -> CmmExpr -> NatM InstrBlock
-genAtomicRead width dst addr = do
+genAtomicRead :: Width -> MemoryOrdering -> LocalReg -> CmmExpr -> NatM InstrBlock
+genAtomicRead width _mord dst addr = do
   load_code <- intLoadCode (MOV (intFormat width)) addr
   return (load_code (getLocalRegReg dst))
 
-genAtomicWrite :: Width -> CmmExpr -> CmmExpr -> NatM InstrBlock
-genAtomicWrite width addr val = do
+genAtomicWrite :: Width -> MemoryOrdering -> CmmExpr -> CmmExpr -> NatM InstrBlock
+genAtomicWrite width mord addr val = do
   code <- assignMem_IntCode (intFormat width) addr val
-  return $ code `snocOL` MFENCE
+  let needs_fence = case mord of
+        MemOrderSeqCst  -> True
+        MemOrderRelease -> True
+        MemOrderAcquire -> pprPanic "genAtomicWrite: acquire ordering on write" empty
+        MemOrderRelaxed -> False
+  return $ if needs_fence then code `snocOL` MFENCE else code
 
 genCmpXchg
   :: BlockId
