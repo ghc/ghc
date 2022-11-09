@@ -69,7 +69,6 @@ stageBootPackages = return [lintersCommon, lintCommitMsg, lintSubmoduleRefs, lin
 stage0Packages :: Action [Package]
 stage0Packages = do
     cross <- flag CrossCompiling
-    winTarget  <- isWinTarget
     return $ [ binary
              , bytestring
              , cabalSyntax
@@ -97,7 +96,7 @@ stage0Packages = do
              , text
              , transformers
              , unlit
-             , if winTarget then win32 else unix
+             , if windowsHost then win32 else unix
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
@@ -107,7 +106,15 @@ stage0Packages = do
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
 stage1Packages = do
-    libraries0 <- filter isLibrary <$> stage0Packages
+    let good_stage0_package p
+          -- we only keep libraries for some reason
+          | not (isLibrary p) = False
+          -- but not win32/unix because it depends on cross-compilation target
+          | p == win32        = False
+          | p == unix         = False
+          | otherwise         = True
+
+    libraries0 <- filter good_stage0_package <$> stage0Packages
     cross      <- flag CrossCompiling
     winTarget  <- isWinTarget
 
@@ -135,6 +142,7 @@ stage1Packages = do
         , stm
         , unlit
         , xhtml
+        , if winTarget then win32 else unix
         ]
       , when (not cross)
         [ haddock
