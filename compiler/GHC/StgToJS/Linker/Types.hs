@@ -22,6 +22,7 @@ module GHC.StgToJS.Linker.Types
   ( GhcjsEnv (..)
   , newGhcjsEnv
   , JSLinkConfig (..)
+  , defaultJSLinkConfig
   , generateAllJs
   , LinkedObj (..)
   , LinkableUnit
@@ -60,26 +61,14 @@ data JSLinkConfig = JSLinkConfig
 generateAllJs :: JSLinkConfig -> Bool
 generateAllJs s = not (lcOnlyOut s) && not (lcNoRts s)
 
-instance Monoid JSLinkConfig where
-  mempty = JSLinkConfig
-            { lcNoJSExecutables    = False
-            , lcNoHsMain           = False
-            , lcOnlyOut            = False
-            , lcNoRts              = False
-            , lcNoStats            = False
-            }
-
-instance Semigroup JSLinkConfig where
-  (<>) c1 c2 =
-    let comb :: (a -> a -> a) -> (JSLinkConfig -> a) -> a
-        comb f a = f (a c1) (a c2)
-    in JSLinkConfig
-            { lcNoJSExecutables    = comb (||) lcNoJSExecutables
-            , lcNoHsMain           = comb (||) lcNoHsMain
-            , lcOnlyOut            = comb (||) lcOnlyOut
-            , lcNoRts              = comb (||) lcNoRts
-            , lcNoStats            = comb (||) lcNoStats
-            }
+defaultJSLinkConfig :: JSLinkConfig
+defaultJSLinkConfig = JSLinkConfig
+  { lcNoJSExecutables = False
+  , lcNoHsMain        = False
+  , lcOnlyOut         = False
+  , lcNoRts           = False
+  , lcNoStats         = False
+  }
 
 --------------------------------------------------------------------------------
 -- Linker Environment

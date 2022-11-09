@@ -83,6 +83,7 @@ import GHC.Linker.Static.Utils
 import GHC.Linker.Types
 
 import GHC.StgToJS.Linker.Linker
+import GHC.StgToJS.Linker.Types (defaultJSLinkConfig)
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -364,8 +365,8 @@ link :: GhcLink                 -- ^ interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt
-  = case linkHook hooks of
+link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt =
+  case linkHook hooks of
       Nothing -> case ghcLink of
         NoLink        -> return Succeeded
         LinkBinary    -> normal_link
@@ -448,7 +449,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         case ghcLink dflags of
           LinkBinary
             | isJS      -> do
-              let lc_cfg   = mempty
+              let lc_cfg   = defaultJSLinkConfig
               let extra_js = mempty
               let cfg      = initStgToJSConfig dflags
               jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
@@ -574,7 +575,7 @@ doLink hsc_env o_files = do
     NoLink        -> return ()
     LinkBinary
       | isJS      -> do
-        let lc_cfg   = mempty
+        let lc_cfg   = defaultJSLinkConfig
         let extra_js = mempty
         let cfg      = initStgToJSConfig dflags
         jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env o_files []
