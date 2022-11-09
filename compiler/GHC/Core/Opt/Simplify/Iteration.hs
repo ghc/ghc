@@ -1497,9 +1497,10 @@ rebuild env expr cont
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
         -> rebuild env (App expr (Type ty)) cont
 
-      ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag, sc_cont = cont}
+      ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag
+                 , sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
-        -> do { (_, _, arg') <- simplArg env dup_flag se arg
+        -> do { (_, _, arg') <- simplArg env dup_flag fun_ty se arg
               ; rebuild env (App expr arg') cont }
 
 completeBindX :: SimplEnv
@@ -1598,7 +1599,8 @@ simplCast env body co0 cont0
         --         co1 :: t1 ~ s1
         --         co2 :: s2 ~ t2
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                      , sc_dup = dup, sc_cont = tail })
+                                      , sc_dup = dup, sc_cont = tail
+                                      , sc_hole_ty = fun_ty })
           | Just (m_co1, m_co2) <- pushCoValArg co
           , fixed_rep m_co1
           = {-#SCC "addCoerce-pushCoValArg" #-}
@@ -1610,7 +1612,7 @@ simplCast env body co0 cont0
                       -- See Note [Avoiding exponential behaviour]
 
                    MCo co1 ->
-            do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
+            do { (dup', arg_se', arg') <- simplArg env dup fun_ty arg_se arg
                     -- When we build the ApplyTo we can't mix the OutCoercion
                     -- 'co' with the InExpr 'arg', so we simplify
                     -- to make it all consistent.  It's a bit messy.
@@ -1636,14 +1638,16 @@ simplCast env body co0 cont0
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
-simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
+simplArg :: SimplEnv -> DupFlag
+         -> OutType                 -- Type of the function applied to this arg
+         -> StaticEnv -> CoreExpr   -- Expression with its static envt
          -> SimplM (DupFlag, StaticEnv, OutExpr)
-simplArg env dup_flag arg_env arg
+simplArg env dup_flag fun_ty arg_env arg
   | isSimplified dup_flag
   = return (dup_flag, arg_env, arg)
   | otherwise
   = do { let arg_env' = arg_env `setInScopeFromE` env
-       ; arg' <- simplExpr arg_env'  arg
+       ; arg' <- simplExprC arg_env' arg (mkBoringStop (funArgTy fun_ty))
        ; return (Simplified, zapSubstEnv arg_env', arg') }
          -- Return a StaticEnv that includes the in-scope set from 'env',
          -- because arg' may well mention those variables (#20639)
@@ -2029,6 +2033,21 @@ zap the SubstEnv.  This is VITAL.  Consider
 
 We'll clone the inner \x, adding x->x' in the id_subst Then when we
 inline y, we must *not* replace x by x' in the inlined copy!!
+
+Note [Fast path for data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For applications of a data constructor worker, the full glory of
+rebuildCall is a waste of effort;
+* They never inline, obviously
+* They have no rewrite rules
+* They are not strict (see Note [Data-con worker strictness]
+  in GHC.Core.DataCon)
+So it's fine to zoom straight to `rebuild` which just rebuilds the
+call in a very straightforward way.
+
+Some programs have a /lot/ of data constructors in the source program
+(compiler/perf/T9961 is an example), so this fast path can be very
+valuable.
 -}
 
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
@@ -2046,6 +2065,9 @@ simplVar env var
 
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
+  | isDataConWorkId var         -- See Note [Fast path for data constructors]
+  = rebuild env (Var var) cont
+  | otherwise
   = case substId env var of
       ContEx tvs cvs ids e -> simplExprF env' e cont
         -- Don't trimJoinCont; haven't already simplified e,
@@ -2315,6 +2337,8 @@ field of the ArgInfo record is the state of a little state-machine:
   If we inline `f` before simplifying `BIG` well use preInlineUnconditionally,
   and we'll simplify BIG once, at x's occurrence, rather than twice.
 
+* GHC.Core.Opt.Simplify.Utils. mkRewriteCall: if there are no rules, and no
+  unfolding, we can skip both TryRules and TryInlining, which saves work.
 
 Note [Avoid redundant simplification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3645,7 +3669,7 @@ mkDupableContWithDmds env dmds
     do  { let (dmd:cont_dmds) = dmds   -- Never fails
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
-        ; (_, se', arg') <- simplArg env' dup se arg
+        ; (_, se', arg') <- simplArg env' dup hole_ty se arg
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
