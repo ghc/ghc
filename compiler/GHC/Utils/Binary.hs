@@ -172,7 +172,7 @@ handleData (BinMem _ ixr _ binr) = BinData <$> readFastMutInt ixr <*> readIORef 
 
 data BinHandle
   = BinMem {                     -- binary data stored in an unboxed array
-     bh_usr :: !UserData,        -- sigh, need parameterized modules :-)
+     bh_usr :: UserData,         -- sigh, need parameterized modules :-)
      _off_r :: !FastMutInt,      -- the current offset
      _sz_r  :: !FastMutInt,      -- size of the array (cached)
      _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
