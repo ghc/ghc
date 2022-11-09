@@ -69,7 +69,6 @@ import GHC.Data.Graph.UnVar
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder, mkCoreLet )
 import GHC.Builtin.Types
-import GHC.Core.TyCo.Rep        ( TyCoBinder(..) )
 import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, substCo
                                 , extendTvSubst, extendCvSubst )
@@ -503,7 +502,7 @@ mkSimplEnv mode fam_envs
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
-init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder Many unitTy))
+init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder ManyTy unitTy))
               -- See Note [WildCard binders]
 
 {-
@@ -1188,7 +1187,7 @@ adjustJoinPointType mult new_res_ty join_id
             = pprPanic "adjustJoinPointType" (ppr orig_ar <+> ppr orig_ty)
 
     -- See Note [Bangs in the Simplifier]
-    scale_bndr (Anon af t) = Anon af $! (scaleScaled mult t)
+    scale_bndr (Anon t af) = (Anon $! (scaleScaled mult t)) af
     scale_bndr b@(Named _) = b
 
 {- Note [Scaling join point arguments]

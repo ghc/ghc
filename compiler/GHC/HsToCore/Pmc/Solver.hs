@@ -45,6 +45,7 @@ import GHC.Utils.Monad (allM)
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
+
 import GHC.Types.Basic (Levity(..))
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
@@ -55,14 +56,17 @@ import GHC.Types.Name
 import GHC.Types.Var      (EvVar)
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Types.Unique.Supply
+
 import GHC.Core
-import GHC.Core.FVs       (exprFreeVars)
+import GHC.Core.FVs         (exprFreeVars)
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
 import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
 import GHC.Core.Make      (mkListExpr, mkCharExpr, mkRuntimeErrorApp, rUNTIME_ERROR_ID)
-import GHC.Types.Unique.Supply
+
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
@@ -73,7 +77,6 @@ import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
 import GHC.Builtin.Names
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim (tYPETyCon)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst (elemSubst)
 import GHC.Core.Type
@@ -639,7 +642,7 @@ nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalIdOrCoVar idname Many pred_ty)
+  return (mkLocalIdOrCoVar idname ManyTy pred_ty)
 
 -----------------------------
 -- ** Adding term constraints

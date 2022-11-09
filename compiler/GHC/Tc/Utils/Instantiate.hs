@@ -187,7 +187,7 @@ topSkolemise skolem_info ty
       = do { (subst', tvs1) <- tcInstSkolTyVarsX skolem_info subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; go subst'
-                (wrap <.> mkWpTyLams tvs1 <.> mkWpLams ev_vars1)
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpEvLams ev_vars1)
                 (tv_prs ++ (map tyVarName tvs `zip` tvs1))
                 (ev_vars ++ ev_vars1)
                 inner_ty }
@@ -203,7 +203,7 @@ topInstantiate ::CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- NB: returns a type with no (=>),
 --     and no invisible forall at the top
 topInstantiate orig sigma
-  | (tvs,   body1) <- tcSplitSomeForAllTyVars isInvisibleArgFlag sigma
+  | (tvs,   body1) <- tcSplitSomeForAllTyVars isInvisibleForAllTyFlag sigma
   , (theta, body2) <- tcSplitPhiTy body1
   , not (null tvs && null theta)
   = do { (_, wrap1, body3) <- instantiateSigma orig tvs theta body2
@@ -261,7 +261,7 @@ instTyVarsWith orig tvs tys
            ; go (extendTvSubstAndInScope subst tv (ty `mkCastTy` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
-        ty_kind = tcTypeKind ty
+        ty_kind = typeKind ty
 
     go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
 
@@ -368,6 +368,7 @@ instStupidTheta orig theta
 
 -- | Given ty::forall k1 k2. k, instantiate all the invisible forall-binders
 --   returning ty @kk1 @kk2 :: k[kk1/k1, kk2/k1]
+-- Called only to instantiate kinds, in user-written type signatures
 tcInstInvisibleTyBinders :: TcType -> TcKind -> TcM (TcType, TcKind)
 tcInstInvisibleTyBinders ty kind
   = do { (extra_args, kind') <- tcInstInvisibleTyBindersN n_invis kind
@@ -376,6 +377,7 @@ tcInstInvisibleTyBinders ty kind
     n_invis = invisibleTyBndrCount kind
 
 tcInstInvisibleTyBindersN :: Int -> TcKind -> TcM ([TcType], TcKind)
+-- Called only to instantiate kinds, in user-written type signatures
 tcInstInvisibleTyBindersN 0 kind
   = return ([], kind)
 tcInstInvisibleTyBindersN n ty
@@ -386,27 +388,29 @@ tcInstInvisibleTyBindersN n ty
     go n subst kind
       | n > 0
       , Just (bndr, body) <- tcSplitPiTy_maybe kind
-      , isInvisibleBinder bndr
+      , isInvisiblePiTyBinder bndr
       = do { (subst', arg) <- tcInstInvisibleTyBinder subst bndr
            ; (args, inner_ty) <- go (n-1) subst' body
            ; return (arg:args, inner_ty) }
       | otherwise
       = return ([], substTy subst kind)
 
--- | Used only in *types*
-tcInstInvisibleTyBinder :: Subst -> TyBinder -> TcM (Subst, TcType)
+tcInstInvisibleTyBinder :: Subst -> PiTyVarBinder -> TcM (Subst, TcType)
+-- Called only to instantiate kinds, in user-written type signatures
+
 tcInstInvisibleTyBinder subst (Named (Bndr tv _))
   = do { (subst', tv') <- newMetaTyVarX subst tv
        ; return (subst', mkTyVarTy tv') }
 
-tcInstInvisibleTyBinder subst (Anon af ty)
+tcInstInvisibleTyBinder subst (Anon ty af)
   | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
-    -- Equality is the *only* constraint currently handled in types.
+    -- For kinds like (k1 ~ k2) => blah, we want to emit a unification
+    -- constraint for (k1 ~# k2) and return the argument (Eq# k1 k2)
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
-  = assert (af == InvisArg) $
+    -- Equality is the *only* constraint currently handled in types.
+  = assert (isInvisibleFunArg af) $
     do { co <- unifyKind Nothing k1 k2
-       ; arg' <- mk co
-       ; return (subst, arg') }
+       ; return (subst, mk co) }
 
   | otherwise  -- This should never happen
                -- See GHC.Core.TyCo.Rep Note [Constraints in kinds]
@@ -414,9 +418,9 @@ tcInstInvisibleTyBinder subst (Anon af ty)
 
 -------------------------------
 get_eq_tys_maybe :: Type
-                 -> Maybe ( Coercion -> TcM Type
-                             -- given a coercion proving t1 ~# t2, produce the
-                             -- right instantiation for the TyBinder at hand
+                 -> Maybe ( Coercion -> Type
+                             -- Given a coercion proving t1 ~# t2, produce the
+                             -- right instantiation for the PiTyVarBinder at hand
                           , Type  -- t1
                           , Type  -- t2
                           )
@@ -425,31 +429,28 @@ get_eq_tys_maybe ty
   -- Lifted heterogeneous equality (~~)
   | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
   , tc `hasKey` heqTyConKey
-  = Just (\co -> mkHEqBoxTy co k1 k2, k1, k2)
+  = Just (mkHEqBoxTy k1 k2, k1, k2)
 
   -- Lifted homogeneous equality (~)
   | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
   , tc `hasKey` eqTyConKey
-  = Just (\co -> mkEqBoxTy co k1 k2, k1, k2)
+  = Just (mkEqBoxTy k1 k2, k1, k2)
 
   | otherwise
   = Nothing
 
 -- | This takes @a ~# b@ and returns @a ~~ b@.
-mkHEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
--- monadic just for convenience with mkEqBoxTy
-mkHEqBoxTy co ty1 ty2
-  = return $
-    mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
-  where k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
+mkHEqBoxTy :: Type -> Type -> TcCoercion -> Type
+mkHEqBoxTy ty1 ty2 co
+  = mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
+  where k1 = typeKind ty1
+        k2 = typeKind ty2
 
 -- | This takes @a ~# b@ and returns @a ~ b@.
-mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
-mkEqBoxTy co ty1 ty2
-  = return $
-    mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
-  where k = tcTypeKind ty1
+mkEqBoxTy :: Type -> Type -> TcCoercion -> Type
+mkEqBoxTy ty1 ty2 co
+  = mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
+  where k = typeKind ty1
 
 {- *********************************************************************
 *                                                                      *
@@ -488,7 +489,7 @@ tcInstTypeBndrs poly_ty
              subst'  = extendSubstInScopeSet subst (tyCoVarsOfType rho)
        ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
   where
-    (tyvars, rho) = splitForAllInvisTVBinders poly_ty
+    (tyvars, rho) = tcSplitForAllInvisTVBinders poly_ty
     (theta, tau)  = tcSplitPhiTy rho
 
     inst_invis_bndr :: Subst -> InvisTVBinder

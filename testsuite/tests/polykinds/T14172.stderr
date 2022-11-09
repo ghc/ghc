@@ -8,7 +8,8 @@ T14172.hs:7:46: error: [GHC-88464]
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘h’, namely ‘_’
       In the first argument of ‘f’, namely ‘(h _)’
-      In the type ‘(a -> f b) -> g a -> f (h _)’
+      In the type signature:
+        traverseCompose :: (a -> f b) -> g a -> f (h _)
 
 T14172.hs:8:19: error: [GHC-25897]
     • Couldn't match type ‘a’ with ‘g'1 a'0’

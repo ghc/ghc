@@ -72,6 +72,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Class
+
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Env
 import GHC.Utils.Misc

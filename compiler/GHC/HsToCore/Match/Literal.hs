@@ -36,29 +36,36 @@ import GHC.HsToCore.Utils
 
 import GHC.Hs
 
-import GHC.Types.Id
-import GHC.Types.SourceText
+import GHC.Tc.Utils.Zonk ( shortCutLit )
+import GHC.Tc.Utils.TcType
+
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.DataCon
-import GHC.Tc.Utils.Zonk ( shortCutLit )
-import GHC.Tc.Utils.TcType
-import GHC.Types.Name
 import GHC.Core.Type
+import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
+
+import GHC.Types.Name
+import GHC.Types.Literal
+import GHC.Types.SrcLoc
+
 import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
-import GHC.Types.Literal
-import GHC.Types.SrcLoc
-import GHC.Utils.Outputable as Outputable
+
+import GHC.Types.Id
+import GHC.Types.SourceText
+
 import GHC.Driver.Session
+
+import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
 import GHC.Data.FastString
-import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 
 import Control.Monad
 import Data.Int
@@ -265,7 +272,7 @@ warnAboutIdentities :: DynFlags -> Id -> Type -> DsM ()
 warnAboutIdentities dflags conv_fn type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
-  , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
+  , Just (_, _, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = diagnosticDs (DsIdentitiesFound conv_fn type_of_conv)
 warnAboutIdentities _ _ _ = return ()

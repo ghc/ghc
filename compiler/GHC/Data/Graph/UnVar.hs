@@ -16,7 +16,7 @@ equal to g, but twice as expensive and large.
 -}
 module GHC.Data.Graph.UnVar
     ( UnVarSet
-    , emptyUnVarSet, mkUnVarSet, varEnvDom, unionUnVarSet, unionUnVarSets
+    , emptyUnVarSet, mkUnVarSet, unionUnVarSet, unionUnVarSets
     , extendUnVarSet, extendUnVarSetList, delUnVarSet, delUnVarSetList
     , elemUnVarSet, isEmptyUnVarSet
     , UnVarGraph
@@ -26,13 +26,13 @@ module GHC.Data.Graph.UnVar
     , neighbors
     , hasLoopAt
     , delNode
+    , domUFMUnVarSet
     ) where
 
 import GHC.Prelude
 
-import GHC.Types.Id
-import GHC.Types.Var.Env
-import GHC.Types.Unique.FM
+import GHC.Types.Unique.FM( UniqFM, ufmToSet_Directly )
+import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 
@@ -49,6 +49,9 @@ newtype UnVarSet = UnVarSet (S.IntSet)
 
 k :: Var -> Int
 k v = getKey (getUnique v)
+
+domUFMUnVarSet :: UniqFM key elt -> UnVarSet
+domUFMUnVarSet ae = UnVarSet $ ufmToSet_Directly ae
 
 emptyUnVarSet :: UnVarSet
 emptyUnVarSet = UnVarSet S.empty
@@ -74,9 +77,6 @@ sizeUnVarSet (UnVarSet s) = S.size s
 
 mkUnVarSet :: [Var] -> UnVarSet
 mkUnVarSet vs = UnVarSet $ S.fromList $ map k vs
-
-varEnvDom :: VarEnv a -> UnVarSet
-varEnvDom ae = UnVarSet $ ufmToSet_Directly ae
 
 extendUnVarSet :: Var -> UnVarSet -> UnVarSet
 extendUnVarSet v (UnVarSet s) = UnVarSet $ S.insert (k v) s

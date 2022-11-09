@@ -23,7 +23,7 @@ module GHC.Types.Var.Env (
         isEmptyVarEnv,
         elemVarEnvByKey,
         filterVarEnv, restrictVarEnv,
-        partitionVarEnv,
+        partitionVarEnv, varEnvDomain,
 
         -- * Deterministic Var environments (maps)
         DVarEnv, DIdEnv, DTyVarEnv,
@@ -83,6 +83,7 @@ import GHC.Types.Name.Occurrence
 import GHC.Types.Name
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
+import GHC.Data.Graph.UnVar   -- UnVarSet
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
@@ -505,6 +506,7 @@ extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
 plusVarEnv        :: VarEnv a -> VarEnv a -> VarEnv a
 plusVarEnvList    :: [VarEnv a] -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
+varEnvDomain      :: VarEnv elt -> UnVarSet
 
 partitionVarEnv   :: (a -> Bool) -> VarEnv a -> (VarEnv a, VarEnv a)
 -- | Only keep variables contained in the VarSet
@@ -561,7 +563,9 @@ mkVarEnv_Directly= listToUFM_Directly
 emptyVarEnv      = emptyUFM
 unitVarEnv       = unitUFM
 isEmptyVarEnv    = isNullUFM
-partitionVarEnv       = partitionUFM
+partitionVarEnv  = partitionUFM
+varEnvDomain     = domUFMUnVarSet
+
 
 restrictVarEnv env vs = filterUFM_Directly keep env
   where

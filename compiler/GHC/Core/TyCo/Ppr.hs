@@ -27,14 +27,14 @@ module GHC.Core.TyCo.Ppr
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.CoreToIface
-   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
+   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndrs
    , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
-import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many,
-                       splitForAllReqTVBinders, splitForAllInvisTVBinders )
+import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern OneTy, pattern ManyTy,
+                       splitForAllReqTyBinders, splitForAllInvisTyBinders )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -42,7 +42,7 @@ import GHC.Core.TyCo.Tidy
 import GHC.Core.TyCo.FVs
 import GHC.Core.Class
 import GHC.Types.Var
-
+import GHC.Core.Multiplicity( pprArrowWithMultiplicity )
 import GHC.Iface.Type
 
 import GHC.Types.Var.Set
@@ -161,18 +161,18 @@ pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 pprSigmaType :: Type -> SDoc
 pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 
-pprForAll :: [TyCoVarBinder] -> SDoc
-pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
+pprForAll :: [ForAllTyBinder] -> SDoc
+pprForAll tvs = pprIfaceForAll (toIfaceForAllBndrs tvs)
 
 -- | Print a user-level forall; see @Note [When to print foralls]@ in
 -- "GHC.Iface.Type".
-pprUserForAll :: [TyCoVarBinder] -> SDoc
-pprUserForAll = pprUserIfaceForAll . map toIfaceForAllBndr
+pprUserForAll :: [ForAllTyBinder] -> SDoc
+pprUserForAll = pprUserIfaceForAll . toIfaceForAllBndrs
 
-pprTCvBndrs :: [TyCoVarBinder] -> SDoc
+pprTCvBndrs :: [ForAllTyBinder] -> SDoc
 pprTCvBndrs tvs = sep (map pprTCvBndr tvs)
 
-pprTCvBndr :: TyCoVarBinder -> SDoc
+pprTCvBndr :: ForAllTyBinder -> SDoc
 pprTCvBndr = pprTyVar . binderVar
 
 pprTyVars :: [TyVar] -> SDoc
@@ -230,18 +230,15 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
+debug_ppr_ty prec (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
   = maybeParen prec funPrec $
     sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
   where
-    arr = case af of
-            VisArg   -> case mult of
-                          One -> lollipop
-                          Many -> arrow
-                          w -> mulArrow (const ppr) w
-            InvisArg -> case mult of
-                          Many -> darrow
-                          _ -> pprPanic "unexpected multiplicity" (ppr ty)
+    arr = pprArrowWithMultiplicity af $
+          case mult of
+            OneTy  -> Left True
+            ManyTy -> Left False
+            _      -> Right (debug_ppr_ty appPrec mult)
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc
@@ -263,7 +260,7 @@ debug_ppr_ty _ (CoercionTy co)
 
 -- Invisible forall:  forall {k} (a :: k). t
 debug_ppr_ty prec t
-  | (bndrs, body) <- splitForAllInvisTVBinders t
+  | (bndrs, body) <- splitForAllInvisTyBinders t
   , not (null bndrs)
   = maybeParen prec funPrec $
     sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <> dot,
@@ -276,7 +273,7 @@ debug_ppr_ty prec t
 
 -- Visible forall:  forall x y -> t
 debug_ppr_ty prec t
-  | (bndrs, body) <- splitForAllReqTVBinders t
+  | (bndrs, body) <- splitForAllReqTyBinders t
   , not (null bndrs)
   = maybeParen prec funPrec $
     sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <+> arrow,
@@ -288,7 +285,7 @@ debug_ppr_ty prec t
 
 -- Impossible case: neither visible nor invisible forall.
 debug_ppr_ty _ ForAllTy{}
-  = panic "debug_ppr_ty: neither splitForAllInvisTVBinders nor splitForAllReqTVBinders returned any binders"
+  = panic "debug_ppr_ty: neither splitForAllInvisTyBinders nor splitForAllReqTyBinders returned any binders"
 
 {-
 Note [Infix type variables]

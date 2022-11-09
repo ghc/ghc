@@ -44,29 +44,35 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
-
+import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family
+
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Type
 import GHC.Core.Multiplicity
-import GHC.Types.ForeignCall
-import GHC.Utils.Error
-import GHC.Types.Id
-import GHC.Types.Name
-import GHC.Types.Name.Reader
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
-import GHC.Tc.Utils.TcType
+
+import GHC.Types.ForeignCall
+import GHC.Types.Id
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+
 import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim( isArrowTyCon )
+
 import GHC.Driver.Session
 import GHC.Driver.Backend
+
+import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Types.SrcLoc
+
 import GHC.Data.Bag
 import GHC.Driver.Hooks
 import qualified GHC.LanguageExtensions as LangExt
@@ -122,13 +128,13 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
   where
     go :: Role -> RecTcChecker -> Type -> WriterT (Bag GlobalRdrElt) TcM Reduction
     go role rec_nts ty
-      | Just ty' <- tcView ty     -- Expand synonyms
+      | Just ty' <- coreView ty     -- Expand synonyms
       = go role rec_nts ty'
 
       | Just (tc, tys) <- splitTyConApp_maybe ty
       = go_tc_app role rec_nts tc tys
 
-      | (bndrs, inner_ty) <- splitForAllTyCoVarBinders ty
+      | (bndrs, inner_ty) <- splitForAllForAllTyBinders ty
       , not (null bndrs)
       = do redn <- go role rec_nts inner_ty
            return $ mkHomoForAllRedn bndrs redn
@@ -139,9 +145,13 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
     go_tc_app :: Role -> RecTcChecker -> TyCon -> [Type]
               -> WriterT (Bag GlobalRdrElt) TcM Reduction
     go_tc_app role rec_nts tc tys
+        | isArrowTyCon tc  -- Recurse through arrows, or at least the top
+        = children_only    -- level arrows.  Remember, the default case is
+                           -- "don't recurse" (see last eqn for go_tc_app)
+
+        | tc_key `elem` [ioTyConKey, funPtrTyConKey]
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
-        | tc_key `elem` [ioTyConKey, funPtrTyConKey, funTyConKey]
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
@@ -244,10 +254,17 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
-           -- Drop the foralls before inspecting the
-           -- structure of the foreign type.
-             (arg_tys, res_ty) = tcSplitFunTys (dropForAlls norm_sig_ty)
-             id                = mkLocalId nm Many sig_ty
+             -- Drop the foralls before inspecting the
+             -- structure of the foreign type.
+             -- Use splitFunTys, which splits (=>) as well as (->)
+             -- so that for  foreign import foo :: Eq a => a -> blah
+             -- we get "unacceptable argument Eq a" rather than
+             --        "unacceptable result Eq a => a -> blah"
+             -- Not a big deal.  We could make a better error message specially
+             -- for overloaded functions, but doesn't seem worth it
+             (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
+
+             id = mkLocalId nm ManyTy sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Utils.Zonk.zonkForeignExports ignores it).
@@ -271,7 +288,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) safety mh l@(CLabel
   = do checkCg (Right idecl) backendValidityOfCImport
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkVisFunTys arg_tys res_ty))
+       check (isFFILabelTy (mkScaledFunTys arg_tys res_ty))
              (TcRnIllegalForeignType Nothing)
        cconv' <- checkCConv (Right idecl) cconv
        return (CImport src (L lc cconv') safety mh l)
@@ -304,7 +321,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport src (L lc cconv) (L ls safety) mh
           addErrTc (TcRnIllegalForeignType Nothing AtLeastOneArgExpected)
         (Scaled arg1_mult arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = mkVisFunTys arg_tys res_ty
+          let curried_res_ty = mkScaledFunTys arg_tys res_ty
           checkNoLinearFFI arg1_mult
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (TcRnIllegalForeignType (Just Arg))
@@ -442,8 +459,8 @@ checkForeignArgs pred tys = mapM_ go tys
                           check (pred ty) (TcRnIllegalForeignType (Just Arg))
 
 checkNoLinearFFI :: Mult -> TcM ()  -- No linear types in FFI (#18472)
-checkNoLinearFFI Many = return ()
-checkNoLinearFFI _    = addErrTc $ TcRnIllegalForeignType (Just Arg)
+checkNoLinearFFI ManyTy = return ()
+checkNoLinearFFI _      = addErrTc $ TcRnIllegalForeignType (Just Arg)
                                    LinearTypesNotAllowed
 
 ------------ Checking result types for foreign calls ----------------------
@@ -464,7 +481,7 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
 
   -- We disallow nested foralls in foreign types
   -- (at least, for the time being). See #16702.
-  | tcIsForAllTy ty
+  | isForAllTy ty
   = addErrTc $ TcRnIllegalForeignType (Just Result) UnexpectedNestedForall
 
   -- Case for non-IO result type with FFI Import

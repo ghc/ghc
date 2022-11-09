@@ -121,7 +121,8 @@ import GHC.Core.Type
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction ( Reduction(..) )
-import GHC.Core.Unify( RoughMatchTc(..) )
+import GHC.Core.RoughMap( RoughMatchTc(..) )
+import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.FamInstEnv
    ( FamInst, pprFamInst, famInstsRepTyCons
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
@@ -1252,7 +1253,7 @@ checkBootTyCon is_boot tc1 tc2
     --          data T a = MkT
     --
     -- If you write this, we'll treat T as injective, and make inferences
-    -- like T a ~R T b ==> a ~N b (mkNthCo).  But if we can
+    -- like T a ~R T b ==> a ~N b (mkSelCo).  But if we can
     -- subsequently replace T with one at phantom role, we would then be able to
     -- infer things like T Int ~R T Bool which is bad news.
     --
@@ -2717,7 +2718,8 @@ tcRnType hsc_env flexi normalise rdr_type
                                normaliseType fam_envs Nominal ty
                  | otherwise = ty
 
-       ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
+       ; traceTc "tcRnExpr" (debugPprType ty $$ debugPprType ty')
+       ; return (ty', mkInfForAllTys kvs (typeKind ty')) }
 
 
 {- Note [TcRnExprMode]

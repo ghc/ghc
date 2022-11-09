@@ -367,7 +367,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 --    that is, checkValidType doesn't need to do kind checking
 -- Not used for instance decls; checkValidInstance instead
 checkValidType ctxt ty
-  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty))
+  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
        ; rankn_flag  <- xoptM LangExt.RankNTypes
        ; impred_flag <- xoptM LangExt.ImpredicativeTypes
        ; let gen_rank :: Rank -> Rank
@@ -433,7 +433,7 @@ checkValidType ctxt ty
        --     and there may be nested foralls for the subtype test to examine
        ; checkAmbiguity ctxt ty
 
-       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (tcTypeKind ty)) }
+       ; traceTc "checkValidType done" (ppr ty <+> text "::" <+> ppr (typeKind ty)) }
 
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
@@ -446,10 +446,10 @@ checkValidMonoType ty
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
 checkTySynRhs ctxt ty
-  | tcReturnsConstraintKind actual_kind
+  | returnsConstraintKind actual_kind
   = do { ck <- xoptM LangExt.ConstraintKinds
        ; if ck
-         then  when (tcIsConstraintKind actual_kind)
+         then  when (isConstraintLikeKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
                         ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
@@ -460,7 +460,7 @@ checkTySynRhs ctxt ty
   | otherwise
   = return ()
   where
-    actual_kind = tcTypeKind ty
+    actual_kind = typeKind ty
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -761,12 +761,12 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env
   where
     (tvbs, phi)   = tcSplitForAllTyVarBinders ty
     (theta, tau)  = tcSplitPhiTy phi
-    (env', _)     = tidyTyCoVarBinders env tvbs
+    (env', _)     = tidyForAllTyBinders env tvbs
 
 check_type (ve@ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank })
            ty@(FunTy _ mult arg_ty res_ty)
-  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyDataConTy mult))
+  = do  { failIfTcM (not (linearityAllowed ctxt) && not (isManyTy mult))
                      (env, TcRnLinearFuncInKind (tidyType env ty))
         ; check_type (ve{ve_rank = arg_rank}) arg_ty
         ; check_type (ve{ve_rank = res_rank}) res_ty }
@@ -818,7 +818,7 @@ check_syn_tc_app (ve@ValidityEnv{ ve_ctxt = ctxt, ve_expand = expand })
 
     check_expansion_only expand
       = assertPpr (isTypeSynonymTyCon tc) (ppr tc) $
-        case tcView ty of
+        case coreView ty of
          Just ty' -> let err_ctxt = text "In the expansion of type synonym"
                                     <+> quotes (ppr tc)
                      in addErrCtxt err_ctxt $
@@ -942,7 +942,7 @@ checkVdqOK ve tvbs ty = do
   checkTcM (vdqAllowed ctxt || no_vdq)
            (env, TcRnVDQInTermType (Just (tidyType env ty)))
   where
-    no_vdq = all (isInvisibleArgFlag . binderArgFlag) tvbs
+    no_vdq = all (isInvisibleForAllTyFlag . binderFlag) tvbs
     ValidityEnv{ve_tidy_env = env, ve_ctxt = ctxt} = ve
 
 {-
@@ -1086,7 +1086,7 @@ check_pred_help :: Bool    -- True <=> under a type synonym
                 -> DynFlags -> UserTypeCtxt
                 -> PredType -> TcM ()
 check_pred_help under_syn env dflags ctxt pred
-  | Just pred' <- tcView pred  -- Switch on under_syn when going under a
+  | Just pred' <- coreView pred  -- Switch on under_syn when going under a
                                  -- synonym (#9838, yuk)
   = check_pred_help True env dflags ctxt pred'
 
@@ -1545,7 +1545,9 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
   = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
-        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` manyDataConTy = tys_t
+        tys'' | tc `hasKey` fUNTyConKey
+              , ManyTy : tys_t <- tys'
+              = tys_t
               | otherwise = tys'
     in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (#13833)
@@ -1556,7 +1558,7 @@ tcInstHeadTyAppAllTyVars ty
         -- and that each is distinct
     ok tys = equalLength tvs tys && hasNoDups tvs
            where
-             tvs = mapMaybe tcGetTyVar_maybe tys
+             tvs = mapMaybe getTyVar_maybe tys
 
 dropCasts :: Type -> Type
 -- See Note [Casts during validity checking]
@@ -2027,23 +2029,23 @@ checkValidAssocTyFamDeflt fam_tc pats =
   do { cpt_tvs <- zipWithM extract_tv pats pats_vis
      ; check_all_distinct_tvs $ zip cpt_tvs pats_vis }
   where
-    pats_vis :: [ArgFlag]
-    pats_vis = tyConArgFlags fam_tc pats
+    pats_vis :: [ForAllTyFlag]
+    pats_vis = tyConForAllTyFlags fam_tc pats
 
     -- Checks that a pattern on the LHS of a default is a type
     -- variable. If so, return the underlying type variable, and if
     -- not, throw an error.
     -- See Note [Type-checking default assoc decls]
-    extract_tv :: Type    -- The particular type pattern from which to extract
-                          -- its underlying type variable
-               -> ArgFlag -- The visibility of the type pattern
-                          -- (only used for error message purposes)
+    extract_tv :: Type          -- The particular type pattern from which to
+                                -- extrace its underlying type variable
+               -> ForAllTyFlag  -- The visibility of the type pattern
+                                -- (only used for error message purposes)
                -> TcM TyVar
     extract_tv pat pat_vis =
       case getTyVar_maybe pat of
         Just tv -> pure tv
         Nothing -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+          pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
           hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
              2 (vcat [ppr_eqn, suggestion])
 
@@ -2051,7 +2053,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
     -- duplicated. If that is the case, throw an error.
     -- See Note [Type-checking default assoc decls]
     check_all_distinct_tvs ::
-         [(TyVar, ArgFlag)] -- The type variable arguments in the associated
+         [(TyVar, ForAllTyFlag)] -- The type variable arguments in the associated
                             -- default declaration, along with their respective
                             -- visibilities (the latter are only used for error
                             -- message purposes)
@@ -2060,8 +2062,8 @@ checkValidAssocTyFamDeflt fam_tc pats =
       let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
         (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
-               mkTcRnUnknownMessage $ mkPlainError noHints $
-               pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+              mkTcRnUnknownMessage $ mkPlainError noHints $
+               pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
                hang (text "Illegal duplicate variable"
                        <+> quotes (ppr pat_tv) <+> text "in:")
                   2 (vcat [ppr_eqn, suggestion]))
@@ -2243,16 +2245,16 @@ checkConsistentFamInst (InClsInst { ai_class = clas
   where
     (ax_tvs, ax_arg_tys, _) = etaExpandCoAxBranch branch
 
-    arg_triples :: [(Type,Type, ArgFlag)]
+    arg_triples :: [(Type,Type, ForAllTyFlag)]
     arg_triples = [ (cls_arg_ty, at_arg_ty, vis)
                   | (fam_tc_tv, vis, at_arg_ty)
                        <- zip3 (tyConTyVars fam_tc)
-                               (tyConArgFlags fam_tc ax_arg_tys)
+                               (tyConForAllTyFlags fam_tc ax_arg_tys)
                                ax_arg_tys
                   , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
     pp_wrong_at_arg vis
-      = pprWithExplicitKindsWhen (isInvisibleArgFlag vis) $
+      = pprWithExplicitKindsWhen (isInvisibleForAllTyFlag vis) $
         vcat [ text "Type indexes must match class instance head"
              , text "Expected:" <+> pp_expected_ty
              , text "  Actual:" <+> pp_actual_ty ]
@@ -2279,7 +2281,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
 
     -- For check_match, bind_me, see
     -- Note [Matching in the consistent-instantiation check]
-    check_match :: [(Type,Type,ArgFlag)] -> TcM ()
+    check_match :: [(Type,Type,ForAllTyFlag)] -> TcM ()
     check_match triples = go emptySubst emptySubst triples
 
     go _ _ [] = return ()
@@ -2741,9 +2743,9 @@ checkTyConTelescope tc
         fkvs = tyCoVarsOfType (tyVarKind tv)
 
     inferred_tvs  = [ binderVar tcb
-                    | tcb <- tcbs, Inferred == tyConBinderArgFlag tcb ]
+                    | tcb <- tcbs, Inferred == tyConBinderForAllTyFlag tcb ]
     specified_tvs = [ binderVar tcb
-                    | tcb <- tcbs, Specified == tyConBinderArgFlag tcb ]
+                    | tcb <- tcbs, Specified == tyConBinderForAllTyFlag tcb ]
 
     pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
     pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
@@ -2781,7 +2783,7 @@ checkTyConTelescope tc
 -- Free variables of a type, retaining repetitions, and expanding synonyms
 -- This ignores coercions, as coercions aren't user-written
 fvType :: Type -> [TyCoVar]
-fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
+fvType ty | Just exp_ty <- coreView ty = fvType exp_ty
 fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
@@ -2798,7 +2800,7 @@ fvTypes tys                = concatMap fvType tys
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
+sizeType ty | Just exp_ty <- coreView ty = sizeType exp_ty
 sizeType (TyVarTy {})      = 1
 sizeType (TyConApp tc tys) = 1 + sizeTyConAppArgs tc tys
 sizeType (LitTy {})        = 1

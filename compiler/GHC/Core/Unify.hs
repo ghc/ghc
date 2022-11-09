@@ -10,21 +10,19 @@ module GHC.Core.Unify (
         tcMatchTyX, tcMatchTysX, tcMatchTyKisX,
         tcMatchTyX_BM, ruleMatchTyKiX,
 
-        -- * Rough matching
-        RoughMatchTc(..), roughMatchTcs, roughMatchTcsLookup, instanceCantMatch,
-        typesCantMatch, isRoughWildcard,
-
         -- Side-effect free unification
         tcUnifyTy, tcUnifyTyKi, tcUnifyTys, tcUnifyTyKis,
         tcUnifyTysFG, tcUnifyTyWithTFs,
         BindFun, BindFlag(..), matchBindFun, alwaysBindFun,
         UnifyResult, UnifyResultM(..), MaybeApartReason(..),
+        typesCantMatch, typesAreApart,
 
         -- Matching a type against a lifted type (coercion)
         liftCoMatch,
 
         -- The core flattening algorithm
-        flattenTys, flattenTysX
+        flattenTys, flattenTysX,
+
    ) where
 
 import GHC.Prelude
@@ -37,9 +35,9 @@ import GHC.Core.Type     hiding ( getTvSubstEnv )
 import GHC.Core.Coercion hiding ( getCvSubstEnv )
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.FVs   ( tyCoVarsOfCoList, tyCoFVsOfTypes )
-import GHC.Core.TyCo.Subst ( mkTvSubst, emptyIdSubstEnv )
-import GHC.Core.RoughMap
+import GHC.Core.TyCo.Compare ( eqType, tcEqType )
+import GHC.Core.TyCo.FVs     ( tyCoVarsOfCoList, tyCoFVsOfTypes )
+import GHC.Core.TyCo.Subst   ( mkTvSubst, emptyIdSubstEnv )
 import GHC.Core.Map.Type
 import GHC.Utils.FV( FV, fvVarList )
 import GHC.Utils.Misc
@@ -48,7 +46,6 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import {-# SOURCE #-} GHC.Tc.Utils.TcType ( tcEqType )
 import GHC.Exts( oneShot )
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
@@ -56,8 +53,6 @@ import GHC.Data.FastString
 import Data.List ( mapAccumL )
 import Control.Monad
 import qualified Data.Semigroup as S
-
-import GHC.Builtin.Names (constraintKindTyConKey, liftedTypeKindTyConKey)
 
 {-
 
@@ -161,7 +156,7 @@ tcMatchTyX subst ty1 ty2
 -- See also Note [tcMatchTy vs tcMatchTyKi]
 tcMatchTys :: [Type]         -- ^ Template
            -> [Type]         -- ^ Target
-           -> Maybe Subst -- ^ One-shot; in principle the template
+           -> Maybe Subst    -- ^ One-shot; in principle the template
                              -- variables could be free in the target
 tcMatchTys tys1 tys2
   = tc_match_tys alwaysBindFun False tys1 tys2
@@ -254,62 +249,6 @@ matchBindFun tvs tv _ty
 alwaysBindFun :: BindFun
 alwaysBindFun _tv _ty = BindMe
 
-{- *********************************************************************
-*                                                                      *
-                Rough matching
-*                                                                      *
-********************************************************************* -}
-
-{- Note [Rough matching in class and family instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  instance C (Maybe [Tree a]) Bool
-and suppose we are looking up
-     C Bool Bool
-
-We can very quickly rule the instance out, because the first
-argument is headed by Maybe, whereas in the constraint we are looking
-up has first argument headed by Bool.  These "headed by" TyCons are
-called the "rough match TyCons" of the constraint or instance.
-They are used for a quick filter, to check when an instance cannot
-possibly match.
-
-The main motivation is to avoid sucking in whole instance
-declarations that are utterly useless.  See GHC.Core.InstEnv
-Note [ClsInst laziness and the rough-match fields].
-
-INVARIANT: a rough-match TyCons `tc` is always a real, generative tycon,
-like Maybe or Either, including a newtype or a data family, both of
-which are generative. It replies True to `isGenerativeTyCon tc Nominal`.
-
-But it is never
-    - A type synonym
-      E.g. Int and (S Bool) might match
-           if (S Bool) is a synonym for Int
-
-    - A type family (#19336)
-      E.g.   (Just a) and (F a) might match if (F a) reduces to (Just a)
-             albeit perhaps only after 'a' is instantiated.
--}
-
-roughMatchTcs :: [Type] -> [RoughMatchTc]
-roughMatchTcs tys = map typeToRoughMatchTc tys
-
-roughMatchTcsLookup :: [Type] -> [RoughMatchLookupTc]
-roughMatchTcsLookup tys = map typeToRoughMatchLookupTc tys
-
-instanceCantMatch :: [RoughMatchTc] -> [RoughMatchTc] -> Bool
--- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
--- possibly be instantiated to actual, nor vice versa;
--- False is non-committal
-instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
-instanceCantMatch _         _         =  False  -- Safe
-
-itemCantMatch :: RoughMatchTc -> RoughMatchTc -> Bool
-itemCantMatch (RM_KnownTc t) (RM_KnownTc a) = t /= a
-itemCantMatch _           _           = False
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -351,13 +290,12 @@ suffices.
 -- apart, even after arbitrary type function evaluation and substitution?
 typesCantMatch :: [(Type,Type)] -> Bool
 -- See Note [Pruning dead case alternatives]
-typesCantMatch prs = any (uncurry cant_match) prs
-  where
-    cant_match :: Type -> Type -> Bool
-    cant_match t1 t2 = case tcUnifyTysFG alwaysBindFun [t1] [t2] of
-      SurelyApart -> True
-      _           -> False
+typesCantMatch prs = any (uncurry typesAreApart) prs
 
+typesAreApart :: Type -> Type -> Bool
+typesAreApart t1 t2 = case tcUnifyTysFG alwaysBindFun [t1] [t2] of
+                        SurelyApart -> True
+                        _           -> False
 {-
 ************************************************************************
 *                                                                      *
@@ -538,10 +476,13 @@ data UnifyResultM a = Unifiable a        -- the subst that unifies the types
 -- This is used (only) in Note [Infinitary substitution in lookup] in GHC.Core.InstEnv
 -- As of Feb 2022, we never differentiate between MARTypeFamily and MARTypeVsConstraint;
 -- it's really only MARInfinite that's interesting here.
-data MaybeApartReason = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
-                      | MARInfinite     -- ^ matching e.g. a ~? Maybe a
-                      | MARTypeVsConstraint  -- ^ matching Type ~? Constraint
-                                             -- See Note [coreView vs tcView] in GHC.Core.Type
+data MaybeApartReason
+  = MARTypeFamily   -- ^ matching e.g. F Int ~? Bool
+
+  | MARInfinite     -- ^ matching e.g. a ~? Maybe a
+
+  | MARTypeVsConstraint  -- ^ matching Type ~? Constraint or the arrow types
+    -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
 
 instance Outputable MaybeApartReason where
   ppr MARTypeFamily       = text "MARTypeFamily"
@@ -943,10 +884,18 @@ the equality between the substed kind of the left-hand type and the substed
 kind of the right-hand type. Note that we do not unify kinds at the leaves
 (as we did previously). We thus have
 
-INVARIANT: In the call
-    unify_ty ty1 ty2 kco
-it must be that subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2)), where
-`subst` is the ambient substitution in the UM monad.
+Hence: (Unification Kind Invariant)
+-----------------------------------
+In the call
+     unify_ty ty1 ty2 kco
+it must be that
+     subst(kco) :: subst(kind(ty1)) ~N subst(kind(ty2))
+where `subst` is the ambient substitution in the UM monad.  And in the call
+     unify_tys tys1 tys2
+(which has no kco), after we unify any prefix of tys1,tys2, the kinds of the
+head of the remaining tys1,tys2 are identical after substitution.  This
+implies, for example, that the kinds of the head of tys1,tys2 are identical
+after substitution.
 
 To get this coercion, we first have to match/unify
 the kinds before looking at the types. Happily, we need look only one level
@@ -1057,6 +1006,8 @@ unify_ty :: UMEnv
          -> CoercionN     -- A coercion between their kinds
                           -- See Note [Kind coercions in Unify]
          -> UM ()
+-- Precondition: see (Unification Kind Invariant)
+--
 -- See Note [Specification of unification]
 -- Respects newtypes, PredTypes
 -- See Note [Computing equality on types] in GHC.Core.Type
@@ -1065,19 +1016,10 @@ unify_ty _env (TyConApp tc1 []) (TyConApp tc2 []) _kco
   | tc1 == tc2
   = return ()
 
-  -- See Note [coreView vs tcView] in GHC.Core.Type.
-  | tc1 `hasKey` constraintKindTyConKey
-  , tc2 `hasKey` liftedTypeKindTyConKey
-  = maybeApart MARTypeVsConstraint
-
-  | tc2 `hasKey` constraintKindTyConKey
-  , tc1 `hasKey` liftedTypeKindTyConKey
-  = maybeApart MARTypeVsConstraint
-
 unify_ty env ty1 ty2 kco
     -- Now handle the cases we can "look through": synonyms and casts.
-  | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
-  | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
+  | Just ty1' <- coreView ty1 = unify_ty env ty1' ty2 kco
+  | Just ty2' <- coreView ty2 = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
                                 then unify_ty env ty1' ty2 (co `mkTransCo` kco)
                                 else -- See Note [Matching in the presence of casts (1)]
@@ -1093,8 +1035,6 @@ unify_ty env ty1 (TyVarTy tv2) kco
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
 unify_ty env ty1 ty2 _kco
- -- NB: This keeps Constraint and Type distinct, as it should for use in the
- -- type-checker.
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2
@@ -1130,31 +1070,43 @@ unify_ty env ty1 ty2 _kco
     --        NB: we have already dealt with the 'ty1 = variable' case
   = maybeApart MARTypeFamily
 
+  -- TYPE and CONSTRAINT are not Apart
+  -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
+  -- NB: at this point we know that the two TyCons do not match
+  | Just {} <- sORTKind_maybe ty1
+  , Just {} <- sORTKind_maybe ty2
+  = maybeApart MARTypeVsConstraint
+    -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
+    -- Note [Type and Constraint are not apart]
+
+  -- The arrow types are not Apart
+  -- See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim
+  --     wrinkle (W2)
+  -- NB1: at this point we know that the two TyCons do not match
+  -- NB2: In the common FunTy/FunTy case you might wonder if we want to go via
+  --      splitTyConApp_maybe.  But yes we do: we need to look at those implied
+  --      kind argument in order to satisfy (Unification Kind Invariant)
+  | FunTy {} <- ty1
+  , FunTy {} <- ty2
+  = maybeApart MARTypeVsConstraint
+    -- We don't bother to look inside; wrinkle (W3) in GHC.Builtin.Types.Prim
+    -- Note [Type and Constraint are not apart]
+
   where
-    mb_tc_app1 = tcSplitTyConApp_maybe ty1
-    mb_tc_app2 = tcSplitTyConApp_maybe ty2
+    mb_tc_app1 = splitTyConApp_maybe ty1
+    mb_tc_app2 = splitTyConApp_maybe ty2
 
         -- Applications need a bit of care!
         -- They can match FunTy and TyConApp, so use splitAppTy_maybe
         -- NB: we've already dealt with type variables,
         -- so if one type is an App the other one jolly well better be too
 unify_ty env (AppTy ty1a ty1b) ty2 _kco
-  | Just (ty2a, ty2b) <- tcRepSplitAppTy_maybe ty2
+  | Just (ty2a, ty2b) <- tcSplitAppTyNoView_maybe ty2
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
 
 unify_ty env ty1 (AppTy ty2a ty2b) _kco
-  | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
+  | Just (ty1a, ty1b) <- tcSplitAppTyNoView_maybe ty1
   = unify_ty_app env ty1a [ty1b] ty2a [ty2b]
-
-  -- tcSplitTyConApp won't split a (=>), so we handle this separately.
-unify_ty env (FunTy InvisArg _w1 arg1 res1) (FunTy InvisArg _w2 arg2 res2) _kco
-   -- Look at result representations, but arg representations would be redundant
-   -- as anything that can appear to the left of => is lifted.
-   -- And anything that can appear to the left of => is unrestricted, so skip the
-   -- multiplicities.
-  | Just res_rep1 <- getRuntimeRep_maybe res1
-  , Just res_rep2 <- getRuntimeRep_maybe res2
-  = unify_tys env [res_rep1, arg1, res1] [res_rep2, arg2, res2]
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
@@ -1170,7 +1122,7 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)
-             , let (_, co_l, co_r) = decomposeFunCo Nominal kco
+             , let (_, co_l, co_r) = decomposeFunCo kco
                      -- Because the coercion is used in a type, it should be safe to
                      -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
@@ -1187,8 +1139,8 @@ unify_ty _ _ _ _ = surelyApart
 
 unify_ty_app :: UMEnv -> Type -> [Type] -> Type -> [Type] -> UM ()
 unify_ty_app env ty1 ty1args ty2 ty2args
-  | Just (ty1', ty1a) <- repSplitAppTy_maybe ty1
-  , Just (ty2', ty2a) <- repSplitAppTy_maybe ty2
+  | Just (ty1', ty1a) <- splitAppTyNoView_maybe ty1
+  , Just (ty2', ty2a) <- splitAppTyNoView_maybe ty2
   = unify_ty_app env ty1' (ty1a : ty1args) ty2' (ty2a : ty2args)
 
   | otherwise
@@ -1202,6 +1154,7 @@ unify_ty_app env ty1 ty1args ty2 ty2args
        ; unify_tys env ty1args ty2args }
 
 unify_tys :: UMEnv -> [Type] -> [Type] -> UM ()
+-- Precondition: see (Unification Kind Invariant)
 unify_tys env orig_xs orig_ys
   = go orig_xs orig_ys
   where
@@ -1260,8 +1213,7 @@ uUnrefined :: UMEnv
 -- We know that tv1 isn't refined
 
 uUnrefined env tv1' ty2 ty2' kco
-    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
-  | Just ty2'' <- tcView ty2'
+  | Just ty2'' <- coreView ty2'
   = uUnrefined env tv1' ty2 ty2'' kco    -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a
@@ -1555,8 +1507,6 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
    -- where lsubst = lcSubstLeft(env) and rsubst = lcSubstRight(env)
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
-     -- why coreView here, not tcView? Because we're firmly after type-checking.
-     -- This function is used only during coercion optimisation.
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst
@@ -1615,24 +1565,24 @@ ty_co_match menv subst (AppTy ty1a ty1b) co _lkco _rkco
   | Just (co2, arg2) <- splitAppCo_maybe co     -- c.f. Unify.match on AppTy
   = ty_co_match_app menv subst ty1a [ty1b] co2 [arg2]
 ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
-  | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
+  | Just (ty1a, ty1b) <- splitAppTyNoView_maybe ty1
        -- yes, the one from Type, not TcType; this is for coercion optimization
   = ty_co_match_app menv subst ty1a [ty1b] co2 [arg2]
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (FunTy _ w ty1 ty2) co _lkco _rkco
-  | Just (tc, [co_mult,rrco1,rrco2,co1,co2]) <- splitTyConAppCo_maybe co
-  , tc == funTyCon
-  = let rr1 = getRuntimeRep ty1
-        rr2 = getRuntimeRep ty2
-        Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind)
-                             [co_mult,rrco1, rrco2,co1,co2]
-    in  -- NB: we include the RuntimeRep arguments in the matching; not doing so caused #21205.
-        ty_co_match_args menv subst
-          [w, rr1, rr2, ty1, ty2]
-          [co_mult, rrco1, rrco2, co1, co2]
-          lkcos rkcos
+
+ty_co_match menv subst (FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
+            (FunCo { fco_mult = co_w, fco_arg = co1, fco_res = co2 }) _lkco _rkco
+  = ty_co_match_args menv subst [w,    rep1,    rep2,    ty1, ty2]
+                                [co_w, co1_rep, co2_rep, co1, co2]
+  where
+     rep1    = getRuntimeRep ty1
+     rep2    = getRuntimeRep ty2
+     co1_rep = mkRuntimeRepCo co1
+     co2_rep = mkRuntimeRepCo co2
+    -- NB: we include the RuntimeRep arguments in the matching;
+    --     not doing so caused #21205.
 
 ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
@@ -1655,9 +1605,9 @@ ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
 --   1. Given:
 --        cv1      :: (s1 :: k1) ~r (s2 :: k2)
 --        kind_co2 :: (s1' ~ s2') ~N (t1 ~ t2)
---        eta1      = mkNthCo role 2 (downgradeRole r Nominal kind_co2)
+--        eta1      = mkSelCo (SelTyCon 2 role) (downgradeRole r Nominal kind_co2)
 --                 :: s1' ~ t1
---        eta2      = mkNthCo role 3 (downgradeRole r Nominal kind_co2)
+--        eta2      = mkSelCo (SelTyCon 3 role) (downgradeRole r Nominal kind_co2)
 --                 :: s2' ~ t2
 --      Wanted:
 --        subst1 <- ty_co_match menv subst  s1 eta1 kco1 kco2
@@ -1687,7 +1637,6 @@ ty_co_match menv subst ty co1 lkco rkco
     in ty_co_match menv subst ty (mkReflCo r t) (lkco `mkTransCo` kco')
                                                 (rkco `mkTransCo` kco')
 
-
 ty_co_match menv subst ty co lkco rkco
   | Just co' <- pushRefl co = ty_co_match menv subst ty co' lkco rkco
   | otherwise               = Nothing
@@ -1698,16 +1647,13 @@ ty_co_match_tc :: MatchEnv -> LiftCoEnv
                -> Maybe LiftCoEnv
 ty_co_match_tc menv subst tc1 tys1 tc2 cos2
   = do { guard (tc1 == tc2)
-       ; ty_co_match_args menv subst tys1 cos2 lkcos rkcos }
-  where
-    Pair lkcos rkcos
-      = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) cos2
+       ; ty_co_match_args menv subst tys1 cos2 }
 
 ty_co_match_app :: MatchEnv -> LiftCoEnv
                 -> Type -> [Type] -> Coercion -> [Coercion]
                 -> Maybe LiftCoEnv
 ty_co_match_app menv subst ty1 ty1args co2 co2args
-  | Just (ty1', ty1a) <- repSplitAppTy_maybe ty1
+  | Just (ty1', ty1a) <- splitAppTyNoView_maybe ty1
   , Just (co2', co2a) <- splitAppCo_maybe co2
   = ty_co_match_app menv subst ty1' (ty1a : ty1args) co2' (co2a : co2args)
 
@@ -1715,32 +1661,30 @@ ty_co_match_app menv subst ty1 ty1args co2 co2args
   = do { subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
        ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2
        ; subst2 <- ty_co_match menv subst1 ty1 co2 lkco rkco
-       ; let Pair lkcos rkcos = traverse (fmap (mkNomReflCo . typeKind) . coercionKind) co2args
-       ; ty_co_match_args menv subst2 ty1args co2args lkcos rkcos }
+       ; ty_co_match_args menv subst2 ty1args co2args }
   where
     ki1 = typeKind ty1
     ki2 = promoteCoercion co2
     ki_ki_co = mkNomReflCo liftedTypeKind
 
-ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type]
-                 -> [Coercion] -> [Coercion] -> [Coercion]
+ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type] -> [Coercion]
                  -> Maybe LiftCoEnv
-ty_co_match_args _    subst []       []         _ _ = Just subst
-ty_co_match_args menv subst (ty:tys) (arg:args) (lkco:lkcos) (rkco:rkcos)
-  = do { subst' <- ty_co_match menv subst ty arg lkco rkco
-       ; ty_co_match_args menv subst' tys args lkcos rkcos }
-ty_co_match_args _    _     _        _          _ _ = Nothing
+ty_co_match_args menv subst (ty:tys) (arg:args)
+  = do { let Pair lty rty = coercionKind arg
+             lkco = mkNomReflCo (typeKind lty)
+             rkco = mkNomReflCo (typeKind rty)
+       ; subst' <- ty_co_match menv subst ty arg lkco rkco
+       ; ty_co_match_args menv subst' tys args }
+ty_co_match_args _    subst []       [] = Just subst
+ty_co_match_args _    _     _        _  = Nothing
 
 pushRefl :: Coercion -> Maybe Coercion
 pushRefl co =
   case (isReflCo_maybe co) of
     Just (AppTy ty1 ty2, Nominal)
       -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
-    Just (FunTy _ w ty1 ty2, r)
-      | Just rep1 <- getRuntimeRep_maybe ty1
-      , Just rep2 <- getRuntimeRep_maybe ty2
-      ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
-                                       , mkReflCo r ty1,  mkReflCo r ty2 ])
+    Just (FunTy af w ty1 ty2, r)
+      ->  Just (FunCo r af af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
     Just (ForAllTy (Bndr tv _) ty, r)
@@ -2065,3 +2009,4 @@ mkFlattenFreshCoVar in_scope kind
   = let uniq = unsafeGetFreshLocalUnique in_scope
         name = mkSystemVarName uniq (fsLit "flc")
     in mkCoVar name kind
+

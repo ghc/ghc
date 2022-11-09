@@ -49,7 +49,8 @@ module GHC.Types.Basic (
 
         CbvMark(..), isMarkedCbv,
 
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec,
+        starPrec, appPrec, maxPrec,
         maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
@@ -108,6 +109,7 @@ module GHC.Types.Basic (
         TypeOrKind(..), isTypeLevel, isKindLevel,
 
         Levity(..), mightBeLifted, mightBeUnlifted,
+        TypeOrConstraint(..),
 
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
@@ -129,13 +131,11 @@ import qualified Data.Semigroup as Semi
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
 import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
           Binary choice
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
 data LeftOrRight = CLeft | CRight
                  deriving( Eq, Data )
@@ -748,16 +748,17 @@ pprSafeOverlap False = empty
 newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
 -- See Note [Precedence in types]
 
-topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec :: PprPrec
-topPrec = PprPrec 0 -- No parens
-sigPrec = PprPrec 1 -- Explicit type signatures
-funPrec = PprPrec 2 -- Function args; no parens for constructor apps
-                    -- See [Type operator precedence] for why both
-                    -- funPrec and opPrec exist.
-opPrec  = PprPrec 2 -- Infix operator
+topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec, maxPrec :: PprPrec
+topPrec  = PprPrec 0 -- No parens
+sigPrec  = PprPrec 1 -- Explicit type signatures
+funPrec  = PprPrec 2 -- Function args; no parens for constructor apps
+                     -- See [Type operator precedence] for why both
+                     -- funPrec and opPrec exist.
+opPrec   = PprPrec 2 -- Infix operator
 starPrec = PprPrec 3 -- Star syntax for the type of types, i.e. the * in (* -> *)
                      -- See Note [Star kind precedence]
 appPrec  = PprPrec 4 -- Constructor args; no parens for atomic
+maxPrec  = appPrec   -- Maximum precendence
 
 maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
@@ -1936,9 +1937,16 @@ isKindLevel KindLevel = True
 
 {- *********************************************************************
 *                                                                      *
-                     Levity information
+                 Levity and TypeOrConstraint
 *                                                                      *
 ********************************************************************* -}
+
+{- The types `Levity` and `TypeOrConstraint` are internal to GHC.
+   They have the same shape as the eponymous types in the library
+      ghc-prim:GHC.Types
+   but they aren't the same types -- after all, they are defined in a
+   different module.
+-}
 
 data Levity
   = Lifted
@@ -1956,6 +1964,11 @@ mightBeLifted _               = True
 mightBeUnlifted :: Maybe Levity -> Bool
 mightBeUnlifted (Just Lifted) = False
 mightBeUnlifted _             = True
+
+data TypeOrConstraint
+  = TypeLike | ConstraintLike
+  deriving( Eq, Ord, Data )
+
 
 {- *********************************************************************
 *                                                                      *

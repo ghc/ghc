@@ -505,11 +505,11 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        -> Type
        -> (a, Bool)   -- (result of type a, does type contain var)
 
-    go co ty | Just ty' <- tcView ty = go co ty'
+    go co ty | Just ty' <- coreView ty = go co ty'
     go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
     go co (FunTy { ft_arg = x, ft_res = y, ft_af = af })
-       | InvisArg <- af = go co y
-       | xc || yc       = (caseFun xr yr,True)
+       | isInvisibleFunArg af = go co y
+       | xc || yc             = (caseFun xr yr,True)
        where (xr,xc) = go (not co) x
              (yr,yc) = go co       y
     go co (AppTy    x y) | xc = (caseWrongArg,   True)
@@ -532,8 +532,8 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
          -- actually needs. See #12399
          (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
     go co (ForAllTy (Bndr v vis) x)
-       | isVisibleArgFlag vis = panic "unexpected visible binder"
-       | v /= var && xc       = (caseForAll v xr,True)
+       | isVisibleForAllTyFlag vis = panic "unexpected visible binder"
+       | v /= var && xc            = (caseForAll v xr,True)
        where (xr,xc) = go co x
 
     go _ _ = (caseTrivial,False)

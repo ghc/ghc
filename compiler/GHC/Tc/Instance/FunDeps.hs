@@ -29,14 +29,18 @@ import GHC.Types.Var
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Type
-import GHC.Tc.Utils.TcType( transSuperClasses )
+import GHC.Core.RoughMap( RoughMatchTc(..) )
 import GHC.Core.Coercion.Axiom( TypeEqn )
 import GHC.Core.Unify
 import GHC.Core.InstEnv
+import GHC.Core.TyCo.FVs
+import GHC.Core.TyCo.Compare( eqTypes, eqType )
+import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
+
+import GHC.Tc.Utils.TcType( transSuperClasses )
+
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
@@ -122,11 +126,12 @@ Wrinkles:
        [W] D Int Bool ty
 
     Then we'll generate
-       FDEqn { fd_qtvs = [x], fd_eqs = [Pair x Bool, Pair (Maybe x) ty] }
+       FDEqn { fd_qtvs = [x0], fd_eqs = [ x0 ~ Bool, Maybe x0 ~ ty] }
+    which generates one fresh unification variable x0
 
     But if the fundeps had been (a->b, a->c) we'd generate two FDEqns
-       FDEqn { fd_qtvs = [x], fd_eqs = [Pair x Bool] }
-       FDEqn { fd_qtvs = [x], fd_eqs = [Pair (Maybe x) ty] }
+       FDEqn { fd_qtvs = [x1], fd_eqs = [ x1 ~ Bool ] }
+       FDEqn { fd_qtvs = [x2], fd_eqs = [ Maybe x2 ~ ty ] }
     with two FDEqns, generating two separate unification variables.
 
 (3) improveFromInstEnv doesn't return any equations that already hold.
@@ -405,7 +410,7 @@ checkInstCoverage be_liberal clas theta inst_taus
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = tyCoVarsOfTypes ls
-         rs_tvs = splitVisVarsOfTypes rs
+         rs_tvs = visVarsOfTypes rs
 
          undetermined_tvs | be_liberal = liberal_undet_tvs
                           | otherwise  = conserv_undet_tvs

@@ -39,9 +39,10 @@ import GHC.Rename.Names ( gresFromAvails )
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Env
-import GHCi.RemoteTypes  ( HValue )
-import GHC.Core.Type     ( Type, eqType, mkTyConTy )
-import GHC.Core.TyCon    ( TyCon )
+import GHCi.RemoteTypes     ( HValue )
+import GHC.Core.Type        ( Type, mkTyConTy )
+import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCon       ( TyCon )
 
 import GHC.Types.SrcLoc        ( noSrcSpan )
 import GHC.Types.Name    ( Name, nameModule_maybe )

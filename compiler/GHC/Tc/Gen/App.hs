@@ -40,6 +40,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
 import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
+import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
@@ -544,7 +545,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
           HsUnboundVar {} -> True
           _               -> False
 
-    inst_all, inst_inferred, inst_none :: ArgFlag -> Bool
+    inst_all, inst_inferred, inst_none :: ForAllTyFlag -> Bool
     inst_all (Invisible {}) = True
     inst_all Required       = False
 
@@ -554,7 +555,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     inst_none _ = False
 
-    inst_fun :: [HsExprArg 'TcpRn] -> ArgFlag -> Bool
+    inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
     inst_fun [] | inst_final  = inst_all
                 | otherwise   = inst_none
                 -- Using `inst_none` for `:type` avoids
@@ -573,7 +574,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -- go: If fun_ty=kappa, look it up in Theta
     go delta acc so_far fun_ty args
-      | Just kappa <- tcGetTyVar_maybe fun_ty
+      | Just kappa <- getTyVar_maybe fun_ty
       , kappa `elemVarSet` delta
       = do { cts <- readMetaTyVar kappa
            ; case cts of
@@ -624,7 +625,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule IVAR from Fig 4 of the QL paper:
     go1 delta acc so_far fun_ty args@(EValArg {} : _)
-      | Just kappa <- tcGetTyVar_maybe fun_ty
+      | Just kappa <- getTyVar_maybe fun_ty
       , kappa `elemVarSet` delta
       = -- Function type was of form   f :: forall a b. t1 -> t2 -> b
         -- with 'b', one of the quantified type variables, in the corner
@@ -651,8 +652,8 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
            ; let delta'  = delta `extendVarSetList` (res_nu:arg_nus)
                  arg_tys = mkTyVarTys arg_nus
                  res_ty  = mkTyVarTy res_nu
-                 fun_ty' = mkVisFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
-                 co_wrap = mkWpCastN (mkTcGReflLeftCo Nominal fun_ty' kind_co)
+                 fun_ty' = mkScaledFunTys (zipWithEqual "tcInstFun" mkScaled mults arg_tys) res_ty
+                 co_wrap = mkWpCastN (mkGReflLeftCo Nominal fun_ty' kind_co)
                  acc'    = addArgWrap co_wrap acc
                  -- Suppose kappa :: kk
                  -- Then fun_ty :: kk, fun_ty' :: Type, kind_co :: Type ~ kk
@@ -716,7 +717,7 @@ tcVTA :: TcType            -- Function type
 -- The function type has already had its Inferred binders instantiated
 tcVTA fun_ty hs_ty
   | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
-  , binderArgFlag tvb == Specified
+  , binderFlag tvb == Specified
     -- It really can't be Inferred, because we've just
     -- instantiated those. But, oddly, it might just be Required.
     -- See Note [Required quantifiers in the type of a term]
@@ -731,11 +732,12 @@ tcVTA fun_ty hs_ty
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
                          --     substitution is kind-respecting
-       ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
-                             , debugPprType ty_arg
-                             , debugPprType (tcTypeKind ty_arg)
-                             , debugPprType inner_ty
-                             , debugPprType insted_ty ])
+       ; traceTc "VTA" (vcat [ text "fun_ty" <+> ppr fun_ty
+                             , text "tv" <+> ppr tv <+> dcolon <+> debugPprType kind
+                             , text "ty_arg" <+> debugPprType ty_arg <+> dcolon
+                                             <+> debugPprType (typeKind ty_arg)
+                             , text "inner_ty" <+> debugPprType inner_ty
+                             , text "insted_ty" <+> debugPprType insted_ty ])
        ; return (ty_arg, insted_ty) }
 
   | otherwise
@@ -758,7 +760,7 @@ whose first argument is Required
 We want to reject this type application to Int, but in earlier
 GHCs we had an ASSERT that Required could not occur here.
 
-The ice is thin; c.f. Note [No Required TyCoBinder in terms]
+The ice is thin; c.f. Note [No Required PiTyBinder in terms]
 in GHC.Core.TyCo.Rep.
 
 Note [VTA for out-of-scope functions]
@@ -876,7 +878,7 @@ quickLookArg delta larg (Scaled _ arg_ty)
               -- This top-level zonk step, which is the reason
               -- we need a local 'go' loop, is subtle
               -- See Section 9 of the QL paper
-              | Just kappa <- tcGetTyVar_maybe arg_ty
+              | Just kappa <- getTyVar_maybe arg_ty
               , kappa `elemVarSet` delta
               = do { info <- readMetaTyVar kappa
                    ; case info of
@@ -990,8 +992,8 @@ qlUnify delta ty1 ty2
 
     -- Now, and only now, expand synonyms
     go bvs rho1 rho2
-      | Just rho1 <- tcView rho1 = go bvs rho1 rho2
-      | Just rho2 <- tcView rho2 = go bvs rho1 rho2
+      | Just rho1 <- coreView rho1 = go bvs rho1 rho2
+      | Just rho2 <- coreView rho2 = go bvs rho1 rho2
 
     go bvs (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2
@@ -1001,25 +1003,25 @@ qlUnify delta ty1 ty2
 
     -- Decompose (arg1 -> res1) ~ (arg2 -> res2)
     -- and         (c1 => res1) ~   (c2 => res2)
-    -- But for the latter we only learn instantiation info from t1~t2
+    -- But for the latter we only learn instantiation info from res1~res2
     -- We look at the multiplicity too, although the chances of getting
     -- impredicative instantiation info from there seems...remote.
     go bvs (FunTy { ft_af = af1, ft_arg = arg1, ft_res = res1, ft_mult = mult1 })
            (FunTy { ft_af = af2, ft_arg = arg2, ft_res = res2, ft_mult = mult2 })
-      | af1 == af2
-      = do { when (af1 == VisArg) $
-             do { go bvs arg1 arg2; go bvs mult1 mult2 }
+      | af1 == af2 -- Match the arrow TyCon
+      = do { when (isVisibleFunArg af1) (go bvs arg1 arg2)
+           ; when (isFUNArg af1)        (go bvs mult1 mult2)
            ; go bvs res1 res2 }
 
     -- ToDo: c.f. Tc.Utils.unify.uType,
     -- which does not split FunTy here
-    -- Also NB tcRepSplitAppTy here, which does not split (c => t)
+    -- Also NB tcSplitAppTyNoView here, which does not split (c => t)
     go bvs (AppTy t1a t1b) ty2
-      | Just (t2a, t2b) <- tcRepSplitAppTy_maybe ty2
+      | Just (t2a, t2b) <- tcSplitAppTyNoView_maybe ty2
       = do { go bvs t1a t2a; go bvs t1b t2b }
 
     go bvs ty1 (AppTy t2a t2b)
-      | Just (t1a, t1b) <- tcRepSplitAppTy_maybe ty1
+      | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
       = do { go bvs t1a t2a; go bvs t1b t2b }
 
     go (bvs1, bvs2) (ForAllTy bv1 ty1) (ForAllTy bv2 ty2)
@@ -1215,7 +1217,7 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
          check_enumeration res_ty rep_tc
        ; let rep_ty  = mkTyConApp rep_tc rep_args
              tc_fun' = mkHsWrap (WpTyApp rep_ty) tc_fun
-             df_wrap = mkWpCastR (mkTcSymCo coi)
+             df_wrap = mkWpCastR (mkSymCo coi)
        ; tc_expr <- rebuildHsApps tc_fun' fun_ctxt [val_arg] res_ty
        ; return (mkHsWrap df_wrap tc_expr) }}}}}
 

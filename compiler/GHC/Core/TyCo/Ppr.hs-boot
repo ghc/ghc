@@ -5,6 +5,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind, Coercion, TyLit)
 import GHC.Utils.Outputable ( SDoc )
 
 pprType :: Type -> SDoc
+debugPprType :: Type -> SDoc
 pprKind :: Kind -> SDoc
 pprCo :: Coercion -> SDoc
 pprTyLit :: TyLit -> SDoc

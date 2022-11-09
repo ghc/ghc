@@ -36,6 +36,7 @@ import GHC.Types.Id
 import GHC.Cmm.Graph
 import GHC.Types.Name
 import GHC.Core.Type
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
 import GHC.Types.Var.Env

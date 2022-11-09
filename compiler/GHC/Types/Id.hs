@@ -309,7 +309,7 @@ mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = assert (isCoVarType ty) $
-    Var.mkLocalVar CoVarId name Many ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name ManyTy ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> Mult -> Type -> Id
@@ -377,7 +377,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) Many ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ManyTy ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id

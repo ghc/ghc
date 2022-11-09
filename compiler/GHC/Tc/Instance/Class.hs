@@ -38,6 +38,7 @@ import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Var
 
 import GHC.Core.Predicate
+import GHC.Core.Coercion
 import GHC.Core.InstEnv
 import GHC.Core.Type
 import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
@@ -53,8 +54,6 @@ import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
-import Data.Maybe
 
 {- *******************************************************************
 *                                                                    *
@@ -154,20 +153,17 @@ matchGlobalInst :: DynFlags
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> TcM ClsInstResult
 matchGlobalInst dflags short_cut clas tys
-  | cls_name == knownNatClassName
-  = matchKnownNat    dflags short_cut clas tys
-  | cls_name == knownSymbolClassName
-  = matchKnownSymbol dflags short_cut clas tys
-  | cls_name == knownCharClassName
-  = matchKnownChar dflags short_cut clas tys
-  | isCTupleClass clas                = matchCTuple          clas tys
-  | cls_name == typeableClassName     = matchTypeable        clas tys
-  | cls_name == withDictClassName     = matchWithDict             tys
-  | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
-  | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
-  | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
-  | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
-  | otherwise                         = matchInstEnv dflags short_cut clas tys
+  | cls_name == knownNatClassName     = matchKnownNat    dflags short_cut clas tys
+  | cls_name == knownSymbolClassName  = matchKnownSymbol dflags short_cut clas tys
+  | cls_name == knownCharClassName    = matchKnownChar   dflags short_cut clas tys
+  | isCTupleClass clas                = matchCTuple                       clas tys
+  | cls_name == typeableClassName     = matchTypeable                     clas tys
+  | cls_name == withDictClassName     = matchWithDict                          tys
+  | clas `hasKey` heqTyConKey         = matchHeteroEquality                    tys
+  | clas `hasKey` eqTyConKey          = matchHomoEquality                      tys
+  | clas `hasKey` coercibleTyConKey   = matchCoercible                         tys
+  | cls_name == hasFieldClassName     = matchHasField    dflags short_cut clas tys
+  | otherwise                         = matchInstEnv     dflags short_cut clas tys
   where
     cls_name = className clas
 
@@ -193,7 +189,7 @@ matchInstEnv dflags short_cut_solver clas tys
 
             -- Nothing matches
             ([], NoUnifiers, _)
-                -> do { traceTc "matchClass not matching" (ppr pred)
+                -> do { traceTc "matchClass not matching" (ppr pred $$ ppr (ie_local instEnvs))
                       ; return NoInstance }
 
             -- A single match (& no safe haskell failure)
@@ -427,7 +423,7 @@ makeLitDict clas ty et
                     -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))
+    , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
     = return $ OneInst { cir_new_theta = []
                        , cir_mk_ev     = \_ -> ev_tm
                        , cir_what      = BuiltinInstance }
@@ -454,8 +450,8 @@ matchWithDict [cls, mty]
     -- and in that case let
     -- co :: C t1 ..tn ~R# inst_meth_ty
   , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
-  = do { sv <- mkSysLocalM (fsLit "withDict_s") Many mty
-       ; k  <- mkSysLocalM (fsLit "withDict_k") Many (mkInvisFunTyMany cls openAlphaTy)
+  = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
+       ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
 
        -- Given co2 : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
@@ -472,11 +468,11 @@ matchWithDict [cls, mty]
                mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
                  Var nospecId
                    `App`
-                 (Type $ mkInvisFunTyMany cls openAlphaTy)
+                 (Type $ mkInvisFunTy cls openAlphaTy)
                    `App`
                  Var k
                    `App`
-                 (Var sv `Cast` mkTcTransCo (mkTcSubCo co2) (mkTcSymCo co))
+                 (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
 
        ; tc <- tcLookupTyCon withDictClassName
        ; let Just withdict_data_con
@@ -646,18 +642,29 @@ Some further observations about `withDict`:
 -- and it was applied to the correct argument.
 matchTypeable :: Class -> [Type] -> TcM ClsInstResult
 matchTypeable clas [k,t]  -- clas = Typeable
-  -- For the first two cases, See Note [No Typeable for polytypes or qualified types]
-  | isForAllTy k                      = return NoInstance   -- Polytype
-  | isJust (tcSplitPredFunTy_maybe t) = return NoInstance   -- Qualified type
+  -- Forall types: see Note [No Typeable for polytypes or qualified types]
+  | isForAllTy k = return NoInstance
+
+  -- Functions; but only with a visible argment
+  | Just (af,mult,arg,ret) <- splitFunTy_maybe t
+  = if isVisibleFunArg af
+    then doFunTy clas t mult arg ret
+    else return NoInstance
+      -- 'else' case: qualified types like (Num a => blah) are not typeable
+      -- see Note [No Typeable for polytypes or qualified types]
 
   -- Now cases that do work
-  | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
-  | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
-  | k `eqType` charTy                      = doTyLit knownCharClassName        t
-  | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
-  | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
+  | k `eqType` naturalTy      = doTyLit knownNatClassName         t
+  | k `eqType` typeSymbolKind = doTyLit knownSymbolClassName      t
+  | k `eqType` charTy         = doTyLit knownCharClassName        t
+
+  -- TyCon applied to its kind args
+  -- No special treatment of Type and Constraint; they get distinct TypeReps
+  -- see wrinkle (W4) of Note [Type and Constraint are not apart]
+  --     in GHC.Builtin.Types.Prim.
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
+
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
 
 matchTypeable _ _ = return NoInstance
@@ -681,10 +688,9 @@ doFunTy clas ty mult arg_ty ret_ty
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
   | tyConIsTypeable tc
-  = do
-     return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
-                      , cir_mk_ev     = mk_ev
-                      , cir_what      = BuiltinTypeableInstance tc }
+  = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) kind_args
+                     , cir_mk_ev     = mk_ev
+                     , cir_what      = BuiltinTypeableInstance tc }
   | otherwise
   = return NoInstance
   where
@@ -710,7 +716,7 @@ doTyApp :: Class -> Type -> Type -> KindOrType -> TcM ClsInstResult
 --    (Typeable f, Typeable Int, Typeable Char)  --> (after some simp. steps)
 --    Typeable f
 doTyApp clas ty f tk
-  | isForAllTy (tcTypeKind f)
+  | isForAllTy (typeKind f)
   = return NoInstance -- We can't solve until we know the ctr.
   | otherwise
   = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) [f, tk]
@@ -723,7 +729,7 @@ doTyApp clas ty f tk
 
 -- Emit a `Typeable` constraint for the given type.
 mk_typeable_pred :: Class -> Type -> PredType
-mk_typeable_pred clas ty = mkClassPred clas [ tcTypeKind ty, ty ]
+mk_typeable_pred clas ty = mkClassPred clas [ typeKind ty, ty ]
 
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
   -- we generate a sub-goal for the appropriate class.
@@ -739,14 +745,31 @@ doTyLit kc t = do { kc_clas <- tcLookupClass kc
 
 {- Note [Typeable (T a b c)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For type applications we always decompose using binary application,
-via doTyApp, until we get to a *kind* instantiation.  Example
-   Proxy :: forall k. k -> *
 
-To solve Typeable (Proxy (* -> *) Maybe) we
-  - First decompose with doTyApp,
-    to get (Typeable (Proxy (* -> *))) and Typeable Maybe
-  - Then solve (Typeable (Proxy (* -> *))) with doTyConApp
+For type applications we always decompose using binary application,
+via doTyApp (building a TrApp), until we get to a *kind* instantiation
+(building a TrTyCon).  We detect a pure kind instantiation using
+`onlyNamedBndrsApplied`.
+
+Example: Proxy :: forall k. k -> *
+
+  To solve Typeable (Proxy @(* -> *) Maybe) we
+
+  - First decompose with doTyApp (onlyNamedBndrsApplied is False)
+    to get (Typeable (Proxy @(* -> *))) and Typeable Maybe.
+    This step returns a TrApp.
+
+  - Then solve (Typeable (Proxy @(* -> *))) with doTyConApp
+    (onlyNamedBndrsApplied is True).
+    This step returns a TrTyCon
+
+  So the TypeRep we build is
+    TrApp (TrTyCon ("Proxy" @(*->*))) (TrTyCon "Maybe")
+
+Notice also that TYPE and CONSTRAINT are distinct so, in effect, we
+allow (Typeable TYPE) and (Typeable CONSTRAINT), giving disinct TypeReps.
+This is very important: we may want to get a TypeRep for a kind like
+   Type -> Constraint
 
 If we attempt to short-cut by solving it all at once, via
 doTyConApp
@@ -939,8 +962,8 @@ matchHasField dflags short_cut clas tys
                          -- it to a HasField dictionary.
                          mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
                            where
-                             co = mkTcSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTcTransCo` mkTcSymCo co2
+                             co = mkSubCo (evTermCoercion (EvExpr ev1))
+                                      `mkTransCo` mkSymCo co2
                          mk_ev [] = panic "matchHasField.mk_ev"
 
                          Just (_, co2) = tcInstNewTyCon_maybe (classTyCon clas)

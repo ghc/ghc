@@ -47,7 +47,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Ppr
-import GHC.Core.Unify( RoughMatchTc(..) )
+import GHC.Core.RoughMap( RoughMatchTc(..) )
 
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
@@ -559,7 +559,7 @@ tyConToIfaceDecl env tycon
     -- an error.
     (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
     tc_tyvars      = binderVars tc_binders
-    if_binders     = toIfaceTyCoVarBinders tc_binders
+    if_binders     = toIfaceForAllBndrs tc_binders
                      -- No tidying of the binders; they are already tidy
     if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
@@ -601,7 +601,7 @@ tyConToIfaceDecl env tycon
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
                     ifConExTCvs  = map toIfaceBndr ex_tvs',
-                    ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
+                    ifConUserTvBinders = toIfaceForAllBndrs user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
                     ifConArgTys  =
@@ -628,18 +628,18 @@ tyConToIfaceDecl env tycon
                      -- A bit grimy, perhaps, but it's simple!
 
           (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
-          user_bndrs' = map (tidyUserTyCoVarBinder con_env2) user_bndrs
+          user_bndrs' = map (tidyUserForAllTyBinder con_env2) user_bndrs
           to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
 
           -- By this point, we have tidied every universal and existential
-          -- tyvar. Because of the dcUserTyCoVarBinders invariant
+          -- tyvar. Because of the dcUserForAllTyBinders invariant
           -- (see Note [DataCon user type variable binders]), *every*
           -- user-written tyvar must be contained in the substitution that
           -- tidying produced. Therefore, tidying the user-written tyvars is a
           -- simple matter of looking up each variable in the substitution,
           -- which tidyTyCoVarOcc accomplishes.
-          tidyUserTyCoVarBinder :: TidyEnv -> InvisTVBinder -> InvisTVBinder
-          tidyUserTyCoVarBinder env (Bndr tv vis) =
+          tidyUserForAllTyBinder :: TidyEnv -> InvisTVBinder -> InvisTVBinder
+          tidyUserForAllTyBinder env (Bndr tv vis) =
             Bndr (tidyTyCoVarOcc env tv) vis
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
@@ -647,7 +647,7 @@ classToIfaceDecl env clas
   = ( env1
     , IfaceClass { ifName   = getName tycon,
                    ifRoles  = tyConRoles (classTyCon clas),
-                   ifBinders = toIfaceTyCoVarBinders tc_binders,
+                   ifBinders = toIfaceForAllBndrs tc_binders,
                    ifBody   = body,
                    ifFDs    = map toIfaceFD clas_fds })
   where
@@ -702,7 +702,7 @@ tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
 tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
  = case lookupVarEnv subst tv of
      Just tv' -> (env,  Bndr tv' vis)
-     Nothing  -> tidyTyCoVarBinder env tvb
+     Nothing  -> tidyForAllTyBinder env tvb
 
 tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
 tidyTyConBinders = mapAccumL tidyTyConBinder

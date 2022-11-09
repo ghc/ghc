@@ -1,7 +1,6 @@
 
 UnliftedNewtypesMismatchedKindRecord.hs:11:23: error: [GHC-83865]
-    • Couldn't match kind ‘'WordRep’ with ‘'IntRep’
-      Expected kind ‘TYPE 'IntRep’, but ‘Word#’ has kind ‘TYPE 'WordRep’
+    • Expected an IntRep type, but ‘Word#’ is a WordRep type
     • In the type ‘Word#’
       In the definition of data constructor ‘FooC’
       In the newtype declaration for ‘Foo’

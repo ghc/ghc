@@ -302,8 +302,12 @@ nonDetStrictFoldUDFM k z (UDFM m _i) = foldl' k' z m
     k' acc (TaggedVal v _) = k v acc
 
 eltsUDFM :: UniqDFM key elt -> [elt]
-eltsUDFM (UDFM m _i) =
-  map taggedFst $ sortBy (compare `on` taggedSnd) $ M.elems m
+{-# INLINE eltsUDFM #-}
+-- The INLINE makes it a good producer (from the map)
+eltsUDFM (UDFM m _i) = map taggedFst (sort_it m)
+
+sort_it :: M.IntMap (TaggedVal elt) -> [TaggedVal elt]
+sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i

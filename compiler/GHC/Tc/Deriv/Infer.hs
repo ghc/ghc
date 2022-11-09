@@ -16,16 +16,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Data.Bag
-import GHC.Types.Basic
-import GHC.Core.Class
-import GHC.Core.DataCon
-import GHC.Utils.Error
-import GHC.Utils.Outputable
-import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
-import GHC.Data.Pair
-import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils
 import GHC.Tc.Utils.Env
 import GHC.Tc.Deriv.Generate
@@ -35,20 +25,35 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Utils.TcType
-import GHC.Core.TyCon
-import GHC.Core.TyCo.Ppr (pprTyVars)
-import GHC.Core.Type
 import GHC.Tc.Solver
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor)
-import GHC.Builtin.Types (typeToTypeKind)
+
+import GHC.Core.Class
+import GHC.Core.DataCon
+import GHC.Core.TyCon
+import GHC.Core.TyCo.Ppr (pprTyVars)
+import GHC.Core.Type
+import GHC.Core.Predicate
 import GHC.Core.Unify (tcUnifyTy)
+
+import GHC.Data.Pair
+import GHC.Builtin.Names
+import GHC.Builtin.Types (typeToTypeKind)
+
+import GHC.Utils.Error
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
+
+import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.Var.Set
+
+import GHC.Data.Bag
 
 import Control.Monad
 import Control.Monad.Trans.Class  (lift)
@@ -236,7 +241,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            is_generic  = main_cls `hasKey` genClassKey
            is_generic1 = main_cls `hasKey` gen1ClassKey
            -- is_functor_like: see Note [Inferring the instance context]
-           is_functor_like = tcTypeKind inst_ty `tcEqKind` typeToTypeKind
+           is_functor_like = typeKind inst_ty `tcEqKind` typeToTypeKind
                           || is_generic1
 
            get_gen1_constraints ::
@@ -288,7 +293,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            -- message which points out the kind mismatch.
            -- See Note [Inferring the instance context]
            mk_functor_like_constraints orig t_or_k cls
-              = map $ \ty -> let ki = tcTypeKind ty in
+              = map $ \ty -> let ki = typeKind ty in
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , SimplePredSpec
                                    { sps_pred = mkPrimEqPred ki typeToTypeKind
@@ -309,7 +314,7 @@ inferConstraintsStock dit@(DerivInstTys { dit_cls_tys     = cls_tys
            --         and we need the Data constraints to typecheck the method
            extra_constraints
                  | main_cls `hasKey` dataClassKey
-                 , all (isLiftedTypeKind . tcTypeKind) rep_tc_args
+                 , all (isLiftedTypeKind . typeKind) rep_tc_args
                  = [ mk_cls_pred deriv_origin t_or_k main_cls ty
                    | (t_or_k, ty) <- zip t_or_ks rep_tc_args]
                  | otherwise

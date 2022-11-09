@@ -381,7 +381,7 @@ getSymtabName _name_cache _dict symtab bh = do
         in
           return $! case lookupKnownKeyName u of
                       Nothing -> pprPanic "getSymtabName:unknown known-key unique"
-                                          (ppr i $$ ppr u)
+                                          (ppr i $$ ppr u $$ char tag $$ ppr ix)
                       Just n  -> n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)

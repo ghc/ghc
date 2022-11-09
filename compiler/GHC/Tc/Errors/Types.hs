@@ -3288,8 +3288,8 @@ data TcSolverReportMsg
 
   -- | Cannot unify a variable, because of a type mismatch.
   | CannotUnifyVariable
-    { mismatchMsg             :: MismatchMsg
-    , cannotUnifyReason       :: CannotUnifyVariableReason }
+    { mismatchMsg         :: MismatchMsg
+    , cannotUnifyReason   :: CannotUnifyVariableReason }
 
   -- | A mismatch between two types.
   | Mismatch
@@ -3308,6 +3308,11 @@ data TcSolverReportMsg
   --
   -- Test cases: none.
   | BlockedEquality ErrorItem
+    -- These are for the "blocked" equalities, as described in
+    -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical,
+    -- wrinkle (2). There should always be another unsolved wanted around,
+    -- which will ordinarily suppress this message. But this can still be printed out
+    -- with -fdefer-type-errors (sigh), so we must produce a message.
 
   -- | Something was not applied to sufficiently many arguments.
   --
@@ -3388,7 +3393,7 @@ data MismatchMsg
   --    3 + 3# -- can't match a lifted type with an unlifted type
   --
   --  Test cases: T1396, T8263, ...
-    BasicMismatch -- SLD TODO rename this
+    BasicMismatch
       { mismatch_ea           :: MismatchEA  -- ^ Should this be phrased in terms of expected vs actual?
       , mismatch_item         :: ErrorItem   -- ^ The constraint in which the mismatch originated.
       , mismatch_ty1          :: Type        -- ^ First type (the expected type if if mismatch_ea is True)
@@ -3438,6 +3443,9 @@ data MismatchMsg
      }
   deriving Generic
 
+-- | Construct a basic mismatch message between two types.
+--
+-- See 'pprMismatchMsg' for how such a message is displayed to users.
 mkBasicMismatchMsg :: MismatchEA -> ErrorItem -> Type -> Type -> MismatchMsg
 mkBasicMismatchMsg ea item ty1 ty2
   = BasicMismatch
@@ -3489,6 +3497,8 @@ data CannotUnifyVariableReason
   | RepresentationalEq TyVarInfo (Maybe CoercibleMsg)
   deriving Generic
 
+-- | Report a mismatch error without any extra
+-- information.
 mkPlainMismatchMsg :: MismatchMsg -> TcSolverReportMsg
 mkPlainMismatchMsg msg
   = Mismatch

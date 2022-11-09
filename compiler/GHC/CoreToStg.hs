@@ -38,7 +38,7 @@ import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Env
 import GHC.Types.Name   ( isExternalName, nameModule_maybe )
-import GHC.Types.Basic  ( Arity )
+import GHC.Types.Basic  ( Arity, TypeOrConstraint(..) )
 import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.IPE
@@ -404,7 +404,7 @@ coreToStgExpr expr@(App _ _)
                                          --    Recompute representation, because in
                                          --    '(RUBBISH[rep] x) :: (T :: TYPE rep2)'
                                          --    rep might not be equal to rep2
-            -> return (StgLit $ LitRubbish $ getRuntimeRep (exprType expr))
+            -> return (StgLit $ LitRubbish TypeLike $ getRuntimeRep (exprType expr))
 
       _     -> pprPanic "coreToStgExpr - Invalid app head:" (ppr expr)
     where
@@ -494,8 +494,7 @@ mkStgAltType bndr alts
    prim_reps = typePrimRep bndr_ty
 
    _is_poly_alt_tycon tc
-        =  isFunTyCon tc
-        || isPrimTyCon tc   -- "Any" is lifted but primitive
+        =  isPrimTyCon tc   -- "Any" is lifted but primitive
         || isFamilyTyCon tc -- Type family; e.g. Any, or arising from strict
                             -- function application where argument has a
                             -- type-family type

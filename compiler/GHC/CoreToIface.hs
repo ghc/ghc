@@ -9,7 +9,7 @@ module GHC.CoreToIface
     , toIfaceBndr
     , toIfaceTopBndr
     , toIfaceForAllBndr
-    , toIfaceTyCoVarBinders
+    , toIfaceForAllBndrs
     , toIfaceTyVar
       -- * Types
     , toIfaceType, toIfaceTypeX
@@ -57,18 +57,18 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Tidy ( tidyCo )
 
 import GHC.Builtin.Types.Prim ( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Types ( heqTyCon )
-import GHC.Builtin.Names
 
 import GHC.Iface.Syntax
 import GHC.Data.FastString
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( noinlineIdName )
+import GHC.Types.Id.Make ( noinlineIdName, noinlineConstraintIdName )
 import GHC.Types.Literal
 import GHC.Types.Name
 import GHC.Types.Basic
@@ -83,7 +83,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( isNothing, catMaybes )
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,11 +143,14 @@ toIfaceBndrX fr var
   | isId var  = IfaceIdBndr (toIfaceIdBndrX fr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndrX fr var)
 
-toIfaceTyCoVarBinder :: VarBndr Var vis -> VarBndr IfaceBndr vis
-toIfaceTyCoVarBinder (Bndr tv vis) = Bndr (toIfaceBndr tv) vis
+toIfaceForAllBndrs :: [VarBndr TyCoVar vis] -> [VarBndr IfaceBndr vis]
+toIfaceForAllBndrs = map toIfaceForAllBndr
 
-toIfaceTyCoVarBinders :: [VarBndr Var vis] -> [VarBndr IfaceBndr vis]
-toIfaceTyCoVarBinders = map toIfaceTyCoVarBinder
+toIfaceForAllBndr :: VarBndr TyCoVar flag -> VarBndr IfaceBndr flag
+toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
+
+toIfaceForAllBndrX :: VarSet -> (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
+toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
 {-
 ************************************************************************
@@ -217,12 +220,6 @@ toIfaceTyVar = occNameFS . getOccName
 toIfaceCoVar :: CoVar -> FastString
 toIfaceCoVar = occNameFS . getOccName
 
-toIfaceForAllBndr :: (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
-toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
-
-toIfaceForAllBndrX :: VarSet -> (VarBndr TyCoVar flag) -> (VarBndr IfaceBndr flag)
-toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
-
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTyCon tc
@@ -290,7 +287,7 @@ toIfaceCoercionX fr co
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (NthCo _r d co)      = IfaceNthCo d (go co)
+    go (SelCo d co)         = IfaceSelCo d (go co)
     go (LRCo lr co)         = IfaceLRCo lr (go co)
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (KindCo c)           = IfaceKindCo (go c)
@@ -300,12 +297,12 @@ toIfaceCoercionX fr co
     go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
-    go (TyConAppCo r tc cos)
-      | tc `hasKey` funTyConKey
-      , [_,_,_,_, _] <- cos         = panic "toIfaceCoercion"
-      | otherwise                =
-        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
+    go co@(TyConAppCo r tc cos)
+      =  assertPpr (isNothing (tyConAppFunCo_maybe r tc cos)) (ppr co) $
+         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+
+    go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
+      = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)
@@ -338,6 +335,9 @@ toIfaceAppArgsX :: VarSet -> Kind -> [Type] -> IfaceAppArgs
 -- Is 'blib' visible?  It depends on the visibility flag on j,
 -- so we have to substitute for k.  Annoying!
 toIfaceAppArgsX fr kind ty_args
+  | null ty_args
+  = IA_Nil
+  | otherwise
   = go (mkEmptySubst in_scope) kind ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
@@ -355,11 +355,10 @@ toIfaceAppArgsX fr kind ty_args
     go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
       = IA_Arg (toIfaceTypeX fr t) argf (go env res ts)
       where
-        argf = case af of
-                 VisArg   -> Required
-                 InvisArg -> Inferred
-                   -- It's rare for a kind to have a constraint argument, but
-                   -- it can happen. See Note [AnonTCB InvisArg] in GHC.Core.TyCon.
+        argf | isVisibleFunArg af = Required
+             | otherwise          = Inferred
+             -- It's rare for a kind to have a constraint argument, but it
+             -- can happen. See Note [AnonTCB with constraint arg] in GHC.Core.TyCon.
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
@@ -410,8 +409,8 @@ patSynToIfaceDecl ps
     (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
     univ_bndrs = patSynUnivTyVarBinders ps
     ex_bndrs   = patSynExTyVarBinders ps
-    (env1, univ_bndrs') = tidyTyCoVarBinders emptyTidyEnv univ_bndrs
-    (env2, ex_bndrs')   = tidyTyCoVarBinders env1 ex_bndrs
+    (env1, univ_bndrs') = tidyForAllTyBinders emptyTidyEnv univ_bndrs
+    (env2, ex_bndrs')   = tidyForAllTyBinders env1 ex_bndrs
     to_if_pr (name, _type, needs_dummy) = (name, needs_dummy)
 
 {-
@@ -548,7 +547,7 @@ toIfGuidance src guidance
 
 toIfaceExpr :: CoreExpr -> IfaceExpr
 toIfaceExpr (Var v)         = toIfaceVar v
-toIfaceExpr (Lit (LitRubbish r)) = IfaceLitRubbish (toIfaceType r)
+toIfaceExpr (Lit (LitRubbish tc r)) = IfaceLitRubbish tc (toIfaceType r)
 toIfaceExpr (Lit l)         = IfaceLit l
 toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
 toIfaceExpr (Coercion co)   = IfaceCo   (toIfaceCoercion co)
@@ -646,8 +645,8 @@ toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
     | isBootUnfolding (idUnfolding v)
     = -- See Note [Inlining and hs-boot files]
-      IfaceApp (IfaceApp (IfaceExt noinlineIdName)
-                         (IfaceType (toIfaceType (idType v))))
+      IfaceApp (IfaceApp (IfaceExt noinline_id)
+                         (IfaceType (toIfaceType ty)))
                (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
 
     | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
@@ -655,7 +654,12 @@ toIfaceVar v
 
     | isExternalName name             = IfaceExt name
     | otherwise                       = IfaceLcl (getOccFS name)
-  where name = idName v
+  where
+    name = idName v
+    ty   = idType v
+    noinline_id | isConstraintKind (typeKind ty) = noinlineConstraintIdName
+                | otherwise                      = noinlineIdName
+
 
 
 ---------------------
@@ -734,7 +738,8 @@ But how do we arrange for this to happen?  There are two ingredients:
     1. When we serialize out unfoldings to IfaceExprs (toIfaceVar),
     for every variable reference we see if we are referring to an
     'Id' that came from an hs-boot file.  If so, we add a `noinline`
-    to the reference.
+    to the reference.  See Note [noinlineId magic]
+    in GHC.Types.Id.Make
 
     2. But how do we know if a reference came from an hs-boot file
     or not?  We could record this directly in the 'IdInfo', but

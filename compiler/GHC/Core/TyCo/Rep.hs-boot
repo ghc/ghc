@@ -3,17 +3,19 @@ module GHC.Core.TyCo.Rep where
 
 import GHC.Utils.Outputable ( Outputable )
 import Data.Data  ( Data )
-import {-# SOURCE #-} GHC.Types.Var( Var, ArgFlag, AnonArgFlag )
+import {-# SOURCE #-} GHC.Types.Var( Var, VarBndr, ForAllTyFlag, FunTyFlag )
 import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 
 data Type
 data Coercion
+data CoSel
 data UnivCoProvenance
 data TyLit
-data TyCoBinder
 data MCoercion
 
 data Scaled a
+scaledThing :: Scaled a -> a
+
 type Mult = Type
 
 type PredType = Type
@@ -23,9 +25,17 @@ type ThetaType = [PredType]
 type CoercionN = Coercion
 type MCoercionN = MCoercion
 
-mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
-mkForAllTy :: Var -> ArgFlag -> Type -> Type
-mkNakedTyConTy :: TyCon -> Type
+mkForAllTy       :: VarBndr Var ForAllTyFlag -> Type -> Type
+mkNakedTyConTy   :: TyCon -> Type
+mkNakedKindFunTy :: FunTyFlag -> Type -> Type -> Type
 
-instance Data Type  -- To support Data instances in GHC.Core.Coercion.Axiom
+
+-- To support Data instances in GHC.Core.Coercion.Axiom
+instance Data Type
+
+-- To support instances PiTyBinder in Var
+instance Data a => Data (Scaled a)
+
+-- To support debug pretty-printing
 instance Outputable Type
+instance Outputable a => Outputable (Scaled a)

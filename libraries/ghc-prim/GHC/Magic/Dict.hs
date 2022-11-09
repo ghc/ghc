@@ -29,7 +29,9 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic.Dict (WithDict(..)) where
+module GHC.Magic.Dict (
+    WithDict( withDict )
+  ) where
 
 import GHC.Types (RuntimeRep, TYPE)
 

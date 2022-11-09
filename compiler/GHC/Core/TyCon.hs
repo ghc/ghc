@@ -17,14 +17,14 @@ module GHC.Core.TyCon(
         AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
-        RuntimeRepInfo(..), TyConFlavour(..),
+        PromDataConInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
-        TyConBinder, TyConBndrVis(..), TyConTyCoBinder,
+        TyConBinder, TyConBndrVis(..), TyConPiTyBinder,
         mkNamedTyConBinder, mkNamedTyConBinders,
         mkRequiredTyConBinder,
-        mkAnonTyConBinder, mkAnonTyConBinders,
-        tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
+        mkAnonTyConBinder, mkAnonTyConBinders, mkInvisAnonTyConBinder,
+        tyConBinderForAllTyFlag, tyConBndrVisForAllTyFlag, isNamedTyConBinder,
         isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
 
         -- ** Field labels
@@ -33,7 +33,6 @@ module GHC.Core.TyCon(
         -- ** Constructing TyCons
         mkAlgTyCon,
         mkClassTyCon,
-        mkFunTyCon,
         mkPrimTyCon,
         mkTupleTyCon,
         mkSumTyCon,
@@ -46,15 +45,14 @@ module GHC.Core.TyCon(
         noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
-        isAlgTyCon, isVanillaAlgTyCon, isConstraintKindCon,
+        isAlgTyCon, isVanillaAlgTyCon,
         isClassTyCon, isFamInstTyCon,
-        isFunTyCon,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
         isLiftedAlgTyCon,
         isTypeSynonymTyCon,
-        mustBeSaturated,
+        tyConMustBeSaturated,
         isPromotedDataCon, isPromotedDataCon_maybe,
         isDataKindsPromotedDataCon,
         isKindTyCon, isLiftedTypeKindTyConName,
@@ -91,7 +89,7 @@ module GHC.Core.TyCon(
         tyConFamilySize,
         tyConStupidTheta,
         tyConArity,
-        tyConNullaryTy,
+        tyConNullaryTy, mkTyConTy,
         tyConRoles,
         tyConFlavour,
         tyConTuple_maybe, tyConClass_maybe, tyConATs,
@@ -104,7 +102,7 @@ module GHC.Core.TyCon(
         unwrapNewTyCon_maybe, unwrapNewTyConEtad_maybe,
         newTyConDataCon_maybe,
         algTcFields,
-        tyConRuntimeRepInfo,
+        tyConPromDataConInfo,
         tyConBinders, tyConResKind, tyConInvisTVBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
         mkTyConTagMap,
@@ -139,13 +137,13 @@ import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
-   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany, mkNakedTyConTy )
+   ( Kind, Type, PredType, mkForAllTy, mkNakedKindFunTy, mkNakedTyConTy )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
    ( runtimeRepTyCon, constraintKind, levityTyCon
    , multiplicityTyCon
-   , vecCountTyCon, vecElemTyCon, liftedTypeKind )
+   , vecCountTyCon, vecElemTyCon )
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConFieldLabels
    , dataConTyCon, dataConFullSig
@@ -442,37 +440,44 @@ See #19367.
 
 ************************************************************************
 *                                                                      *
-                    TyConBinder, TyConTyCoBinder
+                    TyConBinder, TyConPiTyBinder
 *                                                                      *
 ************************************************************************
 -}
 
 type TyConBinder     = VarBndr TyVar   TyConBndrVis
-type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
-     -- Only PromotedDataCon has TyConTyCoBinders
+type TyConPiTyBinder = VarBndr TyCoVar TyConBndrVis
+     -- Only PromotedDataCon has TyConPiTyBinders
      -- See Note [Promoted GADT data constructors]
 
 data TyConBndrVis
-  = NamedTCB ArgFlag
-  | AnonTCB  AnonArgFlag
+  = NamedTCB ForAllTyFlag
+  | AnonTCB  FunTyFlag
 
 instance Outputable TyConBndrVis where
-  ppr (NamedTCB flag) = text "NamedTCB" <> ppr flag
-  ppr (AnonTCB af)    = text "AnonTCB"  <> ppr af
+  ppr (NamedTCB flag) = ppr flag
+  ppr (AnonTCB af)    = ppr af
 
-mkAnonTyConBinder :: AnonArgFlag -> TyVar -> TyConBinder
-mkAnonTyConBinder af tv = assert (isTyVar tv) $
-                          Bndr tv (AnonTCB af)
+mkAnonTyConBinder :: TyVar -> TyConBinder
+-- Make a visible anonymous TyCon binder
+mkAnonTyConBinder tv = assert (isTyVar tv) $
+                       Bndr tv (AnonTCB visArgTypeLike)
 
-mkAnonTyConBinders :: AnonArgFlag -> [TyVar] -> [TyConBinder]
-mkAnonTyConBinders af tvs = map (mkAnonTyConBinder af) tvs
+mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
+mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
 
-mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
+mkInvisAnonTyConBinder :: TyVar -> TyConBinder
+-- Make an /invisible/ anonymous TyCon binder
+-- Not used much
+mkInvisAnonTyConBinder tv = assert (isTyVar tv) $
+                            Bndr tv (AnonTCB invisArgTypeLike)
+
+mkNamedTyConBinder :: ForAllTyFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
 mkNamedTyConBinder vis tv = assert (isTyVar tv) $
                             Bndr tv (NamedTCB vis)
 
-mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
+mkNamedTyConBinders :: ForAllTyFlag -> [TyVar] -> [TyConBinder]
 -- The odd argument order supports currying
 mkNamedTyConBinders vis tvs = map (mkNamedTyConBinder vis) tvs
 
@@ -483,15 +488,16 @@ mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
                       -> TyConBinder
 mkRequiredTyConBinder dep_set tv
   | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
-  | otherwise               = mkAnonTyConBinder  VisArg   tv
+  | otherwise               = mkAnonTyConBinder tv
 
-tyConBinderArgFlag :: TyConBinder -> ArgFlag
-tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
+tyConBinderForAllTyFlag :: TyConBinder -> ForAllTyFlag
+tyConBinderForAllTyFlag (Bndr _ vis) = tyConBndrVisForAllTyFlag vis
 
-tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
-tyConBndrVisArgFlag (NamedTCB vis)     = vis
-tyConBndrVisArgFlag (AnonTCB VisArg)   = Required
-tyConBndrVisArgFlag (AnonTCB InvisArg) = Inferred    -- See Note [AnonTCB InvisArg]
+tyConBndrVisForAllTyFlag :: TyConBndrVis -> ForAllTyFlag
+tyConBndrVisForAllTyFlag (NamedTCB vis)     = vis
+tyConBndrVisForAllTyFlag (AnonTCB af)    -- See Note [AnonTCB with constraint arg]
+  | isVisibleFunArg af = Required
+  | otherwise          = Inferred
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -505,9 +511,8 @@ isVisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
-isVisibleTcbVis (NamedTCB vis)     = isVisibleArgFlag vis
-isVisibleTcbVis (AnonTCB VisArg)   = True
-isVisibleTcbVis (AnonTCB InvisArg) = False
+isVisibleTcbVis (NamedTCB vis) = isVisibleForAllTyFlag vis
+isVisibleTcbVis (AnonTCB af)   = isVisibleFunArg af
 
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -519,8 +524,16 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (AnonTCB af))   k = mkFunTyMany af (varType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
+    mk (Bndr tv (AnonTCB af))   k = mkNakedKindFunTy af (varType tv) k
+    -- mkNakedKindFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
+
+-- | (mkTyConTy tc) returns (TyConApp tc [])
+-- but arranges to share that TyConApp among all calls
+-- See Note [Sharing nullary TyConApps]
+-- So it's just an alias for tyConNullaryTy!
+mkTyConTy :: TyCon -> Type
+mkTyConTy tycon = tyConNullaryTy tycon
 
 tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
                     -> [InvisTVBinder] -- Suitable for the foralls of a term function
@@ -531,8 +544,9 @@ tyConInvisTVBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB VisArg           -> SpecifiedSpec
-                AnonTCB InvisArg         -> InferredSpec   -- See Note [AnonTCB InvisArg]
+                AnonTCB af    -- Note [AnonTCB with constraint arg]
+                  | isInvisibleFunArg af -> InferredSpec
+                  | otherwise            -> SpecifiedSpec
                 NamedTCB Required        -> SpecifiedSpec
                 NamedTCB (Invisible vis) -> vis
 
@@ -542,10 +556,10 @@ tyConVisibleTyVars tc
   = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
-{- Note [AnonTCB InvisArg]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's pretty rare to have an (AnonTCB InvisArg) binder.  The
-only way it can occur is through equality constraints in kinds. These
+{- Note [AnonTCB with constraint arg]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's pretty rare to have an (AnonTCB af) binder with af=FTF_C_T or FTF_C_C.
+The only way it can occur is through equality constraints in kinds. These
 can arise in one of two ways:
 
 * In a PromotedDataCon whose kind has an equality constraint:
@@ -554,19 +568,20 @@ can arise in one of two ways:
 
   See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and
   Note [Promoted data constructors] in this module.
+
 * In a data type whose kind has an equality constraint, as in the
   following example from #12102:
 
     data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type
 
-When mapping an (AnonTCB InvisArg) to an ArgFlag, in
-tyConBndrVisArgFlag, we use "Inferred" to mean "the user cannot
+When mapping an (AnonTCB FTF_C_x) to an ForAllTyFlag, in
+tyConBndrVisForAllTyFlag, we use "Inferred" to mean "the user cannot
 specify this arguments, even with visible type/kind application;
 instead the type checker must fill it in.
 
-We map (AnonTCB VisArg) to Required, of course: the user must
+We map (AnonTCB FTF_T_x) to Required, of course: the user must
 provide it. It would be utterly wrong to do this for constraint
-arguments, which is why AnonTCB must have the AnonArgFlag in
+arguments, which is why AnonTCB must have the FunTyFlag in
 the first place.
 
 Note [Building TyVarBinders from TyConBinders]
@@ -578,12 +593,12 @@ TyConBinders but TyVarBinders (used in forall-type)  E.g:
  *  From   data T a = MkT (Maybe a)
     we are going to make a data constructor with type
            MkT :: forall a. Maybe a -> T a
-    See the TyCoVarBinders passed to buildDataCon
+    See the ForAllTyBinders passed to buildDataCon
 
  * From    class C a where { op :: a -> Maybe a }
    we are going to make a default method
            $dmop :: forall a. C a => a -> Maybe a
-   See the TyCoVarBinders passed to mkSigmaTy in mkDefaultMethodType
+   See the ForAllTyBinders passed to mkSigmaTy in mkDefaultMethodType
 
 Both of these are user-callable.  (NB: default methods are not callable
 directly by the user but rather via the code generated by 'deriving',
@@ -604,7 +619,7 @@ The TyConBinders for App line up with App's kind, given above.
 But the DataCon MkApp has the type
   MkApp :: forall {k} (a:k->*) (b:k). a b -> App k a b
 
-That is, its TyCoVarBinders should be
+That is, its ForAllTyBinders should be
 
   dataConUnivTyVarBinders = [ Bndr (k:*)    Inferred
                             , Bndr (a:k->*) Specified
@@ -617,15 +632,15 @@ So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
 The last part about Required->Specified comes from this:
   data T k (a:k) b = MkT (a b)
 Here k is Required in T's kind, but we don't have Required binders in
-the TyCoBinders for a term (see Note [No Required TyCoBinder in terms]
-in GHC.Core.TyCo.Rep), so we change it to Specified when making MkT's TyCoBinders
+the PiTyBinders for a term (see Note [No Required PiTyBinder in terms]
+in GHC.Core.TyCo.Rep), so we change it to Specified when making MkT's PiTyBinders
 -}
 
 
 {- Note [The binders/kind/arity fields of a TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All TyCons have this group of fields
-  tyConBinders   :: [TyConBinder/TyConTyCoBinder]
+  tyConBinders   :: [TyConBinder/TyConPiTyBinder]
   tyConResKind   :: Kind
   tyConTyVars    :: [TyVar]   -- Cached = binderVars tyConBinders
                               --   NB: Currently (Aug 2018), TyCons that own this
@@ -650,7 +665,7 @@ They fit together like so:
 
   See Note [tyConBinders and lexical scoping]
 
-* See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
+* See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
   for what the visibility flag means.
 
 * Each TyConBinder tyConBinders has a TyVar (sometimes it is TyCoVar), and
@@ -722,13 +737,7 @@ Why do we have this invariant?
 -}
 
 instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v bi) = ppr_bi bi <+> parens (pprBndr LetBind v)
-    where
-      ppr_bi (AnonTCB VisArg)     = text "anon-vis"
-      ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
-      ppr_bi (NamedTCB Required)  = text "req"
-      ppr_bi (NamedTCB Specified) = text "spec"
-      ppr_bi (NamedTCB Inferred)  = text "inf"
+  ppr (Bndr v bi) = ppr bi <+> parens (pprBndr LetBind v)
 
 instance Binary TyConBndrVis where
   put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }
@@ -767,25 +776,7 @@ instance Binary TyConBndrVis where
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data TyCon
-  = -- | The function type constructor, @(->)@
-    FunTyCon {
-        tyConUnique :: Unique,   -- ^ A Unique of this TyCon. Invariant:
-                                 -- identical to Unique of Name stored in
-                                 -- tyConName field.
-
-        tyConName   :: Name,     -- ^ Name of the constructor
-
-        -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyConBinder],    -- ^ Full binders
-        tyConResKind :: Kind,             -- ^ Result kind
-        tyConKind    :: Kind,             -- ^ Kind of this TyCon
-        tyConArity   :: Arity,            -- ^ Arity
-        tyConNullaryTy :: Type,
-
-        tcRepName :: TyConRepName
-    }
-
+data TyCon =
   -- | Algebraic data types, from
   --     - @data@ declarations
   --     - @newtype@ declarations
@@ -798,10 +789,10 @@ data TyCon
   --     - unboxed sums
   -- Data/newtype/type /families/ are handled by 'FamilyTyCon'.
   -- See 'AlgTyConRhs' for more information.
-  | AlgTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
-                                 -- identical to Unique of Name stored in
-                                 -- tyConName field.
+    AlgTyCon {
+        tyConUnique  :: !Unique,  -- ^ A Unique of this TyCon. Invariant:
+                                  -- identical to Unique of Name stored in
+                                  -- tyConName field.
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
@@ -860,9 +851,9 @@ data TyCon
 
   -- | Represents type synonyms
   | SynonymTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
-                                 -- identical to Unique of Name stored in
-                                 -- tyConName field.
+        tyConUnique  :: !Unique,  -- ^ A Unique of this TyCon. Invariant:
+                                  -- identical to Unique of Name stored in
+                                  -- tyConName field.
 
         tyConName    :: Name,    -- ^ Name of the constructor
 
@@ -899,7 +890,7 @@ data TyCon
   -- | Represents families (both type and data)
   -- Argument roles are all Nominal
   | FamilyTyCon {
-        tyConUnique  :: Unique,  -- ^ A Unique of this TyCon. Invariant:
+        tyConUnique :: !Unique,  -- ^ A Unique of this TyCon. Invariant:
                                  -- identical to Unique of Name stored in
                                  -- tyConName field.
 
@@ -937,9 +928,9 @@ data TyCon
   -- the usual suspects (such as @Int#@) as well as foreign-imported
   -- types and kinds (@*@, @#@, and @?@)
   | PrimTyCon {
-        tyConUnique   :: Unique, -- ^ A Unique of this TyCon. Invariant:
-                                 -- identical to Unique of Name stored in
-                                 -- tyConName field.
+        tyConUnique   :: !Unique, -- ^ A Unique of this TyCon. Invariant:
+                                  -- identical to Unique of Name stored in
+                                  -- tyConName field.
 
         tyConName     :: Name,   -- ^ Name of the constructor
 
@@ -961,12 +952,12 @@ data TyCon
 
   -- | Represents promoted data constructor.
   | PromotedDataCon {          -- See Note [Promoted data constructors]
-        tyConUnique  :: Unique,     -- ^ Same Unique as the data constructor
+        tyConUnique  :: !Unique,    -- ^ Same Unique as the data constructor
         tyConName    :: Name,       -- ^ Same Name as the data constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyConTyCoBinder], -- ^ Full binders
-           -- TyConTyCoBinder: see Note [Promoted GADT data constructors]
+        tyConBinders :: [TyConPiTyBinder], -- ^ Full binders
+           -- TyConPiTyBinder: see Note [Promoted GADT data constructors]
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -975,13 +966,13 @@ data TyCon
         tcRoles       :: [Role],    -- ^ Roles: N for kind vars, R for type vars
         dataCon       :: DataCon,   -- ^ Corresponding data constructor
         tcRepName     :: TyConRepName,
-        promDcRepInfo :: RuntimeRepInfo  -- ^ See comments with 'RuntimeRepInfo'
+        promDcInfo    :: PromDataConInfo  -- ^ See comments with 'PromDataConInfo'
     }
 
   -- | These exist only during type-checking. See Note [How TcTyCons work]
   -- in "GHC.Tc.TyCl"
   | TcTyCon {
-        tyConUnique :: Unique,
+        tyConUnique :: !Unique,
         tyConName   :: Name,
 
         -- See Note [The binders/kind/arity fields of a TyCon]
@@ -1033,8 +1024,8 @@ constraints in its type; e.g.
     K :: forall a b. (a ~# [b]) => a -> b -> T a
 
 So, when promoted to become a type constructor, the tyConBinders
-will include CoVars.  That is why we use [TyConTyCoBinder] for the
-tyconBinders field.  TyConTyCoBinder is a synonym for TyConBinder,
+will include CoVars.  That is why we use [TyConPiTyBinder] for the
+tyconBinders field.  TyConPiTyBinder is a synonym for TyConBinder,
 but with the clue that the binder can be a CoVar not just a TyVar.
 
 Note [Representation-polymorphic TyCons]
@@ -1251,20 +1242,22 @@ mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs = mkLevPolyDataTyConRhs True False
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
--- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
+-- the `IntRep` constructor of `RuntimeRep` corresponds to the 'IntRep'
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
--- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
+-- up things like `RuntimeRep`'s `PrimRep` by known-key every time.
 -- See also Note [Getting from RuntimeRep to PrimRep] in "GHC.Types.RepType"
-data RuntimeRepInfo
-  = NoRRI       -- ^ an ordinary promoted data con
+data PromDataConInfo
+  = NoPromInfo       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
-      -- ^ A constructor of @RuntimeRep@. The argument to the function should
+      -- ^ A constructor of `RuntimeRep`. The argument to the function should
       -- be the list of arguments to the promoted datacon.
-  | VecCount Int         -- ^ A constructor of @VecCount@
-  | VecElem PrimElemRep  -- ^ A constructor of @VecElem@
-  | LiftedInfo           -- ^ A constructor of @Levity@
-  | UnliftedInfo         -- ^ A constructor of @Levity@
+
+  | VecCount Int         -- ^ A constructor of `VecCount`
+
+  | VecElem PrimElemRep  -- ^ A constructor of `VecElem`
+
+  | Levity Levity        -- ^ A constructor of `Levity`
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
@@ -1419,8 +1412,8 @@ All data constructors can be promoted to become a type constructor,
 via the PromotedDataCon alternative in GHC.Core.TyCon.
 
 * The TyCon promoted from a DataCon has the *same* Name and Unique as
-  the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
-  say) is promoted to a TyCon whose name is Data.Maybe.Just(unique 78)
+  the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78)
+  is promoted to a TyCon whose name is      Data.Maybe.Just(unique 78)
 
 * We promote the *user* type of the DataCon.  Eg
      data T = MkT {-# UNPACK #-} !(Bool, Bool)
@@ -1522,8 +1515,6 @@ type TyConRepName = Name
    --    $tcMaybe = TyCon { tyConName = "Maybe", ... }
 
 tyConRepName_maybe :: TyCon -> Maybe TyConRepName
-tyConRepName_maybe (FunTyCon   { tcRepName = rep_nm })
-  = Just rep_nm
 tyConRepName_maybe (PrimTyCon  { primRepName = rep_nm })
   = Just rep_nm
 tyConRepName_maybe (AlgTyCon { algTcFlavour = parent }) = case parent of
@@ -1842,24 +1833,6 @@ module mutual-recursion.  And they aren't called from many places.
 So we compromise, and move their Kind calculation to the call site.
 -}
 
--- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is recommended to use 'GHC.Builtin.Types.funTyCon' if you want
--- this functionality
-mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
-mkFunTyCon name binders rep_nm
-  = let tc =
-          FunTyCon {
-              tyConUnique  = nameUnique name,
-              tyConName    = name,
-              tyConBinders = binders,
-              tyConResKind = liftedTypeKind,
-              tyConKind    = mkTyConKind binders liftedTypeKind,
-              tyConArity   = length binders,
-              tyConNullaryTy = mkNakedTyConTy tc,
-              tcRepName    = rep_nm
-          }
-    in tc
-
 -- | This is the making of an algebraic 'TyCon'.
 mkAlgTyCon :: Name
            -> [TyConBinder]  -- ^ Binders of the 'TyCon'
@@ -2071,8 +2044,8 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
 -- as the data constructor itself; when we pretty-print
 -- the TyCon we add a quote; see the Outputable TyCon instance
 mkPromotedDataCon :: DataCon -> Name -> TyConRepName
-                  -> [TyConTyCoBinder] -> Kind -> [Role]
-                  -> RuntimeRepInfo -> TyCon
+                  -> [TyConPiTyBinder] -> Kind -> [Role]
+                  -> PromDataConInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = let tc =
           PromotedDataCon {
@@ -2086,13 +2059,9 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
             tyConKind     = mkTyConKind binders res_kind,
             dataCon       = con,
             tcRepName     = rep_name,
-            promDcRepInfo = rep_info
+            promDcInfo    = rep_info
           }
     in tc
-
-isFunTyCon :: TyCon -> Bool
-isFunTyCon (FunTyCon {}) = True
-isFunTyCon _             = False
 
 -- | Test if the 'TyCon' is algebraic but abstract (invisible data constructors)
 isAbstractTyCon :: TyCon -> Bool
@@ -2115,16 +2084,6 @@ isAlgTyCon _               = False
 isVanillaAlgTyCon :: TyCon -> Bool
 isVanillaAlgTyCon (AlgTyCon { algTcFlavour = VanillaAlgTyCon _ }) = True
 isVanillaAlgTyCon _                                              = False
-
--- | Returns @True@ for the 'TyCon' of the 'Constraint' kind.
-{-# INLINE isConstraintKindCon #-} -- See Note [Inlining coreView] in GHC.Core.Type
-isConstraintKindCon :: TyCon -> Bool
--- NB: We intentionally match on AlgTyCon, because 'constraintKindTyCon' is
--- always an AlgTyCon (see 'pcTyCon' in TysWiredIn) and the record selector
--- for 'tyConUnique' would generate unreachable code for every other data
--- constructor of TyCon (see #18026).
-isConstraintKindCon AlgTyCon { tyConUnique = u } = u == constraintKindTyConKey
-isConstraintKindCon _                            = False
 
 isDataTyCon :: TyCon -> Bool
 -- ^ Returns @True@ for data types that are /definitely/ represented by
@@ -2165,7 +2124,6 @@ isTypeDataTyCon _              = False
 -- See also Note [Decomposing equality] in "GHC.Tc.Solver.Canonical"
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon _                             Phantom          = False
-isInjectiveTyCon (FunTyCon {})                 _                = True
 isInjectiveTyCon (AlgTyCon {})                 Nominal          = True
 isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
   = isGenInjAlgRhs rhs
@@ -2258,11 +2216,11 @@ isForgetfulSynTyCon _                                          = False
 --            (T ~N d), (a ~N e) and (b ~N f)?
 -- Specifically NOT true of synonyms (open and otherwise)
 --
--- It'd be unusual to call mustBeSaturated on a regular H98
+-- It'd be unusual to call tyConMustBeSaturated on a regular H98
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
-mustBeSaturated :: TyCon -> Bool
-mustBeSaturated = tcFlavourMustBeSaturated . tyConFlavour
+tyConMustBeSaturated :: TyCon -> Bool
+tyConMustBeSaturated = tcFlavourMustBeSaturated . tyConFlavour
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -2458,7 +2416,6 @@ isLiftedTypeKindTyConName = (`hasKey` liftedTypeKindTyConKey)
 --   (namely: boxed and unboxed tuples are wired-in and implicit,
 --            but constraint tuples are not)
 isImplicitTyCon :: TyCon -> Bool
-isImplicitTyCon (FunTyCon {})        = True
 isImplicitTyCon (PrimTyCon {})       = True
 isImplicitTyCon (PromotedDataCon {}) = True
 isImplicitTyCon (AlgTyCon { algTcRhs = rhs, tyConName = name })
@@ -2498,7 +2455,6 @@ setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 --
 -- See Note [Representation-polymorphic TyCons]
 tcHasFixedRuntimeRep :: TyCon -> Bool
-tcHasFixedRuntimeRep FunTyCon{}           = True
 tcHasFixedRuntimeRep (AlgTyCon { algTcRhs = rhs }) = case rhs of
   AbstractTyCon {} -> False
           -- An abstract TyCon might not have a fixed runtime representation.
@@ -2688,8 +2644,7 @@ tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
 tyConRoles tc
   = case tc of
-    { FunTyCon {}                         -> [Nominal, Nominal, Nominal, Representational, Representational]
-    ; AlgTyCon { tcRoles = roles }        -> roles
+    { AlgTyCon { tcRoles = roles }        -> roles
     ; SynonymTyCon { tcRoles = roles }    -> roles
     ; FamilyTyCon {}                      -> const_role Nominal
     ; PrimTyCon { tcRoles = roles }       -> roles
@@ -2741,7 +2696,7 @@ newTyConDataCon_maybe _ = Nothing
 -- @data Eq a => T a ...@. See @Note [The stupid context]@ in "GHC.Core.DataCon".
 tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
-tyConStupidTheta (FunTyCon {}) = []
+tyConStupidTheta (PrimTyCon {}) = []
 tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
 
 -- | Extract the 'TyVar's bound by a vanilla type synonym
@@ -2807,9 +2762,9 @@ tyConFamilyCoercion_maybe (AlgTyCon {algTcFlavour = DataFamInstTyCon ax _ _ })
 tyConFamilyCoercion_maybe _ = Nothing
 
 -- | Extract any 'RuntimeRepInfo' from this TyCon
-tyConRuntimeRepInfo :: TyCon -> RuntimeRepInfo
-tyConRuntimeRepInfo (PromotedDataCon { promDcRepInfo = rri }) = rri
-tyConRuntimeRepInfo _                                         = NoRRI
+tyConPromDataConInfo :: TyCon -> PromDataConInfo
+tyConPromDataConInfo (PromotedDataCon { promDcInfo = rri }) = rri
+tyConPromDataConInfo _                                      = NoPromInfo
   -- could panic in that second case. But Douglas Adams told me not to.
 
 {-
@@ -2916,7 +2871,6 @@ tyConFlavour (FamilyTyCon { famTcFlav = flav, famTcParent = parent })
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
       BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
 tyConFlavour (SynonymTyCon {})    = TypeSynonymFlavour
-tyConFlavour (FunTyCon {})        = BuiltInTypeFlavour
 tyConFlavour (PrimTyCon {})       = BuiltInTypeFlavour
 tyConFlavour (PromotedDataCon {}) = PromotedDataConFlavour
 tyConFlavour (TcTyCon { tcTyConFlavour = flav }) = flav

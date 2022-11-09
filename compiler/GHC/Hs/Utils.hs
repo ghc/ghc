@@ -55,10 +55,6 @@ module GHC.Hs.Utils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
   mkLocatedList,
 
-  -- * Constructing general big tuples
-  -- $big_tuples
-  mkChunkified, chunkify,
-
   -- * Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mkSimpleGeneratedFunBind, mkTopFunBind,
   mkPatSynBind,
@@ -122,12 +118,16 @@ import GHC.Hs.Extension
 import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
-import GHC.Core.TyCo.Rep
-import GHC.Core.Multiplicity ( pattern Many )
-import GHC.Builtin.Types ( unitTy )
-import GHC.Tc.Utils.TcType
+
+import GHC.Core.Coercion( isReflCo )
+import GHC.Core.Multiplicity ( pattern ManyTy )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
+import GHC.Core.Make   ( mkChunkified )
+import GHC.Core.Type   ( Type, isUnliftedType )
+
+import GHC.Builtin.Types ( unitTy )
+
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Set hiding ( unitFV )
@@ -138,9 +138,9 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Fixity
 import GHC.Types.SourceText
+
 import GHC.Data.FastString
 import GHC.Data.Bag
-import GHC.Settings.Constants
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -268,7 +268,7 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
-                                       <.> mkWpLams dicts) expr
+                                       <.> mkWpEvLams dicts) expr
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
@@ -414,7 +414,7 @@ mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
                                                 xbstc_boundResultType = unitTy,
                                                    -- unitTy is a dummy value
                                                    -- can't panic here: it's forced during zonking
-                                                xbstc_boundResultMult = Many,
+                                                xbstc_boundResultMult = ManyTy,
                                                 xbstc_failOp = Nothing }) pat body
 
 emptyRecStmt' :: forall idL idR body .
@@ -681,47 +681,6 @@ mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
 mkBigLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
 mkBigLHsPatTup = mkChunkified mkLHsPatTup
 
--- $big_tuples
--- #big_tuples#
---
--- GHCs built in tuples can only go up to 'mAX_TUPLE_SIZE' in arity, but
--- we might conceivably want to build such a massive tuple as part of the
--- output of a desugaring stage (notably that for list comprehensions).
---
--- We call tuples above this size \"big tuples\", and emulate them by
--- creating and pattern matching on >nested< tuples that are expressible
--- by GHC.
---
--- Nesting policy: it's better to have a 2-tuple of 10-tuples (3 objects)
--- than a 10-tuple of 2-tuples (11 objects), so we want the leaves of any
--- construction to be big.
---
--- If you just use the 'mkBigCoreTup', 'mkBigCoreVarTupTy', 'mkTupleSelector'
--- and 'mkTupleCase' functions to do all your work with tuples you should be
--- fine, and not have to worry about the arity limitation at all.
-
--- | Lifts a \"small\" constructor into a \"big\" constructor by recursive decomposition
-mkChunkified :: ([a] -> a)      -- ^ \"Small\" constructor function, of maximum input arity 'mAX_TUPLE_SIZE'
-             -> [a]             -- ^ Possible \"big\" list of things to construct from
-             -> a               -- ^ Constructed thing made possible by recursive decomposition
-mkChunkified small_tuple as = mk_big_tuple (chunkify as)
-  where
-        -- Each sub-list is short enough to fit in a tuple
-    mk_big_tuple [as] = small_tuple as
-    mk_big_tuple as_s = mk_big_tuple (chunkify (map small_tuple as_s))
-
-chunkify :: [a] -> [[a]]
--- ^ Split a list into lists that are small enough to have a corresponding
--- tuple arity. The sub-lists of the result all have length <= 'mAX_TUPLE_SIZE'
--- But there may be more than 'mAX_TUPLE_SIZE' sub-lists
-chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = [xs]
-  | otherwise              = split xs
-  where
-    n_xs     = length xs
-    split [] = []
-    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -815,7 +774,7 @@ mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = XPat $ CoPat co_fn p ty
 
 mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
-mkHsWrapPatCo co pat ty | isTcReflCo co = pat
+mkHsWrapPatCo co pat ty | isReflCo co = pat
                         | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc

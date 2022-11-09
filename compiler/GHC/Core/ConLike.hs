@@ -185,10 +185,14 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 --
 -- 7) The original result type
 conLikeFullSig :: ConLike
-               -> ([TyVar], [TyCoVar], [EqSpec]
+               -> ([TyVar], [TyCoVar]
                    -- Why tyvars for universal but tycovars for existential?
                    -- See Note [Existential coercion variables] in GHC.Core.DataCon
-                  , ThetaType, ThetaType, [Scaled Type], Type)
+                  , [EqSpec]
+                  , ThetaType      -- Provided theta
+                  , ThetaType      -- Required theta
+                  , [Scaled Type]  -- Arguments
+                  , Type )         -- Result
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional

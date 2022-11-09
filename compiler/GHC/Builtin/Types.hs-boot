@@ -16,8 +16,8 @@ coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
 
-
 liftedTypeKindTyConName :: Name
+constraintKindTyConName :: Name
 
 liftedTypeKind, unliftedTypeKind, zeroBitTypeKind :: Kind
 

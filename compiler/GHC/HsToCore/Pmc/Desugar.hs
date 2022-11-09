@@ -42,6 +42,7 @@ import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Type
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
@@ -139,7 +140,8 @@ desugarPat x pat = case pat of
         ListPat {}
           | ViewPat arg_ty _lexpr pat <- expansion
           , not (xopt LangExt.RebindableSyntax dflags)
-          , Just _ <- splitListTyConApp_maybe arg_ty
+          , Just tc <- tyConAppTyCon_maybe arg_ty
+          , tc == listTyCon
           -> desugarLPat x pat
 
         _ -> desugarPat x expansion
@@ -247,7 +249,7 @@ desugarPat x pat = case pat of
 -- | 'desugarPat', but also select and return a new match var.
 desugarPatV :: Pat GhcTc -> DsM (Id, [PmGrd])
 desugarPatV pat = do
-  x <- selectMatchVar Many pat
+  x <- selectMatchVar ManyTy pat
   grds <- desugarPat x pat
   pure (x, grds)
 

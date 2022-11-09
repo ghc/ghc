@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
              PolyKinds, NegativeLiterals, DataKinds, ScopedTypeVariables,
-             TypeApplications, StandaloneKindSignatures,
+             TypeApplications, StandaloneKindSignatures, GADTs,
              FlexibleInstances, UndecidableInstances #-}
 -- NegativeLiterals: see Note [Fixity of (->)]
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
@@ -40,7 +40,8 @@ module GHC.Types (
         type (~), type (~~), Coercible,
 
         -- * Representation polymorphism
-        TYPE, Levity(..), RuntimeRep(..),
+        TYPE, CONSTRAINT,
+        Levity(..), RuntimeRep(..),
         LiftedRep, UnliftedRep,
         Type, UnliftedType, Constraint,
           -- The historical type * should ideally be written as
@@ -49,6 +50,11 @@ module GHC.Types (
         ZeroBitRep, ZeroBitType,
         VecCount(..), VecElem(..),
         Void#,
+
+        -- * Boxing constructors
+        DictBox( MkDictBox ),
+        WordBox( MkWordBox), IntBox( MkIntBox),
+        FloatBox( MkFloatBox), DoubleBox( MkDoubleBox),
 
         -- * Multiplicity types
         Multiplicity(..), MultMul,
@@ -61,7 +67,6 @@ module GHC.Types (
 import GHC.Prim
 
 infixr 5 :
-
 
 {- *********************************************************************
 *                                                                      *
@@ -92,8 +97,7 @@ type (->) = FUN 'Many
 *                                                                      *
 ********************************************************************* -}
 
--- | The kind of constraints, like @Show a@
-data Constraint
+
 
 -- | The runtime representation of lifted types.
 type LiftedRep = 'BoxedRep 'Lifted
@@ -106,6 +110,9 @@ type UnliftedRep = 'BoxedRep 'Unlifted
 type ZeroBitRep = 'TupleRep '[]
 
 -------------------------
+-- | The kind of lifted constraints
+type Constraint = CONSTRAINT LiftedRep
+
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE LiftedRep
 
@@ -473,7 +480,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 -- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
 -- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in GHC.Builtin.Types
--- See also Note [TYPE and RuntimeRep] in GHC.Builtin.Type.Prim
+-- See also Note [TYPE and CONSTRAINT] in GHC.Builtin.Type.Prim
 
 -- | Length of a SIMD vector type
 data VecCount = Vec2
@@ -499,6 +506,37 @@ data VecElem = Int8ElemRep
 
 {-# DEPRECATED Void# "Void# is now an alias for the unboxed tuple (# #)." #-}
 type Void# = (# #)
+
+{- *********************************************************************
+*                                                                      *
+             Boxing data constructors
+*                                                                      *
+********************************************************************* -}
+
+-- These "boxing" data types allow us to wrap up a value of kind (TYPE rr)
+-- in a box of kind Type, for each rr.
+data LiftBox   (a :: TYPE UnliftedRep) = MkLiftBox a
+
+data IntBox    (a :: TYPE IntRep)      = MkIntBox a
+data Int8Box   (a :: TYPE Int8Rep)     = MkInt8Box a
+data Int16Box  (a :: TYPE Int16Rep)    = MkInt16Box a
+data Int32Box  (a :: TYPE Int32Rep)    = MkInt32Box a
+data Int64Box  (a :: TYPE Int64Rep)    = MkInt64Box a
+
+data WordBox   (a :: TYPE WordRep)     = MkWordBox a
+data Word8Box  (a :: TYPE Word8Rep)    = MkWord8Box a
+data Word16Box (a :: TYPE Word16Rep)   = MkWord16Box a
+data Word32Box (a :: TYPE Word32Rep)   = MkWord32Box a
+data Word64Box (a :: TYPE Word64Rep)   = MkWord64Box a
+
+data FloatBox  (a :: TYPE FloatRep)    = MkFloatBox a
+data DoubleBox (a :: TYPE DoubleRep)   = MkDoubleBox a
+
+-- | Data type `Dict` provides a simple way to wrap up a (lifted)
+--   constraint as a type
+data DictBox c where
+  MkDictBox :: c => DictBox c
+
 
 {- *********************************************************************
 *                                                                      *

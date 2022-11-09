@@ -64,8 +64,8 @@ import GHC.Types.Basic
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
-import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
+import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
+import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
@@ -560,8 +560,8 @@ data IfaceExpr
   | IfaceLet    (IfaceBinding IfaceLetBndr) IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
-  | IfaceLitRubbish IfaceType -- See GHC.Types.Literal
-                              --   Note [Rubbish literals] item (6)
+  | IfaceLitRubbish TypeOrConstraint IfaceType
+       -- See GHC.Types.Literal Note [Rubbish literals] item (6)
   | IfaceFCall  ForeignCall IfaceType
   | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
@@ -865,7 +865,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
     pp_kind    = ppUnless (if ki_sig_printable
-                              then isIfaceTauType kind
+                              then isIfaceRhoType kind
                                       -- Even in the presence of a standalone kind signature, a non-tau
                                       -- result kind annotation cannot be discarded as it determines the arity.
                                       -- See Note [Arity inference in kcCheckDeclHeader_sig] in GHC.Tc.Gen.HsType
@@ -1073,7 +1073,8 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                               , ex_msg
                               , pprIfaceContextArr prov_ctxt
-                              , pprIfaceType $ foldr (IfaceFunTy VisArg many_ty) pat_ty arg_tys ])
+                              , pprIfaceType $ foldr (IfaceFunTy visArgTypeLike many_ty)
+                                                     pat_ty arg_tys ])
         pat_body = braces $ sep $ punctuate comma $ map ppr pat_fldlbls
         univ_msg = pprUserIfaceForAll $ tyVarSpecToBinders univ_bndrs
         ex_msg   = pprUserIfaceForAll $ tyVarSpecToBinders ex_bndrs
@@ -1212,16 +1213,18 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
         -- because we don't have a Name for the tycon, only an OccName
     pp_tau | null fields
            = case pp_args ++ [pp_gadt_res_ty] of
-                (t:ts) -> fsep (t : zipWithEqual "pprIfaceConDecl" (\(w,_) d -> ppr_arr w <+> d) arg_tys ts)
+                (t:ts) -> fsep (t : zipWithEqual "pprIfaceConDecl" (\(w,_) d -> ppr_arr w <+> d)
+                                                 arg_tys ts)
                 []     -> panic "pp_con_taus"
            | otherwise
            = sep [pp_field_args, arrow <+> pp_gadt_res_ty]
 
     -- Constructors are linear by default, but we don't want to show
     -- linear arrows when -XLinearTypes is disabled
-    ppr_arr w = sdocOption sdocLinearTypes (\linearTypes -> if linearTypes
-                                                            then ppr_fun_arrow w
-                                                            else arrow)
+    ppr_arr w = sdocOption sdocLinearTypes $ \linearTypes ->
+                if linearTypes
+                then pprTypeArrow visArgTypeLike w
+                else arrow
 
     ppr_bang IfNoBang = whenPprDebug $ char '_'
     ppr_bang IfStrict = char '!'
@@ -1311,7 +1314,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- 3. Pretty-print the data type constructor applied to its arguments.
     --    This process will omit any invisible arguments, such as coercion
     --    variables, if necessary. (See Note
-    --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.)
+    --    [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.)
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
       <+> pprParendIfaceAppArgs
@@ -1320,7 +1323,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     mk_tc_app_args :: [IfaceTyConBinder] -> IfaceAppArgs
     mk_tc_app_args [] = IA_Nil
     mk_tc_app_args (Bndr bndr vis:tc_bndrs) =
-      IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (tyConBndrVisArgFlag vis)
+      IA_Arg (IfaceTyVar (ifaceBndrName bndr)) (tyConBndrVisForAllTyFlag vis)
              (mk_tc_app_args tc_bndrs)
 
 instance Outputable IfaceRule where
@@ -1397,16 +1400,20 @@ pprParendIfaceExpr = pprIfaceExpr parens
 -- an atomic value (e.g. function args)
 pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
-pprIfaceExpr _       (IfaceLcl v)       = ppr v
-pprIfaceExpr _       (IfaceExt v)       = ppr v
-pprIfaceExpr _       (IfaceLit l)       = ppr l
-pprIfaceExpr _       (IfaceLitRubbish r) = text "RUBBISH" <> parens (ppr r)
-pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
-pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
-pprIfaceExpr _       (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
+pprIfaceExpr _ (IfaceLcl v)       = ppr v
+pprIfaceExpr _ (IfaceExt v)       = ppr v
+pprIfaceExpr _ (IfaceLit l)       = ppr l
+pprIfaceExpr _ (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
+pprIfaceExpr _ (IfaceType ty)     = char '@' <> pprParendIfaceType ty
+pprIfaceExpr _ (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
+pprIfaceExpr _ (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
+
+pprIfaceExpr _ (IfaceLitRubbish tc r)
+  = text "RUBBISH"
+    <> (case tc of { TypeLike -> empty; ConstraintLike -> text "[c]" })
+    <> parens (ppr r)
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
-pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)
 
 pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map pprIfaceLamBndr bndrs) <+> arrow,
@@ -1709,7 +1716,7 @@ freeNamesIfCoercion (IfaceSymCo c)
   = freeNamesIfCoercion c
 freeNamesIfCoercion (IfaceTransCo c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
-freeNamesIfCoercion (IfaceNthCo _ co)
+freeNamesIfCoercion (IfaceSelCo _ co)
   = freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceLRCo _ co)
   = freeNamesIfCoercion co
@@ -2388,8 +2395,11 @@ instance Binary IfaceExpr where
         putByte bh 13
         put_ bh a
         put_ bh b
-    put_ bh (IfaceLitRubbish r) = do
+    put_ bh (IfaceLitRubbish TypeLike r) = do
         putByte bh 14
+        put_ bh r
+    put_ bh (IfaceLitRubbish ConstraintLike r) = do
+        putByte bh 15
         put_ bh r
     get bh = do
         h <- getByte bh
@@ -2434,7 +2444,9 @@ instance Binary IfaceExpr where
                      b <- get bh
                      return (IfaceECase a b)
             14 -> do r <- get bh
-                     return (IfaceLitRubbish r)
+                     return (IfaceLitRubbish TypeLike r)
+            15 -> do r <- get bh
+                     return (IfaceLitRubbish ConstraintLike r)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceTickish where
@@ -2691,7 +2703,7 @@ instance NFData IfaceExpr where
     IfaceLet bind e -> rnf bind `seq` rnf e
     IfaceCast e co -> rnf e `seq` rnf co
     IfaceLit l -> l `seq` () -- FIXME
-    IfaceLitRubbish r -> rnf r `seq` ()
+    IfaceLitRubbish tc r -> tc `seq` rnf r `seq` ()
     IfaceFCall fc ty -> fc `seq` rnf ty
     IfaceTick tick e -> rnf tick `seq` rnf e
 

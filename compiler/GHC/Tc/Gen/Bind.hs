@@ -32,6 +32,7 @@ import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
@@ -42,45 +43,52 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Solver
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
-import GHC.Core.TyCo.Ppr( pprTyVars )
+
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Validity (checkValidType)
+
+import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.Class   ( Class )
-import GHC.Tc.Utils.TcType
+import GHC.Core.Coercion( mkSymCo )
 import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
-import GHC.Builtin.Types ( mkBoxedTupleTy )
+import GHC.Core.TyCo.Ppr( pprTyVars )
+
+import GHC.Builtin.Types ( mkConstraintTupleTy )
 import GHC.Builtin.Types.Prim
+import GHC.Unit.Module
+
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env( TidyEnv, TyVarEnv, mkVarEnv, lookupVarEnv )
-import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
-import GHC.Data.Bag
+
 import GHC.Utils.Error
-import GHC.Data.Graph.Directed
-import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Types.CompleteMatch
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
-import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
+
+import GHC.Data.Bag
+import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
 
 import Control.Monad
 import Data.Foldable (find)
@@ -540,7 +548,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name Many forall_a_a
+      = mkLocalId name ManyTy forall_a_a
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -904,7 +912,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- do this check; otherwise (#14000) we may report an ambiguity
          -- error for a rather bogus type.
 
-       ; return (mkLocalId poly_name Many inferred_poly_ty) }
+       ; return (mkLocalId poly_name ManyTy inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
@@ -1006,12 +1014,12 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
            -- NB: my_theta already includes all the annotated constraints
            ; diff_theta <- findInferredDiff annotated_theta my_theta
 
-           ; case tcGetCastedTyVar_maybe wc_var_ty of
+           ; case getCastedTyVar_maybe wc_var_ty of
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
                -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
                -- So, to make the kinds work out, we reverse the cast here.
-               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mk_ctuple diff_theta
-                                                              `mkCastTy` mkTcSymCo wc_co)
+               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
+                                                              `mkCastTy` mkSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $
@@ -1037,12 +1045,8 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                       , residual_ct <- bagToList $ wc_simple (ic_wanted residual_implic)
                       , let residual_pred = ctPred residual_ct
                       , Just (Nominal, lhs, rhs) <- [ getEqPredTys_maybe residual_pred ]
-                      , Just lhs_tv <- [ tcGetTyVar_maybe lhs ]
+                      , Just lhs_tv <- [ getTyVar_maybe lhs ]
                       , lhs_tv == tv ]
-
-    mk_ctuple preds = mkBoxedTupleTy preds
-       -- Hack alert!  See GHC.Tc.Gen.HsType:
-       -- Note [Extra-constraint holes in partial type signatures]
 
 chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))
   = pprPanic "chooseInferredQuantifiers" (ppr sig)
@@ -1261,7 +1265,7 @@ tcMonoBinds is_rec sig_fn no_gen
   = setSrcSpanA b_loc    $
     do  { ((co_fn, matches'), mono_id, _) <- fixM $ \ ~(_, _, rhs_ty) ->
                                           -- See Note [fixM for rhs_ty in tcMonoBinds]
-            do  { mono_id <- newLetBndr no_gen name Many rhs_ty
+            do  { mono_id <- newLetBndr no_gen name ManyTy rhs_ty
                 ; (matches', rhs_ty')
                     <- tcInfer $ \ exp_ty ->
                        tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
@@ -1441,7 +1445,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name Many mono_ty
+       ; mono_id <- newLetBndr no_gen name ManyTy mono_ty
           -- This ^ generates a binder with Many multiplicity because all
           -- let/where-binders are unrestricted. When we introduce linear let
           -- binders, we will need to retrieve the multiplicity information.
@@ -1512,7 +1516,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name Many tau
+  = newLetBndr no_gen name ManyTy tau
     -- Binders with a signature are currently always of multiplicity
     -- Many. Because they come either from toplevel, let, or where
     -- declarations. Which are all unrestricted currently.

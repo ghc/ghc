@@ -11,21 +11,14 @@ import GHC.Types.Basic ( SwapFlag(..),
                          infinity, IntWithInf, intGtLimit )
 import GHC.Tc.Solver.Canonical
 import GHC.Types.Var.Set
-import GHC.Core.Type as Type
-import GHC.Core.InstEnv         ( DFunInstType )
 
 import GHC.Types.Var
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
-import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches, sfInteractInert, sfInteractTop )
-import GHC.Core.Class
-import GHC.Core.TyCon
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
-import GHC.Core.FamInstEnv
-import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
@@ -33,32 +26,46 @@ import GHC.Utils.Panic
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType( promoteMetaTyVarTo )
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
-import GHC.Data.Bag
-import GHC.Utils.Monad ( concatMapM, foldlM )
 
 import GHC.Core
-import Data.List( deleteFirstsBy )
-import Data.Function ( on )
+import GHC.Core.Type as Type
+import GHC.Core.InstEnv     ( DFunInstType )
+import GHC.Core.Class
+import GHC.Core.TyCon
+import GHC.Core.Predicate
+import GHC.Core.Coercion
+import GHC.Core.FamInstEnv
+import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
+import GHC.Core.Coercion.Axiom ( CoAxBranch (..), CoAxiom (..), TypeEqn, fromBranches
+                               , sfInteractInert, sfInteractTop )
+
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
-
-import qualified Data.Semigroup as S
-import Control.Monad
-import Data.Maybe ( listToMaybe, mapMaybe )
-import GHC.Data.Pair (Pair(..))
 import GHC.Types.Unique( hasKey )
-import GHC.Driver.Session
+
+import GHC.Data.Bag
+import GHC.Data.Pair (Pair(..))
+
+import GHC.Utils.Monad ( concatMapM, foldlM )
 import GHC.Utils.Misc
+
+import GHC.Driver.Session
+
 import qualified GHC.LanguageExtensions as LangExt
+
+import Data.List( deleteFirstsBy )
+import Data.Maybe ( listToMaybe, mapMaybe )
+import Data.Function ( on )
+import qualified Data.Semigroup as S
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
+import Control.Monad
 
 {-
 **********************************************************************
@@ -672,7 +679,7 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
     swap_me swap ev
       = case swap of
            NotSwapped -> ctEvTerm ev
-           IsSwapped  -> evCoercion (mkTcSymCo (evTermCoercion (ctEvTerm ev)))
+           IsSwapped  -> evCoercion (mkSymCo (evTermCoercion (ctEvTerm ev)))
 
 interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 
@@ -1523,10 +1530,10 @@ interactEq inerts workItem@(CEqCan { cc_lhs = lhs
                                    , cc_eq_rel = eq_rel })
   | Just (ev_i, swapped) <- inertsCanDischarge inerts workItem
   = do { setEvBindIfWanted ev $
-         evCoercion (maybeTcSymCo swapped $
-                     tcDowngradeRole (eqRelRole eq_rel)
-                                     (ctEvRole ev_i)
-                                     (ctEvCoercion ev_i))
+         evCoercion (maybeSymCo swapped $
+                     downgradeRole (eqRelRole eq_rel)
+                                   (ctEvRole ev_i)
+                                   (ctEvCoercion ev_i))
 
        ; stopWith ev "Solved from inert" }
 
@@ -1588,10 +1595,10 @@ solveByUnification wd tv xi
        ; traceTcS "Sneaky unification:" $
                        vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr xi,
                              text "Coercion:" <+> pprEq tv_ty xi,
-                             text "Left Kind is:" <+> ppr (tcTypeKind tv_ty),
-                             text "Right Kind is:" <+> ppr (tcTypeKind xi) ]
+                             text "Left Kind is:" <+> ppr (typeKind tv_ty),
+                             text "Right Kind is:" <+> ppr (typeKind xi) ]
        ; unifyTyVar tv xi
-       ; setEvBindIfWanted wd (evCoercion (mkTcNomReflCo xi))
+       ; setEvBindIfWanted wd (evCoercion (mkNomReflCo xi))
        ; n_kicked <- kickOutAfterUnification tv
        ; return (Stop wd (text "Solved by unification" <+> pprKicked n_kicked)) }
 
@@ -2574,7 +2581,7 @@ impliedBySCs :: TcThetaType -> TcThetaType -> Bool
 impliedBySCs c1 c2 = all in_c2 c1
   where
     in_c2 :: TcPredType -> Bool
-    in_c2 pred = any (pred `eqType`) c2_expanded
+    in_c2 pred = any (pred `tcEqType`) c2_expanded
 
     c2_expanded :: [TcPredType]  -- Includes all superclasses
     c2_expanded = [ q | p <- c2, q <- p : transSuperClasses p ]

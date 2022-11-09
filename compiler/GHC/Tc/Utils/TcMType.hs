@@ -111,9 +111,9 @@ import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Origin
-import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
@@ -191,7 +191,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name Many ty) }
+                 ; return (mkLocalIdOrCoVar name ManyTy ty) }
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
@@ -319,7 +319,7 @@ emitNewExprHole occ ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name Many (mkClassPred cls tys)) }
+       ; return (mkLocalId name ManyTy (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
@@ -643,7 +643,7 @@ promoteTcType :: TcLevel -> TcType -> TcM (TcCoercionN, TcType)
 promoteTcType dest_lvl ty
   = do { cur_lvl <- getTcLevel
        ; if (cur_lvl `sameDepthAs` dest_lvl)
-         then return (mkTcNomReflCo ty, ty)
+         then return (mkNomReflCo ty, ty)
          else promote_it }
   where
     promote_it :: TcM (TcCoercion, TcType)
@@ -971,13 +971,11 @@ writeMetaTyVarRef tyvar ref ty
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty      <- zonkTcType ty
-       ; let zonked_ty_kind = tcTypeKind zonked_ty
+       ; let zonked_ty_kind = typeKind zonked_ty
              zonked_ty_lvl  = tcTypeLevel zonked_ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
              level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
              kind_check_ok = zonked_ty_kind `eqType` zonked_tv_kind
-             -- Hack alert! eqType, not tcEqType. see:
-             -- Note [coreView vs tcView] in GHC.Core.Type
              -- Note [Extra-constraint holes in partial type signatures] in GHC.Tc.Gen.HsType
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
@@ -1501,24 +1499,24 @@ collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co orig_ty bound = go_co
   where
-    go_co dv (Refl ty)             = collect_cand_qtvs orig_ty True bound dv ty
-    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs orig_ty True bound dv ty
-                                        go_mco dv1 mco
-    go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
-    go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
-    go_co dv (FunCo _ w co1 co2)   = foldlM go_co dv [w, co1, co2]
-    go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
-    go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
-                                        dv2 <- collect_cand_qtvs orig_ty True bound dv1 t1
-                                        collect_cand_qtvs orig_ty True bound dv2 t2
-    go_co dv (SymCo co)            = go_co dv co
-    go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
-    go_co dv (NthCo _ _ co)        = go_co dv co
-    go_co dv (LRCo _ co)           = go_co dv co
-    go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]
-    go_co dv (KindCo co)           = go_co dv co
-    go_co dv (SubCo co)            = go_co dv co
+    go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True bound dv ty
+    go_co dv (GRefl _ ty mco)        = do dv1 <- collect_cand_qtvs orig_ty True bound dv ty
+                                          go_mco dv1 mco
+    go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
+    go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
+    go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
+    go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
+    go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
+    go_co dv (UnivCo prov _ t1 t2)   = do dv1 <- go_prov dv prov
+                                          dv2 <- collect_cand_qtvs orig_ty True bound dv1 t1
+                                          collect_cand_qtvs orig_ty True bound dv2 t2
+    go_co dv (SymCo co)              = go_co dv co
+    go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
+    go_co dv (SelCo _ co)            = go_co dv co
+    go_co dv (LRCo _ co)             = go_co dv co
+    go_co dv (InstCo co1 co2)        = foldlM go_co dv [co1, co2]
+    go_co dv (KindCo co)             = go_co dv co
+    go_co dv (SubCo co)              = go_co dv co
 
     go_co dv (HoleCo hole)
       = do m_co <- unpackCoercionHole_maybe hole
@@ -2520,7 +2518,7 @@ zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
 zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
 zonkTcTyVarToTcTyVar tv
   = do { ty <- zonkTcTyVar tv
-       ; let tv' = case tcGetTyVar_maybe ty of
+       ; let tv' = case getTyVar_maybe ty of
                      Just tv' -> tv'
                      Nothing  -> pprPanic "zonkTcTyVarToTcTyVar"
                                           (ppr tv $$ ppr ty)

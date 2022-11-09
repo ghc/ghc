@@ -45,7 +45,8 @@ import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
 import GHC.Tc.Module ( runTcInteractive )
 
 import GHC.Core.Type
-import GHC.Core.TyCon     ( tyConDataCons )
+import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCon       ( tyConDataCons )
 import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
@@ -746,11 +747,11 @@ mkUnsafeCoercePrimPair _old_id old_expr
                           , openAlphaTyVar, openBetaTyVar
                           , x ] $
                    mkSingleAltCase scrut1
-                                   (mkWildValBinder Many scrut1_ty)
+                                   (mkWildValBinder ManyTy scrut1_ty)
                                    (DataAlt unsafe_refl_data_con)
                                    [rr_cv] $
                    mkSingleAltCase scrut2
-                                   (mkWildValBinder Many scrut2_ty)
+                                   (mkWildValBinder ManyTy scrut2_ty)
                                    (DataAlt unsafe_refl_data_con)
                                    [ab_cv] $
                    Var x `mkCast` x_co

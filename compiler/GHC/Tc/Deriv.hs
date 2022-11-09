@@ -635,8 +635,8 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                   -- is the case.
                |  Just inst_ty <- lastMaybe inst_tys
                -> do
-               let via_kind     = tcTypeKind via_ty
-                   inst_ty_kind = tcTypeKind inst_ty
+               let via_kind     = typeKind via_ty
+                   inst_ty_kind = typeKind inst_ty
                    mb_match     = tcUnifyTy inst_ty_kind via_kind
 
                checkTc (isJust mb_match)
@@ -747,7 +747,7 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
                                 -- See Note [tc_args and tycon arity]
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
-              inst_ty_kind    = tcTypeKind (mkTyConApp tc tc_args_to_keep)
+              inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
 
               -- Match up the kinds, and apply the resulting kind substitution
               -- to the types.  See Note [Unify kinds in deriving]
@@ -756,6 +756,12 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
               enough_args     = n_args_to_keep >= 0
 
         -- Check that the result really is well-kinded
+        ; traceTc "deriveTyData" $
+          vcat [ text "class:" <+> ppr cls <+> dcolon <+> ppr (tyConKind (classTyCon cls))
+               , text "cls_tys:" <+> ppr cls_tys
+               , text "tycon:" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
+               , text "cls_arg:" <+> ppr (mkTyConApp tc tc_args_to_keep) <+> dcolon <+> ppr inst_ty_kind
+               , text "cls_arg_kind:" <+> ppr cls_arg_kind ]
         ; checkTc (enough_args && isJust mb_match)
                   (TcRnCannotDeriveInstance cls cls_tys Nothing NoGeneralizedNewtypeDeriving $
                      DerivErrNotWellKinded tc cls_arg_kind n_args_to_keep)
@@ -797,9 +803,9 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
               -- Perform an additional unification with the kind of the `via`
               -- type and the result of the previous kind unification.
               Just (ViaStrategy via_ty) -> do
-                let via_kind = tcTypeKind via_ty
+                let via_kind = typeKind via_ty
                     inst_ty_kind
-                              = tcTypeKind (mkTyConApp tc tc_args')
+                              = typeKind (mkTyConApp tc tc_args')
                     via_match = tcUnifyTy inst_ty_kind via_kind
 
                 checkTc (isJust via_match)

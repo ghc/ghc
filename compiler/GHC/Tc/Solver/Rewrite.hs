@@ -40,7 +40,7 @@ import GHC.Data.Maybe
 import GHC.Exts (oneShot)
 import Control.Monad
 import Control.Applicative (liftA3)
-import GHC.Builtin.Types.Prim (tYPETyCon)
+import GHC.Builtin.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import qualified GHC.Data.List.Infinite as Inf
@@ -277,8 +277,8 @@ rewriteType loc ty
 
 Key invariants:
   (F0) co :: zonk(ty') ~ xi   where zonk(ty') ~ zonk(ty)
-  (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
-  (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
+  (F1) typeKind(xi) succeeds and returns a fully zonked kind
+  (F2) typeKind(xi) `eqType` zonk(typeKind(ty))
 
 Note that it is rewrite's job to try to reduce *every type function it sees*.
 
@@ -299,14 +299,14 @@ It is for this reason that we occasionally have to explicitly zonk,
 when (co :: ty ~ xi) is important even before we zonk the whole program.
 For example, see the RTRNotFollowed case in rewriteTyVar.
 
-Why have these invariants on rewriting? Because we sometimes use tcTypeKind
+Why have these invariants on rewriting? Because we sometimes use typeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
 GHC.Tc.Solver.Canonical.canEqCanLHS).
 
 Rewriting is always homogeneous. That is, the kind of the result of rewriting is
 always the same as the kind of the input, modulo zonking. More formally:
 
-  (F2) zonk(tcTypeKind(ty)) `eqType` tcTypeKind(xi)
+  (F2) zonk(typeKind(ty)) `eqType` typeKind(xi)
 
 This invariant means that the kind of a rewritten type might not itself be rewritten.
 
@@ -391,7 +391,7 @@ rewrite_args_tc tc = rewrite_args all_bndrs any_named_bndrs inner_ki emptyVarSet
     -- NB: Those bangs there drop allocations in T9872{a,c,d} by 8%.
 
 {-# INLINE rewrite_args #-}
-rewrite_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
+rewrite_args :: [PiTyBinder] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
              -> Maybe (Infinite Role) -> [Type]    -- these are in 1-to-1 correspondence
@@ -400,7 +400,7 @@ rewrite_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
 -- This function returns ArgsReductions (Reductions cos xis) res_co
 --   coercions: co_i :: ty_i ~ xi_i, at roles given
 --   types:     xi_i
---   coercion:  res_co :: tcTypeKind(fun tys) ~N tcTypeKind(fun xis)
+--   coercion:  res_co :: typeKind(fun tys) ~N typeKind(fun xis)
 -- That is, the result coercion relates the kind of some function (whose kind is
 -- passed as the first parameter) instantiated at tys to the kind of that
 -- function instantiated at the xis. This is useful in keeping rewriting
@@ -439,7 +439,7 @@ rewrite_args_fast orig_tys
 {-# INLINE rewrite_args_slow #-}
 -- | Slow path, compared to rewrite_args_fast, because this one must track
 -- a lifting context.
-rewrite_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
+rewrite_args_slow :: [PiTyBinder] -> Kind -> TcTyCoVarSet
                   -> Infinite Role -> [Type]
                   -> RewriteM ArgsReductions
 rewrite_args_slow binders inner_ki fvs roles tys
@@ -591,7 +591,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
              do { let tc_roles  = tyConRolesRepresentational tc
                       arg_roles = Inf.dropList xis tc_roles
                 ; ArgsReductions (Reductions arg_cos arg_xis) kind_co
-                    <- rewrite_vector (tcTypeKind fun_xi) arg_roles arg_tys
+                    <- rewrite_vector (typeKind fun_xi) arg_roles arg_tys
 
                   -- We start with a reduction of the form
                   --   fun_co :: ty ~ T xi_1 ... xi_n
@@ -608,8 +608,8 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                       app_co = case eq_rel of
                         NomEq  -> mkAppCos fun_co arg_cos
                         ReprEq -> mkAppCos fun_co (map mkNomReflCo arg_tys)
-                                  `mkTcTransCo`
-                                  mkTcTyConAppCo Representational tc
+                                  `mkTransCo`
+                                  mkTyConAppCo Representational tc
                                     (zipWith mkReflCo (Inf.toList tc_roles) xis ++ arg_cos)
 
                 ; return $
@@ -618,7 +618,7 @@ rewrite_app_ty_args fun_redn@(Reduction fun_co fun_xi) arg_tys
                       kind_co }
            Nothing ->
              do { ArgsReductions redns kind_co
-                    <- rewrite_vector (tcTypeKind fun_xi) (Inf.repeat Nominal) arg_tys
+                    <- rewrite_vector (typeKind fun_xi) (Inf.repeat Nominal) arg_tys
                 ; return $ mkHetReduction (mkAppRedns fun_redn redns) kind_co }
 
        ; role <- getRole
@@ -1055,7 +1055,7 @@ the new story.
 
 -- | Like 'splitPiTys'' but comes with a 'Bool' which is 'True' iff there is at
 -- least one named binder.
-split_pi_tys' :: Type -> ([TyCoBinder], Type, Bool)
+split_pi_tys' :: Type -> ([PiTyBinder], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
      -- put common cases first
@@ -1066,20 +1066,20 @@ split_pi_tys' ty = split ty ty
   split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let -- See #19102
                                        !(bs, ty, named) = split res res
-                                   in  (Anon af (mkScaled w arg) : bs, ty, named)
+                                   in  (Anon (mkScaled w arg) af : bs, ty, named)
 
   split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
--- | Like 'tyConBindersTyCoBinders' but you also get a 'Bool' which is true iff
+-- | Like 'tyConBindersPiTyBinders' but you also get a 'Bool' which is true iff
 -- there is at least one named binder.
-ty_con_binders_ty_binders' :: [TyConBinder] -> ([TyCoBinder], Bool)
+ty_con_binders_ty_binders' :: [TyConBinder] -> ([PiTyBinder], Bool)
 ty_con_binders_ty_binders' = foldr go ([], False)
   where
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv (AnonTCB af))   (bndrs, n)
-      = (Anon af (tymult (tyVarKind tv)) : bndrs, n)
+      = (Anon (tymult (tyVarKind tv)) af : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

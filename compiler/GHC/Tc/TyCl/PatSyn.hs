@@ -21,17 +21,27 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+
 import GHC.Tc.Gen.Pat
-import GHC.Core.Multiplicity
-import GHC.Core.Type ( tidyTyCoVarBinders, tidyTypes, tidyType, isManyDataConTy )
-import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.TcMType
+import GHC.Tc.Utils.Zonk
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
                       , addInlinePrags, addInlinePragArity )
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Solver
+import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Origin
+import GHC.Tc.TyCl.Build
+
+import GHC.Core.Multiplicity
+import GHC.Core.Type ( typeKind, tidyForAllTyBinders, tidyTypes, tidyType, isManyTy, mkTYPEapp )
+import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
+import GHC.Core.Predicate
+
 import GHC.Builtin.Types.Prim
 import GHC.Types.Error
 import GHC.Types.Name
@@ -47,14 +57,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info( RecSelParent(..) )
 import GHC.Tc.Gen.Bind
 import GHC.Types.Basic
-import GHC.Tc.Solver
-import GHC.Tc.Utils.Unify
-import GHC.Core.Predicate
 import GHC.Builtin.Types
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.Evidence
-import GHC.Tc.Types.Origin
-import GHC.Tc.TyCl.Build
 import GHC.Types.Var.Set
 import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
@@ -214,8 +217,8 @@ mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
 -- See Note [Equality evidence in pattern synonyms]
 mkProvEvidence ev_id
   | EqPred r ty1 ty2 <- classifyPredType pred
-  , let k1 = tcTypeKind ty1
-        k2 = tcTypeKind ty2
+  , let k1 = typeKind ty1
+        k2 = typeKind ty2
         is_homo = k1 `tcEqType` k2
         homo_tys   = [k1, ty1, ty2]
         hetero_tys = [k1, k2, ty1, ty2]
@@ -422,7 +425,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
              ex_tvs     = binderVars ex_bndrs
 
          -- Pattern synonyms currently cannot be linear (#18806)
-       ; checkTc (all (isManyDataConTy . scaledMult) arg_tys) $
+       ; checkTc (all (isManyTy . scaledMult) arg_tys) $
            TcRnLinearPatSyn sig_body_ty
 
        ; skol_info <- mkSkolemInfo (SigSkol (PatSynCtxt name) pat_ty [])
@@ -718,8 +721,8 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
        ; pat_ty'         <- zonkTcTypeToTypeX   ze pat_ty
        ; arg_tys'        <- zonkTcTypesToTypesX ze arg_tys
 
-       ; let (env1, univ_tvs) = tidyTyCoVarBinders emptyTidyEnv univ_tvs'
-             (env2, ex_tvs)   = tidyTyCoVarBinders env1 ex_tvs'
+       ; let (env1, univ_tvs) = tidyForAllTyBinders emptyTidyEnv univ_tvs'
+             (env2, ex_tvs)   = tidyForAllTyBinders env1 ex_tvs'
              req_theta  = tidyTypes env2 req_theta'
              prov_theta = tidyTypes env2 prov_theta'
              arg_tys    = tidyTypes env2 arg_tys'
@@ -803,9 +806,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  Many cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  Many fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") ManyTy pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  ManyTy cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  ManyTy fail_ty
 
        ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty

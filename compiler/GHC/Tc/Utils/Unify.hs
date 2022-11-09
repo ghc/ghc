@@ -42,8 +42,7 @@ module GHC.Tc.Utils.Unify (
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr( debugPprType )
+
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, makeTypeConcrete, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
@@ -52,6 +51,9 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 
 import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Ppr( debugPprType )
+import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 
@@ -62,7 +64,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( Name, isSystemName )
 
-import GHC.Core.TyCon
 import GHC.Builtin.Types
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
@@ -132,10 +133,10 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
     go :: TcRhoType   -- The type we're processing, perhaps after
                       -- expanding type synonyms
        -> TcM (HsWrapper, Scaled TcSigmaTypeFRR, TcSigmaType)
-    go ty | Just ty' <- tcView ty = go ty'
+    go ty | Just ty' <- coreView ty = go ty'
 
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
+      = assert (isVisibleFunArg af) $
       do { hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
          ; return (idHsWrapper, Scaled w arg_ty, res_ty) }
 
@@ -168,7 +169,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
       = do { arg_ty <- newOpenFlexiTyVarTy
            ; res_ty <- newOpenFlexiTyVarTy
            ; mult <- newFlexiTyVarTy multiplicityTy
-           ; let unif_fun_ty = mkVisFunTy mult arg_ty res_ty
+           ; let unif_fun_ty = tcMkVisFunTy mult arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
            ; hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
            ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
@@ -387,17 +388,17 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                                                go acc_arg_tys n ty'
            ; return (wrap_gen <.> wrap_res, result) }
 
-    -- No more args; do this /before/ tcView, so
+    -- No more args; do this /before/ coreView, so
     -- that we do not unnecessarily unwrap synonyms
     go acc_arg_tys 0 rho_ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType rho_ty)
            ; return (idHsWrapper, result) }
 
     go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+      | Just ty' <- coreView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
-      = assert (af == VisArg) $
+    go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
+      = assert (isVisibleFunArg af) $
         do { let arg_pos = 1 + length acc_arg_tys -- for error messages only
            ; (arg_co, arg_ty) <- hasFixedRuntimeRep (FRRExpectedFunTy herald arg_pos) arg_ty
            ; (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
@@ -440,7 +441,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
            ; more_arg_tys <- mapM (\(Scaled m t) -> Scaled m <$> readExpType t) more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkScaledFunTys more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
@@ -465,7 +466,7 @@ mkFunTysMsg :: TidyEnv
             -> TcM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
-                            mkVisFunTys arg_tys res_ty
+                            mkScaledFunTys arg_tys res_ty
 
        ; let (all_arg_tys, _) = splitFunTys fun_rho
              n_fun_args = length all_arg_tys
@@ -502,15 +503,16 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = assert (not $ isFunTyCon tc) $ go orig_ty
+  = assertPpr (isAlgTyCon tc) (ppr tc) $
+    go orig_ty
   where
     go ty
-       | Just ty' <- tcView ty
+       | Just ty' <- coreView ty
        = go ty'
 
     go ty@(TyConApp tycon args)
        | tc == tycon  -- Common case
-       = return (mkTcNomReflCo ty, args)
+       = return (mkNomReflCo ty, args)
 
     go (TyVarTy tv)
        | isMetaTyVar tv
@@ -550,10 +552,10 @@ matchExpectedAppTy orig_ty
   = go orig_ty
   where
     go ty
-      | Just ty' <- tcView ty = go ty'
+      | Just ty' <- coreView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
+      = return (mkNomReflCo orig_ty, (fun_ty, arg_ty))
 
     go (TyVarTy tv)
       | isMetaTyVar tv
@@ -571,7 +573,7 @@ matchExpectedAppTy orig_ty
            ; co <- unifyType Nothing (mkAppTy ty1 ty2) orig_ty
            ; return (co, (ty1, ty2)) }
 
-    orig_kind = tcTypeKind orig_ty
+    orig_kind = typeKind orig_ty
     kind1 = mkVisFunTyMany liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
@@ -651,7 +653,7 @@ fillInferResult act_res_ty (IR { ir_uniq = u
                            Just frr_orig -> hasFixedRuntimeRep frr_orig act_res_ty
 
                      -- Compose the two coercions.
-                     ; let final_co = prom_co `mkTcTransCo` frr_co
+                     ; let final_co = prom_co `mkTransCo` frr_co
 
                      ; writeTcRef ref (Just act_res_ty)
 
@@ -840,7 +842,7 @@ tcSubTypePat _ _ (Infer inf_res) ty_expected
   = do { co <- fillInferResult ty_expected inf_res
                -- In patterns we do not instantatiate
 
-       ; return (mkWpCastN (mkTcSymCo co)) }
+       ; return (mkWpCastN (mkSymCo co)) }
 
 ---------------
 tcSubType :: CtOrigin -> UserTypeCtxt
@@ -1278,9 +1280,9 @@ tc_sub_type_ds unify inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
        ; go ty_actual ty_expected }
   where
-    -- NB: 'go' is not recursive, except for doing tcView
-    go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
-                 | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
+    -- NB: 'go' is not recursive, except for doing coreView
+    go ty_a ty_e | Just ty_a' <- coreView ty_a = go ty_a' ty_e
+                 | Just ty_e' <- coreView ty_e = go ty_a  ty_e'
 
     go (TyVarTy tv_a) ty_e
       = do { lookup_res <- isFilledMetaTyVar_maybe tv_a
@@ -1291,13 +1293,13 @@ tc_sub_type_ds unify inst_orig ctxt ty_actual ty_expected
                     ; tc_sub_type_ds unify inst_orig ctxt ty_a' ty_e }
                Nothing -> just_unify ty_actual ty_expected }
 
-    go ty_a@(FunTy { ft_af = VisArg, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
-       ty_e@(FunTy { ft_af = VisArg, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
-      | isTauTy ty_a, isTauTy ty_e         -- Short cut common case to avoid
-      = just_unify ty_actual ty_expected   -- unnecessary eta expansion
-
-      | otherwise
-      = -- This is where we do the co/contra thing, and generate a WpFun, which in turn
+    go ty_a@(FunTy { ft_af = af1, ft_mult = act_mult, ft_arg = act_arg, ft_res = act_res })
+       ty_e@(FunTy { ft_af = af2, ft_mult = exp_mult, ft_arg = exp_arg, ft_res = exp_res })
+      | isVisibleFunArg af1, isVisibleFunArg af2
+      = if (isTauTy ty_a && isTauTy ty_e)       -- Short cut common case to avoid
+        then just_unify ty_actual ty_expected   -- unnecessary eta expansion
+        else
+        -- This is where we do the co/contra thing, and generate a WpFun, which in turn
         -- causes eta-expansion, which we don't like; hence encouraging NoDeepSubsumption
         do { arg_wrap  <- tc_sub_type_deep unify given_orig GenSigCtxt exp_arg act_arg
                           -- GenSigCtxt: See Note [Setting the argument context]
@@ -1380,14 +1382,12 @@ deeplySkolemise skol_info ty
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpLams ids1
-                      <.> mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
-                      <.> wrap
-                      <.> mkWpEvVarApps ids1
+           ; return ( mkWpEta ids1 (mkWpTyLams tvs1
+                                    <.> mkWpEvLams ev_vars1
+                                    <.> wrap)
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkVisFunTys arg_tys' rho ) }
+                    , mkScaledFunTys arg_tys' rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -1407,11 +1407,8 @@ deeplyInstantiate orig ty
            ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
            ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
            ; (wrap2, rho2) <- go subst' rho
-           ; return (mkWpLams ids1
-                        <.> wrap2
-                        <.> wrap1
-                        <.> mkWpEvVarApps ids1,
-                     mkVisFunTys arg_tys' rho2) }
+           ; return (mkWpEta ids1 (wrap2 <.> wrap1),
+                     mkScaledFunTys arg_tys' rho2) }
 
       | otherwise
       = do { let ty' = substTy subst ty
@@ -1703,7 +1700,7 @@ non-exported generic functions.
 -}
 
 unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
-          -> TcTauType -> TcTauType    -- ty1, ty2
+          -> TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
           -> TcM TcCoercionN           -- :: ty1 ~# ty2
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
@@ -1757,6 +1754,8 @@ uType, uType_defer
 --------------
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
+--    ty1 is "actual"
+--    ty2 is "expected"
 uType_defer t_or_k origin ty1 ty2
   = do { co <- emitWantedEq origin t_or_k Nominal ty1 ty2
 
@@ -1833,17 +1832,18 @@ uType t_or_k origin orig_ty1 orig_ty2
         -- we'll end up saying "can't match Foo with Bool"
         -- rather than "can't match "Int with Bool".  See #4535.
     go ty1 ty2
-      | Just ty1' <- tcView ty1 = go ty1' ty2
-      | Just ty2' <- tcView ty2 = go ty1  ty2'
+      | Just ty1' <- coreView ty1 = go ty1' ty2
+      | Just ty2' <- coreView ty2 = go ty1  ty2'
 
     -- Functions (t1 -> t2) just check the two parts
     -- Do not attempt (c => t); just defer
-    go (FunTy { ft_af = VisArg, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
-       (FunTy { ft_af = VisArg, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+    go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
+       (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
+      | isVisibleFunArg af1, af1 == af2
       = do { co_l <- uType t_or_k origin arg1 arg2
            ; co_r <- uType t_or_k origin res1 res2
            ; co_w <- uType t_or_k origin w1 w2
-           ; return $ mkFunCo Nominal co_w co_l co_r }
+           ; return $ mkNakedFunCo1 Nominal af1 co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -1874,12 +1874,12 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     go (AppTy s1 t1) (TyConApp tc2 ts2)
       | Just (ts2', t2') <- snocView ts2
-      = assert (not (mustBeSaturated tc2)) $
+      = assert (not (tyConMustBeSaturated tc2)) $
         go_app (isNextTyConArgVisible tc2 ts2') s1 t1 (TyConApp tc2 ts2') t2'
 
     go (TyConApp tc1 ts1) (AppTy s2 t2)
       | Just (ts1', t1') <- snocView ts1
-      = assert (not (mustBeSaturated tc1)) $
+      = assert (not (tyConMustBeSaturated tc1)) $
         go_app (isNextTyConArgVisible tc1 ts1') (TyConApp tc1 ts1') t1' s2 t2
 
     go (CoercionTy co1) (CoercionTy co2)
@@ -2030,7 +2030,7 @@ uUnfilledVar1 :: CtOrigin
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
 uUnfilledVar1 origin t_or_k swapped tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2
+  | Just tv2 <- getTyVar_maybe ty2
   = go tv2
 
   | otherwise
@@ -2077,18 +2077,18 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            ; if not can_continue_solving
              then not_ok_so_defer
              else
-        do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2) (tyVarKind tv1)
+        do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                  , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
-                  , ppr (isTcReflCo co_k), ppr co_k ]
+                  , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
+                  , ppr (isReflCo co_k), ppr co_k ]
 
-           ; if isTcReflCo co_k
+           ; if isReflCo co_k
                -- Only proceed if the kinds match
                -- NB: tv1 should still be unfilled, despite the kind unification
                --     because tv1 is not free in ty2 (or, hence, in its kind)
              then do { writeMetaTyVar tv1 ty2
-                     ; return (mkTcNomReflCo ty2) }
+                     ; return (mkNomReflCo ty2) }
 
              else defer }} -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
                            -- Note [Equalities with incompatible kinds] for how
@@ -2134,7 +2134,7 @@ startSolvingByUnification info xi
                [] -> return True
                _  -> return False }
       TyVarTv ->
-        case tcGetTyVar_maybe xi of
+        case getTyVar_maybe xi of
            Nothing -> return False
            Just tv ->
              case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
@@ -2516,14 +2516,14 @@ causing this wibble in behavior seen here.
 matchExpectedFunKind
   :: TypedThing     -- ^ type, only for errors
   -> Arity           -- ^ n: number of desired arrows
-  -> TcKind          -- ^ fun_ kind
+  -> TcKind          -- ^ fun_kind
   -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
 
 matchExpectedFunKind hs_ty n k = go n k
   where
     go 0 k = return (mkNomReflCo k)
 
-    go n k | Just k' <- tcView k = go n k'
+    go n k | Just k' <- coreView k = go n k'
 
     go n k@(TyVarTy kvar)
       | isMetaTyVar kvar
@@ -2532,9 +2532,10 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy { ft_mult = w, ft_arg = arg, ft_res = res })
+    go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+      | isVisibleFunArg af
       = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
+           ; return (mkNakedFunCo1 Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
 
     go n other
      = defer n other
@@ -2658,7 +2659,7 @@ checkTypeEq lhs ty
     go (LitTy {})              = cteOK
     go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
                                = go w S.<> go a S.<> go r S.<>
-                                 if not ghci_tv && af == InvisArg
+                                 if not ghci_tv && isInvisibleFunArg af
                                    then impredicative
                                    else cteOK
     go (AppTy fun arg) = go fun S.<> go arg

@@ -17,7 +17,6 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Solver
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Types.Constraint
-import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
@@ -25,9 +24,12 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify( buildImplicationFor )
-import GHC.Tc.Types.Evidence( mkTcCoVarCo )
+
 import GHC.Core.Type
+import GHC.Core.Coercion( mkCoVarCo )
 import GHC.Core.TyCon( isTypeFamilyTyCon )
+import GHC.Core.Predicate
+
 import GHC.Types.Id
 import GHC.Types.Var( EvVar, tyVarName )
 import GHC.Types.Var.Set
@@ -229,7 +231,7 @@ tcRuleTmBndrs _ [] = return ([],[])
 tcRuleTmBndrs rule_name (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; (tyvars, tmvars) <- tcRuleTmBndrs rule_name rule_bndrs
-        ; return (tyvars, mkLocalId name Many ty : tmvars) }
+        ; return (tyvars, mkLocalId name ManyTy ty : tmvars) }
 tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
@@ -238,7 +240,7 @@ tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt rule_name name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt HM_Sig rn_ty OpenKind
-        ; let id  = mkLocalId name Many id_ty
+        ; let id  = mkLocalId name ManyTy id_ty
                     -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 
               -- The type variables scope over subsequent bindings; yuk
@@ -444,7 +446,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
           EvVarDest ev_id -> return ev_id
           HoleDest hole   -> -- See Note [Quantifying over coercion holes]
                              do { ev_id <- newEvVar pred
-                                ; fillCoercionHole hole (mkTcCoVarCo ev_id)
+                                ; fillCoercionHole hole (mkCoVarCo ev_id)
                                 ; return ev_id }
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 

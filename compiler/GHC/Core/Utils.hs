@@ -73,7 +73,7 @@ import GHC.Core.Ppr
 import GHC.Core.DataCon
 import GHC.Core.Type as Type
 import GHC.Core.FamInstEnv
-import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
+import GHC.Core.TyCo.Compare( eqType, eqTypeX )
 import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.TyCon
@@ -169,25 +169,14 @@ mkLamTypes :: [Var] -> Type -> Type
 
 mkLamType v body_ty
    | isTyVar v
-   = mkForAllTy v Inferred body_ty
+   = mkForAllTy (Bndr v Inferred) body_ty
 
    | isCoVar v
    , v `elemVarSet` tyCoVarsOfType body_ty
-   = mkForAllTy v Required body_ty
+   = mkForAllTy (Bndr v Required) body_ty
 
    | otherwise
    = mkFunctionType (varMult v) (varType v) body_ty
-
-mkFunctionType :: Mult -> Type -> Type -> Type
--- This one works out the AnonArgFlag from the argument type
--- See GHC.Types.Var Note [AnonArgFlag]
-mkFunctionType mult arg_ty res_ty
-   | isPredTy arg_ty -- See GHC.Types.Var Note [AnonArgFlag]
-   = assert (eqType mult Many) $
-     mkInvisFunTy mult arg_ty res_ty
-
-   | otherwise
-   = mkVisFunTy mult arg_ty res_ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
@@ -238,7 +227,7 @@ applyTypeToArgs pp_e op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
-    go op_ty (_ : args)           | Just (_, _, res_ty) <- splitFunTy_maybe op_ty
+    go op_ty (_ : args)           | Just (_, _, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
@@ -1400,9 +1389,8 @@ isExpandableApp fn n_val_args
 
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = case bndr of
-           Named {}        -> all_pred_args n_val_args ty
-           Anon InvisArg _ -> all_pred_args (n_val_args-1) ty
-           Anon VisArg _   -> False
+           Named {}  -> all_pred_args n_val_args ty
+           Anon _ af -> isInvisibleFunArg af && all_pred_args (n_val_args-1) ty
 
        | otherwise
        = False
@@ -1635,9 +1623,9 @@ app_ok fun_ok primop_ok fun args
     (arg_tys, _) = splitPiTys (idType fun)
 
     -- Used for arguments to primops and to partial applications
-    arg_ok :: TyBinder -> CoreExpr -> Bool
+    arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
-    arg_ok (Anon _ ty) arg      -- A term argument
+    arg_ok (Anon ty _) arg      -- A term argument
        | Just Lifted <- typeLevity_maybe (scaledThing ty)
        = True -- See Note [Primops with lifted arguments]
        | otherwise

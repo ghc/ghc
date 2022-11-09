@@ -20,6 +20,7 @@ import GHC.Driver.Flags
 import GHC.Core
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Utils
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr, zapLambdaBndrs, scrutBinderSwap_maybe )
@@ -604,7 +605,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
-              work_id   = mkLocalIdWithInfo work_name Many work_ty work_info
+              work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
               is_strict = isStrictId bndr
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
@@ -831,7 +832,7 @@ makeTrivial env top_lvl dmd occ_fs expr
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name Many expr_ty id_info
+              var  = mkLocalIdWithInfo name ManyTy expr_ty id_info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
@@ -1546,7 +1547,7 @@ In particular, we want to behave well on
 
  * (f |> co) @t1 @t2 ... @tn x1 .. xm
    Here we will use pushCoTyArg and pushCoValArg successively, which
-   build up NthCo stacks.  Silly to do that if co is reflexive.
+   build up SelCo stacks.  Silly to do that if co is reflexive.
 
 However, we don't want to call isReflexiveCo too much, because it uses
 type equality which is expensive on big types (#14737 comment:7).
@@ -2185,7 +2186,7 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
-           _ -> do { s' <- newId (fsLit "s") Many realWorldStatePrimTy
+           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
@@ -3192,7 +3193,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") Many ty2
+  = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }

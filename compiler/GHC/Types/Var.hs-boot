@@ -9,8 +9,8 @@ import {-# SOURCE #-} GHC.Types.Name
   -- otherwise-unnecessary import tells the build system that this module
   -- depends on GhcPrelude, which ensures that GHC.Type is built first.
 
-data ArgFlag
-data AnonArgFlag
+data ForAllTyFlag
+data FunTyFlag
 data Var
 instance NamedThing Var
 data VarBndr var argf

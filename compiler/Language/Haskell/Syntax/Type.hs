@@ -906,8 +906,10 @@ data HsTyLit pass
 data HsArrow pass
   = HsUnrestrictedArrow !(LHsUniToken "->" "→" pass)
     -- ^ a -> b or a → b
+
   | HsLinearArrow !(HsLinearArrowTokens pass)
     -- ^ a %1 -> b or a %1 → b, or a ⊸ b
+
   | HsExplicitMult !(LHsToken "%" pass) !(LHsType pass) !(LHsUniToken "->" "→" pass)
     -- ^ a %m -> b or a %m → b (very much including `a %Many -> b`!
     -- This is how the programmer wrote it). It is stored as an

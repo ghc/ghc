@@ -57,7 +57,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
 
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr     ( pprTyVar )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -1009,7 +1009,7 @@ zonk_cmd_top env (HsCmdTop (CmdTopTc stack_tys ty ids) cmd)
        new_ty <- zonkTcTypeToTypeX env ty
        new_ids <- mapSndM (zonkExpr env) ids
 
-       massert (isLiftedTypeKind (tcTypeKind new_stack_tys))
+       massert (isLiftedTypeKind (typeKind new_stack_tys))
          -- desugarer assumes that this is not representation-polymorphic...
          -- but indeed it should always be lifted due to the typing
          -- rules for arrows
@@ -1634,7 +1634,7 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
 
        ; term' <- case getEqPredTys_maybe (idType var') of
            Just (r, ty1, ty2) | ty1 `eqType` ty2
-                  -> return (evCoercion (mkTcReflCo r ty1))
+                  -> return (evCoercion (mkReflCo r ty1))
            _other -> zonkEvTerm env term
 
        ; return (bind { eb_lhs = var', eb_rhs = term' }) }

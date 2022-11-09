@@ -21,8 +21,7 @@ T22065.hs:12:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of f :: [w] -> Int
                at T22065.hs:13:3-19
-    • In the type ‘[_] -> Int’
-      In the type signature: f :: [_] -> Int
+    • In the type signature: f :: [_] -> Int
       In an equation for ‘foo’:
           foo
             = Apply f x :: forall a. _
@@ -40,8 +39,7 @@ T22065.hs:15:9: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
       Where: ‘w’ is a rigid type variable bound by
                the inferred type of x :: [w]
                at T22065.hs:16:3-17
-    • In the type ‘[_]’
-      In the type signature: x :: [_]
+    • In the type signature: x :: [_]
       In an equation for ‘foo’:
           foo
             = Apply f x :: forall a. _

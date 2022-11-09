@@ -57,6 +57,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Map.Expr
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names

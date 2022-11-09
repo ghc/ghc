@@ -793,7 +793,6 @@ after we allocate a new one.
 
 Note [Tidying multiple names at once]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Consider
 
     > :t (id,id,id)

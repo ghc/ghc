@@ -44,9 +44,9 @@ module GHC.Core.TyCo.Subst
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
         substCoVarBndr,
-        substTyVar, substTyVars, substTyCoVars,
-        substTyCoBndr,
-        substForAllCoBndr,
+        substTyVar, substTyVars, substTyVarToTyVar,
+        substTyCoVars,
+        substTyCoBndr, substForAllCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
   ) where
@@ -54,11 +54,11 @@ module GHC.Core.TyCo.Subst
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type
-   ( mkCastTy, mkAppTy, isCoercionTy, mkTyConApp )
+   ( mkCastTy, mkAppTy, isCoercionTy, mkTyConApp, getTyVar_maybe )
 import {-# SOURCE #-} GHC.Core.Coercion
-   ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
+   ( mkCoVarCo, mkKindCo, mkSelCo, mkTransCo
    , mkNomReflCo, mkSubCo, mkSymCo
-   , mkFunCo, mkForAllCo, mkUnivCo
+   , mkFunCo2, mkForAllCo, mkUnivCo
    , mkAxiomInstCo, mkAppCo, mkGReflCo
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
@@ -375,7 +375,7 @@ extendTvSubst (Subst in_scope ids tvs cvs) tv ty
   = assert (isTyVar tv) $
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
 
-extendTvSubstBinderAndInScope :: Subst -> TyCoBinder -> Type -> Subst
+extendTvSubstBinderAndInScope :: Subst -> PiTyBinder -> Type -> Subst
 extendTvSubstBinderAndInScope subst (Named (Bndr v _)) ty
   = assert (isTyVar v )
     extendTvSubstAndInScope subst v ty
@@ -820,6 +820,16 @@ substTyVar (Subst _ _ tenv _) tv
       Just ty -> ty
       Nothing -> TyVarTy tv
 
+substTyVarToTyVar :: HasDebugCallStack => Subst -> TyVar -> TyVar
+-- Apply the substitution, expecing the result to be a TyVarTy
+substTyVarToTyVar (Subst _ _ tenv _) tv
+  = assert (isTyVar tv) $
+    case lookupVarEnv tenv tv of
+      Just ty -> case getTyVar_maybe ty of
+                    Just tv -> tv
+                    Nothing -> pprPanic "substTyVarToTyVar" (ppr tv $$ ppr ty)
+      Nothing -> tv
+
 substTyVars :: Subst -> [TyVar] -> [Type]
 substTyVars subst = map $ substTyVar subst
 
@@ -884,14 +894,14 @@ subst_co subst co
       = case substForAllCoBndrUnchecked subst tv kind_co of
          (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co
-    go (FunCo r w co1 co2)   = ((mkFunCo r $! go w) $! go co1) $! go co2
+    go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
                                 (go_ty t1)) $! (go_ty t2)
     go (SymCo co)            = mkSymCo $! (go co)
     go (TransCo co1 co2)     = (mkTransCo $! (go co1)) $! (go co2)
-    go (NthCo r d co)        = mkNthCo r d $! (go co)
+    go (SelCo d co)          = mkSelCo d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
     go (KindCo co)           = mkKindCo $! (go co)
@@ -1114,8 +1124,8 @@ cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
     (subst' , tv )   = cloneTyVarBndr subst t uniq
     (subst'', tvs)   = cloneTyVarBndrs subst' ts usupply'
 
-substTyCoBndr :: Subst -> TyCoBinder -> (Subst, TyCoBinder)
-substTyCoBndr subst (Anon af ty)          = (subst, Anon af (substScaledTy subst ty))
+substTyCoBndr :: Subst -> PiTyBinder -> (Subst, PiTyBinder)
+substTyCoBndr subst (Anon ty af)          = (subst, Anon (substScaledTy subst ty) af)
 substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
                                           where
                                             (subst', tv') = substVarBndr subst tv

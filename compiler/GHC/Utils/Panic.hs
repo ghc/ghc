@@ -34,6 +34,7 @@ module GHC.Utils.Panic
    , assertPanic
    , assertPprPanic
    , assertPpr
+   , assertPprMaybe
    , assertPprM
    , massertPpr
 
@@ -315,6 +316,12 @@ assertPpr cond msg a =
   if debugIsOn && not cond
     then withFrozenCallStack (assertPprPanic msg)
     else a
+
+assertPprMaybe :: HasCallStack => Maybe SDoc -> a -> a
+{-# INLINE assertPprMaybe #-}
+assertPprMaybe mb_msg a
+  | debugIsOn, Just msg <- mb_msg = withFrozenCallStack (assertPprPanic msg)
+  | otherwise                     = a
 
 massertPpr :: (HasCallStack, Applicative m) => Bool -> SDoc -> m ()
 {-# INLINE massertPpr #-}

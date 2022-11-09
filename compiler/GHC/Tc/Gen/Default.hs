@@ -12,7 +12,8 @@ import GHC.Prelude
 
 import GHC.Hs
 import GHC.Core.Class
-import GHC.Core.Type ( typeKind )
+import GHC.Core.Type( typeKind )
+
 import GHC.Types.Var( tyVarKind )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad

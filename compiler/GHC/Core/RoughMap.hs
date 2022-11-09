@@ -13,6 +13,9 @@ module GHC.Core.RoughMap
   , RoughMatchLookupTc(..)
   , typeToRoughMatchLookupTc
   , roughMatchTcToLookup
+  , roughMatchTcs
+  , roughMatchTcsLookup
+  , instanceCantMatch
 
     -- * RoughMap
   , RoughMap
@@ -37,11 +40,10 @@ import GHC.Core.Type
 import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Builtin.Types.Prim( cONSTRAINTTyConName, tYPETyConName )
 
 import Control.Monad (join)
 import Data.Data (Data)
-import GHC.Utils.Misc
-import Data.Bifunctor
 import GHC.Utils.Panic
 
 {-
@@ -108,6 +110,10 @@ KnownTc Int, KnownTc Char]`.
 This explains the third clause of the mightMatch specification in Note [Simple Matching Semantics].
 As soon as the lookup key runs out, the remaining instances might match.
 
+This only matters for the data-family case of a FamInstEnv (see Note [Over-saturated matches]
+in GHC.Core.FamInstEnv; it's irrelevantfor ClsInstEnv and for type-family instances.
+But we use RoughMaps for all cases, so we are conservative.
+
 Note [Matching a RoughMap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 The /lookup key/ into a rough map (RoughMatchLookupTc) is slightly
@@ -135,6 +141,7 @@ an insertion key. The second case arises in two situations:
    doesn't match with any of the KnownTC instances so we can discard them all. For example:
     Show a[sk] or Show (a[sk] b[sk]). One place constraints like this arise is when
     typechecking derived instances.
+
 2. The head of the application is a known type family.
    For example: F a[sk]. The application of F is stuck, and because
    F is a type family it won't match any KnownTC instance so it's safe to discard
@@ -222,20 +229,59 @@ types don't match as well.
 
 -}
 
+{- *********************************************************************
+*                                                                      *
+                Rough matching
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Rough matching in class and family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  instance C (Maybe [Tree a]) Bool
+and suppose we are looking up
+     C Bool Bool
+
+We can very quickly rule the instance out, because the first
+argument is headed by Maybe, whereas in the constraint we are looking
+up has first argument headed by Bool.  These "headed by" TyCons are
+called the "rough match TyCons" of the constraint or instance.
+They are used for a quick filter, to check when an instance cannot
+possibly match.
+
+The main motivation is to avoid sucking in whole instance
+declarations that are utterly useless.  See GHC.Core.InstEnv
+Note [ClsInst laziness and the rough-match fields].
+
+INVARIANT: a rough-match TyCons `tc` is always a real, generative tycon,
+like Maybe or Either, including a newtype or a data family, both of
+which are generative. It replies True to `isGenerativeTyCon tc Nominal`.
+
+But it is never
+    - A type synonym
+      E.g. Int and (S Bool) might match
+           if (S Bool) is a synonym for Int
+
+    - A type family (#19336)
+      E.g.   (Just a) and (F a) might match if (F a) reduces to (Just a)
+             albeit perhaps only after 'a' is instantiated.
+-}
+
+
 -- Key for insertion into a RoughMap
 data RoughMatchTc
-  = RM_KnownTc Name   -- INVARIANT: Name refers to a TyCon tc that responds
-                   -- true to `isGenerativeTyCon tc Nominal`. See
-                   -- Note [Rough matching in class and family instances]
-  | RM_WildCard    -- e.g. type variable at the head
+  = RM_KnownTc Name  -- INVARIANT: Name refers to a TyCon tc that responds
+                     -- true to `isGenerativeTyCon tc Nominal`. See
+                     -- Note [Rough matching in class and family instances]
+  | RM_WildCard      -- e.g. type variable at the head
   deriving( Data )
 
 -- Key for lookup into a RoughMap
 -- See Note [Matching a RoughMap]
 data RoughMatchLookupTc
   = RML_KnownTc Name -- ^ The position only matches the specified KnownTc
-  | RML_NoKnownTc -- ^ The position definitely doesn't match any KnownTc
-  | RML_WildCard -- ^ The position can match anything
+  | RML_NoKnownTc    -- ^ The position definitely doesn't match any KnownTc
+  | RML_WildCard     -- ^ The position can match anything
   deriving ( Data )
 
 instance Outputable RoughMatchLookupTc where
@@ -243,31 +289,51 @@ instance Outputable RoughMatchLookupTc where
     ppr RML_NoKnownTc = text "RML_NoKnownTC"
     ppr RML_WildCard = text "_"
 
-roughMatchTcToLookup :: RoughMatchTc -> RoughMatchLookupTc
-roughMatchTcToLookup (RM_KnownTc n) = RML_KnownTc n
-roughMatchTcToLookup RM_WildCard = RML_WildCard
-
 instance Outputable RoughMatchTc where
     ppr (RM_KnownTc nm) = text "KnownTc" <+> ppr nm
     ppr RM_WildCard = text "OtherTc"
+
+instanceCantMatch :: [RoughMatchTc] -> [RoughMatchTc] -> Bool
+-- (instanceCantMatch tcs1 tcs2) returns True if tcs1 cannot
+-- possibly be instantiated to actual, nor vice versa;
+-- False is non-committal
+instanceCantMatch (mt : ts) (ma : as) = itemCantMatch mt ma || instanceCantMatch ts as
+instanceCantMatch _         _         =  False  -- Safe
+
+itemCantMatch :: RoughMatchTc -> RoughMatchTc -> Bool
+itemCantMatch (RM_KnownTc t) (RM_KnownTc a) = t /= a
+itemCantMatch _              _              = False
+
+roughMatchTcToLookup :: RoughMatchTc -> RoughMatchLookupTc
+roughMatchTcToLookup (RM_KnownTc n) = RML_KnownTc n
+roughMatchTcToLookup RM_WildCard = RML_WildCard
 
 isRoughWildcard :: RoughMatchTc -> Bool
 isRoughWildcard RM_WildCard  = True
 isRoughWildcard (RM_KnownTc {}) = False
 
+roughMatchTcs :: [Type] -> [RoughMatchTc]
+roughMatchTcs tys = map typeToRoughMatchTc tys
+
+roughMatchTcsLookup :: [Type] -> [RoughMatchLookupTc]
+roughMatchTcsLookup tys = map typeToRoughMatchLookupTc tys
+
 typeToRoughMatchLookupTc :: Type -> RoughMatchLookupTc
 typeToRoughMatchLookupTc ty
-  | Just (ty', _) <- splitCastTy_maybe ty   = typeToRoughMatchLookupTc ty'
-  | otherwise =
-      case splitAppTys ty of
+  | Just (ty', _) <- splitCastTy_maybe ty
+  = typeToRoughMatchLookupTc ty'
+  | otherwise
+  = case splitAppTys ty of
         -- Case 1: Head of application is a type variable, does not match any KnownTc.
         (TyVarTy {}, _) -> RML_NoKnownTc
+
         (TyConApp tc _, _)
           -- Case 2: Head of application is a known type constructor, hence KnownTc.
-          | not (isTypeFamilyTyCon tc) -> RML_KnownTc $! tyConName tc
+          | not (isTypeFamilyTyCon tc) -> RML_KnownTc $! roughMatchTyConName tc
           -- Case 3: Head is a type family so it's stuck and therefore doesn't match
           -- any KnownTc
           | isTypeFamilyTyCon tc -> RML_NoKnownTc
+
         -- Fallthrough: Otherwise, anything might match this position
         _ -> RML_WildCard
 
@@ -275,10 +341,22 @@ typeToRoughMatchTc :: Type -> RoughMatchTc
 typeToRoughMatchTc ty
   | Just (ty', _) <- splitCastTy_maybe ty   = typeToRoughMatchTc ty'
   | Just (tc,_)   <- splitTyConApp_maybe ty
-  , not (isTypeFamilyTyCon tc)              = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc)
-                                              RM_KnownTc $! tyConName tc
+  , not (isTypeFamilyTyCon tc)              = RM_KnownTc $! roughMatchTyConName tc
     -- See Note [Rough matching in class and family instances]
   | otherwise                               = RM_WildCard
+
+roughMatchTyConName :: TyCon -> Name
+roughMatchTyConName tc
+  | tc_name == cONSTRAINTTyConName
+  = tYPETyConName  -- TYPE and CONSTRAINT are not apart, so they must use
+                   -- the same rough-map key. We arbitrarily use TYPE.
+                   -- See Note [Type and Constraint are not apart]
+                   -- wrinkle (W1) in GHC.Builtin.Types.Prim
+  | otherwise
+  = assertPpr (isGenerativeTyCon tc Nominal) (ppr tc) tc_name
+  where
+    tc_name = tyConName tc
+
 
 -- | Trie of @[RoughMatchTc]@
 --
@@ -288,14 +366,20 @@ typeToRoughMatchTc ty
 -- insert [OtherTc] 2
 -- lookup [OtherTc] == [1,2]
 -- @
-data RoughMap a = RM { rm_empty   :: Bag a
-                     , rm_known   :: DNameEnv (RoughMap a)
-                        -- See Note [InstEnv determinism] in GHC.Core.InstEnv
-                     , rm_unknown :: RoughMap a }
-                | RMEmpty -- an optimised (finite) form of emptyRM
-                          -- invariant: Empty RoughMaps are always represented with RMEmpty
+data RoughMap a
+  = RMEmpty -- An optimised (finite) form of emptyRM
+            -- Invariant: Empty RoughMaps are always represented with RMEmpty
 
-                deriving (Functor)
+  | RM { rm_empty :: Bag a
+           -- Keyed by an empty [RoughMapTc]
+
+       , rm_known :: DNameEnv (RoughMap a)
+           -- Keyed by (RM_KnownTc tc : rm_tcs)
+           -- DNameEnv: see Note [InstEnv determinism] in GHC.Core.InstEnv
+
+       , rm_wild :: RoughMap a }
+           -- Keyed by (RM_WildCard : rm_tcs)
+  deriving (Functor)
 
 instance Outputable a => Outputable (RoughMap a) where
   ppr (RM empty known unknown) =
@@ -323,28 +407,37 @@ lookupRM tcs rm = bagToList (fst $ lookupRM' tcs rm)
 -- See Note [Matches vs Unifiers]
 lookupRM' :: [RoughMatchLookupTc] -> RoughMap a -> (Bag a -- Potential matches
                                                    , [a]) -- Potential unifiers
-lookupRM' _                  RMEmpty = (emptyBag, [])
--- See Note [Simple Matching Semantics] about why we return everything when the lookup
--- key runs out.
-lookupRM' []                 rm      = let m = elemsRM rm
-                                       in (listToBag m, m)
-lookupRM' (RML_KnownTc tc : tcs) rm  =
-  let (common_m, common_u) = lookupRM' tcs (rm_unknown rm)
-      (m, u) = maybe (emptyBag, []) (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
-  in (rm_empty rm `unionBags` common_m `unionBags` m
-     , bagToList (rm_empty rm) ++ common_u ++ u)
--- A RML_NoKnownTC does **not** match any KnownTC but can unify
-lookupRM' (RML_NoKnownTc : tcs)  rm      =
+lookupRM' _ RMEmpty   -- The RoughMap is empty
+  = (emptyBag, [])
 
-  let (u_m, _u_u) = lookupRM' tcs (rm_unknown rm)
-  in (rm_empty rm `unionBags` u_m -- Definitely don't match
+lookupRM' [] rm       -- See Note [Simple Matching Semantics] about why
+  = (listToBag m, m)  -- we return everything when the lookup key runs out
+  where
+    m = elemsRM rm
+
+lookupRM' (RML_KnownTc tc : tcs) rm  =
+  let (common_m, common_u) = lookupRM' tcs (rm_wild rm)
+      (m, u) = maybe (emptyBag, []) (lookupRM' tcs) (lookupDNameEnv (rm_known rm) tc)
+  in ( rm_empty rm `unionBags` common_m `unionBags` m
+     , bagToList (rm_empty rm) ++ common_u ++ u)
+
+-- A RML_NoKnownTC does **not** match any KnownTC but can unify
+lookupRM' (RML_NoKnownTc : tcs) rm =
+  let (u_m, _u_u) = lookupRM' tcs (rm_wild rm)
+  in ( rm_empty rm `unionBags` u_m -- Definitely don't match
      , snd $ lookupRM' (RML_WildCard : tcs) rm) -- But could unify..
 
 lookupRM' (RML_WildCard : tcs)    rm  =
-  let (m, u) = bimap unionManyBags concat (mapAndUnzip (lookupRM' tcs) (eltsDNameEnv $ rm_known rm))
-      (u_m, u_u) = lookupRM' tcs (rm_unknown rm)
-  in (rm_empty rm `unionBags` u_m `unionBags` m
-     , bagToList (rm_empty rm) ++ u_u ++ u)
+--  pprTrace "RM wild" (ppr tcs $$ ppr (eltsDNameEnv (rm_known rm))) $
+  let (m, u)     = foldDNameEnv add_one (emptyBag, []) (rm_known rm)
+      (u_m, u_u) = lookupRM' tcs (rm_wild rm)
+  in ( rm_empty rm `unionBags` u_m `unionBags` m
+     , bagToList (rm_empty rm) ++ u_u ++ u )
+  where
+     add_one :: RoughMap a -> (Bag a, [a]) -> (Bag a, [a])
+     add_one rm ~(m2, u2) = (m1 `unionBags` m2, u1 ++ u2)
+                          where
+                            (m1,u1) = lookupRM' tcs rm
 
 unionRM :: RoughMap a -> RoughMap a -> RoughMap a
 unionRM RMEmpty a = a
@@ -352,7 +445,7 @@ unionRM a RMEmpty = a
 unionRM a b =
   RM { rm_empty = rm_empty a `unionBags` rm_empty b
      , rm_known = plusDNameEnv_C unionRM (rm_known a) (rm_known b)
-     , rm_unknown = rm_unknown a `unionRM` rm_unknown b
+     , rm_wild = rm_wild a `unionRM` rm_wild b
      }
 
 
@@ -360,17 +453,19 @@ insertRM :: [RoughMatchTc] -> a -> RoughMap a -> RoughMap a
 insertRM k v RMEmpty =
     insertRM k v $ RM { rm_empty = emptyBag
                       , rm_known = emptyDNameEnv
-                      , rm_unknown = emptyRM }
+                      , rm_wild = emptyRM }
 insertRM [] v rm@(RM {}) =
     -- See Note [Simple Matching Semantics]
     rm { rm_empty = v `consBag` rm_empty rm }
+
 insertRM (RM_KnownTc k : ks) v rm@(RM {}) =
     rm { rm_known = alterDNameEnv f (rm_known rm) k }
   where
     f Nothing  = Just $ (insertRM ks v emptyRM)
     f (Just m) = Just $ (insertRM ks v m)
+
 insertRM (RM_WildCard : ks) v rm@(RM {}) =
-    rm { rm_unknown = insertRM ks v (rm_unknown rm) }
+    rm { rm_wild = insertRM ks v (rm_wild rm) }
 
 filterRM :: (a -> Bool) -> RoughMap a -> RoughMap a
 filterRM _ RMEmpty = RMEmpty
@@ -378,7 +473,7 @@ filterRM pred rm =
     normalise $ RM {
       rm_empty = filterBag pred (rm_empty rm),
       rm_known = mapDNameEnv (filterRM pred) (rm_known rm),
-      rm_unknown = filterRM pred (rm_unknown rm)
+      rm_wild = filterRM pred (rm_wild rm)
     }
 
 -- | Place a 'RoughMap' in normal form, turning all empty 'RM's into
@@ -399,13 +494,13 @@ filterMatchingRM pred (RM_KnownTc tc : tcs) rm =
     normalise $ RM {
       rm_empty = filterBag pred (rm_empty rm),
       rm_known = alterDNameEnv (join . fmap (dropEmpty . filterMatchingRM pred tcs)) (rm_known rm) tc,
-      rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
+      rm_wild = filterMatchingRM pred tcs (rm_wild rm)
     }
 filterMatchingRM pred (RM_WildCard : tcs) rm =
     normalise $ RM {
       rm_empty = filterBag pred (rm_empty rm),
       rm_known = mapDNameEnv (filterMatchingRM pred tcs) (rm_known rm),
-      rm_unknown = filterMatchingRM pred tcs (rm_unknown rm)
+      rm_wild = filterMatchingRM pred tcs (rm_wild rm)
     }
 
 dropEmpty :: RoughMap a -> Maybe (RoughMap a)
@@ -421,7 +516,7 @@ foldRM f = go
     -- N.B. local worker ensures that the loop can be specialised to the fold
     -- function.
     go z RMEmpty = z
-    go z (RM{ rm_unknown = unk, rm_known = known, rm_empty = empty}) =
+    go z (RM{ rm_wild = unk, rm_known = known, rm_empty = empty}) =
       foldr
         f
         (foldDNameEnv
@@ -442,7 +537,7 @@ nonDetStrictFoldRM f = go
         f
         (nonDetStrictFoldDNameEnv
            (flip go)
-           (go z (rm_unknown rm))
+           (go z (rm_wild rm))
            (rm_known rm)
         )
         (rm_empty rm)

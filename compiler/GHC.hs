@@ -197,7 +197,7 @@ module GHC (
         TyCon,
         tyConTyVars, tyConDataCons, tyConArity,
         isClassTyCon, isTypeSynonymTyCon, isTypeFamilyTyCon, isNewTyCon,
-        isPrimTyCon, isFunTyCon,
+        isPrimTyCon,
         isFamilyTyCon, isOpenFamilyTyCon, isOpenTypeFamilyTyCon,
         tyConClass_maybe,
         synTyConRhs_maybe, synTyConDefn_maybe, tyConKind,

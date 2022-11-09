@@ -3,7 +3,7 @@ import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
-import GHC.Core.Multiplicity ( pattern Many )
+import GHC.Core.Multiplicity ( pattern ManyTy )
 import GHC.Core.Make
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make
@@ -192,7 +192,7 @@ mkLApps v = mkApps (Var v) . map mkLit
 mkACase = mkIfThenElse (mkVarApps (Var scrutf) [scruta])
 
 mkTestId :: Int -> String -> Type -> Id
-mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) Many ty
+mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) ManyTy ty
 
 mkTestIds :: [String] -> [Type] -> [Id]
 mkTestIds ns tys = zipWith3 mkTestId [0..] ns tys

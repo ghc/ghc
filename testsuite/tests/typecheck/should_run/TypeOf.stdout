@@ -9,7 +9,7 @@ SomeTypeRep
 Bool
 Ordering
 Int -> Int
-Proxy Constraint (Eq Int)
+Proxy (CONSTRAINT ('BoxedRep 'Lifted)) (Eq Int)
 Proxy * (Int,Int)
 Proxy Symbol "hello world"
 Proxy Natural 1
@@ -24,4 +24,4 @@ Proxy Levity 'Lifted
 Proxy Levity 'Unlifted
 Proxy RuntimeRep ('BoxedRep 'Lifted)
 Proxy (Natural,Symbol) ('(,) Natural Symbol 1 "hello")
-Proxy (* -> * -> Constraint) ((~~) * *)
+Proxy (* -> * -> CONSTRAINT ('BoxedRep 'Lifted)) ((~~) * *)

@@ -33,7 +33,7 @@ import GHC.Rename.Unbound ( isUnboundName )
 import GHC.Rename.Module  ( rnSrcDecls, findSplice )
 import GHC.Rename.Pat     ( rnPat )
 import GHC.Types.Error
-import GHC.Types.Basic    ( TopLevelFlag, isTopLevel )
+import GHC.Types.Basic    ( TopLevelFlag, isTopLevel, maxPrec )
 import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Utils.Outputable
 import GHC.Unit.Module
@@ -673,22 +673,34 @@ rnSpliceType splice
        = ( makePending UntypedTypeSplice name rn_splice
          , HsSpliceTy (HsUntypedSpliceNested name) rn_splice)
 
+    run_type_splice :: HsUntypedSplice GhcRn -> RnM (HsType GhcRn, FreeVars)
     run_type_splice rn_splice
       = do { traceRn "rnSpliceType: untyped type splice" empty
            ; (hs_ty2, mod_finalizers) <-
                 runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
            ; (hs_ty3, fvs) <- do { let doc = SpliceTypeCtx hs_ty2
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
-                                    -- checkNoErrs: see Note [Renamer errors]
+                                         -- checkNoErrs: see Note [Renamer errors]
+
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsParTy noAnn
-                              $ flip HsSpliceTy rn_splice
-                              . HsUntypedSpliceTop (ThModFinalizers mod_finalizers)
-                                  <$> hs_ty3
+           ; return ( HsSpliceTy (HsUntypedSpliceTop (ThModFinalizers mod_finalizers)
+                                                     (mb_paren hs_ty3))
+                                 rn_splice
                     , fvs
                     ) }
               -- Wrap the result of the splice in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
+
+    -- Wrap a non-atomic result in HsParTy parens;
+    -- but not if it's atomic to avoid double parens for operators
+    -- This is to account for, say  foo :: $(blah) -> Int
+    -- when we want $(blah) to expand to (this -> that), with parens.
+    -- Sadly, it's awkward add precisely the correct parens, because
+    -- that depends on the context.
+    mb_paren :: LHsType GhcRn -> LHsType GhcRn
+    mb_paren lhs_ty@(L loc hs_ty)
+      | hsTypeNeedsParens maxPrec hs_ty = L loc (HsParTy noAnn lhs_ty)
+      | otherwise                       = lhs_ty
 
 {- Note [Partial Type Splices]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

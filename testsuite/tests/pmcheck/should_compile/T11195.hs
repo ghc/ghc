@@ -5,6 +5,7 @@ module T11195 where
 import GHC.Core.TyCo.Rep
 import GHC.Core.Coercion
 import GHC.Core.Type hiding( substTyVarBndr, substTy, extendTCvSubst )
+import GHC.Core.TyCo.Compare
 import GHC.Core.InstEnv
 import GHC.Core.Coercion.Axiom
 import GHC.Tc.Utils.TcType       ( exactTyCoVarsOfType )
@@ -61,8 +62,8 @@ opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
 
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
-opt_trans_rule is in_co1@(NthCo r1 d1 co1) in_co2@(NthCo r2 d2 co2)
-  | d1 == d2
+opt_trans_rule is in_co1@(SelCo sel1 co1) in_co2@(SelCo sel2 co2)
+  | sel1 == sel2
   , co1 `compatible_co` co2 = undefined
 
 opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)

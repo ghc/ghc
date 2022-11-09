@@ -77,12 +77,11 @@ import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
-import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
+import GHC.Core.Type    ( Type, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet
                         , typeHasFixedRuntimeRep
                         )
-import GHC.Core.Multiplicity     ( pattern Many )
-import GHC.Core.DataCon ( dataConOrigResTy )
+import GHC.Core.Multiplicity     ( pattern ManyTy )
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -464,7 +463,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
-  , Many <- idMult case_bndr     -- See Note [Floating linear case]
+  , ManyTy <- idMult case_bndr     -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
@@ -661,21 +660,20 @@ lvlMFE env strict_ctxt ann_expr
   | escapes_value_lam
   , not expr_ok_for_spec -- Boxing/unboxing isn't worth it for cheap expressions
                          -- See Note [Test cheapness with exprOkForSpeculation]
-  , Just (tc, _) <- splitTyConApp_maybe expr_ty
-  , Just dc <- boxingDataCon_maybe tc
-  , let dc_res_ty = dataConOrigResTy dc  -- No free type variables
-        [bx_bndr, ubx_bndr] = mkTemplateLocals [dc_res_ty, expr_ty]
+  , BI_Box { bi_data_con = box_dc, bi_inst_con = boxing_expr
+           , bi_boxed_type = box_ty } <- boxingDataCon expr_ty
+  , let [bx_bndr, ubx_bndr] = mkTemplateLocals [box_ty, expr_ty]
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let l1r       = incMinorLvlFrom rhs_env
              float_rhs = mkLams abs_vars_w_lvls $
-                         Case expr1 (stayPut l1r ubx_bndr) dc_res_ty
-                             [Alt DEFAULT [] (mkConApp dc [Var ubx_bndr])]
+                         Case expr1 (stayPut l1r ubx_bndr) box_ty
+                             [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
        ; var <- newLvlVar float_rhs Nothing is_mk_static
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
-                             [Alt (DataAlt dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
+                             [Alt (DataAlt box_dc) [stayPut l1u ubx_bndr] (Var ubx_bndr)]
        ; return (Let (NonRec (TB var (FloatMe dest_lvl)) float_rhs)
                      use_expr) }
 
@@ -1731,7 +1729,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq Many rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq ManyTy rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

@@ -450,13 +450,13 @@ unariseMulti_maybe rho dc args ty_args
 
 -- Doesn't return void args.
 unariseRubbish_maybe :: Literal -> Maybe [OutStgArg]
-unariseRubbish_maybe (LitRubbish rep)
+unariseRubbish_maybe (LitRubbish torc rep)
   | [prep] <- preps
   , not (isVoidRep prep)
   = Nothing   -- Single, non-void PrimRep. Nothing to do!
 
   | otherwise -- Multiple reps, possibly with VoidRep. Eliminate via elimCase
-  = Just [ StgLitArg (LitRubbish (primRepToRuntimeRep prep))
+  = Just [ StgLitArg (LitRubbish torc (primRepToRuntimeRep prep))
          | prep <- preps, not (isVoidRep prep) ]
   where
     preps = runtimeRepPrimRep (text "unariseRubbish_maybe") rep
@@ -688,13 +688,13 @@ mkUbxSum dc ty_args args0
 -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
-ubxSumRubbishArg PtrLiftedSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-ubxSumRubbishArg PtrUnliftedSlot  = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
-ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
-ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
-ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
-ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish vec_rep)
+ubxSumRubbishArg PtrLiftedSlot   = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg PtrUnliftedSlot = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+ubxSumRubbishArg WordSlot        = StgLitArg (LitNumber LitNumWord 0)
+ubxSumRubbishArg Word64Slot      = StgLitArg (LitNumber LitNumWord64 0)
+ubxSumRubbishArg FloatSlot       = StgLitArg (LitFloat 0)
+ubxSumRubbishArg DoubleSlot      = StgLitArg (LitDouble 0)
+ubxSumRubbishArg (VecSlot n e)   = StgLitArg (LitRubbish TypeLike vec_rep)
   where vec_rep = primRepToRuntimeRep (VecRep n e)
 
 --------------------------------------------------------------------------------

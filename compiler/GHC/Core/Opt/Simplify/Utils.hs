@@ -524,7 +524,7 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 -- should be scaled if it commutes with E. This appears, in particular, in the
 -- case-of-case transformation.
 contHoleScaling :: SimplCont -> Mult
-contHoleScaling (Stop _ _ _) = One
+contHoleScaling (Stop _ _ _) = OneTy
 contHoleScaling (CastIt _ k) = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
   = idMult id `mkMultMul` contHoleScaling k
@@ -681,7 +681,7 @@ mkArgInfo env rule_base fun cont
       | Just (_, fun_ty') <- splitForAllTyCoVar_maybe fun_ty
       = add_type_strictness fun_ty' dmds     -- Look through foralls
 
-      | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd'
              | Just Unlifted <- typeLevity_maybe arg_ty
@@ -2544,7 +2544,7 @@ mkCase2 mode scrut bndr alts_ty alts
       _                 -> True
   , sm_case_folding mode
   , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
-  = do { bndr' <- newId (fsLit "lwild") Many (exprType scrut')
+  = do { bndr' <- newId (fsLit "lwild") ManyTy (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives

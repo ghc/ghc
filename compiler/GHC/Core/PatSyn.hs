@@ -389,7 +389,7 @@ mkPatSyn :: Name
          -> [FieldLabel]         -- ^ Names of fields for
                                  --   a record pattern synonym
          -> PatSyn
- -- NB: The univ and ex vars are both in TyBinder form and TyVar form for
+ -- NB: The univ and ex vars are both in PiTyVarBinder form and TyVar form for
  -- convenience. All the TyBinders should be Named!
 mkPatSyn name declared_infix
          (univ_tvs, req_theta)
@@ -508,6 +508,6 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , pprType sigma_ty ]
   where
     sigma_ty = mkInvisForAllTys ex_tvs $
-               mkInvisFunTysMany prov_theta $
+               mkInvisFunTys prov_theta $
                mkVisFunTysMany orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

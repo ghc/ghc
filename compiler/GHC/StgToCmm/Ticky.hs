@@ -886,7 +886,7 @@ showTypeCategory ty
   Just (tycon, _) ->
     let anyOf us = getUnique tycon `elem` us in
     case () of
-      _ | anyOf [funTyConKey] -> '>'
+      _ | anyOf [fUNTyConKey] -> '>'
         | anyOf [charTyConKey] -> 'C'
         | anyOf [charPrimTyConKey] -> 'c'
         | anyOf [doubleTyConKey] -> 'D'

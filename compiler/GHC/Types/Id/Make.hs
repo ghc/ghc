@@ -17,7 +17,7 @@ have a standard form, namely:
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Types.Id.Make (
-        mkDictFunId, mkDictFunTy, mkDictSelId, mkDictSelRhs,
+        mkDictFunId, mkDictSelId, mkDictSelRhs,
 
         mkFCallId,
 
@@ -33,7 +33,10 @@ module GHC.Types.Id.Make (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, coerceId,
-        proxyHashId, noinlineId, noinlineIdName, nospecId, nospecIdName,
+        proxyHashId,
+        nospecId, nospecIdName,
+        noinlineId, noinlineIdName,
+        noinlineConstraintId, noinlineConstraintIdName,
         coerceName, leftSectionName, rightSectionName,
     ) where
 
@@ -71,7 +74,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import GHC.Types.Var (VarBndr(Bndr))
+import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike)
 
 import GHC.Tc.Utils.TcType as TcType
 
@@ -160,7 +163,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId, nospecId]
+magicIds = [lazyId, oneShotId, noinlineId, noinlineConstraintId, nospecId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -308,14 +311,15 @@ for symmetry with the way data instances are handled.
 
 Note [Newtype datacons]
 ~~~~~~~~~~~~~~~~~~~~~~~
-The "data constructor" for a newtype should always be vanilla.  At one
-point this wasn't true, because the newtype arising from
+The "data constructor" for a newtype should have no existentials. It's
+not quite a "vanilla" data constructor, because the newtype arising from
      class C a => D a
-looked like
-       newtype T:D a = D:D (C a)
-so the data constructor for T:C had a single argument, namely the
-predicate (C a).  But now we treat that as an ordinary argument, not
-part of the theta-type, so all is well.
+looks like
+       newtype T:D a = C:D (C a)
+so the data constructor for T:C has a single argument, namely the
+predicate (C a).  That ends up in the dcOtherTheta for the data con,
+which makes it not vanilla.  So the assert just tests for existentials.
+The rest is checked by having a singleton arg_tys.
 
 Note [Newtype workers]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -472,7 +476,7 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkInvisForAllTys tyvars $
-             mkInvisFunTyMany (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             mkFunctionType ManyTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
              scaledThing (getNth arg_tys val_index)
                -- See Note [Type classes and linear types]
 
@@ -589,8 +593,10 @@ mkDataConWorkId wkr_name data_con
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
+
     ----------- Workers for newtypes --------------
     univ_tvs = dataConUnivTyVars data_con
+    ex_tcvs  = dataConExTyCoVars data_con
     arg_tys  = dataConRepArgTys  data_con  -- Should be same as dataConOrigArgTys
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
@@ -598,8 +604,8 @@ mkDataConWorkId wkr_name data_con
                   `setUnfoldingInfo`      newtype_unf
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
-    newtype_unf  = assertPpr (isVanillaDataCon data_con && isSingleton arg_tys)
-                             (ppr data_con) $
+    newtype_unf  = assertPpr (null ex_tcvs && isSingleton arg_tys)
+                             (ppr data_con)
                               -- Note [Newtype datacons]
                    mkCompulsoryUnfolding $
                    mkLams univ_tvs $ Lam id_arg1 $
@@ -740,10 +746,10 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
 
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
-      = dataConFullSig data_con
+                 = dataConFullSig data_con
     stupid_theta = dataConStupidTheta data_con
     wrap_tvs     = dataConUserTyVars data_con
-    res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
+    res_ty_args  = dataConResRepTyArgs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConWrapperType data_con
@@ -781,16 +787,16 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
         (not new_tycon
                      -- (Most) newtypes have only a worker, with the exception
                      -- of some newtypes written with GADT syntax. See below.
-         && (any isBanged (ev_ibangs ++ arg_ibangs)
+         && (any isBanged (ev_ibangs ++ arg_ibangs)))
                      -- Some forcing/unboxing (includes eq_spec)
-             || (not $ null eq_spec))) -- GADT
       || isFamInstTyCon tycon -- Cast result
-      || dataConUserTyVarsArePermuted data_con
+      || dataConUserTyVarsNeedWrapper data_con
                      -- If the data type was written with GADT syntax and
                      -- orders the type variables differently from what the
                      -- worker expects, it needs a data con wrapper to reorder
                      -- the type variables.
                      -- See Note [Data con wrappers and GADT syntax].
+                     -- NB: All GADTs return true from this function
       || not (null stupid_theta)
                      -- If the data constructor has a datatype context,
                      -- we need a wrapper in order to drop the stupid arguments.
@@ -1329,7 +1335,7 @@ mkFCallId uniq fcall ty
            `setCprSigInfo` topCprSig
 
     (bndrs, _) = tcSplitPiTys ty
-    arity      = count isAnonTyCoBinder bndrs
+    arity      = count isAnonPiTyBinder bndrs
     strict_sig = mkVanillaDmdSig arity topDiv
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't
@@ -1365,11 +1371,7 @@ mkDictFunId dfun_name tvs theta clas tys
                       dfun_ty
   where
     is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = mkDictFunTy tvs theta clas tys
-
-mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
-mkDictFunTy tvs theta clas tys
- = mkSpecSigmaTy tvs theta (mkClassPred clas tys)
+    dfun_ty = TcType.tcMkDFunSigmaTy tvs theta (mkClassPred clas tys)
 
 {-
 ************************************************************************
@@ -1405,10 +1407,9 @@ leftSectionName   = mkWiredInIdName gHC_PRIM  (fsLit "leftSection")    leftSecti
 rightSectionName  = mkWiredInIdName gHC_PRIM  (fsLit "rightSection")   rightSectionKey    rightSectionId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName, nospecIdName :: Name
+lazyIdName, oneShotName, nospecIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
 nospecIdName      = mkWiredInIdName gHC_MAGIC (fsLit "nospec")         nospecIdKey        nospecId
 
 ------------------------------------------------
@@ -1471,12 +1472,28 @@ lazyId = pcMiscPrelId lazyIdName ty info
     info = noCafIdInfo
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
+------------------------------------------------
+noinlineIdName, noinlineConstraintIdName :: Name
+noinlineIdName           = mkWiredInIdName gHC_MAGIC (fsLit "noinline")
+                                           noinlineIdKey noinlineId
+noinlineConstraintIdName = mkWiredInIdName gHC_MAGIC (fsLit "noinlineConstraint")
+                                           noinlineConstraintIdKey noinlineConstraintId
+
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo
-    ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] $
+          mkVisFunTyMany alphaTy alphaTy
 
+noinlineConstraintId :: Id -- See Note [noinlineId magic]
+noinlineConstraintId = pcMiscPrelId noinlineConstraintIdName ty info
+  where
+    info = noCafIdInfo
+    ty   = mkSpecForAllTys [alphaConstraintTyVar] $
+           mkFunTy visArgConstraintLike ManyTy alphaTy alphaConstraintTy
+
+------------------------------------------------
 nospecId :: Id -- See Note [nospecId magic]
 nospecId = pcMiscPrelId nospecIdName ty info
   where
@@ -1562,8 +1579,8 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
     mult1 = mkTyVarTy multiplicityTyVar1
     mult2 = mkTyVarTy multiplicityTyVar2
 
-    [f,x,y] = mkTemplateLocals [ mkVisFunTys [ Scaled mult1 openAlphaTy
-                                             , Scaled mult2 openBetaTy ] openGammaTy
+    [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
+                                                , Scaled mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
     xmult = setIdMult x mult1
     ymult = setIdMult y mult2
@@ -1586,7 +1603,7 @@ coerceId = pcMiscPrelId coerceName ty info
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
                                  , Bndr av SpecifiedSpec
                                  , Bndr bv SpecifiedSpec ] $
-                mkInvisFunTyMany eqRTy $
+                mkInvisFunTy eqRTy $
                 mkVisFunTyMany a b
 
     bndrs@[rv,av,bv] = mkTemplateKiTyVar runtimeRepTy
@@ -1723,20 +1740,31 @@ But actually we give 'noinline' a wired-in name for three distinct reasons:
      noinline foo x xs
    where x::Int, will naturally desugar to
       noinline @Int (foo @Int dEqInt) x xs
-   But now it's entirely possible htat (foo @Int dEqInt) will inline foo,
+   But now it's entirely possible that (foo @Int dEqInt) will inline foo,
    since 'foo' is no longer a lone variable -- see #18995
 
    Solution: in the desugarer, rewrite
       noinline (f x y)  ==>  noinline f x y
    This is done in GHC.HsToCore.Utils.mkCoreAppDs.
+   This is only needed for noinlineId, not noInlineConstraintId (wrinkle
+   (W1) below), because the latter never shows up in user code.
 
-Note that noinline as currently implemented can hide some simplifications since
-it hides strictness from the demand analyser. Specifically, the demand analyser
-will treat 'noinline f x' as lazy in 'x', even if the demand signature of 'f'
-specifies that it is strict in its argument. We considered fixing this this by adding a
-special case to the demand analyser to address #16588. However, the special
-case seemed like a large and expensive hammer to address a rare case and
-consequently we rather opted to use a more minimal solution.
+Wrinkles
+
+(W1) Sometimes case (2) above needs to apply `noinline` to a type of kind
+     Constraint; e.g.
+                    noinline @(Eq Int) $dfEqInt
+     We don't have type-or-kind polymorphism, so we simply have two `inline`
+     Ids, namely `noinlineId` and `noinlineConstraintId`.
+
+(W2) Note that noinline as currently implemented can hide some simplifications
+     since it hides strictness from the demand analyser. Specifically, the
+     demand analyser will treat 'noinline f x' as lazy in 'x', even if the
+     demand signature of 'f' specifies that it is strict in its argument. We
+     considered fixing this this by adding a special case to the demand
+     analyser to address #16588. However, the special case seemed like a large
+     and expensive hammer to address a rare case and consequently we rather
+     opted to use a more minimal solution.
 
 Note [nospecId magic]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1822,7 +1850,7 @@ unboxedUnitExpr :: CoreExpr
 unboxedUnitExpr = Var (dataConWorkId unboxedUnitDataCon)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey ManyTy unboxedUnitTy
 
 coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"

@@ -813,7 +813,7 @@ ppType (TyUTup ts) = "(mkTupleTy Unboxed "
                      ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkVisFunTyMany ("   ++ ppType s ++ ") (" ++ ppType d ++ "))"
-ppType (TyC s d) = "(mkInvisFunTyMany (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
+ppType (TyC s d) = "(mkInvisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 
 ppType other
    = error ("ppType: can't handle: " ++ show other ++ "\n")

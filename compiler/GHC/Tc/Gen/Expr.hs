@@ -69,6 +69,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Core.TyCon
 import GHC.Core.Type
+import GHC.Core.Coercion( mkSymCo )
 import GHC.Tc.Types.Evidence
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -331,7 +332,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
              -- See Note [Typechecking data constructors] in GHC.Tc.Gen.Head
              -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
-             act_res_ty = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
+             act_res_ty = mkScaledFunTys missing_tys (mkTupleTy1 boxity arg_tys)
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 
@@ -648,7 +649,7 @@ arithSeqEltType :: Maybe (SyntaxExpr GhcRn) -> ExpRhoType
 arithSeqEltType Nothing res_ty
   = do { res_ty <- expTypeToType res_ty
        ; (coi, elt_ty) <- matchExpectedListTy res_ty
-       ; return (mkWpCastN coi, One, elt_ty, Nothing) }
+       ; return (mkWpCastN coi, OneTy, elt_ty, Nothing) }
 arithSeqEltType (Just fl) res_ty
   = do { ((elt_mult, elt_ty), fl')
            <- tcSyntaxOp ListOrigin fl [SynList] res_ty $
@@ -847,7 +848,7 @@ tcSynArgA orig op sigma_ty arg_shapes res_shape thing_inside
            ; (list_co, elt_ty)   <- matchExpectedListTy rho_ty
                -- list_co :: [elt_ty] ~N rho_ty
            ; result <- thing_inside [elt_ty]
-           ; return (result, mkWpCastN (mkTcSymCo list_co) <.> inst_wrap) }
+           ; return (result, mkWpCastN (mkSymCo list_co) <.> inst_wrap) }
     tc_syn_arg _ (SynFun {}) _
       = pprPanic "tcSynArgA hits a SynFun" (ppr orig)
     tc_syn_arg res_ty (SynType the_ty) thing_inside
@@ -1182,8 +1183,8 @@ desugarRecordUpd record_expr rbnds res_ty
           -- the record to disambiguate its fields, so we must infer the record
           -- type here before we can desugar. See Wrinkle [Disambiguating fields]
           -- in Note [Record Updates].
-       ; ((_, record_rho), _lie) <- captureConstraints $  -- see (1) below
-                                    tcScalingUsage Many $ -- see (2) below
+       ; ((_, record_rho), _lie) <- captureConstraints    $ -- see (1) below
+                                    tcScalingUsage ManyTy $ -- see (2) below
                                     tcInferRho record_expr
 
             -- (1)
@@ -1593,7 +1594,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        Many field_ty (locA loc)
+                                        ManyTy field_ty (locA loc)
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

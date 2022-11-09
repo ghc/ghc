@@ -66,16 +66,30 @@ module GHC.Types.Var (
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
-        -- * ArgFlags
-        ArgFlag(Invisible,Required,Specified,Inferred),
-        AnonArgFlag(..), Specificity(..),
-        isVisibleArgFlag, isInvisibleArgFlag, isInferredArgFlag,
-        sameVis,
+        -- * ForAllTyFlags
+        ForAllTyFlag(Invisible,Required,Specified,Inferred),
+        Specificity(..),
+        isVisibleForAllTyFlag, isInvisibleForAllTyFlag, isInferredForAllTyFlag,
+
+        -- * FunTyFlag
+        FunTyFlag(..), isVisibleFunArg, isInvisibleFunArg, isFUNArg,
+        mkFunTyFlag, visArg, invisArg,
+        visArgTypeLike, visArgConstraintLike,
+        invisArgTypeLike, invisArgConstraintLike,
+        funTyFlagResultTypeOrConstraint,
+        TypeOrConstraint(..),  -- Re-export this: it's an argument of FunTyFlag
+
+        -- * PiTyBinder
+        PiTyBinder(..), PiTyVarBinder,
+        isInvisiblePiTyBinder, isVisiblePiTyBinder,
+        isTyBinder, isNamedPiTyBinder, isAnonPiTyBinder,
+        namedPiTyBinder_maybe, anonPiTyBinderType_maybe, piTyBinderType,
 
         -- * TyVar's
-        VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder, ReqTVBinder,
-        binderVar, binderVars, binderArgFlag, binderType,
-        mkTyCoVarBinder, mkTyCoVarBinders,
+        VarBndr(..), ForAllTyBinder, TyVarBinder,
+        InvisTyBinder, InvisTVBinder, ReqTyBinder, ReqTVBinder,
+        binderVar, binderVars, binderFlag, binderFlags, binderType,
+        mkForAllTyBinder, mkForAllTyBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder,
         tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
@@ -96,7 +110,7 @@ module GHC.Types.Var (
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
+import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
@@ -105,6 +119,7 @@ import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
+import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
@@ -429,20 +444,20 @@ updateVarTypeM upd var
 
 {- *********************************************************************
 *                                                                      *
-*                   ArgFlag
+*                   ForAllTyFlag
 *                                                                      *
 ********************************************************************* -}
 
--- | Argument Flag
+-- | ForAllTyFlag
 --
 -- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
-data ArgFlag = Invisible Specificity
-             | Required
+-- See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
+data ForAllTyFlag = Invisible Specificity
+                  | Required
   deriving (Eq, Ord, Data)
-  -- (<) on ArgFlag means "is less visible than"
+  -- (<) on ForAllTyFlag means "is less visible than"
 
 -- | Whether an 'Invisible' argument may appear in source Haskell.
 data Specificity = InferredSpec
@@ -453,35 +468,27 @@ data Specificity = InferredSpec
                    -- required.
   deriving (Eq, Ord, Data)
 
-pattern Inferred, Specified :: ArgFlag
+pattern Inferred, Specified :: ForAllTyFlag
 pattern Inferred  = Invisible InferredSpec
 pattern Specified = Invisible SpecifiedSpec
 
 {-# COMPLETE Required, Specified, Inferred #-}
 
--- | Does this 'ArgFlag' classify an argument that is written in Haskell?
-isVisibleArgFlag :: ArgFlag -> Bool
-isVisibleArgFlag af = not (isInvisibleArgFlag af)
+-- | Does this 'ForAllTyFlag' classify an argument that is written in Haskell?
+isVisibleForAllTyFlag :: ForAllTyFlag -> Bool
+isVisibleForAllTyFlag af = not (isInvisibleForAllTyFlag af)
 
--- | Does this 'ArgFlag' classify an argument that is not written in Haskell?
-isInvisibleArgFlag :: ArgFlag -> Bool
-isInvisibleArgFlag (Invisible {}) = True
-isInvisibleArgFlag Required       = False
+-- | Does this 'ForAllTyFlag' classify an argument that is not written in Haskell?
+isInvisibleForAllTyFlag :: ForAllTyFlag -> Bool
+isInvisibleForAllTyFlag (Invisible {}) = True
+isInvisibleForAllTyFlag Required       = False
 
-isInferredArgFlag :: ArgFlag -> Bool
--- More restrictive than isInvisibleArgFlag
-isInferredArgFlag (Invisible InferredSpec) = True
-isInferredArgFlag _                        = False
+isInferredForAllTyFlag :: ForAllTyFlag -> Bool
+-- More restrictive than isInvisibleForAllTyFlag
+isInferredForAllTyFlag (Invisible InferredSpec) = True
+isInferredForAllTyFlag _                        = False
 
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-sameVis :: ArgFlag -> ArgFlag -> Bool
-sameVis Required      Required      = True
-sameVis (Invisible _) (Invisible _) = True
-sameVis _             _             = False
-
-instance Outputable ArgFlag where
+instance Outputable ForAllTyFlag where
   ppr Required  = text "[req]"
   ppr Specified = text "[spec]"
   ppr Inferred  = text "[infrd]"
@@ -496,7 +503,7 @@ instance Binary Specificity where
       0 -> return SpecifiedSpec
       _ -> return InferredSpec
 
-instance Binary ArgFlag where
+instance Binary ForAllTyFlag where
   put_ bh Required  = putByte bh 0
   put_ bh Specified = putByte bh 1
   put_ bh Inferred  = putByte bh 2
@@ -508,54 +515,111 @@ instance Binary ArgFlag where
       1 -> return Specified
       _ -> return Inferred
 
--- | The non-dependent version of 'ArgFlag'.
--- See Note [AnonArgFlag]
--- Appears here partly so that it's together with its friends ArgFlag
+{- *********************************************************************
+*                                                                      *
+*                   FunTyFlag
+*                                                                      *
+********************************************************************* -}
+
+-- | The non-dependent version of 'ForAllTyFlag'.
+-- See Note [FunTyFlag]
+-- Appears here partly so that it's together with its friends ForAllTyFlag
 -- and ForallVisFlag, but also because it is used in IfaceType, rather
 -- early in the compilation chain
-data AnonArgFlag
-  = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
-              --   The argument is visible in source code.
-  | InvisArg  -- ^ Used for @(=>)@: a non-dependent predicate arrow.
-              --   The argument is invisible in source code.
+data FunTyFlag
+  = FTF_T_T           -- (->)  Type -> Type
+  | FTF_T_C           -- (-=>) Type -> Constraint
+  | FTF_C_T           -- (=>)  Constraint -> Type
+  | FTF_C_C           -- (==>) Constraint -> Constraint
   deriving (Eq, Ord, Data)
 
-instance Outputable AnonArgFlag where
-  ppr VisArg   = text "[vis]"
-  ppr InvisArg = text "[invis]"
+instance Outputable FunTyFlag where
+  ppr FTF_T_T  = text "[->]"
+  ppr FTF_T_C  = text "[-=>]"
+  ppr FTF_C_T  = text "[=>]"
+  ppr FTF_C_C  = text "[==>]"
 
-instance Binary AnonArgFlag where
-  put_ bh VisArg   = putByte bh 0
-  put_ bh InvisArg = putByte bh 1
+instance Binary FunTyFlag where
+  put_ bh FTF_T_T = putByte bh 0
+  put_ bh FTF_T_C = putByte bh 1
+  put_ bh FTF_C_T = putByte bh 2
+  put_ bh FTF_C_C = putByte bh 3
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> return VisArg
-      _ -> return InvisArg
+      0 -> return FTF_T_T
+      1 -> return FTF_T_C
+      2 -> return FTF_C_T
+      _ -> return FTF_C_C
 
-{- Note [AnonArgFlag]
+mkFunTyFlag :: TypeOrConstraint -> TypeOrConstraint -> FunTyFlag
+mkFunTyFlag TypeLike       torc = visArg torc
+mkFunTyFlag ConstraintLike torc = invisArg torc
+
+visArg :: TypeOrConstraint -> FunTyFlag
+visArg TypeLike       = FTF_T_T
+visArg ConstraintLike = FTF_T_C
+
+visArgTypeLike :: FunTyFlag
+visArgTypeLike = FTF_T_T
+
+visArgConstraintLike :: FunTyFlag
+visArgConstraintLike = FTF_T_C
+
+invisArg :: TypeOrConstraint -> FunTyFlag
+invisArg TypeLike       = FTF_C_T
+invisArg ConstraintLike = FTF_C_C
+
+invisArgTypeLike :: FunTyFlag
+invisArgTypeLike = FTF_C_T
+
+invisArgConstraintLike :: FunTyFlag
+invisArgConstraintLike = FTF_C_C
+
+isInvisibleFunArg :: FunTyFlag -> Bool
+isInvisibleFunArg af = not (isVisibleFunArg af)
+
+isVisibleFunArg :: FunTyFlag -> Bool
+isVisibleFunArg FTF_T_T = True
+isVisibleFunArg FTF_T_C = True
+isVisibleFunArg _       = False
+
+isFUNArg :: FunTyFlag -> Bool
+-- This one, FUN, or (->), has an extra multiplicity argument
+isFUNArg FTF_T_T = True
+isFUNArg _       = False
+
+funTyFlagResultTypeOrConstraint :: FunTyFlag -> TypeOrConstraint
+-- Whether it /returns/ a type or a constraint
+funTyFlagResultTypeOrConstraint FTF_T_T = TypeLike
+funTyFlagResultTypeOrConstraint FTF_C_T = TypeLike
+funTyFlagResultTypeOrConstraint _       = ConstraintLike
+
+{- Note [FunTyFlag]
 ~~~~~~~~~~~~~~~~~~~~~
-AnonArgFlag is used principally in the FunTy constructor of Type.
-  FunTy VisArg   t1 t2   means   t1 -> t2
-  FunTy InvisArg t1 t2   means   t1 => t2
+FunTyFlag is used principally in the FunTy constructor of Type.
+  FunTy FTF_T_T t1 t2   means   t1 -> t2
+  FunTy FTF_C_T t1 t2   means   t1 => t2
+  FunTy FTF_T_C t1 t2   means   t1 -=> t2
+  FunTy FTF_C_C t1 t2   means   t1 ==> t2
 
-However, the AnonArgFlag in a FunTy is just redundant, cached
+However, the FunTyFlag in a FunTy is just redundant, cached
 information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
-  * if (isPredTy t1 = True)  then af = InvisArg
-  * if (isPredTy t1 = False) then af = VisArg
+  ---------------------------------------------
+  (isPredTy t1)   (isPredTy ty)     FunTyFlag
+  ---------------------------------------------
+     False           False         FTF_T_T
+     False           True          FTF_T_C
+     True            False         FTF_C_T
+     True            True          FTF_C_C
 where isPredTy is defined in GHC.Core.Type, and sees if t1's
-kind is Constraint.  See GHC.Core.TyCo.Rep
-Note [Types for coercions, predicates, and evidence]
+kind is Constraint.  See GHC.Core.Type.chooseFunTyFlag, and
+GHC.Core.TyCo.Rep Note [Types for coercions, predicates, and evidence]
 
-GHC.Core.Utils.mkFunctionType :: Mult -> Type -> Type -> Type
-uses isPredTy to decide the AnonArgFlag for the FunTy.
-
-The term (Lam b e), and coercion (FunCo co1 co2) don't carry
-AnonArgFlags; instead they use mkFunctionType when we want to
-get their types; see mkLamType and coercionLKind/RKind resp.
-This is just an engineering choice; we could cache here too
-if we wanted.
+The term (Lam b e) donesn't carry an FunTyFlag; instead it uses
+mkFunctionType when we want to get its types; see mkLamType.  This is
+just an engineering choice; we could cache here too if we wanted.
 
 Why bother with all this? After all, we are in Core, where (=>) and
 (->) behave the same.  We maintain this distinction throughout Core so
@@ -591,7 +655,7 @@ Note [Types for coercions, predicates, and evidence]
 
 {- *********************************************************************
 *                                                                      *
-*                   VarBndr, TyCoVarBinder
+*                   VarBndr, ForAllTyBinder
 *                                                                      *
 ********************************************************************* -}
 
@@ -600,29 +664,29 @@ Note [Types for coercions, predicates, and evidence]
 VarBndr is polymorphic in both var and visibility fields.
 Currently there are nine different uses of 'VarBndr':
 
-* Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
+* Var.ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
   Binder of a forall-type; see ForAllTy in GHC.Core.TyCo.Rep
 
-* Var.TyVarBinder = VarBndr TyVar ArgFlag
-  Subset of TyCoVarBinder when we are sure the binder is a TyVar
+* Var.TyVarBinder = VarBndr TyVar ForAllTyFlag
+  Subset of ForAllTyBinder when we are sure the binder is a TyVar
 
 * Var.InvisTVBinder = VarBndr TyVar Specificity
-  Specialised form of TyVarBinder, when ArgFlag = Invisible s
+  Specialised form of TyVarBinder, when ForAllTyFlag = Invisible s
   See GHC.Core.Type.splitForAllInvisTVBinders
 
 * Var.ReqTVBinder = VarBndr TyVar ()
-  Specialised form of TyVarBinder, when ArgFlag = Required
+  Specialised form of TyVarBinder, when ForAllTyFlag = Required
   See GHC.Core.Type.splitForAllReqTVBinders
   This one is barely used
 
 * TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
   Binders of a TyCon; see TyCon in GHC.Core.TyCon
 
-* TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
+* TyCon.TyConPiTyBinder = VarBndr TyCoVar TyConBndrVis
   Binders of a PromotedDataCon
   See Note [Promoted GADT data constructors] in GHC.Core.TyCon
 
-* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
 * IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 * IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
 -}
@@ -633,26 +697,29 @@ data VarBndr var argf = Bndr var argf
 
 -- | Variable Binder
 --
--- A 'TyCoVarBinder' is the binder of a ForAllTy
+-- A 'ForAllTyBinder' is the binder of a ForAllTy
 -- It's convenient to define this synonym here rather its natural
 -- home in "GHC.Core.TyCo.Rep", because it's used in GHC.Core.DataCon.hs-boot
 --
 -- A 'TyVarBinder' is a binder with only TyVar
-type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
-type TyVarBinder       = VarBndr TyVar   ArgFlag
-type InvisTVBinder     = VarBndr TyVar   Specificity
-type ReqTVBinder       = VarBndr TyVar   ()
+type ForAllTyBinder = VarBndr TyCoVar ForAllTyFlag
+type InvisTyBinder  = VarBndr TyCoVar   Specificity
+type ReqTyBinder    = VarBndr TyCoVar   ()
 
-tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
+type TyVarBinder    = VarBndr TyVar   ForAllTyFlag
+type InvisTVBinder  = VarBndr TyVar   Specificity
+type ReqTVBinder    = VarBndr TyVar   ()
+
+tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ForAllTyFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
 
-tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ArgFlag
+tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ForAllTyFlag
 tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
 
-tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ArgFlag]
+tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ForAllTyFlag]
 tyVarReqToBinders = map tyVarReqToBinder
 
-tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
+tyVarReqToBinder :: VarBndr a () -> VarBndr a ForAllTyFlag
 tyVarReqToBinder (Bndr tv _) = Bndr tv Required
 
 binderVar :: VarBndr tv argf -> tv
@@ -661,15 +728,21 @@ binderVar (Bndr v _) = v
 binderVars :: [VarBndr tv argf] -> [tv]
 binderVars tvbs = map binderVar tvbs
 
-binderArgFlag :: VarBndr tv argf -> argf
-binderArgFlag (Bndr _ argf) = argf
+binderFlag :: VarBndr tv argf -> argf
+binderFlag (Bndr _ argf) = argf
+
+binderFlags :: [VarBndr tv argf] -> [argf]
+binderFlags tvbs = map binderFlag tvbs
 
 binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
 
+isTyVarBinder :: VarBndr TyCoVar vis -> Bool
+isTyVarBinder (Bndr tcv _) = isTyVar tcv
+
 -- | Make a named binder
-mkTyCoVarBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
-mkTyCoVarBinder vis var = Bndr var vis
+mkForAllTyBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
+mkForAllTyBinder vis var = Bndr var vis
 
 -- | Make a named binder
 -- 'var' should be a type variable
@@ -679,16 +752,13 @@ mkTyVarBinder vis var
     Bndr var vis
 
 -- | Make many named binders
-mkTyCoVarBinders :: vis -> [TyCoVar] -> [VarBndr TyCoVar vis]
-mkTyCoVarBinders vis = map (mkTyCoVarBinder vis)
+mkForAllTyBinders :: vis -> [TyCoVar] -> [VarBndr TyCoVar vis]
+mkForAllTyBinders vis = map (mkForAllTyBinder vis)
 
 -- | Make many named binders
 -- Input vars should be type variables
 mkTyVarBinders :: vis -> [TyVar] -> [VarBndr TyVar vis]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
-
-isTyVarBinder :: TyCoVarBinder -> Bool
-isTyVarBinder (Bndr v _) = isTyVar v
 
 mapVarBndr :: (var -> var') -> (VarBndr var flag) -> (VarBndr var' flag)
 mapVarBndr f (Bndr v fl) = Bndr (f v) fl
@@ -696,7 +766,7 @@ mapVarBndr f (Bndr v fl) = Bndr (f v) fl
 mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
 mapVarBndrs f = map (mapVarBndr f)
 
-instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
+instance Outputable tv => Outputable (VarBndr tv ForAllTyFlag) where
   ppr (Bndr v Required)  = ppr v
   ppr (Bndr v Specified) = char '@' <> ppr v
   ppr (Bndr v Inferred)  = braces (ppr v)
@@ -711,6 +781,270 @@ instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
 
 instance NamedThing tv => NamedThing (VarBndr tv flag) where
   getName (Bndr tv _) = getName tv
+
+
+{- **********************************************************************
+*                                                                       *
+                  PiTyBinder
+*                                                                       *
+********************************************************************** -}
+
+-- | A 'PiTyBinder' represents an argument to a function. PiTyBinders can be
+-- dependent ('Named') or nondependent ('Anon'). They may also be visible or
+-- not. See Note [PiTyBinders]
+data PiTyBinder
+  = Named ForAllTyBinder          -- A type-lambda binder, with a ForAllTyFlag
+  | Anon (Scaled Type) FunTyFlag  -- A term-lambda binder. Type here can be CoercionTy.
+                                  -- The arrow is described by the FunTyFlag
+  deriving Data
+
+instance Outputable PiTyBinder where
+  ppr (Anon ty af) = ppr af <+> ppr ty
+  ppr (Named (Bndr v Required))  = ppr v
+  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
+  ppr (Named (Bndr v Inferred))  = braces (ppr v)
+
+
+-- | 'PiTyVarBinder' is like 'PiTyBinder', but there can only be 'TyVar'
+-- in the 'Named' field.
+type PiTyVarBinder = PiTyBinder
+
+-- | Does this binder bind an invisible argument?
+isInvisiblePiTyBinder :: PiTyBinder -> Bool
+isInvisiblePiTyBinder (Named (Bndr _ vis)) = isInvisibleForAllTyFlag vis
+isInvisiblePiTyBinder (Anon _ af)          = isInvisibleFunArg af
+
+-- | Does this binder bind a visible argument?
+isVisiblePiTyBinder :: PiTyBinder -> Bool
+isVisiblePiTyBinder = not . isInvisiblePiTyBinder
+
+isNamedPiTyBinder :: PiTyBinder -> Bool
+isNamedPiTyBinder (Named {}) = True
+isNamedPiTyBinder (Anon {})  = False
+
+namedPiTyBinder_maybe :: PiTyBinder -> Maybe TyCoVar
+namedPiTyBinder_maybe (Named tv) = Just $ binderVar tv
+namedPiTyBinder_maybe _          = Nothing
+
+-- | Does this binder bind a variable that is /not/ erased? Returns
+-- 'True' for anonymous binders.
+isAnonPiTyBinder :: PiTyBinder -> Bool
+isAnonPiTyBinder (Named {}) = False
+isAnonPiTyBinder (Anon {})  = True
+
+-- | Extract a relevant type, if there is one.
+anonPiTyBinderType_maybe :: PiTyBinder -> Maybe Type
+anonPiTyBinderType_maybe (Named {})  = Nothing
+anonPiTyBinderType_maybe (Anon ty _) = Just (scaledThing ty)
+
+-- | If its a named binder, is the binder a tyvar?
+-- Returns True for nondependent binder.
+-- This check that we're really returning a *Ty*Binder (as opposed to a
+-- coercion binder). That way, if/when we allow coercion quantification
+-- in more places, we'll know we missed updating some function.
+isTyBinder :: PiTyBinder -> Bool
+isTyBinder (Named bnd) = isTyVarBinder bnd
+isTyBinder _ = True
+
+piTyBinderType :: PiTyBinder -> Type
+piTyBinderType (Named (Bndr tv _)) = varType tv
+piTyBinderType (Anon ty _)         = scaledThing ty
+
+{- Note [PiTyBinders]
+~~~~~~~~~~~~~~~~~~~
+But a type like
+   forall a. Maybe a -> forall b. (a,b) -> b
+
+can be decomposed to a telescope of type [PiTyBinder], using splitPiTys.
+That function splits off all leading foralls and arrows, giving
+   ([Named a, Anon (Maybe a), Named b, Anon (a,b)], b)
+
+A PiTyBinder represents the type of binders -- that is, the type of an
+argument to a Pi-type. GHC Core currently supports two different
+Pi-types:
+
+ * Anon ty1 fun_flag: a non-dependent function type,
+   written with ->, e.g. ty1 -> ty2
+   represented as FunTy ty1 ty2. These are
+   lifted to Coercions with the corresponding FunCo.
+
+ * Named (Var tv forall_flag)
+    A dependent compile-time-only polytype,
+   written with forall, e.g.  forall (a:*). ty
+   represented as ForAllTy (Bndr a v) ty
+
+Both forms of Pi-types classify terms/types that take an argument. In other
+words, if `x` is either a function or a polytype, `x arg` makes sense
+(for an appropriate `arg`).
+
+Wrinkles
+
+* The Anon constructor of PiTyBinder contains a FunTyFlag.  Since
+  the PiTyBinder really only describes the /argument/ it should perhaps
+  only have a TypeOrConstraint rather than a full FunTyFlag.  But it's
+  very convenient to have the full FunTyFlag, say in mkPiTys, so that's
+  what we do.
+
+
+Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* A ForAllTy (used for both types and kinds) contains a ForAllTyBinder.
+  Each ForAllTyBinder
+      Bndr a tvis
+  is equipped with tvis::ForAllTyFlag, which says whether or not arguments
+  for this binder should be visible (explicit) in source Haskell.
+
+* A TyCon contains a list of TyConBinders.  Each TyConBinder
+      Bndr a cvis
+  is equipped with cvis::TyConBndrVis, which says whether or not type
+  and kind arguments for this TyCon should be visible (explicit) in
+  source Haskell.
+
+This table summarises the visibility rules:
+---------------------------------------------------------------------------------------
+|                                                      Occurrences look like this
+|                             GHC displays type as     in Haskell source code
+|--------------------------------------------------------------------------------------
+| Bndr a tvis :: ForAllTyBinder, in the binder of ForAllTy for a term
+|  tvis :: ForAllTyFlag
+|  tvis = Inferred:            f :: forall {a}. type    Arg not allowed:  f
+                               f :: forall {co}. type   Arg not allowed:  f
+|  tvis = Specified:           f :: forall a. type      Arg optional:     f  or  f @Int
+|  tvis = Required:            T :: forall k -> type    Arg required:     T *
+|    This last form is illegal in terms: See Note [No Required PiTyBinder in terms]
+|
+| Bndr k cvis :: TyConBinder, in the TyConBinders of a TyCon
+|  cvis :: TyConBndrVis
+|  cvis = AnonTCB:             T :: kind -> kind        Required:            T *
+|  cvis = NamedTCB Inferred:   T :: forall {k}. kind    Arg not allowed:     T
+|                              T :: forall {co}. kind   Arg not allowed:     T
+|  cvis = NamedTCB Specified:  T :: forall k. kind      Arg not allowed[1]:  T
+|  cvis = NamedTCB Required:   T :: forall k -> kind    Required:            T *
+---------------------------------------------------------------------------------------
+
+[1] In types, in the Specified case, it would make sense to allow
+    optional kind applications, thus (T @*), but we have not
+    yet implemented that
+
+---- In term declarations ----
+
+* Inferred.  Function defn, with no signature:  f1 x = x
+  We infer f1 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because it doesn't appear in any
+  user-written signature for f1
+
+* Specified.  Function defn, with signature (implicit forall):
+     f2 :: a -> a; f2 x = x
+  So f2 gets the type f2 :: forall a. a -> a, with 'a' Specified
+  even though 'a' is not bound in the source code by an explicit forall
+
+* Specified.  Function defn, with signature (explicit forall):
+     f3 :: forall a. a -> a; f3 x = x
+  So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
+
+* Inferred.  Function defn, with signature (explicit forall), marked as inferred:
+     f4 :: forall {a}. a -> a; f4 x = x
+  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because the user marked it as such, even though it does appear
+  in the user-written signature for f4
+
+* Inferred/Specified.  Function signature with inferred kind polymorphism.
+     f5 :: a b -> Int
+  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
+  Here 'k' is Inferred (it's not mentioned in the type),
+  but 'a' and 'b' are Specified.
+
+* Specified.  Function signature with explicit kind polymorphism
+     f6 :: a (b :: k) -> Int
+  This time 'k' is Specified, because it is mentioned explicitly,
+  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+
+* Similarly pattern synonyms:
+  Inferred - from inferred types (e.g. no pattern type signature)
+           - or from inferred kind polymorphism
+
+---- In type declarations ----
+
+* Inferred (k)
+     data T1 a b = MkT1 (a b)
+  Here T1's kind is  T1 :: forall {k:*}. (k->*) -> k -> *
+  The kind variable 'k' is Inferred, since it is not mentioned
+
+  Note that 'a' and 'b' correspond to /Anon/ PiTyBinders in T1's kind,
+  and Anon binders don't have a visibility flag. (Or you could think
+  of Anon having an implicit Required flag.)
+
+* Specified (k)
+     data T2 (a::k->*) b = MkT (a b)
+  Here T's kind is  T :: forall (k:*). (k->*) -> k -> *
+  The kind variable 'k' is Specified, since it is mentioned in
+  the signature.
+
+* Required (k)
+     data T k (a::k->*) b = MkT (a b)
+  Here T's kind is  T :: forall k:* -> (k->*) -> k -> *
+  The kind is Required, since it bound in a positional way in T's declaration
+  Every use of T must be explicitly applied to a kind
+
+* Inferred (k1), Specified (k)
+     data T a b (c :: k) = MkT (a b) (Proxy c)
+  Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
+  So 'k' is Specified, because it appears explicitly,
+  but 'k1' is Inferred, because it does not
+
+Generally, in the list of TyConBinders for a TyCon,
+
+* Inferred arguments always come first
+* Specified, Anon and Required can be mixed
+
+e.g.
+  data Foo (a :: Type) :: forall b. (a -> b -> Type) -> Type where ...
+
+Here Foo's TyConBinders are
+   [Required 'a', Specified 'b', Anon]
+and its kind prints as
+   Foo :: forall a -> forall b. (a -> b -> Type) -> Type
+
+See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
+
+---- Printing -----
+
+ We print forall types with enough syntax to tell you their visibility
+ flag.  But this is not source Haskell, and these types may not all
+ be parsable.
+
+ Specified: a list of Specified binders is written between `forall` and `.`:
+               const :: forall a b. a -> b -> a
+
+ Inferred: like Specified, but every binder is written in braces:
+               f :: forall {k} (a:k). S k a -> Int
+
+ Required: binders are put between `forall` and `->`:
+              T :: forall k -> *
+
+---- Other points -----
+
+* In classic Haskell, all named binders (that is, the type variables in
+  a polymorphic function type f :: forall a. a -> a) have been Inferred.
+
+* Inferred variables correspond to "generalized" variables from the
+  Visible Type Applications paper (ESOP'16).
+
+Note [No Required PiTyBinder in terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't allow Required foralls for term variables, including pattern
+synonyms and data constructors.  Why?  Because then an application
+would need a /compulsory/ type argument (possibly without an "@"?),
+thus (f Int); and we don't have concrete syntax for that.
+
+We could change this decision, but Required, Named PiTyBinders are rare
+anyway.  (Most are Anons.)
+
+However the type of a term can (just about) have a required quantifier;
+see Note [Required quantifiers in the type of a term] in GHC.Tc.Gen.Expr.
+-}
+
+
 
 {-
 ************************************************************************

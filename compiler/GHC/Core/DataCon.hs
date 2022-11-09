@@ -20,7 +20,6 @@ module GHC.Core.DataCon (
         -- ** Equality specs
         EqSpec, mkEqSpec, eqSpecTyVar, eqSpecType,
         eqSpecPair, eqSpecPreds,
-        substEqSpec, filterEqSpec,
 
         -- ** Field labels
         FieldLabel(..), FieldLabelString,
@@ -37,11 +36,11 @@ module GHC.Core.DataCon (
         dataConDisplayType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
         dataConUserTyVars, dataConUserTyVarBinders,
-        dataConEqSpec, dataConTheta,
+        dataConTheta,
         dataConStupidTheta,
         dataConOtherTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
-        dataConInstOrigArgTys, dataConRepArgTys,
+        dataConInstOrigArgTys, dataConRepArgTys, dataConResRepTyArgs,
         dataConInstUnivs,
         dataConFieldLabels, dataConFieldType, dataConFieldType_maybe,
         dataConSrcBangs,
@@ -56,10 +55,10 @@ module GHC.Core.DataCon (
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon,
         isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
-        isUnboxedSumDataCon,
+        isUnboxedSumDataCon, isCovertGadtDataCon,
         isVanillaDataCon, isNewDataCon, isTypeDataCon,
         classDataCon, dataConCannotMatch,
-        dataConUserTyVarsArePermuted,
+        dataConUserTyVarsNeedWrapper, checkDataConTyVars,
         isBanged, isMarkedStrict, cbvFromStrictMark, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc,
 
@@ -77,6 +76,7 @@ import GHC.Core.Coercion
 import GHC.Core.Unify
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.FieldLabel
@@ -94,7 +94,7 @@ import GHC.Utils.Binary
 import GHC.Types.Unique.FM ( UniqFM )
 import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
-
+import GHC.Data.Graph.UnVar  -- UnVarSet and operations
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
@@ -422,7 +422,7 @@ data DataCon
                 --       syntax, provided its type looks like the above.
                 --       The declaration format is held in the TyCon (algTcGadtSyntax)
 
-        -- Universally-quantified type vars [a,b,c]
+        -- dcUnivTyVars: Universally-quantified type vars [a,b,c]
         -- INVARIANT: length matches arity of the dcRepTyCon
         -- INVARIANT: result type of data con worker is exactly (T a b c)
         -- COROLLARY: The dcUnivTyVars are always in one-to-one correspondence with
@@ -431,16 +431,16 @@ data DataCon
 
         -- Existentially-quantified type and coercion vars [x,y]
         -- For an example involving coercion variables,
-        -- Why tycovars? See Note [Existential coercion variables]
+        -- Why TyCoVars? See Note [Existential coercion variables]
         dcExTyCoVars     :: [TyCoVar],
 
         -- INVARIANT: the UnivTyVars and ExTyCoVars all have distinct OccNames
         -- Reason: less confusing, and easier to generate Iface syntax
 
         -- The type/coercion vars in the order the user wrote them [c,y,x,b]
-        -- INVARIANT: the set of tyvars in dcUserTyVarBinders is exactly the set
-        --            of tyvars (*not* covars) of dcExTyCoVars unioned with the
-        --            set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
+        -- INVARIANT(dataConTyVars): the set of tyvars in dcUserTyVarBinders is
+        --    exactly the set of tyvars (*not* covars) of dcExTyCoVars unioned
+        --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- See Note [DataCon user type variable binders]
         dcUserTyVarBinders :: [InvisTVBinder],
 
@@ -553,7 +553,7 @@ For the TyVarBinders in a DataCon and PatSyn:
 
  * Each argument flag is Inferred or Specified.
    None are Required. (A DataCon is a term-level function; see
-   Note [No Required TyCoBinder in terms] in GHC.Core.TyCo.Rep.)
+   Note [No Required PiTyBinder in terms] in GHC.Core.TyCo.Rep.)
 
 Why do we need the TyVarBinders, rather than just the TyVars?  So that
 we can construct the right type for the DataCon with its foralls
@@ -565,23 +565,23 @@ order in which TyVarBinders appear in a DataCon.
 
 Note [Existential coercion variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 For now (Aug 2018) we can't write coercion quantifications in source Haskell, but
 we can in Core. Consider having:
 
   data T :: forall k. k -> k -> Constraint where
-    MkT :: forall k (a::k) (b::k). forall k' (c::k') (co::k'~k). (b~(c|>co))
-        => T k a b
+    MkT :: forall k (a::k) (b::k).
+           forall k' (c::k') (co::k'~k).
+           (b ~# (c|>co)) => T k a b
 
   dcUnivTyVars       = [k,a,b]
   dcExTyCoVars       = [k',c,co]
   dcUserTyVarBinders = [k,a,k',c]
-  dcEqSpec           = [b~(c|>co)]
+  dcEqSpec           = [b ~# (c|>co)]
   dcOtherTheta       = []
   dcOrigArgTys       = []
   dcRepTyCon         = T
 
-  Function call 'dataConKindEqSpec' returns [k'~k]
+Function call 'dataConKindEqSpec' returns [k'~k]
 
 Note [DataCon arities]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -593,6 +593,31 @@ but dcRepArity does.  For example:
 
 Note [DataCon user type variable binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A DataCon has two different sets of type variables:
+
+* dcUserTyVarBinders, for the type variables binders in the order in which they
+  originally arose in the user-written type signature.
+
+  - They are the forall'd binders of the data con /wrapper/, which the user calls.
+
+  - Their order *does* matter for TypeApplications, so they are full TyVarBinders,
+    complete with visibilities.
+
+* dcUnivTyVars and dcExTyCoVars, for the "true underlying" (i.e. of the data
+  con worker) universal type variable and existential type/coercion variables,
+  respectively.
+
+  - They (i.e. univ ++ ex) are the forall'd variables of the data con /worker/
+
+  - Their order is irrelevant for the purposes of TypeApplications,
+    and as a consequence, they do not come equipped with visibilities
+    (that is, they are TyVars/TyCoVars instead of ForAllTyBinders).
+
+Often (dcUnivTyVars ++ dcExTyCoVars) = dcUserTyVarBinders; but they may differ
+for three reasons, coming next:
+
+--- Reason (R1): Order of quantification in GADT syntax ---
+
 In System FC, data constructor type signatures always quantify over all of
 their universal type variables, followed by their existential type variables.
 Normally, this isn't a problem, as most datatypes naturally quantify their type
@@ -635,36 +660,119 @@ according to the rules of TypeApplications, in the absence of `forall` GHC
 performs a stable topological sort on the type variables in the user-written
 type signature, which would place `b` before `a`.
 
-But as noted above, enacting this behavior is not entirely trivial, as System
-FC demands the variables go in universal-then-existential order under the hood.
-Our solution is thus to equip DataCon with two different sets of type
-variables:
+--- Reason (R2): GADT constructors quantify over different variables ---
 
-* dcUnivTyVars and dcExTyCoVars, for the universal type variable and existential
-  type/coercion variables, respectively. Their order is irrelevant for the
-  purposes of TypeApplications, and as a consequence, they do not come equipped
-  with visibilities (that is, they are TyVars/TyCoVars instead of
-  TyCoVarBinders).
+GADT constructors may quantify over different variables than the worker
+would.  Consider
+   data T a b where
+      MkT :: forall c d. c -> T [c] d
 
-* dcUserTyVarBinders, for the type variables binders in the order in which they
-  originally arose in the user-written type signature. Their order *does* matter
-  for TypeApplications, so they are full TyVarBinders, complete with
-  visibilities.
+The dcUserTyVarBinders must be [c, d] -- that's what the user quantified over.
+But c is actually existential, as it is not equal to either of the two
+universal variables.
 
-This encoding has some redundancy. The set of tyvars in dcUserTyVarBinders
-consists precisely of:
+Here is what we'll get:
+
+  dcUserTyVarBinders = [c, d]
+  dcUnivTyVars = [a, d]
+  dcExTyCoVars = [c]
+
+Note that dcUnivTyVars contains `a` from the type header (the `data T a b`)
+and `d` from the signature for MkT. This is done because d is used in place
+of b in the result of MkT, and so we use the name d for the universal, as that
+might improve error messages. On the other hand, we need to use a fresh name
+for the first universal (recalling that the result of a worker must be the
+type constructor applied to a sequence of plain variables), so we use `a`, from
+the header. This choice of universals is made in GHC.Tc.TyCl.mkGADTVars.
+
+Because c is not a universal, it is an existential. Here, we see that (even
+ignoring order) dcUserTyVarBinders is not dcUnivTyVars ⋃ dcExTyCoVars, because
+the latter has `a` while the former does not. To understand this better, let's
+look at this type for the "true underlying" worker data con:
+
+      MkT :: forall a d. forall c. (a ~# [c]) => c -> T a d
+
+We see here that the `a` universal is connected with the `c` existential via
+an equality constraint. It will always be the case (see the code in mkGADTVars)
+that the universals not mentioned in dcUserTyVarBinders will be used in a
+GADT equality -- that is, used on the left-hand side of an element of dcEqSpec:
+
+  dcEqSpec = [a ~# [c]]
+
+Putting this all together, all variables used on the left-hand side of an
+equation in the dcEqSpec will be in dcUnivTyVars but *not* in
+dcUserTyVarBinders.
+
+--- Reason (R3): Kind equalities may have been solved ---
+
+Consider now this case:
+
+  type family F a where
+    F Type = False
+    F _    = True
+  type T :: forall k. (F k ~ True) => k -> k -> Type
+  data T a b where
+    MkT :: T Maybe List
+
+The constraint F k ~ True tells us that T does not want to be indexed by, say,
+Int. Now let's consider the Core types involved:
+
+  axiom for F: axF[0] :: F Type ~ False
+               axF[1] :: forall a. F a ~ True   (a must be apart from Type)
+  tycon: T :: forall k. (F k ~ True) -> k -> k -> Type
+  wrapper: MkT :: T @(Type -> Type) @(Eq# (axF[1] (Type -> Type)) Maybe List
+  worker:  MkT :: forall k (c :: F k ~ True) (a :: k) (b :: k).
+                  (k ~# (Type -> Type), a ~# Maybe, b ~# List) =>
+                  T @k @c a b
+
+The key observation here is that the worker quantifies over c, while the wrapper
+does not. The worker *must* quantify over c, because c is a universal variable,
+and the result of the worker must be the type constructor applied to a sequence
+of plain type variables. But the wrapper certainly does not need to quantify over
+any evidence that F (Type -> Type) ~ True, as no variables are needed there.
+
+(Aside: the c here is a regular type variable, *not* a coercion variable. This
+is because F k ~ True is a *lifted* equality, not the unlifted ~#. This is why
+we see Eq# in the type of the wrapper: Eq# boxes the unlifted ~# to become a
+lifted ~. See also Note [The equality types story] in GHC.Builtin.Types.Prim about
+Eq# and Note [Constraints in kinds] in GHC.Core.TyCo.Rep about having this constraint
+in the first place.)
+
+In this case, we'll have these fields of the DataCon:
+
+  dcUserTyVarBinders = []    -- the wrapper quantifies over nothing
+  dcUnivTyVars = [k, c, a, b]
+  dcExTyCoVars = []  -- no existentials here, but a different constructor might have
+  dcEqSpec = [k ~# (Type -> Type), a ~# Maybe, b ~# List]
+
+Note that c is in the dcUserTyVars, but mentioned neither in the dcUserTyVarBinders nor
+in the dcEqSpec. We thus have Reason (R3): a variable might be missing from the
+dcUserTyVarBinders if its type's kind is Constraint.
+
+(At one point, we thought that the dcEqSpec would have to be non-empty. But that
+wouldn't account for silly cases like type T :: (True ~ True) => Type.)
+
+--- End of Reasons ---
+
+INVARIANT(dataConTyVars): the set of tyvars in dcUserTyVarBinders
+consists of:
 
 * The set of tyvars in dcUnivTyVars whose type variables do not appear in
   dcEqSpec, unioned with:
+
 * The set of tyvars (*not* covars) in dcExTyCoVars
   No covars here because because they're not user-written
+
+When comparing for equality, we ignore differences concerning type variables
+whose kinds have kind Constraint.
 
 The word "set" is used above because the order in which the tyvars appear in
 dcUserTyVarBinders can be completely different from the order in dcUnivTyVars or
 dcExTyCoVars. That is, the tyvars in dcUserTyVarBinders are a permutation of
 (tyvars of dcExTyCoVars + a subset of dcUnivTyVars). But aside from the
 ordering, they in fact share the same type variables (with the same Uniques). We
-sometimes refer to this as "the dcUserTyVarBinders invariant".
+sometimes refer to this as "the dcUserTyVarBinders invariant". It is checked
+in checkDataConTyVars.
 
 dcUserTyVarBinders, as the name suggests, is the one that users will
 see most of the time. It's used when computing the type signature of a
@@ -767,8 +875,7 @@ data StrictnessMark = MarkedStrict | NotMarkedStrict
 
 -- | An 'EqSpec' is a tyvar/type pair representing an equality made in
 -- rejigging a GADT constructor
-data EqSpec = EqSpec TyVar
-                     Type
+data EqSpec = EqSpec TyVar Type
 
 -- | Make a non-dependent 'EqSpec'
 mkEqSpec :: TyVar -> Type -> EqSpec
@@ -786,22 +893,6 @@ eqSpecPair (EqSpec tv ty) = (tv, ty)
 eqSpecPreds :: [EqSpec] -> ThetaType
 eqSpecPreds spec = [ mkPrimEqPred (mkTyVarTy tv) ty
                    | EqSpec tv ty <- spec ]
-
--- | Substitute in an 'EqSpec'. Precondition: if the LHS of the EqSpec
--- is mapped in the substitution, it is mapped to a type variable, not
--- a full type.
-substEqSpec :: Subst -> EqSpec -> EqSpec
-substEqSpec subst (EqSpec tv ty)
-  = EqSpec tv' (substTy subst ty)
-  where
-    tv' = getTyVar "substEqSpec" (substTyVar subst tv)
-
--- | Filter out any 'TyVar's mentioned in an 'EqSpec'.
-filterEqSpec :: [EqSpec] -> [TyVar] -> [TyVar]
-filterEqSpec eq_spec
-  = filter not_in_eq_spec
-  where
-    not_in_eq_spec var = all (not . (== var) . eqSpecTyVar) eq_spec
 
 instance Outputable EqSpec where
   ppr (EqSpec tv ty) = ppr (tv, ty)
@@ -884,7 +975,7 @@ but the rep type is
 Actually, the unboxed part isn't implemented yet!
 
 Not that this representation is still *different* from runtime
-representation. (Which is what STG uses afer unarise).
+representation. (Which is what STG uses after unarise).
 
 This is how T would end up being used in STG post-unarise:
 
@@ -1047,7 +1138,7 @@ mkDataCon :: Name
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied (Scaled Type)]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
-          -> RuntimeRepInfo     -- ^ See comments on 'GHC.Core.TyCon.RuntimeRepInfo'
+          -> PromDataConInfo    -- ^ See comments on 'GHC.Core.TyCon.PromDataConInfo'
           -> KnotTied TyCon     -- ^ Representation type constructor
           -> ConTag             -- ^ Constructor tag
           -> ThetaType          -- ^ The "stupid theta", context of the data
@@ -1108,8 +1199,11 @@ mkDataCon name declared_infix prom_info
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         DCR{} -> mkInfForAllTys univ_tvs $ mkTyCoInvForAllTys ex_tvs $
-                 mkVisFunTys rep_arg_tys $
+                 mkScaledFunctionTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+                 -- res_arg_tys is a mixture of TypeLike and ConstraintLike,
+                 -- so we don't know which FunTyFlag to use
+                 -- Hence using mkScaledFunctionTys.
 
       -- See Note [Promoted data constructors] in GHC.Core.TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
@@ -1119,9 +1213,9 @@ mkDataCon name declared_infix prom_info
       -- fresh_names: make sure that the "anonymous" tyvars don't
       -- clash in name or unique with the universal/existential ones.
       -- Tiresome!  And unnecessary because these tyvars are never looked at
-    prom_theta_bndrs = [ mkAnonTyConBinder InvisArg (mkTyVar n t)
+    prom_theta_bndrs = [ mkInvisAnonTyConBinder (mkTyVar n t)
      {- Invisible -}   | (n,t) <- fresh_names `zip` theta ]
-    prom_arg_bndrs   = [ mkAnonTyConBinder VisArg (mkTyVar n t)
+    prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
     prom_bndrs       = prom_tv_bndrs ++ prom_theta_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty
@@ -1208,30 +1302,6 @@ dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
--- | Equalities derived from the result type of the data constructor, as written
--- by the programmer in any GADT declaration. This includes *all* GADT-like
--- equalities, including those written in by hand by the programmer.
-dataConEqSpec :: DataCon -> [EqSpec]
-dataConEqSpec con@(MkData { dcEqSpec = eq_spec, dcOtherTheta = theta })
-  = dataConKindEqSpec con
-    ++ eq_spec ++
-    [ spec   -- heterogeneous equality
-    | Just (tc, [_k1, _k2, ty1, ty2]) <- map splitTyConApp_maybe theta
-    , tc `hasKey` heqTyConKey
-    , spec <- case (getTyVar_maybe ty1, getTyVar_maybe ty2) of
-                    (Just tv1, _) -> [mkEqSpec tv1 ty2]
-                    (_, Just tv2) -> [mkEqSpec tv2 ty1]
-                    _             -> []
-    ] ++
-    [ spec   -- homogeneous equality
-    | Just (tc, [_k, ty1, ty2]) <- map splitTyConApp_maybe theta
-    , tc `hasKey` eqTyConKey
-    , spec <- case (getTyVar_maybe ty1, getTyVar_maybe ty2) of
-                    (Just tv1, _) -> [mkEqSpec tv1 ty2]
-                    (_, Just tv2) -> [mkEqSpec tv2 ty1]
-                    _             -> []
-    ]
-
 -- | Dependent (kind-level) equalities in a constructor.
 -- There are extracted from the existential variables.
 -- See Note [Existential coercion variables]
@@ -1247,7 +1317,7 @@ dataConKindEqSpec (MkData {dcExTyCoVars = ex_tcvs})
     | cv <- ex_tcvs
     , isCoVar cv
     , let (_, _, ty1, ty, _) = coVarKindsTypesRole cv
-          tv = getTyVar "dataConKindEqSpec" ty1
+          tv = getTyVar ty1
     ]
 
 -- | The *full* constraints on the constructor type, including dependent GADT
@@ -1467,18 +1537,18 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
                              dcOrigResTy = res_ty,
                              dcStupidTheta = stupid_theta })
   = mkInvisForAllTys user_tvbs $
-    mkInvisFunTysMany (stupid_theta ++ theta) $
-    mkVisFunTys arg_tys $
+    mkInvisFunTys (stupid_theta ++ theta) $
+    mkScaledFunTys arg_tys $
     res_ty
 
 dataConNonlinearType :: DataCon -> Type
 dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                                dcOrigResTy = res_ty })
-  = let arg_tys' = map (\(Scaled w t) -> Scaled (case w of One -> Many; _ -> w) t) arg_tys
+  = let arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
     in mkInvisForAllTys user_tvbs $
-       mkInvisFunTysMany theta $
-       mkVisFunTys arg_tys' $
+       mkInvisFunTys theta $
+       mkScaledFunTys arg_tys' $
        res_ty
 
 dataConDisplayType :: Bool -> DataCon -> Type
@@ -1595,7 +1665,7 @@ dataConRepArgTys (MkData { dcRep = rep
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> assert (null eq_spec) $ (map unrestricted theta) ++ orig_arg_tys
+      NoDataConRep -> assert (null eq_spec) $ map unrestricted theta ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
@@ -1640,6 +1710,61 @@ isNewDataCon dc = isNewTyCon (dataConTyCon dc)
 isTypeDataCon :: DataCon -> Bool
 isTypeDataCon dc = isTypeDataTyCon (dataConTyCon dc)
 
+isCovertGadtDataCon :: DataCon -> Bool
+-- See Note [isCovertGadtDataCon]
+isCovertGadtDataCon (MkData { dcUnivTyVars  = univ_tvs
+                            , dcEqSpec     = eq_spec
+                            , dcRepTyCon   = rep_tc })
+  =  not (null eq_spec)                -- There are some constraints
+  && not (any is_visible_spec eq_spec) -- But none of them are visible
+  where
+    visible_univ_tvs :: [TyVar]  -- Visible arguments in result type
+    visible_univ_tvs
+      = [ univ_tv | (univ_tv, tcb) <- univ_tvs `zip` tyConBinders rep_tc
+                  , isVisibleTyConBinder tcb ]
+
+    is_visible_spec :: EqSpec -> Bool
+    is_visible_spec (EqSpec univ_tv ty)
+       = univ_tv `elem` visible_univ_tvs
+         && not (isTyVarTy ty)  -- See Note [isCovertGadtDataCon] for
+                                -- an example where 'ty' is a tyvar
+
+{- Note [isCovertGadtDataCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(isCovertGadtDataCon K) returns True if K is a GADT data constructor, but
+does not /look/ like it. Consider (#21447)
+    type T :: TYPE r -> Type
+    data T a where { MkT :: b -> T b }
+Here MkT doesn't look GADT-like, but it is. If we make the kind applications
+explicit we'd see:
+    data T a where { MkT :: b -> T @LiftedRep b }
+
+The test for covert-ness is bit tricky, because we want to see if
+  - dcEqSpec is non-empty
+  - dcEqSpec does not constrain any of the /required/ (i.e. visible)
+    arguments of the TyCon to a non-tyvar
+
+In the example above, the DataCon for MkT will have
+    dcUnivTyVars: [(r::RuntimeRep), (a :: TYPE r)]
+    dcExTyVars:   [(b :: Type)]
+    dcEqSpec:     [(r, LiftedRep), (a, b)]
+Here
+  * `r :: RuntimeRep` is constrained by dcEqSpec to LiftedRep
+  * `a :: TYPE r` is constrained by dcEqSpec to `b :: Type`
+But the constraint on `a` is not visible to the user, so this counts
+as a covert GADT data con.  The declaration
+     MkT :: forall (b :: Type). b -> T b
+looks entirely non-GADT-ish.
+
+Wrinkles:
+* The visibility or otherwise is a property of the /TyCon/ binders
+* The dcUnivTyVars may or may not be the same as the TyCon binders
+* So we have to zip them together.
+* For a data family the TyCon in question is the /representation/ TyCon
+  hence dcRepTyCon
+-}
+
+
 -- | Should this DataCon be allowed in a type even without -XDataKinds?
 -- Currently, only Lifted & Unlifted
 specialPromotedDc :: DataCon -> Bool
@@ -1680,17 +1805,71 @@ dataConCannotMatch tys con
 --
 -- This is not a cheap test, so we minimize its use in GHC as much as possible.
 -- Currently, its only call site in the GHC codebase is in 'mkDataConRep' in
--- "MkId", and so 'dataConUserTyVarsArePermuted' is only called at most once
+-- "MkId", and so 'dataConUserTyVarsNeedWrapper' is only called at most once
 -- during a data constructor's lifetime.
 
+dataConResRepTyArgs :: DataCon -> [Type]
+-- Returns the arguments of a GADT version of the /representation/ TyCon
+-- Thus   data instance T [(x,y)] z where
+--           MkT :: forall p q. Int -> T [(Int,p)] (Maybe q)
+-- The "GADT version of the representation type" is
+--        data R:T x y z where
+--           MkT :: forall p q. Int -> R:T Int p (Maybe q)
+-- so dataConResRepTyArgs for MkT returns [Int, p, Maybe q]
+-- This is almost the same as (subst eq_spec univ_tvs); but not quite,
+--   because eq_spec omits constraint-kinded equalities
+dataConResRepTyArgs dc@(MkData { dcRepTyCon = rep_tc, dcOrigResTy = orig_res_ty })
+  | Just (fam_tc, fam_args) <- tyConFamInst_maybe rep_tc
+  = -- fvs(fam_args) = tyConTyVars rep_tc
+    -- These tyvars are the domain of subst
+    -- Fvs(range(subst)) = tvars of the datacon
+    case  tcMatchTy (mkTyConApp fam_tc fam_args) orig_res_ty of
+       Just subst -> map (substTyVar subst) (tyConTyVars rep_tc)
+       Nothing    -> pprPanic "datacOnResRepTyArgs" $
+                     vcat [ ppr dc, ppr fam_tc <+> ppr fam_args
+                          , ppr orig_res_ty ]
+  | otherwise
+  = tyConAppArgs orig_res_ty
+
+checkDataConTyVars :: DataCon -> Bool
+-- Check that the worker and wrapper have the same set of type variables
+-- See Note [DataCon user type variable binders]
+-- Also ensures that no user tyvar is in the eq_spec (the eq_spec should
+-- only relate fresh universals from (R2) of the note)
+checkDataConTyVars dc@(MkData { dcUnivTyVars = univ_tvs
+                              , dcExTyCoVars = ex_tvs
+                              , dcEqSpec = eq_spec })
+     -- use of sets here: (R1) from the Note
+  = mkUnVarSet depleted_worker_vars == mkUnVarSet depleted_wrapper_vars &&
+    all (not . is_eq_spec_var) wrapper_vars
+  where
+    is_constraint_var v = typeTypeOrConstraint (tyVarKind v) == ConstraintLike
+      -- implements (R3) from the Note
+
+    worker_vars = univ_tvs ++ ex_tvs
+    eq_spec_tvs = mkUnVarSet (map eqSpecTyVar eq_spec)
+    is_eq_spec_var = (`elemUnVarSet` eq_spec_tvs)  -- (R2) from the Note
+    depleted_worker_vars = filterOut (is_eq_spec_var <||> is_constraint_var)
+                                     worker_vars
+
+    wrapper_vars = dataConUserTyVars dc
+    depleted_wrapper_vars = filterOut is_constraint_var wrapper_vars
+
+dataConUserTyVarsNeedWrapper :: DataCon -> Bool
+-- Check whether the worker and wapper have the same type variables
+-- in the same order. If not, we need a wrapper to swizzle them.
 -- See Note [DataCon user type variable binders], as well as
 -- Note [Data con wrappers and GADT syntax] for an explanation of what
 -- mkDataConRep is doing with this function.
-dataConUserTyVarsArePermuted :: DataCon -> Bool
-dataConUserTyVarsArePermuted (MkData { dcUnivTyVars = univ_tvs
-                                     , dcExTyCoVars = ex_tvs, dcEqSpec = eq_spec
-                                     , dcUserTyVarBinders = user_tvbs }) =
-  (filterEqSpec eq_spec univ_tvs ++ ex_tvs) /= binderVars user_tvbs
+dataConUserTyVarsNeedWrapper dc@(MkData { dcUnivTyVars = univ_tvs
+                                        , dcExTyCoVars = ex_tvs
+                                        , dcEqSpec = eq_spec })
+  = assert (null eq_spec || answer)  -- all GADTs should say "yes" here
+    answer
+  where
+    answer = (univ_tvs ++ ex_tvs) /= dataConUserTyVars dc
+              -- Worker tyvars         Wrapper tyvars
+
 
 {-
 %************************************************************************

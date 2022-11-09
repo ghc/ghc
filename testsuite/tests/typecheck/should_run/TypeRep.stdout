@@ -14,7 +14,7 @@ Int -> Int
 Int#
 (##)
 (#,#) 'IntRep ('BoxedRep 'Lifted) Int# Int
-Proxy Constraint (Eq Int)
+Proxy (CONSTRAINT ('BoxedRep 'Lifted)) (Eq Int)
 Proxy * (Int,Int)
 Proxy Symbol "hello world"
 Proxy Natural 1

@@ -72,7 +72,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv
 import GHC.Builtin.Types( unrestrictedFunTyConName )
-import GHC.Builtin.Types.Prim( funTyConName )
+import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Data.Maybe( orElse )
 
 import GHC.Utils.FV as FV
@@ -349,19 +349,25 @@ orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
                 -- Look through type synonyms (#4912)
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
+orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
+                                       `unionNameSet` orphNamesOfType res
 orphNamesOfType (TyConApp tycon tys) = func
                                        `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
         where func = case tys of
-                       arg:_ | tycon == funTyCon -> orph_names_of_fun_ty_con arg
+                       arg:_ | tycon == fUNTyCon -> orph_names_of_fun_ty_con arg
                        _ -> emptyNameSet
-orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
-                                       `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy _ w arg res)  =  orph_names_of_fun_ty_con w
-                                       `unionNameSet` unitNameSet funTyConName
+
+orphNamesOfType (FunTy af w arg res) =  func
+                                       `unionNameSet` unitNameSet fun_tc
                                        `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
+        where func | isVisibleFunArg af = orph_names_of_fun_ty_con w
+                   | otherwise          = emptyNameSet
+
+              fun_tc = tyConName (funTyFlagTyCon af)
+
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
 orphNamesOfType (CastTy ty co)       = orphNamesOfType ty `unionNameSet` orphNamesOfCo co
 orphNamesOfType (CoercionTy co)      = orphNamesOfCo co
@@ -381,15 +387,19 @@ orphNamesOfCo (Refl ty)             = orphNamesOfType ty
 orphNamesOfCo (GRefl _ ty mco)      = orphNamesOfType ty `unionNameSet` orphNamesOfMCo mco
 orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` orphNamesOfCos cos
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (ForAllCo _ kind_co co)
-  = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo _ co_mult co1 co2) = orphNamesOfCo co_mult `unionNameSet` orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (ForAllCo _ kind_co co)     = orphNamesOfCo kind_co
+                                            `unionNameSet` orphNamesOfCo co
+orphNamesOfCo (FunCo { fco_mult = co_mult, fco_arg = co1, fco_res = co2 })
+                                    = orphNamesOfCo co_mult
+                                      `unionNameSet` orphNamesOfCo co1
+                                      `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
-orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
+orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1
+                                      `unionNameSet` orphNamesOfType t2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (NthCo _ _ co)        = orphNamesOfCo co
+orphNamesOfCo (SelCo _ co)          = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
 orphNamesOfCo (KindCo co)           = orphNamesOfCo co
@@ -437,8 +447,8 @@ orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
 -- Detect FUN 'Many as an application of (->), so that :i (->) works as expected
 -- (see #8535) Issue #16475 describes a more robust solution
 orph_names_of_fun_ty_con :: Mult -> NameSet
-orph_names_of_fun_ty_con Many = unitNameSet unrestrictedFunTyConName
-orph_names_of_fun_ty_con _ = emptyNameSet
+orph_names_of_fun_ty_con ManyTy = unitNameSet unrestrictedFunTyConName
+orph_names_of_fun_ty_con _      = emptyNameSet
 
 {-
 ************************************************************************
@@ -791,3 +801,4 @@ freeVars = go
 
     go (Type ty)     = (tyCoVarsOfTypeDSet ty, AnnType ty)
     go (Coercion co) = (tyCoVarsOfCoDSet co, AnnCoercion co)
+

@@ -498,8 +498,8 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               -- Map from the skolemized Names to the original Names.
               -- See Note [Associated data family instances and di_scoped_tvs].
               tv_skol_env = mkVarEnv $ map swap tv_skol_prs
-              n_inferred = countWhile ((== Inferred) . binderArgFlag) $
-                           fst $ splitForAllTyCoVarBinders dfun_ty
+              n_inferred = countWhile ((== Inferred) . binderFlag) $
+                           fst $ splitForAllForAllTyBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
         ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
@@ -1468,9 +1468,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
-           ; let sc_top_ty = mkInfForAllTys tyvars $
-                             mkPhiTy (map idType dfun_evs) sc_pred
-                 sc_top_id = mkLocalId sc_top_name Many sc_top_ty
+           ; let sc_top_ty = tcMkDFunSigmaTy tyvars (map idType dfun_evs) sc_pred
+                 sc_top_id = mkLocalId sc_top_name ManyTy sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
@@ -1783,7 +1782,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags
                               (hcat [ppr inst_loc, vbar, ppr sel_id ])
-        lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
+        lam_wrapper  = mkWpTyLams tyvars <.> mkWpEvLams dfun_ev_vars
 
     ----------------------
     -- Check if one of the minimal complete definitions is satisfied
@@ -1954,7 +1953,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; let ctxt = FunSigCtxt sel_name (lhsSigTypeContextSpan hs_sig_ty)
                     -- WantRCC <=> check for redundant constraints in the
                     --          user-specified instance signature
-             inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
+             inner_meth_id  = mkLocalId inner_meth_name ManyTy sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
                                           , sig_loc  = getLocA hs_sig_ty }
@@ -2003,8 +2002,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  Many poly_meth_ty
-              local_meth_id = mkLocalId local_meth_name Many local_meth_ty
+        ; let poly_meth_id  = mkLocalId poly_meth_name  ManyTy poly_meth_ty
+              local_meth_id = mkLocalId local_meth_name ManyTy local_meth_ty
 
         ; return (poly_meth_id, local_meth_id) }
   where
@@ -2115,7 +2114,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
 
               fn   = noLocA (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
-                                      , tyConBinderArgFlag tcb /= Inferred ]
+                                      , tyConBinderForAllTyFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = L (noAnnSrcSpan loc)
                     $ mkTopFunBind Generated fn

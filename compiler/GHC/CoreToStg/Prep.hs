@@ -1046,7 +1046,8 @@ cpeApp top_env expr
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args)
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
             -- See Note [lazyId magic] in GHC.Types.Id.Make
-       || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
+       || f `hasKey` noinlineIdKey || f `hasKey` noinlineConstraintIdKey
+            -- Replace (noinline a) with a
             -- See Note [noinlineId magic] in GHC.Types.Id.Make
        || f `hasKey` nospecIdKey        -- Replace (nospec a) with a
             -- See Note [nospecId magic] in GHC.Types.Id.Make
@@ -2204,7 +2205,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") Many ty
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") ManyTy ty
 
 
 ------------------------------------------------------------------------------

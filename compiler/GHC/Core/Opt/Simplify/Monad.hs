@@ -40,7 +40,7 @@ import GHC.Utils.Misc      ( count )
 import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
-import GHC.Core.Multiplicity        ( pattern Many )
+import GHC.Core.Multiplicity        ( pattern ManyTy )
 import GHC.Exts( oneShot )
 
 {-
@@ -221,7 +221,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name Many join_id_ty id_info) }
+       ; return (mkLocalVar details name ManyTy join_id_ty id_info) }
 
 {-
 ************************************************************************

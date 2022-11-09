@@ -1225,7 +1225,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
        -- Good: returning (Mk#, [x]) with a float of  case exp of x { DEFAULT -> [] }
        --       simplifier produces case exp of a { DEFAULT -> exp[x/a] }
        = let arg' = subst_expr subst arg
-             bndr = uniqAway (subst_in_scope subst) (mkWildValBinder Many arg_type)
+             bndr = uniqAway (subst_in_scope subst) (mkWildValBinder ManyTy arg_type)
              float = FloatCase arg' bndr DEFAULT []
              subst' = subst_extend_in_scope subst bndr
          in go subst' (float:floats) fun (CC (Var bndr : args) co)

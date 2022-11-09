@@ -21,10 +21,10 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Core.Utils
 import GHC.Hs
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
+import GHC.Types.Var( VarBndr(..) )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -182,9 +182,9 @@ hsWrapperType wrap ty = prTypeType $ go wrap (ty,[])
           exp_res = hsWrapperType w2 act_res
       in mkFunctionType m exp_arg exp_res
     go (WpCast co)        = liftPRType $ \_ -> coercionRKind co
-    go (WpEvLam v)        = liftPRType $ mkInvisFunTyMany (idType v)
+    go (WpEvLam v)        = liftPRType $ mkInvisFunTy (idType v)
     go (WpEvApp _)        = liftPRType $ funResultTy
-    go (WpTyLam tv)       = liftPRType $ mkForAllTy tv Inferred
+    go (WpTyLam tv)       = liftPRType $ mkForAllTy (Bndr tv Inferred)
     go (WpTyApp ta)       = \(ty,tas) -> (ty, ta:tas)
     go (WpLet _)          = id
     go (WpMultCoercion _) = id
@@ -193,7 +193,7 @@ lhsCmdTopType :: LHsCmdTop GhcTc -> Type
 lhsCmdTopType (L _ (HsCmdTop (CmdTopTc _ ret_ty _) _)) = ret_ty
 
 matchGroupTcType :: MatchGroupTc -> Type
-matchGroupTcType (MatchGroupTc args res _) = mkVisFunTys args res
+matchGroupTcType (MatchGroupTc args res _) = mkScaledFunTys args res
 
 syntaxExprType :: SyntaxExpr GhcTc -> Type
 syntaxExprType (SyntaxExprTc e _ _) = hsExprType e

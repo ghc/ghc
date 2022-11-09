@@ -234,7 +234,7 @@ data Ct
        --               Note [CEqCan occurs check]
        --   * (TyEq:F) rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * (TyEq:K) tcTypeKind lhs `tcEqKind` tcTypeKind rhs; Note [Ct kind invariant]
+       --   * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
        --   * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
        --     application of a newtype TyCon.
        --     See Note [No top-level newtypes on RHS of representational equalities]
@@ -385,7 +385,7 @@ data NotConcreteReason
   | ContainsCast TcType TcCoercionN
 
   -- | The type contains a forall.
-  | ContainsForall TyCoVarBinder TcType
+  | ContainsForall ForAllTyBinder TcType
 
   -- | The type contains a 'CoercionTy'.
   | ContainsCoercionTy TcCoercion
@@ -694,7 +694,7 @@ instance Outputable Ct where
 -- Does not look through type synonyms.
 canEqLHS_maybe :: Xi -> Maybe CanEqLHS
 canEqLHS_maybe xi
-  | Just tv <- tcGetTyVar_maybe xi
+  | Just tv <- getTyVar_maybe xi
   = Just $ TyVarLHS tv
 
   | Just (tc, args) <- tcSplitTyConApp_maybe xi
@@ -1893,7 +1893,7 @@ ctEvExpr ev = evId (ctEvEvId ev)
 
 ctEvCoercion :: HasDebugCallStack => CtEvidence -> TcCoercion
 ctEvCoercion (CtGiven { ctev_evar = ev_id })
-  = mkTcCoVarCo ev_id
+  = mkCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
   = -- ctEvCoercion is only called on type equalities
@@ -1927,23 +1927,17 @@ arisesFromGivens ct = isGivenCt ct || isGivenLoc (ctLoc ct)
 -- the evidence and the ctev_pred in sync with each other.
 -- See Note [CtEvidence invariants].
 setCtEvPredType :: HasDebugCallStack => CtEvidence -> Type -> CtEvidence
-setCtEvPredType old_ctev new_pred
-  = case old_ctev of
-    CtGiven { ctev_evar = ev, ctev_loc = loc } ->
-      CtGiven { ctev_pred = new_pred
-              , ctev_evar = setVarType ev new_pred
-              , ctev_loc  = loc
-              }
-    CtWanted { ctev_dest = dest, ctev_loc = loc, ctev_rewriters = rewriters } ->
-      CtWanted { ctev_pred      = new_pred
-               , ctev_dest      = new_dest
-               , ctev_loc       = loc
-               , ctev_rewriters = rewriters
-               }
-        where
-          new_dest = case dest of
-            EvVarDest ev -> EvVarDest (setVarType ev new_pred)
-            HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
+setCtEvPredType old_ctev@(CtGiven { ctev_evar = ev }) new_pred
+  = old_ctev { ctev_pred = new_pred
+             , ctev_evar = setVarType ev new_pred }
+
+setCtEvPredType old_ctev@(CtWanted { ctev_dest = dest }) new_pred
+  = old_ctev { ctev_pred = new_pred
+             , ctev_dest = new_dest }
+  where
+    new_dest = case dest of
+      EvVarDest ev -> EvVarDest (setVarType ev new_pred)
+      HoleDest h   -> HoleDest  (setCoHoleType h new_pred)
 
 instance Outputable TcEvDest where
   ppr (HoleDest h)   = text "hole" <> ppr h

@@ -208,7 +208,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar Many upat
+       ; var    <- selectMatchVar ManyTy upat
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
@@ -715,7 +715,7 @@ dsDo ctx stmts
            ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
-                   = do { var   <- selectSimpleMatchVarL Many pat
+                   = do { var   <- selectSimpleMatchVarL ManyTy pat
                         ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
@@ -741,10 +741,10 @@ dsDo ctx stmts
       where
         new_bind_stmt = L loc $ BindStmt
           XBindStmtTc
-            { xbstc_bindOp = bind_op
+            { xbstc_bindOp          = bind_op
             , xbstc_boundResultType = bind_ty
-            , xbstc_boundResultMult = Many
-            , xbstc_failOp = Nothing -- Tuple cannot fail
+            , xbstc_boundResultMult = ManyTy
+            , xbstc_failOp          = Nothing -- Tuple cannot fail
             }
           (mkBigLHsPatTupId later_pats)
           mfix_app

@@ -54,6 +54,7 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Core.Rules
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
@@ -298,7 +299,7 @@ dsAbsBinds dflags tyvars dicts exports
                             mkLet aux_binds $
                             tup_expr
 
-       ; poly_tup_id <- newSysLocalDs Many (exprType poly_tup_rhs)
+       ; poly_tup_id <- newSysLocalDs ManyTy (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -309,10 +310,10 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [AbsBinds wrappers] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs Many tup_ty
+                = do { tup_id  <- newSysLocalDs ManyTy tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
-                                 mkTupleSelector all_locals local tup_id $
+                                 mkBigTupleSelector all_locals local tup_id $
                                  mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                            rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
@@ -369,7 +370,7 @@ dsAbsBinds dflags tyvars dicts exports
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs Many
+      do global <- newSysLocalDs ManyTy
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE { abe_poly  = global
                      , abe_mono  = local
@@ -715,7 +716,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let fn_unf    = realIdUnfolding poly_id
              simpl_opts = initSimpleOpts dflags
              spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id    = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
+             spec_id    = mkLocalId spec_name ManyTy spec_ty -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -877,7 +878,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
      = scopedSort unbound_tvs ++ unbound_dicts
      where
        unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
-       unbound_dicts = [ mkLocalId (localiseName (idName d)) Many (idType d)
+       unbound_dicts = [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
                        | d <- unbound_vars, isDictId d ]
        unbound_vars  = [ v | v <- exprsFreeVarsList args
                            , not (v `elemVarSet` orig_bndr_set)
@@ -1269,7 +1270,7 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        }
 
 ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
-  | Just (m,t1,t2) <- splitFunTy_maybe ty
+  | Just (_af,m,t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
        ; em <- getRep evm m

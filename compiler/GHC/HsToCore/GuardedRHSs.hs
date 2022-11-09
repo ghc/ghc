@@ -129,7 +129,7 @@ matchGuards (LetStmt _ binds : stmts) ctx nablas rhs rhs_ty = do
 
 matchGuards (BindStmt _ pat bind_rhs : stmts) ctx nablas rhs rhs_ty = do
     let upat = unLoc pat
-    match_var <- selectMatchVar Many upat
+    match_var <- selectMatchVar ManyTy upat
        -- We only allow unrestricted patterns in guard, hence the `Many`
        -- above. It isn't clear what linear patterns would mean, maybe we will
        -- figure it out in the future.

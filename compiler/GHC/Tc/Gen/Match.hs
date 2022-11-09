@@ -113,7 +113,7 @@ tcMatchesFun fun_id matches exp_ty
         ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
              -- NB: exp_type may be polymorphic, but
              --     matchExpectedFunTys can cope with that
-          tcScalingUsage Many $
+          tcScalingUsage ManyTy $
           -- toplevel bindings and let bindings are, at the
           -- moment, always unrestricted. The value being bound
           -- must, accordingly, be unrestricted. Hence them
@@ -178,7 +178,7 @@ tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
            -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 -- Used for pattern bindings
 tcGRHSsPat grhss res_ty
-  = tcScalingUsage Many $
+  = tcScalingUsage ManyTy $
       -- Like in tcMatchesFun, this scaling happens because all
       -- let bindings are unrestricted. A difference, here, is
       -- that when this is not the case, any more, we will have to
@@ -421,7 +421,7 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 
 tcGuardStmt :: TcExprStmtChecker
 tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
-  = do  { guard' <- tcScalingUsage Many $ tcCheckMonoExpr guard boolTy
+  = do  { guard' <- tcScalingUsage ManyTy $ tcCheckMonoExpr guard boolTy
           -- Scale the guard to Many (see #19120 and #19193)
         ; thing  <- thing_inside res_ty
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
@@ -434,7 +434,7 @@ tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
           -- The multiplicity of x in u must be the same as the multiplicity at
           -- which the rhs has been consumed. When solving #18738, we want these
           -- two multiplicity to still be the same.
-          (rhs', rhs_ty) <- tcScalingUsage Many $ tcInferRhoNC rhs
+          (rhs', rhs_ty) <- tcScalingUsage ManyTy $ tcInferRhoNC rhs
                                    -- Stmt has a context already
         ; hasFixedRuntimeRep_syntactic FRRBindStmtGuard rhs_ty
         ; (pat', thing)  <- tcCheckPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
@@ -542,7 +542,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name Many (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -735,7 +735,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Building the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name Many (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -916,7 +916,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n t -> mkLocalId n Many t) tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n t -> mkLocalId n ManyTy t) tup_names tup_elt_tys
                 -- Many because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 

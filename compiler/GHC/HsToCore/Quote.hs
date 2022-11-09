@@ -51,8 +51,8 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.TyCon
-import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core
+import GHC.Core.Type( pattern ManyTy, mkFunTy )
 import GHC.Core.Make
 import GHC.Core.Utils
 
@@ -129,8 +129,9 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
           expected_ty = mkInvisForAllTys tyvars $
-                          mkInvisFunTyMany (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
-                                           (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
+                        mkFunTy invisArgConstraintLike ManyTy
+                                (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
+                                (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
       massertPpr (idType monad_sel `eqType` expected_ty) (ppr monad_sel $$ ppr expected_ty)
 
@@ -1357,10 +1358,10 @@ repTy ty@(HsForAllTy { hst_tele = tele, hst_body = body }) =
 repTy ty@(HsQualTy {}) = repForallT ty
 
 repTy (HsTyVar _ _ (L _ n))
-  | isLiftedTypeKindTyConName n        = repTStar
+  | n `hasKey` liftedTypeKindTyConKey  = repTStar
   | n `hasKey` constraintKindTyConKey  = repTConstraint
   | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
-  | n `hasKey` funTyConKey             = repMulArrowTyCon
+  | n `hasKey` fUNTyConKey             = repMulArrowTyCon
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n
@@ -2134,7 +2135,8 @@ mkGenSyms :: [Name] -> MetaM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [(nm, mkLocalId (localiseName nm) Many var_ty) | nm <- ns] }
+                  ; return [ (nm, mkLocalId (localiseName nm) ManyTy var_ty)
+                           | nm <- ns] }
 
 
 addBinds :: [GenSymBind] -> MetaM a -> MetaM a
@@ -2960,7 +2962,9 @@ repGetField (MkC exp) fs = do
 
 repProjection :: NonEmpty FastString -> MetaM (Core (M TH.Exp))
 repProjection fs = do
-  MkC xs <- coreListNonEmpty stringTy <$> mapM coreStringLit fs
+  ne_tycon <- lift $ dsLookupTyCon nonEmptyTyConName
+  MkC xs <- coreListNonEmpty ne_tycon stringTy <$>
+            mapM coreStringLit fs
   rep2 projectionEName [xs]
 
 ------------ Lists -------------------
@@ -2992,8 +2996,13 @@ coreList' :: Type       -- The element type
           -> [Core a] -> Core [a]
 coreList' elt_ty es = MkC (mkListExpr elt_ty (map unC es ))
 
-coreListNonEmpty :: Type -> NonEmpty (Core a) -> Core (NonEmpty a)
-coreListNonEmpty ty (MkC x :| xs) = MkC $ mkNonEmptyListExpr ty x (map unC xs)
+coreListNonEmpty :: TyCon -- TyCon for NonEmpty
+                 -> Type  -- Element type
+                 -> NonEmpty (Core a)
+                 -> Core (NonEmpty a)
+coreListNonEmpty ne_tc ty (MkC x :| xs)
+  = MkC $ mkCoreConApps (tyConSingleDataCon ne_tc)
+          [Type ty, x, mkListExpr ty (map unC xs)]
 
 nonEmptyCoreList :: [Core a] -> Core [a]
   -- The list must be non-empty so we can get the element type

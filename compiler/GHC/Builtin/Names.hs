@@ -263,6 +263,7 @@ basicKnownKeyNames
         starKindRepName,
         starArrStarKindRepName,
         starArrStarArrStarKindRepName,
+        constraintKindRepName,
 
         -- WithDict
         withDictClassName,
@@ -337,6 +338,9 @@ basicKnownKeyNames
         fromListName,
         fromListNName,
         toListName,
+
+        -- Non-empty lists
+        nonEmptyTyConName,
 
         -- Overloaded record dot, record update
         getFieldName, setFieldName,
@@ -1406,14 +1410,19 @@ typeCharTypeRepName   = varQual tYPEABLE_INTERNAL (fsLit "typeCharTypeRep") type
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
 
 -- Typeable KindReps for some common cases
-starKindRepName, starArrStarKindRepName, starArrStarArrStarKindRepName :: Name
-starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")         starKindRepKey
-starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")     starArrStarKindRepKey
-starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")   starArrStarArrStarKindRepKey
+starKindRepName, starArrStarKindRepName,
+  starArrStarArrStarKindRepName, constraintKindRepName :: Name
+starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
+starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
+starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
+constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") constraintKindRepKey
 
 -- WithDict
 withDictClassName :: Name
-withDictClassName     = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
+withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
+
+nonEmptyTyConName :: Name
+nonEmptyTyConName = tcQual gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -1788,7 +1797,7 @@ hasFieldClassNameKey = mkPreludeClassUnique 50
 
 addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
-    doubleTyConKey, floatPrimTyConKey, floatTyConKey, funTyConKey,
+    doubleTyConKey, floatPrimTyConKey, floatTyConKey, fUNTyConKey,
     intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
     int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
     int64PrimTyConKey, int64TyConKey,
@@ -1799,7 +1808,8 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey, ioPortPrimTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
-    stringTyConKey :: Unique
+    stringTyConKey,
+    ccArrowTyConKey, ctArrowTyConKey, tcArrowTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
@@ -1811,7 +1821,7 @@ doublePrimTyConKey                      = mkPreludeTyConUnique  9
 doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
-funTyConKey                             = mkPreludeTyConUnique 13
+fUNTyConKey                             = mkPreludeTyConUnique 13
 intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8PrimTyConKey                        = mkPreludeTyConUnique 16
@@ -1841,6 +1851,10 @@ stablePtrPrimTyConKey                   = mkPreludeTyConUnique 38
 stablePtrTyConKey                       = mkPreludeTyConUnique 39
 eqTyConKey                              = mkPreludeTyConUnique 40
 heqTyConKey                             = mkPreludeTyConUnique 41
+
+ctArrowTyConKey                       = mkPreludeTyConUnique 42
+ccArrowTyConKey                       = mkPreludeTyConUnique 43
+tcArrowTyConKey                       = mkPreludeTyConUnique 44
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -1892,16 +1906,21 @@ voidTyConKey                            = mkPreludeTyConUnique 85
 nonEmptyTyConKey :: Unique
 nonEmptyTyConKey                        = mkPreludeTyConUnique 86
 
+dictTyConKey :: Unique
+dictTyConKey                            = mkPreludeTyConUnique 87
+
 -- Kind constructors
 liftedTypeKindTyConKey, unliftedTypeKindTyConKey,
-  tYPETyConKey, liftedRepTyConKey, unliftedRepTyConKey,
+  tYPETyConKey, cONSTRAINTTyConKey,
+  liftedRepTyConKey, unliftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey,
   zeroBitRepTyConKey, zeroBitTypeTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
-tYPETyConKey                            = mkPreludeTyConUnique 90
-constraintKindTyConKey                  = mkPreludeTyConUnique 92
+tYPETyConKey                            = mkPreludeTyConUnique 91
+cONSTRAINTTyConKey                      = mkPreludeTyConUnique 92
+constraintKindTyConKey                  = mkPreludeTyConUnique 93
 levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
@@ -1922,7 +1941,6 @@ trModuleTyConKey                        = mkPreludeTyConUnique 105
 trNameTyConKey                          = mkPreludeTyConUnique 106
 kindRepTyConKey                         = mkPreludeTyConUnique 107
 typeLitSortTyConKey                     = mkPreludeTyConUnique 108
-
 
 -- Generics (Unique keys)
 v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
@@ -2072,8 +2090,7 @@ charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     word8DataConKey, ioDataConKey, heqDataConKey,
-    coercibleDataConKey, eqDataConKey, nothingDataConKey, justDataConKey,
-    nonEmptyDataConKey :: Unique
+    eqDataConKey, nothingDataConKey, justDataConKey :: Unique
 
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -2092,7 +2109,6 @@ trueDataConKey                          = mkPreludeDataConUnique 14
 wordDataConKey                          = mkPreludeDataConUnique 15
 ioDataConKey                            = mkPreludeDataConUnique 16
 heqDataConKey                           = mkPreludeDataConUnique 18
-nonEmptyDataConKey                      = mkPreludeDataConUnique 19
 
 -- Generic data constructors
 crossDataConKey, inlDataConKey, inrDataConKey, genUnitDataConKey :: Unique
@@ -2110,7 +2126,10 @@ ordLTDataConKey                         = mkPreludeDataConUnique 27
 ordEQDataConKey                         = mkPreludeDataConUnique 28
 ordGTDataConKey                         = mkPreludeDataConUnique 29
 
+mkDictDataConKey :: Unique
+mkDictDataConKey                        = mkPreludeDataConUnique 30
 
+coercibleDataConKey :: Unique
 coercibleDataConKey                     = mkPreludeDataConUnique 32
 
 staticPtrDataConKey :: Unique
@@ -2254,7 +2273,7 @@ naturalNBDataConKey       = mkPreludeDataConUnique 124
 ************************************************************************
 -}
 
-wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
+wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendIdKey,
     buildIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
@@ -2271,6 +2290,7 @@ absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey                  = mkPreludeMiscIdUnique  2
 appendIdKey                   = mkPreludeMiscIdUnique  3
 buildIdKey                    = mkPreludeMiscIdUnique  4
+absentConstraintErrorIdKey    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
@@ -2335,7 +2355,7 @@ traceKey                      = mkPreludeMiscIdUnique 108
 nospecIdKey :: Unique
 nospecIdKey                   = mkPreludeMiscIdUnique 109
 
-inlineIdKey, noinlineIdKey :: Unique
+inlineIdKey, noinlineIdKey, noinlineConstraintIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
@@ -2343,8 +2363,9 @@ mapIdKey, dollarIdKey, coercionTokenIdKey, considerAccessibleIdKey :: Unique
 mapIdKey                = mkPreludeMiscIdUnique 121
 dollarIdKey             = mkPreludeMiscIdUnique 123
 coercionTokenIdKey      = mkPreludeMiscIdUnique 124
-noinlineIdKey           = mkPreludeMiscIdUnique 125
-considerAccessibleIdKey = mkPreludeMiscIdUnique 126
+considerAccessibleIdKey = mkPreludeMiscIdUnique 125
+noinlineIdKey           = mkPreludeMiscIdUnique 126
+noinlineConstraintIdKey = mkPreludeMiscIdUnique 127
 
 integerToFloatIdKey, integerToDoubleIdKey, naturalToFloatIdKey, naturalToDoubleIdKey :: Unique
 integerToFloatIdKey    = mkPreludeMiscIdUnique 128
@@ -2484,14 +2505,15 @@ tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 515
 trLiftedRepKey         = mkPreludeMiscIdUnique 516
 
 -- KindReps for common cases
-starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique
-starKindRepKey        = mkPreludeMiscIdUnique 520
-starArrStarKindRepKey = mkPreludeMiscIdUnique 521
+starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey, constraintKindRepKey :: Unique
+starKindRepKey               = mkPreludeMiscIdUnique 520
+starArrStarKindRepKey        = mkPreludeMiscIdUnique 521
 starArrStarArrStarKindRepKey = mkPreludeMiscIdUnique 522
+constraintKindRepKey         = mkPreludeMiscIdUnique 523
 
 -- Dynamic
 toDynIdKey :: Unique
-toDynIdKey            = mkPreludeMiscIdUnique 523
+toDynIdKey            = mkPreludeMiscIdUnique 530
 
 
 bitIntegerIdKey :: Unique
@@ -2785,9 +2807,10 @@ pretendNameIsInScope n
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
     , liftedDataConKey, unliftedDataConKey
     , tYPETyConKey
+    , cONSTRAINTTyConKey
     , runtimeRepTyConKey, boxedRepDataConKey
     , eqTyConKey
     , listTyConKey
     , oneDataConKey
     , manyDataConKey
-    , funTyConKey ]
+    , fUNTyConKey, unrestrictedFunTyConKey ]

@@ -35,20 +35,20 @@ module GHC.Tc.Gen.Head
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
+import GHC.Prelude
+import GHC.Hs
+
 import GHC.Tc.Gen.HsType
+import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
+
 import GHC.Tc.Gen.Bind( chooseInferredQuantifiers )
 import GHC.Tc.Gen.Sig( tcUserTypeSig, tcInstSig, lhsSigWcTypeContextSpan )
 import GHC.Tc.TyCl.PatSyn( patSynBuilderOcc )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
-import GHC.Types.Basic
-import GHC.Types.Error
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
-import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( unitUE )
-import GHC.Rename.Unbound     ( unknownNameSuggestions, WhatLooking(..) )
 import GHC.Unit.Module        ( getModule )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
@@ -56,35 +56,41 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
-import GHC.Hs
+import GHC.Tc.Types.Evidence
 import GHC.Hs.Syn.Type
-import GHC.Types.Id
-import GHC.Types.Id.Info
+
+import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Core.PatSyn( PatSyn )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
-import GHC.Types.Name
-import GHC.Types.Name.Reader
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Tc.Types.Evidence
+
+import GHC.Types.Var( isInvisibleFunArg )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+import GHC.Types.Basic
+import GHC.Types.Error
+
 import GHC.Builtin.Types( multiplicityTy )
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
+
 import GHC.Driver.Env
 import GHC.Driver.Session
-import GHC.Types.SrcLoc
 import GHC.Utils.Misc
-import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
+import GHC.Data.Maybe
 import Control.Monad
 
-import Data.Function
-
-import GHC.Prelude
 
 
 {- *********************************************************************
@@ -591,7 +597,7 @@ tcRemainingValArgs applied_args app_res_rho fun = case fun of
 
       where
 
-      rem_arg_tys :: [(Scaled Type, AnonArgFlag)]
+      rem_arg_tys :: [(Scaled Type, FunTyFlag)]
       rem_arg_tys = getRuntimeArgTys app_res_rho
         -- We do not need to zonk app_res_rho first, because the number of arrows
         -- in the (possibly instantiated) inferred type of the function will
@@ -606,7 +612,7 @@ tcRemainingValArgs applied_args app_res_rho fun = case fun of
                      -- value argument index, starting from 1
                      -- used to count up to the arity to ensure that
                      -- we don't check too many argument types
-                  -> [(Scaled Type, AnonArgFlag)]
+                  -> [(Scaled Type, FunTyFlag)]
                      -- run-time argument types
                   -> TcM ()
       tc_rem_args _ i_val _
@@ -617,9 +623,9 @@ tcRemainingValArgs applied_args app_res_rho fun = case fun of
         -- than the number of arguments apparent from the type.
         = pprPanic "tcRemainingValArgs" debug_msg
       tc_rem_args i_visval !i_val ((Scaled _ arg_ty, af) : tys)
-        = do { let (i_visval', arg_pos) =
-                     case af of { InvisArg -> ( i_visval    , ArgPosInvis )
-                                ; VisArg   -> ( i_visval + 1, ArgPosVis i_visval ) }
+        = do { let (i_visval', arg_pos)
+                     | isInvisibleFunArg af = ( i_visval    , ArgPosInvis )
+                     | otherwise            = ( i_visval + 1, ArgPosVis i_visval )
                    frr_ctxt = FRRNoBindingResArg rep_poly_fun arg_pos
              ; hasFixedRuntimeRep_syntactic frr_ctxt arg_ty
                  -- Why is this a syntactic check? See Wrinkle [Syntactic check] in
@@ -948,7 +954,7 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap
                          <.> mkWpTyLams qtvs
-                         <.> mkWpLams givens
+                         <.> mkWpEvLams givens
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', my_sigma) }
 
@@ -1118,7 +1124,7 @@ tc_infer_id id_name
 check_local_id :: Id -> TcM ()
 check_local_id id
   = do { checkThLocalId id
-       ; tcEmitBindingUsage $ unitUE (idName id) One }
+       ; tcEmitBindingUsage $ unitUE (idName id) OneTy }
 
 check_naughty :: OccName -> TcId -> TcM ()
 check_naughty lbl id
@@ -1147,14 +1153,14 @@ tcInferDataCon con
 
        ; return ( XExpr (ConLikeTc (RealDataCon con) tvs all_arg_tys)
                 , mkInvisForAllTys tvbs $ mkPhiTy full_theta $
-                  mkVisFunTys scaled_arg_tys res ) }
+                  mkScaledFunTys scaled_arg_tys res ) }
   where
     linear_to_poly :: Scaled Type -> TcM (Scaled Type)
     -- linear_to_poly implements point (3,4)
     -- of Note [Typechecking data constructors]
-    linear_to_poly (Scaled One ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
-                                        ; return (Scaled mul_var ty) }
-    linear_to_poly scaled_ty       = return scaled_ty
+    linear_to_poly (Scaled OneTy ty) = do { mul_var <- newFlexiTyVarTy multiplicityTy
+                                          ; return (Scaled mul_var ty) }
+    linear_to_poly scaled_ty         = return scaled_ty
 
 tcInferPatSyn :: Name -> PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcInferPatSyn id_name ps

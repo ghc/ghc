@@ -35,7 +35,7 @@ mkUnarisedIds :: MonadUnique m => FastString -> [UnaryType] -> m [Id]
 mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
 
 mkUnarisedId :: MonadUnique m => FastString -> UnaryType -> m Id
-mkUnarisedId s t = mkSysLocalM s Many t
+mkUnarisedId s t = mkSysLocalM s ManyTy t
 
 -- Checks if id is a top level error application.
 -- isErrorAp_maybe :: Id ->
@@ -72,8 +72,7 @@ mkStgAltTypeFromStgAlts bndr alts
    prim_reps = typePrimRep bndr_ty
 
    _is_poly_alt_tycon tc
-        =  isFunTyCon tc
-        || isPrimTyCon tc   -- "Any" is lifted but primitive
+        =  isPrimTyCon tc   -- "Any" is lifted but primitive
         || isFamilyTyCon tc -- Type family; e.g. Any, or arising from strict
                             -- function application where argument has a
                             -- type-family type

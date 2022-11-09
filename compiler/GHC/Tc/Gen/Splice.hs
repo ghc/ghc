@@ -676,7 +676,7 @@ tcTypedBracket rn_expr expr res_ty
        --   (See Note [The life cycle of a TH quotation] in GHC.Hs.Expr)
        -- We'll typecheck it again when we splice it in somewhere
        ; (tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
-                                tcScalingUsage Many $
+                                tcScalingUsage ManyTy $
                                 -- Scale by Many, TH lifting is currently nonlinear (#18465)
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
@@ -779,7 +779,7 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
-       ; expr' <- tcScalingUsage Many $ tcCheckPolyExpr expr expected_type
+       ; expr' <- tcScalingUsage ManyTy $ tcCheckPolyExpr expr expected_type
                   -- Scale by Many, TH lifting is currently nonlinear (#18465)
        ; return (PendingTcSplice splice_name expr') }
   where
@@ -1903,7 +1903,7 @@ reifyInstances' th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (#7477)
 
-        ; traceTc "reifyInstances'" (ppr ty $$ ppr (tcTypeKind ty))
+        ; traceTc "reifyInstances'" (ppr ty $$ ppr (typeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
@@ -2109,8 +2109,10 @@ reifyTyCon tc
   | Just cls <- tyConClass_maybe tc
   = reifyClass cls
 
-  | isFunTyCon tc
-  = return (TH.PrimTyConI (reifyName tc) 2                False)
+{-  Seems to be just a short cut for the next equation -- omit
+  | tc `hasKey` fUNTyConKey -- I'm not quite sure what is happening here
+  = return (TH.PrimTyConI (reifyName tc) 2 False)
+-}
 
   | isPrimTyCon tc
   = return (TH.PrimTyConI (reifyName tc) (length (tyConVisibleTyVars tc))
@@ -2254,7 +2256,7 @@ reifyDataCon isGadtDataCon tys dc
 
     subst_tv_binders subst tv_bndrs =
       let tvs            = binderVars tv_bndrs
-          flags          = map binderArgFlag tv_bndrs
+          flags          = binderFlags tv_bndrs
           (subst', tvs') = substTyVarBndrs subst tvs
           tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
       in (subst', tv_bndrs')
@@ -2348,7 +2350,7 @@ annotThType :: Bool   -- True <=> annotate
 annotThType _    _  th_ty@(TH.SigT {}) = return th_ty
 annotThType True ty th_ty
   | not $ isEmptyVarSet $ filterVarSet isTyVar $ tyCoVarsOfType ty
-  = do { let ki = tcTypeKind ty
+  = do { let ki = typeKind ty
        ; th_ki <- reifyKind ki
        ; return (TH.SigT th_ty th_ki) }
 annotThType _    _ th_ty = return th_ty
@@ -2362,7 +2364,7 @@ tyConArgsPolyKinded tc =
      map (is_poly_ty . tyVarKind)      tc_vis_tvs
      -- See "Wrinkle: Oversaturated data family instances" in
      -- @Note [Reified instances and explicit kind signatures]@
-  ++ map (is_poly_ty . tyCoBinderType) tc_res_kind_vis_bndrs -- (1) in Wrinkle
+  ++ map (is_poly_ty . piTyBinderType) tc_res_kind_vis_bndrs -- (1) in Wrinkle
   ++ repeat True                                             -- (2) in Wrinkle
   where
     is_poly_ty :: Type -> Bool
@@ -2374,8 +2376,8 @@ tyConArgsPolyKinded tc =
     tc_vis_tvs :: [TyVar]
     tc_vis_tvs = tyConVisibleTyVars tc
 
-    tc_res_kind_vis_bndrs :: [TyCoBinder]
-    tc_res_kind_vis_bndrs = filter isVisibleBinder $ fst $ splitPiTys $ tyConResKind tc
+    tc_res_kind_vis_bndrs :: [PiTyBinder]
+    tc_res_kind_vis_bndrs = filter isVisiblePiTyBinder $ fst $ splitPiTys $ tyConResKind tc
 
 {-
 Note [Reified instances and explicit kind signatures]
@@ -2530,7 +2532,7 @@ reifyFamilyInstance is_poly_tvs (FamInst { fi_flavor = flavor
                -- Note [Reified instances and explicit kind signatures]
                if (null cons || isGadtSyntaxTyCon rep_tc)
                      && tyConAppNeedsKindSig False fam_tc (length ee_lhs)
-               then do { let full_kind = tcTypeKind (mkTyConApp fam_tc ee_lhs)
+               then do { let full_kind = typeKind (mkTyConApp fam_tc ee_lhs)
                        ; th_full_kind <- reifyKind full_kind
                        ; pure $ Just th_full_kind }
                else pure Nothing
@@ -2566,23 +2568,23 @@ reifyType ty@(AppTy {})     = do
     -- `Type` argument is invisible (#15792).
     filter_out_invisible_args :: Type -> [Type] -> [Type]
     filter_out_invisible_args ty_head ty_args =
-      filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
+      filterByList (map isVisibleForAllTyFlag $ appTyForAllTyFlags ty_head ty_args)
                    ty_args
-reifyType ty@(FunTy { ft_af = af, ft_mult = Many, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
-  | otherwise      = do { [r1,r2] <- reifyTypes [t1,t2]
-                        ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
+reifyType ty@(FunTy { ft_af = af, ft_mult = ManyTy, ft_arg = t1, ft_res = t2 })
+  | isInvisibleFunArg af = reify_for_all Inferred ty  -- Types like ((?x::Int) => Char -> Char)
+  | otherwise            = do { [r1,r2] <- reifyTypes [t1,t2]
+                              ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(FunTy { ft_af = af, ft_mult = tm, ft_arg = t1, ft_res = t2 })
-  | InvisArg <- af = noTH LinearInvisibleArgument ty
-  | otherwise      = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
-                        ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
+  | isInvisibleFunArg af = noTH LinearInvisibleArgument ty
+  | otherwise            = do { [rm,r1,r2] <- reifyTypes [tm,t1,t2]
+                              ; return (TH.MulArrowT `TH.AppT` rm `TH.AppT` r1 `TH.AppT` r2) }
 reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH CoercionsInTypes ty
 
-reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
+reify_for_all :: TyCoRep.ForAllTyFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
 reify_for_all argf ty
-  | isVisibleArgFlag argf
+  | isVisibleForAllTyFlag argf
   = do let (req_bndrs, phi) = tcSplitForAllReqTVBinders ty
        tvbndrs' <- reifyTyVarBndrs req_bndrs
        phi' <- reifyType phi
@@ -2613,7 +2615,7 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
        ; req'        <- reifyCxt req
        ; exTyVars'   <- reifyTyVarBndrs exTyVars
        ; prov'       <- reifyCxt prov
-       ; tau'        <- reifyType (mkVisFunTys argTys resTy)
+       ; tau'        <- reifyType (mkScaledFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
                 $ TH.ForallT exTyVars' prov' tau' }
 
@@ -2690,7 +2692,7 @@ reify_tc_app tc tys
                 -- don't count specified binders as contributing towards
                 -- injective positions in the kind of the tycon.
           tc (length tys)
-      = do { let full_kind = tcTypeKind (mkTyConApp tc tys)
+      = do { let full_kind = typeKind (mkTyConApp tc tys)
            ; th_full_kind <- reifyKind full_kind
            ; return (TH.SigT th_type th_full_kind) }
       | otherwise

@@ -230,7 +230,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name Many sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level
@@ -317,7 +317,7 @@ no_anon_wc_ty lty = go lty
                                         && go ty
       HsQualTy { hst_ctxt = ctxt
                , hst_body = ty }  -> gos (unLoc ctxt) && go ty
-      HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go $ L noSrcSpanA ty
+      HsSpliceTy (HsUntypedSpliceTop _ ty) _ -> go ty
       HsSpliceTy (HsUntypedSpliceNested _) _ -> True
       HsTyLit{} -> True
       HsTyVar{} -> True

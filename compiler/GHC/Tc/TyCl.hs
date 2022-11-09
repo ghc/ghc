@@ -107,7 +107,6 @@ import Data.Functor.Identity
 import Data.List ( partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Set as Set
 import Data.Tuple( swap )
 
 {-
@@ -982,7 +981,7 @@ promises about the ordering of some variables. These might swizzle
 around even between minor released. By forbidding visible type
 application, we ensure users aren't caught unawares.
 
-Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.
+Go read Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep.
 
 The question for this Note is this:
    given a TyClDecl, how are its quantified type variables classified?
@@ -2380,7 +2379,7 @@ wiredInDerivInfo tycon decl
   , HsDataDefn { dd_derivs = derivs } <- dataDefn
   = [ DerivInfo { di_rep_tc = tycon
                 , di_scoped_tvs =
-                    if isFunTyCon tycon || isPrimTyCon tycon
+                    if isPrimTyCon tycon
                        then []  -- no tyConTyVars
                        else mkTyVarNamePairs (tyConTyVars tycon)
                 , di_clauses = derivs
@@ -3432,8 +3431,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs res_kind tag_map
        ; let tc_tvs   = binderVars tc_bndrs
              fake_ty  = mkSpecForAllTys  tc_tvs      $
                         mkInvisForAllTys exp_tvbndrs $
-                        mkPhiTy ctxt $
-                        mkVisFunTys arg_tys $
+                        tcMkPhiTy ctxt               $
+                        tcMkScaledFunTys arg_tys     $
                         unitTy
              -- That type is a lie, of course. (It shouldn't end in ()!)
              -- And we could construct a proper result type from the info
@@ -3538,8 +3537,8 @@ tcConDecl new_or_data dd_info rep_tycon tc_bndrs _res_kind tag_map
 
        ; tkvs <- kindGeneralizeAll skol_info
                     (mkInvisForAllTys outer_tv_bndrs $
-                     mkPhiTy ctxt                    $
-                     mkVisFunTys arg_tys             $
+                     tcMkPhiTy ctxt                  $
+                     tcMkScaledFunTys arg_tys        $
                      res_ty)
        ; traceTc "tcConDecl:GADT" (ppr names $$ ppr res_ty $$ ppr tkvs)
        ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
@@ -3848,10 +3847,12 @@ rejigConRes tc_tvbndrs res_tmpl dc_tvbndrs res_ty
         -- since the dcUserTyVarBinders invariant guarantees that the
         -- substitution has *all* the tyvars in its domain.
         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
-        subst_user_tvs  = mapVarBndrs (getTyVar "rejigConRes" . substTyVar arg_subst)
+        subst_user_tvs  = mapVarBndrs (substTyVarToTyVar arg_subst)
         substed_tvbndrs = subst_user_tvs dc_tvbndrs
 
-        substed_eqs = map (substEqSpec arg_subst) raw_eqs
+        substed_eqs = [ mkEqSpec (substTyVarToTyVar arg_subst tv)
+                                 (substTy arg_subst ty)
+                      | (tv,ty) <- raw_eqs ]
     in
     (univ_tvs, substed_ex_tvs, substed_tvbndrs, substed_eqs, arg_subst)
 
@@ -4017,7 +4018,7 @@ mkGADTVars :: [TyVar]    -- ^ The tycon vars
            -> Subst   -- ^ The matching between the template result type
                          -- and the actual result type
            -> ( [TyVar]
-              , [EqSpec]
+              , [(TyVar,Type)]   -- The un-substituted eq-spec
               , Subst ) -- ^ The univ. variables, the GADT equalities,
                            -- and a subst to apply to the GADT equalities
                            -- and existentials.
@@ -4028,13 +4029,13 @@ mkGADTVars tmpl_tvs dc_tvs subst
                `unionInScope` getSubstInScope subst
     empty_subst = mkEmptySubst in_scope
 
-    choose :: [TyVar]           -- accumulator of univ tvs, reversed
-           -> [EqSpec]          -- accumulator of GADT equalities, reversed
+    choose :: [TyVar]        -- accumulator of univ tvs, reversed
+           -> [(TyVar,Type)] -- accumulator of GADT equalities, reversed
            -> Subst          -- template substitution
            -> Subst          -- res. substitution
            -> [TyVar]           -- template tvs (the univ tvs passed in)
            -> ( [TyVar]         -- the univ_tvs
-              , [EqSpec]        -- GADT equalities
+              , [(TyVar,Type)]  -- GADT equalities
               , Subst )       -- a substitution to fix kinds in ex_tvs
 
     choose univs eqs _t_sub r_sub []
@@ -4046,6 +4047,8 @@ mkGADTVars tmpl_tvs dc_tvs subst
             |  not (r_tv `elem` univs)
             ,  tyVarKind r_tv `eqType` (substTy t_sub (tyVarKind t_tv))
             -> -- simple, well-kinded variable substitution.
+               -- the name of the universal comes from the result of the ctor
+               -- see (R2) of Note [DataCon user type variable binders] in GHC.Core.DataCon
                choose (r_tv:univs) eqs
                       (extendTvSubst t_sub t_tv r_ty')
                       (extendTvSubst r_sub r_tv r_ty')
@@ -4055,13 +4058,19 @@ mkGADTVars tmpl_tvs dc_tvs subst
               r_ty'  = mkTyVarTy r_tv1
 
                -- Not a simple substitution: make an equality predicate
-          _ -> choose (t_tv':univs) (mkEqSpec t_tv' r_ty : eqs)
+               -- the name of the universal comes from the datatype header
+               -- see (R2) of Note [DataCon user type variable binders] in GHC.Core.DataCon
+          _ -> choose (t_tv':univs) eqs'
                       (extendTvSubst t_sub t_tv (mkTyVarTy t_tv'))
                          -- We've updated the kind of t_tv,
                          -- so add it to t_sub (#14162)
                       r_sub t_tvs
             where
-              t_tv' = updateTyVarKind (substTy t_sub) t_tv
+              tv_kind  = tyVarKind t_tv
+              tv_kind' = substTy t_sub tv_kind
+              t_tv'    = setTyVarKind t_tv tv_kind'
+              eqs' | isConstraintLikeKind (typeKind tv_kind') = eqs
+                   | otherwise = (t_tv', r_ty) : eqs
 
       | otherwise
       = pprPanic "mkGADTVars" (ppr tmpl_tvs $$ ppr subst)
@@ -4344,9 +4353,7 @@ checkPartialRecordField all_cons fld
     is_exhaustive = all (dataConCannotMatch inst_tys) cons_without_field
 
     con1 = assert (not (null cons_with_field)) $ head cons_with_field
-    (univ_tvs, _, eq_spec, _, _, _) = dataConFullSig con1
-    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
-    inst_tys = substTyVars eq_subst univ_tvs
+    inst_tys = dataConResRepTyArgs con1
 
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
                  -> Type -> Type -> Type -> Type -> TcM ()
@@ -4369,8 +4376,8 @@ checkValidDataCon dflags existential_ok tc con
 
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
-              , ppr res_ty_tmpl <+> dcolon <+> ppr (tcTypeKind res_ty_tmpl)
-              , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
+              , ppr res_ty_tmpl <+> dcolon <+> ppr (typeKind res_ty_tmpl)
+              , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
 
 
         -- Check that the return type of the data constructor
@@ -4500,17 +4507,8 @@ checkValidDataCon dflags existential_ok tc con
           -- checked here because we sometimes build invalid DataCons before
           -- erroring above here
         ; when debugIsOn $
-          do { let (univs, exs, eq_spec, _, _, _) = dataConFullSig con
-                   user_tvs                       = dataConUserTyVars con
-                   user_tvbs_invariant
-                     =    Set.fromList (filterEqSpec eq_spec univs ++ exs)
-                       == Set.fromList user_tvs
-             ; massertPpr user_tvbs_invariant
-                          $ vcat ([ ppr con
-                               , ppr univs
-                               , ppr exs
-                               , ppr eq_spec
-                               , ppr user_tvs ]) }
+          massertPpr (checkDataConTyVars con) $
+          ppr con $$  ppr (dataConFullSig con) $$ ppr (dataConUserTyVars con)
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con
@@ -4576,8 +4574,8 @@ checkNewDataCon con
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
 
-    ok_mult One = True
-    ok_mult _   = False
+    ok_mult OneTy = True
+    ok_mult _     = False
 
 
 -- | Reject nullary data constructors where a type variable
@@ -4586,7 +4584,7 @@ checkNewDataCon con
 checkEscapingKind :: DataCon -> TcM ()
 checkEscapingKind data_con
   | null eq_spec, null theta, null arg_tys
-  , let tau_kind = tcTypeKind res_ty
+  , let tau_kind = typeKind res_ty
   , Nothing <- occCheckExpand (univ_tvs ++ ex_tvs) tau_kind
     -- Ensure that none of the tvs occur in the kind of the forall
     -- /after/ expanding type synonyms.
@@ -5098,7 +5096,7 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys) }
+             eqSpecPreds eq_spec ++ theta ++ map scaledThing arg_tys }
                     -- See Note [Role-checking data constructor arguments] in GHC.Tc.TyCl.Utils
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

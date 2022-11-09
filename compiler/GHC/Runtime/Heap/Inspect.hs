@@ -36,7 +36,8 @@ import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
-import GHC.Types.Var
+import GHC.Core.TyCon
+
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -44,7 +45,7 @@ import GHC.Tc.Utils.Zonk ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( Runtime
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 
-import GHC.Core.TyCon
+import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Name.Occurrence as OccName
 import GHC.Unit.Module
@@ -675,7 +676,7 @@ applyRevSubst pairs = liftTcM (mapM_ do_pair pairs)
   where
     do_pair (tc_tv, rtti_tv)
       = do { tc_ty <- zonkTcTyVar tc_tv
-           ; case tcGetTyVar_maybe tc_ty of
+           ; case getTyVar_maybe tc_ty of
                Just tv | isMetaTyVar tv -> writeMetaTyVar tv (mkTyVarTy rtti_tv)
                _                        -> return () }
 
@@ -748,10 +749,13 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       -- we have unsound types. Replace constructor types in
                       -- subterms with tyvars
                       zterm' <- mapTermTypeM
-                                 (\ty -> case tcSplitTyConApp_maybe ty of
-                                           Just (tc, _:_) | tc /= funTyCon
-                                               -> newOpenVar
-                                           _   -> return ty)
+                                 (\ty -> case splitTyConApp_maybe ty of
+                                           -- SPJ: I have no idea why we are
+                                           --      matching on (:) here, nor
+                                           --      what the isFunTy is for
+                                           Just (_tc, _ : _) | not (isFunTy ty)
+                                                             -> newOpenVar
+                                           _ -> return ty)
                                  term
                       zonkTerm zterm'
    traceTR (text "Term reconstruction completed." $$
@@ -1346,12 +1350,13 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (w1,l1,l2) <- splitFunTy_maybe l
-    , Just (w2,r1,r2) <- splitFunTy_maybe r
+    | Just (af1,w1,l1,l2) <- splitFunTy_maybe l
+    , Just (af2,w2,r1,r2) <- splitFunTy_maybe r
+    , af1==af2
     , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkVisFunTy w1 r1' r2')
+         return (mkFunTy af1 w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1416,7 +1421,7 @@ isMonomorphicOnNonPhantomArgs ty
   , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
-  | Just (_, ty1, ty2) <- splitFunTy_maybe ty
+  | Just (_, _, ty1, ty2) <- splitFunTy_maybe ty
   = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
   | otherwise = isMonomorphic ty
 

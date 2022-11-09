@@ -502,7 +502,7 @@ pprHoleFit _ (RawHoleFit sd) = sd
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
  hang display 2 provenance
  where tyApp = sep $ zipWithEqual "pprHoleFit" pprArg vars hfWrap
-         where pprArg b arg = case binderArgFlag b of
+         where pprArg b arg = case binderFlag b of
                                 Specified -> text "@" <> pprParendType arg
                                   -- Do not print type application for inferred
                                   -- variables (#16456)
@@ -520,11 +520,11 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
            -- e.g.
            -- return :: forall (m :: * -> *) Monad m => (forall a . a -> m a)
            -- into [m, a]
-           unwrapTypeVars :: Type -> [TyCoVarBinder]
+           unwrapTypeVars :: Type -> [ForAllTyBinder]
            unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
-                               Just (_, _, unfunned) -> unwrapTypeVars unfunned
+                               Just (_, _, _, unfunned) -> unwrapTypeVars unfunned
                                _ -> []
-             where (vars, unforalled) = splitForAllTyCoVarBinders t
+             where (vars, unforalled) = splitForAllForAllTyBinders t
        holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
        holeDisp = if sMs then holeVs
                   else sep $ replicate (length hfMatches) $ text "_"
@@ -917,7 +917,7 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                               _ -> True
                             allConcrete = all notAbstract z_wrp_tys
                       ; z_vars  <- zonkTcTyVars ref_vars
-                      ; let z_mtvs = mapMaybe tcGetTyVar_maybe z_vars
+                      ; let z_mtvs = mapMaybe getTyVar_maybe z_vars
                       ; allFilled <- not <$> anyM isFlexiTyVar z_mtvs
                       ; allowAbstract <- goptM Opt_AbstractRefHoleFits
                       ; if allowAbstract || (allFilled && allConcrete )

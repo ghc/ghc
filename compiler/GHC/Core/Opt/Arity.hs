@@ -64,6 +64,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.Subst    as Core
 import GHC.Core.Type     as Type
 import GHC.Core.Coercion as Type
+import GHC.Core.TyCo.Compare( eqType )
 
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
@@ -196,7 +197,7 @@ typeOneShots ty
       | Just (_, ty')  <- splitForAllTyCoVar_maybe ty
       = go rec_nts ty'
 
-      | Just (_,arg,res) <- splitFunTy_maybe ty
+      | Just (_,_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
@@ -2236,7 +2237,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
        = (in_scope, EI (tcv' : bs) (mkHomoForAllMCo tcv' mco))
 
        ----------- Function types  (t1 -> t2)
-       | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+       | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
        , typeHasFixedRuntimeRep arg_ty
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
@@ -2246,7 +2247,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
        , let eta_id' = eta_id `setIdOneShotInfo` one_shot
        , (in_scope, EI bs mco) <- go (n+1) oss1 subst' res_ty
-       = (in_scope, EI (eta_id' : bs) (mkFunResMCo (idScaledType eta_id') mco))
+       = (in_scope, EI (eta_id' : bs) (mkFunResMCo eta_id' mco))
 
        ----------- Newtypes
        -- Given this:
@@ -2709,15 +2710,15 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_af, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
-       = Just (mkFunResCo Representational (idScaledType bndr) co, [])
+       = Just (mkFunResCo Representational bndr co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , Just (_, fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
-       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCoNoFTF Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty
@@ -2824,19 +2825,19 @@ pushCoTyArg co ty
   = Nothing
   where
     Pair tyL tyR = coercionKind co
-       -- co :: tyL ~ tyR
+       -- co :: tyL ~R tyR
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
 
-    co1 = mkSymCo (mkNthCo Nominal 0 co)
+    co1 = mkSymCo (mkSelCo SelForAll co)
        -- co1 :: k2 ~N k1
-       -- Note that NthCo can extract a Nominal equality between the
+       -- Note that SelCo extracts a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
-       -- See the NthCo case in GHC.Core.Lint.
+       -- See the SelCo case in GHC.Core.Lint.
 
     co2 = mkInstCo co (mkGReflLeftCo Nominal ty co1)
-        -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
-        -- Arg of mkInstCo is always nominal, hence mkNomReflCo
+        -- co2 :: ty1[ (ty|>co1)/a1 ] ~R ty2[ ty/a2 ]
+        -- Arg of mkInstCo is always nominal, hence Nominal
 
 -- | If @pushCoValArg co = Just (co_arg, co_res)@, then
 --
@@ -2860,7 +2861,7 @@ pushCoValArg co
   = Just (MRefl, MRefl)
 
   | isFunTy tyL
-  , (co_mult, co1, co2) <- decomposeFunCo Representational co
+  , (co_mult, co1, co2) <- decomposeFunCo co
       -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
       -- then co1 :: tyL1 ~ tyR1
       --      co2 :: tyL2 ~ tyR2
@@ -2902,9 +2903,9 @@ pushCoercionIntoLambda
 pushCoercionIntoLambda in_scope x e co
     | assert (not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
-    , Just (_, _s1,_s2) <- splitFunTy_maybe s1s2
-    , Just (w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (co_mult, co1, co2) <- decomposeFunCo Representational co
+    , Just {}              <- splitFunTy_maybe s1s2
+    , Just (_, w1, t1,_t2) <- splitFunTy_maybe t1t2
+    , (co_mult, co1, co2)  <- decomposeFunCo co
     , isReflexiveCo co_mult
       -- We can't push the coercion in the case where co_mult isn't
       -- reflexivity. See pushCoValArg for more details.
@@ -2992,11 +2993,11 @@ pushCoDataCon dc dc_args co
 collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
 -- Collect lambda binders, pushing coercions inside if possible
 -- E.g.   (\x.e) |> g         g :: <Int> -> blah
---        = (\x. e |> Nth 1 g)
+--        = (\x. e |> SelCo (SelFun SelRes) g)
 --
 -- That is,
 --
--- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> Nth 1 g)
+-- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> SelCo (SelFun SelRes) g)
 collectBindersPushingCo e
   = go [] e
   where
@@ -3023,21 +3024,21 @@ collectBindersPushingCo e
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_ty tyL) $
         isForAllTy_ty tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isCoVar b
       , let Pair tyL tyR = coercionKind co
       , assert (isForAllTy_co tyL) $
         isForAllTy_co tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkSelCo SelForAll co)  -- See Note [collectBindersPushingCo]
       , let cov = mkCoVarCo b
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
 
       | isId b
       , let Pair tyL tyR = coercionKind co
       , assert (isFunTy tyL) $ isFunTy tyR
-      , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
+      , (co_mult, co_arg, co_res) <- decomposeFunCo co
       , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
@@ -3103,7 +3104,7 @@ etaBodyForJoinPoint need_args body
       | Just (tv, res_ty) <- splitForAllTyCoVar_maybe ty
       , let (subst', tv') = substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
-      | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      | Just (_, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
       , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
       | otherwise

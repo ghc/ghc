@@ -15,6 +15,7 @@ import GHC.Tc.Utils.TcType   ( exactTyCoVarsOfType )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Coercion
 import GHC.Core.Type as Type hiding( substTyVarBndr, substTy )
 import GHC.Core.TyCon
@@ -23,6 +24,7 @@ import GHC.Core.Unify
 
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Unique.Set
 
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
@@ -122,8 +124,19 @@ optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
 optCoercion opts env co
-  | optCoercionEnabled opts = optCoercion' env co
-  | otherwise               = substCo env co
+  | optCoercionEnabled opts
+  = optCoercion' env co
+{-
+  = pprTrace "optCoercion {" (text "Co:" <+> ppr co) $
+    let result = optCoercion' env co in
+    pprTrace "optCoercion }" (vcat [ text "Co:" <+> ppr co
+                                   , text "Optco:" <+> ppr result ]) $
+    result
+-}
+
+  | otherwise
+  = substCo env co
+
 
 optCoercion' :: Subst -> Coercion -> NormalCo
 optCoercion' env co
@@ -135,19 +148,23 @@ optCoercion' env co
     assertPpr (substTyUnchecked env in_ty1 `eqType` out_ty1 &&
                substTyUnchecked env in_ty2 `eqType` out_ty2 &&
                in_role == out_role)
-              ( text "optCoercion changed types!"
-                 $$ hang (text "in_co:") 2 (ppr co)
-                 $$ hang (text "in_ty1:") 2 (ppr in_ty1)
-                 $$ hang (text "in_ty2:") 2 (ppr in_ty2)
-                 $$ hang (text "out_co:") 2 (ppr out_co)
-                 $$ hang (text "out_ty1:") 2 (ppr out_ty1)
-                 $$ hang (text "out_ty2:") 2 (ppr out_ty2)
-                 $$ hang (text "subst:") 2 (ppr env))
-              out_co
+              (hang (text "optCoercion changed types!")
+                  2 (vcat [ text "in_co:" <+> ppr co
+                          , text "in_ty1:" <+> ppr in_ty1
+                          , text "in_ty2:" <+> ppr in_ty2
+                          , text "out_co:" <+> ppr out_co
+                          , text "out_ty1:" <+> ppr out_ty1
+                          , text "out_ty2:" <+> ppr out_ty2
+                          , text "in_role:" <+> ppr in_role
+                          , text "out_role:" <+> ppr out_role
+                          , vcat $ map ppr_one $ nonDetEltsUniqSet $ coVarsOfCo co
+                          , text "subst:" <+> ppr env ]))
+               out_co
 
   | otherwise         = opt_co1 lc False co
   where
     lc = mkSubstLiftingContext env
+    ppr_one cv = ppr cv <+> dcolon <+> ppr (coVarKind cv)
 
 
 type NormalCo    = Coercion
@@ -190,9 +207,12 @@ opt_co3 env sym _                       r co = opt_co4_wrap env sym False r co
 
 -- See Note [Optimising coercion optimisation]
 -- | Optimize a non-phantom coercion.
-opt_co4, opt_co4_wrap :: LiftingContext -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
-
+opt_co4, opt_co4_wrap :: LiftingContext -> SymFlag -> ReprFlag
+                      -> Role -> Coercion -> NormalCo
+-- Precondition: In every call (opt_co4 lc sym rep role co)
+--               we should have role = coercionRole co
 opt_co4_wrap = opt_co4
+
 {-
 opt_co4_wrap env sym rep r co
   = pprTrace "opt_co4_wrap {"
@@ -200,11 +220,12 @@ opt_co4_wrap env sym rep r co
            , text "Rep:" <+> ppr rep
            , text "Role:" <+> ppr r
            , text "Co:" <+> ppr co ]) $
-    assert (r == coercionRole co )
+    assert (r == coercionRole co )    $
     let result = opt_co4 env sym rep r co in
     pprTrace "opt_co4_wrap }" (ppr co $$ text "---" $$ ppr result) $
     result
 -}
+
 
 opt_co4 env _   rep r (Refl ty)
   = assertPpr (r == Nominal)
@@ -268,15 +289,17 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r cow co1 co2)
+opt_co4 env sym rep r (FunCo _r afl afr cow co1 co2)
   = assert (r == _r) $
-    if rep
-    then mkFunCo Representational cow' co1' co2'
-    else mkFunCo r cow' co1' co2'
+    mkFunCo2 r' afl' afr' cow' co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
     cow' = opt_co1 env sym cow
+    !r' | rep       = Representational
+        | otherwise = r
+    !(afl', afr') | sym       = (afr,afl)
+                  | otherwise = (afl,afr)
 
 opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar (lcSubst env) cv
@@ -332,38 +355,29 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
-opt_co4 env _sym rep r (NthCo _r n co)
-  | Just (ty, _) <- isReflCo_maybe co
-  , Just (_tc, args) <- assert (r == _r )
-                        splitTyConApp_maybe ty
-  = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+opt_co4 env _sym rep r (SelCo n co)
+  | Just (ty, _co_role) <- isReflCo_maybe co
+  = liftCoSubst (chooseRole rep r) env (getNthFromType n ty)
+    -- NB: it is /not/ true that r = _co_role
+    --     Rather, r = coercionRole (SelCo n co)
 
-  | Just (ty, _) <- isReflCo_maybe co
-  , n == 0
-  , Just (tv, _) <- splitForAllTyCoVar_maybe ty
-      -- works for both tyvar and covar
-  = liftCoSubst (chooseRole rep r) env (varType tv)
-
-opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
+opt_co4 env sym rep r (SelCo (SelTyCon n r1) (TyConAppCo _ _ cos))
   = assert (r == r1 )
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
 -- see the definition of GHC.Builtin.Types.Prim.funTyCon
-opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 w co1 co2))
-  = assert (r == r1 )
-    opt_co4_wrap env sym rep r (mkNthCoFunCo n w co1 co2)
+opt_co4 env sym rep r (SelCo (SelFun fs) (FunCo _r2 _afl _afr w co1 co2))
+  = opt_co4_wrap env sym rep r (getNthFun fs w co1 co2)
 
-opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
+opt_co4 env sym rep _ (SelCo SelForAll (ForAllCo _ eta _))
       -- works for both tyvar and covar
-  = assert (r == _r )
-    assert (n == 0 )
-    opt_co4_wrap env sym rep Nominal eta
+  = opt_co4_wrap env sym rep Nominal eta
 
-opt_co4 env sym rep r (NthCo _r n co)
-  | Just nth_co <- case co' of
-      TyConAppCo _ _ cos -> Just (cos `getNth` n)
-      FunCo _ w co1 co2  -> Just (mkNthCoFunCo n w co1 co2)
-      ForAllCo _ eta _   -> Just eta
+opt_co4 env sym rep r (SelCo n co)
+  | Just nth_co <- case (co', n) of
+      (TyConAppCo _ _ cos, SelTyCon n _) -> Just (cos `getNth` n)
+      (FunCo _ _ _ w co1 co2, SelFun fs) -> Just (getNthFun fs w co1 co2)
+      (ForAllCo _ eta _, SelForAll)      -> Just eta
       _                  -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
@@ -371,7 +385,7 @@ opt_co4 env sym rep r (NthCo _r n co)
     else nth_co
 
   | otherwise
-  = wrapRole rep r $ NthCo r n co'
+  = wrapRole rep r $ SelCo n co'
   where
     co' = opt_co1 env sym co
 
@@ -454,8 +468,8 @@ opt_co4 env sym rep r (InstCo co1 arg)
             -- new_co = (h1 :: t1 ~ t2) ~ ((n1;h2;sym n2) :: t1 ~ t2)
             r2  = coVarRole cv
             kind_co' = downgradeRole r2 Nominal kind_co
-            n1 = mkNthCo r2 2 kind_co'
-            n2 = mkNthCo r2 3 kind_co'
+            n1 = mkSelCo (SelTyCon 2 r2) kind_co'
+            n2 = mkSelCo (SelTyCon 3 r2) kind_co'
          in mkProofIrrelCo Nominal (Refl (coercionType h1)) h1
                            (n1 `mkTransCo` h2 `mkTransCo` (mkSymCo n2))
 
@@ -576,9 +590,9 @@ opt_univ env sym prov role oty1 oty2
         eta   = mkUnivCo prov' Nominal k1 k2
         eta_d = downgradeRole r' Nominal eta
           -- eta gets opt'ed soon, but not yet.
-        n_co  = (mkSymCo $ mkNthCo r' 2 eta_d) `mkTransCo`
+        n_co  = (mkSymCo $ mkSelCo (SelTyCon 2 r') eta_d) `mkTransCo`
                 (mkCoVarCo cv1) `mkTransCo`
-                (mkNthCo r' 3 eta_d)
+                (mkSelCo (SelTyCon 3 r') eta_d)
         ty2'  = substTyWithCoVars [cv2] [n_co] ty2
 
         (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
@@ -650,13 +664,12 @@ opt_trans_rule is in_co1@(GRefl r1 t1 (MCo co1)) in_co2@(GRefl r2 _ (MCo co2))
     mkGReflRightCo r1 t1 (opt_trans is co1 co2)
 
 -- Push transitivity through matching destructors
-opt_trans_rule is in_co1@(NthCo r1 d1 co1) in_co2@(NthCo r2 d2 co2)
+opt_trans_rule is in_co1@(SelCo d1 co1) in_co2@(SelCo d2 co2)
   | d1 == d2
   , coercionRole co1 == coercionRole co2
   , co1 `compatible_co` co2
-  = assert (r1 == r2) $
-    fireTransRule "PushNth" in_co1 in_co2 $
-    mkNthCo r1 d1 (opt_trans is co1 co2)
+  = fireTransRule "PushNth" in_co1 in_co2 $
+    mkSelCo d1 (opt_trans is co1 co2)
 
 opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   | d1 == d2
@@ -693,10 +706,14 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
-opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
-  = assert (r1 == r2) $   -- Just like the TyConAppCo/TyConAppCo case
+opt_trans_rule is in_co1@(FunCo r1 afl1 afr1 w1 co1a co1b)
+                  in_co2@(FunCo r2 afl2 afr2 w2 co2a co2b)
+  = assert (r1 == r2)     $     -- Just like the TyConAppCo/TyConAppCo case
+    assert (afr1 == afl2) $
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo r1 (opt_trans is w1 w2) (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+    mkFunCo2 r1 afl1 afr2 (opt_trans is w1 w2)
+                          (opt_trans is co1a co2a)
+                          (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   -- Must call opt_trans_rule_app; see Note [EtaAppCo]
@@ -771,8 +788,8 @@ opt_trans_rule is co1 co2
       is'  = is `extendInScopeSet` cv1
       role = coVarRole cv1
       eta1' = downgradeRole role Nominal eta1
-      n1   = mkNthCo role 2 eta1'
-      n2   = mkNthCo role 3 eta1'
+      n1   = mkSelCo (SelTyCon 2 role) eta1'
+      n2   = mkSelCo (SelTyCon 3 role) eta1'
       r2'  = substCo (zipCvSubst [cv2] [(mkSymCo n1) `mkTransCo`
                                         (mkCoVarCo cv1) `mkTransCo` n2])
                     r2
@@ -1133,9 +1150,9 @@ Similarly, we do this
 
 Here,
 
-  h1   = mkNthCo Nominal 0 g :: (s1~s2)~(s3~s4)
-  eta1 = mkNthCo r 2 h1      :: (s1 ~ s3)
-  eta2 = mkNthCo r 3 h1      :: (s2 ~ s4)
+  h1   = mkSelCo Nominal 0 g       :: (s1~s2)~(s3~s4)
+  eta1 = mkSelCo (SelTyCon 2 r) h1 :: (s1 ~ s3)
+  eta2 = mkSelCo (SelTyCon 3 r) h1 :: (s2 ~ s4)
   h2   = mkInstCo g (cv1 ~ (sym eta1;c1;eta2))
 -}
 etaForAllCo_ty_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
@@ -1147,7 +1164,7 @@ etaForAllCo_ty_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (tv1, _) <- splitForAllTyVar_maybe ty1
   , isForAllTy_ty ty2
-  , let kind_co = mkNthCo Nominal 0 co
+  , let kind_co = mkSelCo SelForAll co
   = Just ( tv1, kind_co
          , mkInstCo co (mkGReflRightCo Nominal (TyVarTy tv1) kind_co))
 
@@ -1163,13 +1180,13 @@ etaForAllCo_co_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (cv1, _) <- splitForAllCoVar_maybe ty1
   , isForAllTy_co ty2
-  = let kind_co  = mkNthCo Nominal 0 co
+  = let kind_co  = mkSelCo SelForAll co
         r        = coVarRole cv1
         l_co     = mkCoVarCo cv1
         kind_co' = downgradeRole r Nominal kind_co
-        r_co     = (mkSymCo (mkNthCo r 2 kind_co')) `mkTransCo`
-                   l_co `mkTransCo`
-                   (mkNthCo r 3 kind_co')
+        r_co     = mkSymCo (mkSelCo (SelTyCon 2 r) kind_co')
+                   `mkTransCo` l_co
+                   `mkTransCo` mkSelCo (SelTyCon 3 r) kind_co'
     in Just ( cv1, kind_co
             , mkInstCo co (mkProofIrrelCo Nominal kind_co l_co r_co))
 
@@ -1196,17 +1213,19 @@ etaAppCo_maybe co
 etaTyConAppCo_maybe :: TyCon -> Coercion -> Maybe [Coercion]
 -- If possible, split a coercion
 --       g :: T s1 .. sn ~ T t1 .. tn
--- into [ Nth 0 g :: s1~t1, ..., Nth (n-1) g :: sn~tn ]
+-- into [ SelCo (SelTyCon 0)     g :: s1~t1
+--      , ...
+--      , SelCo (SelTyCon (n-1)) g :: sn~tn ]
 etaTyConAppCo_maybe tc (TyConAppCo _ tc2 cos2)
   = assert (tc == tc2) $ Just cos2
 
 etaTyConAppCo_maybe tc co
-  | not (mustBeSaturated tc)
+  | not (tyConMustBeSaturated tc)
   , (Pair ty1 ty2, r) <- coercionKindRole co
   , Just (tc1, tys1)  <- splitTyConApp_maybe ty1
   , Just (tc2, tys2)  <- splitTyConApp_maybe ty2
   , tc1 == tc2
-  , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
+  , isInjectiveTyCon tc r  -- See Note [SelCo and newtypes] in GHC.Core.TyCo.Rep
   , let n = length tys1
   , tys2 `lengthIs` n      -- This can fail in an erroneous program
                            -- E.g. T a ~# T a b

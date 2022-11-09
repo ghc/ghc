@@ -53,7 +53,6 @@ import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsSyntaxExpr )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
-import GHC.Tc.Utils.TcType( tcSplitTyConApp )
 import GHC.Core
 import GHC.HsToCore.Monad
 
@@ -143,7 +142,7 @@ selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _ _) = assert (isManyDataConTy _w ) (return (unLoc var))
+selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
 selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
@@ -540,7 +539,7 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq], points (2) and (3)
-                   _      -> mkWildValBinder Many ty1
+                   _      -> mkWildValBinder ManyTy ty1
 
 mkCoreAppDs _ (Var f `App` Type _r) arg
   | f `hasKey` noinlineIdKey   -- See Note [noinlineId magic] in GHC.Types.Id.Make
@@ -630,7 +629,7 @@ There are two cases.
   Note that we return 't' as the variable to force if the pattern
   is strict (i.e. with -XStrict or an outermost-bang-pattern)
 
-  Note that (A) /includes/ the situation where
+  Note that (C) /includes/ the situation where
 
    * The pattern binds exactly one variable
         let !(Just (Just x) = e in body
@@ -640,7 +639,8 @@ There are two cases.
        in t `seq` body
     The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
     Note that forcing 't' makes the pattern match happen,
-    but does not force 'v'.
+    but does not force 'v'.  That's why we call `mkBigCoreVarTupSolo`
+    in `mkSeletcorBinds`
 
   * The pattern binds no variables
         let !(True,False) = e in body
@@ -738,7 +738,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs Many pat_ty
+       ; val_var <- newSysLocalDs ManyTy pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -756,13 +756,13 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs Many tuple_ty
+  = do { tuple_var  <- newSysLocalDs ManyTy tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
        ; let mk_tup_bind tick binder
                = (binder, mkOptTickBox tick $
-                          mkTupleSelector1 local_binders binder
+                          mkBigTupleSelectorSolo local_binders binder
                                            tuple_var (Var tuple_var))
              tup_binds = zipWith mk_tup_bind ticks' binders
        ; return (tuple_var, (tuple_var, tuple_expr) : tup_binds) }
@@ -775,7 +775,7 @@ mkSelectorBinds ticks pat val_expr
     ticks'  = ticks ++ repeat []
 
     local_binders = map localiseId binders      -- See Note [Localise pattern binders]
-    local_tuple   = mkBigCoreVarTup1 binders
+    local_tuple   = mkBigCoreVarTupSolo binders
     tuple_ty      = exprType local_tuple
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
@@ -913,8 +913,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs Many (unboxedUnitTy `mkVisFunTyMany` ty)
-       ; fail_fun_arg <- newSysLocalDs Many unboxedUnitTy
+  = do { fail_fun_var <- newFailLocalDs ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
+       ; fail_fun_arg <- newSysLocalDs ManyTy unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) unboxedUnitExpr) }
@@ -997,7 +997,7 @@ mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique
        this_mod <- getModule
-       let bndr1 = mkSysLocal (fsLit "t1") uq One boolTy
+       let bndr1 = mkSysLocal (fsLit "t1") uq OneTy boolTy
          -- It's always sufficient to pattern-match on a boolean with
          -- multiplicity 'One'.
        let

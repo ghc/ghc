@@ -72,6 +72,7 @@ import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
+import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.Type as Type
 
 import GHC.Iface.Env       ( newInteractiveBinder )
@@ -668,9 +669,12 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
              Nothing -> return hsc_env
              Just new_ty -> do
               case improveRTTIType hsc_env old_ty new_ty of
-               Nothing -> return $
-                        warnPprTrace True (":print failed to calculate the "
-                                           ++ "improvement for a type") empty hsc_env
+               Nothing -> warnPprTrace True (":print failed to calculate the "
+                                             ++ "improvement for a type")
+                              (vcat [ text "id" <+> ppr id
+                                    , text "old_ty" <+> debugPprType old_ty
+                                    , text "new_ty" <+> debugPprType new_ty ]) $
+                          return hsc_env
                Just subst -> do
                  let logger = hsc_logger hsc_env
                  putDumpFileMaybe logger Opt_D_dump_rtti "RTTI"
@@ -1071,8 +1075,8 @@ findMatchingInstances ty = do
     k -> Constraint where k is the type of the queried type.
   -}
   try_cls ies cls
-    | Just (_, arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
-    , tcIsConstraintKind res_kind
+    | Just (_, _, arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
+    , isConstraintKind res_kind
     , Type.typeKind ty `eqType` arg_kind
     , (matches, _, _) <- lookupInstEnv True ies cls [ty]
     = matches

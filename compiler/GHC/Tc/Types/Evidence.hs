@@ -8,7 +8,7 @@ module GHC.Tc.Types.Evidence (
   -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR,
+  mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
   idHsWrapper, isIdHsWrapper,
   pprHsWrapper, hsWrapDictBinders,
@@ -41,22 +41,7 @@ module GHC.Tc.Types.Evidence (
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
   Role(..), LeftOrRight(..), pickLR,
-  mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
-  mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
-  mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
-  mkTcSymCo, mkTcSymMCo,
-  mkTcTransCo,
-  mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSymCo,
-  maybeTcSubCo, tcDowngradeRole,
-  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflRightMCo, mkTcGReflLeftCo, mkTcGReflLeftMCo,
-  mkTcPhantomCo,
-  mkTcCoherenceLeftCo,
-  mkTcCoherenceRightCo,
-  mkTcKindCo,
-  tcCoercionKind,
-  mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo,
-  tcCoercionRole,
+  maybeSymCo,
   unwrapIP, wrapIP,
 
   -- * QuoteWrapper
@@ -68,6 +53,7 @@ import GHC.Prelude
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.FM
 import GHC.Types.Var
+import GHC.Types.Id( idScaledType )
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Coercion
 import GHC.Core.Ppr ()   -- Instance OutputableBndr TyVar
@@ -79,14 +65,11 @@ import GHC.Builtin.Names
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Predicate
-import GHC.Data.Pair
 import GHC.Types.Basic
 
 import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
-
-import GHC.Iface.Type
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -118,97 +101,18 @@ kosher free variables.
 
 -}
 
-type TcCoercion  = Coercion
-type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
-type TcCoercionR = CoercionR    -- A Representational coercion ~R
-type TcCoercionP = CoercionP    -- a phantom coercion
+type TcCoercion   = Coercion
+type TcCoercionN  = CoercionN    -- A Nominal          coercion ~N
+type TcCoercionR  = CoercionR    -- A Representational coercion ~R
+type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
 
-mkTcReflCo             :: Role -> TcType -> TcCoercion
-mkTcSymCo              :: TcCoercion -> TcCoercion
-mkTcSymMCo             :: TcMCoercion -> TcMCoercion
-mkTcTransCo            :: TcCoercion -> TcCoercion -> TcCoercion
-mkTcNomReflCo          :: TcType -> TcCoercionN
-mkTcRepReflCo          :: TcType -> TcCoercionR
-mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
-mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
-mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
-                       -> [TcType] -> [TcCoercion] -> TcCoercion
-mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
-                       -> [TcCoercion] -> TcCoercionR
-mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
-mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
-mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
-mkTcSubCo              :: HasDebugCallStack => TcCoercionN -> TcCoercionR
-tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
-mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
-mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
-mkTcGReflRightMCo      :: Role -> TcType -> TcMCoercionN -> TcCoercion
-mkTcGReflLeftCo        :: Role -> TcType -> TcCoercionN -> TcCoercion
-mkTcGReflLeftMCo       :: Role -> TcType -> TcMCoercionN -> TcCoercion
-mkTcCoherenceLeftCo    :: Role -> TcType -> TcCoercionN
-                       -> TcCoercion -> TcCoercion
-mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
-                       -> TcCoercion -> TcCoercion
-mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
-mkTcKindCo             :: TcCoercion -> TcCoercionN
-mkTcCoVarCo            :: CoVar -> TcCoercion
-
-tcCoercionKind         :: TcCoercion -> Pair TcType
-tcCoercionRole         :: TcCoercion -> Role
-isTcReflCo             :: TcCoercion -> Bool
-
--- | This version does a slow check, calculating the related types and seeing
--- if they are equal.
-isTcReflexiveCo        :: TcCoercion -> Bool
-
-mkTcReflCo             = mkReflCo
-mkTcSymCo              = mkSymCo
-mkTcSymMCo             = mkSymMCo
-mkTcTransCo            = mkTransCo
-mkTcNomReflCo          = mkNomReflCo
-mkTcRepReflCo          = mkRepReflCo
-mkTcTyConAppCo         = mkTyConAppCo
-mkTcAppCo              = mkAppCo
-mkTcFunCo              = mkFunCo
-mkTcAxInstCo           = mkAxInstCo
-mkTcUnbranchedAxInstCo = mkUnbranchedAxInstCo Representational
-mkTcForAllCo           = mkForAllCo
-mkTcForAllCos          = mkForAllCos
-mkTcNthCo              = mkNthCo
-mkTcLRCo               = mkLRCo
-mkTcSubCo              = mkSubCo
-tcDowngradeRole        = downgradeRole
-mkTcAxiomRuleCo        = mkAxiomRuleCo
-mkTcGReflRightCo       = mkGReflRightCo
-mkTcGReflRightMCo      = mkGReflRightMCo
-mkTcGReflLeftCo        = mkGReflLeftCo
-mkTcGReflLeftMCo       = mkGReflLeftMCo
-mkTcCoherenceLeftCo    = mkCoherenceLeftCo
-mkTcCoherenceRightCo   = mkCoherenceRightCo
-mkTcPhantomCo          = mkPhantomCo
-mkTcKindCo             = mkKindCo
-mkTcCoVarCo            = mkCoVarCo
-
-tcCoercionKind         = coercionKind
-tcCoercionRole         = coercionRole
-isTcReflCo             = isReflCo
-isTcReflexiveCo        = isReflexiveCo
-
--- | If the EqRel is ReprEq, makes a SubCo; otherwise, does nothing.
--- Note that the input coercion should always be nominal.
-maybeTcSubCo :: HasDebugCallStack => EqRel -> TcCoercionN -> TcCoercion
-maybeTcSubCo NomEq  = id
-maybeTcSubCo ReprEq = mkTcSubCo
-
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
-maybeTcSymCo :: SwapFlag -> TcCoercion -> TcCoercion
-maybeTcSymCo IsSwapped  co = mkTcSymCo co
-maybeTcSymCo NotSwapped co = co
+maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion
+maybeSymCo IsSwapped  co = mkSymCo co
+maybeSymCo NotSwapped co = co
 
 {-
 %************************************************************************
@@ -241,7 +145,10 @@ data HsWrapper
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) ~> (exp_arg -> exp_res)
        -- This isn't the same as for mkFunCo, but it has to be this way
        -- because we can't use 'sym' to flip around these HsWrappers
-       -- The TcType is the "from" type of the first wrapper
+       -- The TcType is the "from" type of the first wrapper;
+       --     it always a Type, not a Constraint
+       --
+       -- NB: a WpFun is always for a (->) function arrow
        --
        -- Use 'mkWpFun' to construct such a wrapper.
 
@@ -251,8 +158,11 @@ data HsWrapper
 
         -- Evidence abstraction and application
         -- (both dictionaries and coercions)
+        -- Both WpEvLam and WpEvApp abstract and apply values
+        --      of kind CONSTRAINT rep
   | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
   | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
+
         -- Kind and Type abstraction and application
   | WpTyLam TyVar       -- \a. []  the 'a' is a type/kind variable (not coercion var)
   | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
@@ -297,29 +207,42 @@ c1 <.> c2    = c1 `WpCompose` c2
 mkWpFun :: HsWrapper -> HsWrapper
         -> Scaled TcTypeFRR -- ^ the "from" type of the first wrapper
                             -- MUST have a fixed RuntimeRep
-        -> TcType           -- ^ either type of the second wrapper (used only when the
-                            -- second wrapper is the identity)
+        -> TcType           -- ^ Either "from" type or "to" type of the second wrapper
+                            --   (used only when the second wrapper is the identity)
         -> HsWrapper
   -- NB: we can't check that the argument type has a fixed RuntimeRep with an assertion,
   -- because of [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep]
   -- in GHC.Tc.Utils.Concrete.
 mkWpFun WpHole       WpHole       _             _  = WpHole
-mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  = WpCast (mk_wp_fun_co w (mkRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 = WpCast (mk_wp_fun_co w (mkSymCo co1)    (mkRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  = WpCast (mk_wp_fun_co w (mkSymCo co1)    co2)
 mkWpFun co1          co2          t1            _  = WpFun co1 co2 t1
+
+mkWpEta :: [Id] -> HsWrapper -> HsWrapper
+-- (mkWpEta [x1, x2] wrap) [e]
+--   = \x1. \x2.  wrap[e x1 x2]
+-- Just generates a bunch of WpFuns
+mkWpEta xs wrap = foldr eta_one wrap xs
+  where
+    eta_one x wrap = WpFun idHsWrapper wrap (idScaledType x)
+
+mk_wp_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
+mk_wp_fun_co mult arg_co res_co
+  = mkNakedFunCo1 Representational FTF_T_T (multToCo mult) arg_co res_co
+    -- FTF_T_T: WpFun is always (->)
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
-  | isTcReflCo co = WpHole
-  | otherwise     = assertPpr (tcCoercionRole co == Representational) (ppr co) $
-                    WpCast co
+  | isReflCo co = WpHole
+  | otherwise   = assertPpr (coercionRole co == Representational) (ppr co) $
+                  WpCast co
 
 mkWpCastN :: TcCoercionN -> HsWrapper
 mkWpCastN co
-  | isTcReflCo co = WpHole
-  | otherwise     = assertPpr (tcCoercionRole co == Nominal) (ppr co) $
-                    WpCast (mkTcSubCo co)
+  | isReflCo co = WpHole
+  | otherwise   = assertPpr (coercionRole co == Nominal) (ppr co) $
+                  WpCast (mkSubCo co)
     -- The mkTcSubCo converts Nominal to Representational
 
 mkWpTyApps :: [Type] -> HsWrapper
@@ -334,8 +257,8 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 
-mkWpLams :: [Var] -> HsWrapper
-mkWpLams ids = mk_co_lam_fn WpEvLam ids
+mkWpEvLams :: [Var] -> HsWrapper
+mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
 
 mkWpLet :: TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case
@@ -857,10 +780,10 @@ Important Details:
 
 mkEvCast :: EvExpr -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | assertPpr (tcCoercionRole lco == Representational)
+  | assertPpr (coercionRole lco == Representational)
               (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]) $
-    isTcReflCo lco = EvExpr ev
-  | otherwise      = evCast ev lco
+    isReflCo lco = EvExpr ev
+  | otherwise    = evCast ev lco
 
 
 mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
@@ -1038,10 +961,12 @@ instance Outputable EvCallStack where
     = ppr (orig,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
-  ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
-  ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (const ppr) tm <+> ppr t2)
-  ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
+  ppr (EvTypeableTyCon ts _)     = text "TyCon" <+> ppr ts
+  ppr (EvTypeableTyApp t1 t2)    = parens (ppr t1 <+> ppr t2)
+  ppr (EvTypeableTyLit t1)       = text "TyLit" <> ppr t1
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> arr <+> ppr t2)
+    where
+      arr = pprArrowWithMultiplicity visArgTypeLike (Right (ppr tm))
 
 
 ----------------------------------------------------------------------

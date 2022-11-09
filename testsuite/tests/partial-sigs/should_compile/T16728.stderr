@@ -6,4 +6,4 @@ T16728.hs:8:37: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
                at T16728.hs:8:13
     • In the kind ‘_’
       In the first argument of ‘Proxy’, namely ‘(x :: _)’
-      In the type ‘Proxy (x :: _)’
+      In the type signature: f :: forall k (x :: k). Proxy (x :: _)

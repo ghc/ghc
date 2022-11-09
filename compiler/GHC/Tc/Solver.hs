@@ -58,7 +58,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
-import GHC.Builtin.Types ( liftedRepTy, manyDataConTy, liftedDataConTy )
+import GHC.Builtin.Types ( liftedRepTy, liftedDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -2895,7 +2895,7 @@ defaultTyVarTcS the_tv
        ; return True }
   | isMultiplicityVar the_tv
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
-       ; unifyTyVar the_tv manyDataConTy
+       ; unifyTyVar the_tv ManyTy
        ; return True }
   | otherwise
   = return False  -- the common case
@@ -2996,7 +2996,7 @@ to ensure that instance declarations match.  For example consider
      foo x = show (\_ -> True)
 
 Then we'll get a constraint (Show (p ->q)) where p has kind (TYPE r),
-and that won't match the tcTypeKind (*) in the instance decl.  See tests
+and that won't match the typeKind (*) in the instance decl.  See tests
 tc217 and tc175.
 
 We look only at touchable type variables. No further constraints
@@ -3153,7 +3153,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
         | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)
         , [ty] <- filterOutInvisibleTypes (classTyCon cls) tys
               -- Ignore invisible arguments for this purpose
-        , Just tv <- tcGetTyVar_maybe ty
+        , Just tv <- getTyVar_maybe ty
         , isMetaTyVar tv  -- We might have runtime-skolems in GHCi, and
                           -- we definitely don't want to try to assign to those!
         = Left (cc, cls, tv)

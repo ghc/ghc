@@ -17,14 +17,16 @@ mkReflCo :: Role -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyCoVar -> Coercion -> Coercion -> Coercion
-mkFunCo :: Role -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo1 :: HasDebugCallStack => Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkNakedFunCo1 :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo2 :: HasDebugCallStack => Role -> FunTyFlag -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
-mkNthCo :: HasDebugCallStack => Role -> Int -> Coercion -> Coercion
+mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion
 mkGReflCo :: Role -> Type -> MCoercionN -> Coercion

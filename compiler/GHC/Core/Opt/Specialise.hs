@@ -31,7 +31,6 @@ import GHC.Core.Utils     ( exprIsTrivial
                           , mkCast, exprType
                           , stripTicksTop, mkInScopeSetBndrs )
 import GHC.Core.FVs
-import GHC.Core.TyCo.Rep ( TyCoBinder (..) )
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
 
@@ -48,7 +47,7 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Types.Var      ( isLocalVar )
+import GHC.Types.Var      ( PiTyBinder(..), isLocalVar, isInvisibleFunArg )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
@@ -2855,8 +2854,8 @@ callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) =
   foldr (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
-getTheta :: [TyCoBinder] -> [PredType]
-getTheta = fmap tyBinderType . filter isInvisibleBinder . filter (not . isNamedBinder)
+getTheta :: [PiTyBinder] -> [PredType]
+getTheta = fmap piTyBinderType . filter isInvisiblePiTyBinder . filter isAnonPiTyBinder
 
 
 ------------------------------------------------------------
@@ -2905,7 +2904,7 @@ mkCallUDs' env f args
              -- which broadens its applicability, since rules only
              -- fire when saturated
 
-    mk_spec_arg :: OutExpr -> TyCoBinder -> SpecArg
+    mk_spec_arg :: OutExpr -> PiTyBinder -> SpecArg
     mk_spec_arg arg (Named bndr)
       |  binderVar bndr `elemVarSet` constrained_tyvars
       = case arg of
@@ -2913,18 +2912,16 @@ mkCallUDs' env f args
           _       -> pprPanic "ci_key" $ ppr arg
       |  otherwise = UnspecType
 
-    -- For "InvisArg", which are the type-class dictionaries,
+    -- For "invisibleFunArg", which are the type-class dictionaries,
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
-    mk_spec_arg arg (Anon InvisArg pred)
-      | interestingDict arg (scaledThing pred)
+    mk_spec_arg arg (Anon pred af)
+      | isInvisibleFunArg af
+      , interestingDict arg (scaledThing pred)
               -- See Note [Interesting dictionary arguments]
       = SpecDict arg
 
       | otherwise = UnspecArg
-
-    mk_spec_arg _ (Anon VisArg _)
-      = UnspecArg
 
 {-
 Note [Ticks on applications]
@@ -3347,7 +3344,7 @@ newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
        ; let n    = idName b
              ty'  = substTyUnchecked subst (idType b)
-             b'   = mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)
+             b'   = mkUserLocal (nameOccName n) uniq ManyTy ty' (getSrcSpan n)
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }
 
@@ -3357,7 +3354,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocal new_occ uniq Many new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq ManyTy new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

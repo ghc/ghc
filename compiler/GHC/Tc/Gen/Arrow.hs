@@ -33,6 +33,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Core.Multiplicity
+import GHC.Core.Coercion
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
@@ -104,8 +105,7 @@ tcProc pat cmd@(L loc (HsCmdTop names _)) exp_ty
         ; (pat', cmd') <- newArrowScope
                           $ tcCheckPat (ArrowMatchCtxt ProcExpr) pat (unrestricted arg_ty)
                           $ tcCmdTop cmd_env names' cmd (unitTy, res_ty)
-        ; let res_co = mkTcTransCo co
-                         (mkTcAppCo co1 (mkTcNomReflCo res_ty))
+        ; let res_co = co `mkTransCo` mkAppCo co1 (mkNomReflCo res_ty)
         ; return (pat', cmd', res_co) }
 
 {-
@@ -383,11 +383,11 @@ tcCmdMatchLambda env
 
 matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcTypeFRR], TcType)
 matchExpectedCmdArgs 0 ty
-  = return (mkTcNomReflCo ty, [], ty)
+  = return (mkNomReflCo ty, [], ty)
 matchExpectedCmdArgs n ty
   = do { (co1, [ty1, ty2]) <- matchExpectedTyConApp pairTyCon ty
        ; (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
-       ; return (mkTcTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
+       ; return (mkTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
 
 {-
 ************************************************************************
@@ -424,7 +424,8 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n p -> mkLocalId n Many p) tup_names tup_elt_tys -- Many because it's a recursive definition
+        ; let tup_ids = zipWith (\n p -> mkLocalId n ManyTy p) tup_names tup_elt_tys
+                        -- Many because it's a recursive definition
         ; tcExtendIdEnv tup_ids $ do
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->

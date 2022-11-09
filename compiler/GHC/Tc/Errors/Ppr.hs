@@ -25,8 +25,7 @@ module GHC.Tc.Errors.Ppr
 import GHC.Prelude
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types (boxedRepDataConTyCon)
-import GHC.Builtin.Types.Prim (tYPETyCon)
+import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon )
 
 import GHC.Core.Coercion
 import GHC.Core.Unify     ( tcMatchTys )
@@ -1018,6 +1017,7 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids feature
       -> mkSimpleDecorated $
         ppr feature <+> text "are not allowed in type data declarations."
+
     TcRnIllegalNewtype con show_linear_types reason
       -> mkSimpleDecorated $
         vcat [msg, additional]
@@ -1036,7 +1036,8 @@ instance Diagnostic TcRnMessage where
                 ppr con <+> dcolon <+> ppr (dataConDisplayType True con))
               IsGADT ->
                 (text "A newtype must not be a GADT",
-                ppr con <+> dcolon <+> pprWithExplicitKindsWhen sneaky_eq_spec (ppr $ dataConDisplayType show_linear_types con))
+                ppr con <+> dcolon <+> pprWithExplicitKindsWhen sneaky_eq_spec
+                                       (ppr $ dataConDisplayType show_linear_types con))
               HasConstructorContext ->
                 (text "A newtype constructor must not have a context in its type",
                 ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
@@ -1046,12 +1047,10 @@ instance Diagnostic TcRnMessage where
               HasStrictnessAnnotation ->
                 (text "A newtype constructor must not have a strictness annotation", empty)
 
-          -- Is there an EqSpec involving an invisible binder? If so, print the
-          -- error message with explicit kinds.
-          invisible_binders = filter isInvisibleTyConBinder (tyConBinders $ dataConTyCon con)
-          sneaky_eq_spec
-            = any (\eq -> any (( == eqSpecTyVar eq) . binderVar) invisible_binders)
-                $ dataConEqSpec con
+          -- Is the data con a "covert" GADT?  See Note [isCovertGadtDataCon]
+          -- in GHC.Core.DataCon
+          sneaky_eq_spec = isCovertGadtDataCon con
+
     TcRnTypedTHWithPolyType ty
       -> mkSimpleDecorated $
         vcat [ text "Illegal polytype:" <+> ppr ty
@@ -2079,7 +2078,7 @@ format_frr_err ty
   = (bullet <+> ppr tidy_ty <+> dcolon <+> ppr tidy_ki)
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
-    tidy_ki             = tidyType tidy_env (tcTypeKind ty)
+    tidy_ki             = tidyType tidy_env (typeKind ty)
 
 pprField :: (FieldLabelString, TcType) -> SDoc
 pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
@@ -2378,8 +2377,8 @@ pprTcSolverReportMsg ctxt (ReportHoleError hole err) =
   pprHoleError ctxt hole err
 pprTcSolverReportMsg ctxt
   (CannotUnifyVariable
-    { mismatchMsg             = msg
-    , cannotUnifyReason       = reason })
+    { mismatchMsg         = msg
+    , cannotUnifyReason   = reason })
   =  pprMismatchMsg ctxt msg
   $$ pprCannotUnifyVariableReason ctxt reason
 pprTcSolverReportMsg ctxt
@@ -2578,7 +2577,7 @@ pprTcSolverReportMsg ctxt@(CEC {cec_encl = implics})
                , not (isTypeFamilyTyCon tc)
                = hang (text "GHC can't yet do polykinded")
                     2 (text "Typeable" <+>
-                       parens (ppr ty <+> dcolon <+> ppr (tcTypeKind ty)))
+                       parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
                | otherwise
                = empty
 
@@ -2731,13 +2730,14 @@ pprMismatchMsg :: SolverReportErrCtxt -> MismatchMsg -> SDoc
 pprMismatchMsg ctxt
   (BasicMismatch { mismatch_ea   = ea
                  , mismatch_item = item
-                 , mismatch_ty1  = ty1
-                 , mismatch_ty2  = ty2
+                 , mismatch_ty1  = ty1  -- Expected
+                 , mismatch_ty2  = ty2  -- Actual
                  , mismatch_whenMatching = mb_match_txt
                  , mismatch_mb_same_occ  = same_occ_info })
-  = addArising (errorItemCtLoc item) msg
-  $$ maybe empty (pprWhenMatching ctxt) mb_match_txt
-  $$ maybe empty pprSameOccInfo same_occ_info
+  =  vcat [ addArising (errorItemCtLoc item) msg
+          , ea_extra
+          , maybe empty (pprWhenMatching ctxt) mb_match_txt
+          , maybe empty pprSameOccInfo same_occ_info ]
   where
     msg
       | (isLiftedRuntimeRep ty1 && isUnliftedRuntimeRep ty2) ||
@@ -2758,18 +2758,20 @@ pprMismatchMsg ctxt
              , nest padding $
                text herald2 <> colon <+> ppr ty2 ]
 
-    want_ea = case ea of { NoEA -> False; EA {} -> True }
-
     herald1 = conc [ "Couldn't match"
                    , if is_repr then "representation of" else ""
                    , if want_ea then "expected"          else ""
                    , what ]
     herald2 = conc [ "with"
-                   , if is_repr then "that of"          else ""
+                   , if is_repr then "that of"           else ""
                    , if want_ea then ("actual " ++ what) else "" ]
 
     padding = length herald1 - length herald2
 
+    (want_ea, ea_extra)
+      = case ea of
+         NoEA        -> (False, empty)
+         EA mb_extra -> (True , maybe empty (pprExpectedActualInfo ctxt) mb_extra)
     is_repr = case errorItemEqRel item of { ReprEq -> True; NomEq -> False }
 
     what = levelString (ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel)
@@ -2789,7 +2791,7 @@ pprMismatchMsg _
       2 (text "but" <+> quotes (ppr thing) <+> text "has kind" <+>
         quotes (ppr act))
   where
-    kind_desc | tcIsConstraintKind exp = text "a constraint"
+    kind_desc | isConstraintLikeKind exp = text "a constraint"
               | Just arg <- kindRep_maybe exp  -- TYPE t0
               , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
                                    True  -> text "kind" <+> quotes (ppr exp)
@@ -2799,52 +2801,77 @@ pprMismatchMsg _
 pprMismatchMsg ctxt
   (TypeEqMismatch { teq_mismatch_ppr_explicit_kinds = ppr_explicit_kinds
                   , teq_mismatch_item     = item
-                  , teq_mismatch_ty1      = ty1
-                  , teq_mismatch_ty2      = ty2
-                  , teq_mismatch_expected = exp
-                  , teq_mismatch_actual   = act
+                  , teq_mismatch_ty1      = ty1   -- These types are the actual types
+                  , teq_mismatch_ty2      = ty2   --   that don't match; may be swapped
+                  , teq_mismatch_expected = exp   -- These are the context of
+                  , teq_mismatch_actual   = act   --   the mis-match
                   , teq_mismatch_what     = mb_thing
                   , teq_mb_same_occ       = mb_same_occ })
-  = (addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg)
+  = addArising ct_loc $ pprWithExplicitKindsWhen ppr_explicit_kinds msg
   $$ maybe empty pprSameOccInfo mb_same_occ
   where
-    msg
-      | isUnliftedTypeKind act, isLiftedTypeKind exp
-      = sep [ text "Expecting a lifted type, but"
-            , thing_msg mb_thing (text "an") (text "unlifted") ]
-      | isLiftedTypeKind act, isUnliftedTypeKind exp
-      = sep [ text "Expecting an unlifted type, but"
-            , thing_msg mb_thing (text "a") (text "lifted") ]
-      | tcIsLiftedTypeKind exp
-      = maybe_num_args_msg $$
-        sep [ text "Expected a type, but"
-            , case mb_thing of
+    msg | Just (torc, rep) <- sORTKind_maybe exp
+        = msg_for_exp_sort torc rep
+
+        | Just nargs_msg <- num_args_msg
+        , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+        = nargs_msg $$ pprMismatchMsg ctxt ea_msg
+
+        | ea_looks_same ty1 ty2 exp act
+        , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
+        = pprMismatchMsg ctxt ea_msg
+
+        | otherwise
+        = bale_out_msg
+
+      -- bale_out_msg: the mismatched types are /inside/ exp and act
+    bale_out_msg = vcat errs
+      where
+        errs = case mk_ea_msg ctxt Nothing level orig of
+                  Left ea_info -> pprMismatchMsg ctxt mismatch_err
+                                : map (pprExpectedActualInfo ctxt) ea_info
+                  Right ea_err -> [ pprMismatchMsg ctxt mismatch_err
+                                  , pprMismatchMsg ctxt ea_err ]
+        mismatch_err = mkBasicMismatchMsg NoEA item ty1 ty2
+
+      -- 'expected' is (TYPE rep) or (CONSTRAINT rep)
+    msg_for_exp_sort exp_torc exp_rep
+      | Just (act_torc, act_rep) <- sORTKind_maybe act
+      = -- (TYPE exp_rep) ~ (CONSTRAINT act_rep) etc
+        msg_torc_torc act_torc act_rep
+      | otherwise
+      = -- (TYPE _) ~ Bool, etc
+        maybe_num_args_msg $$
+        sep [ text "Expected a" <+> ppr_torc exp_torc <> comma
+            , text "but" <+> case mb_thing of
                 Nothing    -> text "found something with kind"
                 Just thing -> quotes (ppr thing) <+> text "has kind"
             , quotes (pprWithTYPE act) ]
-      | Just nargs_msg <- num_args_msg
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = nargs_msg $$ pprMismatchMsg ctxt ea_msg
-      | -- pprTrace "check" (ppr ea_looks_same $$ ppr exp $$ ppr act $$ ppr ty1 $$ ppr ty2) $
-        ea_looks_same ty1 ty2 exp act
-      , Right ea_msg <- mk_ea_msg ctxt (Just item) level orig
-      = pprMismatchMsg ctxt ea_msg
 
-      | otherwise
-      =
-      -- The mismatched types are /inside/ exp and act
-        let mismatch_err = mkBasicMismatchMsg NoEA item ty1 ty2
-            errs = case mk_ea_msg ctxt Nothing level orig of
-              Left ea_info -> pprMismatchMsg ctxt mismatch_err : map (pprExpectedActualInfo ctxt) ea_info
-              Right ea_err -> [ pprMismatchMsg ctxt mismatch_err, pprMismatchMsg ctxt ea_err ]
-        in vcat errs
+      where
+        msg_torc_torc act_torc act_rep
+          | exp_torc == act_torc
+          = msg_same_torc act_torc act_rep
+          | otherwise
+          = sep [ text "Expected a" <+> ppr_torc exp_torc <> comma
+                , text "but" <+> case mb_thing of
+                     Nothing    -> text "found a"
+                     Just thing -> quotes (ppr thing) <+> text "is a"
+                  <+> ppr_torc act_torc ]
+
+        msg_same_torc act_torc act_rep
+          | Just exp_doc <- describe_rep exp_rep
+          , Just act_doc <- describe_rep act_rep
+          = sep [ text "Expected" <+> exp_doc <+> ppr_torc exp_torc <> comma
+                , text "but" <+> case mb_thing of
+                     Just thing -> quotes (ppr thing) <+> text "is"
+                     Nothing    -> text "got"
+                  <+> act_doc <+> ppr_torc act_torc ]
+        msg_same_torc _ _ = bale_out_msg
 
     ct_loc = errorItemCtLoc item
     orig   = errorItemOrigin item
     level  = ctLocTypeOrKind_maybe ct_loc `orElse` TypeLevel
-
-    thing_msg (Just thing) _  levity = quotes (ppr thing) <+> text "is" <+> levity
-    thing_msg Nothing      an levity = text "got" <+> an <+> levity <+> text "type"
 
     num_args_msg = case level of
       KindLevel
@@ -2865,7 +2892,34 @@ pprMismatchMsg ctxt
 
     maybe_num_args_msg = num_args_msg `orElse` empty
 
-    count_args ty = count isVisibleBinder $ fst $ splitPiTys ty
+    count_args ty = count isVisiblePiTyBinder $ fst $ splitPiTys ty
+
+    ppr_torc TypeLike       = text "type";
+    ppr_torc ConstraintLike = text "constraint"
+
+    describe_rep :: RuntimeRepType -> Maybe SDoc
+    -- describe_rep IntRep            = Just "an IntRep"
+    -- describe_rep (BoxedRep Lifted) = Just "a lifted"
+    --   etc
+    describe_rep rep
+      | Just (rr_tc, rr_args) <- splitRuntimeRep_maybe rep
+      = case rr_args of
+          [lev_ty] | rr_tc `hasKey` boxedRepDataConKey
+                   , Just lev <- levityType_maybe lev_ty
+                -> case lev of
+                      Lifted   -> Just (text "a lifted")
+                      Unlifted -> Just (text "a boxed unlifted")
+          [] | rr_tc `hasKey` tupleRepDataConTyConKey -> Just (text "a zero-bit")
+             | starts_with_vowel rr_occ -> Just (text "an" <+> text rr_occ)
+             | otherwise                -> Just (text "a"  <+> text rr_occ)
+             where
+               rr_occ = occNameString (getOccName rr_tc)
+
+          _ -> Nothing -- Must be TupleRep [r1..rn]
+      | otherwise = Nothing
+
+    starts_with_vowel (c:_) = c `elem` "AEIOU"
+    starts_with_vowel []    = False
 
 pprMismatchMsg ctxt (CouldNotDeduce useful_givens (item :| others) mb_extra)
   = main_msg $$
@@ -3140,9 +3194,9 @@ pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
        || not (cty1 `pickyEqType` cty2)
       then vcat [ hang (text "When matching" <+> sub_whats)
                       2 (vcat [ ppr cty1 <+> dcolon <+>
-                               ppr (tcTypeKind cty1)
+                               ppr (typeKind cty1)
                              , ppr cty2 <+> dcolon <+>
-                               ppr (tcTypeKind cty2) ])
+                               ppr (typeKind cty2) ])
                 , supplementary ]
       else text "When matching the kind of" <+> quotes (ppr cty1)
   where
@@ -3242,7 +3296,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
         hang (text "Found extra-constraints wildcard standing for")
           2 (quotes $ pprType hole_ty)  -- always kind constraint
 
-    hole_kind = tcTypeKind hole_ty
+    hole_kind = typeKind hole_ty
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
@@ -3526,10 +3580,11 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy InvisArg w arg res) -- Look under  c => t
-      = ty { ft_mult = tidy_ty env w,
-             ft_arg = tidyType env arg,
-             ft_res = tidy_ty env res }
+    tidy_ty env ty@(FunTy af w arg res) -- Look under  c => t
+      | isInvisibleFunArg af
+      = ty { ft_mult = tidy_ty env w
+           , ft_arg  = tidyType env arg
+           , ft_res  = tidy_ty env res }
 
     tidy_ty env ty = tidyType env ty
 
@@ -3772,7 +3827,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     --
     -- `tyExpansions (M T10)` returns [Maybe T10] (T10 is not expanded)
     tyExpansions :: Type -> [Type]
-    tyExpansions = unfoldr (\t -> (\x -> (x, x)) `fmap` tcView t)
+    tyExpansions = unfoldr (\t -> (\x -> (x, x)) `fmap` coreView t)
 
     -- Drop the type pairs until types in a pair look alike (i.e. the outer
     -- constructors are the same).

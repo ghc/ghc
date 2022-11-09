@@ -13,8 +13,8 @@ module GHC.Builtin.Uniques
 
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
-    , mkSumTyConUnique
-    , mkSumDataConUnique
+    , mkSumTyConUnique, mkSumDataConUnique
+
       -- ** Tuples
       -- *** Vanilla
     , mkTupleTyConUnique
@@ -45,6 +45,9 @@ module GHC.Builtin.Uniques
 
     , initExitJoinUnique
 
+      -- Boxing data types
+    , mkBoxingTyConUnique, boxingDataConUnique
+
     ) where
 
 import GHC.Prelude
@@ -60,7 +63,6 @@ import GHC.Data.FastString
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Data.Maybe
 
@@ -107,8 +109,9 @@ TypeRep for sum DataCon of arity k and alternative n (zero-based):
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
-    assert (arity < 0x3f) $ -- 0x3f since we only have 6 bits to encode the
-                            -- alternative
+    assertPpr (arity <= 0x3f) (ppr arity) $
+              -- 0x3f since we only have 6 bits to encode the
+              -- alternative
     mkUnique 'z' (arity `shiftL` 8 .|. 0xfc)
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique
@@ -297,6 +300,7 @@ Allocation of unique supply characters:
         other a-z: lower case chars for unique supplies.  Used so far:
 
         a       TypeChecking?
+        b       Boxing tycons & datacons
         c       StgToCmm/Renamer
         d       desugarer
         f       AbsC flattener
@@ -310,6 +314,27 @@ Allocation of unique supply characters:
         u       Cmm pipeline
         y       GHCi bytecode generator
         z       anonymous sums
+
+Note [Related uniques for wired-in things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* All wired in tycons actually use *two* uniques:
+  * u: the TyCon itself
+  * u+1: the TyConRepName of the TyCon (for use with TypeRep)
+  The "+1" is implemented in tyConRepNameUnique.
+  If this ever changes, make sure to also change the treatment for boxing tycons.
+
+* All wired in datacons use *three* uniques:
+  * u: the DataCon itself
+  * u+1: its worker Id
+  * u+2: the TyConRepName of the promoted TyCon
+  No wired-in datacons have wrappers.
+  The "+1" is implemented in dataConWorkerUnique and the "+2" is in dataConTyRepNameUnique.
+  If this ever changes, make sure to also change the treatment for boxing tycons.
+
+* Because boxing tycons (see Note [Boxing constructors] in GHC.Builtin.Types)
+  come with both a tycon and a datacon, each one takes up five slots, combining
+  the two cases above. Getting from the tycon to the datacon (by adding 2)
+  is implemented in boxingDataConUnique.
 -}
 
 mkAlphaTyVarUnique     :: Int -> Unique
@@ -351,29 +376,48 @@ mkTcOccUnique   fs = mkUnique 'c' (uniqueOfFS fs)
 initExitJoinUnique :: Unique
 initExitJoinUnique = mkUnique 's' 0
 
-
 --------------------------------------------------
 -- Wired-in type constructor keys occupy *two* slots:
---    * u: the TyCon itself
---    * u+1: the TyConRepName of the TyCon
+-- See Note [Related uniques for wired-in things]
 
 mkPreludeTyConUnique   :: Int -> Unique
-mkPreludeTyConUnique i                = mkUnique '3' (2*i)
+mkPreludeTyConUnique i = mkUnique '3' (2*i)
 
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
 
 --------------------------------------------------
 -- Wired-in data constructor keys occupy *three* slots:
---    * u: the DataCon itself
---    * u+1: its worker Id
---    * u+2: the TyConRepName of the promoted TyCon
--- Prelude data constructors are too simple to need wrappers.
+-- See Note [Related uniques for wired-in things]
 
 mkPreludeDataConUnique :: Int -> Unique
-mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
+mkPreludeDataConUnique i = mkUnique '6' (3*i)    -- Must be alphabetic
 
---------------------------------------------------
 dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique
 dataConWorkerUnique  u = incrUnique u
 dataConTyRepNameUnique u = stepUnique u 2
+
+--------------------------------------------------
+-- The data constructors of RuntimeRep occupy *five* slots:
+-- See Note [Related uniques for wired-in things]
+--
+--    Example: WordRep
+--
+-- * u: the TyCon of the boxing data type WordBox
+-- * u+1: the TyConRepName of the boxing data type
+-- * u+2: the DataCon for MkWordBox
+-- * u+3: the worker id for MkWordBox
+-- * u+4: the TyConRepName of the promoted TyCon 'MkWordBox
+--
+-- Note carefully that
+-- * u,u+1 are in sync with the conventions for
+--          wired-in type constructors, above
+-- * u+2,u+3,u+4 are in sync with the conventions for
+--               wired-in data constructors, above
+-- A little delicate!
+
+mkBoxingTyConUnique :: Int -> Unique
+mkBoxingTyConUnique i = mkUnique 'b' (5*i)
+
+boxingDataConUnique :: Unique -> Unique
+boxingDataConUnique u = stepUnique u 2

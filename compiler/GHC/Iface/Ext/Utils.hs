@@ -13,7 +13,6 @@ import GHC.Driver.Session    ( DynFlags )
 import GHC.Driver.Ppr
 import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
-import GHC.Core.Multiplicity
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable hiding ( (<>) )
@@ -22,6 +21,7 @@ import GHC.Types.SrcLoc
 import GHC.CoreToIface
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( nonDetCmpType )
 import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -41,6 +41,7 @@ import Data.List                  (find)
 import Data.Traversable           ( for )
 import Data.Coerce
 import GHC.Utils.Monad.State.Strict hiding (get)
+import GHC.Utils.Panic.Plain( assert )
 import Control.Monad.Trans.Reader
 import qualified Data.Tree as Tree
 
@@ -70,8 +71,8 @@ resolveVisibility kind ty_args
       | Just ty' <- coreView ty
       = go env ty' ts
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
-      | isVisibleArgFlag vis = (True , t) : ts'
-      | otherwise            = (False, t) : ts'
+      | isVisibleForAllTyFlag vis = (True , t) : ts'
+      | otherwise                 = (False, t) : ts'
       where
         ts' = go (extendTvSubst env tv t) res ts
 
@@ -160,8 +161,8 @@ hieTypeToIface = foldType go
     go (HLitTy l) = IfaceLitTy l
     go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
                                   in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
-    go (HFunTy w a b)   = IfaceFunTy VisArg   w       a    b
-    go (HQualTy pred b) = IfaceFunTy InvisArg many_ty pred b
+    go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b
+    go (HQualTy pred b) = IfaceFunTy invisArgTypeLike many_ty pred b
     go (HCastTy a) = a
     go HCoercionTy = IfaceTyVar "<coercion type>"
     go (HTyConApp a xs) = IfaceTyConApp a (hieToIfaceArgs xs)
@@ -240,9 +241,9 @@ getTypeIndex t
       ai <- getTypeIndex a
       bi <- getTypeIndex b
       wi <- getTypeIndex w
-      return $ case af of
-                 InvisArg -> case w of Many -> HQualTy ai bi; _ -> error "Unexpected non-unrestricted predicate"
-                 VisArg   -> HFunTy wi ai bi
+      return $ if isInvisibleFunArg af
+               then assert (isManyTy w) $ HQualTy ai bi
+               else                       HFunTy wi ai bi
     go (LitTy a) = return $ HLitTy $ toIfaceTyLit a
     go (CastTy t _) = do
       i <- getTypeIndex t

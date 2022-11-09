@@ -21,7 +21,7 @@ import GHC.Prelude
 import GHC.Types.TyThing ( TyThing(..), tyThingParent_maybe )
 import GHC.Types.Name
 
-import GHC.Core.Type    ( ArgFlag(..), mkTyVarBinders )
+import GHC.Core.Type    ( ForAllTyFlag(..), mkTyVarBinders )
 import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
 import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp )

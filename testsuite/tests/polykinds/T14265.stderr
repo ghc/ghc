@@ -6,7 +6,6 @@ T14265.hs:7:12: error: [GHC-88464]
                at T14265.hs:8:1-8
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘proxy’, namely ‘_’
-      In the type ‘proxy _ -> ()’
       In the type signature: f :: proxy _ -> ()
 
 T14265.hs:10:15: error: [GHC-88464]
@@ -16,7 +15,6 @@ T14265.hs:10:15: error: [GHC-88464]
                at T14265.hs:11:1-15
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘StateT’, namely ‘_’
-      In the type ‘StateT _ _ ()’
       In the type signature: foo :: StateT _ _ ()
 
 T14265.hs:10:17: error: [GHC-88464]
@@ -26,5 +24,4 @@ T14265.hs:10:17: error: [GHC-88464]
                at T14265.hs:11:1-15
       To use the inferred type, enable PartialTypeSignatures
     • In the second argument of ‘StateT’, namely ‘_’
-      In the type ‘StateT _ _ ()’
       In the type signature: foo :: StateT _ _ ()

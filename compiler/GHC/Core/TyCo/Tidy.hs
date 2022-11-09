@@ -13,7 +13,7 @@ module GHC.Core.TyCo.Tidy
         tidyTyCoVarOcc,
         tidyTopType,
         tidyCo, tidyCos,
-        tidyTyCoVarBinder, tidyTyCoVarBinders
+        tidyForAllTyBinder, tidyForAllTyBinders
   ) where
 
 import GHC.Prelude
@@ -78,17 +78,17 @@ getHelpfulOccName tv
    name = varName tv
    occ  = getOccName name
 
-tidyTyCoVarBinder :: TidyEnv -> VarBndr TyCoVar vis
+tidyForAllTyBinder :: TidyEnv -> VarBndr TyCoVar vis
                   -> (TidyEnv, VarBndr TyCoVar vis)
-tidyTyCoVarBinder tidy_env (Bndr tv vis)
+tidyForAllTyBinder tidy_env (Bndr tv vis)
   = (tidy_env', Bndr tv' vis)
   where
     (tidy_env', tv') = tidyVarBndr tidy_env tv
 
-tidyTyCoVarBinders :: TidyEnv -> [VarBndr TyCoVar vis]
+tidyForAllTyBinders :: TidyEnv -> [VarBndr TyCoVar vis]
                    -> (TidyEnv, [VarBndr TyCoVar vis])
-tidyTyCoVarBinders tidy_env tvbs
-  = mapAccumL tidyTyCoVarBinder
+tidyForAllTyBinders tidy_env tvbs
+  = mapAccumL tidyForAllTyBinder
               (avoidNameClashes (binderVars tvbs) tidy_env) tvbs
 
 ---------------
@@ -175,14 +175,14 @@ tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 
 
 -- The following two functions differ from mkForAllTys and splitForAllTyCoVars in that
--- they expect/preserve the ArgFlag argument. These belong to "GHC.Core.Type", but
+-- they expect/preserve the ForAllTyFlag argument. These belong to "GHC.Core.Type", but
 -- how should they be named?
-mkForAllTys' :: [(TyCoVar, ArgFlag)] -> Type -> Type
+mkForAllTys' :: [(TyCoVar, ForAllTyFlag)] -> Type -> Type
 mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
   where
     strictMkForAllTy (tv,vis) ty = (ForAllTy $! ((Bndr $! tv) $! vis)) $! ty
 
-splitForAllTyCoVars' :: Type -> ([TyCoVar], [ArgFlag], Type)
+splitForAllTyCoVars' :: Type -> ([TyCoVar], [ForAllTyFlag], Type)
 splitForAllTyCoVars' ty = go ty [] []
   where
     go (ForAllTy (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
@@ -233,7 +233,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
+    go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
@@ -243,7 +243,7 @@ tidyCo env@(_, subst) co
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
-    go (NthCo r d co)        = NthCo r d $! go co
+    go (SelCo d co)          = SelCo d $! go co
     go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
     go (KindCo co)           = KindCo $! go co

@@ -42,6 +42,7 @@ import GHC.Types.SrcLoc
 import GHC.Core.Type as Hs
 import qualified GHC.Core.Coercion as Coercion ( Role(..) )
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Types.Basic as Hs
 import GHC.Types.Fixity as Hs
 import GHC.Types.ForeignCall
@@ -1581,7 +1582,7 @@ cvtTypeKind typeOrKind ty
                      w'' = hsTypeToArrow w'
                  returnLA (HsFunTy noAnn w'' x'' y'')
              | otherwise
-             -> do { fun_tc <- returnLA $ getRdrName funTyCon
+             -> do { fun_tc <- returnLA $ getRdrName fUNTyCon
                    ; mk_apps (HsTyVar noAnn NotPromoted fun_tc) tys' }
            ListT
              | Just normals <- m_normals

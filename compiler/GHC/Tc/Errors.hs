@@ -1,11 +1,11 @@
 
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
-{-# LANGUAGE ParallelListComp #-}
 
 module GHC.Tc.Errors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
@@ -60,8 +60,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Core.TyCo.Ppr  ( pprTyVars
-                           )
+import GHC.Core.TyCo.Ppr     ( pprTyVars )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -672,7 +671,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     is_user_type_error item _ = isUserTypeError (errorItemPred item)
 
     is_homo_equality _ (EqPred _ ty1 ty2)
-      = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
+      = typeKind ty1 `tcEqType` typeKind ty2
     is_homo_equality _ _
       = False
 
@@ -1098,7 +1097,7 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
                    ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo co_var) } }
+                   ; fillCoercionHole hole (mkCoVarCo co_var) } }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 
 mkErrorTerm :: SolverReportErrCtxt -> CtLoc -> Type  -- of the error term
@@ -1647,9 +1646,9 @@ mkEqErr_help :: SolverReportErrCtxt
              -> ErrorItem
              -> TcType -> TcType -> TcM (TcSolverReportMsg, [GhcHint])
 mkEqErr_help ctxt item ty1 ty2
-  | Just casted_tv1 <- tcGetCastedTyVar_maybe ty1
+  | Just casted_tv1 <- getCastedTyVar_maybe ty1
   = mkTyVarEqErr ctxt item casted_tv1 ty2
-  | Just casted_tv2 <- tcGetCastedTyVar_maybe ty2
+  | Just casted_tv2 <- getCastedTyVar_maybe ty2
   = mkTyVarEqErr ctxt item casted_tv2 ty1
   | otherwise
   = do
@@ -1803,7 +1802,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   , Implic { ic_tclvl = lvl } <- implic
   = assertPpr (not (isTouchableMetaTyVar lvl tv1))
               (ppr tv1 $$ ppr lvl) $ do -- See Note [Error messages for untouchables]
-    tv_extra     <- extraTyVarEqInfo (tv1, Just implic) ty2
+    tv_extra <- extraTyVarEqInfo (tv1, Just implic) ty2
     let tv_extra' = tv_extra { thisTyVarIsUntouchable = Just implic }
         msg = Mismatch
                { mismatchMsg           = mismatch_msg
@@ -1969,7 +1968,7 @@ extraTyVarEqInfo (tv1, mb_implic) ty2
           , thisTyVarIsUntouchable = mb_implic
           , otherTy                = ty2_info }
   where
-    ty_extra ty = case tcGetCastedTyVar_maybe ty of
+    ty_extra ty = case getCastedTyVar_maybe ty of
                     Just (tv, _) -> Just <$> extraTyVarInfo tv
                     Nothing      -> return Nothing
 
@@ -1991,7 +1990,7 @@ suggestAddSig ctxt ty1 _ty2
   = Nothing
   where
     inferred_bndrs =
-      case tcGetTyVar_maybe ty1 of
+      case getTyVar_maybe ty1 of
         Just tv | isSkolemTyVar tv -> find (cec_encl ctxt) False tv
         _                          -> []
 
@@ -2024,8 +2023,7 @@ mkMismatchMsg item ty1 ty2 =
     KindEqOrigin cty1 cty2 sub_o mb_sub_t_or_k ->
       (mkBasicMismatchMsg NoEA item ty1 ty2)
         { mismatch_whenMatching = Just $ WhenMatching cty1 cty2 sub_o mb_sub_t_or_k
-        , mismatch_mb_same_occ  = mb_same_occ
-        }
+        , mismatch_mb_same_occ  = mb_same_occ }
     _ ->
       (mkBasicMismatchMsg NoEA item ty1 ty2)
         { mismatch_mb_same_occ  = mb_same_occ }

@@ -728,7 +728,7 @@ resDel :: Var -> CallArityRes -> CallArityRes
 resDel v (!g, !ae) = (g `delNode` v, ae `delVarEnv` v)
 
 domRes :: CallArityRes -> UnVarSet
-domRes (_, ae) = varEnvDom ae
+domRes (_, ae) = varEnvDomain ae
 
 -- In the result, find out the minimum arity and whether the variable is called
 -- at most once.

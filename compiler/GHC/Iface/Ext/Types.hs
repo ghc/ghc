@@ -143,7 +143,7 @@ data HieType a
   = HTyVarTy Name
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
-  | HForAllTy ((Name, a),ArgFlag) a
+  | HForAllTy ((Name, a),ForAllTyFlag) a
   | HFunTy a a a
   | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
   | HLitTy IfaceTyLit
@@ -206,7 +206,7 @@ instance Binary (HieType TypeIndex) where
 
 
 -- | A list of type arguments along with their respective visibilities (ie. is
--- this an argument that would return 'True' for 'isVisibleArgFlag'?).
+-- this an argument that would return 'True' for 'isVisibleForAllTyFlag'?).
 newtype HieArgs a = HieArgs [(Bool,a)]
   deriving (Functor, Foldable, Traversable, Eq)
 

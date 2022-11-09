@@ -24,18 +24,22 @@ where
 import GHC.Prelude hiding (head, init, last, tail)
 
 import GHC.Hs
-import GHC.Core.Type
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Errors.Types
+import GHC.Tc.Instance.Family
+
+import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.FamInstEnv ( FamInst, FamFlavor(..), mkSingleCoAxiom )
-import GHC.Tc.Instance.Family
+
 import GHC.Unit.Module ( moduleName, moduleUnit
                        , unitFS, getModule )
+
 import GHC.Iface.Env    ( newGlobalBinder )
+
 import GHC.Types.Name hiding ( varName )
 import GHC.Types.Name.Reader
 import GHC.Types.SourceText
@@ -343,7 +347,7 @@ data GenericKind_DC = Gen0_DC | Gen1_DC TyVar
 gk2gkDC :: GenericKind -> DataCon -> [Type] -> GenericKind_DC
 gk2gkDC Gen0 _  _       = Gen0_DC
 gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
-                                  $ getTyVar "gk2gkDC" last_dc_inst_univ
+                                  $ getTyVar last_dc_inst_univ
   where
     dc_inst_univs = dataConInstUnivs dc tc_args
     last_dc_inst_univ = assert (not (null dc_inst_univs)) $

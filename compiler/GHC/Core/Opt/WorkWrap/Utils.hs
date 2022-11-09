@@ -648,8 +648,8 @@ canUnboxResult fam_envs ty cpr
 isLinear :: Scaled a -> Bool
 isLinear (Scaled w _ ) =
   case w of
-    One -> True
-    _ -> False
+    OneTy -> True
+    _     -> False
 
 
 {- Note [Which types are unboxed?]
@@ -1248,7 +1248,7 @@ findTypeShape fam_envs ty
        -- to look deep into such products -- see #18034
   where
     go rec_tc ty
-       | Just (_, _, res) <- splitFunTy_maybe ty
+       | Just (_, _, _, res) <- splitFunTy_maybe ty
        = TsFun (go rec_tc res)
 
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
@@ -1526,7 +1526,7 @@ move_transit_vars vars
                                     (DataAlt tup_con) vars build_res
     , ubx_tup_app )
    where
-    ubx_tup_app = mkCoreUbxTup (map idType vars) (map varToCoreExpr vars)
+    ubx_tup_app = mkCoreUnboxedTuple (map varToCoreExpr vars)
     tup_con     = tupleDataCon Unboxed (length vars)
     -- See also Note [Linear types and CPR]
     case_bndr   = mkWildValBinder cprCaseBndrMult (exprType ubx_tup_app)
@@ -1655,7 +1655,7 @@ mkUnpackCase scrut co mult boxing_con unpk_args body
 -- | The multiplicity of a case binder unboxing a constructed result.
 -- See Note [Linear types and CPR]
 cprCaseBndrMult :: Mult
-cprCaseBndrMult = One
+cprCaseBndrMult = OneTy
 
 ww_prefix :: FastString
 ww_prefix = fsLit "ww"

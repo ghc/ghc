@@ -139,14 +139,15 @@ synonymTyConsOfType ty
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
      go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
-     go_co (FunCo _ co_mult co co') = go_co co_mult `plusNameEnv` go_co co `plusNameEnv` go_co co'
+     go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
+                                  = go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
      go_co (CoVarCo _)            = emptyNameEnv
      go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
      go_co (UnivCo p _ ty ty')    = go_prov p `plusNameEnv` go ty `plusNameEnv` go ty'
      go_co (SymCo co)             = go_co co
      go_co (TransCo co co')       = go_co co `plusNameEnv` go_co co'
-     go_co (NthCo _ _ co)         = go_co co
+     go_co (SelCo _ co)           = go_co co
      go_co (LRCo _ co)            = go_co co
      go_co (InstCo co co')        = go_co co `plusNameEnv` go_co co'
      go_co (KindCo co)            = go_co co
@@ -500,8 +501,8 @@ initialRoleEnv1 hsc_src annots_env tc
   | otherwise             = pprPanic "initialRoleEnv1" (ppr tc)
   where name         = tyConName tc
         bndrs        = tyConBinders tc
-        argflags     = map tyConBinderArgFlag bndrs
-        num_exps     = count isVisibleArgFlag argflags
+        argflags     = map tyConBinderForAllTyFlag bndrs
+        num_exps     = count isVisibleForAllTyFlag argflags
 
           -- if the number of annotations in the role annotation decl
           -- is wrong, just ignore it. We check this in the validity check.
@@ -513,7 +514,7 @@ initialRoleEnv1 hsc_src annots_env tc
         default_roles = build_default_roles argflags role_annots
 
         build_default_roles (argf : argfs) (m_annot : ras)
-          | isVisibleArgFlag argf
+          | isVisibleForAllTyFlag argf
           = (m_annot `orElse` default_role) : build_default_roles argfs ras
         build_default_roles (_argf : argfs) ras
           = Nominal : build_default_roles argfs ras
@@ -902,12 +903,17 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     con1 = assert (not (null cons_w_field)) $ head cons_w_field
 
     -- Selector type; Note [Polymorphic selectors]
-    field_ty   = conLikeFieldType con1 lbl
-    data_tvbs  = filter (\tvb -> binderVar tvb `elemVarSet` data_tv_set) $
-                 conLikeUserTyVarBinders con1
-    data_tv_set= tyCoVarsOfTypes inst_tys
+    field_ty    = conLikeFieldType con1 lbl
+    data_tv_set = tyCoVarsOfTypes (data_ty : req_theta)
+    data_tvbs   = filter (\tvb -> binderVar tvb `elemVarSet` data_tv_set) $
+                  conLikeUserTyVarBinders con1
+
+    -- is_naughty: see Note [Naughty record selectors]
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
-                    || has_sel == NoFieldSelectors
+              || has_sel == NoFieldSelectors  -- No field selectors => all are naughty
+                                              -- thus suppressing making a binding
+                                              -- A slight hack!
+
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
            | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
@@ -965,23 +971,12 @@ mkOneRecordSelector all_cons idDetails fl has_sel
         --                 B :: { fld :: Int } -> T Int Char
     dealt_with :: ConLike -> Bool
     dealt_with (PatSynCon _) = False -- We can't predict overlap
-    dealt_with con@(RealDataCon dc) =
-      con `elem` cons_w_field || dataConCannotMatch inst_tys dc
+    dealt_with con@(RealDataCon dc)
+      = con `elem` cons_w_field || dataConCannotMatch inst_tys dc
+      where
+        inst_tys = dataConResRepTyArgs dc
 
-    (univ_tvs, _, eq_spec, _, req_theta, _, data_ty) = conLikeFullSig con1
-
-    eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
-    -- inst_tys corresponds to one of the following:
-    --
-    --  * The arguments to the user-written return type (for GADT constructors).
-    --    In this scenario, eq_subst provides a mapping from the universally
-    --    quantified type variables to the argument types. Note that eq_subst
-    --    does not need to be applied to any other part of the DataCon
-    --    (see Note [The dcEqSpec domain invariant] in GHC.Core.DataCon).
-    --  * The universally quantified type variables
-    --    (for Haskell98-style constructors and pattern synonyms). In these
-    --    scenarios, eq_subst is an empty substitution.
-    inst_tys = substTyVars eq_subst univ_tvs
+    (_, _, _, _, req_theta, _, data_ty) = conLikeFullSig con1
 
     unit_rhs = mkLHsTupleExpr [] noExtField
     msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
@@ -1042,9 +1037,28 @@ helpfully, rather than saying unhelpfully that 'x' is not in scope.
 Hence the sel_naughty flag, to identify record selectors that don't really exist.
 
 In general, a field is "naughty" if its type mentions a type variable that
-isn't in the result type of the constructor.  Note that this *allows*
-GADT record selectors (Note [GADT record selectors]) whose types may look
-like     sel :: T [a] -> a
+isn't in
+  * the (original, user-written) result type of the constructor, or
+  * the "required theta" for the constructor
+
+Note that this *allows* GADT record selectors (Note [GADT record
+selectors]) whose types may look like sel :: T [a] -> a
+
+The "required theta" part is illustrated by test patsyn/should_run/records_run
+where we have
+
+  pattern ReadP :: Read a => a -> String
+  pattern ReadP {readp} <- (read -> readp)
+
+The selector is defined like this:
+
+  $selreadp :: ReadP a => String -> a
+  $selReadP s = readp s
+
+Perfectly fine!  The (ReadP a) constraint lets us contructor a value
+of type 'a' from a bare String.  NB: "required theta" is empty for
+data cons (see conLikeFullSig), so this reasoning only bites for
+patttern synonyms.
 
 For naughty selectors we make a dummy binding
    sel = ()

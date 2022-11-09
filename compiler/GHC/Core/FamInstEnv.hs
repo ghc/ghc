@@ -42,6 +42,7 @@ import GHC.Prelude
 import GHC.Core.Unify
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Compare( eqType, eqTypes )
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom

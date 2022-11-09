@@ -17,8 +17,8 @@ mAX_TUPLE_SIZE = 64 -- Should really match the number
 mAX_CTUPLE_SIZE :: Int   -- Constraint tuples
 mAX_CTUPLE_SIZE = 64     -- Should match the number of decls in GHC.Classes
 
-mAX_SUM_SIZE :: Int
-mAX_SUM_SIZE = 64
+mAX_SUM_SIZE :: Int      -- We use 6 bits to record sum size,
+mAX_SUM_SIZE = 63        -- so max sum size is 63.  Sadly inconsistent.
 
 -- | Default maximum depth for both class instance search and type family
 -- reduction. See also #5395.

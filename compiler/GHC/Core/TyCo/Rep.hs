@@ -30,13 +30,13 @@ module GHC.Core.TyCo.Rep (
 
         TyLit(..),
         KindOrType, Kind,
-        RuntimeRepType,
+        RuntimeRepType, LevityType,
         KnotTied,
         PredType, ThetaType, FRRType,     -- Synonyms
-        ArgFlag(..), AnonArgFlag(..),
+        ForAllTyFlag(..), FunTyFlag(..),
 
         -- * Coercions
-        Coercion(..),
+        Coercion(..), CoSel(..), FunSel(..),
         UnivCoProvenance(..),
         CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
@@ -45,22 +45,14 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
+        mkFunTy, mkNakedKindFunTy,
+        mkVisFunTy, mkScaledFunTys,
+        mkInvisFunTy, mkInvisFunTys,
+        tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
-        mkFunTyMany,
-        mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
-        mkInvisFunTyMany, mkInvisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
-
-        -- * Functions over binders
-        TyCoBinder(..), TyCoVarBinder, TyBinder,
-        binderVar, binderVars, binderType, binderArgFlag,
-        delBinderVar,
-        isInvisibleArgFlag, isVisibleArgFlag,
-        isInvisibleBinder, isVisibleBinder,
-        isTyBinder, isNamedBinder,
 
         -- * Functions over coercions
         pickLR,
@@ -78,27 +70,30 @@ module GHC.Core.TyCo.Rep (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
+import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
 import GHC.Types.Var
-import GHC.Types.Var.Set
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
-import {-# SOURCE #-} GHC.Builtin.Types ( manyDataConTy )
+import GHC.Builtin.Names
+
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
-import GHC.Types.Unique ( Uniquable(..) )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Binary
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
+import Control.DeepSeq
 
 {- **********************************************************************
 *                                                                       *
@@ -115,6 +110,9 @@ type Kind = Type
 
 -- | Type synonym used for types of kind RuntimeRep.
 type RuntimeRepType = Type
+
+-- | Type synonym used for types of kind Levity.
+type LevityType = Type
 
 -- A type with a syntactically fixed RuntimeRep, in the sense
 -- of Note [Fixed RuntimeRep] in GHC.Tc.Utils.Concrete.
@@ -155,7 +153,7 @@ data Type
                         --    can appear as the right hand side of a type synonym.
 
   | ForAllTy
-        {-# UNPACK #-} !TyCoVarBinder
+        {-# UNPACK #-} !ForAllTyBinder
         Type            -- ^ A Π type.
              -- Note [When we quantify over a coercion variable]
              -- INVARIANT: If the binder is a coercion variable, it must
@@ -164,10 +162,14 @@ data Type
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
-     , ft_mult :: Mult          -- Multiplicity
-     , ft_arg :: Type           -- Argument type
-     , ft_res :: Type }         -- Result type
+     { ft_af   :: FunTyFlag    -- Is this (->/FUN) or (=>) or (==>)?
+                                 -- This info is fully specified by the kinds in
+                                 --      ft_arg and ft_res
+                                 -- Note [FunTyFlag] in GHC.Types.Var
+
+     , ft_mult :: Mult           -- Multiplicity; always Many for (=>) and (==>)
+     , ft_arg  :: Type           -- Argument type
+     , ft_res  :: Type }         -- Result type
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -232,9 +234,9 @@ FunTy is the constructor for a function type.  Here are the details:
             TYPE r2 ->
             Type
   mkTyConApp ensures that we convert a saturated application
-    TyConApp FUN [m,r1,r2,t1,t2] into FunTy VisArg m t1 t2
+    TyConApp FUN [m,r1,r2,t1,t2] into FunTy FTF_T_T m t1 t2
   dropping the 'r1' and 'r2' arguments; they are easily recovered
-  from 't1' and 't2'. The visibility is always VisArg, because
+  from 't1' and 't2'. The FunTyFlag is always FTF_T_T, because
   we build constraint arrows (=>) with e.g. mkPhiTy and friends,
   never `mkTyConApp funTyCon args`.
 
@@ -255,12 +257,8 @@ FunTy is the constructor for a function type.  Here are the details:
   There is a plan to change the argument order and make the
   multiplicity argument nondependent in #20164.
 
-* The ft_af field says whether or not this is an invisible argument
-     VisArg:   t1 -> t2    Ordinary function type
-     InvisArg: t1 => t2    t1 is guaranteed to be a predicate type,
-                           i.e. t1 :: Constraint
+* Re the ft_af field: see Note [FunTyFlag] in GHC.Types.Var
   See Note [Types for coercions, predicates, and evidence]
-
   This visibility info makes no difference in Core; it matters
   only when we regard the type as a Haskell source type.
 
@@ -299,8 +297,8 @@ When treated as a user type,
     of kind Constrain), are just regular old types, are
     visible, and are not implicitly instantiated.
 
-In a FunTy { ft_af = InvisArg }, the argument type is always
-a Predicate type.
+In a FunTy { ft_af = af } and af = FTF_C_T or FTF_C_C, the argument
+type is always a Predicate type.
 
 Note [Weird typing rule for ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -363,7 +361,7 @@ How does this work?
   the box on the spot.
 
 * How can we get such a MkT?  By promoting a GADT-style data
-  constructor
+  constructor, written with an explicit equality constraint.
      data T a b where
        MkT :: (a~b) => a -> b -> T a b
   See DataCon.mkPromotedDataCon
@@ -386,15 +384,15 @@ How does this work?
 
 * The existence of promoted MkT with an equality-constraint
   argument is the (only) reason that the AnonTCB constructor
-  of TyConBndrVis carries an AnonArgFlag (VisArg/InvisArg).
+  of TyConBndrVis carries an FunTyFlag.
   For example, when we promote the data constructor
      MkT :: forall a b. (a~b) => a -> b -> T a b
   we get a PromotedDataCon with tyConBinders
       Bndr (a :: Type)  (NamedTCB Inferred)
       Bndr (b :: Type)  (NamedTCB Inferred)
-      Bndr (_ :: a ~ b) (AnonTCB InvisArg)
-      Bndr (_ :: a)     (AnonTCB VisArg))
-      Bndr (_ :: b)     (AnonTCB VisArg))
+      Bndr (_ :: a ~ b) (AnonTCB FTF_C_T)
+      Bndr (_ :: a)     (AnonTCB FTF_T_T))
+      Bndr (_ :: b)     (AnonTCB FTF_T_T))
 
 * One might reasonably wonder who *unpacks* these boxes once they are
   made. After all, there is no type-level `case` construct. The
@@ -539,12 +537,6 @@ cannot appear outside a coercion. We do not (yet) have a function to
 extract relevant free variables, but it would not be hard to write if
 the need arises.
 
-Besides eqType, another equality relation that upholds the (EQ) property above
-is /typechecker equality/, which is implemented as
-GHC.Tc.Utils.TcType.tcEqType. See
-Note [Typechecker equality vs definitional equality] in GHC.Tc.Utils.TcType for
-what the difference between eqType and tcEqType is.
-
 Note [Respecting definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note [Non-trivial definitional equality] introduces the property (EQ).
@@ -634,7 +626,7 @@ the kinds of the arg and the res.
 
 Note [When we quantify over a coercion variable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The TyCoVarBinder in a ForAllTy can be (most often) a TyVar or (rarely)
+The ForAllTyBinder in a ForAllTy can be (most often) a TyVar or (rarely)
 a CoVar. We support quantifying over a CoVar here in order to support
 a homogeneous (~#) relation (someday -- not yet implemented). Here is
 the example:
@@ -664,11 +656,11 @@ See #15710 about that.
 Note [Unused coercion variable in ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
-  \(co:t1 ~ t2). e
+  \(co:t1 ~# t2). e
 
-What type should we give to this expression?
-  (1) forall (co:t1 ~ t2) -> t
-  (2) (t1 ~ t2) -> t
+What type should we give to the above expression?
+  (1) forall (co:t1 ~# t2) -> t
+  (2) (t1 ~# t2) -> t
 
 If co is used in t, (1) should be the right choice.
 if co is not used in t, we would like to have (1) and (2) equivalent.
@@ -731,242 +723,6 @@ are truly unrelated.
 -- Note [Type checking recursive type and class declarations] in
 -- "GHC.Tc.TyCl"
 type KnotTied ty = ty
-
-{- **********************************************************************
-*                                                                       *
-                  TyCoBinder and ArgFlag
-*                                                                       *
-********************************************************************** -}
-
--- | A 'TyCoBinder' represents an argument to a function. TyCoBinders can be
--- dependent ('Named') or nondependent ('Anon'). They may also be visible or
--- not. See Note [TyCoBinders]
-data TyCoBinder
-  = Named TyCoVarBinder    -- A type-lambda binder
-  | Anon AnonArgFlag (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
-                                    -- Visibility is determined by the AnonArgFlag
-  deriving Data.Data
-
-instance Outputable TyCoBinder where
-  ppr (Anon af ty) = ppr af <+> ppr ty
-  ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
-  ppr (Named (Bndr v Inferred))  = braces (ppr v)
-
-
--- | 'TyBinder' is like 'TyCoBinder', but there can only be 'TyVarBinder'
--- in the 'Named' field.
-type TyBinder = TyCoBinder
-
--- | Remove the binder's variable from the set, if the binder has
--- a variable.
-delBinderVar :: VarSet -> TyCoVarBinder -> VarSet
-delBinderVar vars (Bndr tv _) = vars `delVarSet` tv
-
--- | Does this binder bind an invisible argument?
-isInvisibleBinder :: TyCoBinder -> Bool
-isInvisibleBinder (Named (Bndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon InvisArg _)    = True
-isInvisibleBinder (Anon VisArg   _)    = False
-
--- | Does this binder bind a visible argument?
-isVisibleBinder :: TyCoBinder -> Bool
-isVisibleBinder = not . isInvisibleBinder
-
-isNamedBinder :: TyCoBinder -> Bool
-isNamedBinder (Named {}) = True
-isNamedBinder (Anon {})  = False
-
--- | If its a named binder, is the binder a tyvar?
--- Returns True for nondependent binder.
--- This check that we're really returning a *Ty*Binder (as opposed to a
--- coercion binder). That way, if/when we allow coercion quantification
--- in more places, we'll know we missed updating some function.
-isTyBinder :: TyCoBinder -> Bool
-isTyBinder (Named bnd) = isTyVarBinder bnd
-isTyBinder _ = True
-
-{- Note [TyCoBinders]
-~~~~~~~~~~~~~~~~~~~
-A ForAllTy contains a TyCoVarBinder.  But a type can be decomposed
-to a telescope consisting of a [TyCoBinder]
-
-A TyCoBinder represents the type of binders -- that is, the type of an
-argument to a Pi-type. GHC Core currently supports two different
-Pi-types:
-
- * A non-dependent function type,
-   written with ->, e.g. ty1 -> ty2
-   represented as FunTy ty1 ty2. These are
-   lifted to Coercions with the corresponding FunCo.
-
- * A dependent compile-time-only polytype,
-   written with forall, e.g.  forall (a:*). ty
-   represented as ForAllTy (Bndr a v) ty
-
-Both Pi-types classify terms/types that take an argument. In other
-words, if `x` is either a function or a polytype, `x arg` makes sense
-(for an appropriate `arg`).
-
-
-Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* A ForAllTy (used for both types and kinds) contains a TyCoVarBinder.
-  Each TyCoVarBinder
-      Bndr a tvis
-  is equipped with tvis::ArgFlag, which says whether or not arguments
-  for this binder should be visible (explicit) in source Haskell.
-
-* A TyCon contains a list of TyConBinders.  Each TyConBinder
-      Bndr a cvis
-  is equipped with cvis::TyConBndrVis, which says whether or not type
-  and kind arguments for this TyCon should be visible (explicit) in
-  source Haskell.
-
-This table summarises the visibility rules:
----------------------------------------------------------------------------------------
-|                                                      Occurrences look like this
-|                             GHC displays type as     in Haskell source code
-|--------------------------------------------------------------------------------------
-| Bndr a tvis :: TyCoVarBinder, in the binder of ForAllTy for a term
-|  tvis :: ArgFlag
-|  tvis = Inferred:            f :: forall {a}. type    Arg not allowed:  f
-                               f :: forall {co}. type   Arg not allowed:  f
-|  tvis = Specified:           f :: forall a. type      Arg optional:     f  or  f @Int
-|  tvis = Required:            T :: forall k -> type    Arg required:     T *
-|    This last form is illegal in terms: See Note [No Required TyCoBinder in terms]
-|
-| Bndr k cvis :: TyConBinder, in the TyConBinders of a TyCon
-|  cvis :: TyConBndrVis
-|  cvis = AnonTCB:             T :: kind -> kind        Required:            T *
-|  cvis = NamedTCB Inferred:   T :: forall {k}. kind    Arg not allowed:     T
-|                              T :: forall {co}. kind   Arg not allowed:     T
-|  cvis = NamedTCB Specified:  T :: forall k. kind      Arg not allowed[1]:  T
-|  cvis = NamedTCB Required:   T :: forall k -> kind    Required:            T *
----------------------------------------------------------------------------------------
-
-[1] In types, in the Specified case, it would make sense to allow
-    optional kind applications, thus (T @*), but we have not
-    yet implemented that
-
----- In term declarations ----
-
-* Inferred.  Function defn, with no signature:  f1 x = x
-  We infer f1 :: forall {a}. a -> a, with 'a' Inferred
-  It's Inferred because it doesn't appear in any
-  user-written signature for f1
-
-* Specified.  Function defn, with signature (implicit forall):
-     f2 :: a -> a; f2 x = x
-  So f2 gets the type f2 :: forall a. a -> a, with 'a' Specified
-  even though 'a' is not bound in the source code by an explicit forall
-
-* Specified.  Function defn, with signature (explicit forall):
-     f3 :: forall a. a -> a; f3 x = x
-  So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
-
-* Inferred.  Function defn, with signature (explicit forall), marked as inferred:
-     f4 :: forall {a}. a -> a; f4 x = x
-  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
-  It's Inferred because the user marked it as such, even though it does appear
-  in the user-written signature for f4
-
-* Inferred/Specified.  Function signature with inferred kind polymorphism.
-     f5 :: a b -> Int
-  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
-  Here 'k' is Inferred (it's not mentioned in the type),
-  but 'a' and 'b' are Specified.
-
-* Specified.  Function signature with explicit kind polymorphism
-     f6 :: a (b :: k) -> Int
-  This time 'k' is Specified, because it is mentioned explicitly,
-  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
-
-* Similarly pattern synonyms:
-  Inferred - from inferred types (e.g. no pattern type signature)
-           - or from inferred kind polymorphism
-
----- In type declarations ----
-
-* Inferred (k)
-     data T1 a b = MkT1 (a b)
-  Here T1's kind is  T1 :: forall {k:*}. (k->*) -> k -> *
-  The kind variable 'k' is Inferred, since it is not mentioned
-
-  Note that 'a' and 'b' correspond to /Anon/ TyCoBinders in T1's kind,
-  and Anon binders don't have a visibility flag. (Or you could think
-  of Anon having an implicit Required flag.)
-
-* Specified (k)
-     data T2 (a::k->*) b = MkT (a b)
-  Here T's kind is  T :: forall (k:*). (k->*) -> k -> *
-  The kind variable 'k' is Specified, since it is mentioned in
-  the signature.
-
-* Required (k)
-     data T k (a::k->*) b = MkT (a b)
-  Here T's kind is  T :: forall k:* -> (k->*) -> k -> *
-  The kind is Required, since it bound in a positional way in T's declaration
-  Every use of T must be explicitly applied to a kind
-
-* Inferred (k1), Specified (k)
-     data T a b (c :: k) = MkT (a b) (Proxy c)
-  Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
-  So 'k' is Specified, because it appears explicitly,
-  but 'k1' is Inferred, because it does not
-
-Generally, in the list of TyConBinders for a TyCon,
-
-* Inferred arguments always come first
-* Specified, Anon and Required can be mixed
-
-e.g.
-  data Foo (a :: Type) :: forall b. (a -> b -> Type) -> Type where ...
-
-Here Foo's TyConBinders are
-   [Required 'a', Specified 'b', Anon]
-and its kind prints as
-   Foo :: forall a -> forall b. (a -> b -> Type) -> Type
-
-See also Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
-
----- Printing -----
-
- We print forall types with enough syntax to tell you their visibility
- flag.  But this is not source Haskell, and these types may not all
- be parsable.
-
- Specified: a list of Specified binders is written between `forall` and `.`:
-               const :: forall a b. a -> b -> a
-
- Inferred: like Specified, but every binder is written in braces:
-               f :: forall {k} (a:k). S k a -> Int
-
- Required: binders are put between `forall` and `->`:
-              T :: forall k -> *
-
----- Other points -----
-
-* In classic Haskell, all named binders (that is, the type variables in
-  a polymorphic function type f :: forall a. a -> a) have been Inferred.
-
-* Inferred variables correspond to "generalized" variables from the
-  Visible Type Applications paper (ESOP'16).
-
-Note [No Required TyCoBinder in terms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't allow Required foralls for term variables, including pattern
-synonyms and data constructors.  Why?  Because then an application
-would need a /compulsory/ type argument (possibly without an "@"?),
-thus (f Int); and we don't have concrete syntax for that.
-
-We could change this decision, but Required, Named TyCoBinders are rare
-anyway.  (Most are Anons.)
-
-However the type of a term can (just about) have a required quantifier;
-see Note [Required quantifiers in the type of a term] in GHC.Tc.Gen.Expr.
--}
-
 
 {- **********************************************************************
 *                                                                       *
@@ -1041,60 +797,106 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
-         `mkInvisFunTyMany`      -- Associates to the right
+infixr 3 `mkFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`
 
-mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
-mkFunTy af mult arg res = FunTy { ft_af = af
-                                , ft_mult = mult
-                                , ft_arg = arg
-                                , ft_res = res }
+mkNakedKindFunTy :: FunTyFlag -> Kind -> Kind -> Kind
+-- See Note [Naked FunTy] in GHC.Builtin.Types
+-- Always Many multiplicity; kinds have no linearity
+mkNakedKindFunTy af arg res
+ =  FunTy { ft_af   = af, ft_mult = manyDataConTy
+          , ft_arg  = arg, ft_res  = res }
 
-mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
-mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+mkFunTy :: HasDebugCallStack => FunTyFlag -> Mult -> Type -> Type -> Type
+mkFunTy af mult arg res
+  = assertPpr (af == chooseFunTyFlag arg res) (vcat
+      [ text "af" <+> ppr af
+      , text "chooseAAF" <+> ppr (chooseFunTyFlag arg res)
+      , text "arg" <+> ppr arg <+> dcolon <+> ppr (typeKind arg)
+      , text "res" <+> ppr res <+> dcolon <+> ppr (typeKind res) ]) $
+    FunTy { ft_af   = af
+          , ft_mult = mult
+          , ft_arg  = arg
+          , ft_res  = res }
 
-mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
-mkVisFunTy   = mkFunTy VisArg
-mkInvisFunTy = mkFunTy InvisArg
+mkInvisFunTy :: HasDebugCallStack => Type -> Type -> Type
+mkInvisFunTy arg res
+  = mkFunTy (invisArg (typeTypeOrConstraint res)) manyDataConTy arg res
 
-mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
-mkFunTyMany af = mkFunTy af manyDataConTy
+mkInvisFunTys :: HasDebugCallStack => [Type] -> Type -> Type
+mkInvisFunTys args res
+  = foldr (mkFunTy af manyDataConTy) res args
+  where
+    af = invisArg (typeTypeOrConstraint res)
 
--- | Special, common, case: Arrow type with mult Many
-mkVisFunTyMany :: Type -> Type -> Type
-mkVisFunTyMany = mkVisFunTy manyDataConTy
+tcMkVisFunTy :: Mult -> Type -> Type -> Type
+-- Always TypeLike, user-specified multiplicity.
+-- Does not have the assert-checking in mkFunTy: used by the typechecker
+-- to avoid looking at the result kind, which may not be zonked
+tcMkVisFunTy mult arg res
+  = FunTy { ft_af = visArgTypeLike, ft_mult = mult
+          , ft_arg = arg, ft_res = res }
 
-mkInvisFunTyMany :: Type -> Type -> Type
-mkInvisFunTyMany = mkInvisFunTy manyDataConTy
+tcMkInvisFunTy :: TypeOrConstraint -> Type -> Type -> Type
+-- Always TypeLike, invisible argument
+-- Does not have the assert-checking in mkFunTy: used by the typechecker
+-- to avoid looking at the result kind, which may not be zonked
+tcMkInvisFunTy res_torc arg res
+  = FunTy { ft_af = invisArg res_torc, ft_mult = manyDataConTy
+          , ft_arg = arg, ft_res = res }
+
+mkVisFunTy :: HasDebugCallStack => Mult -> Type -> Type -> Type
+-- Always TypeLike, user-specified multiplicity.
+mkVisFunTy = mkFunTy visArgTypeLike
 
 -- | Make nested arrow types
-mkVisFunTys :: [Scaled Type] -> Type -> Type
-mkVisFunTys tys ty = foldr (mkScaledFunTy VisArg) ty tys
+-- | Special, common, case: Arrow type with mult Many
+mkVisFunTyMany :: HasDebugCallStack => Type -> Type -> Type
+-- Always TypeLike, multiplicity Many
+mkVisFunTyMany = mkVisFunTy manyDataConTy
 
 mkVisFunTysMany :: [Type] -> Type -> Type
+-- Always TypeLike, multiplicity Many
 mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
 
-mkInvisFunTysMany :: [Type] -> Type -> Type
-mkInvisFunTysMany tys ty = foldr mkInvisFunTyMany ty tys
+---------------
+mkScaledFunTy :: HasDebugCallStack => FunTyFlag -> Scaled Type -> Type -> Type
+mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
 
+mkScaledFunTys :: HasDebugCallStack => [Scaled Type] -> Type -> Type
+-- All visible args
+-- Result type can be TypeLike or ConstraintLike
+-- Example of the latter: dataConWrapperType for the data con of a class
+mkScaledFunTys tys ty = foldr (mkScaledFunTy af) ty tys
+  where
+    af = visArg (typeTypeOrConstraint ty)
+
+tcMkScaledFunTys :: [Scaled Type] -> Type -> Type
+-- All visible args
+-- Result type must be TypeLike
+-- No mkFunTy assert checking; result kind may not be zonked
+tcMkScaledFunTys tys ty = foldr mk ty tys
+  where
+    mk (Scaled mult arg) res = tcMkVisFunTy mult arg res
+
+---------------
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
-mkForAllTy :: TyCoVar -> ArgFlag -> Type -> Type
-mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
+mkForAllTy :: ForAllTyBinder -> Type -> Type
+mkForAllTy = ForAllTy
 
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
-mkForAllTys :: [TyCoVarBinder] -> Type -> Type
+mkForAllTys :: [ForAllTyBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
 
-mkPiTy :: TyCoBinder -> Type -> Type
-mkPiTy (Anon af ty1) ty2        = mkScaledFunTy af ty1 ty2
-mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
+mkPiTy :: PiTyBinder -> Type -> Type
+mkPiTy (Anon ty1 af) ty2  = mkScaledFunTy af ty1 ty2
+mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
 
-mkPiTys :: [TyCoBinder] -> Type -> Type
+mkPiTys :: [PiTyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
 
 -- | 'mkNakedTyConTy' creates a nullary 'TyConApp'. In general you
@@ -1158,13 +960,15 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
-         -- FunCo :: "e" -> N -> e -> e -> e
-         -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
-         -- Because the AnonArgFlag has no impact on Core; it is only
-         -- there to guide implicit instantiation of Haskell source
-         -- types, and that is irrelevant for coercions, which are
-         -- Core-only.
+  | FunCo  -- FunCo :: "e" -> N/P -> e -> e -> e
+           -- See Note [FunCo] for fco_afl, fco_afr
+       { fco_role         :: Role
+        , fco_afl          :: FunTyFlag   -- Arrow for coercionLKind
+        , fco_afr          :: FunTyFlag   -- Arrow for coercionRKind
+        , fco_mult         :: CoercionN
+        , fco_arg, fco_res :: Coercion }
+       -- (if the role "e" is Phantom, the first coercion is, too)
+       -- the first coercion is for the multiplicity
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -1191,14 +995,7 @@ data Coercion
   | SymCo Coercion             -- :: e -> e
   | TransCo Coercion Coercion  -- :: e -> e -> e
 
-  | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
-    -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
-    -- Using NthCo on a ForAllCo gives an N coercion always
-    -- See Note [NthCo and newtypes]
-    --
-    -- Invariant:  (NthCo r i co), it is always the case that r = role of (Nth i co)
-    -- That is: the role of the entire coercion is redundantly cached here.
-    -- See Note [NthCo Cached Roles]
+  | SelCo CoSel Coercion  -- See Note [SelCo]
 
   | LRCo   LeftOrRight CoercionN     -- Decomposes (t_left t_right)
     -- :: _ -> N -> N
@@ -1218,6 +1015,27 @@ data Coercion
                                      -- Only present during typechecking
   deriving Data.Data
 
+data CoSel  -- See Note [SelCo]
+  = SelTyCon Int Role  -- Decomposes (T co1 ... con); zero-indexed
+                       -- Invariant: Given: SelCo (SelTyCon i r) co
+                       --            we have r == tyConRole (coercionRole co) tc
+                       --                and tc1 == tc2
+                       --            where T tc1 _ = coercionLKind co
+                       --                  T tc2 _ = coercionRKind co
+                       -- See Note [SelCo]
+
+  | SelFun FunSel      -- Decomposes (co1 -> co2)
+
+  | SelForAll          -- Decomposes (forall a. co)
+
+  deriving( Eq, Data.Data )
+
+data FunSel  -- See Note [SelCo]
+  = SelMult  -- Multiplicity
+  | SelArg   -- Argument of function
+  | SelRes   -- Result of function
+  deriving( Eq, Data.Data )
+
 type CoercionN = Coercion       -- always nominal
 type CoercionR = Coercion       -- always representational
 type CoercionP = Coercion       -- always phantom
@@ -1225,6 +1043,36 @@ type KindCoercion = CoercionN   -- always nominal
 
 instance Outputable Coercion where
   ppr = pprCo
+
+instance Outputable CoSel where
+  ppr (SelTyCon n _r) = text "Tc" <> parens (int n)
+  ppr SelForAll       = text "All"
+  ppr (SelFun fs)     = text "Fun" <> parens (ppr fs)
+
+instance Outputable FunSel where
+  ppr SelMult = text "mult"
+  ppr SelArg  = text "arg"
+  ppr SelRes  = text "res"
+
+instance Binary CoSel where
+   put_ bh (SelTyCon n r)   = do { putByte bh 0; put_ bh n; put_ bh r }
+   put_ bh SelForAll        = putByte bh 1
+   put_ bh (SelFun SelMult) = putByte bh 2
+   put_ bh (SelFun SelArg)  = putByte bh 3
+   put_ bh (SelFun SelRes)  = putByte bh 4
+
+   get bh = do { h <- getByte bh
+               ; case h of
+                   0 -> do { n <- get bh; r <- get bh; return (SelTyCon n r) }
+                   1 -> return SelForAll
+                   2 -> return (SelFun SelMult)
+                   3 -> return (SelFun SelArg)
+                   _ -> return (SelFun SelRes) }
+
+instance NFData CoSel where
+  rnf (SelTyCon n r) = n `seq` r `seq` ()
+  rnf SelForAll      = ()
+  rnf (SelFun fs)    = fs `seq` ()
 
 -- | A semantically more meaningful type to represent what may or may not be a
 -- useful 'Coercion'.
@@ -1246,7 +1094,7 @@ instance Outputable MCoercion where
 Invariant 1: Refl lifting
         Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
     For example
-        (Refl T) (Refl a) (Refl b) is normalised (by mkAPpCo) to  (Refl (T a b)).
+        (Refl T) (Refl a) (Refl b) is normalised (by mkAppCo) to  (Refl (T a b)).
 
     You might think that a consequences is:
          Every identity coercion has Refl at the root
@@ -1297,6 +1145,72 @@ It is easy to see that
 
 A nominal reflexive coercion is quite common, so we keep the special form Refl to
 save allocation.
+
+Note [SelCo]
+~~~~~~~~~~~~
+The Coercion form SelCo allows us to decompose a structural coercion, one
+between ForallTys, or TyConApps, or FunTys.
+
+There are three forms, split by the CoSel field inside the SelCo:
+SelTyCon, SelForAll, and SelFun.
+
+* SelTyCon:
+
+      co : (T s1..sn) ~r0 (T t1..tn)
+      T is a data type, not a newtype, nor an arrow type
+      r = tyConRole tc r0 i
+      i < n    (i is zero-indexed)
+      ----------------------------------
+      SelCo (SelTyCon i r) : si ~r ti
+
+  "Not a newtype": see Note [SelCo and newtypes]
+  "Not an arrow type": see SelFun below
+
+   See Note [SelCo Cached Roles]
+
+* SelForAll:
+      co : forall (a:k1).t1 ~r0 forall (a:k2).t2
+      ----------------------------------
+      SelCo SelForAll : k1 ~N k2
+
+  NB: SelForAll always gives a Nominal coercion.
+
+* The SelFun form, for functions, has three sub-forms for the three
+  components of the function type (multiplicity, argument, result).
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelMult
+      ----------------------------------
+      SelCo (SelFun SelMult) : m1 ~r m2
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelArg
+      ----------------------------------
+      SelCo (SelFun SelArg) : s1 ~r s2
+
+      co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
+      r = funRole r0 SelRes
+      ----------------------------------
+      SelCo (SelFun SelRes) : t1 ~r t2
+
+Note [FunCo]
+~~~~~~~~~~~~
+Just as FunTy has a ft_af :: FunTyFlag field, FunCo (which connects
+two function types) has two FunTyFlag fields:
+     funco_afl, funco_afr :: FunTyFlag
+In all cases, the FunTyFlag is recoverable from the kinds of the argument
+and result types/coercions; but experiments show that it's better to
+cache it.
+
+Why does FunCo need /two/ flags? If we have a single method class,
+implemented as a newtype
+   class C a where { op :: [a] -> a }
+then we can have a coercion
+   co :: C Int ~R ([Int]->Int)
+So now we can define
+   FunCo co <Bool> : (C Int => Bool) ~R (([Int]->Int) -> Bool)
+Notice that the left and right arrows are different!  Hence two flags,
+one for coercionLKind and one for coercionRKind.
 
 Note [Coercion axioms applied to coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1416,7 +1330,7 @@ their representation type (see Type.coreView and Type.predTypeRep).
 This collapse is done by mkPredCo; there is no PredCo constructor
 in Coercion.  This is important because we need Nth to work on
 predicates too:
-    Nth 1 ((~) [c] g) = g
+    SelCo (SelTyCon 1) ((~) [c] g) = g
 See Simplify.simplCoercionF, which generates such selections.
 
 Note [Roles]
@@ -1530,7 +1444,7 @@ TyConAppCo Phantom Foo (UnivCo Phantom Int Bool) : Foo Int ~P Foo Bool
 The rules here dictate the roles of the parameters to mkTyConAppCo
 (should be checked by Lint).
 
-Note [NthCo and newtypes]
+Note [SelCo and newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
 
@@ -1547,20 +1461,21 @@ We can then build
   co = NTCo:N a ; sym (NTCo:N b)
 
 for any `a` and `b`. Because of the role annotation on N, if we use
-NthCo, we'll get out a representational coercion. That is:
+SelCo, we'll get out a representational coercion. That is:
 
-  NthCo r 0 co :: forall a b. a ~R b
+  SelCo (SelTyCon 0 r) co :: forall a b. a ~r b
 
 Yikes! Clearly, this is terrible. The solution is simple: forbid
-NthCo to be used on newtypes if the internal coercion is representational.
+SelCo to be used on newtypes if the internal coercion is representational.
+See the SelCo equation for GHC.Core.Lint.lintCoercion.
 
 This is not just some corner case discovered by a segfault somewhere;
 it was discovered in the proof of soundness of roles and described
 in the "Safe Coercions" paper (ICFP '14).
 
-Note [NthCo Cached Roles]
+Note [SelCo Cached Roles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Why do we cache the role of NthCo in the NthCo constructor?
+Why do we cache the role of SelCo in the SelCo constructor?
 Because computing role(Nth i co) involves figuring out that
 
   co :: T tys1 ~ T tys2
@@ -1570,7 +1485,7 @@ at the tyConRoles of T. Avoiding bad asymptotic behaviour here means
 we have to compute the kind and role of a coercion simultaneously,
 which makes the code complicated and inefficient.
 
-This only happens for NthCo. Caching the role solves the problem, and
+This only happens for SelCo. Caching the role solves the problem, and
 allows coercionKind and coercionRole to be simple.
 
 See #11735
@@ -1886,7 +1801,7 @@ data TyCoFolder env a
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
-      , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
+      , tcf_tycobinder :: env -> TyCoVar -> ForAllTyFlag -> env
           -- ^ The returned env is used in the extended scope
       }
 
@@ -1921,27 +1836,28 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_cos _   []     = mempty
     go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
 
-    go_co env (Refl ty)               = go_ty env ty
-    go_co env (GRefl _ ty MRefl)      = go_ty env ty
-    go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
-    go_co env (TyConAppCo _ _ args)   = go_cos env args
-    go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
-                                        go_co env c1 `mappend`
-                                        go_co env c2
-    go_co env (CoVarCo cv)            = covar env cv
-    go_co env (AxiomInstCo _ _ args)  = go_cos env args
-    go_co env (HoleCo hole)           = cohole env hole
-    go_co env (UnivCo p _ t1 t2)      = go_prov env p `mappend` go_ty env t1
-                                                      `mappend` go_ty env t2
-    go_co env (SymCo co)              = go_co env co
-    go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
-    go_co env (AxiomRuleCo _ cos)     = go_cos env cos
-    go_co env (NthCo _ _ co)          = go_co env co
-    go_co env (LRCo _ co)             = go_co env co
-    go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
-    go_co env (KindCo co)             = go_co env co
-    go_co env (SubCo co)              = go_co env co
+    go_co env (Refl ty)                = go_ty env ty
+    go_co env (GRefl _ ty MRefl)       = go_ty env ty
+    go_co env (GRefl _ ty (MCo co))    = go_ty env ty `mappend` go_co env co
+    go_co env (TyConAppCo _ _ args)    = go_cos env args
+    go_co env (AppCo c1 c2)            = go_co env c1 `mappend` go_co env c2
+    go_co env (CoVarCo cv)             = covar env cv
+    go_co env (AxiomInstCo _ _ args)   = go_cos env args
+    go_co env (HoleCo hole)            = cohole env hole
+    go_co env (UnivCo p _ t1 t2)       = go_prov env p `mappend` go_ty env t1
+                                                       `mappend` go_ty env t2
+    go_co env (SymCo co)               = go_co env co
+    go_co env (TransCo c1 c2)          = go_co env c1 `mappend` go_co env c2
+    go_co env (AxiomRuleCo _ cos)      = go_cos env cos
+    go_co env (SelCo _ co)             = go_co env co
+    go_co env (LRCo _ co)              = go_co env co
+    go_co env (InstCo co arg)          = go_co env co `mappend` go_co env arg
+    go_co env (KindCo co)              = go_co env co
+    go_co env (SubCo co)               = go_co env co
+
+    go_co env (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
+       = go_co env cw `mappend` go_co env c1 `mappend` go_co env c2
+
     go_co env (ForAllCo tv kind_co co)
       = go_co env kind_co `mappend` go_ty env (varType tv)
                           `mappend` go_co env' co
@@ -1991,17 +1907,17 @@ coercionSize (Refl ty)             = typeSize ty
 coercionSize (GRefl _ ty MRefl)    = typeSize ty
 coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
-coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
-                                                        + coercionSize w
+coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
+coercionSize (ForAllCo _ h co)     = 1 + coercionSize co + coercionSize h
+coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
+                                                         + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (NthCo _ _ co)      = 1 + coercionSize co
+coercionSize (SelCo _ co)        = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
 coercionSize (KindCo co)         = 1 + coercionSize co

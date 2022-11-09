@@ -30,6 +30,8 @@ module GHC.Builtin.Types.Prim(
         levity1TyVarInf, levity2TyVarInf,
         levity1Ty, levity2Ty,
 
+        alphaConstraintTyVar, alphaConstraintTy,
+
         openAlphaTyVar, openBetaTyVar, openGammaTyVar,
         openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec,
         openAlphaTy, openBetaTy, openGammaTy,
@@ -41,13 +43,16 @@ module GHC.Builtin.Types.Prim(
         multiplicityTyVar1, multiplicityTyVar2,
 
         -- Kind constructors...
-        tYPETyCon, tYPETyConName,
+        tYPETyCon, tYPETyConName, tYPEKind,
+        cONSTRAINTTyCon, cONSTRAINTTyConName, cONSTRAINTKind,
 
-        -- Kinds
-        mkTYPEapp,
+        -- Arrows
+        funTyFlagTyCon, isArrowTyCon,
+        fUNTyCon,       fUNTyConName,
+        ctArrowTyCon, ctArrowTyConName,
+        ccArrowTyCon, ccArrowTyConName,
+        tcArrowTyCon, tcArrowTyConName,
 
-        functionWithMultiplicity,
-        funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
         charPrimTyCon,          charPrimTy, charPrimTyConName,
@@ -121,45 +126,134 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , multiplicityTy )
+  , multiplicityTy
+  , constraintKind )
 
-import GHC.Types.Var    ( TyVarBinder, TyVar
-                        , mkTyVar, mkTyVarBinder, mkTyVarBinders )
-import GHC.Types.Name
-import {-# SOURCE #-} GHC.Types.TyThing
+import {-# SOURCE #-} GHC.Types.TyThing( mkATyCon )
+import {-# SOURCE #-} GHC.Core.Type ( mkTyConApp, getLevity )
+
 import GHC.Core.TyCon
-import GHC.Types.SrcLoc
-import GHC.Types.Unique
-import GHC.Builtin.Uniques
-import GHC.Builtin.Names
-import GHC.Data.FastString
-import GHC.Utils.Misc ( changeLast )
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
-import {-# SOURCE #-} GHC.Core.Type ( mkTyConTy, mkTyConApp, mkTYPEapp, getLevity )
 
+import GHC.Types.Var    ( TyVarBinder, TyVar,binderVar, binderVars
+                        , mkTyVar, mkTyVarBinder, mkTyVarBinders )
+import GHC.Types.Name
+import GHC.Types.SrcLoc
+import GHC.Types.Unique
+
+import GHC.Builtin.Uniques
+import GHC.Builtin.Names
+import GHC.Utils.Misc ( changeLast )
+import GHC.Utils.Panic ( assertPpr )
+import GHC.Utils.Outputable
+
+import GHC.Data.FastString
 import Data.Char
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Primitive type constructors}
+             Building blocks
 *                                                                      *
-************************************************************************
+********************************************************************* -}
+
+mk_TYPE_app :: Type -> Type
+mk_TYPE_app rep = mkTyConApp tYPETyCon [rep]
+
+mk_CONSTRAINT_app :: Type -> Type
+mk_CONSTRAINT_app rep = mkTyConApp cONSTRAINTTyCon [rep]
+
+mkPrimTc :: FastString -> Unique -> TyCon -> Name
+mkPrimTc = mkGenPrimTc UserSyntax
+
+mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
+mkBuiltInPrimTc = mkGenPrimTc BuiltInSyntax
+
+mkGenPrimTc :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
+mkGenPrimTc built_in_syntax occ key tycon
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ)
+                  key
+                  (mkATyCon tycon)
+                  built_in_syntax
+
+-- | Create a primitive 'TyCon' with the given 'Name',
+-- arguments of kind 'Type` with the given 'Role's,
+-- and the given result kind representation.
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon :: Name
+            -> [Role] -> RuntimeRepType -> TyCon
+pcPrimTyCon name roles res_rep
+  = mkPrimTyCon name binders result_kind roles
+  where
+    bndr_kis    = liftedTypeKind <$ roles
+    binders     = mkTemplateAnonTyConBinders bndr_kis
+    result_kind = mk_TYPE_app res_rep
+
+-- | Create a primitive nullary 'TyCon' with the given 'Name'
+-- and result kind representation.
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
+pcPrimTyCon0 name res_rep
+  = pcPrimTyCon name [] res_rep
+
+-- | Create a primitive 'TyCon' like 'pcPrimTyCon', except the last
+-- argument is levity-polymorphic, where the levity argument is
+-- implicit and comes before other arguments
+--
+-- Only use this in "GHC.Builtin.Types.Prim".
+pcPrimTyCon_LevPolyLastArg :: Name
+                           -> [Role] -- ^ roles of the arguments (must be non-empty),
+                                     -- not including the implicit argument of kind 'Levity',
+                                     -- which always has 'Nominal' role
+                           -> RuntimeRepType  -- ^ representation of the fully-applied type
+                           -> TyCon
+pcPrimTyCon_LevPolyLastArg name roles res_rep
+  = mkPrimTyCon name binders result_kind (Nominal : roles)
+    where
+      result_kind = mk_TYPE_app res_rep
+      lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
+      binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
+      lev_tv   = mkTyVarTy (binderVar lev_bndr)
+
+      -- [ Type, ..., Type, TYPE (BoxedRep l) ]
+      anon_bndr_kis = changeLast (liftedTypeKind <$ roles) $
+                      mk_TYPE_app $
+                      mkTyConApp boxedRepDataConTyCon [lev_tv]
+
+
+{- *********************************************************************
+*                                                                      *
+           Primitive type constructors
+*                                                                      *
+********************************************************************* -}
+
+{- Note Note [Unexposed TyCons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A few primitive TyCons are "unexposed", meaning:
+* We don't want users to be able to write them (see #15209);
+  i.e. they aren't in scope, ever.  In particular they do not
+  appear in the exports of GHC.Prim: see GHC.Builtin.Utils.ghcPrimExports
+
+* We don't want users to see them in GHCi's @:browse@ output (see #12023).
 -}
 
 primTyCons :: [TyCon]
 primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
 
--- | Primitive 'TyCon's that are defined in GHC.Prim but not exposed.
--- It's important to keep these separate as we don't want users to be able to
--- write them (see #15209) or see them in GHCi's @:browse@ output
--- (see #12023).
+-- | Primitive 'TyCon's that are defined in GHC.Prim but not "exposed".
+-- See Note [Unexposed TyCons]
 unexposedPrimTyCons :: [TyCon]
 unexposedPrimTyCons
-  = [ eqPrimTyCon
-    , eqReprPrimTyCon
-    , eqPhantPrimTyCon
+  = [ eqPrimTyCon      -- (~#)
+    , eqReprPrimTyCon  -- (~R#)
+    , eqPhantPrimTyCon -- (~P#)
+
+    -- These arrows are un-exposed for now
+    , ctArrowTyCon  -- (=>)
+    , ccArrowTyCon  -- (==>)
+    , tcArrowTyCon  -- (-=>)
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
@@ -201,26 +295,12 @@ exposedPrimTyCons
     , stackSnapshotPrimTyCon
     , promptTagPrimTyCon
 
+    , fUNTyCon
     , tYPETyCon
-    , funTyCon
+    , cONSTRAINTTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
-
-mkPrimTc :: FastString -> Unique -> TyCon -> Name
-mkPrimTc fs unique tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS fs)
-                  unique
-                  (mkATyCon tycon)        -- Relevant TyCon
-                  UserSyntax
-
-mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
-mkBuiltInPrimTc fs unique tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS fs)
-                  unique
-                  (mkATyCon tycon)        -- Relevant TyCon
-                  BuiltInSyntax
-
 
 charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName,
   wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName,
@@ -273,13 +353,13 @@ weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPr
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey promptTagPrimTyCon
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Support code}
+                Type variables
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
+{-
 alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
 -}
@@ -366,13 +446,16 @@ mkTemplateKiTyVar kind mk_arg_kinds
 
 mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
 -- Makes named, Specified binders
-mkTemplateKindTyConBinders kinds = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
+mkTemplateKindTyConBinders kinds
+  = [mkNamedTyConBinder Specified tv | tv <- mkTemplateKindVars kinds]
 
 mkTemplateAnonTyConBinders :: [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBinders kinds = mkAnonTyConBinders VisArg (mkTemplateTyVars kinds)
+mkTemplateAnonTyConBinders kinds
+  = mkAnonTyConBinders (mkTemplateTyVars kinds)
 
 mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
-mkTemplateAnonTyConBindersFrom n kinds = mkAnonTyConBinders VisArg (mkTemplateTyVarsFrom n kinds)
+mkTemplateAnonTyConBindersFrom n kinds
+  = mkAnonTyConBinders (mkTemplateTyVarsFrom n kinds)
 
 alphaTyVars :: [TyVar]
 alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
@@ -382,6 +465,15 @@ alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
 
 alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: TyVarBinder
 (alphaTyVarSpec:betaTyVarSpec:gammaTyVarSpec:deltaTyVarSpec:_) = mkTyVarBinders Specified alphaTyVars
+
+alphaConstraintTyVars :: [TyVar]
+alphaConstraintTyVars = mkTemplateTyVars $ repeat constraintKind
+
+alphaConstraintTyVar :: TyVar
+(alphaConstraintTyVar:_) = alphaConstraintTyVars
+
+alphaConstraintTy :: Type
+alphaConstraintTy = mkTyVarTy alphaConstraintTyVar
 
 alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars
@@ -416,7 +508,9 @@ openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
 -- beta  :: TYPE r2
 -- gamma :: TYPE r3
 [openAlphaTyVar,openBetaTyVar,openGammaTyVar]
-  = mkTemplateTyVars [mkTYPEapp runtimeRep1Ty, mkTYPEapp runtimeRep2Ty, mkTYPEapp runtimeRep3Ty]
+  = mkTemplateTyVars [ mk_TYPE_app runtimeRep1Ty
+                     , mk_TYPE_app runtimeRep2Ty
+                     , mk_TYPE_app runtimeRep3Ty]
 
 openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
 openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
@@ -445,8 +539,8 @@ levity2Ty = mkTyVarTy levity2TyVar
 levPolyAlphaTyVar, levPolyBetaTyVar :: TyVar
 [levPolyAlphaTyVar, levPolyBetaTyVar] =
   mkTemplateTyVars
-    [mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity1Ty])
-    ,mkTYPEapp (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
+    [ mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity1Ty])
+    , mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
 -- alpha :: TYPE ('BoxedRep l)
 -- beta  :: TYPE ('BoxedRep k)
 
@@ -471,80 +565,280 @@ multiplicityTyVar1, multiplicityTyVar2  :: TyVar
 ************************************************************************
 -}
 
-funTyConName :: Name
-funTyConName = mkPrimTcName UserSyntax (fsLit "FUN") funTyConKey funTyCon
+{- Note [Function type constructors and FunTy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have four distinct function type constructors, and a type synonym
+
+ FUN :: forall (m :: Multiplicity) ->
+        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+        TYPE rep1 -> TYPE rep2 -> Type
+
+ (=>)  :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          CONSTRAINT rep1 -> TYPE rep2 -> Type
+
+ (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Constraint
+
+ (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+          TYPE rep1 -> CONSTRAINT rep2 -> Constraint
+
+ type (->) = FUN Many
+
+For efficiency, all four are always represented by
+  FunTy { ft_af :: FunTyFlag, ft_mult :: Mult
+        , ft_arg :: Type, ft_res :: Type }
+rather than by using a TyConApp.
+
+* The four TyCons FUN, (=>), (==>), (-=>) are all wired in.
+  But (->) is just a regular synonym, with no special treatment;
+  in particular it is not wired-in.
+
+* The ft_af :: FunTyFlag distinguishes the four cases.
+  See Note [FunTyFlag] in GHC.Types.Var.
+
+* The ft_af field is redundant: it can always be gleaned from
+  the kinds of ft_arg and ft_res.  See Note [FunTyFlag] in GHC.Types.Var.
+
+* The ft_mult :: Mult field gives the first argument for FUN
+  For the other three cases ft_mult is redundant; it is always Many.
+  Note that of the four type constructors, only `FUN` takes a Multiplicity.
+
+* Functions in GHC.Core.Type help to build and decompose `FunTy`.
+  * funTyConAppTy_maybe
+  * funTyFlagTyCon
+  * tyConAppFun_maybe
+  * splitFunTy_maybe
+  Use them!
+-}
+
+funTyFlagTyCon :: FunTyFlag -> TyCon
+-- `anonArgTyCon af` gets the TyCon that corresponds to the `FunTyFlag`
+-- But be careful: fUNTyCon has a different kind to the others!
+-- See Note [Function type constructors and FunTy]
+funTyFlagTyCon FTF_T_T = fUNTyCon
+funTyFlagTyCon FTF_T_C = tcArrowTyCon
+funTyFlagTyCon FTF_C_T = ctArrowTyCon
+funTyFlagTyCon FTF_C_C = ccArrowTyCon
+
+isArrowTyCon :: TyCon -> Bool
+-- We don't bother to look for plain (->), because this function
+-- should only be used after unwrapping synonyms
+isArrowTyCon tc
+  = assertPpr (not (isTypeSynonymTyCon tc)) (ppr tc)
+    getUnique tc `elem`
+    [fUNTyConKey, ctArrowTyConKey, ccArrowTyConKey, tcArrowTyConKey]
+
+fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name
+fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
+ctArrowTyConName = mkBuiltInPrimTc (fsLit "=>")  ctArrowTyConKey ctArrowTyCon
+ccArrowTyConName = mkBuiltInPrimTc (fsLit "==>") ccArrowTyConKey ccArrowTyCon
+tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 
 -- | The @FUN@ type constructor.
 --
 -- @
 -- FUN :: forall (m :: Multiplicity) ->
 --        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---        TYPE rep1 -> TYPE rep2 -> *
+--        TYPE rep1 -> TYPE rep2 -> Type
 -- @
 --
 -- The runtime representations quantification is left inferred. This
 -- means they cannot be specified with @-XTypeApplications@.
 --
 -- This is a deliberate choice to allow future extensions to the
--- function arrow. To allow visible application a type synonym can be
--- defined:
---
--- @
--- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
---             TYPE rep1 -> TYPE rep2 -> Type
--- type Arr = FUN 'Many
--- @
---
-funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
+-- function arrow.
+fUNTyCon :: TyCon
+fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
     tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
                , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mkTYPEapp runtimeRep1Ty
-                                             , mkTYPEapp runtimeRep2Ty
-                                             ]
-    tc_rep_nm = mkPrelTyConRepName funTyConName
+               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app runtimeRep1Ty
+                                             , mk_TYPE_app runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
+
+-- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--         CONSTRAINT rep1 -> TYPE rep2 -> Type
+ctArrowTyCon :: TyCon
+ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
+                                             , mk_TYPE_app       runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
+
+-- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Constraint
+ccArrowTyCon :: TyCon
+ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs constraintKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
+                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
+
+-- (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--          TYPE rep1 -> CONSTRAINT rep2 -> Constraint
+tcArrowTyCon :: TyCon
+tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
+  where
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
+               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app       runtimeRep1Ty
+                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
+    tc_roles = [Nominal, Nominal, Representational, Representational]
 
 {-
 ************************************************************************
 *                                                                      *
-                Kinds
+                Type and Constraint
 *                                                                      *
 ************************************************************************
 
-Note [TYPE and RuntimeRep]
+Note [TYPE and CONSTRAINT]  aka Note [Type vs Constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-All types that classify values have a kind of the form (TYPE rr), where
+GHC distinguishes Type from Constraint throughout the compiler.
+See GHC Proposal #518, and tickets #21623 and #11715.
 
-    data RuntimeRep     -- Defined in ghc-prim:GHC.Types
+All types that classify values have a kind of the form
+  (TYPE rr) or (CONSTRAINT rr)
+where the `RuntimeRep` parameter, rr, tells us how the value is represented
+at runtime.  TYPE and CONSTRAINT are primitive type constructors.
+
+See Note [RuntimeRep polymorphism] about the `rr` parameter.
+
+There are a bunch of type synonyms and data types defined in the
+library ghc-prim:GHC.Types.  All of them are also wired in to GHC, in
+GHC.Builtin.Types
+
+  type Constraint   = CONSTRAINT LiftedRep  :: Type
+
+  type Type         = TYPE LiftedRep   :: Type
+  type UnliftedType = TYPE UnliftedRep :: Type
+
+  type LiftedRep    = BoxedRep Lifted   :: RuntimeRep
+  type UnliftedRep  = BoxedRep Unlifted :: RuntimeRep
+
+  data RuntimeRep     -- Defined in ghc-prim:GHC.Types
       = BoxedRep Levity
       | IntRep
       | FloatRep
       .. etc ..
 
-    data Levity = Lifted | Unlifted
+  data Levity = Lifted | Unlifted
 
-    rr :: RuntimeRep
-
-    TYPE :: RuntimeRep -> TYPE 'LiftedRep  -- Built in
+We abbreviate '*' specially (with -XStarIsType), as if we had this:
+    type * = Type
 
 So for example:
-    Int        :: TYPE ('BoxedRep 'Lifted)
-    Array# Int :: TYPE ('BoxedRep 'Unlifted)
-    Int#       :: TYPE 'IntRep
-    Float#     :: TYPE 'FloatRep
-    Maybe      :: TYPE ('BoxedRep 'Lifted) -> TYPE ('BoxedRep 'Lifted)
+    Int        :: TYPE (BoxedRep Lifted)
+    Array# Int :: TYPE (BoxedRep Unlifted)
+    Int#       :: TYPE IntRep
+    Float#     :: TYPE FloatRep
+    Maybe      :: TYPE (BoxedRep Lifted) -> TYPE (BoxedRep Lifted)
     (# , #)    :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
 
-We abbreviate '*' specially:
-    type LiftedRep = 'BoxedRep 'Lifted
-    type * = TYPE LiftedRep
+    Eq Int       :: CONSTRAINT (BoxedRep Lifted)
+    IP "foo" Int :: CONSTRAINT (BoxedRep Lifted)
+    a ~ b        :: CONSTRAINT (BoxedRep Lifted)
+    a ~# b       :: CONSTRAINT (TupleRep [])
 
-The 'rr' parameter tells us how the value is represented at runtime.
+Constraints are mostly lifted, but unlifted ones are useful too.
+Specifically  (a ~# b) :: CONSTRAINT (TupleRep [])
 
-Generally speaking, you can't be polymorphic in 'rr'.  E.g
+Wrinkles
+
+(W1) Type and Constraint are considered distinct throughout GHC. But they
+     are not /apart/: see Note [Type and Constraint are not apart]
+
+(W2) We need two absent-error Ids, aBSENT_ERROR_ID for types of kind Type, and
+     aBSENT_CONSTRAINT_ERROR_ID for vaues of kind Constraint.  Ditto noInlineId
+     vs noInlieConstraintId in GHC.Types.Id.Make; see Note [inlineId magic].
+
+(W3) We need a TypeOrConstraint flag in LitRubbish.
+
+Note [Type and Constraint are not apart]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type and Constraint are not equal (eqType) but they are not /apart/
+either. Reason (c.f. #7451):
+
+* We want to allow newtype classes, where
+    class C a where { op :: a -> a }
+
+* The axiom for such a class will look like
+    axiom axC a :: (C a :: Constraint) ~# (a->a :: Type)
+
+* This axiom connects a type of kind Type with one of kind Constraint
+  That is dangerous: kindCo (axC Int) :: Type ~N Constraint
+  And /that/ is bad because we could have
+     type family F a where
+        F Type       = Int
+        F Constraint = Bool
+  So now we can prove Int ~N Bool, and all is lost.  We prevent this
+  by saying that Type and Constraint are not Apart, which makes the
+  above type family instances illegal.
+
+So we ensure that Type and Constraint are not apart; or, more
+precisely, that TYPE and CONSTRAINT are not apart.  This
+non-apart-ness check is implemented in GHC.Core.Unify.unify_ty: look
+for `maybeApart MARTypeVsConstraint`.
+
+Note that, as before, nothing prevents writing instances like:
+
+  instance C (Proxy @Type a) where ...
+
+In particular, TYPE and CONSTRAINT (and the synonyms Type, Constraint
+etc) are all allowed in instance heads. It's just that TYPE is not
+apart from CONSTRAINT, which means that the above instance would
+irretrievably overlap with:
+
+  instance C (Proxy @Constraint a) where ...
+
+Wrinkles
+
+(W1) In GHC.Core.RoughMap.roughMtchTyConName we are careful to map
+     TYPE and CONSTRAINT to the same rough-map key.  Reason:
+     If we insert (F @Constraint tys) into a FamInstEnv, and look
+     up (F @Type tys'), we /must/ ensure that the (C @Constraint tys)
+     appears among the unifiables when we do the lookupRM' in
+     GHC.Core.FamInstEnv.lookup_fam_inst_env'.  So for the RoughMap we
+     simply pretend that they are the same type constructor.  If we
+     don't, we'll treat them as fully apart, which is unsound.
+
+(W2) We must extend this treatment to the different arrow types (see
+     Note [Function type constructors and FunTy]): if we have
+       FunCo (axC Int) <Int> :: (C Int => Int) ~ ((Int -> Int) -> Int),
+     then we could extract an equality between (=>) and (->). We thus
+     must ensure that (=>) and (->) (among the other arrow combinations)
+     are not Apart. See the FunTy/FunTy case in GHC.Core.Unify.unify_ty.
+
+(W3) Are (TYPE IntRep) and (CONSTRAINT WordRep) apart?  In truth yes,
+     they are.  But it's easier to say that htey are not apart, by
+     reporting "maybeApart" (which is always safe), rather than
+     recurse into the arguments (whose kinds may be utterly different)
+     to look for apartness inside them.  Again this is in
+     GHC.Core.Unify.unify_ty.
+
+(W4) We give a different Typeable instance for Type than for Constraint.
+     For type classes instances (unlike type family instances) it is not
+     /unsound/ for Type and Constraint to treated as fully distinct; and
+     for Typeable is desirable to give them different TypeReps.
+     Certainly,
+       - both Type and Constraint must /have/ a TypeRep, and
+       - they had better not be the same (else eqTypeRep would give us
+         a proof Type ~N Constraint, which we do not want
+     So in GHC.Tc.Instance.Class.matchTypeable, Type and Constraint are
+     treated as separate TyCons; i.e. given no special treatment.
+
+Note [RuntimeRep polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking, you can't be polymorphic in `RuntimeRep`.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
    f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
 This is no good: we could not generate code for 'f', because the
@@ -569,85 +863,40 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
      (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                      (a :: TYPE r1) (b :: TYPE r2).
                      a -> b -> TYPE ('TupleRep '[r1, r2])
-
 -}
 
+----------------------
 tYPETyCon :: TyCon
-tYPETyConName :: Name
-
 tYPETyCon = mkPrimTyCon tYPETyConName
                         (mkTemplateAnonTyConBinders [runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
 
---------------------------
--- ... and now their names
+tYPETyConName :: Name
+tYPETyConName = mkPrimTc (fsLit "TYPE") tYPETyConKey tYPETyCon
 
--- If you edit these, you may need to update the GHC formalism
--- See Note [GHC Formalism] in GHC.Core.Lint
-tYPETyConName             = mkPrimTcName UserSyntax (fsLit "TYPE") tYPETyConKey tYPETyCon
+tYPEKind :: Type
+tYPEKind = mkTyConTy tYPETyCon
 
-mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
-mkPrimTcName built_in_syntax occ key tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (mkATyCon tycon) built_in_syntax
+----------------------
+cONSTRAINTTyCon :: TyCon
+cONSTRAINTTyCon = mkPrimTyCon cONSTRAINTTyConName
+                              (mkTemplateAnonTyConBinders [runtimeRepTy])
+                              liftedTypeKind
+                              [Nominal]
 
------------------------------
+cONSTRAINTTyConName :: Name
+cONSTRAINTTyConName = mkPrimTc (fsLit "CONSTRAINT") cONSTRAINTTyConKey cONSTRAINTTyCon
 
--- Given a Multiplicity, applies FUN to it.
-functionWithMultiplicity :: Type -> Type
-functionWithMultiplicity mul = TyConApp funTyCon [mul]
+cONSTRAINTKind :: Type
+cONSTRAINTKind = mkTyConTy cONSTRAINTTyCon
 
-{-
-************************************************************************
+
+{- *********************************************************************
 *                                                                      *
-   Basic primitive types (@Char#@, @Int#@, etc.)
+       Basic primitive types (Char#, Int#, etc.)
 *                                                                      *
-************************************************************************
--}
-
--- | Create a primitive 'TyCon' with the given 'Name',
--- arguments of kind 'Type` with the given 'Role's,
--- and the given result kind representation.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon :: Name
-            -> [Role] -> RuntimeRepType -> TyCon
-pcPrimTyCon name roles res_rep
-  = mkPrimTyCon name binders result_kind roles
-  where
-    bndr_kis    = liftedTypeKind <$ roles
-    binders     = mkTemplateAnonTyConBinders bndr_kis
-    result_kind = mkTYPEapp res_rep
-
--- | Create a primitive nullary 'TyCon' with the given 'Name'
--- and result kind representation.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
-pcPrimTyCon0 name res_rep
-  = pcPrimTyCon name [] res_rep
-
--- | Create a primitive 'TyCon' like 'pcPrimTyCon', except the last
--- argument is levity-polymorphic.
---
--- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon_LevPolyLastArg :: Name
-                           -> [Role] -- ^ roles of the arguments (must be non-empty),
-                                     -- not including the implicit argument of kind 'Levity',
-                                     -- which always has 'Nominal' role
-                           -> RuntimeRepType  -- ^ representation of the fully-applied type
-                           -> TyCon
-pcPrimTyCon_LevPolyLastArg name roles res_rep
-  = mkPrimTyCon name binders result_kind (Nominal : roles)
-    where
-      result_kind = mkTYPEapp res_rep
-      lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
-      binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
-      lev_tv   = mkTyVarTy (binderVar lev_bndr)
-
-      -- [ Type, ..., Type, TYPE (BoxedRep l) ]
-      anon_bndr_kis = changeLast (liftedTypeKind <$ roles)
-                        (mkTYPEapp $ mkTyConApp boxedRepDataConTyCon [lev_tv])
+********************************************************************* -}
 
 charPrimTy :: Type
 charPrimTy      = mkTyConTy charPrimTyCon
@@ -818,6 +1067,8 @@ It is an almost-ordinary class defined as if by
  * In addition (~) is magical syntax, as ~ is a reserved symbol.
    It cannot be exported or imported.
 
+ * The data constructor of the class is "Eq#", not ":C~"
+
 Within GHC, ~ is called eqTyCon, and it is defined in GHC.Builtin.Types.
 
 Historical note: prior to July 18 (~) was defined as a
@@ -944,9 +1195,9 @@ eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Nominal, Nominal]
 
 -- like eqPrimTyCon, but the type for *Representational* coercions
@@ -955,9 +1206,9 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Representational, Representational]
 
 -- like eqPrimTyCon, but the type for *Phantom* coercions.
@@ -966,9 +1217,9 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
 eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+    -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
     binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = unboxedTupleKind []
+    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
     roles    = [Nominal, Nominal, Phantom, Phantom]
 
 -- | Given a Role, what TyCon is the type of equality predicates at that role?

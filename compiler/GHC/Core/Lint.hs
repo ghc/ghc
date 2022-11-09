@@ -49,9 +49,10 @@ import GHC.Core.Type as Type
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
+import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr ( pprTyVar, pprTyVars )
+import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
@@ -166,9 +167,10 @@ If we have done specialisation the we check that there are
 
 Note [Linting function types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As described in Note [Representation of function types], all saturated
-applications of funTyCon are represented with the FunTy constructor. We check
-this invariant in lintType.
+All saturated applications of funTyCon are represented with the FunTy constructor.
+See Note [Function type constructors and FunTy] in GHC.Builtin.Types.Prim
+
+ We check this invariant in lintType.
 
 Note [Linting type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -924,7 +926,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
         ; ((body_type, body_ue), ues) <-
             lintRecBindings NotTopLevel pairs $ \ bndrs' ->
             lintLetBody bndrs' body
-        ; return (body_type, body_ue  `addUE` scaleUE Many (foldr1 addUE ues)) }
+        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
   where
     bndrs = map fst pairs
 
@@ -1404,7 +1406,7 @@ lintTyApp fun_ty arg_ty
 -- application.
 lintValApp :: CoreExpr -> LintedType -> LintedType -> UsageEnv -> UsageEnv -> LintM (LintedType, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
-  | Just (w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
+  | Just (_, w, arg_ty', res_ty') <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg_ty' arg_ty (mkAppMsg arg_ty' arg_ty arg)
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res_ty', app_ue) }
@@ -1566,8 +1568,8 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
         -- We've already check
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; binderMult (Named _)   = Many
-          ; binderMult (Anon _ st) = scaledMult st
+          ; binderMult (Named _)   = ManyTy
+          ; binderMult (Anon st _) = scaledMult st
           -- See Note [Validating multiplicities in a case]
           ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
 
@@ -1636,19 +1638,25 @@ lintBinder site var linterF
 lintTyBndr :: TyVar -> (LintedTyCoVar -> LintM a) -> LintM a
 lintTyBndr = lintTyCoBndr  -- We could specialise it, I guess
 
--- lintCoBndr :: CoVar -> (LintedTyCoVar -> LintM a) -> LintM a
--- lintCoBndr = lintTyCoBndr  -- We could specialise it, I guess
-
 lintTyCoBndr :: TyCoVar -> (LintedTyCoVar -> LintM a) -> LintM a
 lintTyCoBndr tcv thing_inside
   = do { subst <- getSubst
-       ; kind' <- lintType (varType tcv)
+       ; tcv_type' <- lintType (varType tcv)
        ; let tcv' = uniqAway (getSubstInScope subst) $
-                    setVarType tcv kind'
+                    setVarType tcv tcv_type'
              subst' = extendTCvSubstWithClone subst tcv tcv'
-       ; when (isCoVar tcv) $
-         lintL (isCoVarType kind')
-               (text "CoVar with non-coercion type:" <+> pprTyVar tcv)
+
+       -- See (FORALL1) and (FORALL2) in GHC.Core.Type
+       ; if (isTyVar tcv)
+         then -- Check that in (forall (a:ki). blah) we have ki:Type
+              lintL (isLiftedTypeKind (typeKind tcv_type')) $
+              hang (text "TyVar whose kind does not have kind Type:")
+                 2 (ppr tcv' <+> dcolon <+> ppr tcv_type' <+> dcolon <+> ppr (typeKind tcv_type'))
+         else -- Check that in (forall (cv::ty). blah),
+              -- then ty looks like (t1 ~# t2)
+              lintL (isCoVarType tcv_type') $
+              text "CoVar with non-coercion type:" <+> pprTyVar tcv
+
        ; updateSubst subst' (thing_inside tcv') }
 
 lintIdBndrs :: forall a. TopLevelFlag -> [Id] -> ([LintedId] -> LintM a) -> LintM a
@@ -1730,7 +1738,7 @@ lintValueType ty
   = addLoc (InType ty) $
     do  { ty' <- lintType ty
         ; let sk = typeKind ty'
-        ; lintL (classifiesTypeWithValues sk) $
+        ; lintL (isTYPEorCONSTRAINT sk) $
           hang (text "Ill-kinded type:" <+> ppr ty)
              2 (text "has kind:" <+> ppr sk)
         ; return ty' }
@@ -1778,13 +1786,11 @@ lintType ty@(TyConApp tc tys)
   = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
        ; lintTySynFamApp report_unsat ty tc tys }
 
-  | isFunTyCon tc
-  , tys `lengthIs` 5
+  | Just {} <- tyConAppFunTy_maybe tc tys
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
-    -- See Note [Linting function types] and
-    -- Note [Representation of function types].
-  = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
+    -- See Note [Linting function types]
+  = failWithL (hang (text "Saturated application of" <+> quotes (ppr tc)) 2 (ppr ty))
 
   | otherwise  -- Data types, data families, primitive types
   = do { checkTyCon tc
@@ -1799,6 +1805,12 @@ lintType ty@(FunTy af tw t1 t2)
        ; t2' <- lintType t2
        ; tw' <- lintType tw
        ; lintArrow (text "type or kind" <+> quotes (ppr ty)) t1' t2' tw'
+       ; let real_af = chooseFunTyFlag t1 t2
+       ; unless (real_af == af) $ addErrL $
+         hang (text "Bad FunTyFlag in FunTy")
+            2 (vcat [ ppr ty
+                    , text "FunTyFlag =" <+> ppr af
+                    , text "Computed FunTyFlag =" <+> ppr real_af ])
        ; return (FunTy af tw' t1' t2') }
 
 lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
@@ -1887,7 +1899,7 @@ lintTySynFamApp report_unsat ty tc tys
 -- Confirms that a type is really TYPE r or Constraint
 checkValueType :: LintedType -> SDoc -> LintM ()
 checkValueType ty doc
-  = lintL (classifiesTypeWithValues kind)
+  = lintL (isTYPEorCONSTRAINT kind)
           (text "Non-Type-like kind when Type-like expected:" <+> ppr kind $$
            text "when checking" <+> doc)
   where
@@ -1899,17 +1911,16 @@ lintArrow :: SDoc -> LintedType -> LintedType -> LintedType -> LintM ()
 -- See Note [GHC Formalism]
 lintArrow what t1 t2 tw  -- Eg lintArrow "type or kind `blah'" k1 k2 kw
                          -- or lintArrow "coercion `blah'" k1 k2 kw
-  = do { unless (classifiesTypeWithValues k1) (addErrL (msg (text "argument") k1))
-       ; unless (classifiesTypeWithValues k2) (addErrL (msg (text "result")   k2))
-       ; unless (isMultiplicityTy kw) (addErrL (msg (text "multiplicity") kw)) }
+  = do { unless (isTYPEorCONSTRAINT k1) (report (text "argument") k1)
+       ; unless (isTYPEorCONSTRAINT k2) (report (text "result")   k2)
+       ; unless (isMultiplicityTy kw)         (report (text "multiplicity") kw) }
   where
     k1 = typeKind t1
     k2 = typeKind t2
     kw = typeKind tw
-    msg ar k
-      = vcat [ hang (text "Ill-kinded" <+> ar)
-                  2 (text "in" <+> what)
-             , what <+> text "kind:" <+> ppr k ]
+    report ar k = addErrL (vcat [ hang (text "Ill-kinded" <+> ar)
+                                     2 (text "in" <+> what)
+                                , what <+> text "kind:" <+> ppr k ])
 
 -----------------
 lint_ty_app :: Type -> LintedKind -> [LintedType] -> LintM ()
@@ -2094,7 +2105,7 @@ that returned coercion. If we get long chains, that can be asymptotically
 inefficient, notably in
 * TransCo
 * InstCo
-* NthCo (cf #9233)
+* SelCo (cf #9233)
 * LRCo
 
 But the code is simple.  And this is only Lint.  Let's wait to see if
@@ -2163,9 +2174,9 @@ lintCoercion (GRefl r ty (MCo co))
        ; return (GRefl r ty' (MCo co')) }
 
 lintCoercion co@(TyConAppCo r tc cos)
-  | tc `hasKey` funTyConKey
-  , [_w, _rep1,_rep2,_co1,_co2] <- cos
-  = failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
+  | Just {} <- tyConAppFunCo_maybe r tc cos
+  = failWithL (hang (text "Saturated application of" <+> quotes (ppr tc))
+                  2 (ppr co))
     -- All saturated TyConAppCos should be FunCos
 
   | Just {} <- synTyConDefn_maybe tc
@@ -2231,24 +2242,33 @@ lintCoercion co@(ForAllCo tcv kind_co body_co)
 
        ; return (ForAllCo tcv' kind_co' body_co') } }
 
-lintCoercion co@(FunCo r cow co1 co2)
+lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
+                       , fco_mult = cow, fco_arg = co1, fco_res = co2 })
   = do { co1' <- lintCoercion co1
        ; co2' <- lintCoercion co2
        ; cow' <- lintCoercion cow
        ; let Pair lt1 rt1 = coercionKind co1
              Pair lt2 rt2 = coercionKind co2
              Pair ltw rtw = coercionKind cow
-       ; lintArrow (text "coercion" <+> quotes (ppr co)) lt1 lt2 ltw
-       ; lintArrow (text "coercion" <+> quotes (ppr co)) rt1 rt2 rtw
+       ; lintL (afl == chooseFunTyFlag lt1 lt2) (bad_co_msg "afl")
+       ; lintL (afr == chooseFunTyFlag rt1 rt2) (bad_co_msg "afr")
+       ; lintArrow (bad_co_msg "arrowl") lt1 lt2 ltw
+       ; lintArrow (bad_co_msg "arrowr") rt1 rt2 rtw
        ; lintRole co1 r (coercionRole co1)
        ; lintRole co2 r (coercionRole co2)
-       ; ensureEqTys (typeKind ltw) multiplicityTy (text "coercion" <> quotes (ppr co))
-       ; ensureEqTys (typeKind rtw) multiplicityTy (text "coercion" <> quotes (ppr co))
+       ; ensureEqTys (typeKind ltw) multiplicityTy (bad_co_msg "mult-l")
+       ; ensureEqTys (typeKind rtw) multiplicityTy (bad_co_msg "mult-r")
        ; let expected_mult_role = case r of
                                     Phantom -> Phantom
                                     _ -> Nominal
        ; lintRole cow expected_mult_role (coercionRole cow)
-       ; return (FunCo r cow' co1' co2') }
+       ; return (co { fco_mult = cow', fco_arg = co1', fco_res = co2' }) }
+  where
+    bad_co_msg s = hang (text "Bad coercion" <+> parens (text s))
+                      2 (vcat [ text "afl:" <+> ppr afl
+                              , text "afr:" <+> ppr afr
+                              , text "arg_co:" <+> ppr co1
+                              , text "res_co:" <+> ppr co2 ])
 
 -- See Note [Bad unsafe coercion]
 lintCoercion co@(UnivCo prov r ty1 ty2)
@@ -2258,8 +2278,8 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
              k2 = typeKind ty2'
        ; prov' <- lint_prov k1 k2 prov
 
-       ; when (r /= Phantom && classifiesTypeWithValues k1
-                            && classifiesTypeWithValues k2)
+       ; when (r /= Phantom && isTYPEorCONSTRAINT k1
+                            && isTYPEorCONSTRAINT k2)
               (checkTypes ty1 ty2)
 
        ; return (UnivCo prov' r ty1' ty2') }
@@ -2352,32 +2372,39 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co (coercionRole co1) (coercionRole co2)
        ; return (TransCo co1' co2') }
 
-lintCoercion the_co@(NthCo r0 n co)
+lintCoercion the_co@(SelCo cs co)
   = do { co' <- lintCoercion co
-       ; let (Pair s t, r) = coercionKindRole co'
-       ; case (splitForAllTyCoVar_maybe s, splitForAllTyCoVar_maybe t) of
-         { (Just _, Just _)
-             -- works for both tyvar and covar
-             | n == 0
-             ,  (isForAllTy_ty s && isForAllTy_ty t)
+       ; let (Pair s t, co_role) = coercionKindRole co'
+
+       ; if -- forall (both TyVar and CoVar)
+            | Just _ <- splitForAllTyCoVar_maybe s
+            , Just _ <- splitForAllTyCoVar_maybe t
+            , SelForAll <- cs
+            ,   (isForAllTy_ty s && isForAllTy_ty t)
              || (isForAllTy_co s && isForAllTy_co t)
-             -> do { lintRole the_co Nominal r0
-                   ; return (NthCo r0 n co') }
+            -> return (SelCo cs co')
 
-         ; _ -> case (splitTyConApp_maybe s, splitTyConApp_maybe t) of
-         { (Just (tc_s, tys_s), Just (tc_t, tys_t))
-             | tc_s == tc_t
-             , isInjectiveTyCon tc_s r
-                 -- see Note [NthCo and newtypes] in GHC.Core.TyCo.Rep
-             , tys_s `equalLength` tys_t
-             , tys_s `lengthExceeds` n
-             -> do { lintRole the_co tr r0
-                   ; return (NthCo r0 n co') }
-                where
-                  tr = nthRole r tc_s n
+            -- function
+            | isFunTy s
+            , isFunTy t
+            , SelFun {} <- cs
+            -> return (SelCo cs co')
 
-         ; _ -> failWithL (hang (text "Bad getNth:")
-                              2 (ppr the_co $$ ppr s $$ ppr t)) }}}
+            -- TyCon
+            | Just (tc_s, tys_s) <- splitTyConApp_maybe s
+            , Just (tc_t, tys_t) <- splitTyConApp_maybe t
+            , tc_s == tc_t
+            , SelTyCon n r0 <- cs
+            , isInjectiveTyCon tc_s co_role
+                -- see Note [SelCo and newtypes] in GHC.Core.TyCo.Rep
+            , tys_s `equalLength` tys_t
+            , tys_s `lengthExceeds` n
+            -> do { lintRole the_co (tyConRole co_role tc_s n) r0
+                  ; return (SelCo cs co') }
+
+            | otherwise
+            -> failWithL (hang (text "Bad SelCo:")
+                             2 (ppr the_co $$ ppr s $$ ppr t)) }
 
 lintCoercion the_co@(LRCo lr co)
   = do { co' <- lintCoercion co
@@ -2585,10 +2612,14 @@ lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
        ; rhs' <- lintType rhs
        ; let lhs_kind = typeKind lhs'
              rhs_kind = typeKind rhs'
-       ; lintL (lhs_kind `eqType` rhs_kind) $
+       ; lintL (not (lhs_kind `typesAreApart` rhs_kind)) $
          hang (text "Inhomogeneous axiom")
             2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
                text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
+         -- Type and Constraint are not Apart, so this test allows
+         -- the newtype axiom for a single-method class.  Indeed the
+         -- whole reason Type and Constraint are not Apart is to allow
+         -- such axioms!
 
 -- these checks do not apply to newtype axioms
 lint_family_branch :: TyCon -> CoAxBranch -> LintM ()
@@ -3124,7 +3155,7 @@ varCallSiteUsage :: Id -> LintM UsageEnv
 varCallSiteUsage id =
   do m <- getUEAliases
      return $ case lookupNameEnv m (getName id) of
-         Nothing -> unitUE id One
+         Nothing    -> unitUE id OneTy
          Just id_ue -> id_ue
 
 ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
@@ -3135,7 +3166,7 @@ ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
 ensureSubUsage :: Usage -> Mult -> SDoc -> LintM ()
 ensureSubUsage Bottom     _              _ = return ()
-ensureSubUsage Zero       described_mult err_msg = ensureSubMult Many described_mult err_msg
+ensureSubUsage Zero       described_mult err_msg = ensureSubMult ManyTy described_mult err_msg
 ensureSubUsage (MUsage m) described_mult err_msg = ensureSubMult m described_mult err_msg
 
 ensureSubMult :: Mult -> Mult -> SDoc -> LintM ()

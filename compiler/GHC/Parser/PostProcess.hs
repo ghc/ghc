@@ -137,10 +137,11 @@ import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
 import GHC.Utils.Lexeme ( okConOcc )
 import GHC.Types.TyThing
-import GHC.Core.Type    ( unrestrictedFunTyCon, Specificity(..) )
+import GHC.Core.Type    ( Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey )
+                          listTyConName, listTyConKey,
+                          unrestrictedFunTyCon )
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )

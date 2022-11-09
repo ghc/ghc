@@ -1,30 +1,6 @@
 
-T15648.hs:23:21: error: [GHC-83865]
-    • Couldn't match type: (a0 GHC.Prim.~# b0) -> JankyEquality a0 b0
-                     with: JankyEquality a a
-      Expected: JankyEquality a b
-        Actual: (a0 GHC.Prim.~# b0) -> JankyEquality a0 b0
-    • Probable cause: ‘Jank’ is applied to too few arguments
-      In the expression: Jank
-      In an equation for ‘legitToJank’: legitToJank Legit = Jank
-    • Relevant bindings include
-        legitToJank :: LegitEquality a b -> JankyEquality a b
-          (bound at T15648.hs:23:1)
-
-T15648.hs:30:33: error: [GHC-25897]
-    • Couldn't match expected type ‘a’ with actual type ‘b’
-      ‘b’ is a rigid type variable bound by
-        the type signature for:
-          ueqSym :: forall a b. (a GHC.Prim.~# b) -> b GHC.Prim.~# a
-        at T15648.hs:(28,1)-(29,32)
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          ueqSym :: forall a b. (a GHC.Prim.~# b) -> b GHC.Prim.~# a
-        at T15648.hs:(28,1)-(29,32)
-    • In the second argument of ‘($)’, namely ‘mkLegit @b @a’
-      In the second argument of ‘($)’, namely
-        ‘legitToJank $ mkLegit @b @a’
-      In the expression: unJank $ legitToJank $ mkLegit @b @a
-    • Relevant bindings include
-        ueqSym :: (a GHC.Prim.~# b) -> b GHC.Prim.~# a
-          (bound at T15648.hs:30:1)
+T15648.hs:17:11: error: [GHC-83865]
+    • Expected a type, but ‘(GHC.Prim.~#) a b’ is a constraint
+    • In the type ‘(GHC.Prim.~#) a b’
+      In the definition of data constructor ‘Jank’
+      In the data declaration for ‘JankyEquality’

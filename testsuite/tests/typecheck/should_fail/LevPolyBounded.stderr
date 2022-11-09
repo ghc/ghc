@@ -1,6 +1,7 @@
 
 LevPolyBounded.hs:11:15: error: [GHC-25897]
-    • Expected a type, but ‘a’ has kind ‘TYPE r’
+    • Couldn't match kind ‘r’ with ‘LiftedRep’
+      Expected kind ‘*’, but ‘a’ has kind ‘TYPE r’
       ‘r’ is a rigid type variable bound by
         the class declaration for ‘XBounded’
         at LevPolyBounded.hs:10:17-27
@@ -8,7 +9,8 @@ LevPolyBounded.hs:11:15: error: [GHC-25897]
       In the class declaration for ‘XBounded’
 
 LevPolyBounded.hs:12:15: error: [GHC-25897]
-    • Expected a type, but ‘a’ has kind ‘TYPE r’
+    • Couldn't match kind ‘r’ with ‘LiftedRep’
+      Expected kind ‘*’, but ‘a’ has kind ‘TYPE r’
       ‘r’ is a rigid type variable bound by
         the class declaration for ‘XBounded’
         at LevPolyBounded.hs:10:17-27

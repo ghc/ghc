@@ -150,9 +150,8 @@ instance Eq (DeBruijn CoreExpr) where
 
 eqDeBruijnExpr :: DeBruijn CoreExpr -> DeBruijn CoreExpr -> Bool
 eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
-    go (Var v1) (Var v2) = eqDeBruijnVar (D env1 v1) (D env2 v2)
+    go (Var v1) (Var v2)             = eqDeBruijnVar (D env1 v1) (D env2 v2)
     go (Lit lit1)    (Lit lit2)      = lit1 == lit2
-    -- See Note [Using tcView inside eqDeBruijnType] in GHC.Core.Map.Type
     go (Type t1)    (Type t2)        = eqDeBruijnType (D env1 t1) (D env2 t2)
     -- See Note [Alpha-equality for Coercion arguments]
     go (Coercion {}) (Coercion {}) = True
@@ -163,7 +162,6 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
       && go e1 e2
 
     go (Lam b1 e1)  (Lam b2 e2)
-          -- See Note [Using tcView inside eqDeBruijnType] in GHC.Core.Map.Type
       =  eqDeBruijnType (D env1 (varType b1)) (D env2 (varType b2))
       && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
       && eqDeBruijnExpr (D (extendCME env1 b1) e1) (D (extendCME env2 b2) e2)
@@ -175,9 +173,7 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
       = equalLength ps1 ps2
       -- See Note [Alpha-equality for let-bindings]
-      && all2 (\b1 b2 -> -- See Note [Using tcView inside eqDeBruijnType] in
-                         -- GHC.Core.Map.Type
-                         eqDeBruijnType (D env1 (varType b1))
+      && all2 (\b1 b2 -> eqDeBruijnType (D env1 (varType b1))
                                         (D env2 (varType b2)))
               bs1 bs2
       && D env1' rs1 == D env2' rs2

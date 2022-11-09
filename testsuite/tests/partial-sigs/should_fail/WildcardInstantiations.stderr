@@ -18,8 +18,7 @@ WildcardInstantiations.hs:5:18: error: [GHC-88464]
 WildcardInstantiations.hs:5:30: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘String’
       To use the inferred type, enable PartialTypeSignatures
-    • In the type ‘_a -> _’
-      In the type signature: foo :: (Show _a, _) => _a -> _
+    • In the type signature: foo :: (Show _a, _) => _a -> _
 
 WildcardInstantiations.hs:8:8: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘t’
@@ -27,8 +26,7 @@ WildcardInstantiations.hs:8:8: error: [GHC-88464]
                the inferred type of bar :: t -> (t -> w) -> w
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type ‘_ -> _ -> _’
-      In the type signature: bar :: _ -> _ -> _
+    • In the type signature: bar :: _ -> _ -> _
 
 WildcardInstantiations.hs:8:13: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘t -> w’
@@ -36,8 +34,7 @@ WildcardInstantiations.hs:8:13: error: [GHC-88464]
                the inferred type of bar :: t -> (t -> w) -> w
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type ‘_ -> _ -> _’
-      In the type signature: bar :: _ -> _ -> _
+    • In the type signature: bar :: _ -> _ -> _
 
 WildcardInstantiations.hs:8:18: error: [GHC-88464]
     • Found type wildcard ‘_’ standing for ‘w’
@@ -45,5 +42,4 @@ WildcardInstantiations.hs:8:18: error: [GHC-88464]
                the inferred type of bar :: t -> (t -> w) -> w
                at WildcardInstantiations.hs:9:1-13
       To use the inferred type, enable PartialTypeSignatures
-    • In the type ‘_ -> _ -> _’
-      In the type signature: bar :: _ -> _ -> _
+    • In the type signature: bar :: _ -> _ -> _
