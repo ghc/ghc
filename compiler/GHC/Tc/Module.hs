@@ -2047,6 +2047,14 @@ This is unusual: it's a LocalId whose Name has a Module from another
 module. Tiresomely, we must filter it out again in GHC.Iface.Make, less we
 get two defns for 'main' in the interface file!
 
+When using `-fwrite-if-simplified-core` the root_main_id can end up in an interface file.
+When the interface is read back in we have to add a special case when creating the
+Id because otherwise we would go looking for the :Main module which obviously doesn't
+exist. For this logic see GHC.IfaceToCore.mk_top_id.
+
+There is also some similar (probably dead) logic in GHC.Rename.Env which says it
+was added for External Core which faced a similar issue.
+
 
 *********************************************************
 *                                                       *

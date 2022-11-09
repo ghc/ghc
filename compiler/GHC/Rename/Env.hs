@@ -207,6 +207,11 @@ newTopSrcBinder (L loc rdr_name)
         -- the nice Exact name for the TyCon gets swizzled to an Orig name.
         -- Hence the badOrigBinding error message.
         --
+
+        -- MP 2022: I suspect this code path is never called for `rOOT_MAIN` anymore
+        -- because External Core has been removed but we instead have some similar logic for
+        -- serialising whole programs into interface files in GHC.IfaceToCore.mk_top_id.
+
         -- Except for the ":Main.main = ..." definition inserted into
         -- the Main module; ugh!
 
