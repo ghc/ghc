@@ -112,6 +112,17 @@ The goal of this pass is to prepare for code generation.
     and doing so would be tiresome because then we'd need
     to substitute in types and coercions.
 
+    We need to clone ids for two reasons:
+    + Things associated with labels in the final code must be truly unique in
+      order to avoid labels being shadowed in the final output.
+    + Even binders without info tables like function arguments or alternative
+      bound binders must be unique at least in their type/unique combination.
+      We only emit a single declaration for each binder when compiling to C
+      so if binders are not unique we would either get duplicate declarations
+      or misstyped variables. The later happend in #22402.
+    + We heavily use unique-keyed maps in the backend which can go wrong when
+      ids with the same unique are meant to represent the same variable.
+
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
 
