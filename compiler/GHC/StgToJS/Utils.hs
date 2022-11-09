@@ -21,7 +21,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
-assignToTypedExprs :: [TypedExpr] -> [JExpr] -> JStat
+assignToTypedExprs :: HasDebugCallStack => [TypedExpr] -> [JExpr] -> JStat
 assignToTypedExprs tes es =
   assignAllEqual (concatMap typex_expr tes) es
 
@@ -30,7 +30,7 @@ assignTypedExprs tes es =
   -- TODO: check primRep (typex_typ) here?
   assignToTypedExprs tes (concatMap typex_expr es)
 
-assignToExprCtx :: ExprCtx -> [JExpr] -> JStat
+assignToExprCtx :: HasDebugCallStack => ExprCtx -> [JExpr] -> JStat
 assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
 
 -- | Assign first expr only (if it exists), performing coercions between some
