@@ -14,6 +14,7 @@
 /rts/                             @bgamari @simonmar @osa1 @Phyx @angerman
 /rts/linker/                      @angerman @Phyx @simonmar
 /rts/include/                     @bgamari @simonmar @osa1
+/rts/wasm/                        @TerrorJack
 
 [RTS heap profiling]
 /docs/users_guide/profiling.rst   @DanielG
@@ -37,6 +38,7 @@
 /compiler/GHC/HsToCore/            @simonpj @rae
 /compiler/GHC/Tc/Deriv/            @RyanGlScott
 /compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
+/compiler/GHC/CmmToAsm/Wasm/       @TerrorJack
 /compiler/GHC/CmmToLlvm/           @angerman
 /compiler/GHC/StgToCmm/            @simonmar @osa1
 /compiler/GHC/Cmm/                 @simonmar @osa1
@@ -49,6 +51,7 @@
 /compiler/GHC/Cmm/Switch.hs        @nomeata
 /compiler/GHC/Core/Op/DmdAnal.hs   @simonpj @sgraf
 /compiler/GHC/ThToHs.hs            @rae
+/compiler/GHC/Wasm/                @nrnrnr
 
 [Core libraries]
 /libraries/base/                  @hvr
