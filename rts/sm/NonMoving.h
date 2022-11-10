@@ -168,7 +168,7 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     SET_SEGMENT_STATE(seg, ACTIVE);
     while (true) {
-        struct NonmovingSegment *current_active = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->active);
+        struct NonmovingSegment *current_active = RELAXED_LOAD(&alloc->active);
         seg->link = current_active;
         if (cas((StgVolatilePtr) &alloc->active, (StgWord) current_active, (StgWord) seg) == (StgWord) current_active) {
             break;
@@ -183,8 +183,8 @@ INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
         nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     SET_SEGMENT_STATE(seg, FILLED);
     while (true) {
-        struct NonmovingSegment *current_filled = (struct NonmovingSegment*)VOLATILE_LOAD(&alloc->filled);
-        seg->link = current_filled;
+        struct NonmovingSegment *current_filled = (struct NonmovingSegment*) RELAXED_LOAD(&alloc->filled);
+        RELAXED_STORE(&seg->link, current_filled);
         if (cas((StgVolatilePtr) &alloc->filled, (StgWord) current_filled, (StgWord) seg) == (StgWord) current_filled) {
             break;
         }
