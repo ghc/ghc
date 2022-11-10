@@ -1184,15 +1184,17 @@ trace_stack (MarkQueue *queue, StgStack *stack)
 static bool
 bump_static_flag(StgClosure **link_field, StgClosure *q STG_UNUSED)
 {
-    while (1) {
-        StgWord link = (StgWord) *link_field;
-        StgWord new = (link & ~STATIC_BITS) | static_flag;
-        if ((link & STATIC_BITS) == static_flag)
-            return false;
-        else if (cas((StgVolatilePtr) link_field, link, new) == link) {
-            return true;
-        }
+    ACQUIRE_SM_LOCK;
+    bool needs_marking;
+    StgWord link = (StgWord) *link_field;
+    if ((link & STATIC_BITS) == static_flag) {
+        needs_marking = false;
+    } else {
+        *link_field = (StgClosure *) ((link & ~STATIC_BITS) | static_flag);
+        needs_marking = true;
     }
+    RELEASE_SM_LOCK;
+    return needs_marking;
 }
 
 /* N.B. p0 may be tagged */
