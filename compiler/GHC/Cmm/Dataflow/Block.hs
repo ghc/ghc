@@ -14,6 +14,7 @@ module GHC.Cmm.Dataflow.Block
     , IndexedCO
     , Block(..)
     , blockAppend
+    , blockConcat
     , blockCons
     , blockFromList
     , blockJoin
@@ -136,6 +137,8 @@ blockJoin f b t = BlockCC f b t
 blockAppend :: Block n e O -> Block n O x -> Block n e x
 blockAppend = cat
 
+blockConcat :: [Block n O O] -> Block n O O
+blockConcat = foldr blockAppend emptyBlock
 
 -- Taking apart
 
