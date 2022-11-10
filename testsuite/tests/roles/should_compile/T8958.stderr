@@ -10,7 +10,9 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom T8958.N:Map :: Map k v = [(k, v)]
 DATA CONSTRUCTORS
-  MkMap :: forall k v. [(k, v)] -> Map k v
+  MkMap :: forall k v.
+           (Nominal k, Representational v) =>
+           [(k, v)] -> Map k v
 CLASS INSTANCES
   instance [incoherent] Representational a
     -- Defined at T8958.hs:11:10
@@ -92,3 +94,19 @@ AbsBinds [a] []
    Evidence: [EvBinds{}]}
 
 
+
+T8958.hs:14:54: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Representational v’ matches
+        instance Representational a -- Defined at T8958.hs:11:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the definition of data constructor ‘MkMap’
+      In the newtype declaration for ‘Map’
+
+T8958.hs:14:54: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Nominal k’ matches
+        instance Nominal a -- Defined at T8958.hs:8:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the definition of data constructor ‘MkMap’
+      In the newtype declaration for ‘Map’

@@ -1542,14 +1542,18 @@ dataConWrapperType (MkData { dcUserTyVarBinders = user_tvbs,
     res_ty
 
 dataConNonlinearType :: DataCon -> Type
+-- Just like dataConWrapperType, but with the
+-- linearity on the arguments all zapped to Many
 dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
                                dcOtherTheta = theta, dcOrigArgTys = arg_tys,
-                               dcOrigResTy = res_ty })
-  = let arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
-    in mkInvisForAllTys user_tvbs $
-       mkInvisFunTys theta $
-       mkScaledFunTys arg_tys' $
-       res_ty
+                               dcOrigResTy = res_ty,
+                               dcStupidTheta = stupid_theta })
+  = mkInvisForAllTys user_tvbs $
+    mkInvisFunTys (stupid_theta ++ theta) $
+    mkScaledFunTys arg_tys' $
+    res_ty
+  where
+    arg_tys' = map (\(Scaled w t) -> Scaled (case w of OneTy -> ManyTy; _ -> w) t) arg_tys
 
 dataConDisplayType :: Bool -> DataCon -> Type
 dataConDisplayType show_linear_types dc
