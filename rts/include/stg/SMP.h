@@ -496,6 +496,7 @@ load_load_barrier(void) {
 // These are typically necessary only in very specific cases (e.g. WSDeque)
 // where the ordered operations aren't expressive enough to capture the desired
 // ordering.
+#define ACQUIRE_FENCE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 #define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
 #define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 
@@ -530,6 +531,7 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 #define SEQ_CST_RELAXED_CAS(p,o,n) cas(p,o,n)
 
 // Fences
+#define ACQUIRE_FENCE()
 #define RELEASE_FENCE()
 #define SEQ_CST_FENCE()
 

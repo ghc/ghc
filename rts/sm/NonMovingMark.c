@@ -1507,8 +1507,12 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case BLACKHOLE: {
-        PUSH_FIELD((StgInd *) p, indirectee);
-        StgClosure *indirectee = ((StgInd*)p)->indirectee;
+        // Synchronizes with the release-store in updateWithIndirection.
+        // See Note [Heap memory barriers] in SMP.h.
+        StgInd *ind = (StgInd *) p;
+        ACQUIRE_FENCE();
+        StgClosure *indirectee = RELAXED_LOAD(&ind->indirectee);
+        markQueuePushClosure(queue, indirectee, &ind->indirectee);
         if (GET_CLOSURE_TAG(indirectee) == 0 || origin == NULL) {
             // do nothing
         } else {
