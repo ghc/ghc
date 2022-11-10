@@ -73,7 +73,7 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , collectMakeStaticArgs
                         , mkLamTypes, extendInScopeSetBndrs
                         )
-import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
+import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, idBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst
 import GHC.Core.Make    ( sortQuantVars )
@@ -1092,7 +1092,7 @@ lvlBind :: LevelEnv
         -> LvlM (LevelledBind, LevelEnv)
 
 lvlBind env (AnnNonRec bndr rhs)
-  | isTyVar bndr    -- Don't do anything for TyVar binders
+  | is_tyvar        -- Don't do anything for TyVar binders
                     --   (simplifier gets rid of them pronto)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
@@ -1103,7 +1103,9 @@ lvlBind env (AnnNonRec bndr rhs)
           -- bit brutal, but unlifted bindings aren't expensive either
 
   = -- No float
-    do { rhs' <- lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
+    do { rhs' <- if is_tyvar
+                 then lvlExpr env rhs
+                 else lvlRhs env NonRecursive is_bot_lam mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
               (env', [bndr']) = substAndLvlBndrs NonRecursive env bind_lvl [bndr]
        ; return (NonRec bndr' rhs', env') }
@@ -1126,6 +1128,8 @@ lvlBind env (AnnNonRec bndr rhs)
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
   where
+    is_tyvar   = isTyVar bndr
+    deann_rhs  = deAnnotate rhs
     bndr_ty    = idType bndr
     ty_fvs     = tyCoVarsOfType bndr_ty
     rhs_fvs    = freeVarsOf rhs
@@ -1133,11 +1137,13 @@ lvlBind env (AnnNonRec bndr rhs)
     abs_vars   = abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs ty_fvs (isFunction rhs) is_bot_lam is_join
 
-    deann_rhs  = deAnnotate rhs
-    mb_bot_str = exprBotStrictness_maybe deann_rhs
+    mb_bot_str = idBotStrictness_maybe bndr
     is_bot_lam = isJust mb_bot_str
-        -- is_bot_lam: looks like (\xy. bot), maybe zero lams
-        -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
+    -- The Simplifier pins on strictness info, based on a call to arityType
+    -- Using that is faster and more accurate than calling exprBotStrictness_maybe
+    -- is_bot_lam: looks like (\xy. bot), maybe zero lams
+    -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
+    -- NB: these two defns only work for Ids, not TyVars
 
     n_extra    = count isId abs_vars
     mb_join_arity = isJoinId_maybe bndr

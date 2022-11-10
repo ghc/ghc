@@ -57,7 +57,7 @@ import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Unify
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
-import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
+import GHC.Core.Opt.Arity    ( typeArity, tryHardExprIsDeadEnd )
 
 import GHC.Core.Opt.Monad
 
@@ -85,7 +85,6 @@ import GHC.Data.List.SetOps
 import GHC.Utils.Monad
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
 import GHC.Utils.Error
 import qualified GHC.Utils.Error as Err
@@ -1229,49 +1228,6 @@ Utterly bogus.  `f` expects an `Int` and we are giving it an `Age`.
 No no no.  Casts destroy the tail-call property.  Henc markAllJoinsBad
 in the (Cast expr co) case of lintCoreExpr.
 
-Note [No alternatives lint check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Case expressions with no alternatives are odd beasts, and it would seem
-like they would worth be looking at in the linter (cf #10180). We
-used to check two things:
-
-* exprIsHNF is false: it would *seem* to be terribly wrong if
-  the scrutinee was already in head normal form.
-
-* exprIsDeadEnd is true: we should be able to see why GHC believes the
-  scrutinee is diverging for sure.
-
-It was already known that the second test was not entirely reliable.
-Unfortunately (#13990), the first test turned out not to be reliable
-either. Getting the checks right turns out to be somewhat complicated.
-
-For example, suppose we have (comment 8)
-
-  data T a where
-    TInt :: T Int
-
-  absurdTBool :: T Bool -> a
-  absurdTBool v = case v of
-
-  data Foo = Foo !(T Bool)
-
-  absurdFoo :: Foo -> a
-  absurdFoo (Foo x) = absurdTBool x
-
-GHC initially accepts the empty case because of the GADT conditions. But then
-we inline absurdTBool, getting
-
-  absurdFoo (Foo x) = case x of
-
-x is in normal form (because the Foo constructor is strict) but the
-case is empty. To avoid this problem, GHC would have to recognize
-that matching on Foo x is already absurd, which is not so easy.
-
-More generally, we don't really know all the ways that GHC can
-lose track of why an expression is bottom, so we shouldn't make too
-much fuss when that happens.
-
-
 Note [Beta redexes]
 ~~~~~~~~~~~~~~~~~~~
 Consider:
@@ -1436,55 +1392,45 @@ lintTyKind tyvar arg_ty
 -}
 
 lintCaseExpr :: CoreExpr -> Id -> Type -> [CoreAlt] -> LintM (LintedType, UsageEnv)
-lintCaseExpr scrut var alt_ty alts =
-  do { let e = Case scrut var alt_ty alts   -- Just for error messages
+lintCaseExpr scrut case_bndr alt_ty alts =
+  do { let e = Case scrut case_bndr alt_ty alts   -- Just for error messages
 
      -- Check the scrutinee
      ; (scrut_ty, scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
           -- See Note [Join points are less general than the paper]
           -- in GHC.Core
-     ; let scrut_mult = varMult var
+     ; let scrut_mult = varMult case_bndr
 
      ; alt_ty <- addLoc (CaseTy scrut) $
                  lintValueType alt_ty
-     ; var_ty <- addLoc (IdTy var) $
-                 lintValueType (idType var)
 
-     -- We used to try to check whether a case expression with no
-     -- alternatives was legitimate, but this didn't work.
-     -- See Note [No alternatives lint check] for details.
+     -- Don't use lintIdBndr on case_bndr, because unboxed tuple is legitimate
+     ; case_bndr_ty <- addLoc (IdTy case_bndr) $
+                       lintValueType (idType case_bndr)
 
      -- Check that the scrutinee is not a floating-point type
      -- if there are any literal alternatives
      -- See GHC.Core Note [Case expression invariants] item (5)
      -- See Note [Rules for floating-point comparisons] in GHC.Core.Opt.ConstantFold
-     ; let isLitPat (Alt (LitAlt _) _  _) = True
-           isLitPat _                     = False
-     ; checkL (not $ isFloatingPrimTy scrut_ty && any isLitPat alts)
+     ; let is_lit_alt (Alt (LitAlt _) _  _) = True
+           is_lit_alt _                     = False
+     ; checkL (not $ isFloatingPrimTy scrut_ty && any is_lit_alt alts)
          (text "Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238)."
           $$ text "scrut" <+> ppr scrut)
 
-     ; case tyConAppTyCon_maybe (idType var) of
-         Just tycon
-              | debugIsOn
-              , isAlgTyCon tycon
-              , not (isAbstractTyCon tycon)
-              , null (tyConDataCons tycon)
-              , not (exprIsDeadEnd scrut)
-              -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
-                        -- This can legitimately happen for type families
-                      $ return ()
-         _otherwise -> return ()
-
-        -- Don't use lintIdBndr on var, because unboxed tuple is legitimate
+     -- Check whether a case expression with no alternatives is legitimate.
+     -- See Note [No alternatives lint check] for details.
+     ; checkL (not (null alts) || tryHardExprIsDeadEnd scrut) $
+       hang (text "Illegal empty case")
+          2 (ppr case_bndr <+> ppr case_bndr_ty $$ ppr e)
 
      ; subst <- getSubst
-     ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
+     ; ensureEqTys case_bndr_ty scrut_ty (mkScrutMsg case_bndr case_bndr_ty scrut_ty subst)
        -- See GHC.Core Note [Case expression invariants] item (7)
 
-     ; lintBinder CaseBind var $ \_ ->
+     ; lintBinder CaseBind case_bndr $ \_ ->
        do { -- Check the alternatives
-          ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_mult alt_ty) alts
+          ; alt_ues <- mapM (lintCoreAlt case_bndr scrut_ty scrut_mult alt_ty) alts
           ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
           ; checkCaseAlts e scrut_ty alts
           ; return (alt_ty, case_ue) } }
@@ -1586,6 +1532,42 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
 {-
+Note [No alternatives lint check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions with no alternatives are odd beasts, and it would seem
+like they would worth be looking at in the linter (cf #10180). We check
+that the scrutinee is definitely diverging, using exprIsDeadEnd.
+
+Note that exprIsDeadEnv checks for /two/ things:
+* Type:  the type is empty; see Note [Empty types] in GHC.Core.Utils
+* Value: the value visibly bottoming; e.g. (error "urk")
+See Note [Bottoming expressions] in GHC.Core.Opt.Arity
+
+--- Historical note ---
+
+We used to check that exprIsHNF is False for a no-alternative case;
+but that's not quite right (#13990).  Consider:
+
+   data T a = T1 !(F a) | T2 Int
+   data DataConCantHappen -- No constructors
+   type instance F Bool = DataConCantHappen
+
+   f (x::T Bool) = case x of
+                     T1 v -> case (v |> co) of {}
+                     T2 x -> blah
+
+   where co :: F Bool ~ Void
+
+Now T1 is in fact inaccessible: it is a strict constructor and there
+are no inhabitants of (F Bool) = DataConCantHappen.  GHC itself uses
+this a lot in HsSyn to make inactive constructors inaccessible.
+
+However in this example `v` is marked "evaluated" because it is a
+strict field; so the scrutinee responds True to exprIsHNF.  It's
+all fine; but don't complain about exprIsHNF.
+
+--- End of historical note ---
+
 Note [Validating multiplicities in a case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose 'MkT :: a %m -> T m a'.

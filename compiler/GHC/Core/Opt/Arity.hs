@@ -27,7 +27,9 @@ module GHC.Core.Opt.Arity
    , arityTypeArity, idArityType
 
    -- ** Bottoming things
-   , exprIsDeadEnd, exprBotStrictness_maybe, arityTypeBotSigs_maybe
+   , exprIsDeadEnd, tryHardExprIsDeadEnd
+   , arityTypeBotSigs_maybe
+   , exprBotStrictness_maybe, idBotStrictness_maybe
 
    -- ** typeArity and the state hack
    , typeArity, typeOneShots, typeOneShot
@@ -147,12 +149,20 @@ exprBotStrictness_maybe e = arityTypeBotSigs_maybe (cheapArityType e)
 arityTypeBotSigs_maybe :: ArityType ->  Maybe (Arity, DmdSig, CprSig)
 -- Arity of a divergent function
 arityTypeBotSigs_maybe (AT lams div)
-  | isDeadEndDiv div = Just ( arity
-                            , mkVanillaDmdSig arity botDiv
+  | isDeadEndDiv div = Just (arity
+                            , mkVanillaDmdSig arity div
                             , mkCprSig arity botCpr)
   | otherwise        = Nothing
   where
     arity = length lams
+
+idBotStrictness_maybe :: Id ->  Maybe (Arity, DmdSig, CprSig)
+idBotStrictness_maybe id
+  | isDeadEndDiv div = Just (length dmds, dmd_sig, idCprSig id)
+  | otherwise        = Nothing
+  where
+    (dmds, div) = splitDmdSig dmd_sig
+    dmd_sig     = idDmdSig id
 
 
 {- Note [exprArity for applications]
@@ -1653,15 +1663,22 @@ exprArity e = go e
     go _                           = 0
 
 ---------------
-exprIsDeadEnd :: CoreExpr -> Bool
+exprIsDeadEnd, tryHardExprIsDeadEnd :: CoreExpr -> Bool
+tryHardExprIsDeadEnd e = expr_is_dead_end True  e
+exprIsDeadEnd        e = expr_is_dead_end False e
+
+expr_is_dead_end :: Bool -> CoreExpr -> Bool
 -- See Note [Bottoming expressions]
 -- This function is, in effect, just a specialised (and hence cheap)
 --    version of cheapArityType:
 --    exprIsDeadEnd e = case cheapArityType e of
 --                         AT lams div -> null lams && isDeadEndDiv div
+-- The try_hard flag governs how hard it tries to find the right
+-- answer.  It's always OK to say False
+--
 -- See also exprBotStrictness_maybe, which uses cheapArityType
-exprIsDeadEnd e
-  = go 0 e
+expr_is_dead_end try_hard e
+  = go 0 e || isEmptyTy (exprType e)
   where
     go :: Arity -> CoreExpr -> Bool
     -- (go n e) = True <=> expr applied to n value args is bottom
@@ -1676,11 +1693,13 @@ exprIsDeadEnd e
     go n (Lam v e) | isTyVar v   = go n e
                    | otherwise   = False
 
-    go _ (Case _ _ _ alts)       = null alts
-       -- See Note [Empty case alternatives] in GHC.Core
+    go n (Case scrut _ _ alts)
+      | not try_hard = null alts
+      | otherwise    = go 0 scrut || and [ go n rhs | Alt _ _ rhs <- alts ]
+      -- If try_hard then look at scrutinee and all alternatives
+      -- See Note [Empty case alternatives] in GHC.Core
 
     go n (Var v) | isDeadEndAppSig (idDmdSig v) n = True
-                 | isEmptyTy (idType v)           = True
                  | otherwise                      = False
 
 {- Note [Bottoming expressions]
@@ -1693,24 +1712,26 @@ checks for both of these situations:
       (error Int "Hello")
   is visibly bottom.  The strictness analyser also finds out if
   a function diverges or raises an exception, and puts that info
-  in its strictness signature.
+  in its strictness signature.  The `go` function spots this.
 
-* Empty types.  If a type is empty, its only inhabitant is bottom.
-  For example:
-      data T
-      f :: T -> Bool
-      f = \(x:t). case x of Bool {}
+* Empty types. The `isEmptyTy` function spots this. If a type is empty, its
+  only inhabitant is bottom. For example:
+      data Empty   -- No constructors
+      f :: Empty -> Bool
+      f = \(x:Empty). case x of Bool {}
   Since T has no data constructors, the case alternatives are of course
   empty.  However note that 'x' is not bound to a visibly-bottom value;
   it's the *type* that tells us it's going to diverge.
 
-A GADT may also be empty even though it has constructors:
-        data T a where
-          T1 :: a -> T Bool
-          T2 :: T Int
-        ...(case (x::T Char) of {})...
-Here (T Char) is uninhabited.  A more realistic case is (Int ~ Bool),
-which is likewise uninhabited.
+Wrinkles:
+
+(W1) isEmptyTy: a GADT may also be empty even though it has constructors:
+        data G a where
+          G1 :: a -> G Bool
+          g2 :: G Int
+        ...(case (x::G Char) of {})...
+     Here (G Char) is uninhabited.  A more realistic case is (Int ~ Bool),
+     which is likewise uninhabited.  See Note [Empty types] in GHC.Core.Utils
 
 Note [No free join points in arityType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -2269,34 +2269,37 @@ locBind loc b1 b2 diffs = map addLoc diffs
                 | otherwise = ppr b1 <> char '/' <> ppr b2
 
 
-{- *********************************************************************
-*                                                                      *
-\subsection{Determining non-updatable right-hand-sides}
-*                                                                      *
-************************************************************************
-
-Top-level constructor applications can usually be allocated
-statically, but they can't if the constructor, or any of the
-arguments, come from another DLL (because we can't refer to static
-labels in other DLLs).
-
-If this happens we simply make the RHS into an updatable thunk,
-and 'execute' it rather than allocating it statically.
--}
-
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Type utilities}
+              Type utilities
 *                                                                      *
 ************************************************************************
+
+Note [Empty types]
+~~~~~~~~~~~~~~~~~~
+For a type `ty`, if (isEmptyTy ty) is True, then bottom is the only
+inhabitant of `ty`.  So if (e :: ty), we know that `e` must diverge.
+
+How can a type be empty?
+
+* It is a data type with no constructors.  e.g.
+     data T a
+  Then (T Int) and (T b) are empty types
+
+* It is a GADT, but the type parameters excludes all the constructors. e.g.
+     data G a where
+        G1 :: G Int
+        G2 :: G Bool
+  Then (G Char) is empty, because no value can have that type.  But G itself
+  isn't an empty type -- it certainly has data constructors.
+
+See Note [Bottoming expressions] in GHC.Core.Opt.Arity
+See Note [No alternatives lint check] in GHC.Core.Lint
 -}
 
--- | True if the type has no non-bottom elements, e.g. when it is an empty
--- datatype, or a GADT with non-satisfiable type parameters, e.g. Int :~: Bool.
--- See Note [Bottoming expressions]
---
--- See Note [No alternatives lint check] for another use of this function.
+-- | True if the type has no non-bottom elements
+-- See Note [Empty types]
 isEmptyTy :: Type -> Bool
 isEmptyTy ty
     -- Data types where, given the particular type parameters, no data
