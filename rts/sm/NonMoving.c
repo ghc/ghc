@@ -86,6 +86,10 @@ Mutex concurrent_coll_finished_lock;
  *  - A set of *filled* segments, which contain no unallocated blocks and will
  *    be collected during the next major GC cycle
  *
+ * These sets are maintained as atomic singly-linked lists. This is not
+ * susceptible to the ABA problem since we are guaranteed to push a given
+ * segment to a list only once per garbage collection cycle.
+ *
  * Storage for segments is allocated using the block allocator using an aligned
  * group of NONMOVING_SEGMENT_BLOCKS blocks. This makes the task of locating
  * the segment header for a clone a simple matter of bit-masking (as
@@ -544,7 +548,7 @@ void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 static struct NonmovingSegment *nonmovingPopFreeSegment(void)
 {
     while (true) {
-        struct NonmovingSegment *seg = nonmovingHeap.free;
+        struct NonmovingSegment *seg = ACQUIRE_LOAD(&nonmovingHeap.free);
         if (seg == NULL) {
             return NULL;
         }
@@ -642,13 +646,15 @@ static bool advance_next_free(struct NonmovingSegment *seg, const unsigned int b
 static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *alloca)
 {
     while (true) {
-        struct NonmovingSegment *seg = alloca->active;
+        // Synchronizes with CAS in nonmovingPushActiveSegment
+        struct NonmovingSegment *seg = ACQUIRE_LOAD(&alloca->active);
         if (seg == NULL) {
             return NULL;
         }
+        struct NonmovingSegment *next = RELAXED_LOAD(&seg->link);
         if (cas((StgVolatilePtr) &alloca->active,
                 (StgWord) seg,
-                (StgWord) seg->link) == (StgWord) seg) {
+                (StgWord) next) == (StgWord) seg) {
             return seg;
         }
     }
