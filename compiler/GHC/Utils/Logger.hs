@@ -88,11 +88,10 @@ import GHC.Utils.Panic
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
 
-import Data.IORef
 import System.Directory
 import System.FilePath  ( takeDirectory, (</>) )
-import qualified Data.Set as Set
-import Data.Set (Set)
+import qualified Data.Map.Strict as Map
+import Data.Map.Strict (Map)
 import Data.List (stripPrefix)
 import Data.Time
 import System.IO
@@ -206,7 +205,10 @@ data DumpFormat
    | FormatText      -- ^ Unstructured dump
    deriving (Show,Eq)
 
-type DumpCache = IORef (Set FilePath)
+-- | A set of the dump files to which we have written thusfar. Each dump file
+-- has a corresponding MVar to ensure that a dump file has at most one active
+-- writer at a time, avoiding interleaved output.
+type DumpCache = MVar (Map FilePath (MVar ()))
 
 data Logger = Logger
     { log_hook   :: [LogAction -> LogAction]
@@ -244,7 +246,7 @@ defaultTraceFlush = hFlush stderr
 
 initLogger :: IO Logger
 initLogger = do
-    dumps <- newIORef Set.empty
+    dumps <- newMVar Map.empty
     return $ Logger
         { log_hook        = []
         , dump_hook       = []
@@ -448,13 +450,20 @@ withDumpFileHandle dumps logflags flag action = do
     let mFile = chooseDumpFile logflags dump_ways flag
     case mFile of
       Just fileName -> do
-        gd <- readIORef dumps
-        let append = Set.member fileName gd
-            mode = if append then AppendMode else WriteMode
-        unless append $
-            writeIORef dumps (Set.insert fileName gd)
-        createDirectoryIfMissing True (takeDirectory fileName)
-        withFile fileName mode $ \handle -> do
+        lock <- modifyMVar dumps $ \gd ->
+            case Map.lookup fileName gd of
+              Nothing -> do
+                  lock <- newMVar ()
+                  let gd' = Map.insert fileName lock gd
+                  -- ensure that file exists so we can append to it
+                  createDirectoryIfMissing True (takeDirectory fileName)
+                  writeFile fileName ""
+                  return (gd', lock)
+              Just lock -> do
+                  return (gd, lock)
+
+        let withLock k = withMVar lock $ \() -> k >> return ()
+        withLock $ withFile fileName AppendMode $ \handle -> do
             -- We do not want the dump file to be affected by
             -- environment variables, but instead to always use
             -- UTF8. See:
