@@ -1210,9 +1210,15 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     StgWord tag = GET_CLOSURE_TAG(p);
     p = UNTAG_CLOSURE(p);
 
+    // Push an immutable field to the mark queue.
 #   define PUSH_FIELD(obj, field)                                \
         markQueuePushClosure(queue,                              \
                                 (StgClosure *) (obj)->field,     \
+                                (StgClosure **) &(obj)->field)
+    // Push a mutable field to the mark queue.
+#   define PUSH_FIELD_MUT(obj, field)                            \
+        markQueuePushClosure(queue,                              \
+                                (StgClosure *) ACQUIRE_LOAD(&(obj)->field),     \
                                 (StgClosure **) &(obj)->field)
 
     if (!HEAP_ALLOCED_GC(p)) {
@@ -1388,16 +1394,16 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     case MVAR_CLEAN:
     case MVAR_DIRTY: {
         StgMVar *mvar = (StgMVar *) p;
-        PUSH_FIELD(mvar, head);
-        PUSH_FIELD(mvar, tail);
-        PUSH_FIELD(mvar, value);
+        PUSH_FIELD_MUT(mvar, head);
+        PUSH_FIELD_MUT(mvar, tail);
+        PUSH_FIELD_MUT(mvar, value);
         break;
     }
 
     case TVAR: {
         StgTVar *tvar = ((StgTVar *)p);
-        PUSH_FIELD(tvar, current_value);
-        PUSH_FIELD(tvar, first_watch_queue_entry);
+        PUSH_FIELD_MUT(tvar, current_value);
+        PUSH_FIELD_MUT(tvar, first_watch_queue_entry);
         break;
     }
 
@@ -1528,7 +1534,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
-        PUSH_FIELD((StgMutVar *)p, var);
+        PUSH_FIELD_MUT((StgMutVar *)p, var);
         break;
 
     case BLOCKING_QUEUE: {
@@ -1583,7 +1589,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         StgSmallMutArrPtrs *arr = (StgSmallMutArrPtrs *) p;
         for (StgWord i = 0; i < arr->ptrs; i++) {
             StgClosure **field = &arr->payload[i];
-            markQueuePushClosure(queue, *field, field);
+            markQueuePushClosure(queue, ACQUIRE_LOAD(field), field);
         }
         break;
     }
@@ -1639,6 +1645,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
 #   undef PUSH_FIELD
+#   undef PUSH_FIELD_MUT
 
     /* Set the mark bit: it's important that we do this only after we actually push
      * the object's pointers since in the case of marking stacks there may be a
@@ -1719,7 +1726,8 @@ nonmovingMark (MarkQueue *queue)
                 end = arr->ptrs;
             }
             for (StgWord i = start; i < end; i++) {
-                markQueuePushClosure_(queue, arr->payload[i]);
+                StgClosure *c = ACQUIRE_LOAD(&arr->payload[i]);
+                markQueuePushClosure_(queue, c);
             }
             break;
         }
