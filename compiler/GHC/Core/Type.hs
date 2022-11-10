@@ -1327,7 +1327,7 @@ splitFunTys ty = split [] ty ty
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
     split args orig_ty _                   = (reverse args, orig_ty)
 
-funResultTy :: Type -> Type
+funResultTy :: HasDebugCallStack => Type -> Type
 -- ^ Extract the function result type and panic if that is not possible
 funResultTy ty
   | FunTy { ft_res = res } <- coreFullView ty = res
