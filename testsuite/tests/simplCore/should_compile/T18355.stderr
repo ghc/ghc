@@ -7,16 +7,8 @@ Result size of Tidy Core
 f :: forall {a}. Num a => a -> Bool -> a -> a
 [GblId,
  Arity=4,
-<<<<<<< HEAD
- Str=<1P(MC1(C1(L)),MC1(C1(L)),A,A,A,A,A)><L><1L><L>,
+ Str=<1P(MC(1,C(1,L)),MC(1,C(1,L)),A,A,A,A,A)><L><1L><L>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-||||||| parent of 75ae893f7c (Demand: Format Call SubDemands `Cn(sd)` as `C(n,sd)` (#22231))
- Str=<S,1*U(1*C1(C1(U)),1*C1(C1(U)),A,A,A,A,A)><L,U><S,1*U><L,U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-=======
- Str=<S,1*U(1*C(1,C(1,U)),1*C(1,C(1,U)),A,A,A,A,A)><L,U><S,1*U><L,U>,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
->>>>>>> 75ae893f7c (Demand: Format Call SubDemands `Cn(sd)` as `C(n,sd)` (#22231))
          WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [60 0 70 0] 100 0}]
 f = \ (@a)
