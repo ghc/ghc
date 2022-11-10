@@ -105,8 +105,13 @@ stg_gc_noregs
             CurrentNursery = bdescr_link(CurrentNursery);
             bdescr_free(CurrentNursery) = bdescr_start(CurrentNursery);
             OPEN_NURSERY();
-            if (Capability_context_switch(MyCapability()) != 0 :: CInt ||
-                Capability_interrupt(MyCapability())      != 0 :: CInt ||
+
+            CInt context_switch, interrupt;
+            context_switch = %relaxed Capability_context_switch(MyCapability());
+            interrupt = %relaxed Capability_interrupt(MyCapability());
+
+            if (context_switch != 0 :: CInt ||
+                interrupt != 0 :: CInt ||
                 (StgTSO_alloc_limit(CurrentTSO) `lt` (0::I64) &&
                  (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_ALLOC_LIMIT) != 0)) {
                 ret = ThreadYielding;
