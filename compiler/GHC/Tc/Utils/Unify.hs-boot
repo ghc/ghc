@@ -12,6 +12,5 @@ import GHC.Tc.Types.Origin   ( CtOrigin, TypedThing )
 --   GHC.Tc.Utils.Unify and GHC.Tc.Utils.Instantiate
 
 unifyType :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
-unifyKind :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper

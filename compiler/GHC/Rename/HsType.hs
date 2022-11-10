@@ -13,7 +13,7 @@
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
-        rnHsKind, rnLHsKind, rnLHsTypeArgs,
+        rnLHsKind, rnLHsTypeArgs,
         rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
@@ -468,35 +468,6 @@ rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
 {-
 rnHsType is here because we call it from loadInstDecl, and I didn't
 want a gratuitous knot.
-
-Note [HsQualTy in kinds]
-~~~~~~~~~~~~~~~~~~~~~~
-I was wondering whether HsQualTy could occur only at TypeLevel.  But no,
-we can have a qualified type in a kind too. Here is an example:
-
-  type family F a where
-    F Bool = Nat
-    F Nat  = Type
-
-  type family G a where
-    G Type = Type -> Type
-    G ()   = Nat
-
-  data X :: forall k1 k2. (F k1 ~ G k2) => k1 -> k2 -> Type where
-    MkX :: X 'True '()
-
-See that k1 becomes Bool and k2 becomes (), so the equality is
-satisfied. If I write MkX :: X 'True 'False, compilation fails with a
-suitable message:
-
-  MkX :: X 'True '()
-    • Couldn't match kind ‘G Bool’ with ‘Nat’
-      Expected kind: G Bool
-        Actual kind: F Bool
-
-However: in a kind, the constraints in the HsQualTy must all be
-equalities; or at least, any kinds with a class constraint are
-uninhabited. See Note [Constraints in kinds] in GHC.Core.TyCo.Rep.
 -}
 
 data RnTyKiEnv
@@ -551,9 +522,6 @@ rnHsType ctxt ty = rnHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
 rnLHsKind  :: HsDocContext -> LHsKind GhcPs -> RnM (LHsKind GhcRn, FreeVars)
 rnLHsKind ctxt kind = rnLHsTyKi (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
-
-rnHsKind  :: HsDocContext -> HsKind GhcPs -> RnM (HsKind GhcRn, FreeVars)
-rnHsKind ctxt kind = rnHsTyKi  (mkTyKiEnv ctxt KindLevel RnTypeBody) kind
 
 -- renaming a type only, not a kind
 rnLHsTypeArg :: HsDocContext -> LHsTypeArg GhcPs
@@ -610,11 +578,11 @@ rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
                              , hst_tele = tele' , hst_body =  tau' }
                 , fvs) } }
 
-rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
-  = do { data_kinds <- xoptM LangExt.DataKinds -- See Note [HsQualTy in kinds]
-       ; when (not data_kinds && isRnKindLevel env)
-              (addErr (dataKindsErr env ty))
-       ; (ctxt', fvs1) <- rnTyKiContext env lctxt
+rnHsTyKi env (HsQualTy { hst_ctxt = lctxt, hst_body = tau })
+  = do { -- no need to check type vs kind level here; this is
+         -- checked in the type checker. See
+         -- Note [No constraints in kinds] in GHC.Tc.Validity
+         (ctxt', fvs1) <- rnTyKiContext env lctxt
        ; (tau',  fvs2) <- rnLHsTyKi env tau
        ; return (HsQualTy { hst_xqual = noExtField, hst_ctxt = ctxt'
                           , hst_body =  tau' }

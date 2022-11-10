@@ -1732,7 +1732,7 @@ tyConBindersPiTyBinders :: [TyConBinder] -> [PiTyBinder]
 tyConBindersPiTyBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
-    to_tyb (Bndr tv (AnonTCB af))   = Anon (tymult (varType tv)) af
+    to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv)) FTF_T_T
 
 -- | Make a dependent forall over an 'Inferred' variable
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
@@ -1794,7 +1794,7 @@ mkTyConBindersPreferAnon vars inner_tkvs = assert (all isTyVar vars)
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )
               | otherwise
-              = ( Bndr v (AnonTCB visArgTypeLike) : binders
+              = ( Bndr v AnonTCB : binders
                 , fvs `unionVarSet` kind_vars )
       where
         (binders, fvs) = go vs
@@ -2488,9 +2488,8 @@ Here are the key kinding rules for types
           -- in GHC.Builtin.Types.Prim
 
           torc is TYPE or CONSTRAINT
-          ty : body_torc rep
-          bndr_torc is Type or Constraint
-          ki : bndr_torc
+          ty : torc rep
+          ki : Type
           `a` is a type variable
           `a` is not free in rep
 (FORALL1) -----------------------
@@ -2507,10 +2506,6 @@ Here are the key kinding rules for types
 
 Note that:
 * (FORALL1) rejects (forall (a::Maybe). blah)
-
-* (FORALL1) accepts (forall (a :: t1~t2) blah), where the type variable
-  (not coercion variable!) 'a' has a kind (t1~t2) that in turn has kind
-  Constraint.  See Note [Constraints in kinds] in GHC.Core.TyCo.Rep.
 
 * (FORALL2) Surprise 1:
   See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
@@ -2809,8 +2804,7 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
     injective_vars_of_binder :: TyConBinder -> FV
     injective_vars_of_binder (Bndr tv vis) =
       case vis of
-        AnonTCB af     | isVisibleFunArg af
-                       -> injectiveVarsOfType False -- conservative choice
+        AnonTCB        -> injectiveVarsOfType False -- conservative choice
                                               (varType tv)
         NamedTCB argf  | source_of_injectivity argf
                        -> unitFV tv `unionFV`

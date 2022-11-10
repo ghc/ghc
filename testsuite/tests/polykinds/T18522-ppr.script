@@ -1,4 +1,4 @@
-:set -XPolyKinds -XDataKinds -XRankNTypes -XTypeFamilies
+:set -XPolyKinds -XDataKinds -XRankNTypes -XTypeFamilies -fprint-explicit-foralls
 import Data.Kind (Type)
-type family T :: forall k -> (k ~ k) => forall j -> k -> j -> Type
+type family T :: forall a -> ()
 :k T

@@ -205,7 +205,7 @@ mkIfaceTyConKind :: [IfaceTyConBinder] -> IfaceKind -> IfaceKind
 mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
-    mk (Bndr tv (AnonTCB af))   k = IfaceFunTy af many_ty (ifaceBndrType tv) k
+    mk (Bndr tv AnonTCB)        k = IfaceFunTy FTF_T_T many_ty (ifaceBndrType tv) k
     mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
 
 ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
@@ -892,12 +892,7 @@ pprIfaceTyConBinders suppress_sig = sep . map go
     go (Bndr (IfaceTvBndr bndr) vis) =
       -- See Note [Pretty-printing invisible arguments]
       case vis of
-        AnonTCB  af
-          | isVisibleFunArg af -> ppr_bndr (UseBndrParens True)
-          | otherwise          -> char '@' <> braces (ppr_bndr (UseBndrParens False))
-          -- The above case is rare. (See Note [AnonTCB with constraint arg]
-          --   in GHC.Core.TyCon.)
-          -- Should we print these differently?
+        AnonTCB            -> ppr_bndr (UseBndrParens True)
         NamedTCB Required  -> ppr_bndr (UseBndrParens True)
         NamedTCB Specified -> char '@' <> ppr_bndr (UseBndrParens True)
         NamedTCB Inferred  -> char '@' <> braces (ppr_bndr (UseBndrParens False))

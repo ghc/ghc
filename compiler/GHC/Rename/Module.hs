@@ -2064,14 +2064,7 @@ preceded by `type`, with the following restrictions:
 (R3) There are no strictness flags, because they don't make sense at
      the type level.
 
-(R4) The types of the constructors contain no constraints other than
-     equality constraints.  (This is the same restriction imposed
-     on constructors to be promoted with the DataKinds extension in
-     dc_theta_illegal_constraint called from GHC.Tc.Gen.HsType.tcTyVar,
-     but in that case the restriction is imposed if and when a data
-     constructor is used in a type, whereas here it is imposed at
-     the point of definition.  See also Note [Constraints in kinds]
-     in GHC.Core.TyCo.Rep.)
+(R4) The types of the constructors contain no constraints.
 
 (R5) There are no deriving clauses.
 

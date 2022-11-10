@@ -681,10 +681,6 @@ Currently there are nine different uses of 'VarBndr':
 * TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
   Binders of a TyCon; see TyCon in GHC.Core.TyCon
 
-* TyCon.TyConPiTyBinder = VarBndr TyCoVar TyConBndrVis
-  Binders of a PromotedDataCon
-  See Note [Promoted GADT data constructors] in GHC.Core.TyCon
-
 * IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ForAllTyFlag
 * IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 * IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis

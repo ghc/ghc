@@ -43,7 +43,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Env
 
-import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
+import GHC.Builtin.Types  ( heqDataCon, integerTyConName )
 import GHC.Builtin.Names
 
 import GHC.Hs
@@ -53,14 +53,12 @@ import GHC.Core.InstEnv
 import GHC.Core.Predicate
 import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
-import GHC.Core.Multiplicity
-import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
 import GHC.Core.DataCon
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
+import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType )
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
@@ -386,70 +384,20 @@ tcInstInvisibleTyBindersN n ty
 
     go n subst kind
       | n > 0
-      , Just (bndr, body) <- tcSplitPiTy_maybe kind
-      , isInvisiblePiTyBinder bndr
-      = do { (subst', arg) <- tcInstInvisibleTyBinder subst bndr
+      , Just (bndr, body) <- tcSplitForAllTyVarBinder_maybe kind
+      , isInvisibleForAllTyFlag (binderFlag bndr)
+      = do { (subst', arg) <- tcInstInvisibleTyBinder subst (binderVar bndr)
            ; (args, inner_ty) <- go (n-1) subst' body
            ; return (arg:args, inner_ty) }
       | otherwise
       = return ([], substTy subst kind)
 
-tcInstInvisibleTyBinder :: Subst -> PiTyVarBinder -> TcM (Subst, TcType)
+tcInstInvisibleTyBinder :: Subst -> TyVar -> TcM (Subst, TcType)
 -- Called only to instantiate kinds, in user-written type signatures
 
-tcInstInvisibleTyBinder subst (Named (Bndr tv _))
+tcInstInvisibleTyBinder subst tv
   = do { (subst', tv') <- newMetaTyVarX subst tv
        ; return (subst', mkTyVarTy tv') }
-
-tcInstInvisibleTyBinder subst (Anon ty af)
-  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
-    -- For kinds like (k1 ~ k2) => blah, we want to emit a unification
-    -- constraint for (k1 ~# k2) and return the argument (Eq# k1 k2)
-    -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
-    -- Equality is the *only* constraint currently handled in types.
-  = assert (isInvisibleFunArg af) $
-    do { co <- unifyKind Nothing k1 k2
-       ; return (subst, mk co) }
-
-  | otherwise  -- This should never happen
-               -- See GHC.Core.TyCo.Rep Note [Constraints in kinds]
-  = pprPanic "tcInvisibleTyBinder" (ppr ty)
-
--------------------------------
-get_eq_tys_maybe :: Type
-                 -> Maybe ( Coercion -> Type
-                             -- Given a coercion proving t1 ~# t2, produce the
-                             -- right instantiation for the PiTyVarBinder at hand
-                          , Type  -- t1
-                          , Type  -- t2
-                          )
--- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
-get_eq_tys_maybe ty
-  -- Lifted heterogeneous equality (~~)
-  | Just (tc, [_, _, k1, k2]) <- splitTyConApp_maybe ty
-  , tc `hasKey` heqTyConKey
-  = Just (mkHEqBoxTy k1 k2, k1, k2)
-
-  -- Lifted homogeneous equality (~)
-  | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
-  , tc `hasKey` eqTyConKey
-  = Just (mkEqBoxTy k1 k2, k1, k2)
-
-  | otherwise
-  = Nothing
-
--- | This takes @a ~# b@ and returns @a ~~ b@.
-mkHEqBoxTy :: Type -> Type -> TcCoercion -> Type
-mkHEqBoxTy ty1 ty2 co
-  = mkTyConApp (promoteDataCon heqDataCon) [k1, k2, ty1, ty2, mkCoercionTy co]
-  where k1 = typeKind ty1
-        k2 = typeKind ty2
-
--- | This takes @a ~# b@ and returns @a ~ b@.
-mkEqBoxTy :: Type -> Type -> TcCoercion -> Type
-mkEqBoxTy ty1 ty2 co
-  = mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
-  where k = typeKind ty1
 
 {- *********************************************************************
 *                                                                      *

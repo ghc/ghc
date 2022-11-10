@@ -4069,8 +4069,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
               tv_kind  = tyVarKind t_tv
               tv_kind' = substTy t_sub tv_kind
               t_tv'    = setTyVarKind t_tv tv_kind'
-              eqs' | isConstraintLikeKind (typeKind tv_kind') = eqs
-                   | otherwise = (t_tv', r_ty) : eqs
+              eqs'     = (t_tv', r_ty) : eqs
 
       | otherwise
       = pprPanic "mkGADTVars" (ppr tmpl_tvs $$ ppr subst)

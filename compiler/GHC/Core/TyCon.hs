@@ -20,10 +20,10 @@ module GHC.Core.TyCon(
         PromDataConInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
-        TyConBinder, TyConBndrVis(..), TyConPiTyBinder,
+        TyConBinder, TyConBndrVis(..),
         mkNamedTyConBinder, mkNamedTyConBinders,
         mkRequiredTyConBinder,
-        mkAnonTyConBinder, mkAnonTyConBinders, mkInvisAnonTyConBinder,
+        mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderForAllTyFlag, tyConBndrVisForAllTyFlag, isNamedTyConBinder,
         isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
 
@@ -445,37 +445,28 @@ See #19367.
 
 ************************************************************************
 *                                                                      *
-                    TyConBinder, TyConPiTyBinder
+                    TyConBinder
 *                                                                      *
 ************************************************************************
 -}
 
 type TyConBinder     = VarBndr TyVar   TyConBndrVis
-type TyConPiTyBinder = VarBndr TyCoVar TyConBndrVis
-     -- Only PromotedDataCon has TyConPiTyBinders
-     -- See Note [Promoted GADT data constructors]
 
 data TyConBndrVis
-  = NamedTCB ForAllTyFlag
-  | AnonTCB  FunTyFlag
+  = NamedTCB ForAllTyFlag  -- ^ A named, forall-bound variable (invisible or not)
+  | AnonTCB                -- ^ an ordinary, visible type argument
 
 instance Outputable TyConBndrVis where
   ppr (NamedTCB flag) = ppr flag
-  ppr (AnonTCB af)    = ppr af
+  ppr AnonTCB         = text "AnonTCB"
 
 mkAnonTyConBinder :: TyVar -> TyConBinder
 -- Make a visible anonymous TyCon binder
 mkAnonTyConBinder tv = assert (isTyVar tv) $
-                       Bndr tv (AnonTCB visArgTypeLike)
+                       Bndr tv AnonTCB
 
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
-
-mkInvisAnonTyConBinder :: TyVar -> TyConBinder
--- Make an /invisible/ anonymous TyCon binder
--- Not used much
-mkInvisAnonTyConBinder tv = assert (isTyVar tv) $
-                            Bndr tv (AnonTCB invisArgTypeLike)
 
 mkNamedTyConBinder :: ForAllTyFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
@@ -499,10 +490,8 @@ tyConBinderForAllTyFlag :: TyConBinder -> ForAllTyFlag
 tyConBinderForAllTyFlag (Bndr _ vis) = tyConBndrVisForAllTyFlag vis
 
 tyConBndrVisForAllTyFlag :: TyConBndrVis -> ForAllTyFlag
-tyConBndrVisForAllTyFlag (NamedTCB vis)     = vis
-tyConBndrVisForAllTyFlag (AnonTCB af)    -- See Note [AnonTCB with constraint arg]
-  | isVisibleFunArg af = Required
-  | otherwise          = Inferred
+tyConBndrVisForAllTyFlag (NamedTCB vis) = vis
+tyConBndrVisForAllTyFlag AnonTCB        = Required
 
 isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
@@ -517,7 +506,7 @@ isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
 isVisibleTcbVis (NamedTCB vis) = isVisibleForAllTyFlag vis
-isVisibleTcbVis (AnonTCB af)   = isVisibleFunArg af
+isVisibleTcbVis AnonTCB        = True
 
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -530,7 +519,7 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
-    mk (Bndr tv (AnonTCB af))   k = mkNakedFunTy af (varType tv) k
+    mk (Bndr tv AnonTCB)        k = mkNakedFunTy FTF_T_T (varType tv) k
     -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
 
 -- | (mkTyConTy tc) returns (TyConApp tc [])
@@ -549,9 +538,7 @@ tyConInvisTVBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB af    -- Note [AnonTCB with constraint arg]
-                  | isInvisibleFunArg af -> InferredSpec
-                  | otherwise            -> SpecifiedSpec
+                AnonTCB                  -> SpecifiedSpec
                 NamedTCB Required        -> SpecifiedSpec
                 NamedTCB (Invisible vis) -> vis
 
@@ -561,35 +548,7 @@ tyConVisibleTyVars tc
   = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
-{- Note [AnonTCB with constraint arg]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's pretty rare to have an (AnonTCB af) binder with af=FTF_C_T or FTF_C_C.
-The only way it can occur is through equality constraints in kinds. These
-can arise in one of two ways:
-
-* In a PromotedDataCon whose kind has an equality constraint:
-
-    'MkT :: forall a b. (a~b) => blah
-
-  See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and
-  Note [Promoted data constructors] in this module.
-
-* In a data type whose kind has an equality constraint, as in the
-  following example from #12102:
-
-    data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type
-
-When mapping an (AnonTCB FTF_C_x) to an ForAllTyFlag, in
-tyConBndrVisForAllTyFlag, we use "Inferred" to mean "the user cannot
-specify this arguments, even with visible type/kind application;
-instead the type checker must fill it in.
-
-We map (AnonTCB FTF_T_x) to Required, of course: the user must
-provide it. It would be utterly wrong to do this for constraint
-arguments, which is why AnonTCB must have the FunTyFlag in
-the first place.
-
-Note [Building TyVarBinders from TyConBinders]
+{- Note [Building TyVarBinders from TyConBinders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to build the quantified type of a value from
 the TyConBinders of a type or class.  For that we need not
@@ -645,7 +604,7 @@ in GHC.Core.TyCo.Rep), so we change it to Specified when making MkT's PiTyBinder
 {- Note [The binders/kind/arity fields of a TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All TyCons have this group of fields
-  tyConBinders   :: [TyConBinder/TyConPiTyBinder]
+  tyConBinders   :: [TyConBinder]
   tyConResKind   :: Kind
   tyConTyVars    :: [TyVar]   -- Cached = binderVars tyConBinders
                               --   NB: Currently (Aug 2018), TyCons that own this
@@ -656,7 +615,7 @@ All TyCons have this group of fields
 
 They fit together like so:
 
-* tyConBinders gives the telescope of type/coercion variables on the LHS of the
+* tyConBinders gives the telescope of type variables on the LHS of the
   type declaration.  For example:
 
     type App a (b :: k) = a b
@@ -673,7 +632,7 @@ They fit together like so:
 * See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
   for what the visibility flag means.
 
-* Each TyConBinder tyConBinders has a TyVar (sometimes it is TyCoVar), and
+* Each TyConBinder in tyConBinders has a TyVar, and
   that TyVar may scope over some other part of the TyCon's definition. Eg
       type T a = a -> a
   we have
@@ -745,12 +704,12 @@ instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
   ppr (Bndr v bi) = ppr bi <+> parens (pprBndr LetBind v)
 
 instance Binary TyConBndrVis where
-  put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }
+  put_ bh AnonTCB        = do { putByte bh 0 }
   put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
 
   get bh = do { h <- getByte bh
               ; case h of
-                  0 -> do { af  <- get bh; return (AnonTCB af) }
+                  0 -> return AnonTCB
                   _ -> do { vis <- get bh; return (NamedTCB vis) } }
 
 
@@ -915,6 +874,9 @@ data TyConDetails =
     }
 
   -- | Represents promoted data constructor.
+  -- The kind of a promoted data constructor is the *wrapper* type of
+  -- the original data constructor. This type must not have constraints
+  -- (as checked in GHC.Tc.Gen.HsType.tcTyVar).
   | PromotedDataCon {          -- See Note [Promoted data constructors]
         dataCon       :: DataCon,   -- ^ Corresponding data constructor
         tcRepName     :: TyConRepName,
@@ -957,17 +919,6 @@ where
 
 tcTyConScopedTyVars are used only for MonoTcTyCons, not PolyTcTyCons.
 See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType.
-
-Note [Promoted GADT data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Any promoted GADT data constructor will have a type with equality
-constraints in its type; e.g.
-    K :: forall a b. (a ~# [b]) => a -> b -> T a
-
-So, when promoted to become a type constructor, the tyConBinders
-will include CoVars.  That is why we use [TyConPiTyBinder] for the
-tyconBinders field.  TyConPiTyBinder is a synonym for TyConBinder,
-but with the clue that the binder can be a CoVar not just a TyVar.
 
 Note [Representation-polymorphic TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1946,7 +1897,7 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
 -- as the data constructor itself; when we pretty-print
 -- the TyCon we add a quote; see the Outputable TyCon instance
 mkPromotedDataCon :: DataCon -> Name -> TyConRepName
-                  -> [TyConPiTyBinder] -> Kind -> [Role]
+                  -> [TyConBinder] -> Kind -> [Role]
                   -> PromDataConInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = mkTyCon name binders res_kind roles $

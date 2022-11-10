@@ -91,17 +91,10 @@ There are only a couple of exceptions to this rule:
    type theory just isn’t up to the task of promoting data families, which
    requires full dependent types.
 
--  Data constructors with contexts that contain non-equality constraints cannot
-   be promoted. For example: ::
+-  Data constructors with contexts cannot be promoted. For example::
 
      data Foo :: Type -> Type where
-       MkFoo1 :: a ~ Int         => Foo a    -- promotable
-       MkFoo2 :: a ~~ Int        => Foo a    -- promotable
-       MkFoo3 :: Show a          => Foo a    -- not promotable
-
-   ``MkFoo1`` and ``MkFoo2`` can be promoted, since their contexts
-   only involve equality-oriented constraints. However, ``MkFoo3``'s context
-   contains a non-equality constraint ``Show a``, and thus cannot be promoted.
+       MkFoo :: Show a => Foo a    -- not promotable
 
 .. _promotion-syntax:
 
@@ -215,28 +208,3 @@ parameter to ``UnEx``, the kind is not escaping the existential, and the
 above code is valid.
 
 See also :ghc-ticket:`7347`.
-
-.. _constraints_in_kinds:
-
-Constraints in kinds
---------------------
-
-Kinds can (with :extension:`DataKinds`) contain type constraints. However,
-only equality constraints are supported.
-
-Here is an example of a constrained kind: ::
-
-  type family IsTypeLit a where
-    IsTypeLit Nat    = True
-    IsTypeLit Symbol = True
-    IsTypeLit a      = False
-
-  data T :: forall a. (IsTypeLit a ~ True) => a -> Type where
-    MkNat    :: T 42
-    MkSymbol :: T "Don't panic!"
-
-The declarations above are accepted. However, if we add ``MkOther :: T Int``,
-we get an error that the equality constraint is not satisfied; ``Int`` is
-not a type literal. Note that explicitly quantifying with ``forall a`` is
-necessary in order for ``T`` to typecheck
-(see :ref:`complete-kind-signatures`).

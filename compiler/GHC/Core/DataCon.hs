@@ -614,7 +614,7 @@ A DataCon has two different sets of type variables:
     (that is, they are TyVars/TyCoVars instead of ForAllTyBinders).
 
 Often (dcUnivTyVars ++ dcExTyCoVars) = dcUserTyVarBinders; but they may differ
-for three reasons, coming next:
+for two reasons, coming next:
 
 --- Reason (R1): Order of quantification in GADT syntax ---
 
@@ -702,55 +702,6 @@ GADT equality -- that is, used on the left-hand side of an element of dcEqSpec:
 Putting this all together, all variables used on the left-hand side of an
 equation in the dcEqSpec will be in dcUnivTyVars but *not* in
 dcUserTyVarBinders.
-
---- Reason (R3): Kind equalities may have been solved ---
-
-Consider now this case:
-
-  type family F a where
-    F Type = False
-    F _    = True
-  type T :: forall k. (F k ~ True) => k -> k -> Type
-  data T a b where
-    MkT :: T Maybe List
-
-The constraint F k ~ True tells us that T does not want to be indexed by, say,
-Int. Now let's consider the Core types involved:
-
-  axiom for F: axF[0] :: F Type ~ False
-               axF[1] :: forall a. F a ~ True   (a must be apart from Type)
-  tycon: T :: forall k. (F k ~ True) -> k -> k -> Type
-  wrapper: MkT :: T @(Type -> Type) @(Eq# (axF[1] (Type -> Type)) Maybe List
-  worker:  MkT :: forall k (c :: F k ~ True) (a :: k) (b :: k).
-                  (k ~# (Type -> Type), a ~# Maybe, b ~# List) =>
-                  T @k @c a b
-
-The key observation here is that the worker quantifies over c, while the wrapper
-does not. The worker *must* quantify over c, because c is a universal variable,
-and the result of the worker must be the type constructor applied to a sequence
-of plain type variables. But the wrapper certainly does not need to quantify over
-any evidence that F (Type -> Type) ~ True, as no variables are needed there.
-
-(Aside: the c here is a regular type variable, *not* a coercion variable. This
-is because F k ~ True is a *lifted* equality, not the unlifted ~#. This is why
-we see Eq# in the type of the wrapper: Eq# boxes the unlifted ~# to become a
-lifted ~. See also Note [The equality types story] in GHC.Builtin.Types.Prim about
-Eq# and Note [Constraints in kinds] in GHC.Core.TyCo.Rep about having this constraint
-in the first place.)
-
-In this case, we'll have these fields of the DataCon:
-
-  dcUserTyVarBinders = []    -- the wrapper quantifies over nothing
-  dcUnivTyVars = [k, c, a, b]
-  dcExTyCoVars = []  -- no existentials here, but a different constructor might have
-  dcEqSpec = [k ~# (Type -> Type), a ~# Maybe, b ~# List]
-
-Note that c is in the dcUserTyVars, but mentioned neither in the dcUserTyVarBinders nor
-in the dcEqSpec. We thus have Reason (R3): a variable might be missing from the
-dcUserTyVarBinders if its type's kind is Constraint.
-
-(At one point, we thought that the dcEqSpec would have to be non-empty. But that
-wouldn't account for silly cases like type T :: (True ~ True) => Type.)
 
 --- End of Reasons ---
 
@@ -1230,11 +1181,9 @@ mkDataCon name declared_infix prom_info
       -- fresh_names: make sure that the "anonymous" tyvars don't
       -- clash in name or unique with the universal/existential ones.
       -- Tiresome!  And unnecessary because these tyvars are never looked at
-    prom_theta_bndrs = [ mkInvisAnonTyConBinder (mkTyVar n t)
-     {- Invisible -}   | (n,t) <- fresh_names `zip` theta ]
     prom_arg_bndrs   = [ mkAnonTyConBinder (mkTyVar n t)
      {- Visible -}     | (n,t) <- dropList theta fresh_names `zip` map scaledThing orig_arg_tys ]
-    prom_bndrs       = prom_tv_bndrs ++ prom_theta_bndrs ++ prom_arg_bndrs
+    prom_bndrs       = prom_tv_bndrs ++ prom_arg_bndrs
     prom_res_kind    = orig_res_ty
     promoted         = mkPromotedDataCon con name prom_info prom_bndrs
                                          prom_res_kind roles rep_info
@@ -1861,20 +1810,15 @@ checkDataConTyVars dc@(MkData { dcUnivTyVars = univ_tvs
                               , dcExTyCoVars = ex_tvs
                               , dcEqSpec = eq_spec })
      -- use of sets here: (R1) from the Note
-  = mkUnVarSet depleted_worker_vars == mkUnVarSet depleted_wrapper_vars &&
+  = mkUnVarSet depleted_worker_vars == mkUnVarSet wrapper_vars &&
     all (not . is_eq_spec_var) wrapper_vars
   where
-    is_constraint_var v = typeTypeOrConstraint (tyVarKind v) == ConstraintLike
-      -- implements (R3) from the Note
-
     worker_vars = univ_tvs ++ ex_tvs
     eq_spec_tvs = mkUnVarSet (map eqSpecTyVar eq_spec)
     is_eq_spec_var = (`elemUnVarSet` eq_spec_tvs)  -- (R2) from the Note
-    depleted_worker_vars = filterOut (is_eq_spec_var <||> is_constraint_var)
-                                     worker_vars
+    depleted_worker_vars = filterOut is_eq_spec_var worker_vars
 
     wrapper_vars = dataConUserTyVars dc
-    depleted_wrapper_vars = filterOut is_constraint_var wrapper_vars
 
 dataConUserTyVarsNeedWrapper :: DataCon -> Bool
 -- Check whether the worker and wapper have the same type variables

@@ -1,9 +1,4 @@
 
-T16902.hs:12:10: error: [GHC-25897]
-    • Expected a type, but found something with kind ‘a’
-      ‘a’ is a rigid type variable bound by
-        the type signature for ‘MkF’
-        at T16902.hs:12:3-12
-    • In the type ‘F a’
-      In the definition of data constructor ‘MkF’
-      In the data declaration for ‘F’
+T16902.hs:11:1: error: [GHC-01259]
+    • Illegal constraint in a kind: (a ~~ k) => *
+    • In the data type declaration for ‘F’

@@ -520,6 +520,8 @@ typeOrKindCtxt (DataKindCtxt {})          = OnlyKindCtxt
 typeOrKindCtxt (TySynKindCtxt {})         = OnlyKindCtxt
 typeOrKindCtxt (TyFamResKindCtxt {})      = OnlyKindCtxt
 
+-- These cases are also described in Note [No constraints in kinds], so any
+-- change here should be reflected in that note.
 typeOrKindCtxt (TySynCtxt {}) = BothTypeAndKindCtxt
   -- Type synonyms can have types and kinds on their RHSs
 typeOrKindCtxt (GhciCtxt {})  = BothTypeAndKindCtxt
@@ -543,7 +545,6 @@ typeLevelUserTypeCtxt ctxt = case typeOrKindCtxt ctxt of
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
 -- context for a kind of a type, where the arbitrary use of constraints is
 -- currently disallowed.
--- (See @Note [Constraints in kinds]@ in "GHC.Core.TyCo.Rep".)
 allConstraintsAllowed :: UserTypeCtxt -> Bool
 allConstraintsAllowed = typeLevelUserTypeCtxt
 
@@ -931,10 +932,9 @@ checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
 checkConstraintsOK ve theta ty
   | null theta                         = return ()
   | allConstraintsAllowed (ve_ctxt ve) = return ()
-  | otherwise
-  = -- We are in a kind, where we allow only equality predicates
-    -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep, and #16263
-    checkTcM (all isEqPred theta) (env, TcRnConstraintInKind (tidyType env ty))
+  | otherwise -- We are unambiguously in a kind; see
+              -- Note [No constraints in kinds]
+  = failWithTcM (env, TcRnConstraintInKind (tidyType env ty))
   where env = ve_tidy_env ve
 
 checkVdqOK :: ValidityEnv -> [TyVarBinder] -> Type -> TcM ()
@@ -945,7 +945,25 @@ checkVdqOK ve tvbs ty = do
     no_vdq = all (isInvisibleForAllTyFlag . binderFlag) tvbs
     ValidityEnv{ve_tidy_env = env, ve_ctxt = ctxt} = ve
 
-{-
+{- Note [No constraints in kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC does not allow constraints in kinds. Equality constraints
+in kinds were allowed from GHC 8.0, but this "feature" was removed
+as part of Proposal #547 (https://github.com/ghc-proposals/ghc-proposals/pull/547),
+which contains further context and motivation for the removal.
+
+The lack of constraints in kinds is enforced by checkConstraintsOK, which
+uses the UserTypeCtxt to determine if we are unambiguously checking a kind.
+There are two ambiguous contexts (constructor BothTypeAndKindCtxt of TypeOrKindCtxt)
+as written in typeOfKindCtxt:
+  - TySynCtxt: this is the RHS of a type synonym. We check the expansion of type
+    synonyms for constraints, so this is handled at the usage site of the synonym.
+  - GhciCtxt: This is the type in a :kind command. A constraint here does not cause
+    any trouble, because the type cannot be used to classify a type.
+
+Beyond these two cases, we also promote data constructors. We check for constraints
+in data constructor types in GHC.Tc.Gen.HsType.tcTyVar.
+
 Note [Liberal type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If -XLiberalTypeSynonyms is on, expand closed type synonyms *before*

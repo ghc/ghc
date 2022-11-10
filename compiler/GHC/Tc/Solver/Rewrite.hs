@@ -1077,7 +1077,7 @@ ty_con_binders_ty_binders' = foldr go ([], False)
   where
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
-    go (Bndr tv (AnonTCB af))   (bndrs, n)
-      = (Anon (tymult (tyVarKind tv)) af : bndrs, n)
+    go (Bndr tv AnonTCB)   (bndrs, n)
+      = (Anon (tymult (tyVarKind tv)) FTF_T_T : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

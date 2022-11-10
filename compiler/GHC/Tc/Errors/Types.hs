@@ -3854,9 +3854,8 @@ data PromotionErr
   | FamDataConPE     -- Data constructor for a data family
                      -- See Note [AFamDataCon: not promoting data family constructors]
                      -- in GHC.Tc.Utils.Env.
-  | ConstrainedDataConPE PredType
-                     -- Data constructor with a non-equality context
-                     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
+  | ConstrainedDataConPE ThetaType -- Data constructor with a context
+                                   -- See Note [No constraints in kinds] in GHC.Tc.Validity
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in GHC.Tc.Utils.Env
 
@@ -3866,28 +3865,27 @@ data PromotionErr
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
 
 instance Outputable PromotionErr where
-  ppr ClassPE                     = text "ClassPE"
-  ppr TyConPE                     = text "TyConPE"
-  ppr PatSynPE                    = text "PatSynPE"
-  ppr FamDataConPE                = text "FamDataConPE"
-  ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
-                                      <+> parens (ppr pred)
-  ppr RecDataConPE                = text "RecDataConPE"
-  ppr NoDataKindsDC               = text "NoDataKindsDC"
-  ppr TermVariablePE              = text "TermVariablePE"
+  ppr ClassPE              = text "ClassPE"
+  ppr TyConPE              = text "TyConPE"
+  ppr PatSynPE             = text "PatSynPE"
+  ppr FamDataConPE         = text "FamDataConPE"
+  ppr (ConstrainedDataConPE theta) = text "ConstrainedDataConPE" <+> parens (ppr theta)
+  ppr RecDataConPE         = text "RecDataConPE"
+  ppr NoDataKindsDC        = text "NoDataKindsDC"
+  ppr TermVariablePE       = text "TermVariablePE"
 
 pprPECategory :: PromotionErr -> SDoc
 pprPECategory = text . capitalise . peCategory
 
 peCategory :: PromotionErr -> String
-peCategory ClassPE                = "class"
-peCategory TyConPE                = "type constructor"
-peCategory PatSynPE               = "pattern synonym"
-peCategory FamDataConPE           = "data constructor"
+peCategory ClassPE              = "class"
+peCategory TyConPE              = "type constructor"
+peCategory PatSynPE             = "pattern synonym"
+peCategory FamDataConPE         = "data constructor"
 peCategory ConstrainedDataConPE{} = "data constructor"
-peCategory RecDataConPE           = "data constructor"
-peCategory NoDataKindsDC          = "data constructor"
-peCategory TermVariablePE         = "term variable"
+peCategory RecDataConPE         = "data constructor"
+peCategory NoDataKindsDC        = "data constructor"
+peCategory TermVariablePE       = "term variable"
 
 -- | Stores the information to be reported in a representation-polymorphism
 -- error message.

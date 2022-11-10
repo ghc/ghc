@@ -81,6 +81,7 @@ import GHC.Types.Cpr ( topCprSig )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.Maybe ( isNothing, catMaybes )
@@ -353,12 +354,8 @@ toIfaceAppArgsX fr kind ty_args
         ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy { ft_af = af, ft_res = res }) (t:ts)
-      = IA_Arg (toIfaceTypeX fr t) argf (go env res ts)
-      where
-        argf | isVisibleFunArg af = Required
-             | otherwise          = Inferred
-             -- It's rare for a kind to have a constraint argument, but it
-             -- can happen. See Note [AnonTCB with constraint arg] in GHC.Core.TyCon.
+      = assert (isVisibleFunArg af)
+        IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)

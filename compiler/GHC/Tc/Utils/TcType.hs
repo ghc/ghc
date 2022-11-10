@@ -1342,7 +1342,7 @@ getDFunTyLitKey (CharTyLit n) = mkOccName Name.varName (show n)
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([PiTyVarBinder], Type)
 tcSplitPiTys ty
-  = assert (all isTyBinder (fst sty) )   -- No CoVar binders here
+  = assert (all isTyBinder (fst sty))   -- No CoVar binders here
     sty
   where sty = splitPiTys ty
 
@@ -1365,7 +1365,7 @@ tcSplitForAllTyVarBinder_maybe _                = Nothing
 -- returning just the tyvars.
 tcSplitForAllTyVars :: Type -> ([TyVar], Type)
 tcSplitForAllTyVars ty
-  = assert (all isTyVar (fst sty) ) sty
+  = assert (all isTyVar (fst sty)) sty
   where sty = splitForAllTyCoVars ty
 
 -- | Like 'tcSplitForAllTyVars', but only splits 'ForAllTy's with 'Invisible'

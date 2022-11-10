@@ -137,7 +137,7 @@ import GHC.Data.Bag( unitBag )
 import Data.Function ( on )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.List ( find, mapAccumL )
+import Data.List ( mapAccumL )
 import Control.Monad
 import Data.Tuple( swap )
 
@@ -1613,8 +1613,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Named (Bndr _ Inferred)          -> instantiate ki_binder inner_ki
-        Anon _ af | isInvisibleFunArg af -> instantiate ki_binder inner_ki
+        Named (Bndr kv Inferred)         -> instantiate kv inner_ki
 
         Named (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferTyApps (vis kind app)"
@@ -1644,9 +1643,9 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       ---------------- HsValArg: a normal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
-        | isInvisiblePiTyBinder ki_binder   -- FunTy with constraint on LHS;
-                                            -- or ForAllTy with Inferred or Specified
-         -> instantiate ki_binder inner_ki
+        | Named (Bndr kv flag) <- ki_binder
+        , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
+         -> instantiate kv inner_ki
 
         -- "normal" case
         | otherwise
@@ -1984,23 +1983,16 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
                        -- see #15245
                        promotionErr name FamDataConPE
                    ; let (_, _, _, theta, _, _) = dataConFullSig dc
-                   ; traceTc "tcTyVar" (ppr dc <+> ppr theta $$ ppr (dc_theta_illegal_constraint theta))
-                   ; case dc_theta_illegal_constraint theta of
-                       Just pred -> promotionErr name $
-                                    ConstrainedDataConPE pred
-                       Nothing   -> pure ()
+                   ; traceTc "tcTyVar" (ppr dc <+> ppr theta)
+                     -- promotionErr: Note [No constraints in kinds] in GHC.Tc.Validity
+                   ; unless (null theta) $
+                     promotionErr name (ConstrainedDataConPE theta)
                    ; let tc = promoteDataCon dc
                    ; return (mkTyConApp tc [], tyConKind tc) }
 
            APromotionErr err -> promotionErr name err
 
            _  -> wrongThingErr "type" thing name }
-  where
-    -- We cannot promote a data constructor with a context that contains
-    -- constraints other than equalities, so error if we find one.
-    -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
-    dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
-    dc_theta_illegal_constraint = find (not . isEqPred)
 
 {-
 Note [Recursion through the kinds]
@@ -3715,9 +3707,10 @@ splitTyConKind skol_info in_scope avoid_occs kind
                     Nothing -> (reverse acc, substTy subst kind)
 
                     Just (Anon arg af, kind')
-                      -> go occs' uniqs' subst' (tcb : acc) kind'
+                      -> assert (af == FTF_T_T) $
+                         go occs' uniqs' subst' (tcb : acc) kind'
                       where
-                        tcb    = Bndr tv (AnonTCB af)
+                        tcb    = Bndr tv AnonTCB
                         arg'   = substTy subst (scaledThing arg)
                         name   = mkInternalName uniq occ loc
                         tv     = mkTcTyVar name arg' details
@@ -3858,7 +3851,8 @@ tcbVisibilities tc orig_args
     go fun_kind subst all_args@(arg : args)
       | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
       = case tcb of
-          Anon _ af           -> AnonTCB af   : go inner_kind subst  args
+          Anon _ af           -> assert (af == FTF_T_T) $
+                                 AnonTCB      : go inner_kind subst  args
           Named (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args
                  where
                     subst' = extendTCvSubst subst tv arg

@@ -913,9 +913,10 @@ instance Diagnostic TcRnMessage where
                         2 (parens reason))
         where
           reason = case err of
-                     ConstrainedDataConPE pred
+                     ConstrainedDataConPE theta
                                     -> text "it has an unpromotable context"
-                                       <+> quotes (ppr pred)
+                                       <+> quotes (pprTheta theta)
+
                      FamDataConPE   -> text "it comes from a data family instance"
                      NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                      PatSynPE       -> text "pattern synonyms cannot be promoted"
@@ -3385,7 +3386,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
           2 (text "standing for" <+> quotes pp_hole_type_with_kind)
       ConstraintHole ->
         hang (text "Found extra-constraints wildcard standing for")
-          2 (quotes $ pprType hole_ty)  -- always kind constraint
+          2 (quotes $ pprType hole_ty)  -- always kind Constraint
 
     hole_kind = typeKind hole_ty
 

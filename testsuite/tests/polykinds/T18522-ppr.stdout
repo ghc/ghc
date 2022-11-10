@@ -1,1 +1,1 @@
-T :: forall k -> (k ~ k) => forall j -> k -> j -> *
+T :: forall {k}. forall (a :: k) -> ()
