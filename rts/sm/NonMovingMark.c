@@ -1278,7 +1278,10 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 
     bd = Bdescr((StgPtr) p);
 
-    if (bd->gen != oldest_gen) {
+    // This must be a relaxed load since the object may be a large object,
+    // in which case evacuation by the moving collector will result in
+    // mutation.
+    if (RELAXED_LOAD(&bd->gen) != oldest_gen) {
         // Here we have an object living outside of the non-moving heap. While
         // we likely evacuated nearly everything to the nonmoving heap during
         // preparation there are nevertheless a few ways in which we might trace
