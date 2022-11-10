@@ -18,6 +18,25 @@ void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
 
+// Unconditionally atomic operations
+// These are atomic even in the non-threaded RTS. These are necessary in the
+// Proftimer implementation, which may be called from the pthreads-based
+// ITimer implementation.
+#define RELAXED_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
+#define RELAXED_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
+#define RELAXED_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
+
+// Acquire/release atomic operations
+#define ACQUIRE_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
+#define RELEASE_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+
+// Sequentially consistent atomic operations
+#define SEQ_CST_LOAD_ALWAYS(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+#define SEQ_CST_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+#define SEQ_CST_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
+#define SEQ_CST_SUB_ALWAYS(ptr,val) __atomic_sub_fetch(ptr, val, __ATOMIC_SEQ_CST)
+
+
 #if defined(THREADED_RTS)
 
 /* ----------------------------------------------------------------------------
