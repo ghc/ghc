@@ -14,6 +14,11 @@
 #include "Capability.h"
 #include "Trace.h"
 
+/*
+ * N.B. These flags must all always be accessed via atomics since even in the
+ * non-threaded runtime the timer may be provided by way of a signal.
+ */
+
 #if defined(PROFILING)
 static bool do_prof_ticks = false;       // enable profiling ticks
 #endif
@@ -41,7 +46,7 @@ void
 stopProfTimer( void )
 {
 #if defined(PROFILING)
-    RELAXED_STORE(&do_prof_ticks, false);
+    RELAXED_STORE_ALWAYS(&do_prof_ticks, false);
 #endif
 }
 
@@ -49,7 +54,7 @@ void
 startProfTimer( void )
 {
 #if defined(PROFILING)
-    RELAXED_STORE(&do_prof_ticks, true);
+    RELAXED_STORE_ALWAYS(&do_prof_ticks, true);
 #endif
 }
 
@@ -57,7 +62,7 @@ void
 stopHeapProfTimer( void )
 {
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE(&heap_prof_timer_active, false);
+    RELAXED_STORE_ALWAYS(&heap_prof_timer_active, false);
     pauseHeapProfTimer();
   }
 }
@@ -66,14 +71,14 @@ void
 startHeapProfTimer( void )
 {
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE(&heap_prof_timer_active, true);
+    RELAXED_STORE_ALWAYS(&heap_prof_timer_active, true);
     resumeHeapProfTimer();
   }
 }
 
 void
 pauseHeapProfTimer ( void ) {
-    RELAXED_STORE(&do_heap_prof_ticks, false);
+    RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, false);
 }
 
 
@@ -81,7 +86,7 @@ void
 resumeHeapProfTimer ( void ) {
     if (RtsFlags.ProfFlags.doHeapProfile &&
         RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
-        RELAXED_STORE(&do_heap_prof_ticks, true);
+        RELAXED_STORE_ALWAYS(&do_heap_prof_ticks, true);
     }
 }
 
@@ -89,7 +94,7 @@ void
 requestHeapCensus( void ){
   // If no profiling mode is passed then just ignore the call.
   if (RtsFlags.ProfFlags.doHeapProfile){
-    RELAXED_STORE(&performHeapProfile, true);
+    RELAXED_STORE_ALWAYS(&performHeapProfile, true);
   }
 }
 
@@ -115,7 +120,7 @@ handleProfTick(void)
 {
 #if defined(PROFILING)
     total_ticks++;
-    if (RELAXED_LOAD(&do_prof_ticks)) {
+    if (RELAXED_LOAD_ALWAYS(&do_prof_ticks)) {
         uint32_t n;
         for (n=0; n < getNumCapabilities(); n++) {
             capabilities[n]->r.rCCCS->time_ticks++;
@@ -134,7 +139,7 @@ handleProfTick(void)
     }
 #endif
 
-    if (RELAXED_LOAD(&do_heap_prof_ticks) && RELAXED_LOAD(&heap_prof_timer_active))  {
+    if (RELAXED_LOAD_ALWAYS(&do_heap_prof_ticks) && RELAXED_LOAD_ALWAYS(&heap_prof_timer_active))  {
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
