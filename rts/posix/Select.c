@@ -362,7 +362,7 @@ awaitEvent(Capability *cap, bool wait)
 
           /* we were interrupted, return to the scheduler immediately.
            */
-          if (sched_state >= SCHED_INTERRUPTING) {
+          if (getSchedState() >= SCHED_INTERRUPTING) {
               return; /* still hold the lock */
           }
 
@@ -459,7 +459,7 @@ awaitEvent(Capability *cap, bool wait)
           }
       }
 
-    } while (wait && sched_state == SCHED_RUNNING
+    } while (wait && getSchedState() == SCHED_RUNNING
                   && emptyRunQueue(cap));
 }
 
