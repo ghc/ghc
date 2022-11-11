@@ -44,7 +44,7 @@ enum NonmovingSegmentState {
     FREE, CURRENT, ACTIVE, FILLED, FILLED_SWEEPING
 };
 
-#define SET_SEGMENT_STATE(seg, st) (seg)->state = (st)
+#define SET_SEGMENT_STATE(seg, st) RELAXED_STORE(&(seg)->state, (st))
 #else
 #define SET_SEGMENT_STATE(_seg,_st)
 #endif
