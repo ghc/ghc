@@ -263,6 +263,11 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 // Array of all the capabilities
 extern Capability **capabilities;
 
+INLINE_HEADER Capability *getCapability(uint32_t i)
+{
+    return RELAXED_LOAD(&capabilities)[i];
+}
+
 //
 // Types of global synchronisation
 //

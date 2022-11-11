@@ -386,7 +386,7 @@ void collectFreshWeakPtrs()
     uint32_t i;
     // move recently allocated weak_ptr_list to the old list as well
     for (i = 0; i < getNumCapabilities(); i++) {
-        Capability *cap = capabilities[i];
+        Capability *cap = getCapability(i);
         if (cap->weak_ptr_list_tl != NULL) {
             IF_DEBUG(sanity, checkWeakPtrSanity(cap->weak_ptr_list_hd, cap->weak_ptr_list_tl));
             cap->weak_ptr_list_tl->link = g0->weak_ptr_list;

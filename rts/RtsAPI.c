@@ -808,7 +808,7 @@ static void assert_isPausedOnMyTask(const char *functionName)
     // Check that we own all capabilities.
     for (unsigned int i = 0; i < getNumCapabilities(); i++)
     {
-        Capability *cap = capabilities[i];
+        Capability *cap = getCapability(i);
         if (cap->running_task != task)
         {
             errorBelch (
@@ -943,7 +943,7 @@ void hs_try_putmvar (/* in */ int capability,
             capability = 0;
         }
     }
-    cap = capabilities[capability % enabled_capabilities];
+    cap = getCapability(capability % enabled_capabilities);
 
 #if !defined(THREADED_RTS)
 

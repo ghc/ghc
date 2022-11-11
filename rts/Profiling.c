@@ -154,7 +154,7 @@ void initProfiling (void)
     {
         uint32_t n;
         for (n=0; n < getNumCapabilities(); n++) {
-            capabilities[n]->r.rCCCS = CCS_SYSTEM;
+            getCapability(n)->r.rCCCS = CCS_SYSTEM;
         }
     }
 
