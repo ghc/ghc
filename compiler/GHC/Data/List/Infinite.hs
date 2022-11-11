@@ -38,7 +38,7 @@ tail (Inf _ as) = as
 
 {-# RULES
 "head/build" forall (g :: forall b . (a -> b -> b) -> b) . head (build g) = g \ x _ -> x
-#-}
+  #-}
 
 instance Applicative Infinite where
     pure = repeat
@@ -103,7 +103,7 @@ iterate f = go where go a = Inf a (go (f a))
 {-# RULES
 "iterate" [~1] forall f a . iterate f a = build (\ c -> iterateFB c f a)
 "iterateFB" [1] iterateFB Inf = iterate
-#-}
+  #-}
 
 iterateFB :: (a -> b -> b) -> (a -> a) -> a -> b
 iterateFB c f a = go a
@@ -132,13 +132,13 @@ build g = g Inf
 "foldr/id" foldr Inf = id
 
 "foldr/cons/build" forall f a (g :: forall b . (a -> b -> b) -> b) . foldr f (Inf a (build g)) = f a (g f)
-#-}
+  #-}
 
 {-# RULES
 "map" [~1] forall f (as :: Infinite a) . fmap f as = build \ c -> foldr (mapFB c f) as
 "mapFB" forall c f g . mapFB (mapFB c f) g = mapFB c (f . g)
 "mapFB/id" forall c . mapFB c (\ x -> x) = c
-#-}
+  #-}
 
 mapFB :: (b -> c -> c) -> (a -> b) -> a -> c -> c
 mapFB c f = \ x ys -> c (f x) ys
@@ -169,7 +169,7 @@ repeatFB c x = xs where xs = c x xs
 {-# RULES
 "repeat" [~1] forall a . repeat a = build \ c -> repeatFB c a
 "repeatFB" [1] repeatFB Inf = repeat
-#-}
+  #-}
 
 {-
 Note [Fusion for `Infinite` lists]
