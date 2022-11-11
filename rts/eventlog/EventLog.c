@@ -476,7 +476,7 @@ endEventLogging(void)
     //
     // N.B. Don't flush if shutting down: this was done in
     // finishCapEventLogging and the capabilities have already been freed.
-    if (sched_state != SCHED_SHUTTING_DOWN) {
+    if (getSchedState() != SCHED_SHUTTING_DOWN) {
         flushEventLog(NULL);
     }
 
