@@ -24,6 +24,8 @@ typedef struct InfoProv_ {
 } InfoProv;
 
 typedef struct InfoProvEnt_ {
+    // When TNTC is enabled this will point to the entry code
+    // not the info table itself.
     const StgInfoTable *info;
     InfoProv prov;
 } InfoProvEnt;
@@ -50,6 +52,8 @@ typedef uint32_t StringIdx;
 // The size of this must be a multiple of the word size
 // to ensure correct packing.
 typedef struct {
+    // When TNTC is enabled this will point to the entry code
+    // not the info table itself.
     const StgInfoTable *info;
     StringIdx table_name;
     StringIdx closure_desc;
