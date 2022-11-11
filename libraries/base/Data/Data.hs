@@ -140,6 +140,7 @@ import Data.Word             -- So we can give Data instance for Word8, ...
 import GHC.Real              -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
 import GHC.Ptr               -- So we can give Data instance for Ptr
+import Foreign.C.ConstPtr    -- So we can give Data instance for ConstPtr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
 import Foreign.Ptr (IntPtr(..), WordPtr(..))
                              -- So we can give Data instance for IntPtr and WordPtr
@@ -1226,6 +1227,9 @@ instance Data a => Data (Ptr a) where
   gunfold _ _  = errorWithoutStackTrace "Data.Data.gunfold(Ptr)"
   dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
   dataCast1 x  = gcast1 x
+
+-- | @since 4.18.0.0
+deriving instance Data a => Data (ConstPtr a)
 
 ------------------------------------------------------------------------------
 

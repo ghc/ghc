@@ -1,9 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.18.0.0 *TBA*
+  * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
+    pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
-  * Add `Functor` instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
-    `(,,,,,) a b c d e f`
+  * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
+    `(,,,,,) a b c d e f`.
   * Exceptions thrown by weak pointer finalizers are now reported via a global
     exception handler.
   * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which allows the
@@ -42,7 +44,7 @@
     ([CLC proposal #90](https://github.com/haskell/core-libraries-committee/issues/90))
   * Add `Eq` and `Ord` instances for `Generically1`.
   * Relax instances for Functor combinators; put superclass on Class1 and Class2
-    to make non-breaking ([CLC proposal #10](https://github.com/haskell/core-libraries-committee/issues/10), 
+    to make non-breaking ([CLC proposal #10](https://github.com/haskell/core-libraries-committee/issues/10),
     [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md))
   * Add `gcdetails_block_fragmentation_bytes` to `GHC.Stats.GCDetails` to track heap fragmentation.
   * `GHC.TypeLits` and `GHC.TypeNats` now export the `natSing`, `symbolSing`,
