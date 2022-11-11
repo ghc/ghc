@@ -356,7 +356,7 @@ GarbageCollect (uint32_t collect_gen,
   deadlock_detect_gc = deadlock_detect;
 
 #if defined(THREADED_RTS)
-  if (major_gc && RtsFlags.GcFlags.useNonmoving && concurrent_coll_running) {
+  if (major_gc && RtsFlags.GcFlags.useNonmoving && RELAXED_LOAD(&concurrent_coll_running)) {
       /* If there is already a concurrent major collection running then
        * there is no benefit to starting another.
        * TODO: Catch heap-size runaway.

@@ -749,11 +749,12 @@ void nonmovingStop(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;
 #if defined(THREADED_RTS)
-    if (mark_thread) {
+    if (RELAXED_LOAD(&mark_thread)) {
         debugTrace(DEBUG_nonmoving_gc,
                    "waiting for nonmoving collector thread to terminate");
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
+        ACQUIRE_LOCK(&nonmoving_collection_mutex);
     }
 #endif
 }
@@ -928,7 +929,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
     // We also don't run in final GC
-    if (concurrent_coll_running || getSchedState() > SCHED_RUNNING) {
+    if (RELAXED_LOAD(&concurrent_coll_running) || getSchedState() > SCHED_RUNNING) {
         return;
     }
 #endif
@@ -1003,13 +1004,15 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
     if (getSchedState() == SCHED_RUNNING) {
-        concurrent_coll_running = true;
+        RELAXED_STORE(&concurrent_coll_running, true);
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
-        if (createOSThread(&mark_thread, "non-moving mark thread",
+        OSThreadId thread;
+        if (createOSThread(&thread, "non-moving mark thread",
                            nonmovingConcurrentMark, mark_queue) != 0) {
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
+        RELAXED_STORE(&mark_thread, thread);
     } else {
         nonmovingConcurrentMark(mark_queue);
     }
@@ -1248,12 +1251,12 @@ finish:
     exitMyTask();
 
     // We are done...
-    mark_thread = 0;
+    RELAXED_STORE(&mark_thread, 0);
     stat_endNonmovingGc();
 
     // Signal that the concurrent collection is finished, allowing the next
     // non-moving collection to proceed
-    concurrent_coll_running = false;
+    RELAXED_STORE(&concurrent_coll_running, false);
     signalCondition(&concurrent_coll_finished);
     RELEASE_LOCK(&nonmoving_collection_mutex);
 #endif
