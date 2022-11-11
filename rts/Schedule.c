@@ -395,7 +395,7 @@ schedule (Capability *initialCapability, Task *task)
     // it was originally on.
 #if defined(THREADED_RTS)
     if (cap->disabled && !t->bound) {
-        Capability *dest_cap = capabilities[cap->no % enabled_capabilities];
+        Capability *dest_cap = getCapability(cap->no % enabled_capabilities);
         migrateThread(cap, t, dest_cap);
         continue;
     }
@@ -728,7 +728,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 {
 #if defined(THREADED_RTS)
 
-    Capability *free_caps[getNumCapabilities()], *cap0;
+    Capability *free_caps[getNumCapabilities()];
     uint32_t i, n_wanted_caps, n_free_caps;
 
     uint32_t spare_threads = cap->n_run_queue > 0 ? cap->n_run_queue - 1 : 0;
@@ -748,7 +748,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
     for (i = (cap->no + 1) % getNumCapabilities(), n_free_caps=0;
          n_free_caps < n_wanted_caps && i != cap->no;
          i = (i + 1) % getNumCapabilities()) {
-        cap0 = capabilities[i];
+        Capability *cap0 = getCapability(i);
         if (cap != cap0 && !cap0->disabled && tryGrabCapability(cap0,task)) {
             if (!emptyRunQueue(cap0)
                 || RELAXED_LOAD(&cap0->n_returning_tasks) != 0
@@ -1517,7 +1517,7 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
     for (i=0; i < getNumCapabilities(); i++) {
         debugTrace(DEBUG_sched, "grabbing all the capabilities (%d/%d)",
                    i, getNumCapabilities());
-        tmpcap = capabilities[i];
+        tmpcap = getCapability(i);
         if (tmpcap != cap) {
             // we better hope this task doesn't get migrated to
             // another Capability while we're waiting for this one.
@@ -1548,7 +1548,7 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
     uint32_t i;
     ASSERT( task != NULL);
     for (i = 0; i < n; i++) {
-        Capability *tmpcap = capabilities[i];
+        Capability *tmpcap = getCapability(i);
         if (keep_cap != tmpcap) {
             task->cap = tmpcap;
             releaseCapability(tmpcap);
@@ -1665,10 +1665,10 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             // those first:
             uint32_t n_idle = need_idle;
             for (i=0; i < getNumCapabilities(); i++) {
-                if (capabilities[i]->disabled) {
+                if (getCapability(i)->disabled) {
                     idle_cap[i] = true;
                 } else if (n_idle > 0 &&
-                           capabilities[i]->running_task == NULL) {
+                           getCapability(i)->running_task == NULL) {
                     debugTrace(DEBUG_sched, "asking for cap %d to be idle", i);
                     n_idle--;
                     idle_cap[i] = true;
@@ -1744,14 +1744,14 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
                 collect_gen >= RtsFlags.ParFlags.parGcLoadBalancingGen))
         {
             for (i=0; i < n_capabilities; i++) {
-                if (capabilities[i]->disabled) {
-                    idle_cap[i] = tryGrabCapability(capabilities[i], task);
+                if (getCapability(i)->disabled) {
+                    idle_cap[i] = tryGrabCapability(getCapability(i), task);
                     if (idle_cap[i]) {
                         n_idle_caps++;
                     }
                 } else {
                     if (i != cap->no && idle_cap[i]) {
-                        Capability *tmpcap = capabilities[i];
+                        Capability *tmpcap = getCapability(i);
                         task->cap = tmpcap;
                         waitForCapability(&tmpcap, task);
                         n_idle_caps++;
@@ -1762,15 +1762,15 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         else
         {
             for (i=0; i < n_capabilities; i++) {
-                if (capabilities[i]->disabled) {
-                    idle_cap[i] = tryGrabCapability(capabilities[i], task);
+                if (getCapability(i)->disabled) {
+                    idle_cap[i] = tryGrabCapability(getCapability(i), task);
                     if (idle_cap[i]) {
                         n_idle_caps++;
                     }
                 } else if (i != cap->no &&
-                           capabilities[i]->idle >=
+                           getCapability(i)->idle >=
                            RtsFlags.ParFlags.parGcNoSyncWithIdle) {
-                    idle_cap[i] = tryGrabCapability(capabilities[i], task);
+                    idle_cap[i] = tryGrabCapability(getCapability(i), task);
                     if (idle_cap[i]) {
                         n_idle_caps++;
                     } else {
@@ -1782,7 +1782,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         debugTrace(DEBUG_sched, "%d idle caps", n_idle_caps);
 
         for (i=0; i < n_capabilities; i++) {
-            NONATOMIC_ADD(&capabilities[i]->idle, 1);
+            NONATOMIC_ADD(&getCapability(i)->idle, 1);
         }
 
         // For all capabilities participating in this GC, wait until
@@ -1812,10 +1812,10 @@ delete_threads_and_gc:
         // threads.  It just avoids the GC having to do any work to
         // figure out that any remaining sparks are garbage.
         for (i = 0; i < n_capabilities; i++) {
-            capabilities[i]->spark_stats.gcd +=
-                sparkPoolSize(capabilities[i]->sparks);
+            getCapability(i)->spark_stats.gcd +=
+                sparkPoolSize(getCapability(i)->sparks);
             // No race here since all Caps are stopped.
-            discardSparksCap(capabilities[i]);
+            discardSparksCap(getCapability(i));
         }
 #endif
         RELAXED_STORE(&sched_state, SCHED_SHUTTING_DOWN);
@@ -1831,10 +1831,10 @@ delete_threads_and_gc:
 #if defined(THREADED_RTS)
     for (i = enabled_capabilities; i < n_capabilities; i++) {
         Capability *tmp_cap, *dest_cap;
-        tmp_cap = capabilities[i];
+        tmp_cap = getCapability(i);
         ASSERT(tmp_cap->disabled);
         if (i != cap->no) {
-            dest_cap = capabilities[i % enabled_capabilities];
+            dest_cap = getCapability(i % enabled_capabilities);
             while (!emptyRunQueue(tmp_cap)) {
                 tso = popRunQueue(tmp_cap);
                 migrateThread(tmp_cap, tso, dest_cap);
@@ -1919,11 +1919,11 @@ delete_threads_and_gc:
         for (i = 0; i < n_capabilities; i++) {
             if (i != cap->no) {
                 if (idle_cap[i]) {
-                    ASSERT(capabilities[i]->running_task == task);
-                    task->cap = capabilities[i];
-                    releaseCapability(capabilities[i]);
+                    ASSERT(getCapability(i)->running_task == task);
+                    task->cap = getCapability(i);
+                    releaseCapability(getCapability(i));
                 } else {
-                    ASSERT(capabilities[i]->running_task != task);
+                    ASSERT(getCapability(i)->running_task != task);
                 }
             }
         }
@@ -2033,7 +2033,7 @@ forkProcess(HsStablePtr *entry
     ACQUIRE_LOCK(&stable_name_mutex);
 
     for (i=0; i < n_capabilities; i++) {
-        ACQUIRE_LOCK(&capabilities[i]->lock);
+        ACQUIRE_LOCK(&getCapability(i)->lock);
     }
 
     // Take task lock after capability lock to avoid order inversion (#17275).
@@ -2067,8 +2067,8 @@ forkProcess(HsStablePtr *entry
 #endif
 
         for (i=0; i < n_capabilities; i++) {
-            releaseCapability_(capabilities[i],false);
-            RELEASE_LOCK(&capabilities[i]->lock);
+            releaseCapability_(getCapability(i),false);
+            RELEASE_LOCK(&getCapability(i)->lock);
         }
 
         exitMyTask();
@@ -2090,7 +2090,7 @@ forkProcess(HsStablePtr *entry
         initMutex(&task->lock);
 
         for (i=0; i < n_capabilities; i++) {
-            initMutex(&capabilities[i]->lock);
+            initMutex(&getCapability(i)->lock);
         }
 
         initMutex(&all_tasks_mutex);
@@ -2126,7 +2126,7 @@ forkProcess(HsStablePtr *entry
         discardTasksExcept(task);
 
         for (i=0; i < n_capabilities; i++) {
-            cap = capabilities[i];
+            cap = getCapability(i);
 
             // Empty the run queue.  It seems tempting to let all the
             // killed threads stay on the run queue as zombies to be
@@ -2158,7 +2158,7 @@ forkProcess(HsStablePtr *entry
                 releaseCapability(cap);
             }
         }
-        cap = capabilities[0];
+        cap = getCapability(0);
         task->cap = cap;
 
         // Empty the threads lists.  Otherwise, the garbage
@@ -2278,8 +2278,8 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
         // structures, the nursery, etc.
         //
         for (n = new_n_capabilities; n < enabled_capabilities; n++) {
-            capabilities[n]->disabled = true;
-            traceCapDisable(capabilities[n]);
+            getCapability(n)->disabled = true;
+            traceCapDisable(getCapability(n));
         }
         enabled_capabilities = new_n_capabilities;
     }
@@ -2290,8 +2290,8 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
         // enable any disabled capabilities, up to the required number
         for (n = enabled_capabilities;
              n < new_n_capabilities && n < n_capabilities; n++) {
-            capabilities[n]->disabled = false;
-            traceCapEnable(capabilities[n]);
+            getCapability(n)->disabled = false;
+            traceCapEnable(getCapability(n));
         }
         enabled_capabilities = n;
 
@@ -2592,7 +2592,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
     if (cpu == cap->no) {
         appendToRunQueue(cap,tso);
     } else {
-        migrateThread(cap, tso, capabilities[cpu]);
+        migrateThread(cap, tso, getCapability(cpu));
     }
 #else
     appendToRunQueue(cap,tso);
@@ -2678,7 +2678,7 @@ startWorkerTasks (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     Capability *cap;
 
     for (i = from; i < to; i++) {
-        cap = capabilities[i];
+        cap = getCapability(i);
         ACQUIRE_LOCK(&cap->lock);
         startWorkerTask(cap);
         RELEASE_LOCK(&cap->lock);

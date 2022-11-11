@@ -324,7 +324,7 @@ void nonmovingBeginFlush(Task *task)
     // logic won't have been hit. Make sure that everyone so far has flushed.
     // Ideally we want to mark asynchronously with syncing.
     for (uint32_t i = 0; i < getNumCapabilities(); i++) {
-        nonmovingFlushCapUpdRemSetBlocks(capabilities[i]);
+        nonmovingFlushCapUpdRemSetBlocks(getCapability(i));
     }
 }
 
@@ -399,7 +399,7 @@ void nonmovingFinishFlush(Task *task)
 {
     // See Note [Unintentional marking in resurrectThreads]
     for (uint32_t i = 0; i < getNumCapabilities(); i++) {
-        reset_upd_rem_set(&capabilities[i]->upd_rem_set);
+        reset_upd_rem_set(&getCapability(i)->upd_rem_set);
     }
     // Also reset upd_rem_set_block_list in case some of the UpdRemSets were
     // filled and we flushed them.
@@ -1359,7 +1359,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 #if defined(DEBUG)
         bool found_it = false;
         for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
-            if (capabilities[i]->pinned_object_block == bd) {
+            if (getCapability(i)->pinned_object_block == bd) {
                 found_it = true;
                 break;
             }

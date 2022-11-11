@@ -1096,7 +1096,7 @@ resetMutableObjects(traverseState* ts)
         // because we can find MUT_VAR objects which have not been
         // visited during heap traversal.
         for (n = 0; n < getNumCapabilities(); n++) {
-          for (bd = capabilities[n]->mut_lists[g]; bd != NULL; bd = bd->link) {
+          for (bd = getCapability(n)->mut_lists[g]; bd != NULL; bd = bd->link) {
             for (ml = bd->start; ml < bd->free; ml++) {
                 traverseMaybeInitClosureData(ts, (StgClosure *)*ml);
             }

@@ -979,7 +979,7 @@ compact(StgClosure *static_objects,
     // mutable lists
     for (W_ g = 1; g < RtsFlags.GcFlags.generations; g++) {
         for (W_ n = 0; n < getNumCapabilities(); n++) {
-            for (bdescr *bd = capabilities[n]->mut_lists[g];
+            for (bdescr *bd = getCapability(n)->mut_lists[g];
                  bd != NULL; bd = bd->link) {
                 for (P_ p = bd->start; p < bd->free; p++) {
                     thread((StgClosure **)p);

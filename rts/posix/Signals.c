@@ -203,11 +203,11 @@ ioManagerDie (void)
     {
         // Shut down IO managers
         for (i=0; i < getNumCapabilities(); i++) {
-            const int fd = RELAXED_LOAD(&capabilities[i]->io_manager_control_wr_fd);
+            const int fd = RELAXED_LOAD(&getCapability(i)->io_manager_control_wr_fd);
             if (0 <= fd) {
                 r = write(fd, &byte, 1);
                 if (r == -1) { sysErrorBelch("ioManagerDie: write"); }
-                RELAXED_STORE(&capabilities[i]->io_manager_control_wr_fd, -1);
+                RELAXED_STORE(&getCapability(i)->io_manager_control_wr_fd, -1);
             }
         }
     }

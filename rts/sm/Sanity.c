@@ -818,7 +818,7 @@ checkLocalMutableLists (uint32_t cap_no)
 {
     uint32_t g;
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-        checkMutableList(capabilities[cap_no]->mut_lists[g], g);
+        checkMutableList(getCapability(cap_no)->mut_lists[g], g);
     }
 }
 
@@ -1019,7 +1019,7 @@ findMemoryLeak (void)
     uint32_t g, i, j;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (i = 0; i < getNumCapabilities(); i++) {
-            markBlocks(capabilities[i]->mut_lists[g]);
+            markBlocks(getCapability(i)->mut_lists[g]);
             markBlocks(gc_threads[i]->gens[g].part_list);
             markBlocks(gc_threads[i]->gens[g].scavd_list);
             markBlocks(gc_threads[i]->gens[g].todo_bd);
@@ -1035,8 +1035,8 @@ findMemoryLeak (void)
 
     for (i = 0; i < getNumCapabilities(); i++) {
         markBlocks(gc_threads[i]->free_blocks);
-        markBlocks(capabilities[i]->pinned_object_block);
-        markBlocks(capabilities[i]->upd_rem_set.queue.blocks);
+        markBlocks(getCapability(i)->pinned_object_block);
+        markBlocks(getCapability(i)->upd_rem_set.queue.blocks);
     }
 
     if (RtsFlags.GcFlags.useNonmoving) {
@@ -1202,7 +1202,7 @@ memInventory (bool show)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       gen_blocks[g] = 0;
       for (i = 0; i < getNumCapabilities(); i++) {
-          gen_blocks[g] += countBlocks(capabilities[i]->mut_lists[g]);
+          gen_blocks[g] += countBlocks(getCapability(i)->mut_lists[g]);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].todo_bd);
@@ -1217,11 +1217,11 @@ memInventory (bool show)
   for (i = 0; i < getNumCapabilities(); i++) {
       W_ n = countBlocks(gc_threads[i]->free_blocks);
       gc_free_blocks += n;
-      if (capabilities[i]->pinned_object_block != NULL) {
-          nursery_blocks += capabilities[i]->pinned_object_block->blocks;
+      if (getCapability(i)->pinned_object_block != NULL) {
+          nursery_blocks += getCapability(i)->pinned_object_block->blocks;
       }
-      nursery_blocks += countBlocks(capabilities[i]->pinned_object_blocks);
-      free_pinned_blocks += countBlocks(capabilities[i]->pinned_object_empty);
+      nursery_blocks += countBlocks(getCapability(i)->pinned_object_blocks);
+      free_pinned_blocks += countBlocks(getCapability(i)->pinned_object_empty);
   }
 
 #if defined(PROFILING)
@@ -1241,7 +1241,7 @@ memInventory (bool show)
 
   // count UpdRemSet blocks
   for (i = 0; i < getNumCapabilities(); ++i) {
-      upd_rem_set_blocks += countBlocks(capabilities[i]->upd_rem_set.queue.blocks);
+      upd_rem_set_blocks += countBlocks(getCapability(i)->upd_rem_set.queue.blocks);
   }
   upd_rem_set_blocks += countBlocks(upd_rem_set_block_list);
 

@@ -293,8 +293,8 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     // we've moved the nurseries, so we have to update the rNursery
     // pointers from the Capabilities.
     for (i = 0; i < from; i++) {
-        uint32_t index = capabilities[i]->r.rNursery - old_nurseries;
-        capabilities[i]->r.rNursery = &nurseries[index];
+        uint32_t index = getCapability(i)->r.rNursery - old_nurseries;
+        getCapability(i)->r.rNursery = &nurseries[index];
     }
 
     /* The allocation area.  Policy: keep the allocation area
@@ -316,7 +316,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     // allocate a block for each mut list
     for (n = from; n < to; n++) {
         for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-            capabilities[n]->mut_lists[g] =
+            getCapability(n)->mut_lists[g] =
                 allocBlockOnNode(capNoToNumaNode(n));
         }
     }
@@ -325,7 +325,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     if (RtsFlags.GcFlags.useNonmoving) {
         nonmovingAddCapabilities(to);
         for (i = 0; i < to; ++i) {
-            init_upd_rem_set(&capabilities[i]->upd_rem_set);
+            init_upd_rem_set(&getCapability(i)->upd_rem_set);
         }
     }
 
@@ -376,7 +376,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
   uint32_t g, i;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (i = 0; i < getNumCapabilities(); i++) {
-          cb(user, capabilities[i]->mut_lists[g]);
+          cb(user, getCapability(i)->mut_lists[g]);
           cb(user, gc_threads[i]->gens[g].part_list);
           cb(user, gc_threads[i]->gens[g].scavd_list);
           cb(user, gc_threads[i]->gens[g].todo_bd);
@@ -388,11 +388,11 @@ void listAllBlocks (ListBlocksCb cb, void *user)
       cb(user, nurseries[i].blocks);
   }
   for (i = 0; i < getNumCapabilities(); i++) {
-      if (capabilities[i]->pinned_object_block != NULL) {
-          cb(user, capabilities[i]->pinned_object_block);
+      if (getCapability(i)->pinned_object_block != NULL) {
+          cb(user, getCapability(i)->pinned_object_block);
       }
-      cb(user, capabilities[i]->pinned_object_blocks);
-      cb(user, capabilities[i]->pinned_object_empty);
+      cb(user, getCapability(i)->pinned_object_blocks);
+      cb(user, getCapability(i)->pinned_object_empty);
   }
 }
 
@@ -784,8 +784,8 @@ assignNurseriesToCapabilities (uint32_t from, uint32_t to)
     uint32_t i, node;
 
     for (i = from; i < to; i++) {
-        node = capabilities[i]->node;
-        assignNurseryToCapability(capabilities[i], next_nursery[node]);
+        node = getCapability(i)->node;
+        assignNurseryToCapability(getCapability(i), next_nursery[node]);
         next_nursery[node] += n_numa_nodes;
     }
 }
@@ -1569,11 +1569,11 @@ calcTotalAllocated (void)
     W_ n;
 
     for (n = 0; n < getNumCapabilities(); n++) {
-        tot_alloc += capabilities[n]->total_allocated;
+        tot_alloc += getCapability(n)->total_allocated;
 
-        traceEventHeapAllocated(capabilities[n],
+        traceEventHeapAllocated(getCapability(n),
                                 CAPSET_HEAP_DEFAULT,
-                                capabilities[n]->total_allocated * sizeof(W_));
+                                getCapability(n)->total_allocated * sizeof(W_));
     }
 
     return tot_alloc;
@@ -1592,10 +1592,10 @@ updateNurseriesStats (void)
     for (i = 0; i < getNumCapabilities(); i++) {
         // The current nursery block and the current allocate block have not
         // yet been accounted for in cap->total_allocated, so we add them here.
-        bd = capabilities[i]->r.rCurrentNursery;
-        if (bd) finishedNurseryBlock(capabilities[i], bd);
-        bd = capabilities[i]->r.rCurrentAlloc;
-        if (bd) finishedNurseryBlock(capabilities[i], bd);
+        bd = getCapability(i)->r.rCurrentNursery;
+        if (bd) finishedNurseryBlock(getCapability(i), bd);
+        bd = getCapability(i)->r.rCurrentAlloc;
+        if (bd) finishedNurseryBlock(getCapability(i), bd);
     }
 }
 
