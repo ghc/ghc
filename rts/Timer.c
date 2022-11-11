@@ -129,16 +129,16 @@ handle_tick(int unused STG_UNUSED)
    * for threads that are deadlocked.  However, ensure we wait
    * at least interIdleGCWait (+RTS -Iw) between idle GCs.
    */
-  switch (SEQ_CST_LOAD_ALWAYS(&recent_activity)) {
+  switch (getRecentActivity()) {
   case ACTIVITY_YES:
-      SEQ_CST_STORE_ALWAYS(&recent_activity, ACTIVITY_MAYBE_NO);
+      setRecentActivity(ACTIVITY_MAYBE_NO);
       idle_ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
                          RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
       if (idle_ticks_to_gc == 0 && inter_gc_ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
-              SEQ_CST_STORE_ALWAYS(&recent_activity, ACTIVITY_INACTIVE);
+              setRecentActivity(ACTIVITY_INACTIVE);
               inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
                                      RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
@@ -147,7 +147,7 @@ handle_tick(int unused STG_UNUSED)
               // the GC.
 #endif
           } else {
-              SEQ_CST_STORE_ALWAYS(&recent_activity, ACTIVITY_DONE_GC);
+              setRecentActivity(ACTIVITY_DONE_GC);
               // disable timer signals (see #1623, #5991, #9105)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
