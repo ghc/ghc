@@ -56,7 +56,7 @@ awaitEvent(bool wait)
     //  - the run-queue is now non- empty
 
   } while (wait
-           && sched_state == SCHED_RUNNING
+           && getSchedState() == SCHED_RUNNING
            && emptyRunQueue(&MainCapability)
       );
 }

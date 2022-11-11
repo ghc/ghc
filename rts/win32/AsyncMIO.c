@@ -245,7 +245,7 @@ start:
     if (completed_hw == 0) {
         // empty table, drop lock and wait
         OS_RELEASE_LOCK(&queue_lock);
-        if ( wait && sched_state == SCHED_RUNNING ) {
+        if ( wait && getSchedState() == SCHED_RUNNING ) {
             DWORD dwRes = WaitForMultipleObjects(2, wait_handles,
                                                  FALSE, INFINITE);
             switch (dwRes) {

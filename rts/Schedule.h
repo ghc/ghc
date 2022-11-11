@@ -65,11 +65,23 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task);
 /* The state of the scheduler.  This is used to control the sequence
  * of events during shutdown.  See Note [shutdown] in Schedule.c.
  */
-#define SCHED_RUNNING       0  /* running as normal */
-#define SCHED_INTERRUPTING  1  /* before threads are deleted */
-#define SCHED_SHUTTING_DOWN 2  /* final shutdown */
+enum SchedState {
+    SCHED_RUNNING       = 0,  /* running as normal */
+    SCHED_INTERRUPTING  = 1,  /* before threads are deleted */
+    SCHED_SHUTTING_DOWN = 2,  /* final shutdown */
+};
 
-extern volatile StgWord sched_state;
+extern StgWord sched_state;
+
+INLINE_HEADER void setSchedState(enum SchedState ss)
+{
+    SEQ_CST_STORE_ALWAYS(&sched_state, (StgWord) ss);
+}
+
+INLINE_HEADER enum SchedState getSchedState(void)
+{
+    return (enum SchedState) SEQ_CST_LOAD_ALWAYS(&sched_state);
+}
 
 /*
  * flag that tracks whether we have done any execution in this time

@@ -922,7 +922,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
     // We also don't run in final GC
-    if (concurrent_coll_running || sched_state > SCHED_RUNNING) {
+    if (concurrent_coll_running || getSchedState() > SCHED_RUNNING) {
         return;
     }
 #endif
@@ -996,7 +996,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (sched_state == SCHED_RUNNING) {
+    if (getSchedState() == SCHED_RUNNING) {
         concurrent_coll_running = true;
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
@@ -1088,7 +1088,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     Task *task = newBoundTask();
 
     // If at this point if we've decided to exit then just return
-    if (sched_state > SCHED_RUNNING) {
+    if (getSchedState() > SCHED_RUNNING) {
         // Note that we break our invariants here and leave segments in
         // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
         // However because we won't be running mark-sweep in the final GC this
