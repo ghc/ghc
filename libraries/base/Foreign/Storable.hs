@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,6 +45,7 @@ import GHC.Word
 import GHC.Ptr
 import GHC.Base
 import GHC.Fingerprint.Type
+import Foreign.C.ConstPtr
 import Data.Bits
 import GHC.Real
 
@@ -280,3 +284,5 @@ pokeFingerprint p0 (Fingerprint high low) = do
 
       pokeW64 (castPtr p0) 8 high
       pokeW64 (castPtr p0 `plusPtr` 8) 8 low
+
+deriving newtype instance Storable (ConstPtr a)

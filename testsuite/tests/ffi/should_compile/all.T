@@ -43,3 +43,4 @@ test(
     ],
 )
 test('T15531', normal, compile, ['-Wall'])
+test('T22043', [omit_ways(['ghci'])], compile, [''])

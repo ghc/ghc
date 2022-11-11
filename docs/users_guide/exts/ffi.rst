@@ -437,6 +437,18 @@ specified. The syntax looks like: ::
     data    {-# CTYPE "unistd.h" "useconds_t" #-} T = ...
     newtype {-# CTYPE            "useconds_t" #-} T = ...
 
+In case foreign declarations contain ``const``-qualified pointer return
+type, ``ConstPtr`` from :base-ref:`Foreign.C.ConstPtr` may be used to
+encode this, e.g. ::
+
+    foreign import capi "header.h f" f :: CInt -> ConstPtr CInt
+
+which corresponds to
+
+.. code-block:: c
+
+    const *int f(int);
+
 ``hs_thread_done()``
 ~~~~~~~~~~~~~~~~~~~~
 

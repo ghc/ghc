@@ -169,6 +169,7 @@ Library
         Debug.Trace
         Foreign
         Foreign.C
+        Foreign.C.ConstPtr
         Foreign.C.Error
         Foreign.C.String
         Foreign.C.Types
