@@ -204,7 +204,7 @@ splitSections = splitSectionsIf (/=ghc)
 -- there is little benefit.
 
 enableThreadSanitizer :: Flavour -> Flavour
-enableThreadSanitizer = addArgs $ mconcat
+enableThreadSanitizer = addArgs $ notStage0 ? mconcat
     [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
     , builder (Ghc CompileCWithGhc) ? (arg "-optc-fsanitize=thread" <> arg "-DTSAN_ENABLED")
     , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
