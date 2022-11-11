@@ -1558,7 +1558,7 @@ void flushAllCapsEventsBufs()
     RELEASE_LOCK(&eventBufMutex);
 
     for (unsigned int i=0; i < getNumCapabilities(); i++) {
-        flushLocalEventsBuf(capabilities[i]);
+        flushLocalEventsBuf(getCapability(i));
     }
     flushEventLogWriter();
 }
@@ -1579,7 +1579,7 @@ void flushEventLog(Capability **cap USED_IF_THREADS)
     flushAllCapsEventsBufs();
     releaseAllCapabilities(getNumCapabilities(), cap ? *cap : NULL, task);
 #else
-    flushLocalEventsBuf(capabilities[0]);
+    flushLocalEventsBuf(getCapability(0));
 #endif
     flushEventLogWriter();
 }

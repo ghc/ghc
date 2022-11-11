@@ -1349,14 +1349,14 @@ stat_exitReport (void)
             sum.bound_task_count = taskCount - workerCount;
 
             for (uint32_t i = 0; i < getNumCapabilities(); i++) {
-                sum.sparks.created   += capabilities[i]->spark_stats.created;
-                sum.sparks.dud       += capabilities[i]->spark_stats.dud;
+                sum.sparks.created   += getCapability(i)->spark_stats.created;
+                sum.sparks.dud       += getCapability(i)->spark_stats.dud;
                 sum.sparks.overflowed+=
-                  capabilities[i]->spark_stats.overflowed;
+                  getCapability(i)->spark_stats.overflowed;
                 sum.sparks.converted +=
-                  capabilities[i]->spark_stats.converted;
-                sum.sparks.gcd       += capabilities[i]->spark_stats.gcd;
-                sum.sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
+                  getCapability(i)->spark_stats.converted;
+                sum.sparks.gcd       += getCapability(i)->spark_stats.gcd;
+                sum.sparks.fizzled   += getCapability(i)->spark_stats.fizzled;
             }
 
             sum.sparks_count = sum.sparks.created
@@ -1648,10 +1648,10 @@ statDescribeGens(void)
 
       mut = 0;
       for (i = 0; i < getNumCapabilities(); i++) {
-          mut += countOccupied(capabilities[i]->mut_lists[g]);
+          mut += countOccupied(getCapability(i)->mut_lists[g]);
 
           // Add the pinned object block.
-          bd = capabilities[i]->pinned_object_block;
+          bd = getCapability(i)->pinned_object_block;
           if (bd != NULL) {
               gen_live   += bd->free - bd->start;
               gen_blocks += bd->blocks;

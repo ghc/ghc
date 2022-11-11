@@ -139,8 +139,8 @@ void wakeupIOManager(void)
 void
 setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #if defined(THREADED_RTS)
-    if (cap_no < n_capabilities) {
-        RELAXED_STORE(&capabilities[cap_no]->io_manager_control_wr_fd, fd);
+    if (cap_no < getNumCapabilities()) {
+        RELAXED_STORE(&getCapability(cap_no)->io_manager_control_wr_fd, fd);
     } else {
         errorBelch("warning: setIOManagerControlFd called with illegal capability number.");
     }

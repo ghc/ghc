@@ -342,8 +342,8 @@ GarbageCollect (uint32_t collect_gen,
   // attribute any costs to CCS_GC
 #if defined(PROFILING)
   for (n = 0; n < getNumCapabilities(); n++) {
-      save_CCS[n] = capabilities[n]->r.rCCCS;
-      capabilities[n]->r.rCCCS = CCS_GC;
+      save_CCS[n] = getCapability(n)->r.rCCCS;
+      getCapability(n)->r.rCCCS = CCS_GC;
   }
 #endif
 
@@ -502,18 +502,18 @@ GarbageCollect (uint32_t collect_gen,
   if (!is_par_gc()) {
       for (n = 0; n < getNumCapabilities(); n++) {
 #if defined(THREADED_RTS)
-          scavenge_capability_mut_Lists1(capabilities[n]);
+          scavenge_capability_mut_Lists1(getCapability(n));
 #else
-          scavenge_capability_mut_lists(capabilities[n]);
+          scavenge_capability_mut_lists(getCapability(n));
 #endif
       }
   } else {
       scavenge_capability_mut_lists(gct->cap);
       for (n = 0; n < getNumCapabilities(); n++) {
           if (idle_cap[n]) {
-              markCapability(mark_root, gct, capabilities[n],
+              markCapability(mark_root, gct, getCapability(n),
                              true/*don't mark sparks*/);
-              scavenge_capability_mut_lists(capabilities[n]);
+              scavenge_capability_mut_lists(getCapability(n));
           }
       }
   }
@@ -526,7 +526,7 @@ GarbageCollect (uint32_t collect_gen,
   gct->evac_gen_no = 0;
   if (!is_par_gc()) {
       for (n = 0; n < getNumCapabilities(); n++) {
-          markCapability(mark_root, gct, capabilities[n],
+          markCapability(mark_root, gct, getCapability(n),
                          true/*don't mark sparks*/);
       }
   } else {
@@ -575,12 +575,12 @@ GarbageCollect (uint32_t collect_gen,
   // See Note [Pruning the spark pool]
   if (gc_sparks_all_caps) {
       for (n = 0; n < getNumCapabilities(); n++) {
-          pruneSparkQueue(false, capabilities[n]);
+          pruneSparkQueue(false, getCapability(n));
       }
   } else {
       for (n = 0; n < getNumCapabilities(); n++) {
           if (n == cap->no || idle_cap[n]) {
-              pruneSparkQueue(false, capabilities[n]);
+              pruneSparkQueue(false, getCapability(n));
          }
       }
   }
@@ -685,7 +685,7 @@ GarbageCollect (uint32_t collect_gen,
     if (g > 0) {
         W_ mut_list_size = 0;
         for (n = 0; n < getNumCapabilities(); n++) {
-            mut_list_size += countOccupied(capabilities[n]->mut_lists[g]);
+            mut_list_size += countOccupied(getCapability(n)->mut_lists[g]);
         }
         copied +=  mut_list_size;
 
@@ -849,7 +849,7 @@ GarbageCollect (uint32_t collect_gen,
   if (RtsFlags.GcFlags.useNonmoving) {
       RELEASE_SM_LOCK;
       for (n = 0; n < getNumCapabilities(); n++) {
-          nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
+          nonmovingAddUpdRemSetBlocks(&getCapability(n)->upd_rem_set.queue);
       }
       ACQUIRE_SM_LOCK;
   }
@@ -1069,7 +1069,7 @@ GarbageCollect (uint32_t collect_gen,
   // restore enclosing cost centre
 #if defined(PROFILING)
   for (n = 0; n < getNumCapabilities(); n++) {
-      capabilities[n]->r.rCCCS = save_CCS[n];
+      getCapability(n)->r.rCCCS = save_CCS[n];
   }
 #endif
 
@@ -1118,7 +1118,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
     uint32_t g;
     gen_workspace *ws;
 
-    t->cap = capabilities[n];
+    t->cap = getCapability(n);
 
 #if defined(THREADED_RTS)
     t->id = 0;
@@ -1465,9 +1465,9 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
         for(i = 0; i < getNumCapabilities(); ++i) {
             if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
-                prodCapability(capabilities[i], cap->running_task);
+                prodCapability(getCapability(i), cap->running_task);
                 write_barrier();
-                interruptCapability(capabilities[i]);
+                interruptCapability(getCapability(i));
             }
         }
         // this 1ms timeout is not well justified. It's the shortest timeout we
@@ -1618,18 +1618,18 @@ prepare_collected_gen (generation *gen)
     if (RtsFlags.GcFlags.useNonmoving && g == oldest_gen->no) {
         // Nonmoving heap's mutable list is always a root.
         for (i = 0; i < getNumCapabilities(); i++) {
-            stash_mut_list(capabilities[i], g);
+            stash_mut_list(getCapability(i), g);
         }
     } else if (g != 0) {
         // Otherwise throw away the current mutable list. Invariant: the
         // mutable list always has at least one block; this means we can avoid
         // a check for NULL in recordMutable().
         for (i = 0; i < getNumCapabilities(); i++) {
-            bdescr *old = RELAXED_LOAD(&capabilities[i]->mut_lists[g]);
+            bdescr *old = RELAXED_LOAD(&getCapability(i)->mut_lists[g]);
             freeChain(old);
 
             bdescr *new = allocBlockOnNode(capNoToNumaNode(i));
-            RELAXED_STORE(&capabilities[i]->mut_lists[g], new);
+            RELAXED_STORE(&getCapability(i)->mut_lists[g], new);
         }
     }
 
@@ -1761,7 +1761,7 @@ prepare_uncollected_gen (generation *gen)
     // allocate a fresh block for each one.  We'll traverse these
     // mutable lists as roots early on in the GC.
     for (i = 0; i < getNumCapabilities(); i++) {
-        stash_mut_list(capabilities[i], gen->no);
+        stash_mut_list(getCapability(i), gen->no);
     }
 
     ASSERT(gen->scavenged_large_objects == NULL);
@@ -1838,7 +1838,7 @@ collect_pinned_object_blocks (void)
         bdescr *last = NULL;
         if (use_nonmoving && gen == oldest_gen) {
             // Mark objects as belonging to the nonmoving heap
-            for (bdescr *bd = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks); bd != NULL; bd = bd->link) {
+            for (bdescr *bd = RELAXED_LOAD(&getCapability(n)->pinned_object_blocks); bd != NULL; bd = bd->link) {
                 bd->flags |= BF_NONMOVING;
                 bd->gen = oldest_gen;
                 bd->gen_no = oldest_gen->no;
@@ -1847,7 +1847,7 @@ collect_pinned_object_blocks (void)
                 last = bd;
             }
         } else {
-            for (bdescr *bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
+            for (bdescr *bd = getCapability(n)->pinned_object_blocks; bd != NULL; bd = bd->link) {
                 last = bd;
             }
         }
@@ -1857,8 +1857,8 @@ collect_pinned_object_blocks (void)
             if (gen->large_objects != NULL) {
                 gen->large_objects->u.back = last;
             }
-            gen->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
-            RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
+            gen->large_objects = RELAXED_LOAD(&getCapability(n)->pinned_object_blocks);
+            RELAXED_STORE(&getCapability(n)->pinned_object_blocks, NULL);
         }
     }
 }

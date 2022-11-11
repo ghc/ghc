@@ -795,7 +795,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
 
         // Initialize current segments for the new capabilities
         for (unsigned int j = old_n_caps; j < new_n_caps; j++) {
-            allocs[i]->current[j] = nonmovingAllocSegment(capabilities[j]->node);
+            allocs[i]->current[j] = nonmovingAllocSegment(getCapability(j)->node);
             nonmovingInitSegment(allocs[i]->current[j], NONMOVING_ALLOCA0 + i);
             SET_SEGMENT_STATE(allocs[i]->current[j], CURRENT);
             allocs[i]->current[j]->link = NULL;
@@ -947,7 +947,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     markCAFs((evac_fn)markQueueAddRoot, mark_queue);
     for (unsigned int n = 0; n < getNumCapabilities(); ++n) {
         markCapability((evac_fn)markQueueAddRoot, mark_queue,
-                capabilities[n], true/*don't mark sparks*/);
+                getCapability(n), true/*don't mark sparks*/);
     }
     markScheduler((evac_fn)markQueueAddRoot, mark_queue);
     nonmovingMarkWeakPtrList(mark_queue, *dead_weaks);
@@ -1149,7 +1149,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 #if defined(THREADED_RTS)
     // Just pick a random capability. Not sure if this is a good idea -- we use
     // only one capability for all finalizers.
-    scheduleFinalizers(capabilities[0], *dead_weaks);
+    scheduleFinalizers(getCapability(0), *dead_weaks);
     // Note that this mutates heap and causes running write barriers.
     // See Note [Unintentional marking in resurrectThreads] in NonMovingMark.c
     // for how we deal with this.
@@ -1191,7 +1191,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // See Note [Spark management under the nonmoving collector].
 #if defined(THREADED_RTS)
     for (uint32_t n = 0; n < getNumCapabilities(); n++) {
-        pruneSparkQueue(true, capabilities[n]);
+        pruneSparkQueue(true, getCapability(n));
     }
 #endif
 
@@ -1267,7 +1267,7 @@ void assert_in_nonmoving_heap(StgPtr p)
     if (bd->flags & BF_LARGE) {
         // It should be in a capability (if it's not filled yet) or in non-moving heap
         for (uint32_t cap = 0; cap < getNumCapabilities(); ++cap) {
-            if (bd == capabilities[cap]->pinned_object_block) {
+            if (bd == getCapability(cap)->pinned_object_block) {
                 return;
             }
         }
@@ -1500,10 +1500,10 @@ void nonmovingPrintSweepList()
 void check_in_mut_list(StgClosure *p)
 {
     for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
-        for (bdescr *bd = capabilities[cap_n]->mut_lists[oldest_gen->no]; bd; bd = bd->link) {
+        for (bdescr *bd = getCapability(cap_n)->mut_lists[oldest_gen->no]; bd; bd = bd->link) {
             for (StgPtr q = bd->start; q < bd->free; ++q) {
                 if (*((StgPtr**)q) == (StgPtr*)p) {
-                    debugBelch("Object is in mut list of cap %d: %p\n", cap_n, capabilities[cap_n]->mut_lists[oldest_gen->no]);
+                    debugBelch("Object is in mut list of cap %d: %p\n", cap_n, getCapability(cap_n)->mut_lists[oldest_gen->no]);
                     return;
                 }
             }

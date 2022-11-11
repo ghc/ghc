@@ -280,7 +280,7 @@ dirty_BLOCKING_QUEUE:
 void nonmovingSweepMutLists()
 {
     for (uint32_t n = 0; n < getNumCapabilities(); n++) {
-        Capability *cap = capabilities[n];
+        Capability *cap = getCapability(n);
         bdescr *old_mut_list = cap->mut_lists[oldest_gen->no];
         cap->mut_lists[oldest_gen->no] = allocBlockOnNode_lock(cap->node);
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {

@@ -393,8 +393,8 @@ computeRetainerSet( traverseState *ts )
     for (n = 0; n < getNumCapabilities(); n++) {
         // NB: after a GC, all nursery weak_ptr_lists have been migrated
         // to the global lists living in the generations
-        ASSERT(capabilities[n]->weak_ptr_list_hd == NULL);
-        ASSERT(capabilities[n]->weak_ptr_list_tl == NULL);
+        ASSERT(getCapability(n)->weak_ptr_list_hd == NULL);
+        ASSERT(getCapability(n)->weak_ptr_list_tl == NULL);
     }
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (weak = generations[g].weak_ptr_list; weak != NULL; weak = weak->link) {

@@ -140,7 +140,7 @@ findSpark (Capability *cap)
       /* visit cap.s 0..n-1 in sequence until a theft succeeds. We could
       start at a random place instead of 0 as well.  */
       for ( i=0 ; i < getNumCapabilities() ; i++ ) {
-          robbed = capabilities[i];
+          robbed = getCapability(i);
           if (cap == robbed)  // ourselves...
               continue;
 
@@ -183,7 +183,7 @@ anySparks (void)
     uint32_t i;
 
     for (i=0; i < getNumCapabilities(); i++) {
-        if (!emptySparkPoolCap(capabilities[i])) {
+        if (!emptySparkPoolCap(getCapability(i))) {
             return true;
         }
     }
@@ -408,7 +408,7 @@ void initCapabilities (void)
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
     for (i = 0; i < n_numa_nodes; i++) {
-        last_free_capability[i] = capabilities[0];
+        last_free_capability[i] = getCapability(0);
     }
 }
 
@@ -475,7 +475,7 @@ void interruptAllCapabilities(void)
 {
     uint32_t i;
     for (i=0; i < getNumCapabilities(); i++) {
-        interruptCapability(capabilities[i]);
+        interruptCapability(getCapability(i));
     }
 }
 
@@ -829,8 +829,7 @@ static Capability * find_capability_for_task(const Task * task)
 {
     if (task->preferred_capability != -1) {
         // Does the task have a preferred capability? If so, use it
-        return capabilities[task->preferred_capability %
-                            enabled_capabilities];
+        return getCapability(task->preferred_capability % enabled_capabilities);
     } else {
         // Try last_free_capability first
         Capability *cap = RELAXED_LOAD(&last_free_capability[task->node]);
@@ -847,8 +846,8 @@ static Capability * find_capability_for_task(const Task * task)
                   i += n_numa_nodes) {
                 // visits all the capabilities on this node, because
                 // cap[i]->node == i % n_numa_nodes
-                if (!RELAXED_LOAD(&capabilities[i]->running_task)) {
-                    return capabilities[i];
+                if (!RELAXED_LOAD(&getCapability(i)->running_task)) {
+                    return getCapability(i);
                 }
             }
 
@@ -1253,7 +1252,7 @@ shutdownCapabilities(Task *task, bool safe)
     uint32_t i;
     for (i=0; i < getNumCapabilities(); i++) {
         ASSERT(task->incall->tso == NULL);
-        shutdownCapability(capabilities[i], task, safe);
+        shutdownCapability(getCapability(i), task, safe);
     }
 #if defined(THREADED_RTS)
     ASSERT(checkSparkCountInvariant());
@@ -1279,9 +1278,11 @@ freeCapabilities (void)
 #if defined(THREADED_RTS)
     uint32_t i;
     for (i=0; i < getNumCapabilities(); i++) {
-        freeCapability(capabilities[i]);
-        if (capabilities[i] != &MainCapability)
+        Capability *cap = getCapability(i);
+        freeCapability(cap);
+        if (cap != &MainCapability) {
             stgFreeAligned(capabilities[i]);
+        }
     }
 #else
     freeCapability(&MainCapability);
@@ -1333,7 +1334,7 @@ markCapabilities (evac_fn evac, void *user)
 {
     uint32_t n;
     for (n = 0; n < getNumCapabilities(); n++) {
-        markCapability(evac, user, capabilities[n], false);
+        markCapability(evac, user, getCapability(n), false);
     }
 }
 
@@ -1345,13 +1346,14 @@ bool checkSparkCountInvariant (void)
     uint32_t i;
 
     for (i = 0; i < getNumCapabilities(); i++) {
-        sparks.created   += capabilities[i]->spark_stats.created;
-        sparks.dud       += capabilities[i]->spark_stats.dud;
-        sparks.overflowed+= capabilities[i]->spark_stats.overflowed;
-        sparks.converted += capabilities[i]->spark_stats.converted;
-        sparks.gcd       += capabilities[i]->spark_stats.gcd;
-        sparks.fizzled   += capabilities[i]->spark_stats.fizzled;
-        remaining        += sparkPoolSize(capabilities[i]->sparks);
+        Capability *cap = getCapability(i);
+        sparks.created   += cap->spark_stats.created;
+        sparks.dud       += cap->spark_stats.dud;
+        sparks.overflowed+= cap->spark_stats.overflowed;
+        sparks.converted += cap->spark_stats.converted;
+        sparks.gcd       += cap->spark_stats.gcd;
+        sparks.fizzled   += cap->spark_stats.fizzled;
+        remaining        += sparkPoolSize(cap->sparks);
     }
 
     /* The invariant is

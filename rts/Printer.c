@@ -705,7 +705,7 @@ void printWeakLists()
 
     for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
         debugBelch("Capability %d:\n", cap_idx);
-        Capability *cap = capabilities[cap_idx];
+        Capability *cap = getCapability(cap_idx);
         for (StgWeak *weak = cap->weak_ptr_list_hd; weak; weak = weak->link) {
             printClosure((StgClosure*)weak);
         }
@@ -731,7 +731,7 @@ void printLargeAndPinnedObjects()
     debugBelch("====== PINNED OBJECTS ======\n");
 
     for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
-        Capability *cap = capabilities[cap_idx];
+        Capability *cap = getCapability(cap_idx);
 
         debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
