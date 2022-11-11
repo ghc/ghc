@@ -86,7 +86,7 @@ bool heap_overflow = false;
  *
  * NB. must be StgWord, we do xchg() on it.
  */
-volatile StgWord recent_activity = ACTIVITY_YES;
+StgWord recent_activity = ACTIVITY_YES;
 
 /* if this flag is set as well, give up execution
  * LOCK: none (changes monotonically)
@@ -438,13 +438,13 @@ run_thread:
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
 
-    switch (SEQ_CST_LOAD(&recent_activity))
+    switch (getRecentActivity())
     {
     case ACTIVITY_DONE_GC: {
         // ACTIVITY_DONE_GC means we turned off the timer signal to
         // conserve power (see #1623).  Re-enable it here.
         uint32_t prev;
-        prev = xchg((P_)&recent_activity, ACTIVITY_YES);
+        prev = setRecentActivity(ACTIVITY_YES);
         if (prev == ACTIVITY_DONE_GC) {
 #if !defined(PROFILING)
             startTimer();
@@ -459,7 +459,7 @@ run_thread:
         // wakeUpRts().
         break;
     default:
-        SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
+        setRecentActivity(ACTIVITY_YES);
     }
 
     traceEventRunThread(cap, t);
@@ -957,7 +957,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
          * we won't eagerly start a full GC just because we don't have
          * any threads to run currently.
          */
-        if (SEQ_CST_LOAD(&recent_activity) != ACTIVITY_INACTIVE) return;
+        if (getRecentActivity() != ACTIVITY_INACTIVE) return;
 #endif
 
         debugTrace(DEBUG_sched, "deadlocked, forcing major GC...");
@@ -1891,14 +1891,14 @@ delete_threads_and_gc:
 
     traceSparkCounters(cap);
 
-    switch (SEQ_CST_LOAD(&recent_activity)) {
+    switch (getRecentActivity()) {
     case ACTIVITY_INACTIVE:
         if (force_major) {
             // We are doing a GC because the system has been idle for a
             // timeslice and we need to check for deadlock.  Record the
             // fact that we've done a GC and turn off the timer signal;
             // it will get re-enabled if we run any threads after the GC.
-            SEQ_CST_STORE(&recent_activity, ACTIVITY_DONE_GC);
+            setRecentActivity(ACTIVITY_DONE_GC);
 #if !defined(PROFILING)
             stopTimer();
 #endif
@@ -1910,12 +1910,14 @@ delete_threads_and_gc:
         // the GC might have taken long enough for the timer to set
         // recent_activity = ACTIVITY_MAYBE_NO or ACTIVITY_INACTIVE,
         // but we aren't necessarily deadlocked:
-        SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
+        setRecentActivity(ACTIVITY_YES);
         break;
 
     case ACTIVITY_DONE_GC:
         // If we are actually active, the scheduler will reset the
         // recent_activity flag and re-enable the timer.
+        break;
+    case ACTIVITY_YES:
         break;
     }
 
@@ -2719,7 +2721,7 @@ void
 initScheduler(void)
 {
   sched_state    = SCHED_RUNNING;
-  SEQ_CST_STORE(&recent_activity, ACTIVITY_YES);
+  setRecentActivity(ACTIVITY_YES);
 
 
   /* Initialise the mutex and condition variables used by

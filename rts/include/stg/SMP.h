@@ -35,7 +35,7 @@ void arm_atomic_spin_unlock(void);
 #define SEQ_CST_STORE_ALWAYS(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
 #define SEQ_CST_ADD_ALWAYS(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
 #define SEQ_CST_SUB_ALWAYS(ptr,val) __atomic_sub_fetch(ptr, val, __ATOMIC_SEQ_CST)
-
+#define SEQ_CST_XCHG_ALWAYS(ptr,val) __atomic_exchange_n(ptr, val, __ATOMIC_SEQ_CST);
 
 #if defined(THREADED_RTS)
 
