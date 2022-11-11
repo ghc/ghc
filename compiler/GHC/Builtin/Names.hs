@@ -350,7 +350,7 @@ basicKnownKeyNames
         zipName, foldrName, buildName, augmentName, appendName,
 
         -- FFI primitive types that are not wired-in.
-        stablePtrTyConName, ptrTyConName, funPtrTyConName,
+        stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
         int8TyConName, int16TyConName, int32TyConName, int64TyConName,
         word8TyConName, word16TyConName, word32TyConName, word64TyConName,
 
@@ -557,7 +557,7 @@ gHC_PRIM, gHC_PRIM_PANIC,
     aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS, gHC_IS_LIST,
     cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
-    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, fOREIGN_C_TYPES :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
@@ -627,6 +627,7 @@ gHC_TYPENATS_INTERNAL = mkBaseModule (fsLit "GHC.TypeNats.Internal")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
 uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
+fOREIGN_C_TYPES = mkBaseModule (fsLit "Foreign.C.Types")
 
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
@@ -1665,6 +1666,10 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
+constPtrConName :: Name
+constPtrConName =
+    tcQual fOREIGN_C_TYPES (fsLit "ConstPtr") constPtrTyConKey
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1866,7 +1871,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey, stackSnapshotPrimTyConKey,
-    promptTagPrimTyConKey :: Unique
+    promptTagPrimTyConKey, constPtrTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
 stableNameTyConKey                      = mkPreludeTyConUnique 52
@@ -2077,6 +2082,7 @@ typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 413
 typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 414
 typeCharToNatTyFamNameKey = mkPreludeTyConUnique 415
 typeNatToCharTyFamNameKey = mkPreludeTyConUnique 416
+constPtrTyConKey = mkPreludeTyConUnique 417
 
 {-
 ************************************************************************
