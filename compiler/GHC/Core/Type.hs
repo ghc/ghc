@@ -1445,7 +1445,7 @@ piResultTys ty orig_args@(arg:args)
   = piResultTys res args
 
   | ForAllTy (Bndr tv _) res <- ty
-  = go (extendTCvSubst init_subst tv arg) res args
+  = piResultTysX (extendTCvSubst init_subst tv arg) res args
 
   | Just ty' <- coreView ty
   = piResultTys ty' orig_args
@@ -1455,31 +1455,57 @@ piResultTys ty orig_args@(arg:args)
   where
     init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes (ty:orig_args))
 
-    go :: Subst -> Type -> [Type] -> Type
-    go subst ty [] = substTyUnchecked subst ty
+piResultTysX :: Subst -> Type -> [Type] -> Type
+piResultTysX subst ty [] = substTy subst ty
+piResultTysX subst ty all_args@(arg:args)
+  | FunTy { ft_res = res } <- ty
+  = piResultTysX subst res args
 
-    go subst ty all_args@(arg:args)
-      | FunTy { ft_res = res } <- ty
-      = go subst res args
+  | ForAllTy (Bndr tv _) res <- ty
+  = piResultTysX (extendTCvSubst subst tv arg) res args
 
-      | ForAllTy (Bndr tv _) res <- ty
-      = go (extendTCvSubst subst tv arg) res args
+  | Just ty' <- coreView ty
+  = piResultTysX subst ty' all_args
 
-      | Just ty' <- coreView ty
-      = go subst ty' all_args
+  | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
+  = piResultTysX (zapSubst subst) (substTy subst ty) all_args
 
-      | not (isEmptyTCvSubst subst)  -- See Note [Care with kind instantiation]
-      = go init_subst
-          (substTy subst ty)
-          all_args
+  | otherwise
+  = -- We have not run out of arguments, but the function doesn't
+    -- have the right kind to apply to them; so panic.
+    -- Without the explicit isEmptyTCvSubst test, an ill-kinded type
+    -- would give an infinite loop, which is very unhelpful
+    -- c.f. #15473
+    pprPanic "piResultTys2" (ppr ty $$ ppr all_args)
 
-      | otherwise
-      = -- We have not run out of arguments, but the function doesn't
-        -- have the right kind to apply to them; so panic.
-        -- Without the explicit isEmptyVarEnv test, an ill-kinded type
-        -- would give an infinite loop, which is very unhelpful
-        -- c.f. #15473
-        pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
+tyConAppResKind :: TyCon -> [Type] -> Kind
+-- This is a hot function, so we give it special code.
+-- Its specification is:
+--   tyConAppResKind tc tys = piResultTys (tyConKind tc) tys
+tyConAppResKind tc args
+  | null args = tyConKind tc
+  | otherwise
+  = go1 tc_bndrs args
+  where
+    !(tc_bndrs, tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
+    init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes args)
+
+    go1 :: [TyConBinder] -> [Type] -> Type
+    go1 []    []   = tc_res_kind
+    go1 []    args = piResultTys tc_res_kind args
+    go1 bndrs []   = mkTyConKind bndrs tc_res_kind
+    go1 (Bndr tv vis : bndrs) (arg:args)
+      | AnonTCB {}  <- vis = go1 bndrs args
+      | NamedTCB {} <- vis = go2 (extendTCvSubst init_subst tv arg) bndrs args
+
+    go2 :: Subst -> [TyConBinder] -> [Type] -> Type
+    go2 subst [] [] | closed_res_kind = tc_res_kind
+                    | otherwise       = substTy subst tc_res_kind
+    go2 subst []    args = piResultTysX subst tc_res_kind args
+    go2 subst bndrs []   = substTy subst (mkTyConKind bndrs tc_res_kind)
+    go2 subst (Bndr tv vis : bndrs) (arg:args)
+      | AnonTCB {}  <- vis = go2 subst bndrs args
+      | NamedTCB {} <- vis = go2 (extendTCvSubst subst tv arg) bndrs args
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTysX beta-reduces (/\tvs. body_ty) arg_tys
@@ -2554,7 +2580,7 @@ See #14939.
 -----------------------------
 typeKind :: HasDebugCallStack => Type -> Kind
 -- No need to expand synonyms
-typeKind (TyConApp tc tys)      = piResultTys (tyConKind tc) tys
+typeKind (TyConApp tc tys)      = tyConAppResKind tc tys
 typeKind (LitTy l)              = typeLiteralKind l
 typeKind (FunTy { ft_af = af }) = case funTyFlagResultTypeOrConstraint af of
                                      TypeLike       -> liftedTypeKind

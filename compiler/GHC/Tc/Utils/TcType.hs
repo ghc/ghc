@@ -394,7 +394,7 @@ type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
 
-{- Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+{- Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]o
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [How TcTyCons work] in GHC.Tc.TyCl
 
@@ -422,6 +422,11 @@ Invariants:
     Well not /quite/ irrelevant: its length gives the number of Required binders,
     and so allows up to distinguish between the Specified and Required elements of
     tyConScopedTyVars.
+
+  - When zonking (which is necesary because, uniquely, MonoTcTyCons have unification
+    variables), we set tyConKind, but leave the binders and tyConResKind un-zonked.
+    See GHC.Core.TyCon.setTcTyConKind.
+
 
 * PolyTcTyCon:
   - Flag tcTyConIsPoly = True; this is used only to short-cut zonking

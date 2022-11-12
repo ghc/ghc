@@ -400,6 +400,8 @@ See also Note [Kind checking recursive type and class declarations]
 
 Note [How TcTyCons work]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType
+
 TcTyCons are used for two distinct purposes
 
 1.  When recovering from a type error in a type declaration,

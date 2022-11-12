@@ -105,7 +105,7 @@ module GHC.Core.TyCon(
         tyConPromDataConInfo,
         tyConBinders, tyConResKind, tyConInvisTVBinders,
         tcTyConScopedTyVars, isMonoTcTyCon,
-        tyConHasClosedResKind,
+        tyConHasClosedResKind, tyConTypeKindPieces,
         mkTyConTagMap,
 
         -- ** Manipulating TyCons
@@ -934,8 +934,11 @@ data TyConDetails =
           -- The range is always a skolem or TcTyVar, be
           -- MonoTcTyCon only: see Note [Scoped tyvars in a TcTyCon]
 
-        tctc_is_poly :: Bool, -- ^ Is this TcTyCon already generalized?
-                              -- Used only to make zonking more efficient
+        tctc_is_poly     :: Bool, -- ^ Is this TcTyCon already generalized?
+           -- True for PolyTcTyCon, False for MonoTcTyCon
+           -- Used only to make zonking more efficient
+           -- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in
+           -- GHC.Tc.Utils.TcType
 
         tctc_flavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
@@ -984,7 +987,7 @@ to know, given a TyCon 'T' of arity 'n', does
 
 always have a fixed RuntimeRep? That is, is it always the case
 that this application has a kind of the form
-
+v
   T a_1 ... a_n :: TYPE rep
 
 in which 'rep' is a concrete 'RuntimeRep'?
@@ -2460,6 +2463,19 @@ tcTyConScopedTyVars :: TyCon -> [(Name,TcTyVar)]
 tcTyConScopedTyVars tc@(TyCon { tyConDetails = details })
   | TcTyCon { tctc_scoped_tvs = scoped_tvs } <- details = scoped_tvs
   | otherwise = pprPanic "tcTyConScopedTyVars" (ppr tc)
+
+
+tyConTypeKindPieces :: TyCon -> ([TyConBinder], Kind, Bool)
+-- This rather specialised function returns the bits needed for typeKind
+tyConTypeKindPieces (TyCon { tyConBinders = bndrs
+                           , tyConKind = kind, tyConResKind = res_kind
+                           , tyConHasClosedResKind = closed, tyConDetails = details })
+  | TcTyCon { tctc_is_poly = False } <- details
+  = -- For MonoTcTyCons we must use the tyConKind
+    -- because only that is zonked.  See setTcTyConKind
+    ([], kind, False)
+  | otherwise
+  = (bndrs, res_kind, closed)
 
 {-
 -----------------------------------------------
