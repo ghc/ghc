@@ -232,27 +232,50 @@ initIOManager(void)
 {
     selectIOManager();
 
-#if defined(THREADED_RTS)
-    /* Posix implementation in posix/Signals.c
-     * Win32 implementation in win32/ThrIOManager.c
-     */
-    ioManagerStart();
+    switch (iomgr_type) {
 
-#elif defined(mingw32_HOST_OS)
-    /* Non-threaded Win32 implementation, either the WinIO IOCP implementation,
-     * or the classic implementation. */
-    if (is_io_mng_native_p()) {
-        startupAsyncWinIO();
-    } else {
-        startupAsyncIO();
-    }
+        /* The IO_MANAGER_SELECT needs no initialisation */
 
-#else
-    /* The other implementation is the non-threaded Posix select() one.
-     * It does not need any initialisation.
-     */
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            /* Posix implementation in posix/Signals.c
+             * TODO: rename ioManagerStart to be less generic, impl specific
+             */
+            ioManagerStart();
+            break;
 #endif
-
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+            /* Win32 implementation in win32/ThrIOManager.c
+             * TODO: rename ioManagerStart to be less generic, impl specific
+             */
+            ioManagerStart();
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            /* The WinIO I/O manager sadly has two implementations of this
+             * startup, depending on the threading mode.
+             * TODO: rationalise this into one entry point, that internally
+             * can do different things in the two cases.
+             */
+#if defined (THREADED_RTS)
+            /* Win32 implementation in win32/ThrIOManager.c
+             */
+            ioManagerStart();
+#else
+            startupAsyncWinIO();
+#endif
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            startupAsyncIO();
+            break;
+#endif
+        default:
+            break;
+    }
 }
 
 /* Called from forkProcess in the child process on the surviving capability.
@@ -285,14 +308,32 @@ initIOManagerAfterFork(Capability **pcap USED_IF_THREADS_AND_NOT_MINGW32)
 void
 stopIOManager(void)
 {
-
-#if defined(THREADED_RTS)
-    /* Posix implementation in posix/Signals.c
-     * Win32 implementation in win32/ThrIOManager.c
-     */
-    ioManagerDie();
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            /* Posix implementation in posix/Signals.c
+             * TODO: rename ioManagerDie to be less generic, impl specific
+             */
+            ioManagerDie();
+            break;
 #endif
-
+#if defined(IOMGR_ENABLED_MIO_WIN32) || defined(IOMGR_ENABLED_WINIO)
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+#endif
+            /* Win32 implementation in win32/ThrIOManager.c
+             * This impl is currently shared by both MIO and WinIO I/O managers
+             * TODO: rename ioManagerDie to be less generic, impl specific
+             */
+            ioManagerDie();
+            break;
+#endif
+        default:
+            break;
+    }
 }
 
 
@@ -301,15 +342,20 @@ stopIOManager(void)
 void
 exitIOManager(bool wait_threads USED_IF_NOT_THREADS_AND_MINGW32)
 {
-
-#if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
-    if (is_io_mng_native_p()) {
-        shutdownAsyncWinIO(wait_threads);
-    } else {
-        shutdownAsyncIO(wait_threads);
-    }
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            shutdownAsyncWinIO(wait_threads);
+            break;
 #endif
-
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            shutdownAsyncIO(wait_threads);
+            break;
+#endif
+        default:
+            break;
+    }
 }
 
 /* Wakeup hook: called from the scheduler's wakeUpRts (currently only in
