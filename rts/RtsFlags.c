@@ -269,11 +269,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
-#if defined(DEFAULT_NATIVE_IO_MANAGER)
-    RtsFlags.MiscFlags.ioManager               = IO_MNGR_NATIVE;
-#else
-    RtsFlags.MiscFlags.ioManager               = IO_MNGR_POSIX;
-#endif
+    RtsFlags.MiscFlags.ioManager               = IO_MNGR_FLAG_AUTO;
 #if defined(THREADED_RTS) && defined(mingw32_HOST_OS)
     RtsFlags.MiscFlags.numIoWorkerThreads      = getNumberOfProcessors();
 #else
@@ -533,8 +529,10 @@ usage_text[] = {
 "             fatal error. When symbols are available an attempt will be",
 "             made to resolve addresses to names. (default: yes)",
 #endif
-"  --io-manager=<native|posix>",
-"             The I/O manager subsystem to use. (default: posix)",
+"  --io-manager=<name>",
+"             The I/O manager to use.",
+"             Options available: auto" IOMGRS_ENABLED_STR
+              " (default: " IOMGR_DEFAULT_STR ")",
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)
 "  --io-manager-threads=<num>",
@@ -1013,15 +1011,23 @@ error = true;
                       OPTION_SAFE;
                       RtsFlags.MiscFlags.internalCounters = true;
                   }
-                  else if (strequal("io-manager=native",
-                               &rts_argv[arg][2])) {
+                  else if (!strncmp("io-manager=",
+                               &rts_argv[arg][2], 11)) {
                       OPTION_UNSAFE;
-                      RtsFlags.MiscFlags.ioManager = IO_MNGR_NATIVE;
-                  }
-                  else if (strequal("io-manager=posix",
-                               &rts_argv[arg][2])) {
-                      OPTION_UNSAFE;
-                      RtsFlags.MiscFlags.ioManager = IO_MNGR_POSIX;
+                      char *iomgrstr = &rts_argv[arg][13];
+                      IO_MANAGER_FLAG iomgrflag;
+                      enum IOManagerAvailability availability;
+                      availability = parseIOManagerFlag(iomgrstr, &iomgrflag);
+                      if (availability == IOManagerAvailable) {
+                          RtsFlags.MiscFlags.ioManager = iomgrflag;
+                      } else {
+                          errorBelch("%s choice '%s' for --io-manager=\n"
+                                     "The choices are: auto%s",
+                                     availability == IOManagerUnavailable ?
+                                     "unavailable" : "unrecognised",
+                                     iomgrstr, IOMGRS_ENABLED_STR);
+                          stg_exit(EXIT_FAILURE);
+                      }
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
@@ -2721,16 +2727,6 @@ files like <progname>.eventlog, not arbitrary files.
 /* ----------------------------------------------------------------------------
    Helper utilities to query state.
    ------------------------------------------------------------------------- */
-
-bool is_io_mng_native_p (void)
-{
-#if defined(mingw32_HOST_OS)
-  return RtsFlags.MiscFlags.ioManager == IO_MNGR_NATIVE;
-#else
-  return false;
-#endif
-}
-
 
 #if defined(PROFILING)
 bool

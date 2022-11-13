@@ -37,16 +37,6 @@ if test "$enable_asserts_all_ways" = "yes" ; then
    AC_DEFINE([USE_ASSERTS_ALL_WAYS], [1], [Compile-in ASSERTs in all ways.])
 fi
 
-AC_ARG_ENABLE(native-io-manager,
-[AS_HELP_STRING([--enable-native-io-manager],
-                [Enable the native I/O manager by default.])],
-  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableNativeIOManager])],
-  [EnableNativeIOManager=NO]
-)
-if test "$EnableNativeIOManager" = "YES"; then
-  AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
-fi
-
 # We have to run these unconditionally, but we may discard their
 # results in the following code
 AC_CANONICAL_BUILD

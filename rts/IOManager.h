@@ -122,6 +122,60 @@
           IOMGR_ENABLED_STR_WINIO \
           IOMGR_ENABLED_STR_WIN32_LEGACY
 
+/* An enumeration of all the available I/O managers. We use conditional
+ * compilation to help us optimise out unavailable choices. To help us
+ * do that correctly, we only define choices that are available.
+ */
+typedef enum {
+#if defined(IOMGR_ENABLED_SELECT)
+    IO_MANAGER_SELECT,
+#endif
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+    IO_MANAGER_MIO_POSIX,
+#endif
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+    IO_MANAGER_MIO_WIN32,
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+    IO_MANAGER_WINIO,
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+    IO_MANAGER_WIN32_LEGACY,
+#endif
+} IOManagerType;
+
+/* Global var to tell us which I/O manager impl we are using */
+extern IOManagerType iomgr_type;
+
+#if defined(mingw32_HOST_OS)
+/* Global var (only on Windows) that is exported to be shared with the I/O code
+ * in the base library to tell us which style of I/O manager we are using: one
+ * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
+ */
+extern bool rts_IOManagerIsWin32Native;
+#endif
+
+
+/* Parse the I/O manager flag value, returning if is available, unavailable or
+ * unrecognised.
+ *
+ * If it is available, the passed-in IO_MANAGER_FLAG value will be filled in
+ * to record what was requested.
+ *
+ * Called in the RTS flag processing by procRtsOpts.
+ */
+enum IOManagerAvailability {
+    IOManagerAvailable,
+    IOManagerUnavailable,
+    IOManagerUnrecognised
+};
+enum IOManagerAvailability
+parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag);
+
+/* Temporary compat helper function used in the Win32 I/O managers.
+ * TODO: replace by consulting the iomgr_type global instead.
+ */
+bool is_io_mng_native_p (void);
 
 /* The per-capability data structures belonging to the I/O manager.
  *

@@ -233,8 +233,22 @@ typedef struct _CONCURRENT_FLAGS {
 #define DEFAULT_LINKER_ALWAYS_PIC false
 #endif
 
-/* Which I/O Manager to use in the target program.  */
-typedef enum _IO_MANAGER { IO_MNGR_NATIVE, IO_MNGR_POSIX } IO_MANAGER;
+/* Which I/O Manager to use in the target program. */
+typedef enum _IO_MANAGER_FLAG {
+
+    /* Select an I/O manager automatically. This will pick the one determined
+     * at configure time, for the RTS way. This can also fall back to other
+     * available I/O managers if the first choice cannot be initialised,
+     * if platform support turns out to be unavailable (e.g. too old a kernel).
+     */
+    IO_MNGR_FLAG_AUTO,
+
+    /* All other choices pick only the requested one, with no fallback. */
+    IO_MNGR_FLAG_SELECT,          /* Unix only,    non-threaded RTS only */
+    IO_MNGR_FLAG_MIO,             /* cross-platform,   threaded RTS only */
+    IO_MNGR_FLAG_WINIO,           /* Windows only                        */
+    IO_MNGR_FLAG_WIN32_LEGACY,    /* Windows only, non-threaded RTS only */
+  } IO_MANAGER_FLAG;
 
 /* See Note [Synchronization of flags and base APIs] */
 typedef struct _MISC_FLAGS {
@@ -254,7 +268,7 @@ typedef struct _MISC_FLAGS {
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     StgWord linkerMemBase;       /* address to ask the OS for memory
                                   * for the linker, NULL ==> off */
-    IO_MANAGER ioManager;        /* The I/O manager to use.  */
+    IO_MANAGER_FLAG ioManager;   /* The I/O manager to use.  */
     uint32_t numIoWorkerThreads; /* Number of I/O worker threads to use.  */
 } MISC_FLAGS;
 

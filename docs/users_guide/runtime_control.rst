@@ -308,6 +308,23 @@ Miscellaneous RTS options
     undue memory usage shown in reporting tools, so with this flag it can
     be turned off.
 
+.. rts-flag:: --io-manager=(name)
+
+    Select the I/O manager to use. On some combinations of platform and
+    threaded/non-threaded RTS way there is a choice of more than one
+    implementation of I/O manager. This flag lets you override the default
+    and select one by name.
+
+    Currently the available I/O managers are:
+
+    ================ ========= ============
+     Name            Platforms RTS way
+    ================ ========= ============
+    ``select``       Posix     Non-threaded
+    ``mio``          All       Threaded
+    ``win32-legacy`` Windows   Non-threaded
+    ``winio``        Windows   All
+    ================ ========= ============
 
 .. rts-flag:: -xp
 

@@ -33,6 +33,174 @@
 #include "win32/AsyncWinIO.h"
 #endif
 
+#include <string.h>
+
+
+/* Global var to tell us which I/O manager impl we are using */
+IOManagerType iomgr_type;
+
+#if defined(mingw32_HOST_OS)
+/* Global var (only on Windows) that is exported to be shared with the I/O code
+ * in the base library to tell us which style of I/O manager we are using: one
+ * that uses the Windows native API HANDLEs, or one that uses Posix style fds.
+ */
+bool rts_IOManagerIsWin32Native = false;
+#endif
+
+enum IOManagerAvailability
+parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
+{
+    if (strcmp("select", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_SELECT)
+        *flag = IO_MNGR_FLAG_SELECT;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+    }
+    else if (strcmp("mio", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
+        *flag = IO_MNGR_FLAG_MIO;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+        *flag = IO_MNGR_FLAG_MIO;
+    }
+    else if (strcmp("winio", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_WINIO)
+        *flag = IO_MNGR_FLAG_WINIO;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+    }
+    else if (strcmp("win32-legacy", iomgrstr) == 0) {
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        *flag = IO_MNGR_FLAG_WIN32_LEGACY;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+    }
+    else if (strcmp("auto", iomgrstr) == 0) {
+        *flag = IO_MNGR_FLAG_AUTO;
+        return IOManagerAvailable;
+    }
+    /* Two deprecated aliases. These aliases only had any effect on Windows,
+     * but were available as RTS flags on all platforms. The "native" flag
+     * refers to the newer Windows WinIO IO manager (threaded or non-threaded),
+     * while (somewhat confusingly) the "posix" flag refers to the older
+     * Windows I/O managers (win32-legacy and mio). On non-Windows, we now make
+     * these flags equivalent to IO_MNGR_FLAG_AUTO.
+     */
+    else if (strcmp("native", iomgrstr) == 0) {
+#if defined(mingw32_HOST_OS)
+    /* On windows "native" is now an alias for IO_MNGR_FLAG_WINIO */
+#if defined(IOMGR_ENABLED_WINIO)
+        *flag = IO_MNGR_FLAG_WINIO;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+#else // !defined(mingw32_HOST_OS)
+        *flag = IO_MNGR_FLAG_AUTO;
+        return IOManagerAvailable;
+#endif
+    }
+    else if (strcmp("posix", iomgrstr) == 0) {
+#if defined(mingw32_HOST_OS)
+        /* On Windows "posix" is now an alias for either IO_MNGR_FLAG_MIO or
+         * IO_MNGR_FLAG_WIN32_LEGACY */
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        *flag = IO_MNGR_FLAG_MIO;
+        return IOManagerAvailable;
+#elif defined(IOMGR_ENABLED_WIN32_LEGACY)
+        *flag = IO_MNGR_FLAG_WIN32_LEGACY;
+        return IOManagerAvailable;
+#else
+        return IOManagerUnavailable;
+#endif
+#else // !defined(mingw32_HOST_OS)
+        *flag = IO_MNGR_FLAG_AUTO;
+        return IOManagerAvailable;
+#endif
+    }
+    else {
+        return IOManagerUnrecognised;
+    }
+}
+
+/* Based on the I/O manager RTS flag, select an I/O manager to use.
+ *
+ * This fills in the iomgr_type and rts_IOManagerIsWin32Native globals.
+ * Must be called before the I/O manager is started.
+ */
+static void selectIOManager(void)
+{
+    switch (RtsFlags.MiscFlags.ioManager) {
+        case IO_MNGR_FLAG_AUTO:
+#if defined(THREADED_RTS)
+#if   defined(IOMGR_DEFAULT_THREADED_MIO)
+#if defined(mingw32_HOST_OS)
+            iomgr_type = IO_MANAGER_MIO_WIN32;
+#else
+            iomgr_type = IO_MANAGER_MIO_POSIX;
+#endif
+#elif defined(IOMGR_DEFAULT_THREADED_WINIO)
+            iomgr_type = IO_MANAGER_WINIO;
+#else
+#error No I/O default manager. See IOMGR_DEFAULT_THREADED_ flags
+#endif
+#else // !defined(THREADED_RTS)
+#if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
+            iomgr_type = IO_MANAGER_SELECT;
+#elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
+            iomgr_type = IO_MANAGER_WINIO;
+#elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
+            iomgr_type = IO_MANAGER_WIN32_LEGACY;
+#else
+#error No I/O default manager. See IOMGR_DEFAULT_NON_THREADED_ flags
+#endif
+#endif
+            break;
+
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MNGR_FLAG_SELECT:
+            iomgr_type = IO_MANAGER_SELECT;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MNGR_FLAG_MIO:
+            iomgr_type = IO_MANAGER_MIO_POSIX;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MNGR_FLAG_MIO:
+            iomgr_type = IO_MANAGER_MIO_WIN32;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MNGR_FLAG_WINIO:
+            iomgr_type = IO_MANAGER_WINIO;
+            rts_IOManagerIsWin32Native = true;
+            break;
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MNGR_FLAG_WIN32_LEGACY:
+            iomgr_type = IO_MANAGER_WIN32_LEGACY;
+            break;
+#endif
+
+        default:
+          barf("selectIOManager: %d", RtsFlags.MiscFlags.ioManager);
+    }
+}
+
 
 /* Allocate and initialise the per-capability CapIOManager that lives in each
  * Capability. Called early in the RTS initialisation.
@@ -62,6 +230,7 @@ void initCapabilityIOManager(CapIOManager **piomgr)
 void
 initIOManager(void)
 {
+    selectIOManager();
 
 #if defined(THREADED_RTS)
     /* Posix implementation in posix/Signals.c
@@ -217,3 +386,18 @@ void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target)
     }
 }
 #endif
+
+/* Temporary compat helper function used in the Win32 I/O managers.
+ * TODO: replace by consulting the iomgr_type global instead.
+ */
+bool is_io_mng_native_p (void)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            return true;
+#endif
+        default:
+            return false;
+    }
+}

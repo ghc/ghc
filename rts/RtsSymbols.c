@@ -28,6 +28,7 @@
 #include <io.h>
 #include <windows.h>
 #include <shfolder.h> /* SHGetFolderPathW */
+#include "IOManager.h"
 #include "win32/AsyncWinIO.h"
 #endif
 
@@ -166,6 +167,7 @@ extern char **environ;
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
       SymI_HasProto(rts_InstallConsoleEvent)             \
+      SymI_HasProto(rts_IOManagerIsWin32Native)          \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \

@@ -25,6 +25,7 @@ module GHC.RTS.Flags
   , GCFlags (..)
   , ConcFlags (..)
   , MiscFlags (..)
+  , IoManagerFlag (..)
   , DebugFlags (..)
   , DoCostCentres (..)
   , CCFlags (..)
@@ -35,12 +36,12 @@ module GHC.RTS.Flags
   , TickyFlags (..)
   , ParFlags (..)
   , HpcFlags (..)
-  , IoSubSystem (..)
+  , {-# DEPRECATED "import GHC.IO.SubSystem (IoSubSystem (..))" #-}
+    IoSubSystem (..)
   , getRTSFlags
   , getGCFlags
   , getConcFlags
   , getMiscFlags
-  , getIoManagerFlag
   , getDebugFlags
   , getCCFlags
   , getProfFlags
@@ -51,3 +52,4 @@ module GHC.RTS.Flags
   ) where
 
 import GHC.Internal.RTS.Flags
+import GHC.Internal.IO.SubSystem (IoSubSystem(..))

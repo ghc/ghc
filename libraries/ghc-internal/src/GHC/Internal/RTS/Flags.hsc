@@ -27,6 +27,7 @@ module GHC.Internal.RTS.Flags
   , GCFlags (..)
   , ConcFlags (..)
   , MiscFlags (..)
+  , IoManagerFlag (..)
   , DebugFlags (..)
   , DoCostCentres (..)
   , CCFlags (..)
@@ -37,12 +38,10 @@ module GHC.Internal.RTS.Flags
   , TickyFlags (..)
   , ParFlags (..)
   , HpcFlags (..)
-  , IoSubSystem (..)
   , getRTSFlags
   , getGCFlags
   , getConcFlags
   , getMiscFlags
-  , getIoManagerFlag
   , getDebugFlags
   , getCCFlags
   , getProfFlags
@@ -102,32 +101,6 @@ instance Enum GiveGCStats where
     toEnum #{const SUMMARY_GC_STATS} = SummaryGCStats
     toEnum #{const VERBOSE_GC_STATS} = VerboseGCStats
     toEnum e = errorWithoutStackTrace ("invalid enum for GiveGCStats: " ++ show e)
-
--- | The I/O SubSystem to use in the program.
---
--- @since base-4.9.0.0
-data IoSubSystem
-  = IoPOSIX   -- ^ Use a POSIX I/O Sub-System
-  | IoNative  -- ^ Use platform native Sub-System. For unix OSes this is the
-              --   same as IoPOSIX, but on Windows this means use the Windows
-              --   native APIs for I/O, including IOCP and RIO.
-  deriving (Eq, Show)
-
--- | @since base-4.9.0.0
-instance Enum IoSubSystem where
-    fromEnum IoPOSIX  = #{const IO_MNGR_POSIX}
-    fromEnum IoNative = #{const IO_MNGR_NATIVE}
-
-    toEnum #{const IO_MNGR_POSIX}  = IoPOSIX
-    toEnum #{const IO_MNGR_NATIVE} = IoNative
-    toEnum e = errorWithoutStackTrace ("invalid enum for IoSubSystem: " ++ show e)
-
--- | @since base-4.9.0.0
-instance Storable IoSubSystem where
-    sizeOf = sizeOf . fromEnum
-    alignment = sizeOf . fromEnum
-    peek ptr = fmap toEnum $ peek (castPtr ptr)
-    poke ptr v = poke (castPtr ptr) (fromEnum v)
 
 -- | Parameters of the garbage collector.
 --
@@ -191,11 +164,19 @@ data MiscFlags = MiscFlags
     , linkerAlwaysPic       :: Bool
     , linkerMemBase         :: Word
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
-    , ioManager             :: IoSubSystem
+    , ioManager             :: IoManagerFlag
     , numIoWorkerThreads    :: Word32
     } deriving ( Show -- ^ @since base-4.8.0.0
                , Generic -- ^ @since base-4.15.0.0
                )
+
+data IoManagerFlag =
+       IoManagerFlagAuto
+     | IoManagerFlagSelect        -- ^ Unix only, non-threaded RTS only
+     | IoManagerFlagMIO           -- ^ cross-platform, threaded RTS only
+     | IoManagerFlagWinIO         -- ^ Windows only
+     | IoManagerFlagWin32Legacy   -- ^ Windows only, non-threaded RTS only
+  deriving (Eq, Enum, Show)
 
 -- | Flags to control debugging output & extra checking in various
 -- subsystems.
@@ -551,36 +532,6 @@ getMiscFlags = do
                  <$> (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32))
             <*> (fromIntegral
                  <$> (#{peek MISC_FLAGS, numIoWorkerThreads} ptr :: IO Word32))
-
-{- Note [The need for getIoManagerFlag]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-   GHC supports both the new WINIO manager
-   as well as the old MIO one. In order to
-   decide which code path to take we often
-   have to inspect what the user selected at
-   RTS startup.
-
-   We could use getMiscFlags but then we end up with core containing
-   reads for all MiscFlags. These won't be eliminated at the core level
-   even if it's obvious we will only look at the ioManager part of the
-   ADT.
-
-   We could add a INLINE pragma, but that just means whatever we inline
-   into is likely to be inlined. So rather than adding a dozen pragmas
-   we expose a lean way to query this particular flag. It's not satisfying
-   but it works well enough and allows these checks to be inlined nicely.
-
--}
-
-{-# INLINE getIoManagerFlag #-}
--- | Needed to optimize support for different IO Managers on Windows.
--- See Note [The need for getIoManagerFlag]
-getIoManagerFlag :: IO IoSubSystem
-getIoManagerFlag = do
-      let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
-      mgrFlag <- (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32)
-      return $ (toEnum . fromIntegral) mgrFlag
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
