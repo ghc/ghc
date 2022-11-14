@@ -228,6 +228,32 @@ From a semantic point of view:
 
    because ``y`` can match against ``0``.
 
+-  GHC implements **higher order matching** as described by
+   `GHC proposal #555 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst>`_.
+   When a pattern variable is applied to distinct locally bound variables it forms
+   what we call a **higher order pattern**.
+   When matching, higher order patterns are treated like pattern variables, but they are
+   allowed to match expressions that contain the locally bound variables that are part of
+   the higher order patterns.
+
+   For example, we can use this to fix the broken rule from the example from the
+   previous bullet point::
+
+        {-# RULES
+          "test/case-tup" forall (x :: (Int, Int)) (f :: Int -> Int -> Int) (z :: Int).
+            test (case x of (l, r) -> f l r) z = case x of (m, n) -> test (f m n) z
+          #-}
+
+   This modified rule does fire for::
+
+        prog :: (Int, Int) -> (Int, Int)
+        prog x = test (case x of (p, q) -> p) 0
+
+   Under higher order matching, ``f p q`` matches ``p`` by assigning ``f = \p q -> p``.
+   The resulting code after the rewrite is::
+
+        prog x = case x of (m, n) -> test ((\p q -> p) m n) 0
+
 -  A rule that has a forall binder with a polymorphic type, is likely to fail to fire. E. g., ::
 
         {-# RULES forall (x :: forall a. Num a => a -> a).  f x = blah #-}

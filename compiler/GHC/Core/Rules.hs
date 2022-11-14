@@ -62,6 +62,7 @@ import GHC.Core.Coercion as Coercion
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
+import GHC.Core.Make     ( mkCoreLams )
 
 import GHC.Tc.Utils.TcType  ( tcSplitTyConApp_maybe )
 import GHC.Builtin.Types    ( anyTypeOfKind )
@@ -82,6 +83,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
+import GHC.Data.List.SetOps( hasNoDups )
 
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Outputable
@@ -881,8 +883,13 @@ rvInScopeEnv renv = ISE (rnInScopeSet (rv_lcl renv)) (rv_unf renv)
 -- * The BindWrapper in a RuleSubst are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
-data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
-                    , rs_id_subst :: IdSubstEnv   --   template variables
+data RuleSubst = RS { -- Substitution; applied only to the template, not the target
+                      -- Domain is the template variables
+                      -- Range never includes template variables
+                      rs_tv_subst :: TvSubstEnv
+                    , rs_id_subst :: IdSubstEnv
+
+                      -- Floated bindings
                     , rs_binds    :: BindWrapper  -- Floated bindings
                     , rs_bndrs    :: [Var]        -- Variables bound by floated lets
                     }
@@ -1059,6 +1066,165 @@ match renv subst e1 (Var v2) mco  -- Note [Expanding variables]
         -- because of the not-inRnEnvR
 
 ------------------------ Applications ---------------------
+-- See Note [Matching higher order patterns]
+match renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env })
+      subst  e1@App{} e2
+      MRefl               -- Like the App case we insist on Refl here
+                          -- See Note [Casts in the target]
+  | (Var f, args) <- collectArgs e1
+  , let f' = rnOccL rn_env f   -- See similar rnOccL in match_var
+  , f' `elemVarSet` tmpls                     -- (HOP1)
+  , Just vs2 <- traverse arg_as_lcl_var args  -- (HOP2), (HOP3)
+  , hasNoDups vs2                             -- (HOP4)
+  , not can_decompose_app_instead
+  = match_tmpl_var renv subst f' (mkCoreLams vs2 e2)
+    -- match_tmpl_var checks (HOP5) and (HOP6)
+  where
+    arg_as_lcl_var :: CoreExpr -> Maybe Var
+    arg_as_lcl_var (Var v)
+      | Just v' <- rnOccL_maybe rn_env v
+      , not (v' `elemVarSet` tmpls)  -- rnEnvL contains the template variables
+      = Just (to_target v')          -- to_target: see (W1)
+                                     --   in Note [Matching higher order patterns]
+    arg_as_lcl_var _ = Nothing
+
+    can_decompose_app_instead -- Template (e1 v), target (e2 v), and v # fvs(e2)
+      = case (e1, e2) of      -- See (W2) in Note [Matching higher order patterns]
+           (App _ (Var v1), App f2 (Var v2))
+             -> rnOccL rn_env v1 == rnOccR rn_env v2
+                && not (v2 `elemVarSet` exprFreeVars f2)
+           _ -> False
+
+    ----------------
+    -- to_target: see (W1) in Note [Matching higher order patterns]
+    to_target :: Var -> Var   -- From canonical variable back to target-expr variable
+    to_target v = lookupVarEnv rev_envR v `orElse` v
+
+    rev_envR :: VarEnv Var   -- Inverts rnEnvR: from canonical variable
+                             -- back to target-expr variable
+    rev_envR = nonDetStrictFoldVarEnv_Directly add_one emptyVarEnv (rnEnvR rn_env)
+    add_one uniq var env = extendVarEnv env var (var `setVarUnique` uniq)
+
+{- Note [Matching higher order patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Higher order patterns provide a limited form of higher order matching.
+See GHC Proposal #555
+  https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0555-template-patterns.rst
+and #22465 for more details and related work.
+
+Consider the potential match:
+
+   Template: forall f. foo (\x -> f x)
+   Target:             foo (\x -> x*2 + x)
+
+The expression `x*2 + x` in the target is not literally an application of a
+function to the variable `x`, so the simple application rule does not apply.
+However, we can match them modulo beta equivalence with the substitution:
+
+   [f :-> \x -> x*2 + x]
+
+The general problem of higher order matching is tricky to implement, but
+the subproblem which we call /higher order pattern matching/ is sufficient
+for the given example and much easier to implement.
+
+Design:
+
+We start with terminology.
+
+* /Template variables/. The forall'd variables are called the template
+  variables. In the example match above, `f` is a template variable.
+
+* /Local binders/. The local binders of a rule are the variables bound
+  inside the template. In the example match above, `x` is a local binder.
+  Note that local binders can be term variables and type variables.
+
+A /higher order pattern/ (HOP) is a sub-expression of the template,
+of form (f x y z) where:
+
+* (HOP1) f is a template variable
+* (HOP2) x, y, z are local binders (like y in rule "wombat" above; see definitions).
+* (HOP3) The arguments x, y, z are term variables
+* (HOP4) The arguments x, y, z are distinct (no duplicates)
+
+Matching of higher order patterns (HOP-matching). A higher order pattern (f x y z)
+(in the template) matches any target expression e provided:
+
+* (HOP5) The target has the same type as the template
+* (HOP6) No local binder is free in e, other than x, y, z.
+
+If these two condition hold, the higher order pattern (f x y z) matches
+the target expression e, yielding the substitution [f :-> \x y z. e].
+Notice that this substitution is type preserving, and the RHS
+of the substitution has no free local binders.
+
+HOP matching is small enough to be done in-line in the `match` function.
+Two wrinkles:
+
+(W1) Consider the potential match:
+        Template:    forall f. foo (\x -> f x)
+        Target:                foo (\y -> (y, y))
+     During matching we make `x` the canonical variable for the lambdas
+     and then we see:
+        Template:    f x       rnEnvL = []
+        Target:      (y, y)    rnEnvR = [y :-> x]
+     We could bind [f :-> \x. (x,x)], by applying rnEnvR substitution to the target
+     expression.  But that is tiresome (a) because it involves a traversal, and
+     (b) because rnEnvR is a VarEnv Var, and we don't have a substitution function
+     for that.
+
+     So instead, we invert rnEnvR, and apply it to the binders, to get
+     [f :-> \y. (y,y)].  This is done by `to_target` in the HOP-matching case.
+     It takes a little bit of thinking to be sure this will work right in the case
+     of shadowing.  E.g.  Template (\x y. f x y)   Target  (\p p. p*p)
+     Here rnEnvR will be just [p :-> y], so after inversion we'll get
+          [f :-> \x p. p*p]
+     but that is fine.
+
+(W2) This wrinkle concerns the overlp between the new HOP rule and the existing
+     decompose-application rule.  See 3.1 of GHC Proposal #555 for a discussion.
+
+     Consider potential match:
+        Template: forall f.   foo (\x y. Just (f y x))
+        Target:               foo (\p q. Just (h (1+q) p)))
+     During matching we will encounter:
+        Template:    f x y
+        Target:      h (1+q) p    rnEnvR = [p:->x, q:->y]
+     The rnEnvR renaming `[p:->x, q:->y]` is done by the matcher (today) on the fly,
+     to make the bound variables of the template and target "line up".
+     But now we can:
+     * Either use the new HOP rule to succeed with
+          [f :-> \x y. h (1+x) y]
+     * Or use the existing decompose-application rule to match
+          (f x) against (h (1+q)) and `y` against `p`.
+       This will succeed with
+          [f :-> \y. h (1+y)]
+
+     Note that the result of the HOP rule will always be eta-equivalent to
+     the result of the decompose-application rule.  But the proposal specifies
+     that we should use the decompose-application rule because it involves
+     less eta-expansion.
+
+     But take care:
+        Template: forall f.   foo (\x y. Just (f y x))
+        Target:               foo (\p q. Just (h (p+q) p)))
+     Then during matching we will encounter:
+        Template:    f x y
+        Target:      h (p+q) p      rnEnvR = [p:->x, q:->y]
+     Now, we cannot use the decompose-application rule, because p is free in
+     (h (p+q)). So, we can only use the new HOP rule.
+
+(W3) You might wonder if a HOP can have /type/ arguments, thus (in Core)
+        RULE forall h.
+             f (\(MkT @b (d::Num b) (x::b)) -> h @b d x) = ...
+     where the HOP is (h @b d x). In principle this might be possible, but
+     it seems fragile; e.g. we would still need to insist that the (invisible)
+     @b was a type variable.  And since `h` gets a polymoprhic type, that
+     type would have to be declared by the programmer.
+
+     Maybe one day.  But for now, we insist (in `arg_as_lcl_var`)that a HOP
+     has only term-variable arguments.
+-}
+
 -- Note the match on MRefl!  We fail if there is a cast in the target
 --     (e1 e2) ~ (d1 d2) |> co
 -- See Note [Cancel reflexive casts]: in the Cast equations for 'match'
@@ -1358,7 +1524,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
   -- if the right side of the env is empty.
   | anyInRnEnvR rn_env (exprFreeVars e2)
   = Nothing     -- Skolem-escape failure
-                -- e.g. match forall a. (\x-> a x) against (\y. y y)
+                -- e.g. match forall a. (\x -> a) against (\y -> y)
 
   | Just e1' <- lookupVarEnv id_subst v1'
   = if eqCoreExpr e1' e2'
@@ -1378,6 +1544,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
          -- because no free var of e2' is in the rnEnvR of the envt
 
 ------------------------------------------
+
 match_ty :: RuleMatchEnv
          -> RuleSubst
          -> Type                -- Template
@@ -1389,12 +1556,13 @@ match_ty :: RuleMatchEnv
 --      newtype T = MkT Int
 -- We only want to replace (f T) with f', not (f Int).
 
-match_ty renv subst ty1 ty2
-  = do  { tv_subst'
-            <- Unify.ruleMatchTyKiX (rv_tmpls renv) (rv_lcl renv) tv_subst ty1 ty2
+match_ty (RV { rv_tmpls = tmpls, rv_lcl = rn_env })
+         subst@(RS { rs_tv_subst = tv_subst })
+         ty1 ty2
+  = do  { tv_subst' <- Unify.ruleMatchTyKiX tmpls rn_env tv_subst ty1 ty2
+               -- NB: ruleMatchTyKiX applis tv_subst to ty1 only
+               --     and of course only binds 'tmpls'
         ; return (subst { rs_tv_subst = tv_subst' }) }
-  where
-    tv_subst = rs_tv_subst subst
 
 {- Note [Matching variable types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

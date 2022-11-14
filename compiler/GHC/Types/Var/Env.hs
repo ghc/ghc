@@ -24,6 +24,7 @@ module GHC.Types.Var.Env (
         elemVarEnvByKey,
         filterVarEnv, restrictVarEnv,
         partitionVarEnv, varEnvDomain,
+        nonDetStrictFoldVarEnv_Directly,
 
         -- * Deterministic Var environments (maps)
         DVarEnv, DIdEnv, DTyVarEnv,
@@ -318,25 +319,30 @@ rnBndr2 env bL bR = fst $ rnBndr2_var env bL bR
 
 rnBndr2_var :: RnEnv2 -> Var -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but returns the new variable as well as the
--- new environment
+-- new environment.
+-- Postcondition: the type of the returned Var is that of bR
 rnBndr2_var (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bL bR
-  = (RV2 { envL            = extendVarEnv envL bL new_b   -- See Note
-         , envR            = extendVarEnv envR bR new_b   -- [Rebinding]
+  = (RV2 { envL     = extendVarEnv envL bL new_b   -- See Note
+         , envR     = extendVarEnv envR bR new_b   -- [Rebinding]
          , in_scope = extendInScopeSet in_scope new_b }, new_b)
   where
         -- Find a new binder not in scope in either term
-    new_b | not (bL `elemInScopeSet` in_scope) = bL
-          | not (bR `elemInScopeSet` in_scope) = bR
-          | otherwise                          = uniqAway' in_scope bL
+        -- To avoid calling `uniqAway`, we try bL's Unique
+        -- But we always return a Var whose type is that of bR
+    new_b | not (bR `elemInScopeSet` in_scope) = bR
+          | not (bL `elemInScopeSet` in_scope) = bR `setVarUnique` varUnique bL
+          | otherwise                          = uniqAway' in_scope bR
 
         -- Note [Rebinding]
         -- ~~~~~~~~~~~~~~~~
         -- If the new var is the same as the old one, note that
-        -- the extendVarEnv *deletes* any current renaming
+        -- the extendVarEnv *replaces* any current renaming
         -- E.g.   (\x. \x. ...)  ~  (\y. \z. ...)
         --
+        --                        envL    envR          in_scope
         --   Inside \x  \y      { [x->y], [y->y],       {y} }
-        --       \x  \z         { [x->x], [y->y, z->x], {y,x} }
+        --          \x  \z      { [x->z], [y->y, z->z], {y,z} }
+        --          The envL binding [x->y] is replaced by [x->z]
 
 rnBndrL :: RnEnv2 -> Var -> (RnEnv2, Var)
 -- ^ Similar to 'rnBndr2' but used when there's a binder on the left
@@ -530,6 +536,7 @@ lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv        :: Var -> VarEnv a -> Bool
 elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
 disjointVarEnv    :: VarEnv a -> VarEnv a -> Bool
+nonDetStrictFoldVarEnv_Directly :: (Unique -> a -> r -> r) -> r -> VarEnv a -> r
 
 elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
@@ -565,6 +572,7 @@ unitVarEnv       = unitUFM
 isEmptyVarEnv    = isNullUFM
 partitionVarEnv  = partitionUFM
 varEnvDomain     = domUFMUnVarSet
+nonDetStrictFoldVarEnv_Directly = nonDetStrictFoldUFM_Directly
 
 
 restrictVarEnv env vs = filterUFM_Directly keep env
