@@ -132,6 +132,9 @@ joinRhsArity :: CoreExpr -> JoinArity
 -- Join points are supposed to have manifestly-visible
 -- lambdas at the top: no ticks, no casts, nothing
 -- Moreover, type lambdas count in JoinArity
+-- NB: For non-recursive bindings, the join arity of the binding may actually be
+-- less that the number of manifestly-visible lambdas.
+-- See Note [Join arity prediction based on joinRhsArity] in GHC.Core.Opt.OccurAnal
 joinRhsArity (Lam _ e) = 1 + joinRhsArity e
 joinRhsArity _         = 0
 

@@ -35,7 +35,7 @@ module GHC.Utils.Misc (
         equalLength, compareLength, leLength, ltLength,
 
         isSingleton, only, expectOnly, GHC.Utils.Misc.singleton,
-        notNull, snocView,
+        notNull, expectNonEmpty, snocView,
 
         chunkList,
 
@@ -481,7 +481,6 @@ expectOnly _   (a:_) = a
 #endif
 expectOnly msg _     = panic ("expectOnly: " ++ msg)
 
-
 -- | Split a list into chunks of /n/ elements
 chunkList :: Int -> [a] -> [[a]]
 chunkList _ [] = []
@@ -499,6 +498,16 @@ changeLast :: [a] -> a -> [a]
 changeLast []     _  = panic "changeLast"
 changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
+
+-- | Like @expectJust msg . nonEmpty@; a better alternative to 'NE.fromList'.
+expectNonEmpty :: HasCallStack => String -> [a] -> NonEmpty a
+{-# INLINE expectNonEmpty #-}
+expectNonEmpty _   (x:xs) = x:|xs
+expectNonEmpty msg []     = expectNonEmptyPanic msg
+
+expectNonEmptyPanic :: String -> a
+expectNonEmptyPanic msg = panic ("expectNonEmpty: " ++ msg)
+{-# NOINLINE expectNonEmptyPanic #-}
 
 -- | Apply an effectful function to the last list element.
 mapLastM :: Functor f => (a -> f a) -> NonEmpty a -> f (NonEmpty a)

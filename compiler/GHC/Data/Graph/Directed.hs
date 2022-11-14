@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Data.Graph.Directed (
         Graph, graphFromEdgedVerticesOrd, graphFromEdgedVerticesUniq,
@@ -108,7 +109,7 @@ data Node key payload = DigraphNode {
       node_payload :: payload, -- ^ User data
       node_key :: key, -- ^ User defined node id
       node_dependencies :: [key] -- ^ Dependencies/successors of the node
-  }
+  } deriving Functor
 
 
 instance (Outputable a, Outputable b) => Outputable (Node a b) where
