@@ -24,7 +24,7 @@ renderJSON :: JsonDoc -> SDoc
 renderJSON d =
   case d of
     JSNull -> text "null"
-    JSBool b -> text $ if b then "true" else "false"
+    JSBool b -> if b then text "true" else text "false"
     JSInt    n -> ppr n
     JSString s -> doubleQuotes $ text $ escapeJsonString s
     JSArray as -> brackets $ pprList renderJSON as

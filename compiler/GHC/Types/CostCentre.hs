@@ -161,9 +161,9 @@ mkAutoCC id mod
         -- Unique.
         -- See bug #249, tests prof001, prof002,  also #2411
         str | isExternalName name = occNameFS (getOccName id)
-            | otherwise           = occNameFS (getOccName id)
-                                    `appendFS`
-                                    mkFastString ('_' : show (getUnique name))
+            | otherwise           = concatFS [occNameFS (getOccName id),
+                                              fsLit "_",
+                                              mkFastString (show (getUnique name))]
 mkAllCafsCC :: Module -> SrcSpan -> CostCentre
 mkAllCafsCC m loc = AllCafsCC { cc_mod = m, cc_loc = loc }
 

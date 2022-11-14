@@ -657,7 +657,7 @@ sequenceChain _info _weights    [] = []
 sequenceChain _info _weights    [x] = [x]
 sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
     let directEdges :: [CfgEdge]
-        directEdges = sortBy (flip compare) $ catMaybes . map relevantWeight $ (infoEdgeList weights)
+        directEdges = sortBy (flip compare) $ mapMaybe relevantWeight (infoEdgeList weights)
           where
             -- Apply modifiers to turn edge frequencies into useable weights
             -- for computing code layout.

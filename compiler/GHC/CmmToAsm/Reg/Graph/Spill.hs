@@ -147,8 +147,7 @@ regSpill_top platform regSlotMap cmm
                                 $ mapLookup blockId slotMap
 
                 moreSlotsLive   = IntSet.fromList
-                                $ catMaybes
-                                $ map (lookupUFM regSlotMap)
+                                $ mapMaybe (lookupUFM regSlotMap)
                                 $ nonDetEltsUniqSet regsLive
                     -- See Note [Unique Determinism and code generation]
 

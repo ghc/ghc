@@ -130,8 +130,8 @@ slurpSpillCostInfo platform cfg cmm
 
                 -- Increment counts for what regs were read/written from.
                 let (RU read written)   = regUsageOfInstr platform instr
-                mapM_ (incUses scale) $ catMaybes $ map takeVirtualReg $ nub read
-                mapM_ (incDefs scale) $ catMaybes $ map takeVirtualReg $ nub written
+                mapM_ (incUses scale) $ mapMaybe takeVirtualReg $ nub read
+                mapM_ (incDefs scale) $ mapMaybe takeVirtualReg $ nub written
 
                 -- Compute liveness for entry to next instruction.
                 let liveDieRead_virt    = takeVirtuals (liveDieRead  live)

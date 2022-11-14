@@ -31,6 +31,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 
+import GHC.Utils.Outputable
+
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
@@ -375,6 +377,5 @@ makeMove delta vreg src dst
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share
               -- stack slots between vregs.
-              panic ("makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
-                  ++ show dst ++ ")"
-                  ++ " we don't handle mem->mem moves.")
+              pprPanic "makeMove: we don't handle mem->mem moves"
+                 (ppr vreg <+> parens (ppr src) <+> parens (ppr dst))

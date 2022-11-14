@@ -519,9 +519,9 @@ parenSymOcc occ doc | isSymOcc occ = parens doc
 startsWithUnderscore :: OccName -> Bool
 -- ^ Haskell 98 encourages compilers to suppress warnings about unused
 -- names in a pattern if they start with @_@: this implements that test
-startsWithUnderscore occ = case unconsFS (occNameFS occ) of
-  Just ('_', _) -> True
-  _ -> False
+startsWithUnderscore occ = case unpackFS (occNameFS occ) of
+  '_':_ -> True
+  _     -> False
 
 {-
 ************************************************************************
@@ -860,13 +860,13 @@ tidyOccName env occ@(OccName occ_sp fs)
     base1 = mkFastString (base ++ "1")
 
     find !k !n
-      = case lookupUFM env new_fs of
-          Just {} -> find (k+1 :: Int) (n+k)
+      = case elemUFM new_fs env of
+          True -> find (k+1 :: Int) (n+k)
                        -- By using n+k, the n argument to find goes
                        --    1, add 1, add 2, add 3, etc which
                        -- moves at quadratic speed through a dense patch
 
-          Nothing -> (new_env, OccName occ_sp new_fs)
+          False -> (new_env, OccName occ_sp new_fs)
        where
          new_fs = mkFastString (base ++ show n)
          new_env = addToUFM (addToUFM env new_fs 1) base1 (n+1)

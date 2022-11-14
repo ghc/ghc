@@ -939,4 +939,4 @@ hsModuleToModSummary home_keys pn hsc_src modname
 newUnitId :: UnitId -> Maybe FastString -> UnitId
 newUnitId uid mhash = case mhash of
    Nothing   -> uid
-   Just hash -> UnitId (unitIdFS uid `appendFS` mkFastString "+" `appendFS` hash)
+   Just hash -> UnitId (concatFS [unitIdFS uid, fsLit "+", hash])
