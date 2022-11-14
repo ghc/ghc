@@ -807,7 +807,7 @@ generateJumpTables
 generateJumpTables ncgImpl xs = concatMap f xs
     where f p@(CmmProc _ _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
-          g (BasicBlock _ xs) = catMaybes (map (generateJumpTableForInstr ncgImpl) xs)
+          g (BasicBlock _ xs) = mapMaybe (generateJumpTableForInstr ncgImpl) xs
 
 -- -----------------------------------------------------------------------------
 -- Shortcut branches

@@ -29,7 +29,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable ( Outputable, text, (<+>), ppr
                             , pprWithCommas
-                            , showSDocUnsafe
                             )
 
 import GHC.Wasm.ControlFlow
@@ -338,7 +337,7 @@ instance Outputable ContainingSyntax where
 findLabelIn :: HasDebugCallStack => Label -> LabelMap a -> a
 findLabelIn lbl = mapFindWithDefault failed lbl
   where failed =
-            panic $ "label " ++ showSDocUnsafe (ppr lbl) ++ " not found in control-flow graph"
+            pprPanic "label not found in control-flow graph" (ppr lbl)
 
 
 infixl 4 <$~>

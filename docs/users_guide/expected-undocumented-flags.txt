@@ -26,7 +26,6 @@
 -dsource-stats
 -dstg-stats
 -dsuppress-stg-exts
--exclude-module
 -fallow-incoherent-instances
 -fallow-overlapping-instances
 -fallow-undecidable-instances

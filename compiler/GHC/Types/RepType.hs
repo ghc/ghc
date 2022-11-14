@@ -302,11 +302,10 @@ instance Outputable SlotTy where
   ppr (VecSlot n e)   = text "VecSlot" <+> ppr n <+> ppr e
 
 typeSlotTy :: UnaryType -> Maybe SlotTy
-typeSlotTy ty
-  | isZeroBitTy ty
-  = Nothing
-  | otherwise
-  = Just (primRepSlot (typePrimRep1 ty))
+typeSlotTy ty = case typePrimRep ty of
+                  [] -> Nothing
+                  [rep] -> Just (primRepSlot rep)
+                  reps -> pprPanic "typeSlotTy" (ppr ty $$ ppr reps)
 
 primRepSlot :: PrimRep -> SlotTy
 primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")

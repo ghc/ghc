@@ -1483,7 +1483,7 @@ generation are:
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
     If you do not use this flag then the empty suffix is used.
 
-.. ghc-flag:: --exclude-module=⟨file⟩
+.. ghc-flag:: -exclude-module=⟨file⟩
     :shortdesc: Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
         dependencies on it.
     :type: dynamic

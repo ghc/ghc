@@ -3864,7 +3864,7 @@ continueCmd argLine = withSandboxOnly ":continue" $
     where
       contSwitch :: [String] -> Either SDoc (Maybe Int)
       contSwitch [ ] = Right Nothing
-      contSwitch [x] = getIgnoreCount x
+      contSwitch [x] = Just <$> getIgnoreCount x
       contSwitch  _  = Left $
           text "After ':continue' only one ignore count is allowed"
 
@@ -3992,30 +3992,24 @@ ignoreCmd argLine = withSandboxOnly ":ignore" $ do
     result <- ignoreSwitch (words argLine)
     case result of
       Left sdoc -> printForUser sdoc
-      Right (loc, mbCount)   -> do
+      Right (loc, count)   -> do
         let breakInfo = GHC.BreakInfo (breakModule loc) (breakTick loc)
-            count = fromMaybe 0 mbCount
         setupBreakpoint breakInfo count
 
-ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Maybe Int))
+ignoreSwitch :: GhciMonad m => [String] -> m (Either SDoc (BreakLocation, Int))
 ignoreSwitch [break, count] = do
     sdoc_loc <- getBreakLoc break
     pure $ (,) <$> sdoc_loc <*> getIgnoreCount count
 ignoreSwitch _ = pure $ Left $ text "Syntax:  :ignore <breaknum> <count>"
 
-getIgnoreCount :: String -> Either SDoc (Maybe Int)
+getIgnoreCount :: String -> Either SDoc Int
 getIgnoreCount str =
-    let checkJust :: Maybe Int -> Either SDoc (Maybe Int)
-        checkJust mbCnt
-          | (isJust mbCnt) = Right mbCnt
-          | otherwise    = Left $ sdocIgnore <+> text "is not numeric"
-        checkPositive :: Maybe Int -> Either SDoc (Maybe Int)
-        checkPositive mbCnt
-          | isJust mbCnt && fromJust mbCnt >= 0 = Right mbCnt
-          | otherwise = Left $  sdocIgnore <+> text "must be >= 0"
-        mbCnt :: Maybe Int = readMaybe str
-        sdocIgnore = (text "Ignore count") <+> quotes (text str)
-    in  Right mbCnt >>= checkJust >>= checkPositive
+    case readMaybe str of
+      Nothing              -> Left $ sdocIgnore <+> "is not numeric"
+      Just cnt | cnt < 0   -> Left $ sdocIgnore <+> "must be >= 0"
+               | otherwise -> Right cnt
+    where
+      sdocIgnore = text "Ignore count" <+> quotes (text str)
 
 setupBreakpoint :: GhciMonad m => GHC.BreakInfo -> Int -> m()
 setupBreakpoint loc count = do

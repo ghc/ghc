@@ -825,7 +825,7 @@ HYPHEN :: { [AddEpAnn] }
 litpkgname :: { Located FastString }
         : litpkgname_segment { $1 }
         -- a bit of a hack, means p - b is parsed same as p-b, enough for now.
-        | litpkgname_segment HYPHEN litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
+        | litpkgname_segment HYPHEN litpkgname  { sLL $1 $> $ concatFS [unLoc $1, fsLit "-", (unLoc $3)] }
 
 mayberns :: { Maybe [LRenaming] }
         : {- empty -} { Nothing }

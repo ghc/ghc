@@ -328,8 +328,7 @@ selectColor colors graph u
                         -- See Note [Unique Determinism and code generation]
 
         colors_conflict = mkUniqSet
-                        $ catMaybes
-                        $ map nodeColor nsConflicts
+                        $ mapMaybe nodeColor nsConflicts
 
         -- the prefs of our neighbors
         colors_neighbor_prefs

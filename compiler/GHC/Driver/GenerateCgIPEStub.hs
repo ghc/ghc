@@ -3,7 +3,7 @@
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (mapMaybe, listToMaybe)
 import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel)
 import GHC.Cmm.Dataflow (Block, C, O)
@@ -210,7 +210,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
     collectNothing _ cmmGroupSRTs = pure ([], cmmGroupSRTs)
 
     collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
-    collectInfoTables cmmGroup = concat $ catMaybes $ map extractInfoTables cmmGroup
+    collectInfoTables cmmGroup = concat $ mapMaybe extractInfoTables cmmGroup
 
     extractInfoTables :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
     extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
@@ -249,8 +249,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
         lastTickInBlock block =
           listToMaybe $
-            catMaybes $
-              map maybeTick $ (reverse . blockToList) block
+              mapMaybe maybeTick $ (reverse . blockToList) block
 
         maybeTick :: CmmNode O O -> Maybe IpeSourceLocation
         maybeTick (CmmTick (SourceNote span name)) = Just (span, name)

@@ -517,8 +517,8 @@ ppName opts v = case v of
 ppPlainName :: LlvmCgConfig -> LlvmVar -> SDoc
 ppPlainName opts v = case v of
    (LMGlobalVar x _ _ _ _ _) -> ftext x
-   (LMLocalVar  x LMLabel  ) -> text (show x)
-   (LMLocalVar  x _        ) -> text ('l' : show x)
+   (LMLocalVar  x LMLabel  ) -> pprUniqueAlways x
+   (LMLocalVar  x _        ) -> char 'l' <> pprUniqueAlways x
    (LMNLocalVar x _        ) -> ftext x
    (LMLitVar    x          ) -> ppLit opts x
 
