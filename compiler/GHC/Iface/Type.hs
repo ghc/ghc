@@ -846,7 +846,7 @@ Note [Printing type abbreviations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Normally, we pretty-print
    `TYPE       'LiftedRep` as `Type` (or `*`)
-   `CONSTRAINT 'LiftedRep` as `Constraint` (or `*`)
+   `CONSTRAINT 'LiftedRep` as `Constraint`
    `FUN 'Many`             as `(->)`.
 This way, error messages don't refer to representation polymorphism
 or linearity if it is not necessary.  Normally we'd would represent
@@ -856,14 +856,16 @@ command we specifically expand synonyms (see GHC.Tc.Module.tcRnExpr).
 So here in the pretty-printing we effectively collapse back Type
 and Constraint to their synonym forms.  A bit confusing!
 
-However, when printing the definition of Type or (->) with :info,
+However, when printing the definition of Type, Constraint or (->) with :info,
 this would give confusing output: `type (->) = (->)` (#18594).
 Solution: detect when we are in :info and disable displaying the synonym
 with the SDoc option sdocPrintTypeAbbreviations.
+If you are creating a similar synonym, make sure it is listed in pprIfaceDecl,
+see reference to this Note.
 
 If there will be a need, in the future we could expose it as a flag
--fprint-type-abbreviations or even two separate flags controlling
-TYPE 'LiftedRep and FUN 'Many.
+-fprint-type-abbreviations or even three separate flags controlling
+TYPE 'LiftedRep, CONSTRAINT 'LiftedRep and FUN 'Many.
 -}
 
 -- | Do we want to suppress kind annotations on binders?

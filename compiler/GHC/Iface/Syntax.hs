@@ -44,7 +44,8 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
-import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
+import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
+                           constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
@@ -988,7 +989,8 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
 
     -- See Note [Printing type abbreviations] in GHC.Iface.Type
     ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
-              tc `hasKey` unrestrictedFunTyConKey
+              tc `hasKey` unrestrictedFunTyConKey ||
+              tc `hasKey` constraintKindTyConKey
             = updSDocContext (\ctx -> ctx { sdocPrintTypeAbbreviations = False }) $ ppr tau
             | otherwise = ppr tau
 
