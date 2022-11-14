@@ -2465,7 +2465,7 @@ tcTyConScopedTyVars tc@(TyCon { tyConDetails = details })
   | otherwise = pprPanic "tcTyConScopedTyVars" (ppr tc)
 
 
-tyConTypeKindPieces :: TyCon -> ([TyConBinder], Kind, Bool)
+tyConTypeKindPieces :: TyCon -> (Kind, [TyConBinder], Kind, Bool)
 -- This rather specialised function returns the bits needed for typeKind
 tyConTypeKindPieces (TyCon { tyConBinders = bndrs
                            , tyConKind = kind, tyConResKind = res_kind
@@ -2473,9 +2473,9 @@ tyConTypeKindPieces (TyCon { tyConBinders = bndrs
   | TcTyCon { tctc_is_poly = False } <- details
   = -- For MonoTcTyCons we must use the tyConKind
     -- because only that is zonked.  See setTcTyConKind
-    ([], kind, False)
+    (kind, [], kind, False)
   | otherwise
-  = (bndrs, res_kind, closed)
+  = (kind, bndrs, res_kind, closed)
 
 {-
 -----------------------------------------------

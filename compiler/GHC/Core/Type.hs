@@ -1483,11 +1483,11 @@ tyConAppResKind :: TyCon -> [Type] -> Kind
 -- Its specification is:
 --   tyConAppResKind tc tys = piResultTys (tyConKind tc) tys
 tyConAppResKind tc args
-  | null args = tyConKind tc
+  | null args = tc_kind
   | otherwise
   = go1 tc_bndrs args
   where
-    !(tc_bndrs, tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
+    !(tc_kind, tc_bndrs, !tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
     init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes args)
 
     go1 :: [TyConBinder] -> [Type] -> Type
