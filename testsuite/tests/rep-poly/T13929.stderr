@@ -3,8 +3,8 @@ T13929.hs:29:24: error: [GHC-55287]
     • The tuple argument in first position
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c1
-      Cannot unify ‘rf’ with the type variable ‘c1’
+        a0 :: TYPE c0
+      Cannot unify ‘rf’ with the type variable ‘c0’
       because it is not a concrete ‘RuntimeRep’.
     • In the expression: (# gunbox x, gunbox y #)
       In an equation for ‘gunbox’:
@@ -12,7 +12,6 @@ T13929.hs:29:24: error: [GHC-55287]
       In the instance declaration for
         ‘GUnbox (f :*: g) (TupleRep [rf, rg])’
     • Relevant bindings include
-        x :: f p (bound at T13929.hs:29:13)
         gunbox :: (:*:) f g p -> GUnboxed (f :*: g) (TupleRep [rf, rg])
           (bound at T13929.hs:29:5)
 

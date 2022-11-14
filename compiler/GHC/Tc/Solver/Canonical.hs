@@ -113,10 +113,9 @@ canonicalize (CIrredCan { cc_ev = ev })
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
 
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
-                       , cc_tyargs = xis, cc_pend_sc = pend_sc
-                       , cc_fundeps = fds })
+                       , cc_tyargs = xis, cc_pend_sc = pend_sc })
   = {-# SCC "canClass" #-}
-    canClass ev cls xis pend_sc fds
+    canClass ev cls xis pend_sc
 
 canonicalize (CEqCan { cc_ev     = ev
                      , cc_lhs    = lhs
@@ -156,7 +155,7 @@ canClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
   = do { sc_cts <- mkStrictSuperClasses ev [] [] cls tys
        ; emitWork sc_cts
-       ; canClass ev cls tys False fds }
+       ; canClass ev cls tys False }
 
   | CtWanted { ctev_rewriters = rewriters } <- ev
   , Just ip_name <- isCallStackPred cls tys
@@ -182,20 +181,17 @@ canClassNC ev cls tys
                                   (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
-       ; canClass new_ev cls tys
-                  False -- No superclasses
-                  False -- No top level instances for fundeps
+       ; canClass new_ev cls tys False -- No superclasses
        }
 
   | otherwise
-  = canClass ev cls tys (has_scs cls) fds
+  = canClass ev cls tys (has_scs cls)
 
   where
     has_scs cls = not (null (classSCTheta cls))
     loc  = ctEvLoc ev
     orig = ctLocOrigin loc
     pred = ctEvPred ev
-    fds  = classHasFds cls
 
 solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
 -- Also called from GHC.Tc.Solver when defaulting call stacks
@@ -210,11 +206,10 @@ solveCallStack ev ev_cs = do
 canClass :: CtEvidence
          -> Class -> [Type]
          -> Bool            -- True <=> un-explored superclasses
-         -> Bool            -- True <=> unexploited fundep(s)
          -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
-canClass ev cls tys pend_sc fds
+canClass ev cls tys pend_sc
   = -- all classes do *nominal* matching
     assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { (redns@(Reductions _ xis), rewriters) <- rewriteArgsNom ev cls_tc tys
@@ -222,8 +217,7 @@ canClass ev cls tys pend_sc fds
              mk_ct new_ev = CDictCan { cc_ev = new_ev
                                      , cc_tyargs = xis
                                      , cc_class = cls
-                                     , cc_pend_sc = pend_sc
-                                     , cc_fundeps = fds }
+                                     , cc_pend_sc = pend_sc }
        ; mb <- rewriteEvidence rewriters ev redn
        ; traceTcS "canClass" (vcat [ ppr ev
                                    , ppr xi, ppr mb ])
@@ -671,7 +665,7 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
 
     this_ct | null tvs, null theta
             = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
-                       , cc_pend_sc = loop_found, cc_fundeps = classHasFds cls }
+                       , cc_pend_sc = loop_found }
                  -- NB: If there is a loop, we cut off, so we have not
                  --     added the superclasses, hence cc_pend_sc = True
             | otherwise
@@ -1534,6 +1528,7 @@ canTyConApp :: CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApp equalities]
+-- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
 -- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
 -- But they can be data families.
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
@@ -1620,6 +1615,7 @@ do so on the spot.  An important special case is where s1=s2,
 and we get just Refl.
 
 So canDecomposableTyConAppOK uses unifyWanted etc to short-cut that work.
+See also Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
 
 Note [Decomposing TyConApp equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1948,7 +1944,7 @@ Extra points
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
                           -> TyCon -> [TcType] -> [TcType]
                           -> TcS (StopOrContinue Ct)
--- Precondition: tys1 and tys2 are the same length, hence "OK"
+-- Precondition: tys1 and tys2 are the same finite length, hence "OK"
 canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
   = assert (tys1 `equalLength` tys2) $
     do { traceTcS "canDecomposableTyConAppOK"
@@ -1956,10 +1952,12 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
        ; case ev of
            CtWanted { ctev_dest = dest, ctev_rewriters = rewriters }
                   -- new_locs and tc_roles are both infinite, so
-                  -- we are guaranteed that cos has the same length
+                  -- we are guaranteed that cos has the same lengthm
                   -- as tys1 and tys2
-             -> do { cos <- zipWith4M (unifyWanted rewriters) new_locs tc_roles tys1 tys2
-                            -- See Note [Fast path when decomposing TyConApps]
+                  -- See Note [Fast path when decomposing TyConApps]
+                  -- Caution: unifyWanteds is order sensitive
+                  -- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
+             -> do { cos <- unifyWanteds rewriters new_locs tc_roles tys1 tys2
                    ; setWantedEq dest (mkTyConAppCo role tc cos) }
 
            CtGiven { ctev_evar = evar }
@@ -2192,6 +2190,35 @@ canEqCanLHS ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
     k1 = canEqLHSKind lhs1
     k2 = typeKind xi2
 
+
+{-
+Note [Kind Equality Orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While in theory [W] x ~ y and [W] y ~ x ought to give us the same behaviour, in practice it does not.
+See Note [Fundeps with instances, and equality orientation] where this is discussed at length.
+As a rule of thumb: we keep the newest unification variables on the left of the equality.
+See also Note [Improvement orientation] in GHC.Tc.Solver.Interact.
+
+In particular, `canEqCanLHSHetero` produces the following constraint equalities
+
+[X] (xi1 :: ki1) ~ (xi2 :: ki2)
+  -->  [X] kco :: ki1 ~ ki2
+       [X] co : xi1 :: ki1 ~ (xi2 |> sym kco) :: ki1
+
+Note that the types in the LHS of the new constraints are the ones that were on the LHS of
+the original constraint.
+
+--- Historical note ---
+We prevously used to flip the kco to avoid using a sym in the cast
+
+[X] (xi1 :: ki1) ~ (xi2 :: ki2)
+  -->  [X] kco :: ki2 ~ ki1
+       [X] co : xi1 :: ki1 ~ (xi2 |> kco) :: ki1
+
+But this sent solver in an infinite loop (see #19415).
+-- End of historical note --
+-}
+
 canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
                   -> EqRel -> SwapFlag
                   -> CanEqLHS           -- xi1
@@ -2201,46 +2228,50 @@ canEqCanLHSHetero :: CtEvidence         -- :: (xi1 :: ki1) ~ (xi2 :: ki2)
                   -> TcS (StopOrContinue Ct)
 canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
   -- See Note [Equalities with incompatible kinds]
-  = do { (kind_ev, kind_co) <- mk_kind_eq   -- :: ki2 ~N ki1
+  -- See Note [Kind Equality Orientation]
+  -- NB: preserve left-to-right orientation!!
+  -- See Note [Fundeps with instances, and equality orientation]
+  --     wrinkle (W2) in GHC.Tc.Solver.Interact
+  = do { (kind_ev, kind_co) <- mk_kind_eq   -- :: ki1 ~N ki2
 
-       ; let  -- kind_co :: (ki2 :: *) ~N (ki1 :: *)   (whether swapped or not)
+       ; let  -- kind_co :: (ki1 :: *) ~N (ki2 :: *)   (whether swapped or not)
              lhs_redn = mkReflRedn role xi1
-             rhs_redn = mkGReflRightRedn role xi2 kind_co
+             rhs_redn = mkGReflRightRedn role xi2 (mkSymCo kind_co)
 
              -- See Note [Equalities with incompatible kinds], Wrinkle (1)
              -- This will be ignored in rewriteEqEvidence if the work item is a Given
              rewriters = rewriterSetFromCo kind_co
 
        ; traceTcS "Hetero equality gives rise to kind equality"
-           (ppr kind_co <+> dcolon <+> sep [ ppr ki2, text "~#", ppr ki1 ])
+           (ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
        ; type_ev <- rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn
 
        ; emitWorkNC [type_ev]  -- delay the type equality until after we've finished
                                -- the kind equality, which may unlock things
                                -- See Note [Equalities with incompatible kinds]
 
-       ; canEqNC kind_ev NomEq ki2 ki1 }
+       ; canEqNC kind_ev NomEq ki1 ki2 }
   where
     mk_kind_eq :: TcS (CtEvidence, CoercionN)
     mk_kind_eq = case ev of
       CtGiven { ctev_evar = evar }
-        -> do { let kind_co = maybe_sym $ mkKindCo (mkCoVarCo evar)  -- :: k2 ~ k1
+        -> do { let kind_co = maybe_sym $ mkKindCo (mkCoVarCo evar) -- :: k1 ~ k2
               ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
               ; return (kind_ev, ctEvCoercion kind_ev) }
 
       CtWanted { ctev_rewriters = rewriters }
-        -> newWantedEq kind_loc rewriters Nominal ki2 ki1
+        -> newWantedEq kind_loc rewriters Nominal ki1 ki2
 
     xi1      = canEqLHSType lhs1
     loc      = ctev_loc ev
     role     = eqRelRole eq_rel
     kind_loc = mkKindLoc xi1 xi2 loc
-    kind_pty = mkHeteroPrimEqPred liftedTypeKind liftedTypeKind ki2 ki1
+    kind_pty = mkHeteroPrimEqPred liftedTypeKind liftedTypeKind ki1 ki2
 
     maybe_sym = case swapped of
-          IsSwapped  -> id         -- if the input is swapped, then we already
-                                   -- will have k2 ~ k1
-          NotSwapped -> mkSymCo
+          IsSwapped  -> mkSymCo         -- if the input is swapped, then we
+                                        -- will have k2 ~ k1, so flip it to k1 ~ k2
+          NotSwapped -> id
 
 -- guaranteed that typeKind lhs == typeKind rhs
 canEqCanLHSHomo :: CtEvidence
@@ -2550,8 +2581,8 @@ k2 and use this to cast. To wit, from
 
 (where [X] is [G] or [W]), we go to
 
-  [X] co :: k2 ~ k1
-  [X] (tv :: k1) ~ ((rhs |> co) :: k1)
+  [X] co :: k1 ~ k2
+  [X] (tv :: k1) ~ ((rhs |> sym co) :: k1)
 
 We carry on with the *kind equality*, not the type equality, because
 solving the former may unlock the latter. This choice is made in
@@ -2564,7 +2595,7 @@ Wrinkles:
      for the type-level one. See Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
      This is done in canEqCanLHSHetero.
 
- (2) If we have [W] w :: alpha ~ (rhs |> co_hole), should we unify alpha? No.
+ (2) If we have [W] w :: alpha ~ (rhs |> sym co_hole), should we unify alpha? No.
      The problem is that the wanted w is effectively rewritten by another wanted,
      and unifying alpha effectively promotes this wanted to a given. Doing so
      means we lose track of the rewriter set associated with the wanted.
@@ -2582,8 +2613,8 @@ Wrinkles:
      unifyTest in canEqTyVarFunEq.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
-     algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
-     [W] (a :: k1) ~ ((rhs |> co) :: k1) to the irreducibles. Some time
+     algorithm detailed here, producing [W] co :: k1 ~ k2, and adding
+     [W] (a :: k1) ~ ((rhs |> sym co) :: k1) to the irreducibles. Some time
      later, we solve co, and fill in co's coercion hole. This kicks out
      the irreducible as described in (2).
      But now, during canonicalization, we see the cast
@@ -3238,3 +3269,55 @@ unifyWanted rewriters loc role orig_ty1 orig_ty2
        | ty1 `tcEqType` ty2 = return (mkReflCo role ty1)
         -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
        | otherwise = emitNewWantedEq loc rewriters role orig_ty1 orig_ty2
+
+
+{-
+Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we decompose a dependent tycon we obtain a list of
+mixed wanted type and kind equalities. Ideally we want
+all the kind equalities to get solved first so that we avoid
+generating duplicate kind equalities
+
+For example, consider decomposing a TyCon equality
+
+    (0) [W] T k_fresh (t1::k_fresh) ~ T k1 (t2::k_fresh)
+
+This gives rise to 2 equalities in the solver worklist
+
+    (1) [W] k_fresh ~ k1
+    (2) [W] t1::k_fresh ~ t2::k1
+
+The solver worklist is processed in LIFO order:
+see GHC.Tc.Solver.InertSet.selectWorkItem.
+i.e. (2) is processed _before_ (1). Now, while solving (2)
+we would call `canEqCanLHSHetero` and that would emit a
+wanted kind equality
+
+    (3) [W] k_fresh ~ k1
+
+But (3) is exactly the same as (1)!
+
+To avoid such duplicate wanted constraints from being added to the worklist,
+we ensure that (2) is processed before (1). Since we are processing
+the worklist in a LIFO ordering, we do it by emitting (1) before (2).
+This is exactly what we do in `unifyWanteds`.
+
+NB: This ordering is not needed when we decompose FunTyCons as they are not dependently typed
+-}
+
+-- NB: Length of [CtLoc] and [Roles] may be infinite
+-- but list of RHS [TcType] and LHS [TcType] is finite and both are of equal length
+unifyWanteds :: RewriterSet -> [CtLoc] -> [Role]
+             -> [TcType] -- List of RHS types
+             -> [TcType] -- List of LHS types
+             -> TcS [Coercion]
+unifyWanteds rewriters ctlocs roles rhss lhss = unify_wanteds rewriters $ zip4 ctlocs roles rhss lhss
+  where
+    -- Order is important here
+    -- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
+    unify_wanteds _ [] = return []
+    unify_wanteds rewriters ((new_loc, tc_role, ty1, ty2) : rest)
+       = do { cos <- unify_wanteds rewriters rest
+            ; co  <- unifyWanted rewriters new_loc tc_role ty1 ty2
+            ; return (co:cos) }

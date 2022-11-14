@@ -2307,6 +2307,9 @@ Needless to say, all there are wrinkles:
 
 Note [TyVar/TyVar orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Fundeps with instances, and equality orientation]
+where the kind equality orientation is important
+
 Given (a ~ b), should we orient the CEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question! This is invariant (TyEq:TV).
 

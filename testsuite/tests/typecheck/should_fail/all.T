@@ -630,6 +630,7 @@ test('T19397E3', extra_files(['T19397S.hs']), multimod_compile_fail,
 test('T19397E4', extra_files(['T19397S.hs']), multimod_compile_fail,
     ['T19397E4.hs', '-v0 -main-is foo'])
 test('T19415', normal, compile_fail, [''])
+test('T19415b', normal, compile_fail, [''])
 test('T19915', normal, compile_fail, [''])
 test('T19977a', normal, compile_fail, [''])
 test('T19977b', normal, compile_fail, [''])

@@ -1732,8 +1732,12 @@ Then it is solvable, but its very hard to detect this on the spot.
 It's exactly the same with implicit parameters, except that the
 "aggressive" approach would be much easier to implement.
 
-Note [Fundeps with instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Fundeps with instances, and equality orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This Note describes a delicate interaction that constrains the orientation of
+equalities. This one is about fundeps, but the /exact/ same thing arises for
+type-family injectivity constraints: see Note [Improvement orientation].
+
 doTopFundepImprovement compares the constraint with all the instance
 declarations, to see if we can produce any equalities. E.g
    class C2 a b | a -> b
@@ -1747,52 +1751,122 @@ There is a nasty corner in #19415 which led to the typechecker looping:
 
    work_item: dwrk :: C (T @ka (a::ka)) (T @kb0 (b0::kb0)) Char
       where kb0, b0 are unification vars
-   ==> {fundeps against instance; k0, y0 fresh unification vars}
-       [W] T kb0 (b0::kb0) ~ T k0 (y0::k0)
-       Add dwrk to inert set
-   ==> {solve that equality kb0 := k0, b0 := y0
+
+   ==> {doTopFundepImprovement: compare work_item with instance,
+        generate /fresh/ unification variables kfresh0, yfresh0,
+        emit a new Wanted, and add dwrk to inert set}
+
+   Suppose we emit this new Wanted from the fundep:
+       [W] T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
+
+   ==> {solve that equality kb0 := kfresh0, b0 := yfresh0}
    Now kick out dwrk, since it mentions kb0
    But now we are back to the start!  Loop!
 
-NB1: this example relies on an instance that does not satisfy
-the coverage condition (although it may satisfy the weak coverage
-condition), which is known to lead to termination trouble
+NB1: This example relies on an instance that does not satisfy the
+     coverage condition (although it may satisfy the weak coverage
+     condition), and hence whose fundeps generate fresh unification
+     variables.  Not satisfying the coverage condition is known to
+     lead to termination trouble, but in this case it's plain silly.
 
-NB2: if the unification was the other way round, k0:=kb0, all would be
-well.  It's a very delicate problem.
+NB2: In this example, the third parameter to C ensures that the
+     instance doesn't actually match the Wanted, so we can't use it to
+     solve the Wanted
 
-The ticket #19415 discusses various solutions, but the one we adopted
-is very simple:
+We solve the problem by (#21703):
 
-* There is a flag in CDictCan (cc_fundeps :: Bool)
+    carefully orienting the new Wanted so that all the
+    freshly-generated unification variables are on the LHS.
 
-* cc_fundeps = True means
-    a) The class has fundeps
-    b) We have not had a successful hit against instances yet
+    Thus we emit
+       [W] T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
+    and /NOT/
+       [W] T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
 
-* In doTopFundepImprovement, if we emit some constraints we flip the flag
-  to False, so that we won't try again with the same CDictCan.  In our
-  example, dwrk will have its flag set to False.
+Now we'll unify kfresh0:=kb0, yfresh0:=b0, and all is well.  The general idea
+is that we want to preferentially eliminate those freshly-generated
+unification variables, rather than unifying older variables, which causes
+kick-out etc.
 
-* Not that if we have no "hits" we must /not/ flip the flag. We might have
-      dwrk :: C alpha beta Char
-  which does not yet trigger fundeps from the instance, but later we
-  get alpha := T ka a.  We could be cleverer, and spot that the constraint
-  is such that we will /never/ get any hits (no unifiers) but we don't do
-  that yet.
+Keeping younger variables on the left also gives very minor improvement in
+the compiler performance by having less kick-outs and allocations (-0.1% on
+average).  Indeed Historical Note [Eliminate younger unification variables]
+in GHC.Tc.Utils.Unify describes an earlier attempt to do so systematically,
+apparently now in abeyance.
 
-Easy!  What could go wrong?
-* Maybe the class has multiple fundeps, and we get hit with one but not
-  the other.  Per-fundep flags?
-* Maybe we get a hit against one instance with one fundep but, after
-  the work-item is instantiated a bit more, we get a second hit
-  against a second instance.  (This is a pretty strange and
-  undesirable thing anyway, and can only happen with overlapping
-  instances; one example is in Note [Weird fundeps].)
+But this is is a delicate solution. We must take care to /preserve/
+orientation during solving. Wrinkles:
 
-But both of these seem extremely exotic, and ignoring them threatens
-completeness (fixable with some type signature), but not termination
-(not fixable).  So for now we are just doing the simplest thing.
+(W1) We start with
+       [W] T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
+     Decompose to
+       [W] kfresh0 ~ kb0
+       [W] (yfresh0::kfresh0) ~ (b0::kb0)
+     Preserve orientiation when decomposing!!
+
+(W2) Suppose we happen to tackle the second Wanted from (W1)
+     first. Then in canEqCanLHSHetero we emit a /kind/ equality, as
+     well as a now-homogeneous type equality
+       [W] kco : kfresh0 ~ kb0
+       [W] (yfresh0::kfresh0) ~ (b0::kb0) |> (sym kco)
+     Preserve orientation in canEqCanLHSHetero!!  (Failing to
+     preserve orientation here was the immediate cause of #21703.)
+
+(W3) There is a potential interaction with the swapping done by
+     GHC.Tc.Utils.Unify.swapOverTyVars.  We think it's fine, but it's
+     a slight worry.  See especially Note [TyVar/TyVar orientation] in
+     that module.
+
+The trouble is that "preserving orientation" is a rather global invariant,
+and sometimes we definitely do want to swap (e.g. Int ~ alpha), so we don't
+even have a precise statement of what the invariant is.  The advantage
+of the preserve-orientation plan is that it is extremely cheap to implement,
+and apparently works beautifully.
+
+--- Alternative plan (1) ---
+Rather than have an ill-defined invariant, another possiblity is to
+elminate those fresh unification variables at birth, when generating
+the new fundep-inspired equalities.
+
+The key idea is to call `instFlexiX` in `emitFunDepWanteds` on only those
+type variables that are guaranteed to give us some progress. This means we
+have to locally (without calling emitWanteds) identify the type variables
+that do not give us any progress.  In the above example, we _know_ that
+emitting the two wanteds `kco` and `co` is fruitless.
+
+  Q: How do we identify such no-ops?
+
+  1. Generate a matching substitution from LHS to RHS
+        ɸ = [kb0 :-> k0, b0 :->  y0]
+  2. Call `instFlexiX` on only those type variables that do not appear in the domain of ɸ
+        ɸ' = instFlexiX ɸ (tvs - domain ɸ)
+  3. Apply ɸ' on LHS and then call emitWanteds
+        unifyWanteds ... (subst ɸ' LHS) RHS
+
+Why will this work?  The matching substitution ɸ will be a best effort
+substitution that gives us all the easy solutions. It can be generated with
+modified version of `Core/Unify.unify_tys` where we run it in a matching mode
+and never generate `SurelyApart` and always return a `MaybeApart Subst`
+instead.
+
+The same alternative plan would work for type-family injectivity constraints:
+see Note [Improvement orientation].
+--- End of Alternative plan (1) ---
+
+--- Alternative plan (2) ---
+We could have a new flavour of TcTyVar (like `TauTv`, `TyVarTv` etc; see GHC.Tc.Utils.TcType.MetaInfo)
+for the fresh unification variables introduced by functional dependencies.  Say `FunDepTv`.  Then in
+GHC.Tc.Utils.Unify.swapOverTyVars we could arrange to keep a `FunDepTv` on the left if possible.
+Looks possible, but it's one more complication.
+--- End of Alternative plan (2) ---
+
+
+--- Historical note: Failed Alternative Plan (3) ---
+Previously we used a flag `cc_fundeps` in `CDictCan`. It would flip to False
+once we used a fun dep to hint the solver to break and to stop emitting more
+wanteds.  This solution was not complete, and caused a failures while trying
+to solve for transitive functional dependencies (test case: T21703)
+-- End of Historical note: Failed Alternative Plan (3) --
 
 Note [Weird fundeps]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1819,22 +1893,15 @@ as the fundeps.
 doTopFundepImprovement :: Ct -> TcS (StopOrContinue Ct)
 -- Try to functional-dependency improvement between the constraint
 -- and the top-level instance declarations
--- See Note [Fundeps with instances]
+-- See Note [Fundeps with instances, and equality orientation]
 -- See also Note [Weird fundeps]
 doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
-                                           , cc_tyargs = xis
-                                           , cc_fundeps = has_fds })
-  | has_fds
+                                           , cc_tyargs = xis })
   = do { traceTcS "try_fundeps" (ppr work_item)
        ; instEnvs <- getInstEnvs
        ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
-       ; case fundep_eqns of
-           [] -> continueWith work_item  -- No improvement
-           _  -> do { emitFunDepWanteds (ctEvRewriters ev) fundep_eqns
-                    ; continueWith (work_item { cc_fundeps = False }) } }
-  | otherwise
-  = continueWith work_item
-
+       ; emitFunDepWanteds (ctEvRewriters ev) fundep_eqns
+       ; continueWith work_item }
   where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc ev
@@ -1852,7 +1919,10 @@ doTopFundepImprovement work_item = pprPanic "doTopFundepImprovement" (ppr work_i
 
 emitFunDepWanteds :: RewriterSet  -- from the work item
                   -> [FunDepEqn (CtLoc, RewriterSet)] -> TcS ()
+
+emitFunDepWanteds _ [] = return () -- common case noop
 -- See Note [FunDep and implicit parameter reactions]
+
 emitFunDepWanteds work_rewriters fd_eqns
   = mapM_ do_one_FDEqn fd_eqns
   where
@@ -2134,6 +2204,9 @@ we do *not* need to expand type synonyms because the matcher will do that for us
 
 Note [Improvement orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Fundeps with instances, and equality orientation], which describes
+the Exact Same Prolem, with the same solution, but for functional dependencies.
+
 A very delicate point is the orientation of equalities
 arising from injectivity improvement (#12522).  Suppose we have
   type family F x = t | t -> x
