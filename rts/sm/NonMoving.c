@@ -900,7 +900,7 @@ static void nonmovingPrepareMark(void)
 static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_ptr_list)
 {
     for (StgWeak *w = oldest_gen->weak_ptr_list; w; w = w->link) {
-        markQueuePushClosure_(mark_queue, (StgClosure*)w);
+        markQueuePushClosureGC(mark_queue, (StgClosure*)w);
         // Do not mark finalizers and values here, those fields will be marked
         // in `nonmovingMarkDeadWeaks` (for dead weaks) or
         // `nonmovingTidyWeaks` (for live weaks)
@@ -919,8 +919,14 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
     // - So, to be able to traverse `dead_weak_ptr_list` and run finalizers we
     //   need to mark it.
     for (StgWeak *w = dead_weak_ptr_list; w; w = w->link) {
-        markQueuePushClosure_(mark_queue, (StgClosure*)w);
-        nonmovingMarkDeadWeak(mark_queue, w);
+        markQueuePushClosureGC(mark_queue, (StgClosure*)w);
+
+        // Mark the value and finalizer since they will be needed regardless of
+        // whether we find the weak is live.
+        if (w->cfinalizers != &stg_NO_FINALIZER_closure) {
+            markQueuePushClosureGC(mark_queue, w->value);
+        }
+        markQueuePushClosureGC(mark_queue, w->finalizer);
     }
 }
 
@@ -962,7 +968,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 
     // Mark threads resurrected during moving heap scavenging
     for (StgTSO *tso = *resurrected_threads; tso != END_TSO_QUEUE; tso = tso->global_link) {
-        markQueuePushClosure_(mark_queue, (StgClosure*)tso);
+        markQueuePushClosureGC(mark_queue, (StgClosure*)tso);
     }
     trace(TRACE_nonmoving_gc, "Finished marking roots for nonmoving GC");
 

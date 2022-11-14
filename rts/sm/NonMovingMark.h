@@ -137,8 +137,7 @@ extern bdescr *upd_rem_set_block_list;
 
 void nonmovingMarkInitUpdRemSet(void);
 
-void init_upd_rem_set(UpdRemSet *rset);
-void reset_upd_rem_set(UpdRemSet *rset);
+void nonmovingInitUpdRemSet(UpdRemSet *rset);
 void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
 void updateRemembSetPushThunk(Capability *cap, StgThunk *p);
 void updateRemembSetPushTSO(Capability *cap, StgTSO *tso);
@@ -165,7 +164,7 @@ void nonmovingResurrectThreads(struct MarkQueue_ *queue, StgTSO **resurrected_th
 bool nonmovingIsAlive(StgClosure *p);
 void nonmovingMarkDeadWeak(struct MarkQueue_ *queue, StgWeak *w);
 void nonmovingMarkLiveWeak(struct MarkQueue_ *queue, StgWeak *w);
-void nonmovingAddUpdRemSetBlocks(struct MarkQueue_ *rset);
+void nonmovingAddUpdRemSetBlocks(UpdRemSet *rset);
 
 void markQueuePush(MarkQueue *q, const MarkQueueEnt *ent);
 void markQueuePushClosureGC(MarkQueue *q, StgClosure *p);

@@ -27,6 +27,8 @@
 #include "sm/Storage.h"
 #include "CNF.h"
 
+static void nonmovingResetUpdRemSetQueue (MarkQueue *rset);
+static void nonmovingResetUpdRemSet (UpdRemSet *rset);
 static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void trace_tso (MarkQueue *queue, StgTSO *tso);
@@ -261,17 +263,9 @@ static uint32_t markQueueLength(MarkQueue *q);
 #endif
 static void init_mark_queue_(MarkQueue *queue);
 
-/* Transfers the given capability's update-remembered set to the global
- * remembered set.
- *
- * Really the argument type should be UpdRemSet* but this would be rather
- * inconvenient without polymorphism.
- */
-void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
+static void nonmovingAddUpdRemSetBlocks_(MarkQueue *rset)
 {
-    if (markQueueIsEmpty(rset)) return;
-
-    // find the tail of the queue
+    // find the tail of the remembered set mark queue
     bdescr *start = rset->blocks;
     bdescr *end = start;
     while (end->link != NULL)
@@ -282,12 +276,43 @@ void nonmovingAddUpdRemSetBlocks(MarkQueue *rset)
     end->link = upd_rem_set_block_list;
     upd_rem_set_block_list = start;
     RELEASE_LOCK(&upd_rem_set_lock);
+}
 
-    // Reset remembered set
+/*
+ * Transfers the given capability's update-remembered set to the global
+ * remembered set.
+ *
+ * Really the argument type should be UpdRemSet* but this would be rather
+ * inconvenient without polymorphism.
+ */
+static void nonmovingAddUpdRemSetBlocks_lock(MarkQueue *rset)
+{
+    if (markQueueIsEmpty(rset)) return;
+
+    nonmovingAddUpdRemSetBlocks_(rset);
+    // Reset the state of the remembered set.
     ACQUIRE_SM_LOCK;
     init_mark_queue_(rset);
     rset->is_upd_rem_set = true;
     RELEASE_SM_LOCK;
+}
+
+/*
+ * Transfers the given capability's update-remembered set to the global
+ * remembered set.
+ *
+ * Really the argument type should be UpdRemSet* but this would be rather
+ * inconvenient without polymorphism.
+ *
+ * Caller must hold SM_LOCK.
+ */
+void nonmovingAddUpdRemSetBlocks(UpdRemSet *rset)
+{
+    if (markQueueIsEmpty(&rset->queue)) return;
+
+    nonmovingAddUpdRemSetBlocks_(&rset->queue);
+    init_mark_queue_(&rset->queue);
+    rset->queue.is_upd_rem_set = true;
 }
 
 #if defined(THREADED_RTS)
@@ -301,7 +326,7 @@ void nonmovingFlushCapUpdRemSetBlocks(Capability *cap)
                "Capability %d flushing update remembered set: %d",
                cap->no, markQueueLength(&cap->upd_rem_set.queue));
     traceConcUpdRemSetFlush(cap);
-    nonmovingAddUpdRemSetBlocks(&cap->upd_rem_set.queue);
+    nonmovingAddUpdRemSetBlocks_lock(&cap->upd_rem_set.queue);
     atomic_inc(&upd_rem_set_flush_count, 1);
     signalCondition(&upd_rem_set_flushed_cond);
     // After this mutation will remain suspended until nonmovingFinishFlush
@@ -399,7 +424,7 @@ void nonmovingFinishFlush(Task *task)
 {
     // See Note [Unintentional marking in resurrectThreads]
     for (uint32_t i = 0; i < getNumCapabilities(); i++) {
-        reset_upd_rem_set(&getCapability(i)->upd_rem_set);
+        nonmovingResetUpdRemSet(&getCapability(i)->upd_rem_set);
     }
     // Also reset upd_rem_set_block_list in case some of the UpdRemSets were
     // filled and we flushed them.
@@ -424,7 +449,8 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
         if (q->is_upd_rem_set) {
-            nonmovingAddUpdRemSetBlocks(q);
+            // Flush the block to the global update remembered set
+            nonmovingAddUpdRemSetBlocks_lock(q);
         } else {
             // allocate a fresh block.
             ACQUIRE_SM_LOCK;
@@ -780,7 +806,7 @@ void markQueuePushClosure (MarkQueue *q,
 /* TODO: Do we really never want to specify the origin here? */
 void markQueueAddRoot (MarkQueue* q, StgClosure** root)
 {
-    markQueuePushClosure(q, *root, NULL);
+    markQueuePushClosureGC(q, *root);
 }
 
 /* Push a closure to the mark queue without origin information */
@@ -908,18 +934,24 @@ void initMarkQueue (MarkQueue *queue)
 }
 
 /* Must hold sm_mutex. */
-void init_upd_rem_set (UpdRemSet *rset)
+void nonmovingInitUpdRemSet (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);
     rset->queue.is_upd_rem_set = true;
 }
 
-void reset_upd_rem_set (UpdRemSet *rset)
+static void nonmovingResetUpdRemSetQueue (MarkQueue *rset)
 {
     // UpdRemSets always have one block for the mark queue. This assertion is to
     // update this code if we change that.
-    ASSERT(rset->queue.blocks->link == NULL);
-    rset->queue.top->head = 0;
+    ASSERT(rset->is_upd_rem_set);
+    ASSERT(rset->blocks->link == NULL);
+    rset->top->head = 0;
+}
+
+void nonmovingResetUpdRemSet (UpdRemSet *rset)
+{
+    nonmovingResetUpdRemSetQueue(&rset->queue);
 }
 
 void freeMarkQueue (MarkQueue *queue)
