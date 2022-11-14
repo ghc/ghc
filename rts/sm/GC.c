@@ -842,11 +842,9 @@ GarbageCollect (uint32_t collect_gen,
   // Flush the update remembered sets. See Note [Eager update remembered set
   // flushing] in NonMovingMark.c
   if (RtsFlags.GcFlags.useNonmoving) {
-      RELEASE_SM_LOCK;
       for (n = 0; n < getNumCapabilities(); n++) {
-          nonmovingAddUpdRemSetBlocks(&getCapability(n)->upd_rem_set.queue);
+          nonmovingAddUpdRemSetBlocks(&getCapability(n)->upd_rem_set);
       }
-      ACQUIRE_SM_LOCK;
   }
 
   // Mark and sweep the oldest generation.
@@ -867,8 +865,6 @@ GarbageCollect (uint32_t collect_gen,
       // old_weak_ptr_list should be empty.
       ASSERT(oldest_gen->old_weak_ptr_list == NULL);
 
-      // we may need to take the lock to allocate mark queue blocks
-      RELEASE_SM_LOCK;
       // dead_weak_ptr_list contains weak pointers with dead keys. Those need to
       // be kept alive because we'll use them in finalizeSchedulers(). Similarly
       // resurrected_threads are also going to be used in resurrectedThreads()
@@ -878,10 +874,9 @@ GarbageCollect (uint32_t collect_gen,
 #if !defined(THREADED_RTS)
       // In the non-threaded runtime this is the only time we push to the
       // upd_rem_set
-      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set);
 #endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
-      ACQUIRE_SM_LOCK;
   }
 
   // Update the max size of older generations after a major GC:
