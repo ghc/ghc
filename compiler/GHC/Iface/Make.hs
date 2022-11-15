@@ -532,7 +532,7 @@ tyConToIfaceDecl env tycon
     , IfaceData { ifName    = getName tycon,
                   ifBinders = if_binders,
                   ifResKind = if_res_kind,
-                  ifCType   = tyConCType tycon,
+                  ifCType   = tyConCType_maybe tycon,
                   ifRoles   = tyConRoles tycon,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
                   ifCons    = ifaceConDecls (algTyConRhs tycon),

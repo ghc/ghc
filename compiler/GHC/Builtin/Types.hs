@@ -1038,12 +1038,11 @@ unboxedTupleKind = unboxedTupleSumKind tupleRepDataConTyCon
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple Boxed arity = (tycon, tuple_con)
   where
-    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
+    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tuple_con
                          BoxedTuple flavour
 
     tc_binders  = mkTemplateAnonTyConBinders (replicate arity liftedTypeKind)
     tc_res_kind = liftedTypeKind
-    tc_arity    = arity
     flavour     = VanillaAlgTyCon (mkPrelTyConRepName tc_name)
 
     dc_tvs     = binderVars tc_binders
@@ -1061,7 +1060,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
 
 mk_tuple Unboxed arity = (tycon, tuple_con)
   where
-    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
+    tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tuple_con
                          UnboxedTuple flavour
 
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
@@ -1070,8 +1069,6 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
                                         (\ks -> map mkTYPEapp ks)
 
     tc_res_kind = unboxedTupleKind rr_tys
-
-    tc_arity    = arity * 2
     flavour     = VanillaAlgTyCon (mkPrelTyConRepName tc_name)
 
     dc_tvs               = binderVars tc_binders
@@ -1224,7 +1221,7 @@ unboxedSumKind = unboxedTupleSumKind sumRepDataConTyCon
 mk_sum :: Arity -> (TyCon, Array ConTagZ DataCon)
 mk_sum arity = (tycon, sum_cons)
   where
-    tycon   = mkSumTyCon tc_name tc_binders tc_res_kind (arity * 2) tyvars (elems sum_cons)
+    tycon   = mkSumTyCon tc_name tc_binders tc_res_kind (elems sum_cons)
                          UnboxedSumTyCon
 
     tc_binders = mkTemplateTyConBinders (replicate arity runtimeRepTy)

@@ -271,7 +271,10 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
               -> TEQ
           _ -> TNEQ
 
-    gos _  _  []         []         = TEQ
+    -- These bangs make 'gos' strict in the CMEnv, which in turn
+    -- keeps the CMEnv unboxed across the go/gos mutual recursion
+    -- (If you want a test case, T9872c really exercises this code.)
+    gos !_  !_  []         []       = TEQ
     gos e1 e2 (ty1:tys1) (ty2:tys2) = go (D e1 ty1) (D e2 ty2) `andEq`
                                       gos e1 e2 tys1 tys2
     gos _  _  _          _          = TNEQ
