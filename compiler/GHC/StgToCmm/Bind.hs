@@ -703,8 +703,8 @@ emitBlackHoleCode node = do
     whenUpdRemSetEnabled $ emitUpdRemSetPushThunk node
     emitStore (cmmOffsetW platform node (fixedHdrSizeW profile)) currentTSOExpr
     -- See Note [Heap memory barriers] in SMP.h.
-    emitPrimCall [] MO_WriteBarrier []
-    emitStore node (CmmReg (CmmGlobal EagerBlackholeInfo))
+    let w = wordWidth platform
+    emitPrimCall [] (MO_AtomicWrite w MemOrderRelease) [node, CmmReg (CmmGlobal EagerBlackholeInfo)]
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
         -- Nota Bene: this function does not change Node (even if it's a CAF),
