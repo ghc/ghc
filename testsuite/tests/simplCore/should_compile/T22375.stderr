@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 71, types: 31, coercions: 0, joins: 0/0}
+  = {terms: 76, types: 37, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 14, types: 7, coercions: 0, joins: 0/0}
 T22375.$fEqX_$c== :: X -> X -> Bool
@@ -46,7 +46,24 @@ T22375.$fEqX [InlPrag=CONLIKE] :: Eq X
 T22375.$fEqX
   = GHC.Classes.C:Eq @X T22375.$fEqX_$c== T22375.$fEqX_$c/=
 
--- RHS size: {terms: 32, types: 5, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 24, types: 3, coercions: 0, joins: 0/0}
+T22375.$wf [InlPrag=[2]] :: X -> GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId[StrictWorker([!])],
+ Arity=2,
+ Str=<1L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [64 0] 55 0}]
+T22375.$wf
+  = \ (x :: X) (ww :: GHC.Prim.Int#) ->
+      case x of {
+        A -> GHC.Prim.+# 1# ww;
+        B -> GHC.Prim.+# 2# ww;
+        C -> GHC.Prim.+# 3# ww;
+        D -> GHC.Prim.+# 4# ww;
+        E -> GHC.Prim.+# 5# ww
+      }
+
+-- RHS size: {terms: 12, types: 5, coercions: 0, joins: 0/0}
 f [InlPrag=[2]] :: X -> Int -> Int
 [GblId,
  Arity=2,
@@ -57,13 +74,7 @@ f [InlPrag=[2]] :: X -> Int -> Int
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)}]
 f = \ (x :: X) (v :: Int) ->
       case v of { GHC.Types.I# ww ->
-      case x of {
-        A -> GHC.Types.I# (GHC.Prim.+# 1# ww);
-        B -> GHC.Types.I# (GHC.Prim.+# 2# ww);
-        C -> GHC.Types.I# (GHC.Prim.+# 3# ww);
-        D -> GHC.Types.I# (GHC.Prim.+# 4# ww);
-        E -> GHC.Types.I# (GHC.Prim.+# 5# ww)
-      }
+      case T22375.$wf x ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
       }
 
 

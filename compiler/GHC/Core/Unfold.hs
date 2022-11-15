@@ -1347,8 +1347,11 @@ call is at least CONLIKE.  At least for the cases where we use ArgCtxt
 for the RHS of a 'let', we only profit from the inlining if we get a
 CONLIKE thing (modulo lets).
 
-Note [Lone variables]   See also Note [Interaction of exprIsWorkFree and lone variables]
-~~~~~~~~~~~~~~~~~~~~~   which appears below
+Note [Lone variables]
+~~~~~~~~~~~~~~~~~~~~~
+See also Note [Interaction of exprIsWorkFree and lone variables]
+which appears below
+
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory variants, but this is nice.  The idea is that if a
 variable appears all alone

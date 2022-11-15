@@ -449,3 +449,5 @@ test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeab
 # One module, T21851_2.hs, has OPTIONS_GHC -ddump-simpl
 # Expecting to see $s$wwombat
 test('T21851_2', [grep_errmsg(r'wwombat') ], multimod_compile, ['T21851_2', '-O -dno-typeable-binds -dsuppress-uniques'])
+# Should not inline m, so there shouldn't be a single YES
+test('T22317', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check m -ddebug-output'])

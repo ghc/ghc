@@ -740,8 +740,8 @@ Note [Interesting call context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to avoid inlining an expression where there can't possibly be
 any gain, such as in an argument position.  Hence, if the continuation
-is interesting (eg. a case scrutinee, application etc.) then we
-inline, otherwise we don't.
+is interesting (eg. a case scrutinee that isn't just a seq, application etc.)
+then we inline, otherwise we don't.
 
 Previously some_benefit used to return True only if the variable was
 applied to some value arguments.  This didn't work:
@@ -781,6 +781,53 @@ expression into the branches of any case in f's unfolding.  So, to
 reduce unnecessary code expansion, we just make the context look boring.
 This made a small compile-time perf improvement in perf/compiler/T6048,
 and it looks plausible to me.
+
+Note [Seq is boring]
+~~~~~~~~~~~~~~~~~~~~
+Suppose
+  f x = case v of
+          True  -> Just x
+          False -> Just (x-1)
+
+Now consider these cases:
+
+1. case f x of b{-dead-} { DEFAULT -> blah[no b] }
+     Inlining (f x) will allow us to avoid ever allocating (Just x),
+     since the case binder `b` is dead.  We will end up with a
+     join point for blah, thus
+         join j = blah in
+         case v of { True -> j; False -> j }
+     which will turn into (case v of DEFAULT -> blah
+     All good
+
+2. case f x of b { DEFAULT -> blah[b] }
+     Inlining (f x) will still mean we allocate (Just x). We'd get:
+         join j b = blah[b]
+         case v of { True -> j (Just x); False -> j (Just (x-1)) }
+     No new optimisations are revealed. Nothing is gained.
+     (This is the situation in T22317.)
+
+2a. case g x of b { (x{-dead-}, x{-dead-}) -> blah[b, no x, no y] }
+      Instead of DEFAULT we have a single constructor alternative
+      with all dead binders.  This is just a variant of (2); no
+      gain from inlining (f x)
+
+3. case f x of b { Just y -> blah[y,b] }
+     Inlining (f x) will mean we still allocate (Just x),
+     but we also get to bind `y` without fetching it out of the Just, thus
+         join j y b = blah[y,b]
+         case v of { True -> j x (Just x)
+                   ; False -> let y = x-1 in j y (Just y) }
+   Inlining (f x) has a small benefit, perhaps.
+   (To T14955 it makes a surprisingly large difference of ~30% to inline here.)
+
+
+Conclusion: if the case expression
+  * Has a non-dead case-binder
+  * Has one alternative
+  * All the binders in the alternative are dead
+then the `case` is just a strict let-binding, and the scrutinee is
+BoringCtxt (don't inline).  Otherwise CaseCtxt.
 -}
 
 lazyArgContext :: ArgInfo -> CallCtxt
@@ -811,10 +858,13 @@ interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 interestingCallContext env cont
   = interesting cont
   where
-    interesting (Select {})
-       | seCaseCase env = CaseCtxt
-       | otherwise      = BoringCtxt
-       -- See Note [No case of case is boring]
+    interesting (Select {sc_alts=alts, sc_bndr=case_bndr})
+      | not (seCaseCase env)         = BoringCtxt -- See Note [No case of case is boring]
+      | [Alt _ bs _] <- alts
+      , all isDeadBinder bs
+      , not (isDeadBinder case_bndr) = BoringCtxt -- See Note [Seq is boring]
+      | otherwise                    = CaseCtxt
+
 
     interesting (ApplyToVal {}) = ValAppCtxt
         -- Can happen if we have (f Int |> co) y
