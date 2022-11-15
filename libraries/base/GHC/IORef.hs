@@ -32,7 +32,27 @@ import GHC.IO
 -- ---------------------------------------------------------------------------
 -- IORefs
 
--- |A mutable variable in the 'IO' monad
+-- |A mutable variable in the 'IO' monad.
+--
+-- >>> import Data.IORef
+-- >>> r <- newIORef 0
+-- >>> readIORef r
+-- 0
+-- >>> writeIORef r 1
+-- >>> readIORef r
+-- 1
+-- >>> atomicWriteIORef r 2
+-- >>> readIORef r
+-- 2
+-- >>> modifyIORef' r (+ 1)
+-- >>> readIORef r
+-- 3
+-- >>> atomicModifyIORef' r (\a -> (a + 1, ()))
+-- >>> readIORef r
+-- 4
+--
+-- See also 'Data.STRef.STRef' and 'Control.Concurrent.MVar.MVar'.
+--
 newtype IORef a = IORef (STRef RealWorld a)
   deriving Eq
   -- ^ Pointer equality.
@@ -43,11 +63,19 @@ newtype IORef a = IORef (STRef RealWorld a)
 newIORef    :: a -> IO (IORef a)
 newIORef v = stToIO (newSTRef v) >>= \ var -> return (IORef var)
 
--- |Read the value of an 'IORef'
+-- |Read the value of an 'IORef'.
+--
+-- Beware that the CPU executing a thread can reorder reads or writes
+-- to independent locations. See "Data.IORef#memmodel" for more details.
 readIORef   :: IORef a -> IO a
 readIORef  (IORef var) = stToIO (readSTRef var)
 
--- |Write a new value into an 'IORef'
+-- |Write a new value into an 'IORef'.
+--
+-- This function does not create a memory barrier and can be reordered
+-- with other independent reads and writes within a thread, which may cause issues
+-- for multithreaded execution. In these cases, consider using 'Data.IORef.atomicWriteIORef'
+-- instead. See "Data.IORef#memmodel" for more details.
 writeIORef  :: IORef a -> a -> IO ()
 writeIORef (IORef var) v = stToIO (writeSTRef var v)
 
@@ -115,6 +143,9 @@ data Box a = Box a
 --
 -- will increment the 'IORef' and then throw an exception in the calling
 -- thread.
+--
+-- This function imposes a memory barrier, preventing reordering;
+-- see "Data.IORef#memmodel" for details.
 --
 -- @since 4.6.0.0
 atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
