@@ -2121,7 +2121,7 @@ reifyTyCon tc
   | isTypeFamilyTyCon tc
   = do { let tvs      = tyConTyVars tc
              res_kind = tyConResKind tc
-             resVar   = famTcResVar tc
+             resVar   = tyConFamilyResVar_maybe tc
 
        ; kind' <- reifyKind res_kind
        ; let (resultSig, injectivity) =

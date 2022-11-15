@@ -5177,8 +5177,7 @@ addVDQNote :: TcTyCon -> TcM a -> TcM a
 -- See Note [Inferring visible dependent quantification]
 -- Only types without a signature (CUSK or SAK) here
 addVDQNote tycon thing_inside
-  | assertPpr (isTcTyCon tycon) (ppr tycon) $
-    assertPpr (not (tcTyConIsPoly tycon)) (ppr tycon $$ ppr tc_kind)
+  | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq
   = addLandmarkErrCtxt vdq_warning thing_inside
   | otherwise

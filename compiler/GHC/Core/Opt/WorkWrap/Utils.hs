@@ -571,6 +571,11 @@ data UnboxingDecision unboxing_info
                             -- returned product was constructed, so unbox it.
   | DropAbsent              -- ^ The argument/field was absent. Drop it.
 
+instance Outputable i => Outputable (UnboxingDecision i) where
+  ppr DontUnbox  = text "DontUnbox"
+  ppr DropAbsent = text "DropAbsent"
+  ppr (DoUnbox i) = text "DoUnbox" <> braces (ppr i)
+
 -- | Do we want to create workers just for unlifting?
 wwUseForUnlifting :: WwOpts -> WwUse
 wwUseForUnlifting !opts
