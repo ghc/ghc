@@ -1728,7 +1728,7 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
         // Write barrier before we make the new MVAR_TSO_QUEUE
         // visible to other cores.
         // See Note [Heap memory barriers]
-        prim_write_barrier;
+        RELEASE_FENCE;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -1895,7 +1895,7 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         // See Note [Heap memory barriers]
-        prim_write_barrier;
+        RELEASE_FENCE;
 
         if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
             StgMVar_head(mvar) = q;
@@ -2104,7 +2104,7 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         // See Note [Heap memory barriers]
-        prim_write_barrier;
+        RELEASE_FENCE;
 
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
@@ -2237,7 +2237,7 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         // See Note [Heap memory barriers]
-        prim_write_barrier;
+        RELEASE_FENCE;
 
         StgMVar_head(ioport) = q;
         StgTSO__link(CurrentTSO)       = q;

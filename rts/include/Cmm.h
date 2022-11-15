@@ -278,8 +278,7 @@
 // "used".
 
 #define LOAD_INFO_ACQUIRE(ret,x)                \
-    info = %INFO_PTR(UNTAG(x));                 \
-    prim_read_barrier;
+    info = %acquire StgHeader_info(UNTAG(x));
 
 #define UNTAG_IF_PROF(x) UNTAG(x)
 
@@ -289,8 +288,7 @@
   if (GETTAG(x) != 0) {                         \
       ret(x);                                   \
   }                                             \
-  info = %INFO_PTR(x);                          \
-  prim_read_barrier;
+  info = %acquire StgHeader_info(x);
 
 #define UNTAG_IF_PROF(x) (x) /* already untagged */
 
