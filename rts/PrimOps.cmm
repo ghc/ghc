@@ -776,7 +776,7 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
     StgThunk_payload(y,0) = z;
 
   retry:
-    x = StgMutVar_var(mv);
+    x = %relaxed StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
 #if defined(THREADED_RTS)
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
@@ -829,7 +829,7 @@ stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
     StgThunk_payload(z,0) = f;
 
   retry:
-    x = StgMutVar_var(mv);
+    x = %relaxed StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
 #if defined(THREADED_RTS)
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, z);
