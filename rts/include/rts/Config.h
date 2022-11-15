@@ -76,3 +76,9 @@ code.
 #if defined(DEBUG)
 #define PROF_SPIN
 #endif
+
+#if defined(THREADED_RTS)
+#define MAX_N_CAPABILITIES 256
+#else
+#define MAX_N_CAPABILITIES 1
+#endif

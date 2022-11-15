@@ -45,7 +45,7 @@ uint32_t enabled_capabilities = 0;
 // Capabilities, because there may be pointers to them in use
 // (e.g. threads in waitForCapability(), see #8209), so this is
 // an array of Capability* rather than an array of Capability.
-Capability **capabilities = NULL;
+Capability *capabilities[MAX_N_CAPABILITIES];
 
 // Holds the Capability which last became free.  This is used so that
 // an in-call has a chance of quickly finding a free Capability.
@@ -387,6 +387,12 @@ void initCapabilities (void)
     }
 #endif
 
+    if (RtsFlags.ParFlags.nCapabilities > MAX_N_CAPABILITIES) {
+        errorBelch("warning: this GHC runtime system only supports up to %d capabilities",
+                   MAX_N_CAPABILITIES);
+        RtsFlags.ParFlags.nCapabilities = MAX_N_CAPABILITIES;
+    }
+
     n_capabilities = 0;
     moreCapabilities(0, RtsFlags.ParFlags.nCapabilities);
     n_capabilities = RtsFlags.ParFlags.nCapabilities;
@@ -394,7 +400,6 @@ void initCapabilities (void)
 #else /* !THREADED_RTS */
 
     n_capabilities = 1;
-    capabilities = stgMallocBytes(sizeof(Capability*), "initCapabilities");
     capabilities[0] = &MainCapability;
 
     initCapability(&MainCapability, 0);
@@ -415,8 +420,6 @@ void
 moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    Capability **new_capabilities = stgMallocBytes(to * sizeof(Capability*), "moreCapabilities");
-
     // We must disable the timer while we do this since the tick handler may
     // call contextSwitchAllCapabilities, which may see the capabilities array
     // as we free it. The alternative would be to protect the capabilities
@@ -428,29 +431,21 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
         // THREADED_RTS must work on builds that don't have a mutable
         // BaseReg (eg. unregisterised), so in this case
         // capabilities[0] must coincide with &MainCapability.
-        new_capabilities[0] = &MainCapability;
+        capabilities[0] = &MainCapability;
         initCapability(&MainCapability, 0);
     }
     else
     {
         for (uint32_t i = 0; i < to; i++) {
-            if (i < from) {
-                new_capabilities[i] = capabilities[i];
-            } else {
-                new_capabilities[i] = stgMallocBytes(sizeof(Capability),
+            if (i >= from) {
+                capabilities[i] = stgMallocBytes(sizeof(Capability),
                                                      "moreCapabilities");
-                initCapability(new_capabilities[i], i);
+                initCapability(capabilities[i], i);
             }
         }
     }
 
     debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
-
-    Capability **old_capabilities = ACQUIRE_LOAD(&capabilities);
-    RELEASE_STORE(&capabilities, new_capabilities);
-    if (old_capabilities != NULL) {
-        stgFree(old_capabilities);
-    }
 
     startTimer();
 #endif
@@ -1285,7 +1280,6 @@ freeCapabilities (void)
 #else
     freeCapability(&MainCapability);
 #endif
-    stgFree(capabilities);
     traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
     traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
 }

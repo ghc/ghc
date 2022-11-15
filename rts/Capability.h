@@ -261,11 +261,11 @@ INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
 // extern uint32_t enabled_capabilities;
 
 // Array of all the capabilities
-extern Capability **capabilities;
+extern Capability *capabilities[MAX_N_CAPABILITIES];
 
 INLINE_HEADER Capability *getCapability(uint32_t i)
 {
-    return RELAXED_LOAD(&capabilities)[i];
+    return RELAXED_LOAD(&capabilities[i]);
 }
 
 //
