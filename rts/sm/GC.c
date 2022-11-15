@@ -833,12 +833,9 @@ GarbageCollect (uint32_t collect_gen,
     live_blocks += genLiveBlocks(gen);
 
     // add in the partial blocks in the gen_workspaces
-    {
-        uint32_t i;
-        for (i = 0; i < getNumCapabilities(); i++) {
-            live_words  += gcThreadLiveWords(i, gen->no);
-            live_blocks += gcThreadLiveBlocks(i, gen->no);
-        }
+    for (uint32_t i = 0; i < getNumCapabilities(); i++) {
+        live_words  += gcThreadLiveWords(i, gen->no);
+        live_blocks += gcThreadLiveBlocks(i, gen->no);
     }
   } // for all generations
 
