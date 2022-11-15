@@ -41,12 +41,13 @@ import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Data.SArr (SArr, Slice)
+import qualified GHC.Data.SArr as SArr
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
-import GHC.Exts ( IsList(..) )
 
 
 {-
@@ -650,19 +651,19 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
     WithDmdType alt_ty (Alt con new_ids rhs')
 
 -- See Note [Demand on the scrutinee of a product case]
-scrutSubDmd :: SubDemand -> [Demand] -> SubDemand
+scrutSubDmd :: SubDemand -> SArr Demand -> SubDemand
 scrutSubDmd case_sd fld_dmds =
   -- pprTraceWith "scrutSubDmd" (\scrut_sd -> ppr case_sd $$ ppr fld_dmds $$ ppr scrut_sd) $
   case_sd `plusSubDmd` mkProd Unboxed fld_dmds
 
 -- See Note [Demand on case-alternative binders]
-fieldBndrDmds :: SubDemand -- on the scrutinee
+fieldBndrDmds :: SubDemand    -- on the scrutinee
               -> Arity
-              -> [Demand]  -- Final demands for the components of the DataCon
+              -> SArr Demand  -- Final demands for the components of the DataCon
 fieldBndrDmds scrut_sd n_flds =
   case viewProd n_flds scrut_sd of
     Just (_, ds) -> ds
-    Nothing      -> replicate n_flds topDmd
+    Nothing      -> SArr.replicate n_flds topDmd
                       -- Either an arity mismatch or scrut_sd was a call demand.
                       -- See Note [Untyped demand on case-alternative binders]
 
@@ -2273,10 +2274,10 @@ addLazyFVs dmd_ty lazy_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-setBndrsDemandInfo :: HasCallStack => [Var] -> [Demand] -> [Var]
+setBndrsDemandInfo :: HasCallStack => [Var] -> Slice Demand -> [Var]
 setBndrsDemandInfo (b:bs) ds
   | isTyVar b = b : setBndrsDemandInfo bs ds
-setBndrsDemandInfo (b:bs) (d:ds) =
+setBndrsDemandInfo (b:bs) (d SArr.:<| ds) =
     let !new_info = setIdDemandInfo b d
         !vars = setBndrsDemandInfo bs ds
     in new_info : vars

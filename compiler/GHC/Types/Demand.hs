@@ -760,7 +760,7 @@ mkProd :: Boxity -> [Demand] -> SubDemand
 mkProd b ds
   | SArr.all (== AbsDmd) ds = Poly b C_00
   | SArr.all (== BotDmd) ds = Poly b C_10
-  | dmd@(n :* Poly b2 m) :<| _ <- ds
+  | dmd@(n :* Poly b2 m) :<| _ <- slice ds
   , n == m                -- don't rewrite P(SL)  to S
   , b == b2               -- don't rewrite P(S!S) to !S
   , SArr.all (== dmd) ds  -- don't rewrite P(L,A) to L
@@ -769,11 +769,11 @@ mkProd b ds
 
 -- | @viewProd n sd@ interprets @sd@ as a 'Prod' of arity @n@, expanding 'Poly'
 -- demands as necessary.
-viewProd :: Arity -> SubDemand -> Maybe (Boxity, [Demand])
+viewProd :: Arity -> SubDemand -> Maybe (Boxity, SArr Demand)
 -- It's quite important that this function is optimised well;
 -- it is used by lubSubDmd and plusSubDmd.
 viewProd n (Prod b ds)
-  | ds `lengthIs` n = Just (b, ds)
+  | length ds == n = Just (b, ds)
 -- Note the strict application to replicate: This makes sure we don't allocate
 -- a thunk for it, inlines it and lets case-of-case fire at call sites.
 viewProd n (Poly b card)
@@ -2525,7 +2525,7 @@ kill_usage_sd _   sd          = sd
 data TypeShape -- See Note [Trimming a demand to a type]
                --     in GHC.Core.Opt.DmdAnal
   = TsFun TypeShape
-  | TsProd [TypeShape]
+  | TsProd (SArr TypeShape)
   | TsUnk
 
 trimToType :: Demand -> TypeShape -> Demand
@@ -2536,8 +2536,7 @@ trimToType (n :* sd) ts
   = n :* go sd ts
   where
     go (Prod b ds) (TsProd tss)
-      | length ds == length tss' = mkProd b (SArr.zipWith trimToType ds tss') where
-        tss' = fromList tss
+      | length ds == length tss = mkProd b (SArr.zipWith trimToType ds tss)
     go (Call n sd) (TsFun ts)    = mkCall n (go sd ts)
     go sd@Poly{}   _             = sd
     go _           _             = topSubDmd
@@ -2548,9 +2547,10 @@ trimBoxity AbsDmd    = AbsDmd
 trimBoxity BotDmd    = BotDmd
 trimBoxity (n :* sd) = n :* go sd
   where
-    go (Poly _ n)  = Poly Boxed n
-    go (Prod _ ds) = mkProd Boxed (SArr.map trimBoxity ds)
-    go (Call n sd) = mkCall n $ go sd
+    go (Poly _ n)             = Poly Boxed n
+    go (Prod _ ds)
+      | !_ <- foldr seq () ds = pprTrace "test" empty $ pprTrace "trimBoxity" (ppr ds $$ ppr (SArr.map trimBoxity ds)) $ Prod Boxed (SArr.map trimBoxity ds)
+    go (Call n sd)            = mkCall n $ go sd
 
 {-
 ************************************************************************
@@ -2707,7 +2707,7 @@ instance Outputable DmdSig where
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
   ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
-  ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
+  ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr $ SArr.toList tss)
 
 instance Binary Card where
   put_ bh C_00 = putByte bh 0

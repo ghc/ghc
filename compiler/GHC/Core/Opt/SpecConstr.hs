@@ -68,6 +68,7 @@ import GHC.Types.Unique( hasKey )
 
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Data.Pair
+import qualified GHC.Data.SArr as SArr
 import GHC.Data.FastString
 
 import GHC.Utils.Misc
@@ -79,7 +80,7 @@ import GHC.Utils.Monad
 
 import GHC.Builtin.Names ( specTyConKey )
 
-import GHC.Exts( SpecConstrAnnotation(..), IsList(..) )
+import GHC.Exts( SpecConstrAnnotation(..) )
 import GHC.Serialized   ( deserializeWithData )
 
 import Control.Monad    ( zipWithM )
@@ -2128,17 +2129,17 @@ calcSpecInfo fn arg_bndrs (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
     set_dmds (v:vs) ds@(d:ds') | isTyVar v = v                   : set_dmds vs ds
                                | otherwise = setIdDemandInfo v d : set_dmds vs ds'
 
-    go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
+    go :: DmdEnv -> SArr.Slice Demand -> [CoreExpr] -> DmdEnv
     -- We've filtered out all the type patterns already
-    go env (d:ds) (pat : pats)     = go (go_one env d pat) ds pats
-    go env _      _                = env
+    go env (d SArr.:<| ds) (pat : pats)  = go (go_one env d pat) ds pats
+    go env _      _                      = env
 
     go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
     go_one env d          (Var v) = extendVarEnv_C plusDmd env v d
     go_one env (_n :* cd) e -- NB: _n does not have to be strict
       | (Var _, args) <- collectArgs e
       , Just (_b, ds) <- viewProd (length args) cd -- TODO: We may want to look at boxity _b, though...
-      = go env (toList ds) args
+      = go env (SArr.slice ds) args
     go_one env _  _ = env
 
 {-

@@ -49,6 +49,8 @@ import GHC.Types.Name ( getOccFS )
 import GHC.Data.FastString
 import GHC.Data.OrdList
 import GHC.Data.List.SetOps
+import GHC.Data.SArr (SArr)
+import qualified GHC.Data.SArr as SArr
 
 import GHC.Builtin.Types ( tupleDataCon )
 
@@ -604,7 +606,7 @@ data DataConPatContext s
   { dcpc_dc      :: !DataCon
   , dcpc_tc_args :: ![Type]
   , dcpc_co      :: !Coercion
-  , dcpc_args    :: ![s]
+  , dcpc_args    :: !(SArr s)
   }
 
 -- | Describes the outer shape of an argument to be unboxed or left as-is
@@ -657,7 +659,7 @@ canUnboxArg fam_envs ty (n :* sd)
   , Just dc <- tyConSingleAlgDataCon_maybe tc
   , let arity = dataConRepArity dc
   , Just (Unboxed, dmds) <- viewProd arity sd -- See Note [Boxity analysis]
-  , dmds `lengthIs` dataConRepArity dc
+  , length dmds == dataConRepArity dc
   = DoUnbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                , dcpc_co = co, dcpc_args = dmds })
 
@@ -685,7 +687,7 @@ canUnboxResult fam_envs ty cpr
   -- arguments, for the moment, because they require unboxed tuple with variable
   -- multiplicity fields.
   = DoUnbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
-                               , dcpc_co = co, dcpc_args = arg_cprs })
+                               , dcpc_co = co, dcpc_args = SArr.fromList arg_cprs })
 
   | otherwise
   = DontUnbox

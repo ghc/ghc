@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE UnboxedTuples       #-}
 {-# LANGUAGE RankNTypes          #-}
@@ -16,20 +17,24 @@ module GHC.Data.SArr (
       -- * Indexing
       get, unsafeGet, (!),
       -- * Construction
-      take, drop, replicate,
+      fromList, toList, take, drop, replicate,
       -- * Slicing
       Slice(Empty,(:<|),(:|>)), slice, toSArr, takeS, dropS,
       -- * Other operations
-      all, map, zipWith
+      all, map, zipWith, zipWith3
   ) where
 
-import Prelude hiding (replicate, drop, take, head, init, map, all, zipWith)
+import Prelude hiding (replicate, drop, take, head, init, map, all, zipWith, zipWith3)
 import qualified Prelude
 
 import qualified Data.List as List
 import qualified GHC.Exts as Exts
+import qualified GHC.Utils.Binary as Binary
 import GHC.ST
-import GHC.Stack
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+
+import Data.Maybe
 
 -- | A general-purpose array type that is strict in its elements and the
 -- combinators of which enjoy list fusion.
@@ -63,7 +68,7 @@ instance Show a => Show (SArr a) where
   showsPrec p arr = showParen (p >= 10) $
     showString "fromList " . shows (toList arr)
 
-die :: String -> String -> a
+die :: HasDebugCallStack => String -> String -> a
 die fun problem = error (fun ++ ": " ++ problem)
 {-# NOINLINE die #-}
 
@@ -117,7 +122,7 @@ createSmallArrayN (Exts.I# n) x f = runST $ ST $ \s ->
 {-# INLINE createSmallArrayN #-}
 
 createSmallArray
-  :: a
+  :: HasDebugCallStack => a
   -> (forall s. Exts.SmallMutableArray# s a -> USTL s (Exts.SmallMutableArray# s a))
   -> SArr a
 createSmallArray x f = runST $ ST $ \s ->
@@ -128,6 +133,7 @@ createSmallArray x f = runST $ ST $ \s ->
       !s3                   = Exts.shrinkSmallMutableArray# sma' n s2
       !(# s4, sa   #)       = Exts.unsafeFreezeSmallArray# sma' s3
       -- !_                    = trace ("create: " ++ show (Exts.I# n) ++ show (Exts.I# m)) ()
+      !()                   = foldr seq () (SArr sa)
   in (# s4, SArr sa #)
 {-# INLINE createSmallArray #-}
 
@@ -163,11 +169,11 @@ ifoldrUST f b as s = ifoldr c z as b s
     z = Exts.oneShot $ \(Exts.I# i) -> Exts.oneShot $ \b s -> (# s, b, i #)
 {-# INLINE ifoldrUST #-}
 
-dieFromList :: a
+dieFromList :: HasDebugCallStack => a
 dieFromList = die "fromList" "uninitialized element"
 {-# NOINLINE dieFromList #-}
 
-fromList :: [a] -> SArr a
+fromList :: HasDebugCallStack => [a] -> SArr a
 fromList l =
   createSmallArray dieFromList $ Exts.oneShot $ \sma ->
     ifoldrUST (\(Exts.I# i) a sma' s -> a `seq` writeResize i a sma' s) sma l
@@ -175,11 +181,11 @@ fromList l =
 -- we need [2], otherwise FB's (and their builds) will be rewritten back to
 -- list producing functions and we can't fuse away the ifoldr
 
-dieWriteResize :: a
+dieWriteResize :: HasDebugCallStack => a
 dieWriteResize = die "writeResize" "uninitialized element"
 {-# NOINLINE dieWriteResize #-}
 
-writeResize :: Exts.Int# -> a -> Exts.SmallMutableArray# s a -> UST s (Exts.SmallMutableArray# s a)
+writeResize :: HasDebugCallStack => Exts.Int# -> a -> Exts.SmallMutableArray# s a -> UST s (Exts.SmallMutableArray# s a)
 writeResize i a sma s =
   let !(# s1, n #) = Exts.getSizeofSmallMutableArray# sma s -- TODO: cache this
       !(# s2, sma' #)
@@ -190,19 +196,19 @@ writeResize i a sma s =
   in (# s3, sma' #)
 {-# NOINLINE writeResize #-}
 
-dieFromListN :: HasCallStack => a
+dieFromListN :: HasDebugCallStack => a
 dieFromListN = die "fromListN" "uninitialized element"
 {-# NOINLINE dieFromListN #-}
 
-fromListN :: HasCallStack => Int -> [a] -> SArr a
+fromListN :: HasDebugCallStack => Int -> [a] -> SArr a
 fromListN n l =
   createSmallArrayN n dieFromListN $ Exts.oneShot $ \sma s ->
     case ifoldrUST (\(Exts.I# i) a _sma s -> a `seq` (# Exts.writeSmallArray# sma i a s, sma #)) sma l s of
       (# s', _sma, _n #) -> (# s', sma #)
 {-# INLINE [2] fromListN #-}
 
-toList :: SArr a -> [a]
-toList arr = Prelude.map (\i -> unsafeGet i arr) [0..length arr-1]
+toList :: HasDebugCallStack => SArr a -> [a]
+toList arr = Prelude.map (\i -> fromJust $ get i arr) [0..length arr-1]
 {-# INLINE [2] toList #-}
 
 len :: SArr a -> Int
@@ -213,13 +219,18 @@ all :: (a -> Bool) -> SArr a -> Bool
 all cond = List.all cond . toList
 {-# INLINE [2] all #-}
 
-map :: (a -> b) -> SArr a -> SArr b
-map f a = fromList $ Prelude.map f (toList a)
+map :: HasDebugCallStack => (a -> b) -> SArr a -> SArr b
+map f = fromList . Prelude.map f . toList
 {-# INLINE [2] map #-}
 
 zipWith :: (a -> b -> c) -> SArr a -> SArr b -> SArr c
 zipWith f a b = fromListN (min (len a) (len b)) $ Prelude.zipWith f (toList a) (toList b)
 {-# INLINE [2] zipWith #-}
+
+zipWith3 :: HasDebugCallStack => (a -> b -> c -> d) -> SArr a -> SArr b -> SArr c -> SArr d
+zipWith3 f a b c = fromListN (len a `min` len b `min` len c) $
+  Prelude.zipWith3 f (toList a) (toList b) (toList c)
+{-# INLINE [2] zipWith3 #-}
 
 instance Eq a => Eq (SArr a) where
   a1 == a2 = len a1 == len a2 && and (Prelude.map (\i -> a1 ! i == a2 ! i) [0..len a1])
@@ -238,9 +249,9 @@ fromListA l =
 
 {-# RULES
 "toList/fromList"  forall xs.    toList (fromList xs)     = xs
-"toList/fromListN" forall n xs.  toList (fromListN n xs)  = xs
+"toList/fromListN" forall n xs.  toList (fromListN n xs)  = List.take n xs
 "fromList/toList"  forall arr.   fromList (toList arr)    = arr
-"fromListN/toList" forall n arr. fromListN n (toList arr) = arr
+-- "fromListN/toList" forall n arr. fromListN n (toList arr) = arr -- Unsafe: What if n != len arr? We need the copy here
 "len/fromListN"    forall n arr. len (fromListN n arr)    = n
 #-}
 
@@ -383,3 +394,10 @@ pattern a :<| rest <- (head -> Just (a, rest))
 pattern (:|>) :: Slice a -> a -> Slice a
 pattern rest :|> a <- (init -> Just (rest, a))
 {-# COMPLETE Empty, (:|>) #-}
+
+instance Binary.Binary a => Binary.Binary (SArr a) where
+  put_ bh a = Binary.put_ bh (toList a)
+  get bh    = fromList <$> Binary.get bh
+
+instance Outputable a => Outputable (SArr a) where
+  ppr = ppr . toList
