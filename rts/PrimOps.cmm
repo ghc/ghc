@@ -2389,7 +2389,8 @@ stg_makeStableNamezh ( P_ obj )
     /* Is there already a StableName for this heap object?
      *  stable_name_table is a pointer to an array of snEntry structs.
      */
-    if ( snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) == NULL ) {
+    sn_obj = %acquire snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
+    if (sn_obj  == NULL) {
         // At this point we have a snEntry, but it doesn't look as used to the
         // GC yet because we don't have a StableName object for the sn_obj field
         // (remember that sn_obj == NULL means the entry is free). So if we call
@@ -2406,10 +2407,7 @@ stg_makeStableNamezh ( P_ obj )
         // This will make the StableName# object visible to other threads;
         // be sure that its completely visible to other cores.
         // See Note [Heap memory barriers] in SMP.h.
-        prim_write_barrier;
-        snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
-    } else {
-        sn_obj = snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry);
+        %release snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
     }
 
     return (sn_obj);
