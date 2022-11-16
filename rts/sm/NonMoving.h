@@ -275,12 +275,12 @@ extern uint8_t nonmovingMarkEpoch;
 
 INLINE_HEADER void nonmovingSetMark(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
-    seg->bitmap[i] = nonmovingMarkEpoch;
+    RELAXED_STORE(&seg->bitmap[i], nonmovingMarkEpoch);
 }
 
 INLINE_HEADER uint8_t nonmovingGetMark(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
-    return seg->bitmap[i];
+    return RELAXED_LOAD(&seg->bitmap[i]);
 }
 
 INLINE_HEADER void nonmovingSetClosureMark(StgPtr p)
