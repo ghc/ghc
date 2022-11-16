@@ -1765,7 +1765,9 @@ nonmovingMark (MarkQueue *queue)
         }
         case NULL_ENTRY:
             // Perhaps the update remembered set has more to mark...
-            if (upd_rem_set_block_list) {
+            // N.B. This must be atomic since we have not yet taken
+            // upd_rem_set_lock.
+            if (RELAXED_LOAD(&upd_rem_set_block_list) != NULL) {
                 ACQUIRE_LOCK(&upd_rem_set_lock);
                 bdescr *old = queue->blocks;
                 queue->blocks = upd_rem_set_block_list;
