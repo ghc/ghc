@@ -523,7 +523,7 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
 {
     // See Note [Live data accounting in nonmoving collector].
-    if (nonmovingHeap.n_free > NONMOVING_MAX_FREE) {
+    if (RELAXED_LOAD(&nonmovingHeap.n_free) > NONMOVING_MAX_FREE) {
         bdescr *bd = Bdescr((StgPtr) seg);
         ACQUIRE_SM_LOCK;
         ASSERT(oldest_gen->n_blocks >= bd->blocks);
