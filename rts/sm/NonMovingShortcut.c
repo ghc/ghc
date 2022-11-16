@@ -153,7 +153,8 @@ selectee_changed:
     // Selectee is a non-moving object, mark it.
     markQueuePushClosure(queue, selectee, NULL);
 
-    const StgInfoTable *selectee_info_tbl = get_itbl(selectee);
+    // This may synchronize with the release in updateWithIndirection.
+    const StgInfoTable *selectee_info_tbl = get_itbl_acquire(selectee);
     switch (selectee_info_tbl->type) {
         case WHITEHOLE: {
             // Probably a loop. Abort.
