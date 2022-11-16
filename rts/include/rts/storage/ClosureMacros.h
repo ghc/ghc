@@ -87,6 +87,12 @@ EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c)
     return INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
+EXTERN_INLINE const StgInfoTable *get_itbl_acquire(const StgClosure *c);
+EXTERN_INLINE const StgInfoTable *get_itbl_acquire(const StgClosure *c)
+{
+    return INFO_PTR_TO_STRUCT(ACQUIRE_LOAD(&c->header.info));
+}
+
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c);
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
 {
