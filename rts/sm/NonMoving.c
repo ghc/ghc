@@ -754,7 +754,7 @@ void nonmovingStop(void)
                    "waiting for nonmoving collector thread to terminate");
         ACQUIRE_LOCK(&concurrent_coll_finished_lock);
         waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
-        ACQUIRE_LOCK(&nonmoving_collection_mutex);
+        RELEASE_LOCK(&concurrent_coll_finished_lock);
     }
 #endif
 }
@@ -767,6 +767,9 @@ void nonmovingExit(void)
     nonmovingStop();
 
 #if defined(THREADED_RTS)
+    ACQUIRE_LOCK(&nonmoving_collection_mutex);
+    RELEASE_LOCK(&nonmoving_collection_mutex);
+
     closeMutex(&concurrent_coll_finished_lock);
     closeCondition(&concurrent_coll_finished);
     closeMutex(&nonmoving_collection_mutex);
