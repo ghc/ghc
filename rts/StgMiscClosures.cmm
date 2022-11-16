@@ -540,7 +540,8 @@ retry:
         return (p);
     }
 
-    info = GET_INFO(p);
+    // May race with OVERWRITE_INFO in wakeBlockingQueue()
+    info = %relaxed GET_INFO(p);
     if (info == stg_IND_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
