@@ -250,7 +250,7 @@ synifyTyCon _prr _coax tc
       DataFamilyTyCon {}
         -> mkFamDecl DataFamily
   where
-    resultVar = famTcResVar tc
+    resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i = return $ FamDecl noExtField $
       FamilyDecl { fdExt = noAnn
                  , fdInfo = i
