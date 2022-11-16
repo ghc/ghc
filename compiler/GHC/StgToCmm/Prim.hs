@@ -283,9 +283,10 @@ emitPrimOp cfg primop =
     emitAssign (CmmLocal res) currentTSOExpr
 
   ReadMutVarOp -> \[mutv] -> opIntoRegs $ \[res] ->
-    emitAssign (CmmLocal res) (cmmLoadIndexW platform mutv (fixedHdrSizeW profile) (gcWord platform))
+    emitPrimCall [res] (MO_AtomicRead (wordWidth platform) MemOrderAcquire)
+        [ cmmOffsetW platform mutv (fixedHdrSizeW profile) ]
 
-  WriteMutVarOp -> \[mutv, var] -> opIntoRegs $ \res@[] -> do
+  WriteMutVarOp -> \[mutv, var] -> opIntoRegs $ \[] -> do
     old_val <- CmmLocal <$> newTemp (cmmExprType platform var)
     emitAssign old_val (cmmLoadIndexW platform mutv (fixedHdrSizeW profile) (gcWord platform))
 
@@ -294,8 +295,8 @@ emitPrimOp cfg primop =
     -- Note that this also must come after we read the old value to ensure
     -- that the read of old_val comes before another core's write to the
     -- MutVar's value.
-    emitPrimCall res MO_WriteBarrier []
-    emitStore (cmmOffsetW platform mutv (fixedHdrSizeW profile)) var
+    emitPrimCall [] (MO_AtomicWrite (wordWidth platform) MemOrderRelease)
+        [ cmmOffsetW platform mutv (fixedHdrSizeW profile), var ]
 
     platform <- getPlatform
     mkdirtyMutVarCCall <- getCode $! emitCCall
