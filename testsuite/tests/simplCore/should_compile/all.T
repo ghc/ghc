@@ -388,15 +388,15 @@ test('T20820',  normal, compile, ['-O0'])
 # Verify that the letrec is still there
 test('T20895', [ grep_errmsg(r'\s*=\s*letrec') ], compile, ['-O0 -ddump-simpl -dsuppress-all -fno-local-float-out-top-level'])
 
-test('OpaqueNoAbsentArgWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoAbsentArgWW', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoCastWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoRebox', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoRebox2', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoRebox3', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoSpecConstr', req_interp, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoSpecialise', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoStrictArgWW', normal, compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox2', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoRebox3', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecConstr', [ req_interp, grep_errmsg(r'$sloop') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecialise', [ grep_errmsg(r'$sf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoStrictArgWW', [ grep_errmsg(r'$wf') ], compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoWW', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T21144',  normal, compile, ['-O'])
 
