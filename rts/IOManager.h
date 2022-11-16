@@ -190,27 +190,25 @@ bool is_io_mng_native_p (void);
  */
 typedef struct {
 
-#if defined(THREADED_RTS)
-#if !defined(mingw32_HOST_OS)
-    /* Control FD for the MIO manager for this capability */
-    int control_fd;
-#endif
-#else // !defined(THREADED_RTS)
-    /* Thread queue for threads blocked on I/O completion.
-     * Used by the select() and Win32 MIO I/O managers. It is not used by
-     * the WinIO I/O manager, though it remains defined in this case.
-     */
+#if defined(IOMGR_ENABLED_SELECT)
+    /* Thread queue for threads blocked on I/O completion. */
     StgTSO *blocked_queue_hd;
     StgTSO *blocked_queue_tl;
 
-    /* Thread queue for threads blocked on timeouts.
-     * Used by the select() I/O manager only. It is grossly inefficient, like
-     * everything else to do with the select() I/O manager.
-     *
-     * TODO: It is not used by any of the Windows I/O managers, though it
-     * remains defined for them. This is an oddity that should be resolved.
-     */
+    /* Thread queue for threads blocked on timeouts. */
     StgTSO *sleeping_queue;
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+    /* Thread queue for threads blocked on I/O completion. */
+    StgTSO *blocked_queue_hd;
+    StgTSO *blocked_queue_tl;
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+    /* Control FD for the (posix) MIO manager for this capability,
+     */
+    int control_fd;
 #endif
 
 } CapIOManager;

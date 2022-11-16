@@ -211,15 +211,30 @@ void initCapabilityIOManager(CapIOManager **piomgr)
       (CapIOManager *) stgMallocBytes(sizeof(CapIOManager),
                                       "initCapabilityIOManager");
 
-#if defined(THREADED_RTS)
-#if !defined(mingw32_HOST_OS)
-    iomgr->control_fd = -1;
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            iomgr->blocked_queue_hd = END_TSO_QUEUE;
+            iomgr->blocked_queue_tl = END_TSO_QUEUE;
+            iomgr->sleeping_queue   = END_TSO_QUEUE;
+            break;
 #endif
-#else // !defined(THREADED_RTS)
-    iomgr->blocked_queue_hd = END_TSO_QUEUE;
-    iomgr->blocked_queue_tl = END_TSO_QUEUE;
-    iomgr->sleeping_queue   = END_TSO_QUEUE;
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            iomgr->blocked_queue_hd = END_TSO_QUEUE;
+            iomgr->blocked_queue_tl = END_TSO_QUEUE;
+            break;
 #endif
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            iomgr->control_fd = -1;
+            break;
+#endif
+        default:
+            break;
+    }
 
     *piomgr = iomgr;
 }
@@ -376,11 +391,24 @@ void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
                              CapIOManager *iomgr USED_IF_NOT_THREADS)
 {
 
-#if !defined(THREADED_RTS)
-    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
-    evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
+            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
+            evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
+            break;
 #endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
+            evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
+            break;
+#endif
+        default:
+            break;
+    }
 
 }
 
