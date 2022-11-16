@@ -1,0 +1,3 @@
+
+TH_typedata.hs:8:7: error: [GHC-65904]
+    Type data not (yet) handled by Template Haskell

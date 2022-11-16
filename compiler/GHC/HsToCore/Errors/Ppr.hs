@@ -128,7 +128,7 @@ instance Diagnostic DsMessage where
              ThAmbiguousRecordUpdates fld
                -> mkMsg "Ambiguous record updates" (ppr fld)
              ThAbstractClosedTypeFamily decl
-               -> mkMsg "abstract closed type family" (ppr decl)
+               -> mkMsg "Abstract closed type family" (ppr decl)
              ThForeignLabel cls
                -> mkMsg "Foreign label" (doubleQuotes (ppr cls))
              ThForeignExport decl
@@ -168,6 +168,8 @@ instance Diagnostic DsMessage where
                -> mkMsg "Splices within declaration brackets" empty
              ThNonLinearDataCon
                -> mkMsg "Non-linear fields in data constructors" empty
+             ThTypeData
+               -> mkMsg "Type data" empty
          where
            mkMsg what doc =
              mkSimpleDecorated $

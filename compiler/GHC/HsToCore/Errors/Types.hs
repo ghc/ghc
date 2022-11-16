@@ -175,6 +175,7 @@ data ThRejectionReason
   | ThWarningAndDeprecationPragmas [LIdP GhcRn]
   | ThSplicesWithinDeclBrackets
   | ThNonLinearDataCon
+  | ThTypeData
 
 data NegLiteralExtEnabled
   = YesUsingNegLiterals
