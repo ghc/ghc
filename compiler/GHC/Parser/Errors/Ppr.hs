@@ -513,6 +513,16 @@ instance Diagnostic PsMessage where
           , nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n ]
       , text "In the newtype declaration for" <+> quotes (ppr tycon) ]
 
+    PsErrUnicodeCharLooksLike bad_char looks_like_char looks_like_char_name
+      -> mkSimpleDecorated $
+           hsep [ text "Unicode character"
+                -- purposefully not using `quotes (text [bad_char])`, because the quotes function adds smart quotes,
+                -- and smart quotes may be the topic of this error message
+                , text "'" <> text [bad_char] <> text "' (" <> text (show bad_char) <> text ")"
+                , text "looks like"
+                , text "'" <> text [looks_like_char] <> text "' (" <> text looks_like_char_name <> text ")" <> comma
+                , text "but it is not" ]
+
   diagnosticReason = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
@@ -630,6 +640,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalGadtRecordMultiplicity{}          -> ErrorWithoutFlag
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
+    PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -800,6 +811,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalGadtRecordMultiplicity{}          -> noHints
     PsErrInvalidCApiImport {}                     -> noHints
     PsErrMultipleConForNewtype {}                 -> noHints
+    PsErrUnicodeCharLooksLike{}                   -> noHints
 
   diagnosticCode = constructorCode
 

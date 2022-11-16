@@ -466,6 +466,11 @@ data PsMessage
 
    | PsErrMultipleConForNewtype !RdrName !Int
 
+   | PsErrUnicodeCharLooksLike
+      Char -- ^ the problematic character
+      Char -- ^ the character it looks like
+      String -- ^ the name of the character that it looks like
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

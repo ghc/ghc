@@ -267,6 +267,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrIllegalGadtRecordMultiplicity"            = 37475
   GhcDiagnosticCode "PsErrInvalidCApiImport"                        = 72744
   GhcDiagnosticCode "PsErrMultipleConForNewtype"                    = 05380
+  GhcDiagnosticCode "PsErrUnicodeCharLooksLike"                     = 31623
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850

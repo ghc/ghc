@@ -274,6 +274,9 @@ $tab          { warnTab }
 
 "-- " / { atEOL } { lineCommentToken }
 
+-- Everywhere: check for smart quotes--they are not allowed outside of strings
+$unigraphic / { isSmartQuote } { smart_quote_error }
+
 -- 'bol' state: beginning of a line.  Slurp up all the whitespace (including
 -- blank lines) until we find a non-whitespace character, then do layout
 -- processing.
@@ -2037,7 +2040,8 @@ lex_string_tok span buf _len _buf2 = do
 
 lex_quoted_label :: Action
 lex_quoted_label span _buf _len _buf2 = do
-  s <- lex_string_helper ""
+  start <- getInput
+  s <- lex_string_helper "" start
   (AI end _) <- getInput
   let
     token = ITlabelvarid (mkFastString s)
@@ -2050,7 +2054,8 @@ data LexedString = LexedRegularString String | LexedPrimString String
 
 lex_string :: P LexedString
 lex_string = do
-  s <- lex_string_helper ""
+  start <- getInput
+  s <- lex_string_helper "" start
   magicHash <- getBit MagicHashBit
   if magicHash
     then do
@@ -2070,8 +2075,8 @@ lex_string = do
       return $ LexedRegularString s
 
 
-lex_string_helper :: String -> P String
-lex_string_helper s = do
+lex_string_helper :: String -> AlexInput -> P String
+lex_string_helper s start = do
   i <- getInput
   case alexGetChar' i of
     Nothing -> lit_error i
@@ -2082,26 +2087,36 @@ lex_string_helper s = do
 
     Just ('\\',i)
         | Just ('&',i) <- next -> do
-                setInput i; lex_string_helper s
+                setInput i; lex_string_helper s start
         | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
                            -- is_space only works for <= '\x7f' (#3751, #5425)
-                setInput i; lex_stringgap s
+                setInput i; lex_stringgap s start
         where next = alexGetChar' i
 
     Just (c, i1) -> do
         case c of
-          '\\' -> do setInput i1; c' <- lex_escape; lex_string_helper (c':s)
-          c | isAny c -> do setInput i1; lex_string_helper (c:s)
+          '\\' -> do setInput i1; c' <- lex_escape; lex_string_helper (c':s) start
+          c | isAny c -> do setInput i1; lex_string_helper (c:s) start
+          _other | any isDoubleSmartQuote s -> do
+            -- if the built-up string s contains a smart double quote character, it was
+            -- likely the reason why the string literal was not lexed correctly
+            setInput start -- rewind to the first character in the string literal
+                           -- so we can find the smart quote character's location
+            advance_to_smart_quote_character
+            i2@(AI loc _) <- getInput
+            case alexGetChar' i2 of
+              Just (c, _) -> do add_nonfatal_smart_quote_error c loc; lit_error i
+              Nothing -> lit_error i -- should never get here
           _other -> lit_error i
 
 
-lex_stringgap :: String -> P String
-lex_stringgap s = do
+lex_stringgap :: String -> AlexInput -> P String
+lex_stringgap s start = do
   i <- getInput
   c <- getCharOrFail i
   case c of
-    '\\' -> lex_string_helper s
-    c | c <= '\x7f' && is_space c -> lex_stringgap s
+    '\\' -> lex_string_helper s start
+    c | c <= '\x7f' && is_space c -> lex_stringgap s start
                            -- is_space only works for <= '\x7f' (#3751, #5425)
     _other -> lit_error i
 
@@ -2123,15 +2138,16 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                    setInput i2
                    return (L (mkPsSpan loc end2)  ITtyQuote)
 
-        Just ('\\', i2@(AI _end2 _)) -> do      -- We've seen 'backslash
+        Just ('\\', i2@(AI end2 _)) -> do      -- We've seen 'backslash
                   setInput i2
                   lit_ch <- lex_escape
                   i3 <- getInput
                   mc <- getCharOrFail i3 -- Trailing quote
                   if mc == '\'' then finish_char_tok buf loc lit_ch
-                                else lit_error i3
+                  else if isSingleSmartQuote mc then add_smart_quote_error mc end2
+                  else lit_error i3
 
-        Just (c, i2@(AI _end2 _))
+        Just (c, i2@(AI end2 _))
                 | not (isAny c) -> lit_error i1
                 | otherwise ->
 
@@ -2141,6 +2157,7 @@ lex_char_tok span buf _len _buf2 = do        -- We've seen '
                 Just ('\'', i3) -> do   -- We've seen 'x'
                         setInput i3
                         finish_char_tok buf loc c
+                Just (c, _) | isSingleSmartQuote c -> add_smart_quote_error c end2
                 _other -> do            -- We've seen 'x not followed by quote
                                         -- (including the possibility of EOF)
                                         -- Just parse the quote only
@@ -2171,7 +2188,7 @@ isAny c | c > '\x7f' = isPrint c
 
 lex_escape :: P Char
 lex_escape = do
-  i0 <- getInput
+  i0@(AI loc _) <- getInput
   c <- getCharOrFail i0
   case c of
         'a'   -> return '\a'
@@ -2184,6 +2201,11 @@ lex_escape = do
         '\\'  -> return '\\'
         '"'   -> return '\"'
         '\''  -> return '\''
+        -- the next two patterns build up a Unicode smart quote error (#21843)
+        smart_double_quote | isDoubleSmartQuote smart_double_quote ->
+          add_smart_quote_error smart_double_quote loc
+        smart_single_quote | isSingleSmartQuote smart_single_quote ->
+          add_smart_quote_error smart_single_quote loc
         '^'   -> do i1 <- getInput
                     c <- getCharOrFail i1
                     if c >= '@' && c <= '_'
@@ -2337,6 +2359,49 @@ quasiquote_error start = do
   (AI end buf) <- getInput
   reportLexError start (psRealLoc end) buf
     (\k srcLoc -> mkPlainErrorMsgEnvelope srcLoc (PsErrLexer LexUnterminatedQQ k))
+
+-- -----------------------------------------------------------------------------
+-- Unicode Smart Quote detection (#21843)
+
+isDoubleSmartQuote :: Char -> Bool
+isDoubleSmartQuote '“' = True
+isDoubleSmartQuote '”' = True
+isDoubleSmartQuote _ = False
+
+isSingleSmartQuote :: Char -> Bool
+isSingleSmartQuote '‘' = True
+isSingleSmartQuote '’' = True
+isSingleSmartQuote _ = False
+
+isSmartQuote :: AlexAccPred ExtsBitmap
+isSmartQuote _ _ _ (AI _ buf) = let c = prevChar buf ' ' in isSingleSmartQuote c || isDoubleSmartQuote c
+
+smart_quote_error_message :: Char -> PsLoc -> MsgEnvelope PsMessage
+smart_quote_error_message c loc =
+  let (correct_char, correct_char_name) =
+         if isSingleSmartQuote c then ('\'', "Single Quote") else ('"', "Quotation Mark")
+      err = mkPlainErrorMsgEnvelope (mkSrcSpanPs (mkPsSpan loc loc)) $
+              PsErrUnicodeCharLooksLike c correct_char correct_char_name in
+    err
+
+smart_quote_error :: Action
+smart_quote_error span buf _len _buf2 = do
+  let c = currentChar buf
+  addFatalError (smart_quote_error_message c (psSpanStart span))
+
+add_smart_quote_error :: Char -> PsLoc -> P a
+add_smart_quote_error c loc = addFatalError (smart_quote_error_message c loc)
+
+add_nonfatal_smart_quote_error :: Char -> PsLoc -> P ()
+add_nonfatal_smart_quote_error c loc = addError (smart_quote_error_message c loc)
+
+advance_to_smart_quote_character :: P ()
+advance_to_smart_quote_character  = do
+  i <- getInput
+  case alexGetChar' i of
+    Just (c, _) | isDoubleSmartQuote c -> return ()
+    Just (_, i2) -> do setInput i2; advance_to_smart_quote_character
+    Nothing -> return () -- should never get here
 
 -- -----------------------------------------------------------------------------
 -- Warnings
