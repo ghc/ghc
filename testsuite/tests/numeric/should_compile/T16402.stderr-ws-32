@@ -43,7 +43,7 @@ smallWord_foo
       case x of { W64# x# ->
       case {__pkg_ccall ghc-prim Word64#
                       -> Word64# -> State# RealWorld -> (# State# RealWorld, Word64# #)}
-             x# 0xffff##64 realWorld#
+             x# 0xffff#Word64 realWorld#
       of
       { (# ds2, ds3 #) ->
       case {__pkg_ccall ghc-prim Word64#
@@ -86,7 +86,7 @@ $wsmallInt_foo
   = \ ww ->
       case {__pkg_ccall ghc-prim Int64#
                       -> State# RealWorld -> (# State# RealWorld, Word64# #)}
-             1245183#64 realWorld#
+             1245183#Int64 realWorld#
       of
       { (# ds2, ds3 #) ->
       case {__pkg_ccall ghc-prim Int64#

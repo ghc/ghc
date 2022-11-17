@@ -283,8 +283,8 @@ T17966.$tcC :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T17966.$tcC
   = GHC.Types.TyCon
-      12503088876068780286##64
-      926716241154773768##64
+      12503088876068780286#Word64
+      926716241154773768#Word64
       T17966.$trModule
       $tcC_sRL
       0#

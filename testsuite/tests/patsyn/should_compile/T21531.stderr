@@ -68,8 +68,8 @@ T21531.$tcLGate :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 10}]
 T21531.$tcLGate
   = GHC.Types.TyCon
-      1751240159874500841##64
-      16519490186165952419##64
+      1751240159874500841#Word64
+      16519490186165952419#Word64
       T21531.$trModule
       (GHC.Types.TrNameS "LGate"#)
       0#
@@ -98,8 +98,8 @@ T21531.$tc'LGate :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 50 10}]
 T21531.$tc'LGate
   = GHC.Types.TyCon
-      4309544208860551001##64
-      1328337796258811871##64
+      4309544208860551001#Word64
+      1328337796258811871#Word64
       T21531.$trModule
       (GHC.Types.TrNameS "'LGate"#)
       0#

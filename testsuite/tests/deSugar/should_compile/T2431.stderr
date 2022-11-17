@@ -59,8 +59,8 @@ T2431.$tc:~: :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc:~:
   = GHC.Types.TyCon
-      4608886815921030019##64
-      6030312177285011233##64
+      4608886815921030019#Word64
+      6030312177285011233#Word64
       T2431.$trModule
       $tc:~:2
       0#
@@ -98,8 +98,8 @@ T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 T2431.$tc'Refl
   = GHC.Types.TyCon
-      2478588351447975921##64
-      2684375695874497811##64
+      2478588351447975921#Word64
+      2684375695874497811#Word64
       T2431.$trModule
       $tc'Refl2
       1#

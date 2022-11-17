@@ -37,7 +37,8 @@ fun1 [InlPrag=NOINLINE[final]] :: Foo -> ()
          Tmpl= \ (x [Occ=Once1] :: Foo) ->
                  case T7360.$wfun1 x of { (# #) -> GHC.Tuple.Prim.() }}]
 fun1
-  = \ (x :: Foo) -> case T7360.$wfun1 x of { (# #) -> GHC.Tuple.Prim.() }
+  = \ (x :: Foo) ->
+      case T7360.$wfun1 x of { (# #) -> GHC.Tuple.Prim.() }
 
 -- RHS size: {terms: 5, types: 1, coercions: 0, joins: 0/0}
 T7360.fun4 :: ()
@@ -132,8 +133,8 @@ T7360.$tcFoo :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7360.$tcFoo
   = GHC.Types.TyCon
-      1581370841583180512##64
-      13291578023368289311##64
+      1581370841583180512#Word64
+      13291578023368289311#Word64
       T7360.$trModule
       T7360.$tcFoo1
       0#
@@ -167,8 +168,8 @@ T7360.$tc'Foo1 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo1
   = GHC.Types.TyCon
-      3986951253261644518##64
-      2515097940992351150##64
+      3986951253261644518#Word64
+      2515097940992351150#Word64
       T7360.$trModule
       T7360.$tc'Foo5
       0#
@@ -195,8 +196,8 @@ T7360.$tc'Foo2 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo2
   = GHC.Types.TyCon
-      17325079864060690428##64
-      2969742457748208427##64
+      17325079864060690428#Word64
+      2969742457748208427#Word64
       T7360.$trModule
       T7360.$tc'Foo7
       0#
@@ -228,8 +229,8 @@ T7360.$tc'Foo3 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7360.$tc'Foo3
   = GHC.Types.TyCon
-      3674231676522181654##64
-      2694749919371021431##64
+      3674231676522181654#Word64
+      2694749919371021431#Word64
       T7360.$trModule
       T7360.$tc'Foo10
       0#

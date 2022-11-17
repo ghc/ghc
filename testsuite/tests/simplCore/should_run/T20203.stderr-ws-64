@@ -25,11 +25,12 @@ bitOrTwoVarInt8
       case y of { I8# x#1 ->
       I8#
         (word8ToInt8#
-           (orWord8# 17##8 (orWord8# (int8ToWord8# x#) (int8ToWord8# x#1))))
+           (orWord8#
+              17#Word8 (orWord8# (int8ToWord8# x#) (int8ToWord8# x#1))))
       }
       }
 
-bitAndInt1 = I8# 0#8
+bitAndInt1 = I8# 0#Int8
 
 bitAndTwoVarInt8
   = \ x y ->
@@ -38,7 +39,7 @@ bitAndTwoVarInt8
 bitOrInt8
   = \ x ->
       case x of { I8# x# ->
-      I8# (word8ToInt8# (orWord8# 17##8 (int8ToWord8# x#)))
+      I8# (word8ToInt8# (orWord8# 17#Word8 (int8ToWord8# x#)))
       }
 
 bitAndInt8 = \ x -> case x of { I8# x# -> bitAndInt1 }
@@ -50,7 +51,7 @@ bitOrTwoVarInt16
       I16#
         (word16ToInt16#
            (orWord16#
-              255##16 (orWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+              255#Word16 (orWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
       }
       }
 
@@ -61,20 +62,20 @@ bitAndTwoVarInt16
       I16#
         (word16ToInt16#
            (andWord16#
-              170##16 (andWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
+              170#Word16 (andWord16# (int16ToWord16# x#) (int16ToWord16# x#1))))
       }
       }
 
 bitOrInt16
   = \ x ->
       case x of { I16# x# ->
-      I16# (word16ToInt16# (orWord16# 255##16 (int16ToWord16# x#)))
+      I16# (word16ToInt16# (orWord16# 255#Word16 (int16ToWord16# x#)))
       }
 
 bitAndInt16
   = \ x ->
       case x of { I16# x# ->
-      I16# (word16ToInt16# (andWord16# 170##16 (int16ToWord16# x#)))
+      I16# (word16ToInt16# (andWord16# 170#Word16 (int16ToWord16# x#)))
       }
 
 bitOrTwoVarInt32
@@ -125,7 +126,8 @@ bitOrTwoVarInt64
       case y of { I64# x#1 ->
       I64#
         (word64ToInt64#
-           (or64# 255##64 (or64# (int64ToWord64# x#) (int64ToWord64# x#1))))
+           (or64#
+              255#Word64 (or64# (int64ToWord64# x#) (int64ToWord64# x#1))))
       }
       }
 
@@ -135,20 +137,21 @@ bitAndTwoVarInt64
       case y of { I64# x#1 ->
       I64#
         (word64ToInt64#
-           (and64# 170##64 (and64# (int64ToWord64# x#) (int64ToWord64# x#1))))
+           (and64#
+              170#Word64 (and64# (int64ToWord64# x#) (int64ToWord64# x#1))))
       }
       }
 
 bitOrInt64
   = \ x ->
       case x of { I64# x# ->
-      I64# (word64ToInt64# (or64# 255##64 (int64ToWord64# x#)))
+      I64# (word64ToInt64# (or64# 255#Word64 (int64ToWord64# x#)))
       }
 
 bitAndInt64
   = \ x ->
       case x of { I64# x# ->
-      I64# (word64ToInt64# (and64# 170##64 (int64ToWord64# x#)))
+      I64# (word64ToInt64# (and64# 170#Word64 (int64ToWord64# x#)))
       }
 
 

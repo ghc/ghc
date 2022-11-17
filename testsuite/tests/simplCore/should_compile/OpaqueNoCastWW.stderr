@@ -106,8 +106,8 @@ OpaqueNoCastWW.$tcSigned :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tcSigned
   = GHC.Types.TyCon
-      12374680438872388605##64
-      16570143229152367467##64
+      12374680438872388605#Word64
+      16570143229152367467#Word64
       OpaqueNoCastWW.$trModule
       $tcSigned2
       0#
@@ -145,8 +145,8 @@ OpaqueNoCastWW.$tc'S :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 OpaqueNoCastWW.$tc'S
   = GHC.Types.TyCon
-      9801584576887380300##64
-      5757617350287545124##64
+      9801584576887380300#Word64
+      5757617350287545124#Word64
       OpaqueNoCastWW.$trModule
       $tc'S2
       1#

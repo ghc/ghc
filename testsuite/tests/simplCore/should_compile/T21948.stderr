@@ -62,12 +62,12 @@ T21948.nf'1
                    $wgo_s11i (ww_s11e :: GHC.Prim.Int64#)
                              (eta2_s11g [Occ=Once2, OS=OneShot]
                                 :: GHC.Prim.State# GHC.Prim.RealWorld)
-                     = case GHC.Prim.leInt64# ww_s11e 0#64 of {
+                     = case GHC.Prim.leInt64# ww_s11e 0#Int64 of {
                          __DEFAULT ->
                            case lvl_s111 of y_aNQ [Occ=Once1] { __DEFAULT ->
                            case reduce_aBy y_aNQ of { () ->
                            jump go_s10Z
-                             (GHC.Int.I64# (GHC.Prim.subInt64# ww_s11e 1#64)) eta2_s11g
+                             (GHC.Int.I64# (GHC.Prim.subInt64# ww_s11e 1#Int64)) eta2_s11g
                            }
                            };
                          1# -> (# eta2_s11g, GHC.Tuple.() #)
@@ -98,11 +98,11 @@ T21948.nf'1
         [LclId[JoinId(2)(Nothing)], Arity=2, Str=<L><L>, Unf=OtherCon []]
         $wgo_s11i (ww1_X3 :: GHC.Prim.Int64#)
                   (eta2_s11g [OS=OneShot] :: GHC.Prim.State# GHC.Prim.RealWorld)
-          = case GHC.Prim.leInt64# ww1_X3 0#64 of {
+          = case GHC.Prim.leInt64# ww1_X3 0#Int64 of {
               __DEFAULT ->
                 case lvl_s111 of { __DEFAULT ->
                 case lvl1_s11A of { () ->
-                jump $wgo_s11i (GHC.Prim.subInt64# ww1_X3 1#64) eta2_s11g
+                jump $wgo_s11i (GHC.Prim.subInt64# ww1_X3 1#Int64) eta2_s11g
                 }
                 };
               1# -> (# eta2_s11g, GHC.Tuple.() #)

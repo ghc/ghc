@@ -11,11 +11,11 @@ Dependent packages: [base-4.17.0.0]
 ==================== Typechecker ====================
 Bug.$tcC
   = GHC.Types.TyCon
-      12754692886077552850##64 18375870125396612007##64 Bug.$trModule
-      (GHC.Types.TrNameS "C"#) 0# $krep
+      12754692886077552850#Word64 18375870125396612007#Word64
+      Bug.$trModule (GHC.Types.TrNameS "C"#) 0# $krep
 Bug.$tc'C:C
   = GHC.Types.TyCon
-      302756782745842909##64 14248103394115774781##64 Bug.$trModule
+      302756782745842909#Word64 14248103394115774781#Word64 Bug.$trModule
       (GHC.Types.TrNameS "'C:C"#) 2# $krep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp

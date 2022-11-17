@@ -329,8 +329,8 @@ T21848.$tcC :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T21848.$tcC
   = GHC.Types.TyCon
-      14679919086118427567##64
-      12559744112860329810##64
+      14679919086118427567#Word64
+      12559744112860329810#Word64
       T21848.$trModule
       $tcC_s1fa
       0#
@@ -373,8 +373,8 @@ T21848.$tcD :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T21848.$tcD
   = GHC.Types.TyCon
-      2028775029841869083##64
-      18183109077030380353##64
+      2028775029841869083#Word64
+      18183109077030380353#Word64
       T21848.$trModule
       $tcD_s1fd
       0#
@@ -431,8 +431,8 @@ T21848.$tc'C:D :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T21848.$tc'C:D
   = GHC.Types.TyCon
-      4845813539547459579##64
-      7908713917114703782##64
+      4845813539547459579#Word64
+      7908713917114703782#Word64
       T21848.$trModule
       $tc'C:D_s1fg
       1#

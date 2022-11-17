@@ -153,7 +153,7 @@ encodeUtf8BuilderEscaped [InlPrag=INLINE (sat-args=1)]
                                                           GHC.Word.W8# r#_a24P
                                                           } } in
                                                     case GHC.Word.ltWord8
-                                                           w_a1EF (GHC.Word.W8# 128##8)
+                                                           w_a1EF (GHC.Word.W8# 128#Word8)
                                                     of {
                                                       False ->
                                                         (\ (s_a25B [Occ=Once1]
@@ -452,7 +452,7 @@ encodeUtf8BuilderEscaped
                                                                               of r#_a24P
                                                                               { __DEFAULT ->
                                                                               case GHC.Prim.ltWord8#
-                                                                                     r#_a24P 128##8
+                                                                                     r#_a24P 128#Word8
                                                                               of {
                                                                                 __DEFAULT ->
                                                                                   case GHC.Prim.writeWord8OffAddr#
@@ -540,7 +540,7 @@ encodeUtf8BuilderEscaped
                                                                                             { __DEFAULT ->
                                                                                             case GHC.Prim.ltWord8#
                                                                                                    r#1_Xr
-                                                                                                   128##8
+                                                                                                   128#Word8
                                                                                             of {
                                                                                               __DEFAULT ->
                                                                                                 case GHC.Prim.writeWord8OffAddr#
@@ -765,7 +765,7 @@ encodeUtf8BuilderEscaped
                                                                               of r#_a24P
                                                                               { __DEFAULT ->
                                                                               case GHC.Prim.ltWord8#
-                                                                                     r#_a24P 128##8
+                                                                                     r#_a24P 128#Word8
                                                                               of {
                                                                                 __DEFAULT ->
                                                                                   case GHC.Prim.writeWord8OffAddr#
@@ -846,7 +846,7 @@ encodeUtf8BuilderEscaped
                                                                                             { __DEFAULT ->
                                                                                             case GHC.Prim.ltWord8#
                                                                                                    r#1_Xr
-                                                                                                   128##8
+                                                                                                   128#Word8
                                                                                             of {
                                                                                               __DEFAULT ->
                                                                                                 case GHC.Prim.writeWord8OffAddr#
@@ -945,7 +945,7 @@ encodeUtf8BuilderEscaped
                                                                                             { __DEFAULT ->
                                                                                             case GHC.Prim.ltWord8#
                                                                                                    r#1_Xr
-                                                                                                   128##8
+                                                                                                   128#Word8
                                                                                             of {
                                                                                               __DEFAULT ->
                                                                                                 case GHC.Prim.writeWord8OffAddr#
@@ -1208,7 +1208,7 @@ encodeUtf8BuilderEscaped
                                                                                  { __DEFAULT ->
                                                                                  case GHC.Prim.ltWord8#
                                                                                         r#_a24P
-                                                                                        128##8
+                                                                                        128#Word8
                                                                                  of {
                                                                                    __DEFAULT ->
                                                                                      case GHC.Prim.writeWord8OffAddr#
@@ -1298,7 +1298,7 @@ encodeUtf8BuilderEscaped
                                                                                                { __DEFAULT ->
                                                                                                case GHC.Prim.ltWord8#
                                                                                                       r#1_XB
-                                                                                                      128##8
+                                                                                                      128#Word8
                                                                                                of {
                                                                                                  __DEFAULT ->
                                                                                                    case GHC.Prim.writeWord8OffAddr#
@@ -1528,7 +1528,7 @@ encodeUtf8BuilderEscaped
                                                                                  { __DEFAULT ->
                                                                                  case GHC.Prim.ltWord8#
                                                                                         r#_a24P
-                                                                                        128##8
+                                                                                        128#Word8
                                                                                  of {
                                                                                    __DEFAULT ->
                                                                                      case GHC.Prim.writeWord8OffAddr#
@@ -1611,7 +1611,7 @@ encodeUtf8BuilderEscaped
                                                                                                { __DEFAULT ->
                                                                                                case GHC.Prim.ltWord8#
                                                                                                       r#1_XB
-                                                                                                      128##8
+                                                                                                      128#Word8
                                                                                                of {
                                                                                                  __DEFAULT ->
                                                                                                    case GHC.Prim.writeWord8OffAddr#
@@ -1710,7 +1710,7 @@ encodeUtf8BuilderEscaped
                                                                                                { __DEFAULT ->
                                                                                                case GHC.Prim.ltWord8#
                                                                                                       r#1_XB
-                                                                                                      128##8
+                                                                                                      128#Word8
                                                                                                of {
                                                                                                  __DEFAULT ->
                                                                                                    case GHC.Prim.writeWord8OffAddr#
@@ -1829,7 +1829,7 @@ encodeUtf8BuilderEscaped
                                                case GHC.Prim.indexWord8Array# bx_d22M sc2_s2cL
                                                of r#_a24P
                                                { __DEFAULT ->
-                                               case GHC.Prim.ltWord8# r#_a24P 128##8 of {
+                                               case GHC.Prim.ltWord8# r#_a24P 128#Word8 of {
                                                  __DEFAULT ->
                                                    case GHC.Prim.writeWord8OffAddr#
                                                           @GHC.Prim.RealWorld
@@ -1884,7 +1884,7 @@ encodeUtf8BuilderEscaped
                                                                     bx_d22M sc5_s2cS
                                                              of r#1_Xk
                                                              { __DEFAULT ->
-                                                             case GHC.Prim.ltWord8# r#1_Xk 128##8
+                                                             case GHC.Prim.ltWord8# r#1_Xk 128#Word8
                                                              of {
                                                                __DEFAULT ->
                                                                  case GHC.Prim.writeWord8OffAddr#
@@ -1952,7 +1952,7 @@ encodeUtf8BuilderEscaped
                                                                     bx_d22M ww_Xe
                                                              of r#1_Xk
                                                              { __DEFAULT ->
-                                                             case GHC.Prim.ltWord8# r#1_Xk 128##8
+                                                             case GHC.Prim.ltWord8# r#1_Xk 128#Word8
                                                              of {
                                                                __DEFAULT ->
                                                                  case GHC.Prim.writeWord8OffAddr#

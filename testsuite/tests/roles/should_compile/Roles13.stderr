@@ -69,8 +69,8 @@ Roles13.$tcAge :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcAge
   = GHC.Types.TyCon
-      3456257068627873222##64
-      14056710845110756026##64
+      3456257068627873222#Word64
+      14056710845110756026#Word64
       Roles13.$trModule
       $tcAge2
       0#
@@ -103,8 +103,8 @@ Roles13.$tc'MkAge :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkAge
   = GHC.Types.TyCon
-      18264039750958872441##64
-      1870189534242358050##64
+      18264039750958872441#Word64
+      1870189534242358050#Word64
       Roles13.$trModule
       $tc'MkAge2
       0#
@@ -125,8 +125,8 @@ Roles13.$tcWrap :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tcWrap
   = GHC.Types.TyCon
-      13773534096961634492##64
-      15591525585626702988##64
+      13773534096961634492#Word64
+      15591525585626702988#Word64
       Roles13.$trModule
       $tcWrap2
       0#
@@ -164,8 +164,8 @@ Roles13.$tc'MkWrap :: GHC.Types.TyCon
 [GblId, Unf=OtherCon []]
 Roles13.$tc'MkWrap
   = GHC.Types.TyCon
-      15580677875333883466##64
-      808508687714473149##64
+      15580677875333883466#Word64
+      808508687714473149#Word64
       Roles13.$trModule
       $tc'MkWrap2
       1#

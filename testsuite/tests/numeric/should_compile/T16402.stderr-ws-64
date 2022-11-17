@@ -37,7 +37,7 @@ smallInt_foo
            (int16ToInt#
               (intToInt16#
                  (int64ToInt#
-                    (word64ToInt64# (and64# (int64ToWord64# x#) 0x0012ffff##64))))))
+                    (word64ToInt64# (and64# (int64ToWord64# x#) 0x0012ffff#Word64))))))
       }
 
 

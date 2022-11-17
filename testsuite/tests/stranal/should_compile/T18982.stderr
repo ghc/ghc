@@ -72,7 +72,7 @@ T18982.$tcBox1 = GHC.Types.TrNameS T18982.$tcBox2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcBox :: GHC.Types.TyCon
-T18982.$tcBox = GHC.Types.TyCon 16948648223906549518##64 2491460178135962649##64 T18982.$trModule T18982.$tcBox1 0# GHC.Types.krep$*Arr*
+T18982.$tcBox = GHC.Types.TyCon 16948648223906549518#Word64 2491460178135962649#Word64 T18982.$trModule T18982.$tcBox1 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep7 :: [GHC.Types.KindRep]
@@ -96,7 +96,7 @@ T18982.$tc'Box2 = GHC.Types.TrNameS T18982.$tc'Box3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tc'Box :: GHC.Types.TyCon
-T18982.$tc'Box = GHC.Types.TyCon 1412068769125067428##64 8727214667407894081##64 T18982.$trModule T18982.$tc'Box2 1# T18982.$tc'Box1
+T18982.$tc'Box = GHC.Types.TyCon 1412068769125067428#Word64 8727214667407894081#Word64 T18982.$trModule T18982.$tc'Box2 1# T18982.$tc'Box1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcEx2 :: GHC.Prim.Addr#
@@ -108,7 +108,7 @@ T18982.$tcEx1 = GHC.Types.TrNameS T18982.$tcEx2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcEx :: GHC.Types.TyCon
-T18982.$tcEx = GHC.Types.TyCon 4376661818164435927##64 18005417598910668817##64 T18982.$trModule T18982.$tcEx1 0# GHC.Types.krep$*Arr*
+T18982.$tcEx = GHC.Types.TyCon 4376661818164435927#Word64 18005417598910668817#Word64 T18982.$trModule T18982.$tcEx1 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 $krep9 :: [GHC.Types.KindRep]
@@ -136,7 +136,7 @@ T18982.$tc'Ex2 = GHC.Types.TrNameS T18982.$tc'Ex3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tc'Ex :: GHC.Types.TyCon
-T18982.$tc'Ex = GHC.Types.TyCon 14609381081172201359##64 3077219645053200509##64 T18982.$trModule T18982.$tc'Ex2 2# T18982.$tc'Ex1
+T18982.$tc'Ex = GHC.Types.TyCon 14609381081172201359#Word64 3077219645053200509#Word64 T18982.$trModule T18982.$tc'Ex2 2# T18982.$tc'Ex1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcGADT2 :: GHC.Prim.Addr#
@@ -148,7 +148,7 @@ T18982.$tcGADT1 = GHC.Types.TrNameS T18982.$tcGADT2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcGADT :: GHC.Types.TyCon
-T18982.$tcGADT = GHC.Types.TyCon 9243924476135839950##64 5096619276488416461##64 T18982.$trModule T18982.$tcGADT1 0# GHC.Types.krep$*Arr*
+T18982.$tcGADT = GHC.Types.TyCon 9243924476135839950#Word64 5096619276488416461#Word64 T18982.$trModule T18982.$tcGADT1 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep12 :: GHC.Types.KindRep
@@ -168,7 +168,7 @@ T18982.$tc'GADT2 = GHC.Types.TrNameS T18982.$tc'GADT3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tc'GADT :: GHC.Types.TyCon
-T18982.$tc'GADT = GHC.Types.TyCon 2077850259354179864##64 16731205864486799217##64 T18982.$trModule T18982.$tc'GADT2 0# T18982.$tc'GADT1
+T18982.$tc'GADT = GHC.Types.TyCon 2077850259354179864#Word64 16731205864486799217#Word64 T18982.$trModule T18982.$tc'GADT2 0# T18982.$tc'GADT1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcExGADT2 :: GHC.Prim.Addr#
@@ -180,7 +180,7 @@ T18982.$tcExGADT1 = GHC.Types.TrNameS T18982.$tcExGADT2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tcExGADT :: GHC.Types.TyCon
-T18982.$tcExGADT = GHC.Types.TyCon 6470898418160489500##64 10361108917441214060##64 T18982.$trModule T18982.$tcExGADT1 0# GHC.Types.krep$*Arr*
+T18982.$tcExGADT = GHC.Types.TyCon 6470898418160489500#Word64 10361108917441214060#Word64 T18982.$trModule T18982.$tcExGADT1 0# GHC.Types.krep$*Arr*
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep13 :: GHC.Types.KindRep
@@ -208,7 +208,7 @@ T18982.$tc'ExGADT2 = GHC.Types.TrNameS T18982.$tc'ExGADT3
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T18982.$tc'ExGADT :: GHC.Types.TyCon
-T18982.$tc'ExGADT = GHC.Types.TyCon 8468257409157161049##64 5503123603717080600##64 T18982.$trModule T18982.$tc'ExGADT2 1# T18982.$tc'ExGADT1
+T18982.$tc'ExGADT = GHC.Types.TyCon 8468257409157161049#Word64 5503123603717080600#Word64 T18982.$trModule T18982.$tc'ExGADT2 1# T18982.$tc'ExGADT1
 
 -- RHS size: {terms: 11, types: 10, coercions: 0, joins: 0/0}
 T18982.$wi :: forall {a} {e}. (a GHC.Prim.~# Int) => e -> GHC.Prim.Int# -> GHC.Prim.Int#

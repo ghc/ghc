@@ -99,8 +99,8 @@ OpaqueNoSpecConstr.$tcSPEC :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 OpaqueNoSpecConstr.$tcSPEC
   = GHC.Types.TyCon
-      1794519131116102988##
-      1536993820726345194##
+      1794519131116102988#Word64
+      1536993820726345194#Word64
       OpaqueNoSpecConstr.$trModule
       OpaqueNoSpecConstr.$tcSPEC1
       0#
@@ -135,8 +135,8 @@ OpaqueNoSpecConstr.$tc'SPEC :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 OpaqueNoSpecConstr.$tc'SPEC
   = GHC.Types.TyCon
-      9648911419523887824##
-      4100179153648933145##
+      9648911419523887824#Word64
+      4100179153648933145#Word64
       OpaqueNoSpecConstr.$trModule
       OpaqueNoSpecConstr.$tc'SPEC3
       0#
@@ -164,8 +164,8 @@ OpaqueNoSpecConstr.$tc'SPEC2 :: GHC.Types.TyCon
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 OpaqueNoSpecConstr.$tc'SPEC2
   = GHC.Types.TyCon
-      4214136204857816792##
-      17253701793498718125##
+      4214136204857816792#Word64
+      17253701793498718125#Word64
       OpaqueNoSpecConstr.$trModule
       OpaqueNoSpecConstr.$tc'SPEC5
       0#

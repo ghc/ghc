@@ -1251,14 +1251,14 @@ primFloatSuffix  = char '#'
 primIntSuffix    = char '#'
 primDoubleSuffix = text "##"
 primWordSuffix   = text "##"
-primInt8Suffix   = text "#8"
-primWord8Suffix  = text "##8"
-primInt16Suffix  = text "#16"
-primWord16Suffix = text "##16"
-primInt32Suffix  = text "#32"
-primWord32Suffix = text "##32"
-primInt64Suffix  = text "#64"
-primWord64Suffix = text "##64"
+primInt8Suffix   = text "#Int8"
+primWord8Suffix  = text "#Word8"
+primInt16Suffix  = text "#Int16"
+primWord16Suffix = text "#Word16"
+primInt32Suffix  = text "#Int32"
+primWord32Suffix = text "#Word32"
+primInt64Suffix  = text "#Int64"
+primWord64Suffix = text "#Word64"
 
 -- | Special combinator for showing unboxed literals.
 pprPrimChar :: Char -> SDoc
