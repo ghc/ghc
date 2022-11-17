@@ -9,6 +9,7 @@ CPP_FLAGS = \
 			-Irts/include \
 			-Irts/dist/build \
 			-I_build/stage1/rts/build/include \
+			-I_build/stage1/rts/build/include \
 			-DWARD \
 			-DTHREADED_RTS
 
