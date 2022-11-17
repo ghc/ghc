@@ -465,8 +465,7 @@ mkFastStringWith mk_fs sbs = do
   FastStringTableSegment lock _ buckets# <- readIORef segmentRef
   let idx# = hashToIndex# buckets# hash#
   bucket <- IO $ readArray# buckets# idx#
-  res <- bucket_match bucket sbs
-  case res of
+  case bucket_match bucket sbs of
     Just found -> return found
     Nothing -> do
       -- The withMVar below is not dupable. It can lead to deadlock if it is
@@ -485,8 +484,7 @@ mkFastStringWith mk_fs sbs = do
       FastStringTableSegment _ counter buckets# <- maybeResizeSegment segmentRef
       let idx# = hashToIndex# buckets# hash#
       bucket <- IO $ readArray# buckets# idx#
-      res <- bucket_match bucket sbs
-      case res of
+      case bucket_match bucket sbs of
         -- The FastString was added by another thread after previous read and
         -- before we acquired the write lock.
         Just found -> return found
@@ -497,11 +495,12 @@ mkFastStringWith mk_fs sbs = do
           _ <- atomicFetchAddFastMut counter 1
           return fs
 
-bucket_match :: [FastString] -> ShortByteString -> IO (Maybe FastString)
-bucket_match [] _ = return Nothing
-bucket_match (fs@(FastString {fs_sbs=fs_sbs}) : ls) sbs
-  | fs_sbs == sbs = return (Just fs)
-  | otherwise     =  bucket_match ls sbs
+bucket_match :: [FastString] -> ShortByteString -> Maybe FastString
+bucket_match fs sbs = go fs
+  where go [] = Nothing
+        go (fs@(FastString {fs_sbs=fs_sbs}) : ls)
+          | fs_sbs == sbs = Just fs
+          | otherwise     = go ls
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
 mkFastStringBytes !ptr !len =
