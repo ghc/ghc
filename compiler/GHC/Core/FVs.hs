@@ -36,7 +36,7 @@ module GHC.Core.FVs (
         ruleLhsFreeIds, ruleLhsFreeIdsList,
         ruleRhsFreeVars, rulesRhsFreeIds,
 
-        expr_fvs,
+        exprFVs,
 
         -- * Orphan names
         orphNamesOfType, orphNamesOfCo, orphNamesOfAxiom,

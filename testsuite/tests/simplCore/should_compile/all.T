@@ -437,6 +437,7 @@ test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-
 
 test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
 test('T22357',  normal, compile, ['-O'])
+test('T22471',  normal, compile, ['-O'])
 test('T22347',  normal, compile, ['-O -fno-full-laziness'])
 test('T22347a', normal, compile, ['-O2 -fno-full-laziness'])
 

@@ -708,7 +708,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
          --                         , text "spec_co:" <+> ppr spec_co
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
          dflags <- getDynFlags
-       ; case decomposeRuleLhs dflags spec_bndrs ds_lhs of {
+       ; case decomposeRuleLhs dflags spec_bndrs ds_lhs (mkVarSet spec_bndrs) of {
            Left msg -> do { diagnosticDs msg; return Nothing } ;
            Right (rule_bndrs, _fn, rule_lhs_args) -> do
 
@@ -835,6 +835,7 @@ SPEC f :: ty                [n]   INLINE [k]
 -}
 
 decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
+                 -> VarSet   -- Free vars of the RHS
                  -> Either DsMessage ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
@@ -842,47 +843,63 @@ decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
 --
 -- Returns an error message if the LHS isn't of the expected shape
 -- Note [Decomposing the left-hand side of a RULE]
-decomposeRuleLhs dflags orig_bndrs orig_lhs
-  | not (null unbound)    -- Check for things unbound on LHS
-                          -- See Note [Unused spec binders]
-  = Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
+decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
   | Var funId <- fun2
   , Just con <- isDataConId_maybe funId
   = Left (DsRuleIgnoredDueToConstructor con) -- See Note [No RULES on datacons]
-  | Just (fn_id, args) <- decompose fun2 args2
-  , let extra_bndrs = mk_extra_bndrs fn_id args
-  = -- pprTrace "decomposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
-    --                                  , text "orig_lhs:" <+> ppr orig_lhs
-    --                                  , text "lhs1:"     <+> ppr lhs1
-    --                                  , text "extra_bndrs:" <+> ppr extra_bndrs
-    --                                  , text "fn_id:" <+> ppr fn_id
-    --                                  , text "args:"   <+> ppr args]) $
-    Right (orig_bndrs ++ extra_bndrs, fn_id, args)
+
+  | Nothing <- mb_lhs_app
+  = Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+
+  | not (null unbound)    -- Check for things unbound on LHS
+                          -- See Note [Unused spec binders]
+  = -- pprTrace "decomposeRuleLhs 1" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+    --                                     , text "orig_lhs:" <+> ppr orig_lhs
+    --                                     , text "lhs_fvs:" <+> ppr lhs_fvs
+    --                                     , text "rhs_fvs:" <+> ppr rhs_fvs
+    --                                     , text "unbound:" <+> ppr unbound
+    --                                     ]) $
+    Left (DsRuleBindersNotBound unbound orig_bndrs orig_lhs lhs2)
 
   | otherwise
-  = Left (DsRuleLhsTooComplicated orig_lhs lhs2)
+  = -- pprTrace "decomposeRuleLhs 2" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
+    --                                    , text "orig_lhs:" <+> ppr orig_lhs
+    --                                    , text "lhs1:"     <+> ppr lhs1
+    --                                    , text "extra_bndrs:" <+> ppr extra_bndrs
+    --                                    , text "fn_id:" <+> ppr fn_id
+    --                                    , text "args:"   <+> ppr args
+    --                                    , text "args fvs:" <+> ppr (exprsFreeVarsList args)
+    --                                    ]) $
+    Right (trimmed_bndrs ++ extra_bndrs, fn_id, args)
+
  where
-   simpl_opts   = initSimpleOpts dflags
+   simpl_opts    = initSimpleOpts dflags
+   orig_bndr_set = mkVarSet orig_bndrs
+
    lhs1         = drop_dicts orig_lhs
    lhs2         = simpleOptExpr simpl_opts lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
 
-   lhs_fvs    = exprFreeVars lhs2
-   unbound    = filterOut (`elemVarSet` lhs_fvs) orig_bndrs
+   mb_lhs_app = decompose fun2 args2
+   Just (fn_id, args) = mb_lhs_app
 
-   orig_bndr_set = mkVarSet orig_bndrs
+   -- See Note [Variables unbound on the LHS]
+   lhs_fvs       = exprsFreeVars args
+   all_fvs       = lhs_fvs `unionVarSet` rhs_fvs
+   trimmed_bndrs = filter (`elemVarSet` all_fvs) orig_bndrs
+   unbound       = filterOut (`elemVarSet` lhs_fvs) trimmed_bndrs
+                   -- Needed on RHS but not bound on LHS
 
         -- Add extra tyvar binders: Note [Free tyvars on rule LHS]
         -- and extra dict binders: Note [Free dictionaries on rule LHS]
-   mk_extra_bndrs fn_id args
-     = scopedSort unbound_tvs ++ unbound_dicts
+   extra_bndrs = scopedSort extra_tvs ++ extra_dicts
      where
-       unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
-       unbound_dicts = [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
-                       | d <- unbound_vars, isDictId d ]
-       unbound_vars  = [ v | v <- exprsFreeVarsList args
-                           , not (v `elemVarSet` orig_bndr_set)
-                           , not (v == fn_id) ]
+       extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
+       extra_dicts = [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
+                     | d <- extra_vars, isDictId d ]
+       extra_vars  = [ v | v <- exprsFreeVarsList args
+                         , not (v `elemVarSet` orig_bndr_set)
+                         , not (v == fn_id) ]
          -- fn_id: do not quantify over the function itself, which may
          -- itself be a dictionary (in pathological cases, #10251)
 
@@ -926,6 +943,27 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
        needed' = (needed `minusVarSet` rhs_fvs) `extendVarSet` d
 
 {-
+Note [Variables unbound on the LHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We obviously want to complain about
+   RULE   forall x. f True = not x
+because the forall'd variable `x` is not bound on the LHS.
+
+It can be a bit delicate when dictionaries are involved.
+Consider #22471
+  {-# RULES "foo" forall (f :: forall a. [a] -> Int).
+                  foo (\xs. 1 + f xs) = 2 + foo f #-}
+
+We get two dicts on the LHS, one from `1` and one from `+`.
+For reasons described in Note [The SimplifyRule Plan] in
+GHC.Tc.Gen.Rule, we quantify separately over those dictionaries:
+   forall f (d1::Num Int) (d2 :: Num Int).
+   foo (\xs. (+) d1 (fromInteger d2 1) xs) = ...
+
+Now the desugarer shortcircuits (fromInteger d2 1) to (I# 1); so d2 is
+not mentioned at all (on LHS or RHS)! We don't want to complain about
+and unbound d2.  Hence the trimmed_bndrs.
+
 Note [Decomposing the left-hand side of a RULE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are several things going on here.
@@ -955,6 +993,9 @@ to do it here in the desugarer.
 Moreover, we have to do something rather similar for dictionaries;
 see Note [Free dictionaries on rule LHS].   So that's why we look for
 type variables free on the LHS, and quantify over them.
+
+This relies on there not being any in-scope tyvars, which is true for
+user-defined RULEs, which are always top-level.
 
 Note [Free dictionaries on rule LHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

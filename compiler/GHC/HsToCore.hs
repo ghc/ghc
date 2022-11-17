@@ -48,7 +48,7 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon       ( tyConDataCons )
 import GHC.Core
-import GHC.Core.FVs       ( exprsSomeFreeVarsList )
+import GHC.Core.FVs       ( exprsSomeFreeVarsList, exprFreeVars )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold.Make
@@ -463,7 +463,7 @@ dsRule (L loc (HsRule { rd_name = name
         -- Substitute the dict bindings eagerly,
         -- and take the body apart into a (f args) form
         ; dflags <- getDynFlags
-        ; case decomposeRuleLhs dflags bndrs'' lhs'' of {
+        ; case decomposeRuleLhs dflags bndrs'' lhs'' (exprFreeVars rhs'') of {
                 Left msg -> do { diagnosticDs msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
