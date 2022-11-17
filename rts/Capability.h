@@ -404,12 +404,12 @@ release_capability_lock(Capability *cap STG_UNUSED) {
 WARD_NEED(capability_lock_held)
 INLINE_HEADER Task *
 get_running_task(Capability *cap) {
-    return cap->running_task;
+    ACQUIRE_LOAD(&cap->running_task);
 }
 WARD_NEED(capability_lock_held)
 INLINE_HEADER void
 set_running_task(Capability *cap, Task *task) {
-    cap->running_task = task;
+    RELEASE_STORE(&cap->running_task, task);
 }
 
 /* -----------------------------------------------------------------------------
