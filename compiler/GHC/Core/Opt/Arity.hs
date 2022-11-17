@@ -791,7 +791,7 @@ andArityType env (AT [] div1) at2 = andWithTail env div1 at2
 andArityType env at1 (AT [] div2) = andWithTail env div2 at1
 
 andWithTail :: ArityEnv -> Divergence -> ArityType -> ArityType
-andWithTail env div1 at2@(AT lams2 _)
+andWithTail env div1 at2
   | isDeadEndDiv div1     -- case x of { T -> error; F -> \y.e }
   = at2        -- Note [ABot branches: max arity wins]
 
@@ -799,7 +799,7 @@ andWithTail env div1 at2@(AT lams2 _)
   = AT [] topDiv
 
   | otherwise  -- case x of { T -> plusInt <expensive>; F -> \y.e }
-  = AT lams2 topDiv    -- We know div1 = topDiv
+  = takeWhileOneShot at2    -- We know div1 = topDiv
     -- See Note [Combining case branches: andWithTail]
 
 
