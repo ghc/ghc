@@ -298,23 +298,29 @@ initIOManager(void)
 void
 initIOManagerAfterFork(Capability **pcap USED_IF_THREADS_AND_NOT_MINGW32)
 {
-#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
-    /* Posix implementation in posix/Signals.c
-     *
-     * No non-threaded impl because the non-threaded Posix select() I/O manager
-     * does not need any initialisation.
-     *
-     * No Windows impl since no forking.
-     *
-     * TODO: figure out if it is necessary for the threaded MIO case for the
-     * starting of the IO manager threads to be synchronous. It would be
-     * simpler if it could start them asynchronously and thus not have to
-     * have the pcap as an inout param, that could be modified. In practice it
-     * cannot be modified anyway since in the contexts where it is called
-     * (forkProcess), there is only a single cap available.
-     */
-    ioManagerStartCap(pcap);
+
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            /* Posix implementation in posix/Signals.c
+             *
+             * TODO: figure out if it is necessary for the threaded MIO case
+             * for the starting of the IO manager threads to be synchronous.
+             * It would be simpler if it could start them asynchronously and
+             * thus not have to have the pcap as an inout param, that could be
+             * modified. In practice it cannot be modified anyway since in the
+             * contexts where it is called (forkProcess), there is only a
+             * single cap available.
+             */
+            ioManagerStartCap(pcap);
+            break;
 #endif
+        /* The IO_MANAGER_SELECT needs no initialisation */
+
+        /* No impl for any of the Windows I/O managers, since no forking. */
+        default:
+            break;
+    }
 }
 
 
@@ -378,12 +384,35 @@ exitIOManager(bool wait_threads USED_IF_NOT_THREADS_AND_MINGW32)
  */
 void wakeupIOManager(void)
 {
-#if defined(THREADED_RTS)
-    /* Posix implementation in posix/Signals.c
-     * Win32 implementation in win32/ThrIOManager.c
-     */
-    ioManagerWakeup();
+    switch (iomgr_type) {
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            /* MIO Posix implementation in posix/Signals.c */
+            ioManagerWakeup();
+            break;
 #endif
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+            /* MIO Windows implementation in win32/ThrIOManager.c
+             * Yes, this is shared with the WinIO (threaded) impl.
+             */
+            ioManagerWakeup();
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+#if defined(THREADED_RTS)
+            /* WinIO threaded implementation in win32/ThrIOManager.c
+             * Yes, this is shared with the MIO win32 impl.
+             */
+            ioManagerWakeup();
+#endif
+            break;
+#endif
+        default:
+            break;
+    }
 }
 
 void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
