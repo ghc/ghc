@@ -2,7 +2,15 @@ WARD = /opt/exp/haskell-packages/ward/dist-newstyle/build/x86_64-linux/ghc-8.6.5
 
 WARD_CONFIG = rts/ward.config
 
-CPP_FLAGS = -Iincludes -Iincludes/dist/build -Irts -Irts/dist/build -DWARD -DTHREADED_RTS
+CPP_FLAGS = \
+			-Iincludes \
+			-Iincludes/dist/build \
+			-Irts \
+			-Irts/include \
+			-Irts/dist/build \
+			-I_build/stage1/rts/build/include \
+			-DWARD \
+			-DTHREADED_RTS
 
 WARD_OPTS += --config=${WARD_CONFIG} $(addprefix -P,${CPP_FLAGS})
 
