@@ -590,10 +590,8 @@ pprInstr platform instr = case instr of
      -- We never jump to ForeignLabels; if we ever do, c.f. handling for "BL"
      | isForeignLabel lbl -> panic "PPC.Ppr.pprInstr: JMP to ForeignLabel"
      | otherwise ->
-       lines_ [ -- an alias for b that takes a CLabel
-           char '\t',
-           text "b",
-           char '\t',
+       line $ hcat [ -- an alias for b that takes a CLabel
+           text "\tb\t",
            pprAsmLabel platform lbl
        ]
 
@@ -711,13 +709,13 @@ pprInstr platform instr = case instr of
 
    MFOV fmt reg
       -> vcat [
-           lines_ [
+           line $ hcat [
                char '\t',
                text "mfxer",
                char '\t',
                pprReg reg
                ],
-           lines_ [
+           line $ hcat [
                char '\t',
                text "extr",
                case fmt of
