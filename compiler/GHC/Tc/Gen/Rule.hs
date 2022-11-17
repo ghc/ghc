@@ -167,7 +167,8 @@ tcRule (HsRule { rd_ext  = ext
                                 , text "rule_ty:" <+> ppr rule_ty
                                 , text "ty_bndrs:" <+> ppr ty_bndrs
                                 , text "qtkvs ++ tpl_ids:" <+> ppr (qtkvs ++ tpl_ids)
-                                , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
+                                , text "tpl_id info:" <+>
+                                  vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
        -- SimplfyRule Plan, step 5

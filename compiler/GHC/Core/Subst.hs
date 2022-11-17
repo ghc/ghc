@@ -577,7 +577,7 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
      = tyCoFVsOfCo fv_co (const True) emptyVarSet $! acc
      | otherwise
      , let fv_expr = lookupIdSubst subst fv
-     = expr_fvs fv_expr isLocalVar emptyVarSet $! acc
+     = exprFVs fv_expr (const True) emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish
