@@ -639,7 +639,9 @@ struct XXH64_state_s {
    XXH64_hash_t reserved64;  /* never read nor write, might be removed in a future version */
 };   /* typedef'd to XXH64_state_t */
 
-#if defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)   /* C11+ */
+#if defined(WARD)
+#  define XXH_ALIGN(n)   /* disabled */
+#elif defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)   /* C11+ */
 #  include <stdalign.h>
 #  define XXH_ALIGN(n)      alignas(n)
 #elif defined(__GNUC__)
@@ -2588,11 +2590,11 @@ XXH_mult64to128(xxh_u64 lhs, xxh_u64 rhs)
      * In that case it is best to use the portable one.
      * https://github.com/Cyan4973/xxHash/issues/211#issuecomment-515575677
      */
-#if defined(__GNUC__) && !defined(__wasm__) \
+#if defined(__GNUC__) && !defined(__wasm__) && !defined(WARD) \
     && defined(__SIZEOF_INT128__) \
     || (defined(_INTEGRAL_MAX_BITS) && _INTEGRAL_MAX_BITS >= 128)
 
-    __uint128_t const product = (__uint128_t)lhs * (__uint128_t)rhs;
+    __uint128_t product = (__uint128_t)lhs * (__uint128_t)rhs;
     XXH128_hash_t r128;
     r128.low64  = (xxh_u64)(product);
     r128.high64 = (xxh_u64)(product >> 64);
@@ -2611,7 +2613,7 @@ XXH_mult64to128(xxh_u64 lhs, xxh_u64 rhs)
 #   pragma intrinsic(_umul128)
 #endif
     xxh_u64 product_high;
-    xxh_u64 const product_low = _umul128(lhs, rhs, &product_high);
+    xxh_u64 product_low = _umul128(lhs, rhs, &product_high);
     XXH128_hash_t r128;
     r128.low64  = product_low;
     r128.high64 = product_high;
