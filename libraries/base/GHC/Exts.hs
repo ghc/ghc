@@ -120,6 +120,8 @@ module GHC.Exts
         unsafeCoerce#,
 
         -- ** Casting class dictionaries with single methods
+        --
+        --   @since 4.17.0.0
         WithDict(..),
 
         -- * The maximum tuple size

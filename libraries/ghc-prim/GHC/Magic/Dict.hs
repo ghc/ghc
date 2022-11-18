@@ -33,13 +33,23 @@ module GHC.Magic.Dict (WithDict(..)) where
 
 import GHC.Types (RuntimeRep, TYPE)
 
--- | @'withDict' d f@ provides a way to call a type-class–overloaded function
--- @f@ by applying it to the supplied dictionary @d@.
+-- | The constraint @'WithDict' cls meth@ can be solved when evidence for
+-- the constraint @cls@ can be provided in the form of a dictionary of
+-- type @meth@. This requires @cls@ to be a class constraint whose single
+-- method has type @meth@.
 --
--- 'withDict' can only be used if the type class has a single method with no
--- superclasses. For more (important) details on how this works, see
+-- For more (important) details on how this works, see
 -- @Note [withDict]@ in "GHC.Tc.Instance.Class" in GHC.
+--
+--   @since 0.9.0
 class WithDict cls meth where
+  -- @'withDict' d f@ provides a way to call a type-class–overloaded function
+  -- @f@ by applying it to the supplied dictionary @d@.
+  --
+  -- 'withDict' can only be used if the type class has a single method with no
+  -- superclasses.
+  --
+  --   @since 0.9.0
   withDict :: forall {rr :: RuntimeRep} (r :: TYPE rr). meth -> (cls => r) -> r
 
 {- Note [withDict has an ambiguous type]
