@@ -39,6 +39,7 @@ ghcWarningsArgs = do
         , package haddock      ? pure [ "-Wno-unused-imports"
                                       , "-Wno-deprecations" ]
         , package haskeline    ? pure [ "-Wno-deprecations"
+                                      , "-Wno-x-partial"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
                                       , "-Wno-simplifiable-class-constraints" ]

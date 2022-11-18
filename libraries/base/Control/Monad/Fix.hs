@@ -2,6 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- For head in instance MonadFix []
+{-# OPTIONS_GHC -Wno-x-partial #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Fix
@@ -32,7 +35,7 @@ import Data.Monoid ( Dual(..), Sum(..), Product(..)
 import Data.Ord ( Down(..) )
 import GHC.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Generics
-import GHC.List ( head, tail )
+import GHC.List ( head, drop )
 import GHC.Tuple (Solo (..))
 import Control.Monad.ST.Imp
 import System.IO
@@ -79,7 +82,7 @@ instance MonadFix Maybe where
 instance MonadFix [] where
     mfix f = case fix (f . head) of
                []    -> []
-               (x:_) -> x : mfix (tail . f)
+               (x:_) -> x : mfix (drop 1 . f)
 
 -- | @since 4.9.0.0
 instance MonadFix NonEmpty where

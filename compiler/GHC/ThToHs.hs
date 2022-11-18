@@ -27,7 +27,7 @@ module GHC.ThToHs
    )
 where
 
-import GHC.Prelude hiding (head, init, last, tail)
+import GHC.Prelude hiding (init, last, tail)
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
@@ -60,7 +60,6 @@ import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
-import Data.List (head)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )

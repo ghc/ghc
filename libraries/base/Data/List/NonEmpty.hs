@@ -243,7 +243,7 @@ inits1 =
   -- * The only empty element of `inits xs` is the first one (by the definition of `inits`)
   -- * Therefore, if we take all but the first element of `inits xs` i.e.
   --   `tail (inits xs)`, we have a nonempty list of nonempty lists
-  fromList . Prelude.map fromList . List.tail . List.inits . Foldable.toList
+  fromList . Prelude.map fromList . List.drop 1 . List.inits . Foldable.toList
 
 -- | The 'tails' function takes a stream @xs@ and returns all the
 -- suffixes of @xs@, starting with the longest. The result is 'NonEmpty'

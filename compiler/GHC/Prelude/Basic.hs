@@ -2,6 +2,9 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# OPTIONS_GHC -O2 #-} -- See Note [-O2 Prelude]
 
+-- See Note [Proxies for head and tail]
+{-# OPTIONS_GHC -Wno-unrecognised-warning-flags -Wno-x-partial #-}
+
 -- | Custom minimal GHC "Prelude"
 --
 -- This module serves as a replacement for the "Prelude" module
@@ -19,6 +22,7 @@ module GHC.Prelude.Basic
   ,Applicative (..)
   ,module Bits
   ,shiftL, shiftR
+  ,head, tail
   ) where
 
 
@@ -50,9 +54,11 @@ NoImplicitPrelude. There are two motivations for this:
     extensions.
 -}
 
-import Prelude as X hiding ((<>), Applicative(..))
+import qualified Prelude
+import Prelude as X hiding ((<>), Applicative(..), head, tail)
 import Control.Applicative (Applicative(..))
 import Data.Foldable as X (foldl')
+import GHC.Stack.Types (HasCallStack)
 
 #if MIN_VERSION_base(4,16,0)
 import GHC.Bits as Bits hiding (shiftL, shiftR)
@@ -102,3 +108,22 @@ shiftR = Bits.shiftR
 shiftL = Bits.unsafeShiftL
 shiftR = Bits.unsafeShiftR
 #endif
+
+{- Note [Proxies for head and tail]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Prelude.head and Prelude.tail has recently acquired {-# WARNING in "x-partial" #-},
+but GHC codebase uses them fairly extensively and insists on building warning-free.
+Thus instead of adding {-# OPTIONS_GHC -Wno-x-partial #-} to every module which
+employs them, we define a warning-less proxies and export them from GHC.Prelude.
+-}
+
+-- See Note [Proxies for head and tail]
+head :: HasCallStack => [a] -> a
+head = Prelude.head
+{-# INLINE head #-}
+
+-- See Note [Proxies for head and tail]
+tail :: HasCallStack => [a] -> [a]
+tail = Prelude.tail
+{-# INLINE tail #-}
