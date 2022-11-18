@@ -1,7 +1,6 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
 import Data.Bifunctor
-import Data.Function
 import qualified Data.List.NonEmpty as NE
 
 import Base

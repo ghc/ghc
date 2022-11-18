@@ -1,4 +1,10 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Base (
     -- * General utilities
@@ -14,6 +20,8 @@ module Base (
     module Development.Shake.Classes,
     module Development.Shake.FilePath,
     module Development.Shake.Util,
+
+    Vec(..), (&%>),
 
     -- * Basic data types
     module Hadrian.Package,
@@ -36,20 +44,27 @@ module Base (
 import Control.Applicative
 import Control.Monad.Extra
 import Control.Monad.Reader
+import Control.Monad.State ( State )
+import qualified Control.Monad.State as State
+import Data.Foldable (toList)
+import Data.Kind
 import Data.List.Extra
 import Data.Maybe
 import Data.Semigroup
 #if MIN_VERSION_shake(0,19,0)
-import Development.Shake hiding (unit, Normal)
+import Development.Shake hiding (unit, (&%>), Normal)
 #else
-import Development.Shake hiding (unit, (*>), Normal)
+import Development.Shake hiding (unit, (&%>), (*>), Normal)
 #endif
+import qualified Development.Shake as Shake
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import Development.Shake.Util
 import Hadrian.Oracles.DirectoryContents
 import Hadrian.Utilities
 import Hadrian.Package
+
+import GHC.Stack ( HasCallStack )
 
 import Stage
 import Way
@@ -156,3 +171,43 @@ templateHscPath stage = stageLibPath stage <&> (-/- "template-hsc.h")
 --   Windows). See "Rules.Program".
 mingwStamp :: FilePath
 mingwStamp = "mingw" -/- ".stamp"
+
+-- | Same as @'Development.Shake.&%>'@ except that it works with an arbitrary
+-- traversable structure of 'FilePattern's, which avoids running into incomplete
+-- pattern match warnings (see #22430).
+(&%>) :: (HasCallStack, Traversable t, Show (t FilePath))
+      => t FilePattern -> (t FilePath -> Action ()) -> Rules ()
+ps &%> f = toList ps Shake.&%> ( \ fs -> f (fromListWithShape ps fs) )
+
+-- | Utility function that fills in the values of a traversable shape
+-- with the elements of the provided list.
+fromListWithShape :: forall t a b
+                  .  ( HasCallStack, Show (t a), Show b, Traversable t )
+                  => t a -> [b] -> t b
+fromListWithShape shape elts =
+  traverse (const getElt) shape `State.evalState` elts
+  where
+    getElt :: State [b] b
+    getElt = do { s <- State.get
+                ; case s of
+                { []   -> error $ "fromListWithShape: not enough elements to fill this shape\n"
+                               ++ "elements: " ++ show elts ++"\n"
+                               ++ "shape: " ++ show shape
+                ; b:bs ->
+             do { State.put bs
+                ; return b } } }
+
+infixr 5 :&
+data Nat = Zero | Succ Nat
+
+-- | A traversable vector type, defined for convenient use with '(&%>)'.
+type Vec :: Nat -> Type -> Type
+data Vec n a where
+  Nil  :: Vec Zero a
+  (:&) :: a -> Vec n a -> Vec (Succ n) a
+
+deriving instance Functor     (Vec n)
+deriving instance Foldable    (Vec n)
+deriving instance Traversable (Vec n)
+instance Show a => Show (Vec n a) where
+  showsPrec p v = showsPrec p (toList v)

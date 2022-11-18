@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects) where
 
 import Base
@@ -96,7 +98,8 @@ gmpRules = do
         --  - <root>/stageN/gmp/gmp.h
         --  - <root>/stageN/gmp/libgmp.a
         --  - <root>/stageN/gmp/objs/*.o (unpacked objects from libgmp.a)
-        [gmpPath -/- "libgmp.a", gmpPath -/- "gmp.h"] &%> \[lib,header] -> do
+        (gmpPath -/- "libgmp.a" :& gmpPath -/- "gmp.h" :& Nil) &%>
+          \( lib :& header :& _) -> do
             let gmpP = takeDirectory lib
             ctx <- makeGmpPathContext gmpP
             -- build libgmp.a via gmp's Makefile
@@ -133,7 +136,8 @@ gmpRules = do
         -- Extract in-tree GMP sources and apply patches. Produce
         --  - <root>/stageN/gmp/gmpbuild/Makefile.in
         --  - <root>/stageN/gmp/gmpbuild/configure
-        [gmpPath -/- "gmpbuild/Makefile.in", gmpPath -/- "gmpbuild/configure"] &%> \[mkIn,_] -> do
+        (gmpPath -/- "gmpbuild/Makefile.in" :& gmpPath -/- "gmpbuild/configure" :& Nil)
+           &%> \( mkIn :& _ ) -> do
             top <- topDirectory
             let gmpBuildP = takeDirectory mkIn
                 gmpP      = takeDirectory gmpBuildP

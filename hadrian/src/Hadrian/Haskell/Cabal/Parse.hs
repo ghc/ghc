@@ -212,14 +212,18 @@ resolveContextData context@Context {..} = do
 
     -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
     -- See: https://github.com/snowleopard/hadrian/issues/548
-    let extDeps      = externalPackageDeps lbi'
-        deps         = map (C.display . snd) extDeps
-        depDirect    = map (fromMaybe (error "resolveContextData: depDirect failed")
-                     . C.lookupUnitId (C.installedPkgs lbi') . fst) extDeps
-        depIds       = map (C.display . Installed.installedUnitId) depDirect
-        Just ghcProg = C.lookupProgram C.ghcProgram (C.withPrograms lbi')
-        depPkgs      = C.topologicalOrder (packageHacks (C.installedPkgs lbi'))
-        forDeps f    = concatMap f depPkgs
+    let extDeps   = externalPackageDeps lbi'
+        deps      = map (C.display . snd) extDeps
+        depDirect = map (fromMaybe (error "resolveContextData: depDirect failed")
+                  . C.lookupUnitId (C.installedPkgs lbi') . fst) extDeps
+        depIds    = map (C.display . Installed.installedUnitId) depDirect
+        ghcProg   =
+          case C.lookupProgram C.ghcProgram (C.withPrograms lbi') of
+            Just ghc -> ghc
+            Nothing  -> error "resolveContextData: failed to look up 'ghc'"
+
+        depPkgs   = C.topologicalOrder (packageHacks (C.installedPkgs lbi'))
+        forDeps f = concatMap f depPkgs
 
         -- Copied from Distribution.Simple.PreProcess.ppHsc2Hs
         packageHacks = case C.compilerFlavor (C.compiler lbi') of

@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 module Rules.Documentation (
     -- * Rules
     buildPackageDocumentation, documentationRules,
@@ -333,7 +335,7 @@ buildSphinxInfoGuide = do
             -- default target of which actually produces the target
             -- for this build rule.
             let p = dir -/- path
-            let [texipath, infopath] = map (p <.>) ["texi", "info"]
+            let (texipath :& infopath :& _) = fmap (p <.>) ("texi" :& "info" :& Nil)
             build $ target docContext (Makeinfo) [texipath] [infopath]
             copyFileUntracked infopath file
 

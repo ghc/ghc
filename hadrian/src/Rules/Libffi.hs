@@ -202,7 +202,8 @@ libffiRules = do
         writeFileLines dynLibMan dynLibFiles
         putSuccess "| Successfully build libffi."
 
-    fmap (libffiPath -/-) ["Makefile.in", "configure" ] &%> \[mkIn, _] -> do
+    fmap (libffiPath -/-) ( "Makefile.in" :& "configure" :& Nil ) &%>
+      \ ( mkIn :& _ ) -> do
         -- Extract libffi tar file
         context <- libffiContext stage
         removeDirectory libffiPath
@@ -225,7 +226,8 @@ libffiRules = do
         files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- "**"]
         produces files
 
-    fmap (libffiPath -/-) ["Makefile", "config.guess", "config.sub"] &%> \[mk, _, _] -> do
+    fmap (libffiPath -/-) ("Makefile" :& "config.guess" :& "config.sub" :& Nil)
+      &%> \( mk :& _ ) -> do
         _ <- needLibfffiArchive libffiPath
         context <- libffiContext stage
 
