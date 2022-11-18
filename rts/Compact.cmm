@@ -143,7 +143,10 @@ eval:
     }
 
     case ARR_WORDS: {
-
+        // Lives in large object block/compact region but explicitly marked pinned.
+        if(info == stg_ARR_WORDS_PINNED_info) {
+            jump stg_raisezh(base_GHCziIOziException_cannotCompactPinned_closure);
+        }
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
         if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
         if (should == SHOULDCOMPACT_PINNED) {

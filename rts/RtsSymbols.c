@@ -655,6 +655,7 @@ extern char **environ;
       SymI_HasDataProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasDataProto(stg_newAlignedPinnedByteArrayzh)                    \
       SymI_HasDataProto(stg_isByteArrayPinnedzh)                            \
+      SymI_HasDataProto(stg_unsafePinMutableByteArrayzh)                    \
       SymI_HasDataProto(stg_isMutableByteArrayPinnedzh)                     \
       SymI_HasDataProto(stg_shrinkMutableByteArrayzh)                       \
       SymI_HasDataProto(stg_resizzeMutableByteArrayzh)                      \
@@ -762,6 +763,7 @@ extern char **environ;
       SymI_HasDataProto(stg_TVAR_DIRTY_info)                                \
       SymI_HasDataProto(stg_IND_STATIC_info)                                \
       SymI_HasDataProto(stg_ARR_WORDS_info)                                 \
+      SymI_HasDataProto(stg_ARR_WORDS_PINNED_info)                          \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_DIRTY_info)                        \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info)                 \
       SymI_HasDataProto(stg_MUT_ARR_PTRS_FROZEN_DIRTY_info)                 \

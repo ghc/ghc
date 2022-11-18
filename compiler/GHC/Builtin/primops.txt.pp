@@ -1917,13 +1917,47 @@ primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
         can_fail_warning = YesWarnCanFail
         -- can fail warning for the "power of two" requirement
 
+primop  UnsafePinMutableByteArrayOp "unsafePinMutableByteArray#" GenPrimOp
+   MutableByteArray# s -> State# s -> (# State# s, MutableByteArray# s #)
+   {Returns a pinned version of the given mutable byte array.
+
+   * If possible the byte array will be pinned in place.
+   * If not a pinned array will be allocated and the contents of the given array will
+     be copied into it.
+
+   If pinning was in-place or not can be checked by calling sameByteArray# with
+   the the argument and result of unsafePinMutableByteArray#.
+
+   Generally the argument will be pinned in place if:
+   * The argument array is large enough to be considered a large object by the RTS.
+   * The argument array is part of a compact region.
+   * The argument array is already pinned (making this a no-op).
+   But the circumstances which allow a byte array to be pinned in place might
+   change in future releases of GHC.
+
+   This function is considered unsafe as it can change the pinnedness of the argument
+   which can break code using compact region. If this is a concern it's always possible
+   to explicitly allocate a new array and copy over the contents.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
+   MutableByteArray# s -> Int#
+   {Determine whether a 'MutableByteArray#' is guaranteed not to move.}
+   with out_of_line = True
+
+primop  MutableByteArrayIsGcPinnedOp "isMutableByteArrayGcPinned#" GenPrimOp
    MutableByteArray# s -> Int#
    {Determine whether a 'MutableByteArray#' is guaranteed not to move
    during GC.}
    with out_of_line = True
 
 primop  ByteArrayIsPinnedOp "isByteArrayPinned#" GenPrimOp
+   ByteArray# -> Int#
+   {Determine whether a 'ByteArray#' is guaranteed not to move.}
+   with out_of_line = True
+
+primop  ByteArrayIsGcPinnedOp "isByteArrayGcPinned#" GenPrimOp
    ByteArray# -> Int#
    {Determine whether a 'ByteArray#' is guaranteed not to move during GC.}
    with out_of_line = True

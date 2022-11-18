@@ -129,6 +129,17 @@
   an alias to these names. This change may affect tools and libraries that
   rely on type names, such as `Generic` and Template Haskell.
 
+- Added to `GHC.Prim`:
+
+        isByteArrayGcPinned# :: ByteArray# -> Int#
+        isMutableByteArrayGcPinned# :: MutableByteArray# s -> Int#
+        unsafePinMutableByteArray# :: MutableByteArray# s -> s -> (# s, MutableByteArray# s #)
+
+  These operations allow users to distinguish between objects which are never
+  moved and those not moved during GC. The former might be moved only by user
+  request. For example when compacting a data structure. It also allows for a more
+  convenient/efficient way to get a pinned version of an already allocated byte array.
+
 ## 0.10.0
 
 - Shipped with GHC 9.6.1

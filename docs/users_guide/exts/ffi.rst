@@ -1112,22 +1112,50 @@ to the floating point state, so that if you really need to use
 Pinned Byte Arrays
 ~~~~~~~~~~~~~~~~~~
 
-A pinned byte array is one that the garbage collector is not allowed
+A pinned byte array is one that is not allowed
 to move. Consequently, it has a stable address that can be safely
 requested with ``byteArrayContents#``. Not that being pinned doesn't
 prevent the byteArray from being gc'ed in the same fashion a regular
 byte array would be.
 There are a handful of primitive functions in :base-ref:`GHC.Exts.`
 used to enforce or check for pinnedness: ``isByteArrayPinned#``,
-``isMutableByteArrayPinned#``, and ``newPinnedByteArray#``. A
-byte array can be pinned as a result of three possible causes:
+``isMutableByteArrayPinned#``, ``unsafePinMutableByteArray#`` and
+``newPinnedByteArray#``. A byte array can be pinned as a result of two
+possible causes:
 
 1. It was allocated by ``newPinnedByteArray#``.
+2. It was pinned by a call to ``unsafePinMutableByteArray``.
+
+Every regular pinned byte array is also gc pinned. Since it never being
+allowed to move implies it's also not allowed to move during gc.
+
+GcPinned Byte Arrays
+~~~~~~~~~~~~~~~~~~~~
+These are very similar to regular pinned byte arrays. Just like
+regular pinned byte arrays they are never moved during gc.
+
+The main difference is that they are allowed to be moved for other (non-gc)
+reasons. Currently the only reason this might happen is the construction of
+compact regions. But other reasons might be added in future released. For example
+we might start to compact large objects inside the heap in future releases.
+
+A byte array can be gc pinned as a result of three possible causes:
+
+1. It's a regular pinned byte arrays.
 2. It is large. Currently, GHC defines large object to be one
    that is at least as large as 80% of a 4KB block (i.e. at
    least 3277 bytes).
 3. It has been copied into a compact region. The documentation
    for ``ghc-compact`` and ``compact`` describes this process.
+
+However ``byteArrayContents#`` can still be unsafe on these arrays.
+For example such arrays might be copied into compact regions which
+will invalidate any pointer into the payload of the copied arrays.
+This happened in #22255.
+
+If a regular pinned version of such an array is needed ``unsafePinMutableByteArray#``
+can be used. It will try to turn the array into a pinned one without copying if
+possible and only creating a pinned copy if this can't be avoided.
 
 .. [1] Prior to GHC 8.10, when passing an ``ArrayArray#`` argument
   to a foreign function, the foreign function would see a pointer

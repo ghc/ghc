@@ -1,0 +1,24 @@
+Small:False
+Large:False
+Compacted:False
+Pinned:True
+"Failed to compact pinned array as expected."
+Pinnedness of original array references after unsafePinMutableByteArray#
+Small:False
+Large:True
+Compacted:
+True
+Pinned:
+True
+Pinnedness of arrays returned from unsafePinMutableByteArray#
+Small:True
+Large:True
+Compacted:True
+Pinned:True
+Have references been pinned in-place?
+Small:False
+Large:True
+Compacted:True
+Pinned:True
+"Failed to compact large array post-pin(expected to fail)."
+"Failed to compact ar_compact array post-pin(expected to fail)."

@@ -1,4 +1,4 @@
-/* -*- tab-width: 8 -*- */
+ /* -*- tab-width: 8 -*- */
 /* -----------------------------------------------------------------------------
  *
  * (c) The GHC Team, 1998-2012
@@ -58,6 +58,7 @@ import CLOSURE stable_ptr_table;
 import CLOSURE stg_AP_STACK_info;
 import CLOSURE stg_AP_info;
 import CLOSURE stg_ARR_WORDS_info;
+import CLOSURE stg_ARR_WORDS_PINNED_info;
 import CLOSURE stg_BCO_info;
 import CLOSURE stg_C_FINALIZER_LIST_info;
 import CLOSURE stg_DEAD_WEAK_info;
@@ -159,7 +160,7 @@ stg_newPinnedByteArrayzh ( W_ n )
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* No write barrier needed since this is a new allocation. */
-    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    SET_HDR(p, stg_ARR_WORDS_PINNED_info, CCCS);
     StgArrBytes_bytes(p) = n;
     return (p);
 }
@@ -194,12 +195,46 @@ stg_newAlignedPinnedByteArrayzh ( W_ n, W_ alignment )
     TICK_ALLOC_PRIM(SIZEOF_StgArrBytes,WDS(payload_words),0);
 
     /* No write barrier needed since this is a new allocation. */
-    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    SET_HDR(p, stg_ARR_WORDS_PINNED_info, CCCS);
     StgArrBytes_bytes(p) = n;
     return (p);
 }
 
 stg_isByteArrayPinnedzh ( gcptr ba )
+// ByteArray# s -> Int#
+{
+    return (GET_INFO(ba) == stg_ARR_WORDS_PINNED_info);
+}
+
+stg_unsafePinMutableByteArrayzh ( gcptr ba )
+{
+    //It's already pinned, return as-is.
+    if(GET_INFO(ba) == stg_ARR_WORDS_PINNED_info) {
+        return (ba);
+    } else {
+    // If the object is large or in a compact region allow
+    // pinning in-place.
+        W_ bd, flags;
+        bd = Bdescr(ba);
+        flags = TO_W_(bdescr_flags(bd));
+        if(flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0) {
+            SET_INFO(ba,stg_ARR_WORDS_PINNED_info);
+            return (ba);
+    // Otherwise we have no choice but to create a copy.
+        } else {
+            W_ n;
+            //Otherwise allocate a new array and copy the contents.
+            n = StgArrBytes_bytes(ba);
+            (P_ pinned) = call stg_newPinnedByteArrayzh(n);
+            prim %memcpy(BYTE_ARR_CTS(pinned), BYTE_ARR_CTS(ba),
+                        n, SIZEOF_W);
+            return(pinned);//
+        };
+    };
+}
+
+// Doesn't move during GC so safe for FFI
+stg_isByteArrayGcPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
     W_ bd, flags;
@@ -219,6 +254,12 @@ stg_isMutableByteArrayPinnedzh ( gcptr mba )
 // MutableByteArray# s -> Int#
 {
     jump stg_isByteArrayPinnedzh(mba);
+}
+
+stg_isMutableByteArrayGcPinnedzh ( gcptr mba )
+// MutableByteArray# s -> Int#
+{
+    jump stg_isByteArrayGcPinnedzh(mba);
 }
 
 /* Note [LDV profiling and resizing arrays]

@@ -915,6 +915,9 @@ CLOSURE(stg_STM_AWOKEN_closure,stg_STM_AWOKEN);
 INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
 { foreign "C" barf("ARR_WORDS object (%p) entered!", R1) never returns; }
 
+INFO_TABLE(stg_ARR_WORDS_PINNED, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
+{ foreign "C" barf("ARR_WORDS_PINNED object (%p) entered!", R1) never returns; }
+
 INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
 { foreign "C" barf("MUT_ARR_PTRS_CLEAN object (%p) entered!", R1) never returns; }
 

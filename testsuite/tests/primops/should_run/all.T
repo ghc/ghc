@@ -74,6 +74,8 @@ test('FMA_ConstantFold'
       ]
     , compile_and_run, ['-O'])
 
+test('PinByteArray', normal, compile_and_run, [''])
+
 test('T21624', normal, compile_and_run, [''])
 test('T23071', ignore_stdout, compile_and_run, [''])
 test('T22710', normal, compile_and_run, [''])
@@ -84,3 +86,4 @@ test('T24496'
       , when(have_llvm(), extra_ways(["optllvm"]))
       ]
     , compile_and_run, ['-O'])
+
