@@ -1096,6 +1096,7 @@ checkBootTyCon is_boot tc1 tc2
        -- Order of pattern matching matters.
        subDM _ Nothing _ = True
        subDM _ _ Nothing = False
+
        -- If the hsig wrote:
        --
        --   f :: a -> a
@@ -1103,11 +1104,14 @@ checkBootTyCon is_boot tc1 tc2
        --
        -- this should be validly implementable using an old-fashioned
        -- vanilla default method.
-       subDM t1 (Just (_, GenericDM t2)) (Just (_, VanillaDM))
-        = eqTypeX env t1 t2
+       subDM t1 (Just (_, GenericDM gdm_t1)) (Just (_, VanillaDM))
+        = eqType t1 gdm_t1   -- Take care (#22476).  Both t1 and gdm_t1 come
+                             -- from tc1, so use eqType, and /not/ eqTypeX
+
        -- This case can occur when merging signatures
        subDM t1 (Just (_, VanillaDM)) (Just (_, GenericDM t2))
         = eqTypeX env t1 t2
+
        subDM _ (Just (_, VanillaDM)) (Just (_, VanillaDM)) = True
        subDM _ (Just (_, GenericDM t1)) (Just (_, GenericDM t2))
         = eqTypeX env t1 t2
