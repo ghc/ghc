@@ -1053,6 +1053,7 @@ findMemoryLeak (void)
     for (i = 0; i < getNumCapabilities(); i++) {
         markBlocks(gc_threads[i]->free_blocks);
         markBlocks(getCapability(i)->pinned_object_block);
+        markBlocks(getCapability(i)->pinned_object_blocks);
         markBlocks(getCapability(i)->upd_rem_set.queue.blocks);
     }
 
