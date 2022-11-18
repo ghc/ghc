@@ -350,7 +350,7 @@ infix 4 ~, ~~
 --      <http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf Safe Coercions>
 --      by Joachim Breitner, Richard A. Eisenberg, Simon Peyton Jones and Stephanie Weirich.
 --
---      @since 4.7.0.0
+-- @since 0.4.0
 class Coercible (a :: k) (b :: k)
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
