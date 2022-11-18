@@ -39,7 +39,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Tickish
 import GHC.Types.Unique.FM
-import GHC.Types.Name.Ppr
 
 import Control.Monad
 import Data.Foldable ( for_ )
@@ -140,13 +139,13 @@ data SimplifyOpts = SimplifyOpts
 
 simplifyPgm :: Logger
             -> UnitEnv
+            -> NamePprCtx                -- For dumping
             -> SimplifyOpts
             -> ModGuts
             -> IO (SimplCount, ModGuts)  -- New bindings
 
-simplifyPgm logger unit_env opts
+simplifyPgm logger unit_env name_ppr_ctx opts
             guts@(ModGuts { mg_module = this_mod
-                          , mg_rdr_env = rdr_env
                           , mg_binds = binds, mg_rules = local_rules
                           , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts')
@@ -168,7 +167,6 @@ simplifyPgm logger unit_env opts
     mode            = so_mode opts
     max_iterations  = so_iterations opts
     top_env_cfg     = so_top_env_cfg opts
-    print_unqual    = mkPrintUnqualified unit_env rdr_env
     active_rule     = activeRule mode
     active_unf      = activeUnfolding mode
     -- Note the bang in !guts_no_binds.  If you don't force `guts_no_binds`
@@ -275,7 +273,7 @@ simplifyPgm logger unit_env opts
            let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
                 -- Dump the result of this iteration
-           dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts1 binds2 rules1 ;
+           dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts1 binds2 rules1 ;
 
            for_ (so_pass_result_cfg opts) $ \pass_result_cfg ->
              lintPassResult logger pass_result_cfg binds2 ;
@@ -292,10 +290,10 @@ simplifyPgm logger unit_env opts
         totalise = foldr (\c acc -> acc `plusSimplCount` c)
                          (zeroSimplCount $ logHasDumpFlag logger Opt_D_dump_simpl_stats)
 
-dump_end_iteration :: Logger -> Bool -> PrintUnqualified -> Int
+dump_end_iteration :: Logger -> Bool -> NamePprCtx -> Int
                    -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
-dump_end_iteration logger dump_core_sizes print_unqual iteration_no counts binds rules
-  = dumpPassResult logger dump_core_sizes print_unqual mb_flag hdr pp_counts binds rules
+dump_end_iteration logger dump_core_sizes name_ppr_ctx iteration_no counts binds rules
+  = dumpPassResult logger dump_core_sizes name_ppr_ctx mb_flag hdr pp_counts binds rules
   where
     mb_flag | logHasDumpFlag logger Opt_D_dump_simpl_iterations = Just Opt_D_dump_simpl_iterations
             | otherwise                                         = Nothing

@@ -3,7 +3,7 @@ T11471.hs:15:10: error: [GHC-18872]
     • Couldn't match a lifted type with an unlifted type
       When matching types
         a :: *
-        Int# :: TYPE 'IntRep
+        Int# :: TYPE IntRep
       Expected: Proxy a
         Actual: Proxy Int#
     • In the first argument of ‘f’, namely ‘(undefined :: Proxy Int#)’

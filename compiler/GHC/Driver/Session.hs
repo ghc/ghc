@@ -214,6 +214,7 @@ module GHC.Driver.Session (
 
         -- * SDoc
         initSDocContext, initDefaultSDocContext,
+        initPromotionTickContext,
   ) where
 
 import GHC.Prelude
@@ -3456,6 +3457,7 @@ fFlagsDeps = [
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
+  flagSpec "print-redundant-promotion-ticks"  Opt_PrintRedundantPromotionTicks,
   flagSpec "print-typechecker-elaboration"    Opt_PrintTypecheckerElaboration,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
@@ -5041,6 +5043,13 @@ initSDocContext dflags style = SDC
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
+
+initPromotionTickContext :: DynFlags -> PromotionTickContext
+initPromotionTickContext dflags =
+  PromTickCtx {
+    ptcListTuplePuns = True,
+    ptcPrintRedundantPromTicks = gopt Opt_PrintRedundantPromotionTicks dflags
+  }
 
 outputFile :: DynFlags -> Maybe String
 outputFile dflags

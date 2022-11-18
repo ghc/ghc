@@ -364,21 +364,21 @@ printForUserNeverQualify doc = do
 printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
 printForUserModInfo info doc = do
   dflags <- GHC.getInteractiveDynFlags
-  mUnqual <- GHC.mkPrintUnqualifiedForModule info
-  unqual <- maybe GHC.getPrintUnqual return mUnqual
-  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
+  m_name_ppr_ctx <- GHC.mkNamePprCtxForModule info
+  name_ppr_ctx <- maybe GHC.getNamePprCtx return m_name_ppr_ctx
+  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
-  unqual <- GHC.getPrintUnqual
+  name_ppr_ctx <- GHC.getNamePprCtx
   dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
+  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
 
 printForUserPartWay :: GhcMonad m => SDoc -> m ()
 printForUserPartWay doc = do
-  unqual <- GHC.getPrintUnqual
+  name_ppr_ctx <- GHC.getNamePprCtx
   dflags <- GHC.getInteractiveDynFlags
-  liftIO $ Ppr.printForUser dflags stdout unqual DefaultDepth doc
+  liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx DefaultDepth doc
 
 -- | Run a single Haskell expression
 runStmt

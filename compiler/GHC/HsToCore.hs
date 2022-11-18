@@ -146,7 +146,8 @@ deSugar hsc_env
 
   = do { let dflags = hsc_dflags hsc_env
              logger = hsc_logger hsc_env
-             print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
+             ptc = initPromotionTickContext (hsc_dflags hsc_env)
+             name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
         ; withTiming logger
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
@@ -212,7 +213,7 @@ deSugar hsc_env
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-        ; endPassHscEnvIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
+        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugar final_pgm rules_for_imps
         ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
@@ -221,7 +222,7 @@ deSugar hsc_env
         ; putDumpFileMaybe logger Opt_D_dump_occur_anal "Occurrence analysis"
             FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
-        ; endPassHscEnvIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
+        ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
               pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))

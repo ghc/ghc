@@ -1,6 +1,6 @@
 
 Linear17.hs:17:3: error: [GHC-18872]
-    • Couldn't match type ‘'Many’ with ‘'One’
+    • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘x’
     • In a stmt of a 'do' block: x <- ()
       In the expression:
@@ -17,7 +17,7 @@ Linear17.hs:17:3: error: [GHC-18872]
                  ....
 
 Linear17.hs:25:6: error: [GHC-18872]
-    • Couldn't match type ‘'Many’ with ‘'One’
+    • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘z’
     • In the pattern: (y, z)
       In a stmt of a 'do' block: (y, z) <- ((), x)
@@ -28,7 +28,7 @@ Linear17.hs:25:6: error: [GHC-18872]
            ()
 
 Linear17.hs:30:3: error: [GHC-18872]
-    • Couldn't match type ‘'Many’ with ‘'One’
+    • Couldn't match type ‘Many’ with ‘One’
         arising from multiplicity of ‘x’
     • In a stmt of a 'do' block: x <- ()
       In the expression:

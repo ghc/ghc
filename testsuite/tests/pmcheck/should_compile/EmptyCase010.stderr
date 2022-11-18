@@ -9,7 +9,7 @@ EmptyCase010.hs:24:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
 EmptyCase010.hs:28:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a \case alternative:
-        Patterns of type ‘Baz GC 'T1’ not matched: Baz MkGC1
+        Patterns of type ‘Baz GC T1’ not matched: Baz MkGC1
 
 EmptyCase010.hs:37:7: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

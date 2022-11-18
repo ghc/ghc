@@ -49,7 +49,7 @@ data DsGblEnv
   , ds_gbl_rdr_env  :: GlobalRdrEnv       -- needed *only* to know what newtype
                                           -- constructors are in scope during
                                           -- pattern-match satisfiability checking
-  , ds_unqual  :: PrintUnqualified
+  , ds_name_ppr_ctx :: NamePprCtx
   , ds_msgs    :: IORef (Messages DsMessage) -- Diagnostic messages
   , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                           -- possibly-imported things

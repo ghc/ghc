@@ -1472,8 +1472,19 @@ pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
-        -> char '\'' <> brackets (spaceIfSingleQuote (fsep
-                        (punctuate comma (map (ppr_ty topPrec) (ty1:arg_tys)))))
+        ->
+        sdocWithContext $ \ctx ->
+          let
+            items  = ty1:arg_tys
+            eos    = isListEmptyOrSingleton items
+            ticked = promTick (sdocStyle ctx) (PromotedItemListSyntax eos)
+            (preBracket, postBracket) =
+              if ticked
+              then (char '\'', spaceIfSingleQuote)
+              else (empty, id)
+          in
+            preBracket <> brackets (postBracket (fsep
+                          (punctuate comma (map (ppr_ty topPrec) items))))
       (arg_tys, Just tl)
         -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
            2 (fsep [ colon <+> ppr_ty funPrec ty | ty <- arg_tys ++ [tl]])
@@ -1864,11 +1875,21 @@ instance Outputable IfaceTyConInfo where
 
 pprPromotionQuote :: IfaceTyCon -> SDoc
 pprPromotionQuote tc =
-    pprPromotionQuoteI $ ifaceTyConIsPromoted $ ifaceTyConInfo tc
+  getPprStyle $ \sty ->
+    let
+      name   = getOccName (ifaceTyConName tc)
+      ticked =
+        case ifaceTyConIsPromoted (ifaceTyConInfo tc) of
+          NotPromoted -> False
+          IsPromoted  -> promTick sty (PromotedItemDataCon name)
+    in
+      if ticked
+      then char '\''
+      else empty
 
 pprPromotionQuoteI  :: PromotionFlag -> SDoc
 pprPromotionQuoteI NotPromoted = empty
-pprPromotionQuoteI IsPromoted    = char '\''
+pprPromotionQuoteI IsPromoted  = char '\''
 
 instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion

@@ -86,12 +86,15 @@ module GHC.Utils.Outputable (
         -- * Controlling the style in which output is printed
         BindingSite(..),
 
-        PprStyle(..), PrintUnqualified(..),
-        QueryQualifyName, QueryQualifyModule, QueryQualifyPackage,
+        PprStyle(..), NamePprCtx(..),
+        QueryQualifyName, QueryQualifyModule, QueryQualifyPackage, QueryPromotionTick,
+        PromotedItem(..), IsEmptyOrSingleton(..), isListEmptyOrSingleton,
+        PromotionTickContext(..),
         reallyAlwaysQualify, reallyAlwaysQualifyNames,
         alwaysQualify, alwaysQualifyNames, alwaysQualifyModules,
         neverQualify, neverQualifyNames, neverQualifyModules,
         alwaysQualifyPackages, neverQualifyPackages,
+        alwaysPrintPromTick,
         QualifyName(..), queryQual,
         sdocOption,
         updSDocContext,
@@ -100,7 +103,7 @@ module GHC.Utils.Outputable (
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, dumpStyle,
-        qualName, qualModule, qualPackage,
+        qualName, qualModule, qualPackage, promTick,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
         withUserStyle, withErrStyle,
@@ -163,14 +166,14 @@ import GHC.Exts (oneShot)
 -}
 
 data PprStyle
-  = PprUser PrintUnqualified Depth Coloured
+  = PprUser NamePprCtx Depth Coloured
                 -- Pretty-print in a way that will make sense to the
                 -- ordinary user; must be very close to Haskell
                 -- syntax, etc.
                 -- Assumes printing tidied code: non-system names are
                 -- printed without uniques.
 
-  | PprDump PrintUnqualified
+  | PprDump NamePprCtx
                 -- For -ddump-foo; less verbose than in ppr-debug mode, but more than PprUser
                 -- Does not assume tidied code: non-external names
                 -- are printed with uniques.
@@ -193,10 +196,11 @@ data Coloured
 -- original names back to something the user understands.  This is the
 -- purpose of the triple of functions that gets passed around
 -- when rendering 'SDoc'.
-data PrintUnqualified = QueryQualify {
+data NamePprCtx = QueryQualify {
     queryQualifyName    :: QueryQualifyName,
     queryQualifyModule  :: QueryQualifyModule,
-    queryQualifyPackage :: QueryQualifyPackage
+    queryQualifyPackage :: QueryQualifyPackage,
+    queryPromotionTick  :: QueryPromotionTick
 }
 
 -- | Given a `Name`'s `Module` and `OccName`, decide whether and how to qualify
@@ -210,6 +214,31 @@ type QueryQualifyModule = Module -> Bool
 -- | For a given package, we need to know whether to print it with
 -- the component id to disambiguate it.
 type QueryQualifyPackage = Unit -> Bool
+
+-- | Given a promoted data constructor,
+-- decide whether to print a tick to disambiguate the namespace.
+type QueryPromotionTick = PromotedItem -> Bool
+
+-- | Flags that affect whether a promotion tick is printed.
+data PromotionTickContext =
+  PromTickCtx {
+    ptcListTuplePuns :: !Bool,
+    ptcPrintRedundantPromTicks :: !Bool
+  }
+
+data PromotedItem =
+    PromotedItemListSyntax IsEmptyOrSingleton -- '[x]
+  | PromotedItemTupleSyntax                   -- '(x, y)
+  | PromotedItemDataCon OccName               -- 'MkT
+
+newtype IsEmptyOrSingleton = IsEmptyOrSingleton Bool
+
+isListEmptyOrSingleton :: [a] -> IsEmptyOrSingleton
+isListEmptyOrSingleton xs =
+  IsEmptyOrSingleton $ case xs of
+    []  -> True
+    [_] -> True
+    _   -> False
 
 -- See Note [Printing original names] in GHC.Types.Name.Ppr
 data QualifyName   -- Given P:M.T
@@ -252,17 +281,23 @@ alwaysQualifyPackages _ = True
 neverQualifyPackages :: QueryQualifyPackage
 neverQualifyPackages _ = False
 
-reallyAlwaysQualify, alwaysQualify, neverQualify :: PrintUnqualified
+alwaysPrintPromTick :: QueryPromotionTick
+alwaysPrintPromTick _ = True
+
+reallyAlwaysQualify, alwaysQualify, neverQualify :: NamePprCtx
 reallyAlwaysQualify
               = QueryQualify reallyAlwaysQualifyNames
                              alwaysQualifyModules
                              alwaysQualifyPackages
+                             alwaysPrintPromTick
 alwaysQualify = QueryQualify alwaysQualifyNames
                              alwaysQualifyModules
                              alwaysQualifyPackages
+                             alwaysPrintPromTick
 neverQualify  = QueryQualify neverQualifyNames
                              neverQualifyModules
                              neverQualifyPackages
+                             alwaysPrintPromTick
 
 defaultUserStyle :: PprStyle
 defaultUserStyle = mkUserStyle neverQualify AllTheWay
@@ -271,31 +306,31 @@ defaultDumpStyle :: PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 defaultDumpStyle = PprDump neverQualify
 
-mkDumpStyle :: PrintUnqualified -> PprStyle
-mkDumpStyle print_unqual = PprDump print_unqual
+mkDumpStyle :: NamePprCtx -> PprStyle
+mkDumpStyle name_ppr_ctx = PprDump name_ppr_ctx
 
--- | Default style for error messages, when we don't know PrintUnqualified
+-- | Default style for error messages, when we don't know NamePprCtx
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
 defaultErrStyle :: PprStyle
 defaultErrStyle = mkErrStyle neverQualify
 
 -- | Style for printing error messages
-mkErrStyle :: PrintUnqualified -> PprStyle
-mkErrStyle unqual = mkUserStyle unqual DefaultDepth
+mkErrStyle :: NamePprCtx -> PprStyle
+mkErrStyle name_ppr_ctx = mkUserStyle name_ppr_ctx DefaultDepth
 
 cmdlineParserStyle :: PprStyle
 cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
 
-mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
-mkUserStyle unqual depth = PprUser unqual depth Uncoloured
+mkUserStyle :: NamePprCtx -> Depth -> PprStyle
+mkUserStyle name_ppr_ctx depth = PprUser name_ppr_ctx depth Uncoloured
 
-withUserStyle :: PrintUnqualified -> Depth -> SDoc -> SDoc
-withUserStyle unqual depth doc = withPprStyle (PprUser unqual depth Uncoloured) doc
+withUserStyle :: NamePprCtx -> Depth -> SDoc -> SDoc
+withUserStyle name_ppr_ctx depth doc = withPprStyle (PprUser name_ppr_ctx depth Uncoloured) doc
 
-withErrStyle :: PrintUnqualified -> SDoc -> SDoc
-withErrStyle unqual doc =
-   withPprStyle (mkErrStyle unqual) doc
+withErrStyle :: NamePprCtx -> SDoc -> SDoc
+withErrStyle name_ppr_ctx doc =
+   withPprStyle (mkErrStyle name_ppr_ctx) doc
 
 setStyleColoured :: Bool -> PprStyle -> PprStyle
 setStyleColoured col style =
@@ -534,10 +569,16 @@ qualPackage (PprUser q _ _)  m = queryQualifyPackage q m
 qualPackage (PprDump q)      m = queryQualifyPackage q m
 qualPackage _other          _m = True
 
-queryQual :: PprStyle -> PrintUnqualified
+promTick :: PprStyle -> QueryPromotionTick
+promTick (PprUser q _ _) occ = queryPromotionTick q occ
+promTick (PprDump q)     occ = queryPromotionTick q occ
+promTick _               _   = True
+
+queryQual :: PprStyle -> NamePprCtx
 queryQual s = QueryQualify (qualName s)
                            (qualModule s)
                            (qualPackage s)
+                           (promTick s)
 
 codeStyle :: PprStyle -> Bool
 codeStyle PprCode     = True

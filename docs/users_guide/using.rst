@@ -1252,6 +1252,53 @@ messages and in GHCi:
         Expected type: ST s Int
           Actual type: ST s Bool
 
+.. ghc-flag:: -fprint-redundant-promotion-ticks
+    :shortdesc: Print redundant :extension:`DataKinds` promotion ticks
+    :type: dynamic
+    :reverse: -fno-print-redundant-promotion-ticks
+    :category: verbosity
+
+    The :extension:`DataKinds` extension allows us to use data constructors at
+    the type level::
+
+        type B = True     -- refers to the data constructor True (of type Bool)
+
+    When there is a type constructor of the same name, it takes precedence
+    during name resolution::
+
+        data True = MkT
+        type B = True     -- now refers to the type constructor (of kind Type)
+
+    We can tell GHC to prefer the data constructor over the type constructor
+    using special namespace disambiguation syntax that we call a *promotion
+    tick*::
+
+        data True = MkT
+        type B = 'True
+            -- refers to the data constructor True (of type Bool)
+            -- even in the presence of a type constructor of the same name
+
+    Note that the promotion tick is not a promotion operator. Its only purpose
+    is to instruct GHC to prefer the promoted data constructor over a type
+    constructor in case of a name conflict. Therefore, GHC will not print the
+    tick when the name conflict is absent:
+
+    .. code-block:: none
+
+        ghci> type B = False
+        ghci> :kind! B
+        B :: Bool
+        = False          -- no promotion tick here
+
+        ghci> data False -- introduce a name conflict
+
+        ghci> :kind! B
+        B :: Bool
+        = 'False         -- promotion tick resolves the name conflict
+
+    The :ghc-flag:`-fprint-redundant-promotion-ticks` instructs GHC to print the
+    promotion tick unconditionally.
+
 .. ghc-flag:: -fprint-typechecker-elaboration
     :shortdesc: Print extra information from typechecker.
     :type: dynamic

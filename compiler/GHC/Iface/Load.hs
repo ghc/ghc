@@ -1084,11 +1084,12 @@ showIface logger dflags unit_state name_cache filename = do
        qualifyImportedNames mod _
            | mod == mi_module iface = NameUnqual
            | otherwise              = NameNotInScope1
-       print_unqual = QueryQualify qualifyImportedNames
+       name_ppr_ctx = QueryQualify qualifyImportedNames
                                    neverQualifyModules
                                    neverQualifyPackages
+                                   alwaysPrintPromTick
    logMsg logger MCDump noSrcSpan
-      $ withPprStyle (mkDumpStyle print_unqual)
+      $ withPprStyle (mkDumpStyle name_ppr_ctx)
       $ pprModIface unit_state iface
 
 -- | Show a ModIface but don't display details; suitable for ModIfaces stored in

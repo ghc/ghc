@@ -4,6 +4,6 @@ RepPolyWrappedVar.hs:15:10: error: [GHC-55287]
       The first argument of ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE ('BoxedRep l)
+        a :: TYPE (BoxedRep l)
     • In the expression: mkWeak# @a @Int @Bool
       In an equation for ‘primop’: primop = mkWeak# @a @Int @Bool

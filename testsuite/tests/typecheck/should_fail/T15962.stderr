@@ -15,4 +15,4 @@ T15962.hs:28:11: error: [GHC-88464]
           (bound at T15962.hs:28:1)
 
 T15962.hs:34:12: error: [GHC-88464]
-    Variable not in scope: iDontExist :: Big ('Conjunction : ks)
+    Variable not in scope: iDontExist :: Big (Conjunction : ks)

@@ -24,14 +24,14 @@ T6018fail.hs:30:15: error: [GHC-05175]
 T6018fail.hs:38:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation is a bare type variable
-    but these LHS type and kind patterns are not bare variables: ‘'Z’
-      P 'Z m = m -- Defined at T6018fail.hs:38:15
+    but these LHS type and kind patterns are not bare variables: ‘Z’
+      P Z m = m -- Defined at T6018fail.hs:38:15
 
 T6018fail.hs:39:15: error: [GHC-05175]
     Type family equation right-hand sides overlap; this violates
     the family's injectivity annotation:
-      P ('S n) m = 'S (P n m) -- Defined at T6018fail.hs:39:15
-      P 'Z m = m -- Defined at T6018fail.hs:38:15
+      P (S n) m = S (P n m) -- Defined at T6018fail.hs:39:15
+      P Z m = m -- Defined at T6018fail.hs:38:15
 
 T6018fail.hs:44:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
@@ -43,7 +43,7 @@ T6018fail.hs:48:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
     Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
-      K ('S n) m = 'S m -- Defined at T6018fail.hs:48:15
+      K (S n) m = S m -- Defined at T6018fail.hs:48:15
 
 T6018fail.hs:53:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.

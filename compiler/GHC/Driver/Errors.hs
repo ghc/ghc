@@ -19,15 +19,15 @@ import qualified GHC.Driver.CmdLine as CmdLine
 
 printMessages :: forall a . Diagnostic a => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
 printMessages logger msg_opts opts msgs
-  = sequence_ [ let style = mkErrStyle unqual
+  = sequence_ [ let style = mkErrStyle name_ppr_ctx
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
                 in logMsg logger (MCDiagnostic sev (diagnosticReason dia) (diagnosticCode dia)) s $
                    withPprStyle style (messageWithHints ctx dia)
-              | MsgEnvelope { errMsgSpan      = s,
+              | MsgEnvelope { errMsgSpan       = s,
                               errMsgDiagnostic = dia,
-                              errMsgSeverity = sev,
-                              errMsgContext   = unqual } <- sortMsgBag (Just opts)
-                                                                       (getMessages msgs) ]
+                              errMsgSeverity   = sev,
+                              errMsgContext    = name_ppr_ctx }
+                  <- sortMsgBag (Just opts) (getMessages msgs) ]
   where
     messageWithHints :: Diagnostic a => SDocContext -> a -> SDoc
     messageWithHints ctx e =

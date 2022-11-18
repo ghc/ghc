@@ -597,7 +597,9 @@ backpackStyle =
     mkUserStyle
         (QueryQualify neverQualifyNames
                       alwaysQualifyModules
-                      neverQualifyPackages) AllTheWay
+                      neverQualifyPackages
+                      alwaysPrintPromTick)
+        AllTheWay
 
 -- | Message when we initially process a Backpack unit.
 msgTopPackage :: (Int,Int) -> HsComponentId -> BkpM ()

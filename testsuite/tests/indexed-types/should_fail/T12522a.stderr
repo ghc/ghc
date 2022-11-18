@@ -4,7 +4,7 @@ T12522a.hs:23:26: error: [GHC-39999]
       prevents the constraint ‘(Show a0)’ from being solved.
       Relevant bindings include
         n :: a0 (bound at T12522a.hs:23:15)
-        test :: Uncurried '[a0, [Char]] [Char] (bound at T12522a.hs:23:1)
+        test :: Uncurried [a0, [Char]] [Char] (bound at T12522a.hs:23:1)
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       Potentially matching instances:
         instance Show Ordering -- Defined in ‘GHC.Show’

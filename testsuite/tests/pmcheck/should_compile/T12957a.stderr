@@ -1,9 +1,9 @@
 
 T12957a.hs:25:35: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • Inaccessible code in
-        a pattern with constructor: BFields :: [()] -> Fields 'B,
+        a pattern with constructor: BFields :: [()] -> Fields B,
         in a case alternative
-      Couldn't match type ‘'A’ with ‘'B’
+      Couldn't match type ‘A’ with ‘B’
     • In a record update at field ‘list’,
       with type constructor ‘Fields’
       and data constructor ‘BFields’.
@@ -13,9 +13,9 @@ T12957a.hs:25:35: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
       and data constructor ‘S’.
 
 T12957a.hs:25:35: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘'B’ with ‘'A’
-      Expected: Fields 'A
-        Actual: Fields 'B
+    • Couldn't match type ‘B’ with ‘A’
+      Expected: Fields A
+        Actual: Fields B
     • In a record update at field ‘list’,
       with type constructor ‘Fields’
       and data constructor ‘BFields’.

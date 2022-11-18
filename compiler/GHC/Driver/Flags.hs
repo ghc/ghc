@@ -219,6 +219,7 @@ data GeneralFlag
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
+   | Opt_PrintRedundantPromotionTicks
    | Opt_PrintTypecheckerElaboration
 
    -- optimisation opts

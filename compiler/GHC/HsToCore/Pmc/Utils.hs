@@ -35,8 +35,8 @@ import Control.Monad
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
   logger  <- getLogger
-  printer <- mkPrintUnqualifiedDs
-  liftIO $ putDumpFileMaybe' logger printer
+  name_ppr_ctx <- mkNamePprCtxDs
+  liftIO $ putDumpFileMaybe' logger name_ppr_ctx
             Opt_D_dump_ec_trace "" FormatText (text herald $$ (nest 2 doc))
 {-# INLINE tracePm #-}  -- see Note [INLINE conditional tracing utilities]
 

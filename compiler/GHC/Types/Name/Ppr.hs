@@ -1,7 +1,7 @@
 
 
 module GHC.Types.Name.Ppr
-   ( mkPrintUnqualified
+   ( mkNamePprCtx
    , mkQualModule
    , mkQualPackage
    , pkgQual
@@ -9,6 +9,7 @@ module GHC.Types.Name.Ppr
 where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Unit
 import GHC.Unit.Env
@@ -52,7 +53,7 @@ There's one further subtlety: in case (3), what if there are two
 things around, P1:M.T and P2:M.T?  Then we don't want to print both of
 them as M.T!  However only one of the modules P1:M and P2:M can be
 exposed (say P2), so we use M.T for that, and P1:M.T for the other one.
-This is handled by the qual_mod component of PrintUnqualified, inside
+This is handled by the qual_mod component of NamePprCtx, inside
 the (ppr mod) of case (3), in Name.pprModulePrefix
 
 Note [Printing unit ids]
@@ -66,14 +67,19 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkPrintUnqualified :: UnitEnv -> GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified unit_env env
- = QueryQualify qual_name
+mkNamePprCtx :: PromotionTickContext -> UnitEnv -> GlobalRdrEnv -> NamePprCtx
+mkNamePprCtx ptc unit_env env
+ = QueryQualify
+      (mkQualName env)
       (mkQualModule unit_state home_unit)
       (mkQualPackage unit_state)
+      (mkPromTick ptc env)
   where
   unit_state = ue_units unit_env
   home_unit  = ue_homeUnit unit_env
+
+mkQualName :: GlobalRdrEnv -> QueryQualifyName
+mkQualName env = qual_name where
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre
@@ -124,6 +130,35 @@ mkPrintUnqualified unit_env env
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the
     -- current package we can just assume it is unqualified).
+
+mkPromTick :: PromotionTickContext -> GlobalRdrEnv -> QueryPromotionTick
+mkPromTick ptc env
+  | ptcPrintRedundantPromTicks ptc = alwaysPrintPromTick
+  | otherwise                      = print_prom_tick
+  where
+    print_prom_tick (PromotedItemListSyntax (IsEmptyOrSingleton eos)) =
+      -- Ticked: '[], '[x]
+      -- Unticked: [x,y], [x,y,z], and so on
+      ptcListTuplePuns ptc && eos
+    print_prom_tick PromotedItemTupleSyntax =
+      ptcListTuplePuns ptc
+    print_prom_tick (PromotedItemDataCon occ)
+      | isPunnedDataConName occ   -- '[], '(,), ''(,,)
+      = ptcListTuplePuns ptc
+
+      | Just occ' <- promoteOccName occ
+      , [] <- lookupGRE_RdrName (mkRdrUnqual occ') env
+      = -- Could not find a corresponding type name in the environment,
+        -- so the data name is unambiguous. Promotion tick not needed.
+        False
+      | otherwise = True
+
+isPunnedDataConName :: OccName -> Bool
+isPunnedDataConName occ =
+  isDataOcc occ && case unpackFS (occNameFS occ) of
+    '[':_ -> True
+    '(':_ -> True
+    _     -> False
 
 {- Note [pretendNameIsInScopeForPpr]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -200,5 +235,5 @@ mkQualPackage pkgs uid
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.
-pkgQual :: UnitState -> PrintUnqualified
+pkgQual :: UnitState -> NamePprCtx
 pkgQual pkgs = alwaysQualify { queryQualifyPackage = mkQualPackage pkgs }

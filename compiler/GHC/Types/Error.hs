@@ -351,7 +351,7 @@ instance Outputable DiagnosticReason where
 data MsgEnvelope e = MsgEnvelope
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
-   , errMsgContext     :: PrintUnqualified
+   , errMsgContext     :: NamePprCtx
    , errMsgDiagnostic  :: e
    , errMsgSeverity    :: Severity
    } deriving (Functor, Foldable, Traversable)

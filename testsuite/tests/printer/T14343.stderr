@@ -1,14 +1,14 @@
 
 T14343.hs:10:9: error: [GHC-88464]
-    • Found hole: _ :: Proxy '[ 'True]
+    • Found hole: _ :: Proxy '[True]
     • In the expression: _ :: Proxy '[ 'True]
       In an equation for ‘test1’: test1 = _ :: Proxy '[ 'True]
     • Relevant bindings include
-        test1 :: Proxy '[ 'True] (bound at T14343.hs:10:1)
+        test1 :: Proxy '[True] (bound at T14343.hs:10:1)
       Valid hole fits include
-        test1 :: Proxy '[ 'True] (defined at T14343.hs:10:1)
+        test1 :: Proxy '[True] (defined at T14343.hs:10:1)
         Proxy :: forall {k1} (k2 :: k1). Proxy k2
-          with Proxy @'[ 'True]
+          with Proxy @'[True]
           (defined at T14343.hs:8:16)
 
 T14343.hs:11:9: error: [GHC-88464]

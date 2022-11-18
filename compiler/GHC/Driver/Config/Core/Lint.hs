@@ -37,18 +37,18 @@ before and after core passes, and do Core Lint when necessary.
 endPass :: CoreToDo -> CoreProgram -> [CoreRule] -> CoreM ()
 endPass pass binds rules
   = do { hsc_env <- getHscEnv
-       ; print_unqual <- getPrintUnqualified
+       ; name_ppr_ctx <- getNamePprCtx
        ; liftIO $ endPassHscEnvIO hsc_env
-           print_unqual pass binds rules
+           name_ppr_ctx pass binds rules
        }
 
-endPassHscEnvIO :: HscEnv -> PrintUnqualified
+endPassHscEnvIO :: HscEnv -> NamePprCtx
           -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
-endPassHscEnvIO hsc_env print_unqual pass binds rules
+endPassHscEnvIO hsc_env name_ppr_ctx pass binds rules
   = do { let dflags  = hsc_dflags hsc_env
        ; endPassIO
            (hsc_logger hsc_env)
-           (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) print_unqual pass)
+           (initEndPassConfig dflags (interactiveInScope $ hsc_IC hsc_env) name_ppr_ctx pass)
            binds rules
        }
 
@@ -62,13 +62,13 @@ lintCoreBindings dflags coreToDo vars -- binds
       , l_vars     = vars
       }
 
-initEndPassConfig :: DynFlags -> [Var] -> PrintUnqualified -> CoreToDo -> EndPassConfig
-initEndPassConfig dflags extra_vars print_unqual pass = EndPassConfig
+initEndPassConfig :: DynFlags -> [Var] -> NamePprCtx -> CoreToDo -> EndPassConfig
+initEndPassConfig dflags extra_vars name_ppr_ctx pass = EndPassConfig
   { ep_dumpCoreSizes = not (gopt Opt_SuppressCoreSizes dflags)
   , ep_lintPassResult = if gopt Opt_DoCoreLinting dflags
       then Just $ initLintPassResultConfig dflags extra_vars pass
       else Nothing
-  , ep_printUnqual = print_unqual
+  , ep_namePprCtx = name_ppr_ctx
   , ep_dumpFlag = coreDumpFlag pass
   , ep_prettyPass = ppr pass
   , ep_passDetails = pprPassDetails pass

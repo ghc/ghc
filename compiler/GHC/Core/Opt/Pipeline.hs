@@ -81,7 +81,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
              uniq_mask = 's'
 
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
-                                    print_unqual loc $
+                                    name_ppr_ctx loc $
                            do { hsc_env' <- getHscEnv
                               ; all_passes <- withPlugins (hsc_plugins hsc_env')
                                                 installCoreToDos
@@ -101,7 +101,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
     home_pkg_rules = hptRules hsc_env (moduleUnitId mod) (GWIB { gwib_mod = moduleName mod
                                                                , gwib_isBoot = NotBoot })
     hpt_rule_base  = mkRuleBase home_pkg_rules
-    print_unqual   = mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env
+    name_ppr_ctx   = mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env
+    ptc            = initPromotionTickContext dflags
     -- mod: get the module out of the current HscEnv so we can retrieve it from the monad.
     -- This is very convienent for the users of the monad (e.g. plugins do not have to
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
@@ -488,10 +489,15 @@ doCorePass pass guts = do
   let fam_envs = (p_fam_env, mg_fam_inst_env guts)
   let updateBinds  f = return $ guts { mg_binds = f (mg_binds guts) }
   let updateBindsM f = f (mg_binds guts) >>= \b' -> return $ guts { mg_binds = b' }
+  let name_ppr_ctx =
+        mkNamePprCtx
+          (initPromotionTickContext dflags)
+          (hsc_unit_env hsc_env)
+          (mg_rdr_env guts)
 
   case pass of
     CoreDoSimplify opts       -> {-# SCC "Simplify" #-}
-                                 liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) opts guts
+                                 liftIOWithCount $ simplifyPgm logger (hsc_unit_env hsc_env) name_ppr_ctx opts guts
 
     CoreCSE                   -> {-# SCC "CommonSubExpr" #-}
                                  updateBinds cseProgram

@@ -46,7 +46,7 @@ hiModuleNameMismatchWarn requested_mod read_mod
   -- are the same
   withPprStyle (mkUserStyle alwaysQualify AllTheWay) $
     -- we want the Modules below to be qualified with package names,
-    -- so reset the PrintUnqualified setting.
+    -- so reset the NamePprCtx setting.
     hsep [ text "Something is amiss; requested module "
          , ppr requested_mod
          , text "differs from name found in the interface file"

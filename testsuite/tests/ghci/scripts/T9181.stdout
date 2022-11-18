@@ -99,8 +99,7 @@ type (Data.Type.Ord.<=) x y =
   :: Constraint
 type (Data.Type.Ord.<=?) :: forall k. k -> k -> Bool
 type (Data.Type.Ord.<=?) m n =
-  Data.Type.Ord.OrdCond
-    (Data.Type.Ord.Compare m n) 'True 'True 'False
+  Data.Type.Ord.OrdCond (Data.Type.Ord.Compare m n) True True False
   :: Bool
 type GHC.TypeLits.Internal.CmpChar :: Char -> Char -> Ordering
 type family GHC.TypeLits.Internal.CmpChar a b
@@ -143,13 +142,13 @@ type role Data.Type.Ord.OrderingI nominal nominal
 type Data.Type.Ord.OrderingI :: forall {k}. k -> k -> *
 data Data.Type.Ord.OrderingI a b where
   Data.Type.Ord.LTI :: forall {k} (a :: k) (b :: k).
-                       (Data.Type.Ord.Compare a b ~ 'LT) =>
+                       (Data.Type.Ord.Compare a b ~ LT) =>
                        Data.Type.Ord.OrderingI a b
   Data.Type.Ord.EQI :: forall {k} (a :: k).
-                       (Data.Type.Ord.Compare a a ~ 'EQ) =>
+                       (Data.Type.Ord.Compare a a ~ EQ) =>
                        Data.Type.Ord.OrderingI a a
   Data.Type.Ord.GTI :: forall {k} (a :: k) (b :: k).
-                       (Data.Type.Ord.Compare a b ~ 'GT) =>
+                       (Data.Type.Ord.Compare a b ~ GT) =>
                        Data.Type.Ord.OrderingI a b
 pattern GHC.TypeNats.SNat
   :: () => GHC.TypeNats.KnownNat n => GHC.TypeNats.SNat n

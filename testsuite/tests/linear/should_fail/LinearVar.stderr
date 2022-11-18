@@ -1,6 +1,6 @@
 
 LinearVar.hs:5:5: error: [GHC-25897]
-    • Couldn't match type ‘m’ with ‘'Many’
+    • Couldn't match type ‘m’ with ‘Many’
       Expected: a %m -> b
         Actual: a -> b
       ‘m’ is a rigid type variable bound by

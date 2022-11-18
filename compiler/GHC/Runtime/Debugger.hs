@@ -97,8 +97,8 @@ pprintClosureCommand bindThings force str = do
    printSDocs :: GhcMonad m => [SDoc] -> m ()
    printSDocs sdocs = do
       logger <- getLogger
-      unqual <- GHC.getPrintUnqual
-      liftIO $ printOutputForUser logger unqual $ vcat sdocs
+      name_ppr_ctx <- GHC.getNamePprCtx
+      liftIO $ printOutputForUser logger name_ppr_ctx $ vcat sdocs
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => Subst -> Id -> m (Subst, Term)

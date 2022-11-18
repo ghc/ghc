@@ -553,29 +553,29 @@ putDumpFileMaybe logger = putDumpFileMaybe' logger alwaysQualify
 
 -- | Dump if the given DumpFlag is set
 --
--- Unlike 'putDumpFileMaybe', has a PrintUnqualified argument
+-- Unlike 'putDumpFileMaybe', has a NamePprCtx argument
 putDumpFileMaybe'
     :: Logger
-    -> PrintUnqualified
+    -> NamePprCtx
     -> DumpFlag
     -> String
     -> DumpFormat
     -> SDoc
     -> IO ()
-putDumpFileMaybe' logger printer flag hdr fmt doc
+putDumpFileMaybe' logger name_ppr_ctx flag hdr fmt doc
   = when (logHasDumpFlag logger flag) $
-    logDumpFile' logger printer flag hdr fmt doc
+    logDumpFile' logger name_ppr_ctx flag hdr fmt doc
 {-# INLINE putDumpFileMaybe' #-}  -- see Note [INLINE conditional tracing utilities]
 
 
-logDumpFile' :: Logger -> PrintUnqualified -> DumpFlag
+logDumpFile' :: Logger -> NamePprCtx -> DumpFlag
              -> String -> DumpFormat -> SDoc -> IO ()
 {-# NOINLINE logDumpFile' #-}
 -- NOINLINE: Now we are past the conditional, into the "cold" path,
 --           don't inline, to reduce code size at the call site
 -- See Note [INLINE conditional tracing utilities]
-logDumpFile' logger printer flag hdr fmt doc
-  = logDumpFile logger (mkDumpStyle printer) flag hdr fmt doc
+logDumpFile' logger name_ppr_ctx flag hdr fmt doc
+  = logDumpFile logger (mkDumpStyle name_ppr_ctx) flag hdr fmt doc
 
 -- | Ensure that a dump file is created even if it stays empty
 touchDumpFile :: Logger -> DumpFlag -> IO ()

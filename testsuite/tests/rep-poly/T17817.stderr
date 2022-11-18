@@ -4,6 +4,6 @@ T17817.hs:16:10: error: [GHC-55287]
       The first argument of ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE ('BoxedRep l)
+        a :: TYPE (BoxedRep l)
     • In the expression: mkWeak#
       In an equation for ‘primop’: primop = mkWeak#

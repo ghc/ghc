@@ -10,7 +10,7 @@ module GHC.Runtime.Context
    , icReaderEnv
    , icInteractiveModule
    , icInScopeTTs
-   , icPrintUnqual
+   , icNamePprCtx
    )
 where
 
@@ -349,9 +349,10 @@ icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
         ]
 
 
--- | Get the PrintUnqualified function based on the flags and this InteractiveContext
-icPrintUnqual :: UnitEnv -> InteractiveContext -> PrintUnqualified
-icPrintUnqual unit_env ictxt = mkPrintUnqualified unit_env (icReaderEnv ictxt)
+-- | Get the NamePprCtx function based on the flags and this InteractiveContext
+icNamePprCtx :: UnitEnv -> InteractiveContext -> NamePprCtx
+icNamePprCtx unit_env ictxt = mkNamePprCtx ptc unit_env (icReaderEnv ictxt)
+  where ptc = initPromotionTickContext (ic_dflags ictxt)
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the
 -- InteractiveContext to include them. By putting new things first, unqualified

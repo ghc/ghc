@@ -26,14 +26,14 @@ showSDoc dflags sdoc = renderWithContext (initSDocContext dflags defaultUserStyl
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
 
--- | Allows caller to specify the PrintUnqualified to use
-showSDocForUser :: DynFlags -> UnitState -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unit_state unqual doc = renderWithContext (initSDocContext dflags sty) doc'
+-- | Allows caller to specify the NamePprCtx to use
+showSDocForUser :: DynFlags -> UnitState -> NamePprCtx -> SDoc -> String
+showSDocForUser dflags unit_state name_ppr_ctx doc = renderWithContext (initSDocContext dflags sty) doc'
    where
-      sty  = mkUserStyle unqual AllTheWay
+      sty  = mkUserStyle name_ppr_ctx AllTheWay
       doc' = pprWithUnitState unit_state doc
 
-printForUser :: DynFlags -> Handle -> PrintUnqualified -> Depth -> SDoc -> IO ()
-printForUser dflags handle unqual depth doc
+printForUser :: DynFlags -> Handle -> NamePprCtx -> Depth -> SDoc -> IO ()
+printForUser dflags handle name_ppr_ctx depth doc
   = printSDocLn ctx (PageMode False) handle doc
-    where ctx = initSDocContext dflags (mkUserStyle unqual depth)
+    where ctx = initSDocContext dflags (mkUserStyle name_ppr_ctx depth)

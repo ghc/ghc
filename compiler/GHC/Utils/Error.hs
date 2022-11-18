@@ -141,12 +141,12 @@ mk_msg_envelope
   :: Diagnostic e
   => Severity
   -> SrcSpan
-  -> PrintUnqualified
+  -> NamePprCtx
   -> e
   -> MsgEnvelope e
-mk_msg_envelope severity locn print_unqual err
+mk_msg_envelope severity locn name_ppr_ctx err
  = MsgEnvelope { errMsgSpan = locn
-               , errMsgContext = print_unqual
+               , errMsgContext = name_ppr_ctx
                , errMsgDiagnostic = err
                , errMsgSeverity = severity
                }
@@ -158,22 +158,22 @@ mkMsgEnvelope
   :: Diagnostic e
   => DiagOpts
   -> SrcSpan
-  -> PrintUnqualified
+  -> NamePprCtx
   -> e
   -> MsgEnvelope e
-mkMsgEnvelope opts locn print_unqual err
- = mk_msg_envelope (diagReasonSeverity opts (diagnosticReason err)) locn print_unqual err
+mkMsgEnvelope opts locn name_ppr_ctx err
+ = mk_msg_envelope (diagReasonSeverity opts (diagnosticReason err)) locn name_ppr_ctx err
 
 -- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
 -- Precondition: the diagnostic is, in fact, an error. That is,
 -- @diagnosticReason msg == ErrorWithoutFlag@.
 mkErrorMsgEnvelope :: Diagnostic e
                    => SrcSpan
-                   -> PrintUnqualified
+                   -> NamePprCtx
                    -> e
                    -> MsgEnvelope e
-mkErrorMsgEnvelope locn unqual msg =
- assert (diagnosticReason msg == ErrorWithoutFlag) $ mk_msg_envelope SevError locn unqual msg
+mkErrorMsgEnvelope locn name_ppr_ctx msg =
+ assert (diagnosticReason msg == ErrorWithoutFlag) $ mk_msg_envelope SevError locn name_ppr_ctx msg
 
 -- | Variant that doesn't care about qualified/unqualified names.
 mkPlainMsgEnvelope :: Diagnostic e
@@ -247,9 +247,9 @@ pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
 pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
-                               , errMsgContext   = unqual })
+                               , errMsgContext   = name_ppr_ctx })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $
+    withErrStyle name_ppr_ctx $
       mkLocMessage
         (MCDiagnostic sev (diagnosticReason e) (diagnosticCode e))
         s
@@ -430,13 +430,13 @@ debugTraceMsg logger val msg =
 putMsg :: Logger -> SDoc -> IO ()
 putMsg logger msg = logInfo logger (withPprStyle defaultUserStyle msg)
 
-printInfoForUser :: Logger -> PrintUnqualified -> SDoc -> IO ()
-printInfoForUser logger print_unqual msg
-  = logInfo logger (withUserStyle print_unqual AllTheWay msg)
+printInfoForUser :: Logger -> NamePprCtx -> SDoc -> IO ()
+printInfoForUser logger name_ppr_ctx msg
+  = logInfo logger (withUserStyle name_ppr_ctx AllTheWay msg)
 
-printOutputForUser :: Logger -> PrintUnqualified -> SDoc -> IO ()
-printOutputForUser logger print_unqual msg
-  = logOutput logger (withUserStyle print_unqual AllTheWay msg)
+printOutputForUser :: Logger -> NamePprCtx -> SDoc -> IO ()
+printOutputForUser logger name_ppr_ctx msg
+  = logOutput logger (withUserStyle name_ppr_ctx AllTheWay msg)
 
 logInfo :: Logger -> SDoc -> IO ()
 logInfo logger msg = logMsg logger MCInfo noSrcSpan msg

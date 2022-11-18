@@ -1,1 +1,1 @@
-test :: F '[Monad, A, B] m => m ()
+test :: F [Monad, A, B] m => m ()

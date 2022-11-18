@@ -19,8 +19,8 @@
 <interactive>:34:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation is a bare type variable
-    but these LHS type and kind patterns are not bare variables: ‘'Z’
-      P 'Z m = m -- Defined at <interactive>:34:15
+    but these LHS type and kind patterns are not bare variables: ‘Z’
+      P Z m = m -- Defined at <interactive>:34:15
 
 <interactive>:40:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
@@ -32,7 +32,7 @@
     Type family equation violates the family's injectivity annotation.
     Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
-      K ('S n) m = 'S m -- Defined at <interactive>:44:15
+      K (S n) m = S m -- Defined at <interactive>:44:15
 
 <interactive>:49:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.

@@ -1,6 +1,6 @@
 
 saks007_fail.hs:15:10: error: [GHC-83865]
-    • Couldn't match kind ‘'True’ with ‘'False’
+    • Couldn't match kind ‘True’ with ‘False’
       Expected: G (*)
         Actual: F (*)
     • In the type ‘X Integer String’

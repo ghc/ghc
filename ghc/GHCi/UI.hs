@@ -302,8 +302,8 @@ showSDocForUser' :: GHC.GhcMonad m => SDoc -> m String
 showSDocForUser' doc = do
     dflags <- getDynFlags
     unit_state <- hsc_units <$> GHC.getSession
-    unqual <- GHC.getPrintUnqual
-    pure $ showSDocForUser dflags unit_state unqual doc
+    name_ppr_ctx <- GHC.getNamePprCtx
+    pure $ showSDocForUser dflags unit_state name_ppr_ctx doc
 
 showSDocForUserQualify :: GHC.GhcMonad m => SDoc -> m String
 showSDocForUserQualify doc = do

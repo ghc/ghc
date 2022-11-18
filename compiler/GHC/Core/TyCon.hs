@@ -2907,11 +2907,15 @@ tcFlavourIsOpen TypeSynonymFlavour      = False
 
 pprPromotionQuote :: TyCon -> SDoc
 -- Promoted data constructors already have a tick in their OccName
-pprPromotionQuote tc
-        -- Always quote promoted DataCons in types, unless they come
-        -- from "type data" declarations.
-  | isDataKindsPromotedDataCon tc = char '\''
-  | otherwise = empty
+pprPromotionQuote tc =
+  getPprStyle $ \sty ->
+    let
+      name   = getOccName tc
+      ticked = isDataKindsPromotedDataCon tc && promTick sty (PromotedItemDataCon name)
+    in
+      if ticked
+      then char '\''
+      else empty
 
 instance NamedThing TyCon where
     getName = tyConName

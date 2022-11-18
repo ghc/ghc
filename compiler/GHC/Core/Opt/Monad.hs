@@ -21,7 +21,7 @@ module GHC.Core.Opt.Monad (
     getDynFlags, getPackageFamInstEnv,
     getInteractiveContext,
     getUniqMask,
-    getPrintUnqualified, getSrcSpanM,
+    getNamePprCtx, getSrcSpanM,
 
     -- ** Writing to the monad
     addSimplCount,
@@ -114,7 +114,7 @@ data CoreReader = CoreReader {
         cr_hsc_env             :: HscEnv,
         cr_rule_base           :: RuleBase,  -- Home package table rules
         cr_module              :: Module,
-        cr_print_unqual        :: PrintUnqualified,
+        cr_name_ppr_ctx        :: NamePprCtx,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
         cr_uniq_mask           :: !Char      -- Mask for creating unique values
@@ -178,18 +178,18 @@ runCoreM :: HscEnv
          -> RuleBase
          -> Char -- ^ Mask
          -> Module
-         -> PrintUnqualified
+         -> NamePprCtx
          -> SrcSpan
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base mask mod print_unqual loc m
+runCoreM hsc_env rule_base mask mod name_ppr_ctx loc m
   = liftM extract $ runIOEnv reader $ unCoreM m
   where
     reader = CoreReader {
             cr_hsc_env = hsc_env,
             cr_rule_base = rule_base,
             cr_module = mod,
-            cr_print_unqual = print_unqual,
+            cr_name_ppr_ctx = name_ppr_ctx,
             cr_loc = loc,
             cr_uniq_mask = mask
         }
@@ -252,8 +252,8 @@ initRuleEnv guts
 getExternalRuleBase :: CoreM RuleBase
 getExternalRuleBase = eps_rule_base <$> get_eps
 
-getPrintUnqualified :: CoreM PrintUnqualified
-getPrintUnqualified = read cr_print_unqual
+getNamePprCtx :: CoreM NamePprCtx
+getNamePprCtx = read cr_name_ppr_ctx
 
 getSrcSpanM :: CoreM SrcSpan
 getSrcSpanM = read cr_loc
@@ -360,14 +360,14 @@ msg :: MessageClass -> SDoc -> CoreM ()
 msg msg_class doc = do
     logger <- getLogger
     loc    <- getSrcSpanM
-    unqual <- getPrintUnqualified
+    name_ppr_ctx <- getNamePprCtx
     let sty = case msg_class of
                 MCDiagnostic _ _ _ -> err_sty
                 MCDump             -> dump_sty
                 _                  -> user_sty
-        err_sty  = mkErrStyle unqual
-        user_sty = mkUserStyle unqual AllTheWay
-        dump_sty = mkDumpStyle unqual
+        err_sty  = mkErrStyle name_ppr_ctx
+        user_sty = mkUserStyle name_ppr_ctx AllTheWay
+        dump_sty = mkDumpStyle name_ppr_ctx
     liftIO $ logMsg logger msg_class loc (withPprStyle sty doc)
 
 -- | Output a String message to the screen

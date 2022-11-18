@@ -46,7 +46,7 @@ module GHC.Tc.Utils.Monad(
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
   dumpTcRn,
-  getPrintUnqualified,
+  getNamePprCtx,
   printForUserTcRn,
   traceIf, traceOptIf,
   debugTc,
@@ -847,11 +847,11 @@ dumpOptTcRn flag title fmt doc =
 dumpTcRn :: Bool -> DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
 dumpTcRn useUserStyle flag title fmt doc = do
   logger <- getLogger
-  printer <- getPrintUnqualified
+  name_ppr_ctx <- getNamePprCtx
   real_doc <- wrapDocLoc doc
   let sty = if useUserStyle
-              then mkUserStyle printer AllTheWay
-              else mkDumpStyle printer
+              then mkUserStyle name_ppr_ctx AllTheWay
+              else mkDumpStyle name_ppr_ctx
   liftIO $ logDumpFile logger sty flag title fmt real_doc
 
 -- | Add current location if -dppr-debug
@@ -866,18 +866,19 @@ wrapDocLoc doc = do
     else
       return doc
 
-getPrintUnqualified :: TcRn PrintUnqualified
-getPrintUnqualified
-  = do { rdr_env <- getGlobalRdrEnv
+getNamePprCtx :: TcRn NamePprCtx
+getNamePprCtx
+  = do { ptc <- initPromotionTickContext <$> getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
        ; hsc_env <- getTopEnv
-       ; return $ mkPrintUnqualified (hsc_unit_env hsc_env) rdr_env }
+       ; return $ mkNamePprCtx ptc (hsc_unit_env hsc_env) rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
 printForUserTcRn doc = do
     logger <- getLogger
-    printer <- getPrintUnqualified
-    liftIO (printOutputForUser logger printer doc)
+    name_ppr_ctx <- getNamePprCtx
+    liftIO (printOutputForUser logger name_ppr_ctx doc)
 
 {-
 traceIf works in the TcRnIf monad, where no RdrEnv is
@@ -1117,9 +1118,9 @@ add_long_err_at loc msg = mk_long_err_at loc msg >>= reportDiagnostic
   where
     mk_long_err_at :: SrcSpan -> TcRnMessageDetailed -> TcRn (MsgEnvelope TcRnMessage)
     mk_long_err_at loc msg
-      = do { printer <- getPrintUnqualified ;
+      = do { name_ppr_ctx <- getNamePprCtx ;
              unit_state <- hsc_units <$> getTopEnv ;
-             return $ mkErrorMsgEnvelope loc printer
+             return $ mkErrorMsgEnvelope loc name_ppr_ctx
                     $ TcRnMessageWithInfo unit_state msg
                     }
 
@@ -1127,9 +1128,9 @@ mkTcRnMessage :: SrcSpan
               -> TcRnMessage
               -> TcRn (MsgEnvelope TcRnMessage)
 mkTcRnMessage loc msg
-  = do { printer <- getPrintUnqualified ;
+  = do { name_ppr_ctx <- getNamePprCtx ;
          diag_opts <- initDiagOpts <$> getDynFlags ;
-         return $ mkMsgEnvelope diag_opts loc printer msg }
+         return $ mkMsgEnvelope diag_opts loc name_ppr_ctx msg }
 
 reportDiagnostics :: [MsgEnvelope TcRnMessage] -> TcM ()
 reportDiagnostics = mapM_ reportDiagnostic
@@ -1613,12 +1614,12 @@ addDiagnosticTcM (env0, msg)
 addDetailedDiagnostic :: (ErrInfo -> TcRnMessage) -> TcM ()
 addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
-  printer <- getPrintUnqualified
+  name_ppr_ctx <- getNamePprCtx
   !diag_opts  <- initDiagOpts <$> getDynFlags
   env0 <- tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
-  reportDiagnostic (mkMsgEnvelope diag_opts loc printer (mkMsg (ErrInfo err_info empty)))
+  reportDiagnostic (mkMsgEnvelope diag_opts loc name_ppr_ctx (mkMsg (ErrInfo err_info empty)))
 
 addTcRnDiagnostic :: TcRnMessage -> TcM ()
 addTcRnDiagnostic msg = do

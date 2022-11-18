@@ -97,12 +97,12 @@ module GHC (
         modInfoSafe,
         lookupGlobalName,
         findGlobalAnns,
-        mkPrintUnqualifiedForModule,
+        mkNamePprCtxForModule,
         ModIface, ModIface_(..),
         SafeHaskellMode(..),
 
         -- * Printing
-        PrintUnqualified, alwaysQualify,
+        NamePprCtx, alwaysQualify,
 
         -- * Interactive evaluation
 
@@ -119,7 +119,7 @@ module GHC (
         setGHCiMonad, getGHCiMonad,
 
         -- ** Inspecting the current context
-        getBindings, getInsts, getPrintUnqual,
+        getBindings, getInsts, getNamePprCtx,
         findModule, lookupModule,
         findQualifiedModule, lookupQualifiedModule,
         renamePkgQualM, renameRawPkgQualM,
@@ -1346,9 +1346,9 @@ getInsts = withSession $ \hsc_env ->
     let (inst_env, fam_env) = ic_instances (hsc_IC hsc_env)
     in return (instEnvElts inst_env, fam_env)
 
-getPrintUnqual :: GhcMonad m => m PrintUnqualified
-getPrintUnqual = withSession $ \hsc_env -> do
-  return $ icPrintUnqual (hsc_unit_env hsc_env) (hsc_IC hsc_env)
+getNamePprCtx :: GhcMonad m => m NamePprCtx
+getNamePprCtx = withSession $ \hsc_env -> do
+  return $ icNamePprCtx (hsc_unit_env hsc_env) (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1442,12 +1442,14 @@ modInfoInstances = minf_instances
 modInfoIsExportedName :: ModuleInfo -> Name -> Bool
 modInfoIsExportedName minf name = elemNameSet name (availsToNameSet (minf_exports minf))
 
-mkPrintUnqualifiedForModule :: GhcMonad m =>
-                               ModuleInfo
-                            -> m (Maybe PrintUnqualified) -- XXX: returns a Maybe X
-mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
-  let mk_print_unqual = mkPrintUnqualified (hsc_unit_env hsc_env)
-  return (fmap mk_print_unqual (minf_rdr_env minf))
+mkNamePprCtxForModule ::
+  GhcMonad m =>
+  ModuleInfo ->
+  m (Maybe NamePprCtx) -- XXX: returns a Maybe X
+mkNamePprCtxForModule minf = withSession $ \hsc_env -> do
+  let mk_name_ppr_ctx = mkNamePprCtx ptc (hsc_unit_env hsc_env)
+      ptc = initPromotionTickContext (hsc_dflags hsc_env)
+  return (fmap mk_name_ppr_ctx (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
                      ModuleInfo -> Name

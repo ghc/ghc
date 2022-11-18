@@ -8,10 +8,10 @@ COERCION AXIOMS
 DATA CONSTRUCTORS
   A :: MyKind
   B :: MyKind
-  SingA :: Sing 'A
-  SingB :: Sing 'B
+  SingA :: Sing A
+  SingB :: Sing B
 FAMILY INSTANCES
   data instance Sing _a
                   -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.17.0.0]
