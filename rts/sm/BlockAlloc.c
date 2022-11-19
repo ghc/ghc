@@ -438,6 +438,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
     bdescr *best, *bd;
     StgWord n;
 
+    ASSERT_SM_LOCK();
     n = MBLOCK_GROUP_BLOCKS(mblocks);
 
     if(defer_mblock_frees)
@@ -496,6 +497,7 @@ allocGroupOnNode (uint32_t node, W_ n)
     bdescr *bd, *rem;
     StgWord ln;
 
+    ASSERT_SM_LOCK();
     if (n == 0) barf("allocGroup: requested zero blocks");
 
     if (n >= BLOCKS_PER_MBLOCK)
@@ -709,6 +711,7 @@ bdescr* allocLargeChunkOnNode (uint32_t node, W_ min, W_ max)
 {
     bdescr *bd;
     StgWord ln, lnmax;
+    ASSERT_SM_LOCK();
 
     if (min >= BLOCKS_PER_MBLOCK) {
         return allocGroupOnNode(node,max);
@@ -933,8 +936,7 @@ freeGroup(bdescr *p)
   StgWord ln;
   uint32_t node;
 
-  // not true in multithreaded GC:
-  // ASSERT_SM_LOCK();
+  ASSERT_SM_LOCK();
 
   ASSERT(RELAXED_LOAD(&p->free) != (P_)-1);
 

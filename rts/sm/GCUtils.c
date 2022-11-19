@@ -26,38 +26,15 @@
 #include "WSDeque.h"
 #endif
 
-#if defined(THREADED_RTS)
-SpinLock gc_alloc_block_sync;
-#endif
-
 static void push_todo_block(bdescr *bd, gen_workspace *ws);
 
-bdescr* allocGroup_sync(uint32_t n)
-{
-    bdescr *bd;
-    uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
-}
-
-bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n)
-{
-    bdescr *bd;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
-}
-
 static uint32_t
-allocBlocks_sync(uint32_t n, bdescr **hd)
+allocBlocks_lock(uint32_t n, bdescr **hd)
 {
     bdescr *bd;
     uint32_t i;
     uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_SM_LOCK;
     bd = allocLargeChunkOnNode(node,1,n);
     // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
     // fragmentation-friendly way.
@@ -70,25 +47,9 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     bd[n-1].link = NULL;
     // We have to hold the lock until we've finished fiddling with the metadata,
     // otherwise the block allocator can get confused.
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_SM_LOCK;
     *hd = bd;
     return n;
-}
-
-void
-freeChain_sync(bdescr *bd)
-{
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    freeChain(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-}
-
-void
-freeGroup_sync(bdescr *bd)
-{
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    freeGroup(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
 }
 
 /* -----------------------------------------------------------------------------
@@ -303,7 +264,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
                 // object.  However, if the object we're copying is
                 // larger than a block, then we might have an empty
                 // block here.
-                freeGroup_sync(bd);
+                freeGroup_lock(bd);
             } else {
                 push_scanned_block(bd, ws);
             }
@@ -343,14 +304,14 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     else
     {
         if (size > BLOCK_SIZE_W) {
-            bd = allocGroup_sync((W_)BLOCK_ROUND_UP(size*sizeof(W_))
+            bd = allocGroup_lock((W_)BLOCK_ROUND_UP(size*sizeof(W_))
                                  / BLOCK_SIZE);
         } else {
             if (gct->free_blocks) {
                 bd = gct->free_blocks;
                 gct->free_blocks = bd->link;
             } else {
-                allocBlocks_sync(16, &bd);
+                allocBlocks_lock(16, &bd);
                 gct->free_blocks = bd->link;
             }
         }

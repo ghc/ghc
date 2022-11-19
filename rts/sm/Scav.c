@@ -1730,7 +1730,7 @@ scavenge_capability_mut_lists (Capability *cap)
     if (RtsFlags.GcFlags.useNonmoving && major_gc) {
         uint32_t g = oldest_gen->no;
         scavenge_mutable_list(cap->saved_mut_lists[g], oldest_gen);
-        freeChain_sync(cap->saved_mut_lists[g]);
+        freeChain_lock(cap->saved_mut_lists[g]);
         cap->saved_mut_lists[g] = NULL;
         return;
     }
@@ -1743,7 +1743,7 @@ scavenge_capability_mut_lists (Capability *cap)
      */
     for (uint32_t g = RtsFlags.GcFlags.generations-1; g > N; g--) {
         scavenge_mutable_list(cap->saved_mut_lists[g], &generations[g]);
-        freeChain_sync(cap->saved_mut_lists[g]);
+        freeChain_lock(cap->saved_mut_lists[g]);
         cap->saved_mut_lists[g] = NULL;
     }
 }

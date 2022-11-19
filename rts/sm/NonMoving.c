@@ -634,14 +634,10 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
 
     // Nothing in the free list, allocate a new segment...
     if (ret == NULL) {
-        // Take gc spinlock: another thread may be scavenging a moving
-        // generation and call `todo_block_full`
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
         bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
         // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
 
         for (StgWord32 i = 0; i < bd->blocks; ++i) {
             initBdescr(&bd[i], oldest_gen, oldest_gen);
@@ -704,7 +700,7 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
     }
 }
 
-/* Allocate a block in the nonmoving heap. Caller must hold SM_MUTEX. sz is in words */
+/* Allocate a block in the nonmoving heap. sz is in words */
 GNUC_ATTR_HOT
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
@@ -744,7 +740,9 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // there are no active segments, allocate new segment
         if (new_current == NULL) {
+            ACQUIRE_SM_LOCK;
             new_current = nonmovingAllocSegment(cap->node);
+            RELEASE_SM_LOCK;
             nonmovingInitSegment(new_current, log_block_size);
         }
 
@@ -827,14 +825,13 @@ void nonmovingExit(void)
 /*
  * Assumes that no garbage collector or mutator threads are running to safely
  * resize the nonmoving_allocators.
- *
- * Must hold sm_mutex.
  */
 void nonmovingAddCapabilities(uint32_t new_n_caps)
 {
     unsigned int old_n_caps = nonmovingHeap.n_caps;
     struct NonmovingAllocator **allocs = nonmovingHeap.allocators;
 
+    ACQUIRE_SM_LOCK;
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
         struct NonmovingAllocator *old = allocs[i];
         allocs[i] = alloc_nonmoving_allocator(new_n_caps);
@@ -856,6 +853,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
         }
     }
     nonmovingHeap.n_caps = new_n_caps;
+    RELEASE_SM_LOCK;
 }
 
 void nonmovingClearBitmap(struct NonmovingSegment *seg)

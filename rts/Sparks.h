@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "sm/GC.h" // for evac_fn
 #include "WSDeque.h"
 
 #include "BeginPrivate.h"

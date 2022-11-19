@@ -10,6 +10,7 @@
 #include "Rts.h"
 #include "GC.h"
 #include "SMPClosureOps.h"
+#include "NonMoving.h"
 #include "NonMovingMark.h"
 #include "NonMovingShortcut.h"
 #include "Printer.h"

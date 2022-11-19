@@ -312,8 +312,6 @@ GarbageCollect (uint32_t collect_gen,
   CostCentreStack *save_CCS[getNumCapabilities()];
 #endif
 
-  ACQUIRE_SM_LOCK;
-
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
     // block signals
@@ -589,9 +587,7 @@ GarbageCollect (uint32_t collect_gen,
   // the current garbage collection, so we invoke LdvCensusForDead().
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
       || RtsFlags.ProfFlags.bioSelector != NULL) {
-      RELEASE_SM_LOCK; // LdvCensusForDead may need to take the lock
       LdvCensusForDead(N);
-      ACQUIRE_SM_LOCK;
   }
 #endif
 
@@ -760,7 +756,7 @@ GarbageCollect (uint32_t collect_gen,
         }
         else // not compacted
         {
-            freeChain(gen->old_blocks);
+            freeChain_lock(gen->old_blocks);
         }
 
         gen->old_blocks = NULL;
@@ -771,7 +767,7 @@ GarbageCollect (uint32_t collect_gen,
          * collection from large_objects.  Any objects left on the
          * large_objects list are therefore dead, so we free them here.
          */
-        freeChain(gen->large_objects);
+        freeChain_lock(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
         gen->n_large_words  = countOccupied(gen->large_objects);
@@ -890,7 +886,7 @@ GarbageCollect (uint32_t collect_gen,
   if (mark_stack_top_bd != NULL) {
       debugTrace(DEBUG_gc, "mark stack: %d blocks",
                  countBlocks(mark_stack_top_bd));
-      freeChain(mark_stack_top_bd);
+      freeChain_lock(mark_stack_top_bd);
   }
 
   // Free any bitmaps.
@@ -942,9 +938,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // Start any pending finalizers.  Must be after
   // updateStableTables() and stableUnlock() (see #4221).
-  RELEASE_SM_LOCK;
   scheduleFinalizers(cap, dead_weak_ptr_list);
-  ACQUIRE_SM_LOCK;
 
   // check sanity after GC
   // before resurrectThreads(), because that might overwrite some
@@ -959,9 +953,7 @@ GarbageCollect (uint32_t collect_gen,
   // behind.
   if (do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
-      RELEASE_SM_LOCK;
       heapCensus(mut_time);
-      ACQUIRE_SM_LOCK;
   }
 
 #if defined(TICKY_TICKY)
@@ -975,14 +967,14 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
   // send exceptions to any threads which were about to die
-  RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
-  ACQUIRE_SM_LOCK;
 
   // Finally free the deferred mblocks by sorting the deferred free list and
   // merging it into the actual sorted free list. This needs to happen here so
   // that the `returnMemoryToOS` call down below can successfully free memory.
+  ACQUIRE_SM_LOCK;
   commitMBlockFreeing();
+  RELEASE_SM_LOCK;
 
   if (major_gc) {
       W_ need_prealloc, need_live, need, got;
@@ -1095,8 +1087,6 @@ GarbageCollect (uint32_t collect_gen,
   }
 #endif
 
-  RELEASE_SM_LOCK;
-
   SET_GCT(saved_gct);
 }
 
@@ -1146,7 +1136,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
         // but can't, because it uses gct which isn't set up at this point.
         // Hence, allocate a block for todo_bd manually:
         {
-            bdescr *bd = allocBlockOnNode(capNoToNumaNode(n));
+            bdescr *bd = allocBlockOnNode_lock(capNoToNumaNode(n));
                 // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
@@ -1605,7 +1595,7 @@ static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
     cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
-    RELEASE_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
+    RELEASE_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_lock(cap->node));
 }
 
 /* ----------------------------------------------------------------------------
@@ -1632,9 +1622,9 @@ prepare_collected_gen (generation *gen)
         // a check for NULL in recordMutable().
         for (i = 0; i < getNumCapabilities(); i++) {
             bdescr *old = RELAXED_LOAD(&getCapability(i)->mut_lists[g]);
-            freeChain(old);
+            freeChain_lock(old);
 
-            bdescr *new = allocBlockOnNode(capNoToNumaNode(i));
+            bdescr *new = allocBlockOnNode_lock(capNoToNumaNode(i));
             RELAXED_STORE(&getCapability(i)->mut_lists[g], new);
         }
     }
@@ -1717,7 +1707,7 @@ prepare_collected_gen (generation *gen)
         bitmap_size = gen->n_old_blocks * BLOCK_SIZE / BITS_IN(W_);
 
         if (bitmap_size > 0) {
-            bitmap_bdescr = allocGroup((StgWord)BLOCK_ROUND_UP(bitmap_size)
+            bitmap_bdescr = allocGroup_lock((StgWord)BLOCK_ROUND_UP(bitmap_size)
                                        / BLOCK_SIZE);
             gen->bitmap = bitmap_bdescr;
             bitmap = bitmap_bdescr->start;
