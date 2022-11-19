@@ -299,8 +299,8 @@ sizeOfEntryCode tables_next_to_code
   | otherwise = do
      code' <- mkJumpToAddr undefined
      pure $ case code' of
-       Left  xs -> sizeOf (head xs) * length xs
-       Right xs -> sizeOf (head xs) * length xs
+       Left  (xs :: [Word8])  -> sizeOf (undefined :: Word8)  * length xs
+       Right (xs :: [Word32]) -> sizeOf (undefined :: Word32) * length xs
 
 -- Note: Must return proper pointer for use in a closure
 newExecConItbl :: Bool -> StgInfoTable -> ByteString -> IO (FunPtr ())

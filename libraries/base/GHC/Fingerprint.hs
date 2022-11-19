@@ -43,7 +43,7 @@ fingerprint0 = Fingerprint 0 0
 fingerprintFingerprints :: [Fingerprint] -> Fingerprint
 fingerprintFingerprints fs = unsafeDupablePerformIO $
   withArrayLen fs $ \len p ->
-    fingerprintData (castPtr p) (len * sizeOf (head fs))
+    fingerprintData (castPtr p) (len * sizeOf (undefined :: Fingerprint))
 
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
 fingerprintData buf len =

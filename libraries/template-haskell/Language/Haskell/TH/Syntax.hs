@@ -1133,8 +1133,9 @@ addrToByteArrayName = helper
   where
     helper :: HasCallStack => Name
     helper =
-      case head (getCallStack ?callStack) of
-        (_, SrcLoc{..}) -> mkNameG_v srcLocPackage srcLocModule "addrToByteArray"
+      case getCallStack ?callStack of
+        [] -> error "addrToByteArrayName: empty call stack"
+        (_, SrcLoc{..}) : _ -> mkNameG_v srcLocPackage srcLocModule "addrToByteArray"
 
 
 addrToByteArray :: Int -> Addr# -> ByteArray

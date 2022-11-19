@@ -13,8 +13,10 @@ dropWhileEndLE p = foldr (\x r -> if null r && p x then [] else x:r) []
 grabHpcPos :: Map.Map Int String -> HpcPos -> String
 grabHpcPos hsMap srcspan = 
          case lns of
+           [] -> error "grabHpcPos: invalid source span"
            [ln] -> (take ((c2 - c1) + 1) $ drop (c1 - 1) ln)
-           _ -> let lns1 = drop (c1 -1) (head lns) : tail lns
+           hd : tl ->
+                let lns1 = drop (c1 -1) hd : tl
                     lns2 = init lns1 ++ [take (c2 + 1) (last lns1) ]
                  in foldl1 (\ xs ys -> xs ++ "\n" ++ ys) lns2
   where (l1,c1,l2,c2) = fromHpcPos srcspan

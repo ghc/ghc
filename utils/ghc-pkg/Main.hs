@@ -390,7 +390,7 @@ runit verbosity cli nonopts = do
 
         splitFields fields = unfoldr splitComma (',':fields)
           where splitComma "" = Nothing
-                splitComma fs = Just $ break (==',') (tail fs)
+                splitComma (_ : fs) = Just $ break (==',') fs
 
         -- | Parses a glob into a predicate which tests if a string matches
         -- the glob.  Returns Nothing if the string in question is not a glob.
@@ -1962,10 +1962,11 @@ checkUnitId ipi db_stack update = do
 
 checkDuplicates :: PackageDBStack -> InstalledPackageInfo
                 -> Bool -> Bool-> Validate ()
-checkDuplicates db_stack pkg multi_instance update = do
+checkDuplicates [] _ _ _ = pure ()
+checkDuplicates (hd : _) pkg multi_instance update = do
   let
         pkgid = mungedId pkg
-        pkgs  = packages (head db_stack)
+        pkgs  = packages hd
   --
   -- Check whether this package id already exists in this DB
   --

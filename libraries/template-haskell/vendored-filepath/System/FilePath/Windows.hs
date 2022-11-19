@@ -600,7 +600,7 @@ hasTrailingPathSeparator x = isPathSeparator (last x)
 
 hasLeadingPathSeparator :: FilePath -> Bool
 hasLeadingPathSeparator "" = False
-hasLeadingPathSeparator x = isPathSeparator (head x)
+hasLeadingPathSeparator (hd : _) = isPathSeparator hd
 
 
 -- | Add a trailing file path separator if one is not already present.
@@ -824,7 +824,7 @@ makeRelative root path
             where (a,b) = break isPathSeparator $ dropWhile isPathSeparator x
 
         -- on windows, need to drop '/' which is kind of absolute, but not a drive
-        dropAbs x | hasLeadingPathSeparator x && not (hasDrive x) = tail x
+        dropAbs x | hasLeadingPathSeparator x && not (hasDrive x) = drop 1 x
         dropAbs x = dropDrive x
 
         takeAbs x | hasLeadingPathSeparator x && not (hasDrive x) = [pathSeparator]

@@ -145,8 +145,10 @@ encode_ch '%'  = "zv"
 encode_ch c    = encode_as_unicode_char c
 
 encode_as_unicode_char :: Char -> EncodedString
-encode_as_unicode_char c = 'z' : if isDigit (head hex_str) then hex_str
-                                                           else '0':hex_str
+encode_as_unicode_char c = 'z' : case hex_str of
+  hd : _
+    | isDigit hd -> hex_str
+  _ -> '0' : hex_str
   where hex_str = showHex (ord c) "U"
   -- ToDo: we could improve the encoding here in various ways.
   -- eg. strings of unicode characters come out as 'z1234Uz5678U', we
