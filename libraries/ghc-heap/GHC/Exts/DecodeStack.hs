@@ -11,6 +11,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack (
@@ -64,6 +65,8 @@ advanceStackFrameIter (StackFrameIter (# s, i #)) = let !(# s', i', hasNext #) =
 foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
+
+foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
 foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
@@ -119,6 +122,14 @@ toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
 
           getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
+decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
+decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
+      let !(# bitmapArray#, size# #) = getterFun# stackFrame# closureOffset#
+          bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
+          bes = wordsToBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
+          payloads = map toBitmapPayload bes
+      in
+        payloads
 
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
@@ -129,7 +140,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         ptrs' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFramePtrs)) sfi
         arity' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameArity))
         size' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameSize))
-        payload' =
+        payload' = decodeLargeBitmap getBCOLargeBitmap# s# i# 2##
         in
        RetBCO {
         instrs = instrs',
@@ -145,10 +156,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                       special = (toEnum . fromInteger . toInteger) (W# special#)
                   in
                     RetSmall special payloads
-     RET_BIG -> let !(# bitmapArray#, size# #) = getLargeBitmap# s# i#
-                    bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-                    bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
-                    payloads = map toBitmapPayload bes
+     RET_BIG -> let payloads = decodeLargeBitmap getLargeBitmap# s# i# 1##
                 in
                   RetBig payloads
      RET_FUN -> let
@@ -160,10 +168,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
           case t of
               ARG_GEN_BIG ->
                 let
-                  !(# bitmapArray#, size# #) = getRetFunLargeBitmap# s# i#
-                  bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-                  bes = wordsToBitmapEntries (StackFrameIter (# s#, plusWord# i# 2## #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
-                  payloads = map toBitmapPayload bes
+                  payloads = decodeLargeBitmap getRetFunLargeBitmap# s# i# 2##
                 in
                   payloads
               _ ->
@@ -304,6 +309,7 @@ data StackFrame =
   RetBig { payload :: [BitmapPayload] } |
   RetFun { retFunType :: RetFunType, size :: Word, fun :: CL.Closure, payload :: [BitmapPayload]} |
   RetBCO {
+  -- TODO: Add pre-defined BCO closures (like knownUpdateFrameType)
           instrs :: CL.Closure,
           literals :: CL.Closure,
           ptrs :: CL.Closure,

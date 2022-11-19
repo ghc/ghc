@@ -155,6 +155,21 @@ StgWord getLargeBitmapSize(StgClosure *c) {
   return bitmap->size;
 }
 
+StgWord getRetFunSize(StgRetFun *ret_fun) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(ret_fun));
+
+  const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+  fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+  switch (fun_info->f.fun_type) {
+    case ARG_GEN:
+      return BITMAP_SIZE(fun_info->f.b.bitmap);
+    case ARG_GEN_BIG:
+      return GET_FUN_LARGE_BITMAP(fun_info)->size;
+    default:
+      return BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+  }
+}
+
 StgWord getBCOLargeBitmapSize(StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
