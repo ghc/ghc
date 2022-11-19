@@ -291,10 +291,8 @@ static void nonmovingAddUpdRemSetBlocks_lock(MarkQueue *rset)
 
     nonmovingAddUpdRemSetBlocks_(rset);
     // Reset the state of the remembered set.
-    ACQUIRE_SM_LOCK;
     init_mark_queue_(rset);
     rset->is_upd_rem_set = true;
-    RELEASE_SM_LOCK;
 }
 
 /*
@@ -468,9 +466,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
 }
 
 /* A variant of push to be used by the minor GC when it encounters a reference
- * to an object in the non-moving heap. In contrast to the other push
- * operations this uses the gc_alloc_block_sync spinlock instead of the
- * SM_LOCK to allocate new blocks in the event that the mark queue is full.
+ * to an object in the non-moving heap.
  */
 void
 markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
@@ -491,13 +487,13 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
         // allocate a fresh block.
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        ACQUIRE_SM_LOCK;
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
         q->blocks = bd;
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        RELEASE_SM_LOCK;
     }
 
     MarkQueueEnt ent = {
@@ -917,6 +913,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
 static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+    ASSERT(queue->blocks == NULL);
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
@@ -926,14 +923,12 @@ static void init_mark_queue_ (MarkQueue *queue)
 #endif
 }
 
-/* Must hold sm_mutex. */
 void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->is_upd_rem_set = false;
 }
 
-/* Must hold sm_mutex. */
 void nonmovingInitUpdRemSet (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);

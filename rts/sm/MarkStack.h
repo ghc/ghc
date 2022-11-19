@@ -32,7 +32,7 @@ push_mark_stack(StgPtr p)
         }
         else
         {
-            bd = allocBlock_sync();
+            bd = allocBlock_lock();
             bd->link = mark_stack_bd;
             bd->u.back = NULL;
             mark_stack_bd->u.back = bd; // double-link the new block on

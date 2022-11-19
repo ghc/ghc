@@ -15,6 +15,7 @@
 #include "Hash.h"
 #include "LinkerInternals.h"
 #include "CheckUnload.h"
+#include "sm/HeapAlloc.h"
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
 #include "sm/HeapUtils.h"

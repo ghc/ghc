@@ -193,14 +193,13 @@ initStorage (void)
   initMutex(&sm_mutex);
 #endif
 
-  ACQUIRE_SM_LOCK;
-
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations
                                              * sizeof(struct generation_),
                                              "initStorage: gens");
 
   /* Initialise all generations */
+  ACQUIRE_SM_LOCK;
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
       initGeneration(&generations[g], g);
   }
@@ -214,15 +213,10 @@ initStorage (void)
       generations[g].to = &generations[g+1];
   }
   oldest_gen->to = oldest_gen;
+  RELEASE_SM_LOCK;
 
   // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
   nonmovingInit();
-
-#if defined(THREADED_RTS)
-  // nonmovingAddCapabilities allocates segments, which requires taking the gc
-  // sync lock, so initialize it before nonmovingAddCapabilities
-  initSpinLock(&gc_alloc_block_sync);
-#endif
 
   if (RtsFlags.GcFlags.useNonmoving)
       nonmovingAddCapabilities(getNumCapabilities());
@@ -260,8 +254,6 @@ initStorage (void)
   storageAddCapabilities(0, getNumCapabilities());
 
   IF_DEBUG(gc, statDescribeGens());
-
-  RELEASE_SM_LOCK;
 
   traceInitEvent(traceHeapInfo);
 
@@ -314,12 +306,14 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     assignNurseriesToCapabilities(from,to);
 
     // allocate a block for each mut list
+    ACQUIRE_SM_LOCK;
     for (n = from; n < to; n++) {
         for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
             getCapability(n)->mut_lists[g] =
                 allocBlockOnNode(capNoToNumaNode(n));
         }
     }
+    RELEASE_SM_LOCK;
 
     // Initialize NonmovingAllocators and UpdRemSets
     if (RtsFlags.GcFlags.useNonmoving) {
@@ -564,9 +558,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Allocate the blackhole indirection closure
     if (RtsFlags.GcFlags.useNonmoving) {
         // See Note [Static objects under the nonmoving collector].
-        ACQUIRE_SM_LOCK;
         bh = (StgInd *)nonmovingAllocate(cap, sizeofW(*bh));
-        RELEASE_SM_LOCK;
         recordMutableCap((StgClosure*)bh,
                          regTableToCapability(reg), oldest_gen->no);
     } else {
@@ -724,6 +716,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
     // automatic prefetching works across nursery blocks.  This is a
     // tiny optimisation (~0.5%), but it's free.
 
+    ACQUIRE_SM_LOCK;
     while (blocks > 0) {
         n = stg_min(BLOCKS_PER_MBLOCK, blocks);
         // allocLargeChunk will prefer large chunks, but will pick up
@@ -759,6 +752,7 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
 
         tail = &bd[0];
     }
+    RELEASE_SM_LOCK;
 
     return &bd[0];
 }
@@ -878,7 +872,7 @@ resizeNurseriesEach (W_ blocks)
                 next_bd = bd->link;
                 next_bd->u.back = NULL;
                 nursery_blocks -= bd->blocks; // might be a large block
-                freeGroup(bd);
+                freeGroup_lock(bd);
                 bd = next_bd;
             }
             nursery->blocks = bd;
@@ -1299,9 +1293,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         if (bd == NULL) {
             // The pinned block list is empty: allocate a fresh block (we can't fail
             // here).
-            ACQUIRE_SM_LOCK;
             bd = allocNursery(cap->node, NULL, PINNED_EMPTY_SIZE);
-            RELEASE_SM_LOCK;
         }
 
         // Bump up the nursery pointer to avoid the pathological situation

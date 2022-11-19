@@ -17,22 +17,6 @@
 
 #include "BeginPrivate.h"
 
-bdescr* allocGroup_sync(uint32_t n);
-bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n);
-
-INLINE_HEADER bdescr *allocBlock_sync(void)
-{
-    return allocGroup_sync(1);
-}
-
-INLINE_HEADER bdescr *allocBlockOnNode_sync(uint32_t node)
-{
-    return allocGroupOnNode_sync(node,1);
-}
-
-void    freeChain_sync(bdescr *bd);
-void    freeGroup_sync(bdescr *bd);
-
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
 StgPtr  todo_block_full      (uint32_t size, gen_workspace *ws);
 StgPtr  alloc_todo_block     (gen_workspace *ws, uint32_t size);
@@ -62,7 +46,7 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
     bd = gct->mut_lists[gen_no];
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
         bdescr *new_bd;
-        new_bd = allocBlock_sync();
+        new_bd = allocBlock_lock();
         new_bd->link = bd;
         bd = new_bd;
         gct->mut_lists[gen_no] = bd;

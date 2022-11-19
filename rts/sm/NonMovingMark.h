@@ -9,9 +9,10 @@
 #pragma once
 
 #include "Task.h"
-#include "NonMoving.h"
 
 #include "BeginPrivate.h"
+
+struct NonMovingHeap;
 
 enum EntryType {
     NULL_ENTRY = 0,

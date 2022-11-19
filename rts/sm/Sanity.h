@@ -19,6 +19,8 @@
 # define MAX_SLOTS      100000
 # endif
 
+struct NonmovingHeap;
+
 /* debugging routines */
 void checkSanity        ( bool after_gc, bool major_gc );
 void checkNurserySanity ( nursery *nursery );

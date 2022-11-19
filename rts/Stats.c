@@ -963,11 +963,6 @@ static void report_summary(const RTSSummaryStats* sum)
                     , col_width[1], "SpinLock"
                     , col_width[2], "Spins"
                     , col_width[3], "Yields");
-        statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*" FMT_Word64 "\n"
-                    , col_width[0], ""
-                    , col_width[1], "gc_alloc_block_sync"
-                    , col_width[2], gc_alloc_block_sync.spin
-                    , col_width[3], gc_alloc_block_sync.yield);
         statsPrintf("%*s" "%*s" "%*" FMT_Word64 "%*s\n"
                     , col_width[0], ""
                     , col_width[1], "whitehole_gc"
@@ -1142,10 +1137,6 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 
     // next, internal counters
 #if defined(PROF_SPIN)
-    MR_STAT("gc_alloc_block_sync_spin", FMT_Word64, gc_alloc_block_sync.spin);
-    MR_STAT("gc_alloc_block_sync_yield", FMT_Word64,
-            gc_alloc_block_sync.yield);
-    MR_STAT("gc_alloc_block_sync_spin", FMT_Word64, gc_alloc_block_sync.spin);
     MR_STAT("waitForGcThreads_spin", FMT_Word64, waitForGcThreads_spin);
     MR_STAT("waitForGcThreads_yield", FMT_Word64,
             waitForGcThreads_yield);
@@ -1572,9 +1563,6 @@ SpinLock:
 Not all of these are actual SpinLocks, see the details below.
 
 Actual SpinLocks:
-* gc_alloc_block:
-    This SpinLock protects the block allocator and free list manager. See
-    BlockAlloc.c.
 * gen[g].sync:
     These SpinLocks, one per generation, protect the generations[g] data
     structure during garbage collection.

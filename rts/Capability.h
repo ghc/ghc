@@ -20,10 +20,10 @@
 
 #pragma once
 
-#include "sm/GC.h" // for evac_fn
 #include "Task.h"
 #include "Sparks.h"
-#include "sm/NonMovingMark.h" // for MarkQueue
+#include "sm/GC.h" // for evac_fn
+#include "sm/NonMovingMark.h" // for UpdRemSet
 #include "IOManager.h" // for CapIOManager
 
 #include "BeginPrivate.h"
