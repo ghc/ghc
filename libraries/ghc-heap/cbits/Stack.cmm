@@ -120,7 +120,17 @@ getLargeBitmapzh(P_ stack, W_ index){
   (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
   (size) = ccall getLargeBitmapSize(c);
 
-  // ccall debugBelch("getLargeBitmapzh - size %ul\n", size);
+  return (stgArrBytes, size);
+}
+
+getBCOLargeBitmapzh(P_ stack, W_ index){
+  P_ c, stgArrBytes;
+  W_ size;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  (stgArrBytes) = ccall getBCOLargeBitmaps(MyCapability(), c);
+  (size) = ccall getBCOLargeBitmapSize(c);
 
   return (stgArrBytes, size);
 }

@@ -155,6 +155,12 @@ StgWord getLargeBitmapSize(StgClosure *c) {
   return bitmap->size;
 }
 
+StgWord getBCOLargeBitmapSize(StgClosure *c) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  return BCO_BITMAP_SIZE(c);
+}
+
 #define ROUNDUP_BITS_TO_WDS(n)                                                 \
   (((n) + WORD_SIZE_IN_BITS - 1) / WORD_SIZE_IN_BITS)
 
@@ -185,6 +191,26 @@ StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   StgLargeBitmap *bitmap = GET_FUN_LARGE_BITMAP(fun_info);
+  StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
+  StgArrBytes *array =
+      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
+
+  for (int i = 0; i < neededWords; i++) {
+    array->payload[i] = bitmap->bitmap[i];
+  }
+
+  return array;
+}
+
+// TODO: Much duplication between: getBCOLargeBitmaps, getRetFunLargeBitmaps, getLargeBitmaps
+StgArrBytes *getBCOLargeBitmaps(Capability *cap, StgClosure *c) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  const StgInfoTable *info = get_itbl(c);
+  StgLargeBitmap *bitmap = BCO_BITMAP(info);
+  // TODO: Use BCO_BITMAP_SIZEW?
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
