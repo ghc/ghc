@@ -1,7 +1,7 @@
 import ghc.nix/default.nix {
-#    bootghc = "ghc902";
     withDocs = false;
     withHadrianDeps = true;
-    withLlvm = true;
+    withLlvm = false;
     withIde = true;
+    withGhcid = true;
 }

@@ -123,7 +123,22 @@ toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
-     RET_BCO -> RetBCO
+     RET_BCO -> let
+        instrs' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFrameInstrs)) sfi
+        literals' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFrameLiterals)) sfi
+        ptrs' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFramePtrs)) sfi
+        arity' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameArity))
+        size' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameSize))
+        payload' =
+        in
+       RetBCO {
+        instrs = instrs',
+          literals  = literals',
+          ptrs = ptrs',
+          arity = arity',
+          size = size',
+          payload = payload'
+              }
      RET_SMALL -> let !(# bitmap#, size#, special# #) = getSmallBitmap# s# i#
                       bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #))(W# bitmap#) (W# size#)
                       payloads = map toBitmapPayload bes
@@ -236,6 +251,8 @@ foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :
 
 foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
 
+foreign import prim "getHalfWordzh" getHalfWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
+
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 
 data BitmapPayload = Closure CL.Closure | Primitive Word
@@ -286,7 +303,14 @@ data StackFrame =
   RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
   RetBig { payload :: [BitmapPayload] } |
   RetFun { retFunType :: RetFunType, size :: Word, fun :: CL.Closure, payload :: [BitmapPayload]} |
-  RetBCO
+  RetBCO {
+          instrs :: CL.Closure,
+          literals :: CL.Closure,
+          ptrs :: CL.Closure,
+          arity :: Word,
+          size :: Word,
+          payload :: [BitmapPayload]
+         }
   deriving (Show)
 
 data RetFunType =

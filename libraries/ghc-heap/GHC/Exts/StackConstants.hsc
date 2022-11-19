@@ -47,4 +47,19 @@ offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun) + (#size StgHeader)
 
 offsetStgRetFunFramePayload :: Int
 offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload) + (#size StgHeader)
+
+offsetStgRetBCOFrameInstrs :: Int
+offsetStgRetBCOFrameInstrs = (#const OFFSET_StgRetBCO_instrs) + (#size StgHeader)
+
+offsetStgRetBCOFrameLiterals :: Int
+offsetStgRetBCOFrameLiterals = (#const OFFSET_StgRetBCO_literals) + (#size StgHeader)
+
+offsetStgRetBCOFramePtrs :: Int
+offsetStgRetBCOFramePtrs = (#const OFFSET_StgRetBCO_ptrs) + (#size StgHeader)
+
+offsetStgRetBCOFrameArity :: Int
+offsetStgRetBCOFrameArity = (#const OFFSET_StgRetBCO_arity) + (#size StgHeader)
+
+offsetStgRetBCOFrameSize :: Int
+offsetStgRetBCOFrameSize = (#const OFFSET_StgRetBCO_size) + (#size StgHeader)
 #endif
