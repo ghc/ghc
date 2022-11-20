@@ -124,6 +124,7 @@ toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
 
           getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
+-- TODO: StackFrameIter parameter
 decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
 decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       let !(# bitmapArray#, size# #) = getterFun# stackFrame# closureOffset#
@@ -133,6 +134,7 @@ decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       in
         payloads
 
+-- TODO: StackFrameIter parameter
 decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
 decodeSmallBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       let !(# bitmap#, size# #) = getterFun# stackFrame# closureOffset#
@@ -141,8 +143,13 @@ decodeSmallBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       in
         payloads
 
+-- TODO: Negative offsets won't work! Consider using Word
 getClosure :: StackFrameIter -> Int -> CL.Closure
 getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
+
+-- TODO: Negative offsets won't work! Consider using Word
+getHalfWord :: StackFrameIter -> Int -> Word
+getHalfWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getHalfWord# s# i# (intToWord# relativeOffset))
 
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
@@ -151,8 +158,8 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         instrs' = getClosure sfi offsetStgRetBCOFrameInstrs
         literals' = getClosure sfi offsetStgRetBCOFrameLiterals
         ptrs' = getClosure sfi offsetStgRetBCOFramePtrs
-        arity' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameArity))
-        size' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameSize))
+        arity' = getHalfWord sfi offsetStgRetBCOFrameArity
+        size' = getHalfWord sfi offsetStgRetBCOFrameSize
         payload' = decodeLargeBitmap getBCOLargeBitmap# s# i# 2##
         in
        RetBCO {
