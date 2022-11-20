@@ -124,9 +124,8 @@ toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
 
           getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
--- TODO: StackFrameIter parameter
-decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
-decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
+decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> Word# -> [BitmapPayload]
+decodeLargeBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
       let !(# bitmapArray#, size# #) = getterFun# stackFrame# closureOffset#
           bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
           bes = wordsToBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
@@ -134,9 +133,8 @@ decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       in
         payloads
 
--- TODO: StackFrameIter parameter
-decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
-decodeSmallBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> Word# -> [BitmapPayload]
+decodeSmallBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
       let !(# bitmap#, size# #) = getterFun# stackFrame# closureOffset#
           bes = toBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #))(W# bitmap#) (W# size#)
           payloads = map toBitmapPayload bes
@@ -164,7 +162,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         ptrs' = getClosure sfi offsetStgRetBCOFramePtrs
         arity' = getHalfWord sfi offsetStgRetBCOFrameArity
         size' = getHalfWord sfi offsetStgRetBCOFrameSize
-        payload' = decodeLargeBitmap getBCOLargeBitmap# s# i# 2##
+        payload' = decodeLargeBitmap getBCOLargeBitmap# sfi 2##
         in
        RetBCO {
         instrs = instrs',
@@ -174,12 +172,12 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
           size = size',
           payload = payload'
               }
-     RET_SMALL -> let payloads = decodeSmallBitmap getSmallBitmap# s# i# 1##
+     RET_SMALL -> let payloads = decodeSmallBitmap getSmallBitmap# sfi 1##
                       special# = getRetSmallSpecialType# s# i#
                       special = (toEnum . fromInteger . toInteger) (W# special#)
                   in
                     RetSmall special payloads
-     RET_BIG -> let payloads = decodeLargeBitmap getLargeBitmap# s# i# 1##
+     RET_BIG -> let payloads = decodeLargeBitmap getLargeBitmap# sfi 1##
                 in
                   RetBig payloads
      RET_FUN -> let
@@ -190,12 +188,12 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
           case t of
               ARG_GEN_BIG ->
                 let
-                  payloads = decodeLargeBitmap getRetFunLargeBitmap# s# i# 2##
+                  payloads = decodeLargeBitmap getRetFunLargeBitmap# sfi 2##
                 in
                   payloads
               _ ->
                 let
-                  payloads = decodeSmallBitmap getRetFunSmallBitmap# s# i# 2##
+                  payloads = decodeSmallBitmap getRetFunSmallBitmap# sfi 2##
                 in
                   payloads
        in
