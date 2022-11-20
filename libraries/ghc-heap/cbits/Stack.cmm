@@ -93,10 +93,19 @@ getSmallBitmapzh(P_ stack, W_ index) {
   W_ bitmap, size, specialType;
   (bitmap) = ccall getBitmapWord(c);
   (size) = ccall getBitmapSize(c);
+
+  return (bitmap, size);
+}
+
+getRetSmallSpecialTypezh(P_ stack, W_ index) {
+  P_ c;
+  c = StgStack_sp(stack) + WDS(index);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ specialType;
   (specialType) = ccall getSpecialRetSmall(c);
 
-  // ccall debugBelch("getSmallBitmapzh - bitmap %ul, size %ul\n", bitmap, size);
-  return (bitmap, size, specialType);
+  return (specialType);
 }
 
 getRetFunSmallBitmapzh(P_ stack, W_ index) {

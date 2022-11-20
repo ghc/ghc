@@ -70,7 +70,9 @@ foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: StackSnapshot# -
 
 foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
-foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word#, Word# #)
+foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
+
+foreign import prim "getRetSmallSpecialTypezh" getRetSmallSpecialType# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
@@ -131,6 +133,14 @@ decodeLargeBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       in
         payloads
 
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackSnapshot# -> Word# -> Word# -> [BitmapPayload]
+decodeSmallBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
+      let !(# bitmap#, size# #) = getterFun# stackFrame# closureOffset#
+          bes = toBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #))(W# bitmap#) (W# size#)
+          payloads = map toBitmapPayload bes
+      in
+        payloads
+
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
@@ -150,9 +160,8 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
           size = size',
           payload = payload'
               }
-     RET_SMALL -> let !(# bitmap#, size#, special# #) = getSmallBitmap# s# i#
-                      bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 1## #))(W# bitmap#) (W# size#)
-                      payloads = map toBitmapPayload bes
+     RET_SMALL -> let payloads = decodeSmallBitmap getSmallBitmap# s# i# 1##
+                      special# = getRetSmallSpecialType# s# i#
                       special = (toEnum . fromInteger . toInteger) (W# special#)
                   in
                     RetSmall special payloads
@@ -164,7 +173,6 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         size =  W# (getWord# s# i# (intToWord# offsetStgRetFunFrameSize))
         fun = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetFunFrameFun)) sfi
         payload =
-          -- TODO: Much duplication with RET_SMALL and RET_BIG
           case t of
               ARG_GEN_BIG ->
                 let
@@ -173,9 +181,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                   payloads
               _ ->
                 let
-                  !(# bitmap#, size# #) = getRetFunSmallBitmap# s# i#
-                  bes = toBitmapEntries (StackFrameIter (# s#, plusWord# i# 2## #))(W# bitmap#) (W# size#)
-                  payloads = map toBitmapPayload bes
+                  payloads = decodeSmallBitmap getRetFunSmallBitmap# s# i# 2##
                 in
                   payloads
        in
