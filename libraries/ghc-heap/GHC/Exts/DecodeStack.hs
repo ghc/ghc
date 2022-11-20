@@ -141,13 +141,16 @@ decodeSmallBitmap getterFun# stackFrame# closureOffset# relativePayloadOffset# =
       in
         payloads
 
+getClosure :: StackFrameIter -> Int -> CL.Closure
+getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
+
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
      RET_BCO -> let
-        instrs' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFrameInstrs)) sfi
-        literals' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFrameLiterals)) sfi
-        ptrs' = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetBCOFramePtrs)) sfi
+        instrs' = getClosure sfi offsetStgRetBCOFrameInstrs
+        literals' = getClosure sfi offsetStgRetBCOFrameLiterals
+        ptrs' = getClosure sfi offsetStgRetBCOFramePtrs
         arity' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameArity))
         size' = W# (getHalfWord# s# i# (intToWord# offsetStgRetBCOFrameSize))
         payload' = decodeLargeBitmap getBCOLargeBitmap# s# i# 2##
@@ -171,7 +174,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
      RET_FUN -> let
         t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
         size =  W# (getWord# s# i# (intToWord# offsetStgRetFunFrameSize))
-        fun = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgRetFunFrameFun)) sfi
+        fun = getClosure sfi offsetStgRetFunFrameFun
         payload =
           case t of
               ARG_GEN_BIG ->
@@ -188,12 +191,12 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
         RetFun t size fun payload
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
-        c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgUpdateFrameUpdatee)) sfi
+        c = getClosure sfi offsetStgUpdateFrameUpdatee
         !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
        in
         UpdateFrame t c
      CATCH_FRAME -> let
-        c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchFrameHandler)) sfi
+        c = getClosure sfi offsetStgCatchFrameHandler
         -- TODO: Replace with getWord# expression
         exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
        in
@@ -204,19 +207,19 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
           UnderflowFrame (StackSnapshot nextChunk#)
      STOP_FRAME ->  StopFrame
      ATOMICALLY_FRAME -> let
-          c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgAtomicallyFrameCode)) sfi
-          r = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgAtomicallyFrameResult)) sfi
+          c = getClosure sfi offsetStgAtomicallyFrameCode
+          r = getClosure sfi offsetStgAtomicallyFrameResult
        in
          AtomicallyFrame c r
      CATCH_RETRY_FRAME ->  let
         running_alt_code = W# (getWord# s# i# (intToWord# offsetStgCatchRetryFrameRunningAltCode))
-        first_code = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchRetryFrameRunningFirstCode)) sfi
-        alt_code = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchRetryFrameRunningAltCode)) sfi
+        first_code = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
+        alt_code = getClosure sfi offsetStgCatchRetryFrameRunningAltCode
        in
          CatchRetryFrame running_alt_code first_code alt_code
      CATCH_STM_FRAME -> let
-          c = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameCode)) sfi
-          h = toClosure (unpackClosureReferencedByFrame# (intToWord# offsetStgCatchSTMFrameHandler)) sfi
+          c = getClosure sfi offsetStgCatchSTMFrameCode
+          h = getClosure sfi offsetStgCatchSTMFrameHandler
         in
           CatchStmFrame c h
      x -> error $ "Unexpected closure type on stack: " ++ show x
