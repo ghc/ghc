@@ -353,7 +353,7 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey)
+type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey [RealSrcSpan])
 
   -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
@@ -800,7 +800,7 @@ type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
 
 ----------------- Class instances -------------
 
-type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey) -- TODO:AZ:tidy up
+type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey [RealSrcSpan]) -- TODO:AZ:tidy up
 type instance XCClsInstDecl    GhcRn = NoExtField
 type instance XCClsInstDecl    GhcTc = NoExtField
 

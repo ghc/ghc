@@ -1356,7 +1356,7 @@ instance Binary BinSrcSpan where
           h <- getByte bh
           case h of
             0 -> do BinSpan ss <- get bh
-                    return $ BinSrcSpan (RealSrcSpan ss Strict.Nothing)
+                    return $ BinSrcSpan (RealSrcSpan ss)
             _ -> do s <- get bh
                     return $ BinSrcSpan (UnhelpfulSpan s)
 

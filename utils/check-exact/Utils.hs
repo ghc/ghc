@@ -30,6 +30,7 @@ import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
+import GHC.Data.Bag
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -128,14 +129,14 @@ undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan sp)
 -- ---------------------------------------------------------------------
 
 adjustDeltaForOffset :: LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset _colOffset              dp@(SameLine _) = dp
 adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
   = DifferentLine l (c - colOffset)
 
 -- ---------------------------------------------------------------------
 
-ss2pos :: RealSrcSpan -> Pos
-ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
+-- ss2pos :: RealSrcSpan -> Pos
+-- ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
 
 ss2posEnd :: RealSrcSpan -> Pos
 ss2posEnd ss = (srcSpanEndLine ss,srcSpanEndCol ss)
@@ -242,7 +243,8 @@ normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- |Must compare without span filenames, for CPP injected comments with fake filename
 cmpComments :: Comment -> Comment -> Ordering
-cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+-- cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare l1 l2
 
 -- |Sort, comparing without span filenames, for CPP injected comments with fake filename
 sortComments :: [Comment] -> [Comment]
@@ -252,7 +254,8 @@ sortComments cs = sortBy cmpComments cs
 sortEpaComments :: [LEpaComment] -> [LEpaComment]
 sortEpaComments cs = sortBy cmp cs
   where
-    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    -- cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    cmp (L l1 _) (L l2 _) = compare l1 l2
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
@@ -268,8 +271,8 @@ isKWComment c = isJust (commentOrigin c)
 noKWComments :: [Comment] -> [Comment]
 noKWComments = filter (\c -> not (isKWComment c))
 
-sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
-sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
+-- sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+-- sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
@@ -429,7 +432,59 @@ hackAnchorToSrcSpan (EpaSpan r) = RealSrcSpan (setRealSrcSpanBufSpan r Strict.No
 --     e = - (deltaColumn dp)
 hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 
- -- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+
+orderedDeclsBinds
+  :: AnnSortKey [DeclTag]
+  -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+  -> [LHsDecl GhcPs]
+orderedDeclsBinds sortKey binds sigs =
+  case sortKey of
+    NoAnnSortKey ->
+      sortBy (\a b -> compare (realSrcSpan "orderedDecls" $ getLocA a)
+                              (realSrcSpan "orderedDecls" $ getLocA b)) (binds ++ sigs)
+    AnnSortKey keys ->
+      let
+        go [] _ _                      = []
+        go (ValDTag:ks) (b:bs) ss = b : go ks bs ss
+        go (SigDTag:ks) bs (s:ss) = s : go ks bs ss
+        go (_:ks) bs ss           =     go ks bs ss
+      in
+        go keys binds sigs
+
+hsDeclsLocalBinds :: HsLocalBinds GhcPs -> [LHsDecl GhcPs]
+hsDeclsLocalBinds lb = case lb of
+    HsValBinds _ (ValBinds sortKey bs sigs) ->
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+    HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
+    HsIPBinds {}       -> []
+    EmptyLocalBinds {} -> []
+
+hsDeclsValBinds :: (HsValBindsLR GhcPs GhcPs) -> [LHsDecl GhcPs]
+hsDeclsValBinds (ValBinds sortKey bs sigs) =
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+hsDeclsValBinds XValBindsLR{} = error "hsDeclsValBinds"
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LSig' into a 'LHsDecl'
+wrapSig :: LSig GhcPs -> LHsDecl GhcPs
+wrapSig (L l s) = L l (SigD NoExtField s)
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LHsBind' into a 'LHsDecl'
+wrapDecl :: LHsBind GhcPs -> LHsDecl GhcPs
+wrapDecl (L l s) = L l (ValD NoExtField s)
+-- ---------------------------------------------------------------------
 
 showAst :: (Data a) => a -> String
 showAst ast

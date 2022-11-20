@@ -54,8 +54,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
@@ -204,6 +204,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/hie003.hs" Nothing
  -- "../../testsuite/tests/th/TH_dataD1.hs" Nothing
+ -- "../../testsuite/tests/printer/Test20297.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -462,10 +463,12 @@ changeAddDecl1 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
   let decl' = setEntryDP decl (DifferentLine 2 0)
 
-  let (p',_,_) = runTransform doAddDecl
+  let (p',_,_w) = runTransform doAddDecl
       doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtStart m decl'
+
+  debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
   return p'
 
 -- ---------------------------------------------------------------------
@@ -473,10 +476,12 @@ changeAddDecl1 libdir top = do
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
+  -- let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
+  let decl' = setEntryDP decl (DifferentLine 2 0)
 
   let (p',_,_) = runTransform doAddDecl
-      doAddDecl = everywhereM (mkM replaceTopLevelDecls) (makeDeltaAst top)
+      -- doAddDecl = everywhereM (mkM replaceTopLevelDecls) (makeDeltaAst top)
+      doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtEnd m decl'
   return p'
@@ -518,7 +523,7 @@ changeLocalDecls libdir (L l p) = do
         let oldBinds     = concatMap decl2Bind oldDecls'
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 4) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
@@ -550,7 +555,7 @@ changeLocalDecls2 libdir (L l p) = do
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
                         emptyComments
         let decls = [s,d]
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
@@ -795,7 +800,7 @@ rmDecl5 _libdir lp = do
         let
           go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
           go (HsLet a tkLet lb tkIn expr) = do
-            decs <- hsDeclsValBinds lb
+            let decs = hsDeclsLocalBinds lb
             let dec = last decs
             _ <- transferEntryDP (head decs) dec
             lb' <- replaceDeclsValbinds WithoutWhere lb [dec]

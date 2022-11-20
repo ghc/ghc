@@ -18,7 +18,7 @@ module GHC.Parser.Annotation (
   TokenLocation(..),
   DeltaPos(..), deltaPos, getDeltaLine,
 
-  EpAnn(..), Anchor(..), AnchorOperation(..),
+  EpAnn(..), Anchor, AnchorOperation(..),
   anchor, anchor_op,
   EpAnnS(..),
   spanAsAnchor, realSpanAsAnchor,
@@ -46,7 +46,7 @@ module GHC.Parser.Annotation (
   AnnContext(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
-  AnnSortKey(..),
+  AnnSortKey(..), DeclTag(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
@@ -558,8 +558,8 @@ type Anchor = EpaLocation -- Transitional
 
 anchor :: Anchor -> RealSrcSpan
 anchor (EpaSpan r) = r
--- anchor (EpaDelta _ _) = panic "anchor"
-anchor (EpaDelta _ _) = placeholderRealSpan
+anchor (EpaDelta _ _) = panic "anchor"
+-- anchor (EpaDelta _ _) = placeholderRealSpan
 
 anchor_op :: Anchor -> AnchorOperation
 anchor_op (EpaSpan _) = UnchangedAnchor
@@ -850,10 +850,27 @@ data AnnPragma
 -- SrcSpan is used purely as an index into the annotations, allowing
 -- transformations of the AST including the introduction of new Located
 -- items or re-arranging existing ones.
-data AnnSortKey
+data AnnSortKey a
   = NoAnnSortKey
-  | AnnSortKey [RealSrcSpan]
+  | AnnSortKey a
   deriving (Data, Eq)
+
+data DeclTag
+  = TyClDTag
+  | InstDTag
+  | DerivDTag
+  | ValDTag
+  | SigDTag
+  | KindSigDTag
+  | DefDTag
+  | ForDTag
+  | WarningDTag
+  | AnnDTag
+  | RuleDTag
+  | SpliceDTag
+  | DocDTag
+  | RoleAnnotDTag
+  deriving (Eq,Data,Ord,Show)
 
 -- ---------------------------------------------------------------------
 
@@ -1375,12 +1392,12 @@ instance Monoid NameAnn where
   mempty = NameAnnTrailing []
 
 
-instance Semigroup AnnSortKey where
+instance (Semigroup a) => Semigroup (AnnSortKey a) where
   NoAnnSortKey <> x = x
   x <> NoAnnSortKey = x
   AnnSortKey ls1 <> AnnSortKey ls2 = AnnSortKey (ls1 <> ls2)
 
-instance Monoid AnnSortKey where
+instance (Semigroup a) => Monoid (AnnSortKey a) where
   mempty = NoAnnSortKey
 
 instance (Outputable a) => Outputable (EpAnn a) where
@@ -1417,23 +1434,23 @@ instance (NamedThing (Located a)) => NamedThing (LocatedAnS an a) where
 instance Outputable AnnContext where
   ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
 
-instance Outputable AnnSortKey where
+instance (Outputable a) => Outputable (AnnSortKey a) where
   ppr NoAnnSortKey    = text "NoAnnSortKey"
   ppr (AnnSortKey ls) = text "AnnSortKey" <+> ppr ls
 
 instance Outputable IsUnicodeSyntax where
   ppr = text . show
 
-instance Binary a => Binary (LocatedL a) where
-  -- We do not serialise the annotations
-    put_ bh (L l x) = do
-            put_ bh (locI l)
-            put_ bh x
+-- instance Binary a => Binary (LocatedL a) where
+--   -- We do not serialise the annotations
+--     put_ bh (L l x) = do
+--             put_ bh (locI l)
+--             put_ bh x
 
-    get bh = do
-            l <- get bh
-            x <- get bh
-            return (L (noAnnSrcSpanI l) x)
+--     get bh = do
+--             l <- get bh
+--             x <- get bh
+--             return (L (noAnnSrcSpanI l) x)
 
 instance (Outputable a) => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l

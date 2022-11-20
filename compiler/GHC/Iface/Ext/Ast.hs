@@ -615,6 +615,7 @@ instance ToHie (IEContext (LocatedA ModuleName)) where
       pure $ [Node (mkSourcedNodeInfo org $ NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
           idents = M.singleton (Left mname) details
+  toHie (IEC _ (L (EpAnnS (EpaDelta _ _) _ _) _)) = pure []
 
 instance ToHie (Context (Located a)) => ToHie (Context (LocatedN a)) where
   toHie (C c (L l a)) = toHie (C c (L (locN l) a))

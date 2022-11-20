@@ -25,7 +25,7 @@ import Data.Data
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
-import GHC.Parser.Annotation ( LocatedL, noLocA )
+import GHC.Parser.Annotation ( LocatedL, noLocI )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
@@ -259,6 +259,6 @@ instance Binary a => Binary (BooleanFormula a) where
     h <- getByte bh
     case h of
       0 -> Var                  <$> get bh
-      1 -> And    . fmap noLocA <$> get bh
-      2 -> Or     . fmap noLocA <$> get bh
-      _ -> Parens . noLocA      <$> get bh
+      1 -> And    . fmap noLocI <$> get bh
+      2 -> Or     . fmap noLocI <$> get bh
+      _ -> Parens . noLocI      <$> get bh

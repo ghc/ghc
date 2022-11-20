@@ -190,7 +190,7 @@ validateIdentWith identParser mloc str0 =
         }
       buffer = stringBufferFromByteString str0
       realSrcLc = case mloc of
-        RealSrcSpan loc _ -> realSrcSpanStart loc
+        RealSrcSpan loc -> realSrcSpanStart loc
         UnhelpfulSpan _ -> mkRealSrcLoc nilFS 0 0
       pstate = initParserState pflags buffer realSrcLc
   in case unP identParser pstate of

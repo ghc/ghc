@@ -61,20 +61,20 @@ instance Outputable (WarningTxt pass) where
 instance Binary (WarningTxt GhcRn) where
     put_ bh (WarningTxt s w) = do
             putByte bh 0
-            put_ bh $ unLoc s
+            put_ bh s
             put_ bh $ unLoc <$> w
     put_ bh (DeprecatedTxt s d) = do
             putByte bh 1
-            put_ bh $ unLoc s
+            put_ bh s
             put_ bh $ unLoc <$> d
 
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do s <- noLoc <$> get bh
+              0 -> do s <- get bh
                       w <- fmap noLoc  <$> get bh
                       return (WarningTxt s w)
-              _ -> do s <- noLoc <$> get bh
+              _ -> do s <- get bh
                       d <- fmap noLoc <$> get bh
                       return (DeprecatedTxt s d)
 

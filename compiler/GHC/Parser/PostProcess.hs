@@ -1040,8 +1040,17 @@ checkTyClHdr is_cls ty
       let
         lr = ap Semi.<> as
       in (EpAnnS lr
-                 (NameAnn NameParens o lr c ta)
+                 (NameAnn NameParens o ap c ta)
                  (csp Semi.<> cs))
+        -- (EpAnnS
+        --  (EpaSpan { tests/examples/ghc88/StarBinder.hs:6:13-14 })
+        --  (NameAnn
+        --   (NameParens)
+        --   (EpaSpan { tests/examples/ghc88/StarBinder.hs:6:13 })
+        --   (EpaSpan { tests/examples/ghc88/StarBinder.hs:6:13 })
+        --   (EpaSpan { tests/examples/ghc88/StarBinder.hs:6:15 })
+        --   [])
+
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -1460,8 +1469,8 @@ class DisambInfixOp b where
   mkHsInfixHolePV :: SrcSpan -> (EpAnnComments -> EpAnn EpAnnUnboundVar) -> PV (Located b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
-  mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
-  mkHsConOpPV v = return $ L (getLoc v) (HsVar noExtField v)
+  mkHsVarOpPV v = return $ L (l2l $ getLoc v) (HsVar noExtField v)
+  mkHsConOpPV v = return $ L (l2l $ getLoc v) (HsVar noExtField v)
   mkHsInfixHolePV l ann = do
     cs <- getCommentsFor l
     return $ L l (hsHoleExpr (ann cs))

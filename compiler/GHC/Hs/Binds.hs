@@ -84,7 +84,7 @@ data NHsValBindsLR idL
       [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
 
-type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnSortKey
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = AnnSortKey [DeclTag]
 type instance XXValBindsLR (GhcPass pL) pR
             = NHsValBindsLR (GhcPass pL)
 
