@@ -151,6 +151,10 @@ getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intT
 getHalfWord :: StackFrameIter -> Int -> Word
 getHalfWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getHalfWord# s# i# (intToWord# relativeOffset))
 
+-- TODO: Negative offsets won't work! Consider using Word
+getWord :: StackFrameIter -> Int -> Word
+getWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getWord# s# i# (intToWord# relativeOffset))
+
 unpackStackFrameIter :: StackFrameIter -> StackFrame
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
@@ -180,7 +184,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                   RetBig payloads
      RET_FUN -> let
         t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
-        size =  W# (getWord# s# i# (intToWord# offsetStgRetFunFrameSize))
+        size = getWord sfi offsetStgRetFunFrameSize
         fun = getClosure sfi offsetStgRetFunFrameFun
         payload =
           case t of
@@ -219,7 +223,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
        in
          AtomicallyFrame c r
      CATCH_RETRY_FRAME ->  let
-        running_alt_code = W# (getWord# s# i# (intToWord# offsetStgCatchRetryFrameRunningAltCode))
+        running_alt_code = getWord sfi offsetStgCatchRetryFrameRunningAltCode
         first_code = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
         alt_code = getClosure sfi offsetStgCatchRetryFrameRunningAltCode
        in
