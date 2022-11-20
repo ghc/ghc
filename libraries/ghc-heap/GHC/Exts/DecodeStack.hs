@@ -85,25 +85,25 @@ wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [BitmapEntry]
 wordsToBitmapEntries _ [] 0 = []
 wordsToBitmapEntries _ [] i = error $ "Invalid state: Empty list, size " ++ show i
 wordsToBitmapEntries _ l 0 = error $ "Invalid state: Size 0, list " ++ show l
-wordsToBitmapEntries sfi (b:bs) size =
-    let  entries = toBitmapEntries sfi b (min size (fromIntegral wORD_SIZE_IN_BITS))
+wordsToBitmapEntries sfi (b:bs) bitmapSize =
+    let  entries = toBitmapEntries sfi b (min bitmapSize (fromIntegral wORD_SIZE_IN_BITS))
          mbLastEntry = (listToMaybe . reverse) entries
          mbLastFrame = fmap closureFrame mbLastEntry
       in
         case mbLastFrame of
           Just (StackFrameIter (# s'#, i'# #)) ->
-            entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord size)
+            entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord bitmapSize)
           Nothing -> error "This should never happen! Recursion ended not in base case."
   where
     subtractDecodedBitmapWord :: Word -> Word
-    subtractDecodedBitmapWord size = fromIntegral $ max 0 ((fromIntegral size) - wORD_SIZE_IN_BITS)
+    subtractDecodedBitmapWord bSize = fromIntegral $ max 0 ((fromIntegral bSize) - wORD_SIZE_IN_BITS)
 
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
-toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap size = BitmapEntry {
+toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap bSize = BitmapEntry {
     closureFrame = sfi,
     isPrimitive = (bitmap .&. 1) /= 0
-  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (size - 1)
+  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> BitmapPayload
 toBitmapPayload e | isPrimitive e = Primitive . toWord . closureFrame $ e
@@ -182,9 +182,9 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                   RetBig payloads
      RET_FUN -> let
         t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
-        size = getWord sfi offsetStgRetFunFrameSize
-        fun = getClosure sfi offsetStgRetFunFrameFun
-        payload =
+        size' = getWord sfi offsetStgRetFunFrameSize
+        fun' = getClosure sfi offsetStgRetFunFrameFun
+        payload' =
           case t of
               ARG_GEN_BIG ->
                 let
@@ -197,7 +197,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
                 in
                   payloads
        in
-        RetFun t size fun payload
+        RetFun t size' fun' payload'
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
         c = getClosure sfi offsetStgUpdateFrameUpdatee
@@ -221,11 +221,11 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
        in
          AtomicallyFrame c r
      CATCH_RETRY_FRAME ->  let
-        running_alt_code = getWord sfi offsetStgCatchRetryFrameRunningAltCode
-        first_code = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
-        alt_code = getClosure sfi offsetStgCatchRetryFrameRunningAltCode
+        running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
+        first_code' = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
+        alt_code' = getClosure sfi offsetStgCatchRetryFrameRunningAltCode
        in
-         CatchRetryFrame running_alt_code first_code alt_code
+         CatchRetryFrame running_alt_code' first_code' alt_code'
      CATCH_STM_FRAME -> let
           c = getClosure sfi offsetStgCatchSTMFrameCode
           h = getClosure sfi offsetStgCatchSTMFrameHandler
