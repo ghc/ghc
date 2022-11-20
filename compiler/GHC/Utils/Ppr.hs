@@ -93,6 +93,7 @@ module GHC.Utils.Ppr (
 
         -- * Predicates on documents
         isEmpty,
+        docHead,
 
         -- * Rendering documents
 
@@ -112,6 +113,7 @@ module GHC.Utils.Ppr (
   ) where
 
 import GHC.Prelude.Basic hiding (error)
+import Control.Applicative ((<|>))
 
 import GHC.Utils.BufHandle
 import GHC.Data.FastString
@@ -349,6 +351,37 @@ empty = Empty
 isEmpty :: Doc -> Bool
 isEmpty Empty = True
 isEmpty _     = False
+
+-- | Get the first character of a document. We also return a new document,
+-- equivalent to the original one but faster to render. Use it to avoid work
+-- duplication.
+docHead :: Doc -> (Maybe Char, Doc)
+docHead d = (headChar, rdoc)
+  where
+    rdoc = reduceDoc d
+    headChar = go rdoc
+
+    go :: RDoc -> Maybe Char
+    go (Union p q)  = go (first p q)
+    go (Nest _ p)   = go p
+    go Empty        = Nothing
+    go (NilAbove _) = Just '\n'
+    go (TextBeside td _ p) = go_td td <|> go p
+    go NoDoc       = error "docHead: NoDoc"
+    go (Above {})  = error "docHead: Above"
+    go (Beside {}) = error "docHead: Beside"
+
+    go_td :: TextDetails -> Maybe Char
+    go_td (Chr c)  = Just c
+    go_td (Str s)  = go_str s
+    go_td (PStr s) = go_str (unpackFS s) -- O(1) because unpackFS is lazy
+    go_td (ZStr s) = go_str (zStringTakeN 1 s)
+    go_td (LStr s) = go_str (unpackPtrStringTakeN 1 s)
+    go_td (RStr n c) = if n > 0 then Just c else Nothing
+
+    go_str :: String -> Maybe Char
+    go_str []    = Nothing
+    go_str (c:_) = Just c
 
 {-
 Q: What is the reason for negative indentation (i.e. argument to indent

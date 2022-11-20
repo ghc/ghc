@@ -1450,22 +1450,19 @@ Consider this GHCi session (#14343)
       Found hole: _ :: Proxy '['True]
 
 This would be bad, because the '[' looks like a character literal.
+
+A similar issue arises if the element is a character literal (#22488)
+    ghci> type T = '[ 'x' ]
+    ghci> :kind! T
+    T :: [Char]
+    = '['x']
+
 Solution: in type-level lists and tuples, add a leading space
-if the first type is itself promoted.  See pprSpaceIfPromotedTyCon.
+if the first element is printed with a single quote.
 -}
 
 
 -------------------
-
--- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
--- See Note [Printing promoted type constructors]
-pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
-pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
-  = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
-      IsPromoted -> (space <>)
-      _ -> id
-pprSpaceIfPromotedTyCon _
-  = id
 
 -- See equivalent function in "GHC.Core.TyCo.Rep"
 pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
@@ -1475,7 +1472,7 @@ pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
-        -> char '\'' <> brackets (pprSpaceIfPromotedTyCon ty1 (fsep
+        -> char '\'' <> brackets (spaceIfSingleQuote (fsep
                         (punctuate comma (map (ppr_ty topPrec) (ty1:arg_tys)))))
       (arg_tys, Just tl)
         -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
@@ -1714,12 +1711,9 @@ pprTuple ctxt_prec sort promoted args =
     IsPromoted
       -> let tys = appArgsIfaceTypes args
              args' = drop (length tys `div` 2) tys
-             spaceIfPromoted = case args' of
-               arg0:_ -> pprSpaceIfPromotedTyCon arg0
-               _ -> id
          in ppr_tuple_app args' $
             pprPromotionQuoteI IsPromoted <>
-            tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
+            tupleParens sort (spaceIfSingleQuote (pprWithCommas pprIfaceType args'))
 
     NotPromoted
       |  ConstraintTuple <- sort

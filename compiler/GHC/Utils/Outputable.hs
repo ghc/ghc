@@ -32,6 +32,7 @@ module GHC.Utils.Outputable (
         interppSP, interpp'SP, interpp'SP',
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
+        spaceIfSingleQuote,
         isEmpty, nest,
         ptext,
         int, intWithCommas, integer, word, float, double, rational, doublePrec,
@@ -1286,6 +1287,16 @@ pprWithBars :: (a -> SDoc) -- ^ The pretty printing function to use
             -> SDoc        -- ^ 'SDoc' where the things have been pretty printed,
                            -- bar-separated and finally packed into a paragraph.
 pprWithBars pp xs = fsep (intersperse vbar (map pp xs))
+
+-- Prefix the document with a space if it starts with a single quote.
+-- See Note [Printing promoted type constructors] in GHC.Iface.Type
+spaceIfSingleQuote :: SDoc -> SDoc
+spaceIfSingleQuote (SDoc m) =
+  SDoc $ \ctx ->
+    let (mHead, d) = Pretty.docHead (m ctx)
+    in if mHead == Just '\''
+       then Pretty.space Pretty.<> d
+       else d
 
 -- | Returns the separated concatenation of the pretty printed things.
 interppSP  :: Outputable a => [a] -> SDoc

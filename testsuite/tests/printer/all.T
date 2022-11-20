@@ -181,3 +181,6 @@ test('Test20315', normal, compile_fail, [''])
 test('Test20846', [ignore_stderr, req_ppr_deps], makefile_test, ['Test20846'])
 test('Test21355', [ignore_stderr, req_ppr_deps], makefile_test, ['Test21355'])
 test('Test21805', [ignore_stderr, req_ppr_deps], makefile_test, ['Test21805'])
+
+test('T22488', normal, ghci_script, ['T22488.script'])
+test('T22488_docHead', normal, compile_and_run, ['-package ghc'])

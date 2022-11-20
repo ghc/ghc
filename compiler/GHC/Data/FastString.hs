@@ -56,6 +56,7 @@ module GHC.Data.FastString
         FastZString,
         hPutFZS,
         zString,
+        zStringTakeN,
         lengthFZS,
 
         -- * FastStrings
@@ -103,6 +104,7 @@ module GHC.Data.FastString
 
         -- ** Deconstruction
         unpackPtrString,
+        unpackPtrStringTakeN,
 
         -- ** Operations
         lengthPS
@@ -178,6 +180,14 @@ hPutFZS handle (FastZString bs) = BS.hPut handle bs
 zString :: FastZString -> String
 zString (FastZString bs) =
     inlinePerformIO $ BS.unsafeUseAsCStringLen bs peekCAStringLen
+
+-- | @zStringTakeN n = 'take' n . 'zString'@
+-- but is performed in \(O(\min(n,l))\) rather than \(O(l)\),
+-- where \(l\) is the length of the 'FastZString'.
+zStringTakeN :: Int -> FastZString -> String
+zStringTakeN n (FastZString bs) =
+    inlinePerformIO $ BS.unsafeUseAsCStringLen bs $ \(cp, len) ->
+        peekCAStringLen (cp, min n len)
 
 lengthFZS :: FastZString -> Int
 lengthFZS (FastZString bs) = BS.length bs
@@ -586,7 +596,7 @@ lengthFS fs = n_chars fs
 nullFS :: FastString -> Bool
 nullFS fs = SBS.null $ fs_sbs fs
 
--- | Unpacks and decodes the FastString
+-- | Lazily unpacks and decodes the FastString
 unpackFS :: FastString -> String
 unpackFS fs = utf8DecodeShortByteString $ fs_sbs fs
 
@@ -665,6 +675,14 @@ mkPtrString# a# = PtrString (Ptr a#) (ptrStrLength (Ptr a#))
 -- This does not free the memory associated with 'PtrString'.
 unpackPtrString :: PtrString -> String
 unpackPtrString (PtrString (Ptr p#) (I# n#)) = unpackNBytes# p# n#
+
+-- | @unpackPtrStringTakeN n = 'take' n . 'unpackPtrString'@
+-- but is performed in \(O(\min(n,l))\) rather than \(O(l)\),
+-- where \(l\) is the length of the 'PtrString'.
+unpackPtrStringTakeN :: Int -> PtrString -> String
+unpackPtrStringTakeN n (PtrString (Ptr p#) len) =
+  case min n len of
+    I# n# -> unpackNBytes# p# n#
 
 -- | Return the length of a 'PtrString'
 lengthPS :: PtrString -> Int
