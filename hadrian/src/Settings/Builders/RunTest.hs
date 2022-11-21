@@ -60,7 +60,6 @@ runTestGhcFlags = do
         , pure "-dno-debug-output"
         ]
 
-
 data TestCompilerArgs = TestCompilerArgs{
     hasDynamicRts, hasThreadedRts :: Bool
  ,   hasDynamic        :: Bool
@@ -68,6 +67,7 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   withNativeCodeGen :: Bool
  ,   withInterpreter   :: Bool
  ,   unregisterised    :: Bool
+ ,   tables_next_to_code :: Bool
  ,   withSMP           :: Bool
  ,   debugAssertions   :: Bool
       -- ^ Whether the compiler has debug assertions enabled,
@@ -99,6 +99,7 @@ inTreeCompilerArgs stg = do
     leadingUnderscore   <- flag LeadingUnderscore
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
+    tables_next_to_code <- flag TablesNextToCode
     withSMP             <- targetSupportsSMP
     debugAssertions     <- ($ stg) . ghcDebugAssertions <$> flavour
     profiled            <- ghcProfiled        <$> flavour <*> pure stg
@@ -144,6 +145,7 @@ outOfTreeCompilerArgs = do
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
+    tables_next_to_code <- getBooleanSetting TestGhcUnregisterised
     withSMP             <- getBooleanSetting TestGhcWithSMP
     debugAssertions     <- getBooleanSetting TestGhcDebugged
 
@@ -254,6 +256,7 @@ runTestBuilderArgs = builder Testsuite ? do
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
+            , arg "-e", arg $ "config.tables_next_to_code=" ++ show tables_next_to_code
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
             , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
