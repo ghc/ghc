@@ -22,7 +22,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.Cont  (MonadCont)
-import Control.Monad.Error (MonadError)
+import Control.Monad.Except(MonadError)
 import Control.Monad.Reader(MonadReader)
 import Control.Monad.Writer(MonadWriter)
 import Control.Monad.State (MonadState)

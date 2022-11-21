@@ -1,6 +1,9 @@
 module T17810a where
 
+import Control.Monad
+import Control.Monad.IO.Class
 import Control.Monad.Except
+import Control.Monad.Trans
 
 class Monad m => ReadTCState m where
   locallyTCState :: m ()

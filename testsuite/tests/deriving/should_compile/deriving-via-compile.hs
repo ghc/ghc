@@ -25,6 +25,7 @@ import Data.Complex
 import Data.Functor.Const
 import Data.Functor.Identity
 import Data.Ratio
+import Control.Monad (liftM, ap)
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer

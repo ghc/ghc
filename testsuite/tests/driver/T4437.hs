@@ -37,8 +37,7 @@ check title expected got
 -- See Note [Adding a language extension] in compiler/GHC/Driver/Session.hs.
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
-    [ "DeepSubsumption"
-    , "TypeData"
+    [
     ]
 
 expectedCabalOnlyExtensions :: [String]
@@ -54,5 +53,7 @@ expectedCabalOnlyExtensions = ["Generics",
                                "Unsafe",
                                "Trustworthy",
                                "MonadFailDesugaring",
-                               "MonoPatBinds"
+                               "MonoPatBinds",
+                               -- https://github.com/haskell/cabal/pull/8521
+                               "RequiredTypeArguments"
                               ]
