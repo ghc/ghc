@@ -50,9 +50,11 @@ import GHC.Utils.Panic
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
-import Control.Monad.Identity
+import Control.Monad (forM, when, unless)
+import Control.Monad.Identity (Identity(..))
 import qualified Control.Monad.Reader as Reader
-import Control.Monad.RWS
+import Control.Monad.RWS (MonadReader, RWST, evalRWST, tell, modify, get, gets, ask)
+import Control.Monad.Trans (lift)
 import Data.Data ( Data )
 import Data.Dynamic
 import Data.Foldable

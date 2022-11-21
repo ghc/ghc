@@ -47,7 +47,7 @@ module Parsers (
 
 import Preprocess
 
-import Control.Monad.RWS
+import Data.Functor (void)
 
 import qualified GHC hiding (parseModule)
 import qualified Control.Monad.IO.Class as GHC

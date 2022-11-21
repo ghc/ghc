@@ -18,7 +18,8 @@ module Utils
   -- , isGoodDelta
   -- ) where
   where
-import Control.Monad.State
+
+import Control.Monad (when)
 import Data.Function
 import Data.Maybe (isJust)
 import Data.Ord (comparing)
