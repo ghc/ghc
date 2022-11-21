@@ -36,19 +36,23 @@ Now `t` is no longer in a recursive function, and good things happen!
 -}
 
 import GHC.Prelude
+import GHC.Core
+import GHC.Core.Type
+import GHC.Core.Utils
+import GHC.Core.Opt.Arity( exprBotStrictness_maybe )
+import GHC.Core.FVs
+
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core
-import GHC.Core.Utils
-import GHC.Utils.Monad.State.Strict
-import GHC.Builtin.Uniques
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.FVs
+
+import GHC.Builtin.Uniques
 import GHC.Data.FastString
-import GHC.Core.Type
+
 import GHC.Utils.Misc( mapSnd )
+import GHC.Utils.Monad.State.Strict
 
 import Data.Bifunctor
 import Control.Monad
@@ -254,28 +258,34 @@ exitifyRec in_scope pairs
         captures_join_points = any isJoinId abs_vars
 
 
+addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
 -- Picks a new unique, which is disjoint from
 --  * the free variables of the whole joinrec
 --  * any bound variables (captured)
 --  * any exit join points created so far.
-mkExitJoinId :: InScopeSet -> Type -> JoinArity -> ExitifyM JoinId
-mkExitJoinId in_scope ty join_arity = do
-    fs <- get
-    let avoid = in_scope `extendInScopeSetList` (map fst fs)
-                         `extendInScopeSet` exit_id_tmpl -- just cosmetics
-    return (uniqAway avoid exit_id_tmpl)
+--
+-- If it's a bottoming expression (which is very plausible) give it
+--   a bottoming demand/cpr sig right away, for the same reasons
+--   as given in Note [Bottoming floats] in GHC.Core.Opt.SetLevels
+--   Especially: if we fail to attach the signature we might CSE with
+--   another binding that /does/ have a bottoming signature, and lose
+--   the signature ==> Lint errors.
+addExit in_scope join_arity rhs
+  = do { fs <- get
+       ; let avoid = in_scope `extendInScopeSetList` (map fst fs)
+                              `extendInScopeSet` exit_id1 -- just cosmetics
+             final_exit_id = uniqAway avoid exit_id2
+       ; put ((final_exit_id,rhs):fs)
+       ; return final_exit_id }
   where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
-                    `asJoinId` join_arity
-
-addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
-addExit in_scope join_arity rhs = do
-    -- Pick a suitable name
-    let ty = exprType rhs
-    v <- mkExitJoinId in_scope ty join_arity
-    fs <- get
-    put ((v,rhs):fs)
-    return v
+    ty = exprType rhs
+    exit_id1 = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
+               `asJoinId` join_arity
+    exit_id2 | Just (arity, str_sig, cpr_sig) <- exprBotStrictness_maybe rhs
+             = exit_id1 `setIdArity`  arity
+                        `setIdDmdSig` str_sig
+                        `setIdCprSig` cpr_sig
+             | otherwise = exit_id1
 
 {-
 Note [Interesting expression]
