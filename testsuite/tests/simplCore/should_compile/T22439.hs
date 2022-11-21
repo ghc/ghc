@@ -8,7 +8,7 @@ module Bug where
 
 import qualified Data.Text.Lazy as T
 import GHC.Exts (IsList(..))
-import Prelude (Bool, Char, otherwise)
+import Prelude (Bool, Char, otherwise, type (~) )
 
 class (IsList full, item ~ Item full) => ListLike full item | full -> item where
     empty :: full
