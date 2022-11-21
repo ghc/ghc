@@ -207,7 +207,7 @@ splitSections = splitSectionsIf (/=ghc)
 -- configure with @--disable-large-address-space@ when using this.
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ notStage0 ? mconcat
-    [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
+    [ builder (Ghc CompileHs) ? (arg "-optc-fsanitize=thread" <> arg "-fcmm-thread-sanitizer")
     , builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
     , builder (Ghc LinkHs) ? (arg "-optc-fsanitize=thread" <> arg "-optl-fsanitize=thread")
     , builder Cc ? arg "-fsanitize=thread"
