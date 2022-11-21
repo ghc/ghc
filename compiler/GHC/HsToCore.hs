@@ -182,8 +182,8 @@ deSugar hsc_env
             _ -> pure $ emptyHpcInfo other_hpc_info
 
         ; (msgs, mb_res) <- initDs hsc_env tcg_env $
-                       do { ds_ev_binds <- dsEvBinds ev_binds
-                          ; core_prs <- dsTopLHsBinds binds_cvr
+                       do { dsEvBinds ev_binds $ \ ds_ev_binds -> do
+                          { core_prs <- dsTopLHsBinds binds_cvr
                           ; core_prs <- patchMagicDefns core_prs
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
@@ -194,7 +194,7 @@ deSugar hsc_env
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
                                    , spec_rules ++ ds_rules
-                                   , ds_fords `appendStubC` hpc_init) }
+                                   , ds_fords `appendStubC` hpc_init) } }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;

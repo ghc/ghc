@@ -285,9 +285,9 @@ matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
         ; var' <- newUniqueId var (idMult var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getCoPat <$> eqns
-        ; core_wrap <- dsHsWrapper co
-        ; let bind = NonRec var' (core_wrap (Var var))
-        ; return (mkCoLetMatchResult bind match_result) }
+        ; dsHsWrapper co $ \core_wrap -> do
+        { let bind = NonRec var' (core_wrap (Var var))
+        ; return (mkCoLetMatchResult bind match_result) } }
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Apply the view function to the match variable and then match that

@@ -163,13 +163,13 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                                  }
                                } : pats
                              }))
-                = do ds_bind <- dsTcEvBinds bind
-                     return ( wrapBinds (tvs `zip` tvs1)
-                            . wrapBinds (ds  `zip` dicts1)
-                            . mkCoreLets ds_bind
-                            , eqn { eqn_orig = Generated
-                                  , eqn_pats = conArgPats val_arg_tys args ++ pats }
-                            )
+                = do dsTcEvBinds bind $ \ds_bind ->
+                       return ( wrapBinds (tvs `zip` tvs1)
+                              . wrapBinds (ds  `zip` dicts1)
+                              . mkCoreLets ds_bind
+                              , eqn { eqn_orig = Generated
+                                    , eqn_pats = conArgPats val_arg_tys args ++ pats }
+                              )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
         ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they

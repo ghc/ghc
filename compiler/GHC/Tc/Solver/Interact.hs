@@ -32,7 +32,7 @@ import GHC.Tc.Solver.Monad
 
 import GHC.Core
 import GHC.Core.Type as Type
-import GHC.Core.InstEnv     ( DFunInstType )
+import GHC.Core.InstEnv     ( DFunInstType, Coherence(..) )
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.Predicate
@@ -231,7 +231,7 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest ev
+      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest IsCoherent ev -- TODO: plugins should be able to signal non-coherence
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 
 -- | A pair of (given, wanted) constraints to pass to plugins
@@ -665,9 +665,9 @@ interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
          vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
               , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i)) ]
        ; case solveOneFromTheOther ct_i ct_w of
-            KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
+            KeepInert -> do { setEvBindIfWanted ev_w IsCoherent (swap_me swap ev_i)
                             ; return (Stop ev_w (text "Irred equal:KeepInert" <+> ppr ct_w)) }
-            KeepWork ->  do { setEvBindIfWanted ev_i (swap_me swap ev_w)
+            KeepWork ->  do { setEvBindIfWanted ev_i IsCoherent (swap_me swap ev_w)
                             ; updInertIrreds (\_ -> others)
                             ; continueWith ct_w } }
 
@@ -1028,10 +1028,10 @@ interactDict inerts ct_w@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = t
          -- the inert from the work-item or vice-versa.
        ; case solveOneFromTheOther ct_i ct_w of
            KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr ct_w)
-                           ; setEvBindIfWanted ev_w (ctEvTerm ev_i)
+                           ; setEvBindIfWanted ev_w IsCoherent (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> ppr ct_w) }
            KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr ct_w)
-                           ; setEvBindIfWanted ev_i (ctEvTerm ev_w)
+                           ; setEvBindIfWanted ev_i IsCoherent (ctEvTerm ev_w)
                            ; updInertDicts $ \ ds -> delDict ds cls tys
                            ; continueWith ct_w } } }
 
@@ -1102,9 +1102,10 @@ shortCutSolver dflags ev_w ev_i
       , ClassPred cls tys <- classifyPredType pred
       = do { inst_res <- lift $ matchGlobalInst dflags True cls tys
            ; case inst_res of
-               OneInst { cir_new_theta = preds
-                       , cir_mk_ev     = mk_ev
-                       , cir_what      = what }
+               OneInst { cir_new_theta   = preds
+                       , cir_mk_ev       = mk_ev
+                       , cir_coherence   = coherence
+                       , cir_what        = what }
                  | safeOverlap what
                  , all isTyFamFree preds  -- Note [Shortcut solving: type families]
                  -> do { let solved_dicts' = addDict solved_dicts cls tys ev
@@ -1123,7 +1124,7 @@ shortCutSolver dflags ev_w ev_i
 
                        ; let ev_tm     = mk_ev (map getEvExpr evc_vs)
                              ev_binds' = extendEvBinds ev_binds $
-                                         mkWantedEvBind (ctEvEvId ev) ev_tm
+                                         mkWantedEvBind (ctEvEvId ev) coherence ev_tm
 
                        ; foldlM try_solve_from_instance
                                 (ev_binds', solved_dicts')
@@ -1539,7 +1540,7 @@ interactEq inerts workItem@(CEqCan { cc_lhs = lhs
                                    , cc_ev = ev
                                    , cc_eq_rel = eq_rel })
   | Just (ev_i, swapped) <- inertsCanDischarge inerts workItem
-  = do { setEvBindIfWanted ev $
+  = do { setEvBindIfWanted ev IsCoherent $
          evCoercion (maybeSymCo swapped $
                      downgradeRole (eqRelRole eq_rel)
                                    (ctEvRole ev_i)
@@ -1608,7 +1609,7 @@ solveByUnification wd tv xi
                              text "Left Kind is:" <+> ppr (typeKind tv_ty),
                              text "Right Kind is:" <+> ppr (typeKind xi) ]
        ; unifyTyVar tv xi
-       ; setEvBindIfWanted wd (evCoercion (mkNomReflCo xi))
+       ; setEvBindIfWanted wd IsCoherent (evCoercion (mkNomReflCo xi))
        ; n_kicked <- kickOutAfterUnification tv
        ; return (Stop wd (text "Solved by unification" <+> pprKicked n_kicked)) }
 
@@ -2269,7 +2270,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
      -- See Note [No Given/Given fundeps]
 
   | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
-  = do { setEvBindIfWanted ev (ctEvTerm solved_ev)
+  = do { setEvBindIfWanted ev IsCoherent (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 
   | otherwise  -- Wanted, but not cached
@@ -2305,7 +2306,7 @@ tryLastResortProhibitedSuperclass inerts
   , Just ct_i <- lookupInertDict (inert_cans inerts) loc_w cls xis
   , let ev_i = ctEvidence ct_i
   , isGiven ev_i
-  = do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
+  = do { setEvBindIfWanted ev_w IsCoherent (ctEvTerm ev_i)
        ; ctLocWarnTcS loc_w $
          TcRnLoopySuperclassSolve loc_w (ctPred work_item)
        ; return $ Stop ev_w (text "Loopy superclass") }
@@ -2314,9 +2315,10 @@ tryLastResortProhibitedSuperclass _ work_item
 
 chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
 chooseInstance work_item
-               (OneInst { cir_new_theta = theta
-                        , cir_what      = what
-                        , cir_mk_ev     = mk_ev })
+               (OneInst { cir_new_theta   = theta
+                        , cir_what        = what
+                        , cir_mk_ev       = mk_ev
+                        , cir_coherence   = coherence })
   = do { traceTcS "doTopReact/found instance for" $ ppr ev
        ; deeper_loc <- checkInstanceOK loc what pred
        ; checkReductionDepth deeper_loc pred
@@ -2326,7 +2328,7 @@ chooseInstance work_item
                   -- See Note [Instances in no-evidence implications]
          else
            do { evc_vars <- mapM (newWanted deeper_loc (ctRewriters work_item)) theta
-              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
+              ; setEvBindIfWanted ev coherence (mk_ev (map getEvExpr evc_vars))
               ; emitWorkNC (freshGoals evc_vars)
               ; stopWith ev "Dict/Top (solved wanted)" }}
   where
@@ -2591,9 +2593,10 @@ matchLocalInst pred loc
           { Just (dfun_id, tys, theta)
             | all ((theta `impliedBySCs`) . thdOf3) unifs
             ->
-            do { let result = OneInst { cir_new_theta = theta
-                                      , cir_mk_ev     = evDFunApp dfun_id tys
-                                      , cir_what      = LocalInstance }
+            do { let result = OneInst { cir_new_theta   = theta
+                                      , cir_mk_ev       = evDFunApp dfun_id tys
+                                      , cir_coherence   = IsCoherent
+                                      , cir_what        = LocalInstance }
                ; traceTcS "Best local instance found:" $
                   vcat [ text "pred:" <+> ppr pred
                        , text "result:" <+> ppr result

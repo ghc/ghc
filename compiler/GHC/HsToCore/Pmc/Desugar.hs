@@ -154,8 +154,8 @@ desugarPat x pat = case pat of
       | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
       | otherwise -> do
           (y, grds) <- desugarPatV p
-          wrap_rhs_y <- dsHsWrapper wrapper
-          pure (PmLet y (wrap_rhs_y (Var x)) : grds)
+          dsHsWrapper wrapper $ \wrap_rhs_y ->
+              pure (PmLet y (wrap_rhs_y (Var x)) : grds)
 
   -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do

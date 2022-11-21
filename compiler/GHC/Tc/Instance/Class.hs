@@ -34,7 +34,6 @@ import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name, pprDefinedAt )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
-import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Var
 
 import GHC.Core.Predicate
@@ -46,7 +45,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
 
-import GHC.Core ( Expr(Var, App, Cast, Type) )
+import GHC.Core ( Expr(Var, App, Cast) )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -97,9 +96,10 @@ type SafeOverlapping = Bool
 data ClsInstResult
   = NoInstance   -- Definitely no instance
 
-  | OneInst { cir_new_theta :: [TcPredType]
-            , cir_mk_ev     :: [EvExpr] -> EvTerm
-            , cir_what      :: InstanceWhat }
+  | OneInst { cir_new_theta   :: [TcPredType]
+            , cir_mk_ev       :: [EvExpr] -> EvTerm
+            , cir_coherence   :: Coherence -- See Note [Coherence and specialisation: overview]
+            , cir_what        :: InstanceWhat }
 
   | NotSure      -- Multiple matches and/or one or more unifiers
 
@@ -188,12 +188,12 @@ matchInstEnv dflags short_cut_solver clas tys
         ; case (matches, unify, safeHaskFail) of
 
             -- Nothing matches
-            ([], NoUnifiers, _)
+            ([], NoUnifiers{}, _)
                 -> do { traceTc "matchClass not matching" (ppr pred $$ ppr (ie_local instEnvs))
                       ; return NoInstance }
 
             -- A single match (& no safe haskell failure)
-            ([(ispec, inst_tys)], NoUnifiers, False)
+            ([(ispec, inst_tys)], NoUnifiers coherence, False)
                 | short_cut_solver      -- Called from the short-cut solver
                 , isOverlappable ispec
                 -- If the instance has OVERLAPPABLE or OVERLAPS or INCOHERENT
@@ -207,10 +207,11 @@ matchInstEnv dflags short_cut_solver clas tys
                 -> do { let dfun_id = instanceDFunId ispec
                       ; traceTc "matchClass success" $
                         vcat [text "dict" <+> ppr pred,
+                              ppr coherence,
                               text "witness" <+> ppr dfun_id
                                              <+> ppr (idType dfun_id) ]
                                 -- Record that this dfun is needed
-                      ; match_one (null unsafeOverlaps) dfun_id inst_tys }
+                      ; match_one (null unsafeOverlaps) coherence dfun_id inst_tys }
 
             -- More than one matches (or Safe Haskell fail!). Defer any
             -- reactions of a multitude until we learn more about the reagent
@@ -221,16 +222,17 @@ matchInstEnv dflags short_cut_solver clas tys
    where
      pred = mkClassPred clas tys
 
-match_one :: SafeOverlapping -> DFunId -> [DFunInstType] -> TcM ClsInstResult
+match_one :: SafeOverlapping -> Coherence -> DFunId -> [DFunInstType] -> TcM ClsInstResult
              -- See Note [DFunInstType: instantiating types] in GHC.Core.InstEnv
-match_one so dfun_id mb_inst_tys
+match_one so coherence dfun_id mb_inst_tys
   = do { traceTc "match_one" (ppr dfun_id $$ ppr mb_inst_tys)
        ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
        ; traceTc "match_one 2" (ppr dfun_id $$ ppr tys $$ ppr theta)
-       ; return $ OneInst { cir_new_theta = theta
-                          , cir_mk_ev     = evDFunApp dfun_id tys
-                          , cir_what      = TopLevInstance { iw_dfun_id = dfun_id
-                                                           , iw_safe_over = so } } }
+       ; return $ OneInst { cir_new_theta   = theta
+                          , cir_mk_ev       = evDFunApp dfun_id tys
+                          , cir_coherence   = coherence
+                          , cir_what        = TopLevInstance { iw_dfun_id = dfun_id
+                                                             , iw_safe_over = so } } }
 
 
 {- Note [Shortcut solving: overlap]
@@ -262,9 +264,10 @@ was a puzzling example.
 
 matchCTuple :: Class -> [Type] -> TcM ClsInstResult
 matchCTuple clas tys   -- (isCTupleClass clas) holds
-  = return (OneInst { cir_new_theta = tys
-                    , cir_mk_ev     = tuple_ev
-                    , cir_what      = BuiltinInstance })
+  = return (OneInst { cir_new_theta   = tys
+                    , cir_mk_ev       = tuple_ev
+                    , cir_coherence   = IsCoherent
+                    , cir_what        = BuiltinInstance })
             -- The dfun *is* the data constructor!
   where
      data_con = tyConSingleDataCon (classTyCon clas)
@@ -424,9 +427,10 @@ makeLitDict clas ty et
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
     , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
-    = return $ OneInst { cir_new_theta = []
-                       , cir_mk_ev     = \_ -> ev_tm
-                       , cir_what      = BuiltinInstance }
+    = return $ OneInst { cir_new_theta   = []
+                       , cir_mk_ev       = \_ -> ev_tm
+                       , cir_coherence   = IsCoherent
+                       , cir_what        = BuiltinInstance }
 
     | otherwise
     = pprPanic "makeLitDict" $
@@ -457,19 +461,9 @@ matchWithDict [cls, mty]
        -- the WithDict dictionary:
        --
        --   \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
-       --     nospec @(cls => a) k (sv |> (sub co ; sym co2))
-       --
-       -- where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
-       -- doesn't attempt to common up this evidence term with other evidence terms
-       -- of the same type.
-       --
-       -- See (WD6) in Note [withDict], and Note [nospecId magic] in GHC.Types.Id.Make.
+       --     k (sv |> (sub co ; sym co2))
        ; let evWithDict co2 =
                mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                 Var nospecId
-                   `App`
-                 (Type $ mkInvisFunTy cls openAlphaTy)
-                   `App`
                  Var k
                    `App`
                  (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
@@ -482,9 +476,10 @@ matchWithDict [cls, mty]
                             [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
-       ; return $ OneInst { cir_new_theta = [mkPrimEqPred mty inst_meth_ty]
-                          , cir_mk_ev     = mk_ev
-                          , cir_what      = BuiltinInstance }
+       ; return $ OneInst { cir_new_theta   = [mkPrimEqPred mty inst_meth_ty]
+                          , cir_mk_ev       = mk_ev
+                          , cir_coherence   = IsIncoherent -- See (WD6) in Note [withDict]
+                          , cir_what        = BuiltinInstance }
        }
 
 matchWithDict _
@@ -587,12 +582,14 @@ Some further observations about `withDict`:
 (WD6) In fact, we desugar `withDict @cls @mty @{rr} @r` to
 
          \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
-           nospec @(cls => a) k (sv |> (sub co2 ; sym co)))
+           k (sv |> (sub co2 ; sym co)))
 
-      That is, we cast the method using a coercion, and apply k to it.
-      However, we use the 'nospec' magicId (see Note [nospecId magic] in GHC.Types.Id.Make)
-      to ensure that the typeclass specialiser doesn't incorrectly common-up distinct
-      evidence terms. This is super important! Suppose we have calls
+      That is, we cast the method using a coercion, and apply k to
+      it. Moreover, we mark the evidence as incoherent, resulting in
+      the use of the 'nospec' magicId (see Note [nospecId magic] in
+      GHC.Types.Id.Make) to ensure that the typeclass specialiser
+      doesn't incorrectly common-up distinct evidence terms. This is
+      super important! Suppose we have calls
 
           withDict A k
           withDict B k
@@ -672,9 +669,10 @@ matchTypeable _ _ = return NoInstance
 -- | Representation for a type @ty@ of the form @arg -> ret@.
 doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
 doFunTy clas ty mult arg_ty ret_ty
-  = return $ OneInst { cir_new_theta = preds
-                     , cir_mk_ev     = mk_ev
-                     , cir_what      = BuiltinInstance }
+  = return $ OneInst { cir_new_theta   = preds
+                     , cir_mk_ev       = mk_ev
+                     , cir_coherence   = IsCoherent
+                     , cir_what        = BuiltinInstance }
   where
     preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
     mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
@@ -688,9 +686,10 @@ doFunTy clas ty mult arg_ty ret_ty
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
 doTyConApp clas ty tc kind_args
   | tyConIsTypeable tc
-  = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) kind_args
-                     , cir_mk_ev     = mk_ev
-                     , cir_what      = BuiltinTypeableInstance tc }
+  = return $ OneInst { cir_new_theta   = map (mk_typeable_pred clas) kind_args
+                     , cir_mk_ev       = mk_ev
+                     , cir_coherence   = IsCoherent
+                     , cir_what        = BuiltinTypeableInstance tc }
   | otherwise
   = return NoInstance
   where
@@ -719,9 +718,10 @@ doTyApp clas ty f tk
   | isForAllTy (typeKind f)
   = return NoInstance -- We can't solve until we know the ctr.
   | otherwise
-  = return $ OneInst { cir_new_theta = map (mk_typeable_pred clas) [f, tk]
-                     , cir_mk_ev     = mk_ev
-                     , cir_what      = BuiltinInstance }
+  = return $ OneInst { cir_new_theta   = map (mk_typeable_pred clas) [f, tk]
+                     , cir_mk_ev       = mk_ev
+                     , cir_coherence   = IsCoherent
+                     , cir_what        = BuiltinInstance }
   where
     mk_ev [t1,t2] = evTypeable ty $ EvTypeableTyApp (EvExpr t1) (EvExpr t2)
     mk_ev _ = panic "doTyApp"
@@ -739,9 +739,10 @@ doTyLit kc t = do { kc_clas <- tcLookupClass kc
                   ; let kc_pred    = mkClassPred kc_clas [ t ]
                         mk_ev [ev] = evTypeable t $ EvTypeableTyLit (EvExpr ev)
                         mk_ev _    = panic "doTyLit"
-                  ; return (OneInst { cir_new_theta = [kc_pred]
-                                    , cir_mk_ev     = mk_ev
-                                    , cir_what      = BuiltinInstance }) }
+                  ; return (OneInst { cir_new_theta   = [kc_pred]
+                                    , cir_mk_ev       = mk_ev
+                                    , cir_coherence   = IsCoherent
+                                    , cir_what        = BuiltinInstance }) }
 
 {- Note [Typeable (T a b c)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -830,24 +831,27 @@ if you'd written
 matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
 matchHeteroEquality args
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev     = evDataConApp heqDataCon args
-                    , cir_what      = BuiltinEqInstance })
+  = return (OneInst { cir_new_theta   = [ mkTyConApp eqPrimTyCon args ]
+                    , cir_mk_ev       = evDataConApp heqDataCon args
+                    , cir_coherence   = IsCoherent
+                    , cir_what        = BuiltinEqInstance })
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~ t2)
 matchHomoEquality args@[k,t1,t2]
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
-                    , cir_mk_ev     = evDataConApp eqDataCon args
-                    , cir_what      = BuiltinEqInstance })
+  = return (OneInst { cir_new_theta   = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
+                    , cir_mk_ev       = evDataConApp eqDataCon args
+                    , cir_coherence   = IsCoherent
+                    , cir_what        = BuiltinEqInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
 -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
-                    , cir_mk_ev     = evDataConApp coercibleDataCon args
-                    , cir_what      = BuiltinEqInstance })
+  = return (OneInst { cir_new_theta   = [ mkTyConApp eqReprPrimTyCon args' ]
+                    , cir_mk_ev       = evDataConApp coercibleDataCon args
+                    , cir_coherence   = IsCoherent
+                    , cir_what        = BuiltinEqInstance })
   where
     args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
@@ -978,9 +982,10 @@ matchHasField dflags short_cut clas tys
                      then do { -- See Note [Unused name reporting and HasField]
                                addUsedGRE True gre
                              ; keepAlive (greMangledName gre)
-                             ; return OneInst { cir_new_theta = theta
-                                              , cir_mk_ev     = mk_ev
-                                              , cir_what      = BuiltinInstance } }
+                             ; return OneInst { cir_new_theta   = theta
+                                              , cir_mk_ev       = mk_ev
+                                              , cir_coherence   = IsCoherent
+                                              , cir_what        = BuiltinInstance } }
                      else matchInstEnv dflags short_cut clas tys }
 
            _ -> matchInstEnv dflags short_cut clas tys }

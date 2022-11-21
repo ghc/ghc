@@ -2684,13 +2684,13 @@ neededEvVars implic@(Implic { ic_given = givens
       = needs `unionVarSet` acc
 
    needed_ev_bind needed (EvBind { eb_lhs = ev_var
-                                 , eb_is_given = is_given })
-     | is_given  = ev_var `elemVarSet` needed
+                                 , eb_info = info })
+     | EvBindGiven{} <- info = ev_var `elemVarSet` needed
      | otherwise = True   -- Keep all wanted bindings
 
    add_wanted :: EvBind -> VarSet -> VarSet
-   add_wanted (EvBind { eb_is_given = is_given, eb_rhs = rhs }) needs
-     | is_given  = needs  -- Add the rhs vars of the Wanted bindings only
+   add_wanted (EvBind { eb_info = info, eb_rhs = rhs }) needs
+     | EvBindGiven{} <- info = needs  -- Add the rhs vars of the Wanted bindings only
      | otherwise = evVarsOfTerm rhs `unionVarSet` needs
 
 -------------------------------------------------

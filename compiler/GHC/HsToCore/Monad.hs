@@ -36,6 +36,9 @@ module GHC.HsToCore.Monad (
         -- Getting and setting pattern match oracle states
         getPmNablas, updPmNablas,
 
+        -- Tracking evidence variable coherence
+        addIncoherents, getIncoherents,
+
         -- Get COMPLETE sets of a TyCon
         dsGetCompleteMatches,
 
@@ -91,6 +94,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Basic ( Origin )
 import GHC.Types.SourceFile
 import GHC.Types.Id
+import GHC.Types.Var (EvId)
 import GHC.Types.SrcLoc
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.Supply
@@ -109,6 +113,7 @@ import qualified GHC.Data.Strict as Strict
 
 import Data.IORef
 import GHC.Driver.Env.KnotVars
+import qualified Data.Set as S
 
 {-
 ************************************************************************
@@ -349,9 +354,10 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
                            , ds_cc_st   = cc_st_var
                            , ds_next_wrapper_num = next_wrapper_num
                            }
-        lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
-                           , dsl_loc     = real_span
-                           , dsl_nablas  = initNablas
+        lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
+                           , dsl_loc         = real_span
+                           , dsl_nablas      = initNablas
+                           , dsl_incoherents = mempty
                            }
     in (gbl_env, lcl_env)
 
@@ -406,6 +412,12 @@ getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 -- See 'dsl_nablas'.
 updPmNablas :: Nablas -> DsM a -> DsM a
 updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
+
+addIncoherents :: S.Set EvId -> DsM a -> DsM a
+addIncoherents incoherents = updLclEnv (\env -> env{ dsl_incoherents = incoherents `mappend` dsl_incoherents env })
+
+getIncoherents :: DsM (S.Set EvId)
+getIncoherents = dsl_incoherents <$> getLclEnv
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

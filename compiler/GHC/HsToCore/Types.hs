@@ -14,6 +14,7 @@ module GHC.HsToCore.Types (
 import GHC.Prelude (Int)
 
 import Data.IORef
+import qualified Data.Set as S
 
 import GHC.Types.CostCentre.State
 import GHC.Types.Error
@@ -78,6 +79,9 @@ data DsLclEnv
   -- ^ See Note [Long-distance information] in "GHC.HsToCore.Pmc".
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
+  , dsl_incoherents :: S.Set EvVar
+  -- ^ See Note [Desugaring incoherent evidence]: this field collects
+  -- all incoherent evidence variables in scope.
   }
 
 -- Inside [| |] brackets, the desugarer looks

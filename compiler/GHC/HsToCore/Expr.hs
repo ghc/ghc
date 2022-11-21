@@ -92,11 +92,11 @@ dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 -------------------------
 dsIPBinds :: HsIPBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ev_binds ip_binds) body
-  = do  { ds_binds <- dsTcEvBinds ev_binds
-        ; let inner = mkCoreLets ds_binds body
+  = do  { dsTcEvBinds ev_binds $ \ ds_binds -> do
+        { let inner = mkCoreLets ds_binds body
                 -- The dict bindings may not be in
                 -- dependency order; hence Rec
-        ; foldrM ds_ip_bind inner ip_binds }
+        ; foldrM ds_ip_bind inner ip_binds } }
   where
     ds_ip_bind :: LIPBind GhcTc -> CoreExpr -> DsM CoreExpr
     ds_ip_bind (L _ (IPBind n _ e)) body
@@ -182,8 +182,8 @@ dsUnliftedBind (XHsBindsLR (AbsBinds { abs_tvs = [], abs_ev_vars = []
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlM (\body lbind -> dsUnliftedBind (unLoc lbind) body)
                             body1 lbinds
-       ; ds_binds <- dsTcEvBinds_s ev_binds
-       ; return (mkCoreLets ds_binds body2) }
+       ; dsTcEvBinds_s ev_binds $ \ ds_binds -> do
+       { return (mkCoreLets ds_binds body2) } }
 
 dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
@@ -193,9 +193,9 @@ dsUnliftedBind (FunBind { fun_id = L l fun
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun)) Nothing matches
        ; massert (null args) -- Functions aren't unlifted
-       ; core_wrap <- dsHsWrapper co_fn  -- Can be non-identity (#21516)
-       ; let rhs' = core_wrap (mkOptTickBox tick rhs)
-       ; return (bindNonRec fun rhs' body) }
+       ; dsHsWrapper co_fn $ \core_wrap -> do -- Can be non-identity (#21516)
+       { let rhs' = core_wrap (mkOptTickBox tick rhs)
+       ; return (bindNonRec fun rhs' body) } }
 
 dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = (ty, _) }) body
@@ -550,10 +550,10 @@ dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
                            , syn_res_wrap  = res_wrap })
              arg_exprs
   = do { fun            <- dsExpr expr
-       ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
-       ; core_res_wrap  <- dsHsWrapper res_wrap
-       ; let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
-       ; return $ core_res_wrap (mkCoreApps fun wrapped_args) }
+       ; dsHsWrappers arg_wraps $ \core_arg_wraps -> do
+       { dsHsWrapper res_wrap $ \core_res_wrap -> do
+       { let wrapped_args = zipWithEqual "dsSyntaxExpr" ($) core_arg_wraps arg_exprs
+       ; return $ core_res_wrap (mkCoreApps fun wrapped_args) } } }
 dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
@@ -872,15 +872,15 @@ dsHsWrapped orig_hs_expr
        = go (wrap <.> WpTyApp ty) hs_e
 
     go wrap (HsVar _ (L _ var))
-      = do { wrap' <- dsHsWrapper wrap
-           ; let expr = wrap' (varToCoreExpr var)
+      = do { dsHsWrapper wrap $ \wrap' -> do
+           { let expr = wrap' (varToCoreExpr var)
                  ty   = exprType expr
            ; dflags <- getDynFlags
            ; warnAboutIdentities dflags var ty
-           ; return expr }
+           ; return expr } }
 
     go wrap hs_e
-       = do { wrap' <- dsHsWrapper wrap
-            ; addTyCs FromSource (hsWrapDictBinders wrap) $
+       = do { dsHsWrapper wrap $ \wrap' -> do
+            { addTyCs FromSource (hsWrapDictBinders wrap) $
               do { e <- dsExpr hs_e
-                 ; return (wrap' e) } }
+                 ; return (wrap' e) } } }

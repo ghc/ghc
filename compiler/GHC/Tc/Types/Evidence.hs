@@ -22,7 +22,7 @@ module GHC.Tc.Types.Evidence (
   isEmptyEvBindMap,
   evBindMapToVarSet,
   varSetMinusEvBindMap,
-  EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
+  EvBindInfo(..), EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
   -- * EvTerm (already a CoreExpr)
@@ -70,6 +70,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
+import GHC.Core.InstEnv ( Coherence(..) )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -447,24 +448,29 @@ varSetMinusEvBindMap vs (EvBindMap dve) = vs `uniqSetMinusUDFM` dve
 instance Outputable EvBindMap where
   ppr (EvBindMap m) = ppr m
 
+data EvBindInfo
+  = EvBindGiven { -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+    }
+  | EvBindWanted { ebi_coherence :: Coherence -- See Note [Desugaring incoherent evidence]
+    }
+
 -----------------
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
-  = EvBind { eb_lhs      :: EvVar
-           , eb_rhs      :: EvTerm
-           , eb_is_given :: Bool  -- True <=> given
-                 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+  = EvBind { eb_lhs  :: EvVar
+           , eb_rhs  :: EvTerm
+           , eb_info :: EvBindInfo
     }
 
 evBindVar :: EvBind -> EvVar
 evBindVar = eb_lhs
 
-mkWantedEvBind :: EvVar -> EvTerm -> EvBind
-mkWantedEvBind ev tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm }
+mkWantedEvBind :: EvVar -> Coherence -> EvTerm -> EvBind
+mkWantedEvBind ev c tm = EvBind { eb_info = EvBindWanted c, eb_lhs = ev, eb_rhs = tm }
 
 -- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm
 mkGivenEvBind :: EvVar -> EvTerm -> EvBind
-mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm }
+mkGivenEvBind ev tm = EvBind { eb_info = EvBindGiven, eb_lhs = ev, eb_rhs = tm }
 
 
 -- An EvTerm is, conceptually, a CoreExpr that implements the constraint.
@@ -845,8 +851,7 @@ findNeededEvVars ev_binds seeds
    add :: Var -> VarSet -> VarSet
    add v needs
      | Just ev_bind <- lookupEvBind ev_binds v
-     , EvBind { eb_is_given = is_given, eb_rhs = rhs } <- ev_bind
-     , is_given
+     , EvBind { eb_info = EvBindGiven, eb_rhs = rhs } <- ev_bind
      = evVarsOfTerm rhs `unionVarSet` needs
      | otherwise
      = needs
@@ -940,12 +945,14 @@ instance Uniquable EvBindsVar where
   getUnique = ebv_uniq
 
 instance Outputable EvBind where
-  ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })
+  ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_info = info })
      = sep [ pp_gw <+> ppr v
            , nest 2 $ equals <+> ppr e ]
+      -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
      where
-       pp_gw = brackets (if is_given then char 'G' else char 'W')
-   -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
+       pp_gw = brackets $ case info of
+           EvBindGiven{}  -> char 'G'
+           EvBindWanted{} -> char 'W'
 
 instance Outputable EvTerm where
   ppr (EvExpr e)         = ppr e

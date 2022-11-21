@@ -16,7 +16,7 @@ lower levels it is preserved with @let@/@letrec@s).
 
 module GHC.HsToCore.Binds
    ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
-   , dsHsWrapper, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
+   , dsHsWrapper, dsHsWrappers, dsEvTerm, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds
    , dsWarnOrphanRule
    )
 where
@@ -41,6 +41,7 @@ import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
 import GHC.Core.SimpleOpt    ( simpleOptExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
+import GHC.Core.InstEnv ( Coherence(..) )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
@@ -60,6 +61,7 @@ import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 import GHC.Tc.Types.Evidence
 
 import GHC.Types.Id
+import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -72,6 +74,7 @@ import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.Graph.Directed
 import GHC.Data.Bag
+import qualified Data.Set as S
 
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Misc
@@ -153,7 +156,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = (co_fn, tick)
                            })
- = do   { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
+ = do   { dsHsWrapper co_fn $ \core_wrap -> do
+        { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
                           -- FromSource might not be accurate (we don't have any
                           -- origin annotations for things in this module), but at
                           -- worst we do superfluous calls to the pattern match
@@ -163,7 +167,6 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           -- See Note [Long-distance information] in "GHC.HsToCore.Pmc"
                           matchWrapper (mkPrefixFunRhs (L loc (idName fun))) Nothing matches
 
-        ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
               rhs   = core_wrap (mkLams args body')
               core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
@@ -179,7 +182,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
         ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
           --                          , ppr (mg_alts matches)
           --                          , ppr args, ppr core_binds, ppr body']) $
-          return (force_var, [core_binds]) }
+          return (force_var, [core_binds]) } }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = (ty, (rhs_tick, var_ticks))
@@ -208,10 +211,10 @@ dsHsBind
              --            for inner pattern match check
              -- See Check, Note [Long-distance information]
 
-       ; ds_ev_binds <- dsTcEvBinds_s ev_binds
+       ; dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
 
        -- dsAbsBinds does the hard work
-       ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
+       { dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig } }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
@@ -241,9 +244,8 @@ dsAbsBinds dflags tyvars dicts exports
                            _                   -> Nothing
        -- If there is a variable to force, it's just the
        -- single variable we are binding here
-  = do { core_wrap <- dsHsWrapper wrap -- Usually the identity
-
-       ; let rhs = core_wrap $
+  = do { dsHsWrapper wrap $ \core_wrap -> do -- Usually the identity
+       { let rhs = core_wrap $
                    mkLams tyvars $ mkLams dicts $
                    mkCoreLets ds_ev_binds $
                    body
@@ -261,7 +263,7 @@ dsAbsBinds dflags tyvars dicts exports
                                        (isDefaultMethod prags)
                                        (dictArity dicts) rhs
 
-       ; return (force_vars', main_bind : fromOL spec_binds) }
+       ; return (force_vars', main_bind : fromOL spec_binds) } }
 
     -- Another common case: no tyvars, no dicts
     -- In this case we can have a much simpler desugaring
@@ -273,9 +275,9 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_wrap = wrap })
                      -- No SpecPrags (no dicts)
                      -- Can't be a default method (default methods are singletons)
-               = do { core_wrap <- dsHsWrapper wrap
-                    ; return ( gbl_id `setInlinePragma` defaultInlinePragma
-                             , core_wrap (Var lcl_id)) }
+               = do { dsHsWrapper wrap $ \core_wrap -> do
+                    { return ( gbl_id `setInlinePragma` defaultInlinePragma
+                             , core_wrap (Var lcl_id)) } }
 
        ; main_prs <- mapM mk_main exports
        ; return (force_vars, flattenBinds ds_ev_binds
@@ -309,8 +311,8 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
                 = do { tup_id  <- newSysLocalDs ManyTy tup_ty
-                     ; core_wrap <- dsHsWrapper wrap
-                     ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
+                     ; dsHsWrapper wrap $ \core_wrap -> do
+                     { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $
                                  mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                            rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
@@ -320,7 +322,7 @@ dsAbsBinds dflags tyvars dicts exports
                            -- Kill the INLINE pragma because it applies to
                            -- the user written (local) function.  The global
                            -- Id is just the selector.  Hmm.
-                     ; return ((global', rhs) : fromOL spec_binds) }
+                     ; return ((global', rhs) : fromOL spec_binds) } }
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
@@ -698,9 +700,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                -- perhaps with the body of the lambda wrapped in some WpLets
                -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
 
-       ; core_app <- dsHsWrapper spec_app
+       ; dsHsWrapper spec_app $ \core_app -> do
 
-       ; let ds_lhs  = core_app (Var poly_id)
+       { let ds_lhs  = core_app (Var poly_id)
              spec_ty = mkLamTypes spec_bndrs (exprType ds_lhs)
        ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
          --                         , text "spec_co:" <+> ppr spec_co
@@ -729,7 +731,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
             -- NB: do *not* use makeCorePair on (spec_id,spec_rhs), because
             --     makeCorePair overwrites the unfolding, which we have
             --     just created using specUnfolding
-       } } }
+       } } } }
   where
     is_local_id = isJust mb_poly_rhs
     poly_rhs | Just rhs <-  mb_poly_rhs
@@ -1150,75 +1152,157 @@ evidence that is used in `e`.
 
 This question arose when thinking about deep subsumption; see
 https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-1125419649).
+
+Note [Desugaring incoherent evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the evidence is coherent, we desugar WpEvApp by simply passing
+core_tm directly to k:
+
+  k core_tm
+
+If the evidence is not coherent, we mark the application with nospec:
+
+  nospec @(cls => a) k core_tm
+
+where  nospec :: forall a. a -> a  ensures that the typeclass specialiser
+doesn't attempt to common up this evidence term with other evidence terms
+of the same type (see Note [nospecId magic] in GHC.Types.Id.Make).
+
+See Note [Coherence and specialisation: overview] for why we shouldn't
+specialise incoherent evidence.
+
+We can find out if a given evidence is coherent or not during the
+desugaring of its WpLet wrapper: an evidence is incoherent if its
+own resolution was incoherent (see Note [Incoherent instances]), or
+if its definition refers to other incoherent evidence. dsEvBinds is
+the convenient place to compute this, since it already needs to do
+inter-evidence dependency analysis to generate well-scoped
+bindings. We then record this coherence information in the
+dsl_coherence field of DsM's local environment.
+
 -}
 
-dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
-dsHsWrapper WpHole            = return $ \e -> e
-dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
-dsHsWrapper (WpEvLam ev)      = return $ Lam ev
-dsHsWrapper (WpTyLam tv)      = return $ Lam tv
-dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
-                                   ; return (mkCoreLets bs) }
-dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
-                                   ; w2 <- dsHsWrapper c2
-                                   ; return (w1 . w2) }
-dsHsWrapper (WpFun c1 c2 (Scaled w t1))  -- See Note [Desugaring WpFun]
-                              = do { x <- newSysLocalDs w t1
-                                   ; w1 <- dsHsWrapper c1
-                                   ; w2 <- dsHsWrapper c2
-                                   ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
-                                         arg     = w1 (Var x)
-                                   ; return (\e -> (Lam x (w2 (app e arg)))) }
-dsHsWrapper (WpCast co)       = assert (coercionRole co == Representational) $
-                                return $ \e -> mkCastDs e co
-dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
-                                   ; return (\e -> App e core_tm) }
+dsHsWrapper :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
+dsHsWrapper WpHole            k = k $ \e -> e
+dsHsWrapper (WpTyApp ty)      k = k $ \e -> App e (Type ty)
+dsHsWrapper (WpEvLam ev)      k = k $ Lam ev
+dsHsWrapper (WpTyLam tv)      k = k $ Lam tv
+dsHsWrapper (WpLet ev_binds)  k = do { dsTcEvBinds ev_binds $ \bs -> do
+                                     { k (mkCoreLets bs) } }
+dsHsWrapper (WpCompose c1 c2) k = do { dsHsWrapper c1 $ \w1 -> do
+                                     { dsHsWrapper c2 $ \w2 -> do
+                                     { k (w1 . w2) } } }
+dsHsWrapper (WpFun c1 c2 (Scaled w t1)) k -- See Note [Desugaring WpFun]
+                                = do { x <- newSysLocalDs w t1
+                                     ; dsHsWrapper c1 $ \w1 -> do
+                                     { dsHsWrapper c2 $ \w2 -> do
+                                     { let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+                                           arg     = w1 (Var x)
+                                     ; k (\e -> (Lam x (w2 (app e arg)))) } } }
+dsHsWrapper (WpCast co)       k = assert (coercionRole co == Representational) $
+                                  k $ \e -> mkCastDs e co
+dsHsWrapper (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
+                                     ; incoherents <- getIncoherents
+                                     ; let vs = exprFreeVarsList core_tm
+                                           is_incoherent_var v = v `S.member` incoherents
+                                           is_coherent = all (not . is_incoherent_var) vs -- See Note [Desugaring incoherent evidence]
+                                     ; k (\e -> app_ev is_coherent e core_tm) }
   -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
-dsHsWrapper (WpMultCoercion co) = do { when (not (isReflexiveCo co)) $
-                                         diagnosticDs DsMultiplicityCoercionsNotSupported
-                                     ; return $ \e -> e }
---------------------------------------
-dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
-dsTcEvBinds_s []       = return []
-dsTcEvBinds_s (b:rest) = assert (null rest) $  -- Zonker ensures null
-                         dsTcEvBinds b
+dsHsWrapper (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
+                                           diagnosticDs DsMultiplicityCoercionsNotSupported
+                                       ; k $ \e -> e }
 
-dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]
+app_ev :: Bool -> CoreExpr -> CoreExpr -> CoreExpr
+app_ev is_coherent k core_tm
+    | is_coherent = k `App` core_tm
+    | otherwise   = Var nospecId `App` Type (exprType k) `App` k `App` core_tm
+
+dsHsWrappers :: [HsWrapper] -> ([CoreExpr -> CoreExpr] -> DsM a) -> DsM a
+dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps -> k (wrap:wraps)
+dsHsWrappers [] k = k []
+
+--------------------------------------
+dsTcEvBinds_s :: [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a
+dsTcEvBinds_s []       k = k []
+dsTcEvBinds_s (b:rest) k = assert (null rest) $  -- Zonker ensures null
+                           dsTcEvBinds b k
+
+dsTcEvBinds :: TcEvBinds -> ([CoreBind] -> DsM a) -> DsM a
 dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"    -- Zonker has got rid of this
 dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 
-dsEvBinds :: Bag EvBind -> DsM [CoreBind]
-dsEvBinds bs
-  = do { ds_bs <- mapBagM dsEvBind bs
-       ; return (mk_ev_binds ds_bs) }
+--   * Desugars the ev_binds, sorts them into dependency order, and
+--     passes the resulting [CoreBind] to thing_inside
+--   * Extends the DsM (dsl_coherence field) with coherence information
+--     for each binder in ev_binds, before invoking thing_inside
+dsEvBinds :: Bag EvBind -> ([CoreBind] -> DsM a) -> DsM a
+dsEvBinds ev_binds thing_inside
+  = do { ds_binds <- mapBagM dsEvBind ev_binds
+       ; let comps = sort_ev_binds ds_binds
+       ; go comps thing_inside }
+  where
+    go ::[SCC (Node EvVar (Coherence, CoreExpr))] -> ([CoreBind] -> DsM a) -> DsM a
+    go (comp:comps) thing_inside
+      = do { incoherents <- getIncoherents
+           ; let (core_bind, new_incoherents) = ds_component incoherents comp
+           ; addIncoherents new_incoherents $ go comps $ \ core_binds -> thing_inside (core_bind:core_binds) }
+    go [] thing_inside = thing_inside []
 
-mk_ev_binds :: Bag (Id,CoreExpr) -> [CoreBind]
+    is_coherent IsCoherent = True
+    is_coherent IsIncoherent = False
+
+    ds_component incoherents (AcyclicSCC node) = (NonRec v rhs, new_incoherents)
+      where
+        ((v, rhs), (this_coherence, deps)) = unpack_node node
+        transitively_incoherent = not (is_coherent this_coherence) || any is_incoherent deps
+        is_incoherent dep = dep `S.member` incoherents
+        new_incoherents
+            | transitively_incoherent = S.singleton v
+            | otherwise = mempty
+    ds_component incoherents (CyclicSCC nodes) = (Rec pairs, new_incoherents)
+      where
+        (pairs, direct_coherence) = unzip $ map unpack_node nodes
+
+        is_incoherent_remote dep = dep `S.member` incoherents
+        transitively_incoherent = or [ not (is_coherent this_coherence) || any is_incoherent_remote deps | (this_coherence, deps) <- direct_coherence ]
+            -- Bindings from a given SCC are transitively coherent if
+            -- all are coherent and all their remote dependencies are
+            -- also coherent; see Note [Desugaring incoherent evidence]
+
+        new_incoherents
+            | transitively_incoherent = S.fromList [ v | (v, _) <- pairs]
+            | otherwise = mempty
+
+    unpack_node DigraphNode { node_key = v, node_payload = (coherence, rhs), node_dependencies = deps } = ((v, rhs), (coherence, deps))
+
+sort_ev_binds :: Bag (Id, Coherence, CoreExpr) -> [SCC (Node EvVar (Coherence, CoreExpr))]
 -- We do SCC analysis of the evidence bindings, /after/ desugaring
 -- them. This is convenient: it means we can use the GHC.Core
 -- free-variable functions rather than having to do accurate free vars
 -- for EvTerm.
-mk_ev_binds ds_binds
-  = map ds_scc (stronglyConnCompFromEdgedVerticesUniq edges)
+sort_ev_binds ds_binds = stronglyConnCompFromEdgedVerticesUniqR edges
   where
-    edges :: [ Node EvVar (EvVar,CoreExpr) ]
+    edges :: [ Node EvVar (Coherence, CoreExpr) ]
     edges = foldr ((:) . mk_node) [] ds_binds
 
-    mk_node :: (Id, CoreExpr) -> Node EvVar (EvVar,CoreExpr)
-    mk_node b@(var, rhs)
-      = DigraphNode { node_payload = b
+    mk_node :: (Id, Coherence, CoreExpr) -> Node EvVar (Coherence, CoreExpr)
+    mk_node (var, coherence, rhs)
+      = DigraphNode { node_payload = (coherence, rhs)
                     , node_key = var
                     , node_dependencies = nonDetEltsUniqSet $
                                           exprFreeVars rhs `unionVarSet`
                                           coVarsOfType (varType var) }
-      -- It's OK to use nonDetEltsUniqSet here as stronglyConnCompFromEdgedVertices
+      -- It's OK to use nonDetEltsUniqSet here as graphFromEdgedVerticesUniq
       -- is still deterministic even if the edges are in nondeterministic order
       -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
-    ds_scc (AcyclicSCC (v,r)) = NonRec v r
-    ds_scc (CyclicSCC prs)    = Rec prs
-
-dsEvBind :: EvBind -> DsM (Id, CoreExpr)
-dsEvBind (EvBind { eb_lhs = v, eb_rhs = r}) = liftM ((,) v) (dsEvTerm r)
+dsEvBind :: EvBind -> DsM (Id, Coherence, CoreExpr)
+dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
+    e <- dsEvTerm r
+    let coherence = case info of
+            EvBindGiven{} -> IsCoherent
+            EvBindWanted{ ebi_coherence = coherence } -> coherence
+    return (v, coherence, e)
 
 
 {-**********************************************************************
@@ -1232,10 +1316,10 @@ dsEvTerm (EvExpr e)          = return e
 dsEvTerm (EvTypeable ty ev)  = dsEvTypeable ty ev
 dsEvTerm (EvFun { et_tvs = tvs, et_given = given
                 , et_binds = ev_binds, et_body = wanted_id })
-  = do { ds_ev_binds <- dsTcEvBinds ev_binds
-       ; return $ (mkLams (tvs ++ given) $
+  = do { dsTcEvBinds ev_binds $ \ds_ev_binds -> do
+       { return $ (mkLams (tvs ++ given) $
                    mkCoreLets ds_ev_binds $
-                   Var wanted_id) }
+                   Var wanted_id) } }
 
 
 {-**********************************************************************

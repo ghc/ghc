@@ -32,6 +32,7 @@ import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness c
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
+import GHC.Core.InstEnv ( Coherence(..) )
 import GHC.Core
 import GHC.Types.Id( mkTemplateLocals )
 import GHC.Core.FamInstEnv ( FamInstEnvs )
@@ -201,7 +202,7 @@ solveCallStack ev ev_cs = do
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   cs_tm <- evCallStack ev_cs
   let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
-  setEvBindIfWanted ev ev_tm
+  setEvBindIfWanted ev IsCoherent ev_tm
 
 canClass :: CtEvidence
          -> Class -> [Type]
@@ -889,7 +890,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
       ; ev_binds <- emitImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs
                                        given_ev_vars wanteds
 
-      ; setWantedEvTerm dest $
+      ; setWantedEvTerm dest IsCoherent $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
               , et_binds = ev_binds, et_body = w_id }
 
@@ -1071,7 +1072,7 @@ can_eq_nc' rewritten _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
 -- Literals
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
  | l1 == l2
-  = do { setEvBindIfWanted ev (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
+  = do { setEvBindIfWanted ev IsCoherent (evCoercion $ mkReflCo (eqRelRole eq_rel) ty1)
        ; stopWith ev "Equal LitTy" }
 
 -- Decompose FunTy: (s -> t) and (c => t)
@@ -2650,8 +2651,7 @@ canEqReflexive :: CtEvidence    -- ty ~ ty
                -> TcType        -- ty
                -> TcS (StopOrContinue Ct)   -- always Stop
 canEqReflexive ev eq_rel ty
-  = do { setEvBindIfWanted ev (evCoercion $
-                               mkReflCo (eqRelRole eq_rel) ty)
+  = do { setEvBindIfWanted ev IsCoherent (evCoercion $ mkReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
 rewriteCastedEquality :: CtEvidence     -- :: lhs ~ (rhs |> mco), or (rhs |> mco) ~ lhs
@@ -3225,9 +3225,9 @@ rewriteEvidence new_rewriters
                 (Reduction co new_pred)
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ctEvRole ev)
-       ; setWantedEvTerm dest
-            (mkEvCast (getEvExpr mb_new_ev)
-                      (downgradeRole Representational (ctEvRole ev) (mkSymCo co)))
+       ; setWantedEvTerm dest IsCoherent $
+            mkEvCast (getEvExpr mb_new_ev)
+                     (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
        ; case mb_new_ev of
             Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }

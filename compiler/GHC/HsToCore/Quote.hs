@@ -143,9 +143,9 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
                             mkWpTyApps [m_var]
           tyWrapper t = mkAppTy m_var t
           debug = (quoteWrapper, monadWrapper, m_var)
-      q_f <- dsHsWrapper quoteWrapper
-      m_f <- dsHsWrapper monadWrapper
-      return (MetaWrappers q_f m_f tyWrapper debug)
+      dsHsWrapper quoteWrapper $ \q_f -> do {
+      dsHsWrapper monadWrapper $ \m_f -> do {
+      return (MetaWrappers q_f m_f tyWrapper debug) } }
 
 -- Turn A into m A
 wrapName :: Name -> MetaM Type
