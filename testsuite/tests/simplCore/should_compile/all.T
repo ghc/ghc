@@ -504,3 +504,4 @@ test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 
 test('T24014', normal, compile, ['-dcore-lint'])
 test('T24029', normal, compile, [''])
 test('T21348', normal, compile, ['-O'])
+test('T22439', normal, compile, ['-O'])
