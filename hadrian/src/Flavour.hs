@@ -203,12 +203,14 @@ splitSections = splitSectionsIf (/=ghc)
 -- Disable section splitting for the GHC library. It takes too long and
 -- there is little benefit.
 
+-- | Build GHC and libraries with ThreadSanitizer support. You likely want to
+-- configure with @--disable-large-address-space@ when using this.
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ notStage0 ? mconcat
     [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
-    , builder (Ghc CompileCWithGhc) ? (arg "-optc-fsanitize=thread" <> arg "-DTSAN_ENABLED")
-    , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
-    , builder (Cc  CompileC) ? (arg "-fsanitize=thread" <> arg "-DTSAN_ENABLED")
+    , builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
+    , builder (Ghc LinkHs) ? (arg "-optc-fsanitize=thread" <> arg "-optl-fsanitize=thread")
+    , builder Cc ? arg "-fsanitize=thread"
     , builder (Cabal Flags) ? arg "thread-sanitizer"
     , builder Testsuite ? arg "--config=have_thread_sanitizer=True"
     ]
