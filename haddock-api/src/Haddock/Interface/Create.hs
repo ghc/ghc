@@ -442,7 +442,7 @@ mkDocOpts mbOpts flags mdl = do
   opts <- case mbOpts of
     Just opts -> case words $ replace ',' ' ' opts of
       [] -> tell ["No option supplied to DOC_OPTION/doc_option"] >> return []
-      xs -> liftM catMaybes (mapM parseOption xs)
+      xs -> fmap catMaybes (mapM parseOption xs)
     Nothing -> return []
   pure (foldl go opts flags)
   where
@@ -651,7 +651,7 @@ mkExportItems
       fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre
         exportedNames decls maps fixMap splices instIfaceMap dflags
         allExports
-    Just exports -> liftM concat $ mapM lookupExport exports
+    Just exports -> fmap concat $ mapM lookupExport exports
   where
     lookupExport (IEGroup _ lev docStr, _)  = liftErrMsg $ do
       doc <- processDocString dflags gre (hsDocString . unLoc $ docStr)
