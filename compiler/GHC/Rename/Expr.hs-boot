@@ -1,11 +1,5 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 module GHC.Rename.Expr where
-
-#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
-import Data.Type.Equality (type (~))
-#endif
 
 import GHC.Types.Name
 import GHC.Hs
@@ -21,10 +15,8 @@ rnLExpr :: LHsExpr GhcPs
 
 type AnnoBody body
   = ( Outputable (body GhcPs)
-    , Anno (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (StmtLR GhcRn GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     )
+
 rnStmts :: --forall thing body.
            AnnoBody body => HsStmtContext GhcRn
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))

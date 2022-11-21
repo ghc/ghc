@@ -2078,6 +2078,16 @@ pprStmtContext (TransStmtCtxt c) =
   ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
              (pprStmtContext c)
 
+pprStmtCat :: Stmt (GhcPass p) body -> SDoc
+pprStmtCat (TransStmt {})       = text "transform"
+pprStmtCat (LastStmt {})        = text "return expression"
+pprStmtCat (BodyStmt {})        = text "body"
+pprStmtCat (BindStmt {})        = text "binding"
+pprStmtCat (LetStmt {})         = text "let"
+pprStmtCat (RecStmt {})         = text "rec"
+pprStmtCat (ParStmt {})         = text "parallel"
+pprStmtCat (ApplicativeStmt {}) = text "applicative"
+
 pprAHsDoFlavour, pprHsDoFlavour :: HsDoFlavour -> SDoc
 pprAHsDoFlavour flavour = article <+> pprHsDoFlavour flavour
   where
@@ -2151,13 +2161,11 @@ type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpan
 type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcAnn NoEpAnns
 type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcAnn NoEpAnns
-type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))) = SrcSpanAnnA
-type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr)))) = SrcSpanAnnA
+type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr)))) = SrcSpanAnnA
 
 type instance Anno (HsUntypedSplice (GhcPass p)) = SrcSpanAnnA
 
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr))))] = SrcSpanAnnL
-type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr))))] = SrcSpanAnnL
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (body (GhcPass pr))))] = SrcSpanAnnL
 
 type instance Anno (FieldLabelStrings (GhcPass p)) = SrcAnn NoEpAnns
 type instance Anno FieldLabelString                = SrcSpanAnnN

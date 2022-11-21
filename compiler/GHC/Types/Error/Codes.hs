@@ -422,6 +422,16 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTypeOperator"                       = 62547
   GhcDiagnosticCode "TcRnGADTMonoLocalBinds"                        = 58008
   GhcDiagnosticCode "TcRnIncorrectNameSpace"                        = 31891
+  GhcDiagnosticCode "TcRnNoRebindableSyntaxRecordDot"               = 65945
+  GhcDiagnosticCode "TcRnNoFieldPunsRecordDot"                      = 57365
+  GhcDiagnosticCode "TcRnIllegalStaticExpression"                   = 23800
+  GhcDiagnosticCode "TcRnIllegalStaticFormInSplice"                 = 12219
+  GhcDiagnosticCode "TcRnListComprehensionDuplicateBinding"         = 81232
+  GhcDiagnosticCode "TcRnLastStmtNotExpr"                           = 55814
+  GhcDiagnosticCode "TcRnUnexpectedStatementInContext"              = 42026
+  GhcDiagnosticCode "TcRnSectionWithoutParentheses"                 = 95880
+  GhcDiagnosticCode "TcRnIllegalImplicitParameterBindings"          = 50730
+  GhcDiagnosticCode "TcRnIllegalTupleSection"                       = 59155
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957
   GhcDiagnosticCode "TcRnIllegalBuiltinSyntax"                      = 39716
@@ -580,6 +590,12 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DerivErrGenerics"                              = 30367
   GhcDiagnosticCode "DerivErrEnumOrProduct"                         = 58291
 
+  -- TcRnEmptyStmtsGroupError/EmptyStatementGroupErrReason
+  GhcDiagnosticCode "EmptyStmtsGroupInParallelComp"                 = 41242
+  GhcDiagnosticCode "EmptyStmtsGroupInTransformListComp"            = 92693
+  GhcDiagnosticCode "EmptyStmtsGroupInDoNotation"                   = 82311
+  GhcDiagnosticCode "EmptyStmtsGroupInArrowNotation"                = 19442
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
@@ -671,6 +687,8 @@ type family ConRecursInto con where
     -- Recur inside Mismatch to get the underlying reason
   ConRecursInto "Mismatch"                 = 'Just MismatchMsg
 
+    -- Recur inside empty statements groups to get the underlying statements block
+  ConRecursInto "TcRnEmptyStmtsGroup"      = 'Just EmptyStatementGroupErrReason
   ----------------------------------
   -- Constructors of DsMessage
 

@@ -177,3 +177,6 @@ test('T19843m', normal, compile_fail, [''])
 test('T11167_ambig', normal, compile_fail, [''])
 test('T18138', normal, compile_fail, [''])
 test('T20147', normal, compile_fail, [''])
+
+test('RnEmptyStatementGroup1', normal, compile_fail, [''])
+test('RnImplicitBindInMdoNotation', normal, compile_fail, [''])

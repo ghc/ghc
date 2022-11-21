@@ -1181,6 +1181,49 @@ instance Diagnostic TcRnMessage where
     TcRnNotOpenFamily tc
       -> mkSimpleDecorated $
         text "Illegal instance for closed family" <+> quotes (ppr tc)
+    TcRnNoRebindableSyntaxRecordDot -> mkSimpleDecorated $
+      text "RebindableSyntax is required if OverloadedRecordUpdate is enabled."
+    TcRnNoFieldPunsRecordDot -> mkSimpleDecorated $
+      text "For this to work enable NamedFieldPuns"
+    TcRnIllegalStaticExpression e -> mkSimpleDecorated $
+        text "Illegal static expression:" <+> ppr e
+    TcRnIllegalStaticFormInSplice e -> mkSimpleDecorated $
+      sep [ text "static forms cannot be used in splices:"
+          , nest 2 $ ppr e
+          ]
+    TcRnListComprehensionDuplicateBinding n -> mkSimpleDecorated $
+        (text "Duplicate binding in parallel list comprehension for:"
+          <+> quotes (ppr n))
+    TcRnEmptyStmtsGroup cause -> mkSimpleDecorated  $ case cause of
+      EmptyStmtsGroupInParallelComp ->
+        text "Empty statement group in parallel comprehension"
+      EmptyStmtsGroupInTransformListComp ->
+        text "Empty statement group preceding 'group' or 'then'"
+      EmptyStmtsGroupInDoNotation ctxt ->
+        text "Empty" <+> pprHsDoFlavour ctxt
+      EmptyStmtsGroupInArrowNotation ->
+        text "Empty 'do' block in an arrow command"
+    TcRnLastStmtNotExpr ctxt (UnexpectedStatement stmt) ->
+      mkSimpleDecorated $ hang last_error 2 (ppr stmt)
+      where
+        last_error =
+          text "The last statement in" <+> pprAStmtContext ctxt
+          <+> text "must be an expression"
+    TcRnUnexpectedStatementInContext ctxt (UnexpectedStatement stmt) _ -> mkSimpleDecorated $
+       sep [ text "Unexpected" <+> pprStmtCat stmt <+> text "statement"
+                       , text "in" <+> pprAStmtContext ctxt ]
+    TcRnIllegalTupleSection -> mkSimpleDecorated $
+      text "Illegal tuple section"
+    TcRnIllegalImplicitParameterBindings eBinds -> mkSimpleDecorated $
+        either msg msg eBinds
+      where
+        msg binds = hang
+          (text "Implicit-parameter bindings illegal in an mdo expression")
+          2 (ppr binds)
+    TcRnSectionWithoutParentheses expr -> mkSimpleDecorated $
+      hang (text "A section must be enclosed in parentheses")
+         2 (text "thus:" <+> (parens (ppr expr)))
+
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1562,6 +1605,28 @@ instance Diagnostic TcRnMessage where
     TcRnBadFamInstDecl{}
       -> ErrorWithoutFlag
     TcRnNotOpenFamily{}
+      -> ErrorWithoutFlag
+    TcRnNoRebindableSyntaxRecordDot{}
+      -> ErrorWithoutFlag
+    TcRnNoFieldPunsRecordDot{}
+      -> ErrorWithoutFlag
+    TcRnIllegalStaticExpression{}
+      -> ErrorWithoutFlag
+    TcRnIllegalStaticFormInSplice{}
+      -> ErrorWithoutFlag
+    TcRnListComprehensionDuplicateBinding{}
+      -> ErrorWithoutFlag
+    TcRnEmptyStmtsGroup{}
+      -> ErrorWithoutFlag
+    TcRnLastStmtNotExpr{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedStatementInContext{}
+      -> ErrorWithoutFlag
+    TcRnSectionWithoutParentheses{}
+      -> ErrorWithoutFlag
+    TcRnIllegalImplicitParameterBindings{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTupleSection{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -1947,6 +2012,32 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TypeFamilies]
     TcRnNotOpenFamily{}
       -> noHints
+    TcRnNoRebindableSyntaxRecordDot{}
+      -> noHints
+    TcRnNoFieldPunsRecordDot{}
+      -> noHints
+    TcRnIllegalStaticExpression{}
+      -> [suggestExtension LangExt.StaticPointers]
+    TcRnIllegalStaticFormInSplice{}
+      -> noHints
+    TcRnListComprehensionDuplicateBinding{}
+      -> noHints
+    TcRnEmptyStmtsGroup EmptyStmtsGroupInDoNotation{}
+      -> [suggestExtension LangExt.NondecreasingIndentation]
+    TcRnEmptyStmtsGroup{}
+      -> noHints
+    TcRnLastStmtNotExpr{}
+      -> noHints
+    TcRnUnexpectedStatementInContext _ _ mExt
+      | Nothing <- mExt -> noHints
+      | Just ext <- mExt -> [suggestExtension ext]
+    TcRnSectionWithoutParentheses{}
+      -> noHints
+    TcRnIllegalImplicitParameterBindings{}
+      -> noHints
+    TcRnIllegalTupleSection{}
+      -> [suggestExtension LangExt.TupleSections]
+
 
   diagnosticCode = constructorCode
 

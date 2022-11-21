@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 
@@ -85,6 +86,8 @@ module GHC.Tc.Errors.Types (
   , RunSpliceFailReason(..)
   , ThingBeingConverted(..)
   , IllegalDecls(..)
+  , EmptyStatementGroupErrReason(..)
+  , UnexpectedStatement(..)
   ) where
 
 import GHC.Prelude
@@ -2631,6 +2634,133 @@ data TcRnMessage where
          testsuite/tests/indexed-types/should_fail/Overlap3
   -}
   TcRnNotOpenFamily :: TyCon -> TcRnMessage
+  {-| TcRnNoRebindableSyntaxRecordDot is an error triggered by an overloaded record update
+      without RebindableSyntax enabled.
+
+      Example(s):
+
+     Test cases: parser/should_fail/RecordDotSyntaxFail5
+  -}
+  TcRnNoRebindableSyntaxRecordDot :: TcRnMessage
+
+  {-| TcRnNoFieldPunsRecordDot is an error triggered by the use of record field puns
+      in an overloaded record update without enabling NamedFieldPuns.
+
+      Example(s):
+      print $ a{ foo.bar.baz.quux }
+
+     Test cases: parser/should_fail/RecordDotSyntaxFail12
+  -}
+  TcRnNoFieldPunsRecordDot :: TcRnMessage
+
+  {-| TcRnIllegalStaticExpression is an error thrown when user creates a static
+      pointer via TemplateHaskell without enabling the StaticPointers extension.
+
+      Example(s):
+
+     Test cases: th/T14204
+  -}
+  TcRnIllegalStaticExpression :: HsExpr GhcPs -> TcRnMessage
+
+  {-| TcRnIllegalStaticFormInSplice is an error when a user attempts to define
+      a static pointer in a Template Haskell splice.
+
+      Example(s):
+
+     Test cases: th/TH_StaticPointers02
+  -}
+  TcRnIllegalStaticFormInSplice :: HsExpr GhcPs -> TcRnMessage
+
+  {-| TcRnListComprehensionDuplicateBinding is an error triggered by duplicate
+      let-bindings in a list comprehension.
+
+      Example(s):
+      [ () | let a = 13 | let a = 17 ]
+
+     Test cases: typecheck/should_fail/tcfail092
+  -}
+  TcRnListComprehensionDuplicateBinding :: Name -> TcRnMessage
+
+  {-| TcRnEmptyStmtsGroup is an error triggered by an empty list of statements
+      in a statement block. For more information, see 'EmptyStatementGroupErrReason'
+
+      Example(s):
+
+        [() | then ()]
+
+        do
+
+        proc () -> do
+
+     Test cases: rename/should_fail/RnEmptyStatementGroup1
+  -}
+  TcRnEmptyStmtsGroup:: EmptyStatementGroupErrReason -> TcRnMessage
+
+  {-| TcRnLastStmtNotExpr is an error caused by the last statement
+      in a statement block not being an expression.
+
+      Example(s):
+
+        do x <- pure ()
+
+        do let x = 5
+
+     Test cases: rename/should_fail/T6060
+                 parser/should_fail/T3811g
+                 parser/should_fail/readFail028
+  -}
+  TcRnLastStmtNotExpr
+    :: HsStmtContext GhcRn
+    -> UnexpectedStatement
+    -> TcRnMessage
+
+  {-| TcRnUnexpectedStatementInContext is an error when a statement appears
+      in an unexpected context (e.g. an arrow statement appears in a list comprehension).
+
+      Example(s):
+
+     Test cases: parser/should_fail/readFail042
+                 parser/should_fail/readFail038
+                 parser/should_fail/readFail043
+  -}
+  TcRnUnexpectedStatementInContext
+    :: HsStmtContext GhcRn
+    -> UnexpectedStatement
+    -> Maybe LangExt.Extension
+    -> TcRnMessage
+
+  {-| TcRnIllegalTupleSection is an error triggered by usage of a tuple section
+      without enabling the TupleSections extension.
+
+      Example(s):
+        (5,)
+
+     Test cases: rename/should_fail/rnfail056
+  -}
+  TcRnIllegalTupleSection :: TcRnMessage
+
+  {-| TcRnIllegalImplicitParameterBindings is an error triggered by binding
+      an implicit parameter in an mdo block.
+
+      Example(s):
+      mdo { let { ?x = 5 }; () }
+
+     Test cases: rename/should_fail/RnImplicitBindInMdoNotation
+  -}
+  TcRnIllegalImplicitParameterBindings
+    :: Either (HsLocalBindsLR GhcPs GhcPs) (HsLocalBindsLR GhcRn GhcPs)
+    -> TcRnMessage
+
+  {-| TcRnSectionWithoutParentheses is an error triggered by attempting to
+      use an operator section without parentheses.
+
+      Example(s):
+      (`head` x, ())
+
+     Test cases: rename/should_fail/T2490
+                 rename/should_fail/T5657
+  -}
+  TcRnSectionWithoutParentheses :: HsExpr GhcPs -> TcRnMessage
 
   deriving Generic
 
@@ -3833,3 +3963,32 @@ data LookupTHInstNameErrReason
 data UnrepresentableTypeDescr
   = LinearInvisibleArgument
   | CoercionsInTypes
+
+-- | The context for an "empty statement group" error.
+data EmptyStatementGroupErrReason
+  = EmptyStmtsGroupInParallelComp
+  -- ^ Empty statement group in a parallel list comprehension
+  | EmptyStmtsGroupInTransformListComp
+  -- ^ Empty statement group in a transform list comprehension
+  --
+  --   Example:
+  --   [() | then ()]
+  | EmptyStmtsGroupInDoNotation HsDoFlavour
+  -- ^ Empty statement group in do notation
+  --
+  --   Example:
+  --   do
+  | EmptyStmtsGroupInArrowNotation
+  -- ^ Empty statement group in arrow notation
+  --
+  --   Example:
+  --   proc () -> do
+
+  deriving (Generic)
+
+-- | An existential wrapper around @'StmtLR' GhcPs GhcPs body@.
+data UnexpectedStatement where
+  UnexpectedStatement
+    :: Outputable (StmtLR GhcPs GhcPs body)
+    => StmtLR GhcPs GhcPs body
+    -> UnexpectedStatement
