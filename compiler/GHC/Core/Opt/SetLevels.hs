@@ -685,15 +685,16 @@ lvlMFE env strict_ctxt ann_expr
     expr_ty      = exprType expr
     fvs          = freeVarsOf ann_expr
     fvs_ty       = tyCoVarsOfType expr_ty
-    is_bot       = isBottomThunk mb_bot_str
-    is_bot_lam   = isJust mb_bot_str
+    is_bot_lam   = isJust mb_bot_str   -- True of bottoming thunks too!
     is_function  = isFunction ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
     expr_ok_for_spec = exprOkForSpeculation expr
-    dest_lvl     = destLevel env fvs fvs_ty is_function is_bot False
-    abs_vars     = abstractVars dest_lvl env fvs
+    abs_vars = abstractVars dest_lvl env fvs
+    dest_lvl = destLevel env fvs fvs_ty is_function is_bot_lam False
+               -- NB: is_bot_lam not is_bot; see (3) in
+               --     Note [Bottoming floats]
 
     -- float_is_new_lam: the floated thing will be a new value lambda
     -- replacing, say (g (x+4)) by (lvl x).  No work is saved, nor is
@@ -725,7 +726,9 @@ lvlMFE env strict_ctxt ann_expr
     -- See Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
-                && (not strict_ctxt || is_bot || exprIsHNF expr)
+                && (   not strict_ctxt                     -- (a)
+                    || exprIsHNF expr                      -- (b)
+                    || (is_bot_lam && escapes_value_lam))  -- (c)
 
 hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 -- Has a free join point which is not being floated to top level.
@@ -735,54 +738,62 @@ hasFreeJoin :: LevelEnv -> DVarSet -> Bool
 hasFreeJoin env fvs
   = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
 
-isBottomThunk :: Maybe (Arity, DmdSig, CprSig) -> Bool
--- See Note [Bottoming floats] (2)
-isBottomThunk (Just (0, _, _)) = True   -- Zero arity
-isBottomThunk _                = False
-
 {- Note [Floating to the top]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We are keen to float something to the top level, even if it does not
-escape a value lambda (and hence save work), for two reasons:
+Suppose saves_work is False, i.e.
+ - 'e' does not escape a value lambda (escapes_value_lam), or
+ - 'e' would have added value lambdas if floated (float_is_new_lam)
+Then we may still be keen to float a sub-expression 'e' to the top level,
+for two reasons:
 
-  * Doing so makes the function smaller, by floating out
-    bottoming expressions, or integer or string literals.  That in
-    turn makes it easier to inline, with less duplication.
+ (i) Doing so makes the function smaller, by floating out
+     bottoming expressions, or integer or string literals.  That in
+     turn makes it easier to inline, with less duplication.
+     This only matters if the floated sub-expression is inside a
+     value-lambda, which in turn may be easier to inline.
 
-  * (Minor) Doing so may turn a dynamic allocation (done by machine
-    instructions) into a static one. Minor because we are assuming
-    we are not escaping a value lambda.
+ (ii) (Minor) Doing so may turn a dynamic allocation (done by machine
+      instructions) into a static one. Minor because we are assuming
+      we are not escaping a value lambda.
 
-But do not do so if (saves_alloc):
-     - the context is strict, and
-     - the expression is not a HNF, and
-     - the expression is not bottoming
+But only do so if (saves_alloc):
+     (a) the context is lazy (so we get allocation), or
+     (b) the expression is a HNF (so we get allocation), or
+     (c) the expression is bottoming and (i) applies
+         (NB: if the expression is a lambda, (b) will apply;
+              so this case only catches bottoming thunks)
 
 Examples:
 
-* Bottoming
+* (a) Strict.  Case scrutinee
+      f = case g True of ....
+  Don't float (g True) to top level; then we have the admin of a
+  top-level thunk to worry about, with zero gain.
+
+* (a) Strict.  Case alternative
+      h = case y of
+             True  -> g True
+             False -> False
+  Don't float (g True) to the top level
+
+* (b) HNF
+      f = case y of
+            True  -> p:q
+            False -> blah
+  We may as well float the (p:q) so it becomes a static data structure.
+
+* (c) Bottoming expressions; see also Note [Bottoming floats]
       f x = case x of
               0 -> error <big thing>
               _ -> x+1
   Here we want to float (error <big thing>) to top level, abstracting
   over 'x', so as to make f's RHS smaller.
 
-* HNF
-      f = case y of
-            True  -> p:q
-            False -> blah
-  We may as well float the (p:q) so it becomes a static data structure.
-
-* Case scrutinee
-      f = case g True of ....
-  Don't float (g True) to top level; then we have the admin of a
-  top-level thunk to worry about, with zero gain.
-
-* Case alternative
-      h = case y of
-             True  -> g True
-             False -> False
-  Don't float (g True) to the top level
+  But (#22494) if it's more like
+       foo = case error <thing> of { ... }
+  then there is no point in floating; we are never going to inline
+  'foo' anyway.  So float bottoming things only if they escape
+  a lambda.
 
 * Arguments
      t = f (g True)
@@ -912,7 +923,7 @@ But, as ever, we need to be careful:
 (1) We want to float a bottoming
     expression even if it has free variables:
         f = \x. g (let v = h x in error ("urk" ++ v))
-    Then we'd like to abstract over 'x' can float the whole arg of g:
+    Then we'd like to abstract over 'x', and float the whole arg of g:
         lvl = \x. let v = h x in error ("urk" ++ v)
         f = \x. g (lvl x)
     To achieve this we pass is_bot to destLevel
@@ -921,6 +932,12 @@ But, as ever, we need to be careful:
     bottom.  Instead we treat the /body/ of such a function specially,
     via point (1).  For example:
         f = \x. ....(\y z. if x then error y else error z)....
+    If we float the whole lambda thus
+        lvl = \x. \y z. if x then error y else error z
+        f = \x. ...(lvl x)...
+    we may well end up eta-expanding that PAP to
+        f = \x. ...(\y z. lvl x y z)...
+
     ===>
         lvl = \x z y. if b then error y else error z
         f = \x. ...(\y z. lvl x z y)...
@@ -1402,7 +1419,7 @@ destLevel :: LevelEnv
           -> TyCoVarSet -- Free in the /type/ of the term
                         -- (a subset of the previous argument)
           -> Bool   -- True <=> is function
-          -> Bool   -- True <=> is bottom
+          -> Bool   -- True <=> looks like \x1..xn.bottom (n>=0)
           -> Bool   -- True <=> is a join point
           -> Level
 -- INVARIANT: if is_join=True then result >= join_ceiling
@@ -1419,7 +1436,7 @@ destLevel env fvs fvs_ty is_function is_bot is_join
 
   | is_bot              -- Send bottoming bindings to the top
   = as_far_as_poss      -- regardless; see Note [Bottoming floats]
-                        -- Esp Bottoming floats (1)
+                        -- Esp Bottoming floats (1) and (3)
 
   | Just n_args <- floatLams env
   , n_args > 0  -- n=0 case handled uniformly by the 'otherwise' case
