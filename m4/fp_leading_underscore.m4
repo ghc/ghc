@@ -32,17 +32,15 @@ struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
 #endif
 
-int main(argc, argv)
-int argc;
-char **argv;
+int main(int argc, char **argv)
 {
 #if defined(HAVE_NLIST_H)
     if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
-        exit(1);
+        return 1;
     if(nlist(argv[0], xYzzY2) == 0 && xYzzY2[0].n_value != 0)
-        exit(0);
+        return 0;
 #endif
-    exit(1);
+    return 1;
 }]])],[fptools_cv_leading_underscore=yes],[fptools_cv_leading_underscore=no],[fptools_cv_leading_underscore=no])
 ;;
 esac]);
