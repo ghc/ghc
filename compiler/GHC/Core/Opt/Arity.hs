@@ -2004,8 +2004,11 @@ etaBodyForJoinPoint need_args body
       , let (subst', tv') = substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
       | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+        -- The varToCoreExpr is important: `tv` might be a coercion variable
       , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
-      = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
+      = go (n-1) res_ty subst' (b : rev_bs) (e `App` varToCoreExpr b)
+        -- The varToCoreExpr is important: `b` might be a coercion variable
+
       | otherwise
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
                                          ppr body $$ ppr (exprType body)
