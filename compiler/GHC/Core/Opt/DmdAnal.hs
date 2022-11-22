@@ -982,9 +982,9 @@ dmdTransform :: AnalEnv   -- ^ The analysis environment
 -- See Note [What are demand signatures?] in "GHC.Types.Demand"
 dmdTransform env var sd
   -- Data constructors
-  | isDataConWorkId var
-  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr var $$ ppr sd $$ ppr ty) $
-    dmdTransformDataConSig (idArity var) sd
+  | Just con <- isDataConWorkId_maybe var
+  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr con $$ ppr sd $$ ppr ty) $
+    dmdTransformDataConSig (dataConRepStrictness con) sd
   -- See Note [DmdAnal for DataCon wrappers]
   | isDataConWrapId var, let rhs = uf_tmpl (realIdUnfolding var)
   , WithDmdType dmd_ty _rhs' <- dmdAnal env sd rhs
