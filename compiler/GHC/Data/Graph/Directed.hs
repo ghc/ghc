@@ -334,7 +334,7 @@ stronglyConnCompFromEdgedVerticesOrdR
         => [Node key payload]
         -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesOrdR =
-  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesOrd
+  stronglyConnCompG . graphFromEdgedVerticesOrd
 
 -- The "R" interface is used when you expect to apply SCC to
 -- (some of) the result of SCC, so you don't want to lose the dependency info
@@ -345,7 +345,7 @@ stronglyConnCompFromEdgedVerticesUniqR
         => [Node key payload]
         -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesUniqR =
-  stronglyConnCompG . graphFromEdgedVertices reduceNodesIntoVerticesUniq
+  stronglyConnCompG . graphFromEdgedVerticesUniq
 
 {-
 ************************************************************************
