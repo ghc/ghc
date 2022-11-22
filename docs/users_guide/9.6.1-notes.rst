@@ -151,6 +151,12 @@ Runtime system
   case properties and are more intuitive than :base-ref:`Data.Char.isUpper` and 
   :base-ref:`Data.Char.isLower`.
 
+- ``GHC.IO.Exceptions.AsyncException.StackOverflow`` has been replaced with a
+  new constructor ``GHC.IO.Exceptions.AsyncException.StackOverflow'`` holding a
+  new ``Word#`` communicating the size of the stack when the overflow occurred.
+  A new pattern synonym ``GHC.IO.Exceptions.StackOverflow`` is bundled with
+  ``GHC.IO.Exceptions.AsyncException``, so no changes to programs are required.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

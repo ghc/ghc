@@ -287,7 +287,7 @@ DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell *
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
 
-void reportStackOverflow(StgTSO* tso);
+void reportStackOverflow(StgWord);
 void reportHeapOverflow(void);
 
 void stg_exit(int n) STG_NORETURN;

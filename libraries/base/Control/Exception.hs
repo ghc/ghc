@@ -231,7 +231,7 @@ allowInterrupt = interruptible $ return ()
 
  #AsynchronousExceptions# Asynchronous exceptions are so-called because they arise due to
 external influences, and can be raised at any point during execution.
-'StackOverflow' and 'HeapOverflow' are two examples of
+'StackOverflow\'' and 'HeapOverflow' are two examples of
 system-generated asynchronous exceptions.
 
 The primary source of asynchronous exceptions, however, is

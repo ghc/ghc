@@ -528,6 +528,24 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
   return false;
 }
 
+static StgClosure*
+mkStackOverflowException(Capability *cap, StgWord stack_words) {
+    const size_t e_size = CONSTR_sizeW(0, 1);
+    ASSERT(sizeW_fromITBL(INFO_PTR_TO_STRUCT(StackOverflow_con_info)) == e_size);
+
+    debugBelch("new StackOverflow': size: %"FMT_Word " stack words: %"FMT_Word"\n", (StgWord)e_size, stack_words);
+    debugBelch("sizeW_fromITBL: %" FMT_Word "\n", sizeW_fromITBL(INFO_PTR_TO_STRUCT(StackOverflow_con_info)));
+
+    StgClosure * const e = (StgClosure*)allocate(cap, e_size);
+    *(StgWord*)e->payload = stack_words;
+    SET_HDR_RELEASE(e, StackOverflow_con_info, CCS_SYSTEM);
+    // TODO We should bump a ticky counter for this allocation
+    #if defined(DEBUG)
+    printClosure(e);
+    #endif
+    return TAG_CLOSURE(INFO_PTR_TO_STRUCT(StackOverflow_con_info)->srt,e);
+}
+
 /* -----------------------------------------------------------------------------
    Stack overflow
 
@@ -536,7 +554,6 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
    relocate the TSO into a larger chunk of memory and adjust its stack
    size appropriately.
    -------------------------------------------------------------------------- */
-
 void
 threadStackOverflow (Capability *cap, StgTSO *tso)
 {
@@ -564,7 +581,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         debugTrace(DEBUG_gc,
                    "threadStackOverflow of TSO %" FMT_StgThreadID " (%p): stack"
                    " too large (now %ld; max is %ld)", tso->id, tso,
-                   (long)tso->stackobj->stack_size, RtsFlags.GcFlags.maxStkSize);
+                   (long)tso->tot_stack_size, RtsFlags.GcFlags.maxStkSize);
         IF_DEBUG(gc,
                  /* If we're debugging, just print out the top of the stack */
                  printStackChunk(tso->stackobj->sp,
@@ -572,7 +589,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                                          tso->stackobj->sp+64)));
 
         // See Note [Throw to self when masked], also #767 and #8303.
-        throwToSelf(cap, tso, (StgClosure *)stackOverflow_closure);
+        throwToSelf(cap, tso, mkStackOverflowException(cap, tso->tot_stack_size));
         return;
     }
 

@@ -133,9 +133,9 @@ stgFree(void* p)
    -------------------------------------------------------------------------- */
 
 void
-reportStackOverflow(StgTSO* tso)
+reportStackOverflow(StgWord words)
 {
-    rtsConfig.stackOverflowHook(tso->tot_stack_size * sizeof(W_));
+    rtsConfig.stackOverflowHook(words * sizeof(W_));
 
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();

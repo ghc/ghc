@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DeriveGeneric, NoImplicitPrelude, MagicHash,
-             ExistentialQuantification, ImplicitParams #-}
+             ExistentialQuantification, ImplicitParams,
+             PatternSynonyms #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -29,7 +30,7 @@ module GHC.IO.Exception (
 
   SomeAsyncException(..),
   asyncExceptionToException, asyncExceptionFromException,
-  AsyncException(..), stackOverflow, heapOverflow,
+  AsyncException(.., StackOverflow), heapOverflow,
 
   ArrayException(..),
   ExitCode(..),
@@ -196,12 +197,15 @@ asyncExceptionFromException x = do
 
 -- |Asynchronous exceptions.
 data AsyncException
-  = StackOverflow
+  = StackOverflow' Word#
         -- ^The current thread\'s stack exceeded its limit.
         -- Since an exception has been raised, the thread\'s stack
         -- will certainly be below its limit again, but the
         -- programmer should take remedial action
         -- immediately.
+        -- @since TODO
+        -- The Word# is the size of the stack when the exception
+        -- was thrown
   | HeapOverflow
         -- ^The program\'s heap is reaching its limit, and
         -- the program should take action to reduce the amount of
@@ -230,6 +234,12 @@ data AsyncException
            , Ord -- ^ @since 4.2.0.0
            )
 
+-- | Provided for backwards compatibility.
+-- @since TODO
+pattern StackOverflow :: AsyncException
+pattern StackOverflow <- StackOverflow' {}
+  where StackOverflow = StackOverflow' 0##
+
 -- | @since 4.7.0.0
 instance Exception AsyncException where
   toException = asyncExceptionToException
@@ -251,13 +261,14 @@ data ArrayException
 instance Exception ArrayException
 
 -- for the RTS
-stackOverflow, heapOverflow :: SomeException
-stackOverflow = toException StackOverflow
+-- TODO remove stackOverflow?
+heapOverflow :: SomeException
 heapOverflow  = toException HeapOverflow
 
 -- | @since 4.1.0.0
 instance Show AsyncException where
-  showsPrec _ StackOverflow   = showString "stack overflow"
+  showsPrec _ (StackOverflow' stack_size)
+    = showString $ "stack overflow: " ++ (show (W# stack_size)) ++ " words"
   showsPrec _ HeapOverflow    = showString "heap overflow"
   showsPrec _ ThreadKilled    = showString "thread killed"
   showsPrec _ UserInterrupt   = showString "user interrupt"

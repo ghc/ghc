@@ -40,7 +40,6 @@ extern W_ ZCMain_main_closure[];
 extern StgClosure ZCMain_main_closure;
 #endif
 
-PRELUDE_CLOSURE(base_GHCziIOziException_stackOverflow_closure);
 PRELUDE_CLOSURE(base_GHCziIOziException_heapOverflow_closure);
 PRELUDE_CLOSURE(base_GHCziIOziException_allocationLimitExceeded_closure);
 PRELUDE_CLOSURE(base_GHCziIOziException_blockedIndefinitelyOnMVar_closure);
@@ -86,6 +85,7 @@ PRELUDE_INFO(base_GHCziWord_W16zh_con_info);
 PRELUDE_INFO(base_GHCziWord_W32zh_con_info);
 PRELUDE_INFO(base_GHCziWord_W64zh_con_info);
 PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
+PRELUDE_INFO(base_GHCziIOziException_StackOverflowzq_con_info);
 
 #define Unit_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTupleziPrim_Z0T_closure)
 #define True_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_True_closure)
@@ -106,7 +106,6 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define flushStdHandles_closure   DLL_IMPORT_DATA_REF(base_GHCziTopHandler_flushStdHandles_closure)
 #define runMainIO_closure   DLL_IMPORT_DATA_REF(base_GHCziTopHandler_runMainIO_closure)
 
-#define stackOverflow_closure     DLL_IMPORT_DATA_REF(base_GHCziIOziException_stackOverflow_closure)
 #define heapOverflow_closure      DLL_IMPORT_DATA_REF(base_GHCziIOziException_heapOverflow_closure)
 #define allocationLimitExceeded_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_allocationLimitExceeded_closure)
 #define blockedIndefinitelyOnMVar_closure DLL_IMPORT_DATA_REF(base_GHCziIOziException_blockedIndefinitelyOnMVar_closure)
@@ -142,3 +141,4 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define FunPtr_con_info           DLL_IMPORT_DATA_REF(base_GHCziPtr_FunPtr_con_info)
 #define StablePtr_static_info     DLL_IMPORT_DATA_REF(base_GHCziStable_StablePtr_static_info)
 #define StablePtr_con_info        DLL_IMPORT_DATA_REF(base_GHCziStable_StablePtr_con_info)
+#define StackOverflow_con_info    DLL_IMPORT_DATA_REF(base_GHCziIOziException_StackOverflowzq_con_info)

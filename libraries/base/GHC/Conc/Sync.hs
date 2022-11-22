@@ -412,7 +412,7 @@ real_handler se
   | Just BlockedIndefinitelyOnMVar <- fromException se  =  return ()
   | Just BlockedIndefinitelyOnSTM  <- fromException se  =  return ()
   | Just ThreadKilled              <- fromException se  =  return ()
-  | Just StackOverflow             <- fromException se  =  reportStackOverflow
+  | Just (StackOverflow' num_words)<- fromException se  =  reportStackOverflow num_words
   | otherwise                                           =  reportError se
 
 {- | 'killThread' raises the 'ThreadKilled' exception in the given
@@ -938,10 +938,11 @@ sharedCAF a get_or_set =
         else do freeStablePtr stable_ref
                 deRefStablePtr (castPtrToStablePtr (castPtr ref2))
 
-reportStackOverflow :: IO ()
-reportStackOverflow = do
-     ThreadId tid <- myThreadId
-     c_reportStackOverflow tid
+{- | @since TODO
+-}
+reportStackOverflow :: Word# -> IO ()
+reportStackOverflow stack_size =
+  c_reportStackOverflow stack_size
 
 reportError :: SomeException -> IO ()
 reportError ex = do
@@ -951,7 +952,7 @@ reportError ex = do
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
 foreign import ccall unsafe "reportStackOverflow"
-        c_reportStackOverflow :: ThreadId# -> IO ()
+        c_reportStackOverflow :: Word# -> IO ()
 
 foreign import ccall unsafe "reportHeapOverflow"
         reportHeapOverflow :: IO ()

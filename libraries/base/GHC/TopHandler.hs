@@ -173,8 +173,8 @@ real_handler :: (Int -> IO a) -> SomeException -> IO a
 real_handler exit se = do
   flushStdHandles -- before any error output
   case fromException se of
-      Just StackOverflow -> do
-           reportStackOverflow
+      Just (StackOverflow' num_words) -> do
+           reportStackOverflow num_words
            exit 2
 
       Just UserInterrupt -> exitInterrupted
