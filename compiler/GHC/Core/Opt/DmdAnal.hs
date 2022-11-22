@@ -831,8 +831,9 @@ dmdTransform :: AnalEnv   -- ^ The analysis environment
 -- See Note [What are demand signatures?] in "GHC.Types.Demand"
 dmdTransform env var sd
   -- Data constructors
-  | isDataConWorkId var
-  = dmdTransformDataConSig (idArity var) sd
+  | Just con <- isDataConWorkId_maybe var
+  = -- pprTraceWith "dmdTransform:DataCon" (\ty -> ppr con $$ ppr sd $$ ppr ty) $
+    dmdTransformDataConSig (dataConRepStrictness con) sd
   -- Dictionary component selectors
   -- Used to be controlled by a flag.
   -- See #18429 for some perf measurements.

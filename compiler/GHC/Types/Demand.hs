@@ -94,7 +94,7 @@ import GHC.Data.Maybe   ( orElse )
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
-import GHC.Core.DataCon ( splitDataProductType_maybe )
+import GHC.Core.DataCon ( splitDataProductType_maybe, StrictnessMark, isMarkedStrict )
 import GHC.Core.Multiplicity    ( scaledThing )
 
 import GHC.Utils.Binary
@@ -1020,11 +1020,13 @@ peelCallDmd sd = viewCall sd `orElse` (topCard, topSubDmd)
 -- whether it was unsaturated in the form of a 'Card'inality, denoting
 -- how many times the lambda body was entered.
 -- See Note [Demands from unsaturated function calls].
-peelManyCalls :: Int -> SubDemand -> Card
-peelManyCalls 0 _                          = C_11
--- See Note [Call demands are relative]
-peelManyCalls n (viewCall -> Just (m, sd)) = m `multCard` peelManyCalls (n-1) sd
-peelManyCalls _ _                          = C_0N
+peelManyCalls :: Arity -> SubDemand -> (Card, SubDemand)
+peelManyCalls k sd = go k C_11 sd
+  where
+    go 0 !n !sd                        = (n, sd)
+    go k !n (viewCall -> Just (m, sd)) = go (k-1) (n `multCard` m) sd
+    go _ _  _                          = (topCard, topSubDmd)
+{-# INLINE peelManyCalls #-} -- so that the pair cancels away in a `fst _` context
 
 -- See Note [Demand on the worker] in GHC.Core.Opt.WorkWrap
 mkWorkerDemand :: Int -> Demand
@@ -1068,7 +1070,7 @@ argOneShots (_ :* sd) = go sd -- See Note [Call demands are relative]
 saturatedByOneShots :: Int -> Demand -> Bool
 saturatedByOneShots _ AbsDmd    = True
 saturatedByOneShots _ BotDmd    = True
-saturatedByOneShots n (_ :* sd) = isUsedOnce (peelManyCalls n sd)
+saturatedByOneShots n (_ :* sd) = isUsedOnce $ fst $ peelManyCalls n sd
 
 {- Note [Strict demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1188,6 +1190,46 @@ Note [Demand transformer for a dictionary selector] explains. Annoyingly,
 the boxity info has to be stored in the *sub-demand* `sd`! There's no demand
 to store the boxity in. So we bit the bullet and now we store Boxity in
 'SubDemand', both in 'Prod' *and* 'Poly'. See also Note [Boxity in Poly].
+
+Note [Demand transformer for data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the expression (x,y) with sub-demand P(SL,A).  What is the demand on
+x,y?  Obviously `x` is used strictly, and `y` not at all. So we want to
+decompose a product demand, and feed its components demands into the
+arguments.  That is the job of dmdTransformDataConSig.  More precisely,
+
+ * it gets the demand on the data constructor itself;
+   in the above example that is C(1,C(1,P(SL,A)))
+ * it returns the demands on the arguments;
+   in the above example that is [SL, A]
+
+Nasty wrinkle. Consider this code (#22475 has more realistic examples but
+assume this is what the demand analyser sees)
+
+   data T = MkT !Int Bool
+   get :: T -> Bool
+   get (MkT _ b) = b
+
+   foo = let v::Int = I# 7
+             t::T   = MkT v True
+         in get t
+
+Now `v` is unused by `get`, /but/ we can't give `v` an Absent demand,
+else we'll drop the binding and replace it with an error thunk.
+Then the code generator (more specifically GHC.Stg.InferTags.Rewrite)
+will add an extra eval of MkT's argument to give
+   foo = let v::Int = error "absent"
+             t::T   = case v of v' -> MkT v' True
+         in get t
+
+Boo!  Because of this extra eval (added in STG-land), the truth is that `MkT`
+may (or may not) evaluate its arguments (as established in #21497). Hence the
+use of `bump` in dmdTransformDataConSig, which adds in a `C_01` eval. The
+`C_01` says "may or may not evaluate" which is absolutely faithful to what
+InferTags.Rewrite does.
+
+In particular it is very important /not/ to make that a `C_11` eval,
+see Note [Data-con worker strictness].
 -}
 
 {- *********************************************************************
@@ -2039,20 +2081,24 @@ type DmdTransformer = SubDemand -> DmdType
 -- return how the function evaluates its free variables and arguments.
 dmdTransformSig :: DmdSig -> DmdTransformer
 dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds _)) sd
-  = multDmdType (peelManyCalls (length arg_ds) sd) dmd_ty
+  = multDmdType (fst $ peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
 
 -- | A special 'DmdTransformer' for data constructors that feeds product
 -- demands into the constructor arguments.
-dmdTransformDataConSig :: Arity -> DmdTransformer
-dmdTransformDataConSig arity sd = case go arity sd of
-  Just dmds -> DmdType emptyDmdEnv dmds topDiv
-  Nothing   -> nopDmdType -- Not saturated
+dmdTransformDataConSig :: [StrictnessMark] -> DmdTransformer
+-- See Note [Demand transformer for data constructors]
+dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
+  Just (_, dmds) -> mk_body_ty n dmds
+  Nothing        -> nopDmdType
   where
-    go 0 sd             = snd <$> viewProd arity sd
-    go n (Call C_11 sd) = go (n-1) sd  -- strict calls only!
-    go _ _              = Nothing
+    arity = length str_marks
+    (n, body_sd) = peelManyCalls arity sd
+    mk_body_ty n dmds = DmdType emptyDmdEnv (zipWith (bump n) str_marks dmds) topDiv
+    bump n str dmd | isMarkedStrict str = multDmd n (plusDmd str_field_dmd dmd)
+                   | otherwise          = multDmd n dmd
+    str_field_dmd = C_01 :* seqSubDmd -- Why not C_11? See Note [Data-con worker strictness]
 
 -- | A special 'DmdTransformer' for dictionary selectors that feeds the demand
 -- on the result into the indicated dictionary component (if saturated).

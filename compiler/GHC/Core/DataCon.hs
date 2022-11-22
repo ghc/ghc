@@ -795,19 +795,36 @@ instance Outputable EqSpec where
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Notice that we do *not* say the worker Id is strict even if the data
 constructor is declared strict
-     e.g.    data T = MkT !(Int,Int)
-Why?  Because the *wrapper* $WMkT is strict (and its unfolding has case
-expressions that do the evals) but the *worker* MkT itself is not. If we
-pretend it is strict then when we see
-     case x of y -> MkT y
-the simplifier thinks that y is "sure to be evaluated" (because the worker MkT
-is strict) and drops the case.  No, the workerId MkT is not strict.
+     e.g.    data T = MkT ![Int] Bool
+Even though most often the evals are done by the *wrapper* $WMkT, there are
+situations in which tag inference will re-insert evals around the worker.
+So for all intents and purposes the *worker* MkT is strict, too!
 
-However, the worker does have StrictnessMarks.  When the simplifier sees a
-pattern
-     case e of MkT x -> ...
-it uses the dataConRepStrictness of MkT to mark x as evaluated; but that's
-fine... dataConRepStrictness comes from the data con not from the worker Id.
+Unfortunately, if we exposed accurate strictness of DataCon workers, we'd
+see the following transformation:
+
+  f xs = case xs of xs' { __DEFAULT -> ... case MkT xs b of x { __DEFAULT -> [x] } } -- DmdAnal: Strict in xs
+  ==> { drop-seq, binder swap on xs' }
+  f xs = case MkT xs b of x { __DEFAULT -> [x] } -- DmdAnal: Still strict in xs
+  ==> { case-to-let }
+  f xs = let x = MkT xs' b in [x] -- DmdAnal: No longer strict in xs!
+
+I.e., we are ironically losing strictness in `xs` by dropping the eval on `xs`
+and then doing case-to-let. The issue is that `exprIsHNF` currently says that
+every DataCon worker app is a value. The implicit assumption is that surrounding
+evals will have evaluated strict fields like `xs` before! But now that we had
+just dropped the eval on `xs`, that assumption is no longer valid.
+
+Long story short: By keeping the demand signature lazy, the Simplifier will not
+drop the eval on `xs` and using `exprIsHNF` to decide case-to-let and others
+remains sound.
+
+Similarly, during demand analysis in dmdTransformDataConSig, we bump up the
+field demand with `C_01`, *not* `C_11`, because the latter exposes too much
+strictness that will drop the eval on `xs` above.
+
+This issue is discussed at length in
+"Failed idea: no wrappers for strict data constructors" in #21497 and #22475.
 
 Note [Bangs on data constructor arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
