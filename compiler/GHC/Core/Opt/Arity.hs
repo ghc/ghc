@@ -2677,7 +2677,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
       -- ... and that the function can be eta reduced to arity 0
       -- without violating invariants of Core and GHC
       && canEtaReduceToArity fun 0 0              -- criteria (L), (J), (W), (B)
-    all_calls_with_arity n = isStrict (peelManyCalls n eval_sd)
+    all_calls_with_arity n = isStrict (fst $ peelManyCalls n eval_sd)
        -- See Note [Eta reduction based on evaluation context]
 
     ---------------

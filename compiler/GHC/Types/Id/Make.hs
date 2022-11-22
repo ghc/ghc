@@ -700,7 +700,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                              -- applications are treated as values
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
-                         `setDmdSigInfo`    wrap_sig
+                         `setDmdSigInfo`        wrap_sig
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
