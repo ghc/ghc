@@ -1227,11 +1227,23 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
+  | Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
+    -- Because of the let-can-float invariant, it's ok to
+    -- inline freely, or to drop the binding if it is dead.
+  = do { tick (PreInlineUnconditionally bndr)
+       ; simplExprF env' body cont }
+
+  -- Now check for a join point.  It's better to do the preInlineUnconditionally
+  -- test first, because joinPointBinding_maybe has to eta-expand, so a trivial
+  -- binding like { j = j2 |> co } would first be eta-expanded and then inlined
+  -- Better to test preInlineUnconditionally first.
   | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
-  = {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' body cont
+  = {-#SCC "simplNonRecJoinPoint" #-}
+    simplNonRecJoinPoint env bndr' rhs' body cont
 
   | otherwise
-  = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) body cont
+  = {-#SCC "simplNonRecE" #-}
+    simplNonRecE env False bndr (rhs, env) body cont
 
 {- Note [Avoiding space leaks in OutType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1680,12 +1692,12 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                                     , sc_cont = cont, sc_dup = dup })
   | isSimplified dup  -- Don't re-simplify if we've simplified it once
                       -- See Note [Avoiding exponential behaviour]
-  =  do { tick (BetaReduction bndr)
-        ; completeBindX env bndr arg body cont }
+  = do { tick (BetaReduction bndr)
+       ; completeBindX env bndr arg body cont }
 
   | otherwise         -- See Note [Avoiding exponential behaviour]
-  = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env bndr (arg, arg_se) body cont }
+  = do { tick (BetaReduction bndr)
+       ; simplNonRecE env True bndr (arg, arg_se) body cont }
 
 -- Discard a non-counting tick on a lambda.  This may change the
 -- cost attribution slightly (moving the allocation of the
@@ -1717,6 +1729,8 @@ simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 ------------------
 simplNonRecE :: SimplEnv
+             -> Bool                    -- True  <=> from a lambda
+                                        -- False <=> from a let
              -> InId                    -- The binder, always an Id
                                         -- Never a join point
              -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
@@ -1735,34 +1749,46 @@ simplNonRecE :: SimplEnv
 -- It deals with strict bindings, via the StrictBind continuation,
 -- which may abort the whole process.
 --
--- The RHS may not satisfy the let-can-float invariant yet
+-- from_lam=False => the RHS satisfies the let-can-float invariant
+-- Otherwise it may or may not satisfy it.
 
-simplNonRecE env bndr (rhs, rhs_se) body cont
+simplNonRecE env from_lam bndr (rhs, rhs_se) body cont
   = assert (isId bndr && not (isJoinId bndr) ) $
     do { (env1, bndr1) <- simplNonRecBndr env bndr
        ; let needs_case_binding = needsCaseBinding (idType bndr1) rhs
          -- See Note [Dark corner with representation polymorphism]
-       ; if | not needs_case_binding
-            , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se ->
-            do { tick (PreInlineUnconditionally bndr)
-               ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
-                 simplLam env' body cont }
+         -- If from_lam=False then needs_case_binding is False,
+         -- because the binding started as a let, which must
+         -- satisfy let-can-float
 
+       ; if | from_lam && not needs_case_binding
+              -- If not from_lam we are coming from a (NonRec bndr rhs) binding
+              -- and preInlineUnconditionally has been done already;
+              -- no need to repeat it.  But for lambdas we must be careful about
+              -- preInlineUndonditionally: consider (\(x:Int#). 3) (error "urk")
+              -- We must not drop the (error "urk").
+            , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
+            -> do { tick (PreInlineUnconditionally bndr)
+                  ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
+                    simplLam env' body cont }
 
              -- Deal with strict bindings
-             -- See Note [Dark corner with representation polymorphism]
-            | isStrictId bndr1 && seCaseCase env
-            || needs_case_binding ->
-            simplExprF (rhs_se `setInScopeFromE` env) rhs
-                       (StrictBind { sc_bndr = bndr, sc_body = body
-                                   , sc_env = env, sc_cont = cont, sc_dup = NoDup })
+            |  isStrictId bndr1 && seCaseCase env
+            || from_lam && needs_case_binding
+               -- The important bit here is needs_case_binds; but no need to
+               -- test it if from_lam is False because then needs_case_binding is False too
+               -- NB: either way, the RHS may or may not satisfy let-can-float
+               --     but that's ok for StrictBind.
+            -> simplExprF (rhs_se `setInScopeFromE` env) rhs
+                          (StrictBind { sc_bndr = bndr, sc_body = body
+                                      , sc_env = env, sc_cont = cont, sc_dup = NoDup })
 
             -- Deal with lazy bindings
-            | otherwise ->
-            do { (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
-               ; (floats1, env3)  <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
-               ; (floats2, expr') <- simplLam env3 body cont
-               ; return (floats1 `addFloats` floats2, expr') } }
+            | otherwise
+            -> do { (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (BC_Let NotTopLevel NonRecursive)
+                  ; (floats1, env3)  <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
+                  ; (floats2, expr') <- simplLam env3 body cont
+                  ; return (floats1 `addFloats` floats2, expr') } }
 
 ------------------
 simplRecE :: SimplEnv
@@ -1806,7 +1832,7 @@ care here.
 Note [Avoiding exponential behaviour]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One way in which we can get exponential behaviour is if we simplify a
-big expression, and the re-simplify it -- and then this happens in a
+big expression, and then re-simplify it -- and then this happens in a
 deeply-nested way.  So we must be jolly careful about re-simplifying
 an expression.  That is why simplNonRecX does not try
 preInlineUnconditionally (unlike simplNonRecE).
@@ -1864,13 +1890,8 @@ simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
                      -> InExpr -> SimplCont
                      -> SimplM (SimplFloats, OutExpr)
 simplNonRecJoinPoint env bndr rhs body cont
-  | assert (isJoinId bndr ) True
-  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
-  = do { tick (PreInlineUnconditionally bndr)
-       ; simplExprF env' body cont }
-
-   | otherwise
-   = wrapJoinCont env cont $ \ env cont ->
+   = assert (isJoinId bndr ) $
+     wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
         ; let mult   = contHoleScaling cont
