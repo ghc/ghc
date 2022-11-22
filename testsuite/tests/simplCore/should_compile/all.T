@@ -395,3 +395,4 @@ test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T21144',  normal, compile, ['-O'])
 test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 
+test('T22491', normal, compile, ['-O2'])
