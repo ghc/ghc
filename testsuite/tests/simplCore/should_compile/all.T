@@ -455,3 +455,4 @@ test('T21851_2', [grep_errmsg(r'wwombat') ], multimod_compile, ['T21851_2', '-O 
 test('T22317', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check m -ddebug-output'])
 
 test('T22494', [grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T22491', normal, compile, ['-O2'])
