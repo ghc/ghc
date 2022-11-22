@@ -602,8 +602,11 @@ This really happens in practice.  The module "GHC.Hs.Expr" gets
 This is a mess.
 
 
-Note [HPT space leak] (#15111)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Home Unit Graph space leak]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ticket: #15111
+
 In IfL, we defer some work until it is demanded using forkM, such
 as building TyThings from IfaceDecls. These thunks are stored in
 the ExternalPackageState, and they might never be poked.  If we're
@@ -614,14 +617,15 @@ for ever.
 Therefore, when loading a package interface file , we use a "clean"
 version of the HscEnv with all the data about the currently loaded
 program stripped out. Most of the fields can be panics because
-we'll never read them, but hsc_HPT needs to be empty because this
+we'll never read them, but hsc_HUG needs to be empty because this
 interface will cause other interfaces to be loaded recursively, and
-when looking up those interfaces we use the HPT in loadInterface.
+when looking up those interfaces we use the HUG in loadInterface.
 We know that none of the interfaces below here can refer to
-home-package modules however, so it's safe for the HPT to be empty.
+home-package modules however, so it's safe for the HUG to be empty.
 -}
 
 -- Note [GHC Heap Invariants]
+-- Note [Home Unit Graph space leak]
 dontLeakTheHUG :: IfL a -> IfL a
 dontLeakTheHUG thing_inside = do
   env <- getTopEnv
