@@ -569,7 +569,7 @@ stg_block_takemvar_finally
     W_ r1, r3;
     r1 = R1;
     r3 = R3;
-    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    unlockClosure(r3, stg_MVAR_DIRTY_info);
     R1 = r1;
     R3 = r3;
     jump StgReturn [R1];
@@ -597,7 +597,7 @@ stg_block_readmvar_finally
     W_ r1, r3;
     r1 = R1;
     r3 = R3;
-    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    unlockClosure(r3, stg_MVAR_DIRTY_info);
     R1 = r1;
     R3 = r3;
     jump StgReturn [R1];
@@ -625,7 +625,7 @@ stg_block_putmvar_finally
     W_ r1, r3;
     r1 = R1;
     r3 = R3;
-    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    unlockClosure(r3, stg_MVAR_DIRTY_info);
     R1 = r1;
     R3 = r3;
     jump StgReturn [R1];
