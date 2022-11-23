@@ -342,7 +342,7 @@ setEntryDP (L (EpAnnS (EpaSpan r) an cs) a) dp
                 -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
                 delta = case getLoc lc of
                           EpaSpan rr -> tweakDelta $ ss2delta (ss2pos rr) r
-                          EpaDelta dp _ -> tweakDelta dp
+                          EpaDelta _dp _ -> DifferentLine 1 0
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
@@ -688,7 +688,7 @@ trailingCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                -> [(Int, LEpaComment)]
 trailingCommentsDeltas _ [] = []
 trailingCommentsDeltas rs (la@(L (EpaDelta dp _) _):las)
-  = (deltaLine dp, la): trailingCommentsDeltas rs las
+  = (getDeltaLine dp, la): trailingCommentsDeltas rs las
 trailingCommentsDeltas rs (la@(L l _):las)
   = deltaComment rs la : trailingCommentsDeltas (anchor l) las
   where
@@ -801,28 +801,10 @@ anchorFromLocatedA (L (EpAnnS anc _ _) _) = anchor anc
 commentOrigDelta :: LEpaComment -> LEpaComment
 commentOrigDelta (L (EpaSpan la) (GHC.EpaComment t pp))
   = (L op (GHC.EpaComment t pp))
-                  `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
   where
-        (r,c) = ss2posEnd pp
-
-        op' = if r == 0
-               then EpaDelta (ss2delta (r,c+1) la) []
-               else EpaDelta (tweakDelta $ ss2delta (r,c)   la) []
-        op = if t == EpaEofComment && op' == EpaDelta (SameLine 0) []
-               then EpaDelta (DifferentLine 1 0) []
-               else op'
+    op = EpaDelta (origDelta la pp) []
 commentOrigDelta (L anc (GHC.EpaComment t pp))
   = (L anc (GHC.EpaComment t pp))
-
-
--- ---------------------------------------------------------------------
-
-
--- | For comment-related deltas starting on a new line we have an
--- off-by-one problem. Adjust
-tweakDelta :: DeltaPos  -> DeltaPos
-tweakDelta (SameLine d) = SameLine d
-tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
 
 -- ---------------------------------------------------------------------
 

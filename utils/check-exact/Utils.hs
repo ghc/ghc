@@ -172,6 +172,25 @@ isPointSrcSpan ss = spanLength ss == 0
 
 -- ---------------------------------------------------------------------
 
+origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
+origDelta pos pp = op
+  where
+    (r,c) = ss2posEnd pp
+
+    op = if r == 0
+           then (             ss2delta (r,c+1) pos)
+           else (tweakDelta $ ss2delta (r,c  ) pos)
+
+-- ---------------------------------------------------------------------
+
+-- | For comment-related deltas starting on a new line we have an
+-- off-by-one problem. Adjust
+tweakDelta :: DeltaPos  -> DeltaPos
+tweakDelta (SameLine d) = SameLine d
+tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
+
+-- ---------------------------------------------------------------------
+
 -- |Given a list of items and a list of keys, returns a list of items
 -- ordered by their position in the list of keys.
 orderByKey :: [(RealSrcSpan,a)] -> [RealSrcSpan] -> [(RealSrcSpan,a)]
@@ -214,7 +233,6 @@ ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDoc
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
 tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
@@ -229,7 +247,6 @@ comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
 mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
-mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
 mkComment :: String -> Anchor -> RealSrcSpan -> Comment

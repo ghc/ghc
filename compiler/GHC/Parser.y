@@ -885,8 +885,8 @@ unitdecl :: { LHsUnitDecl PackageName }
 signature :: { Located (HsModule GhcPs) }
        : 'signature' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                acs (\cs-> (L loc (HsModule (XModulePs
-                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6)) cs)
+                acs (\cs -> (L loc (HsModule (XModulePs
+                                               (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
                                             (Just $2) $4 (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
@@ -895,16 +895,16 @@ signature :: { Located (HsModule GhcPs) }
 module :: { Located (HsModule GhcPs) }
        : 'module' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
-                acsFinal (\cs -> (L loc (HsModule (XModulePs
-                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6)) cs)
+                acsFinal (\cs eof -> (L loc (HsModule (XModulePs
+                                                     (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
                                                   (Just $2) $4 (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
                     )) }
         | body2
                 {% fileSrcSpan >>= \ loc ->
-                   acsFinal (\cs -> (L loc (HsModule (XModulePs
-                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1)) cs)
+                   acsFinal (\cs eof -> (L loc (HsModule (XModulePs
+                                                        (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
@@ -956,14 +956,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] []) Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] [])) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] []) Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
@@ -4309,17 +4309,16 @@ acs a = do
   return (a cs)
 
 -- Called at the very end to pick up the EOF position, as well as any comments not allocated yet.
-acsFinal :: (EpAnnComments -> Located a) -> P (Located a)
+acsFinal :: (EpAnnComments -> Maybe (RealSrcSpan, RealSrcSpan) -> Located a) -> P (Located a)
 acsFinal a = do
-  let (L l _) = a emptyComments
+  let (L l _) = a emptyComments Nothing
   cs <- getCommentsFor l
   csf <- getFinalCommentsFor l
   meof <- getEofPos
   let ce = case meof of
-             Strict.Nothing  -> EpaComments []
-             Strict.Just (pos `Strict.And` gap) ->
-               EpaCommentsBalanced [] [L (realSpanAsAnchor pos) (EpaComment EpaEofComment gap)]
-  return (a (cs Semi.<> csf Semi.<> ce))
+             Strict.Nothing  -> Nothing
+             Strict.Just (pos `Strict.And` gap) -> Just (pos,gap)
+  return (a (cs Semi.<> csf) ce)
 
 -- acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
 acsa :: (Monoid t, MonadP m) => (EpAnnComments -> LocatedAnS t a) -> m (LocatedAnS t a)

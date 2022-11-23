@@ -55,13 +55,13 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
- -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
+ "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" (Just addLocaLDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
@@ -596,12 +596,14 @@ addLocaLDecl1 libdir top = do
   Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP (L ld decl) (DifferentLine 1 5)
       doAddLocal = do
-        let lp = makeDeltaAst top
+        -- let lp = makeDeltaAst top
+        let lp = top
         (de1:d2:d3:_) <- hsDecls lp
         (de1'',d2') <- balanceComments de1 d2
         (de1',_) <- modifyValD (getLocA de1'') de1'' $ \_m d -> do
           return ((wrapDecl decl' : d),Nothing)
         replaceDecls lp [de1', d2', d3]
+           -- `debug` ("addLocaLDecl1: (de1'', de1):" ++ showAst (de1'', de1))
 
   (lp',_,w) <- runTransformT doAddLocal
   debugM $ "addLocaLDecl1:" ++ intercalate "\n" w
@@ -635,7 +637,8 @@ addLocaLDecl3 libdir top = do
   Right newDecl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let
       doAddLocal = do
-         let lp = makeDeltaAst top
+         -- let lp = makeDeltaAst top
+         let lp = top
          (de1:d2:_) <- hsDecls lp
          (de1'',d2') <- balanceComments de1 d2
 
@@ -720,7 +723,8 @@ addLocaLDecl6 libdir lp = do
 rmDecl1 :: Changer
 rmDecl1 _libdir top = do
   let doRmDecl = do
-         let lp = makeDeltaAst top
+         -- let lp = makeDeltaAst top
+         let lp = top
          tlDecs0 <- hsDecls lp
          tlDecs <- balanceCommentsList $ captureLineSpacing tlDecs0
          let (de1:_s1:_d2:d3:ds) = tlDecs
@@ -839,7 +843,8 @@ rmDecl7 :: Changer
 rmDecl7 _libdir top = do
   let
       doRmDecl = do
-         let lp = makeDeltaAst top
+         -- let lp = makeDeltaAst top
+         let lp = top
          tlDecs <- hsDecls lp
          [s1,de1,d2,d3] <- balanceCommentsList tlDecs
 
@@ -919,7 +924,8 @@ addHiding1 _libdir (L l p) = do
 addHiding2 :: Changer
 addHiding2 _libdir top = do
   let doTransform = do
-        let (L l p) = makeDeltaAst top
+        -- let (L l p) = makeDeltaAst top
+        let (L l p) = top
         l1 <- uniqueSrcSpanT
         l2 <- uniqueSrcSpanT
         let

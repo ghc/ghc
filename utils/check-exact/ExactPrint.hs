@@ -247,11 +247,7 @@ instance HasEntry (EpAnnS a) where
 fromAnn' :: (HasEntry a) => a -> Entry
 fromAnn' an = case fromAnn an of
   NoEntryVal -> NoEntryVal
-  Entry a c _ u -> Entry a c' FlushComments u
-    where
-      c' = case c of
-        EpaComments cs -> EpaCommentsBalanced (filterEofComment False cs) (filterEofComment True cs)
-        EpaCommentsBalanced cp ct -> EpaCommentsBalanced cp ct
+  Entry a c _ u -> Entry a c FlushComments u
 
 -- ---------------------------------------------------------------------
 
@@ -377,7 +373,8 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
 
   let mflush = when (flush == FlushComments) $ do
         debugM $ "flushing comments in enterAnn:" ++ showAst cs
-        flushComments (getFollowingComments cs ++ filterEofComment True (priorComments cs))
+        -- flushComments (getFollowingComments cs ++ priorComments cs)
+        flushComments (getFollowingComments cs)
 
   advance edp
   a' <- exact a
@@ -436,22 +433,13 @@ addComments csNew = do
 -- ones in the state.
 flushComments :: (Monad m, Monoid w) => [LEpaComment] -> EP w m ()
 flushComments trailing = do
-  addCommentsA (filterEofComment False trailing)
+  addCommentsA trailing
   cs <- getUnallocatedComments
   debugM $ "flushing comments starting"
   mapM_ printOneComment (sortComments cs)
   debugM $ "flushing comments:EOF:trailing:" ++ showAst (trailing)
-  debugM $ "flushing comments:EOF:" ++ showAst (filterEofComment True trailing)
-  mapM_ printOneComment (map tokComment (filterEofComment True trailing))
+  -- mapM_ printOneComment (map tokComment (filterEofComment True trailing))
   debugM $ "flushing comments done"
-
-filterEofComment :: Bool -> [LEpaComment] -> [LEpaComment]
-filterEofComment keep cs = fixCs cs
-  where
-      notEof com = case com of
-       L _ (GHC.EpaComment (EpaEofComment) _) -> keep
-       _ -> not keep
-      fixCs c = filter notEof c
 
 -- ---------------------------------------------------------------------
 
@@ -1443,6 +1431,13 @@ instance ExactPrint (HsModule GhcPs) where
     let am_decls' = case ann_decls' of
           EpAnnNotUsed -> (am_decls $ anns an0)
           EpAnn _ r _ -> r
+
+    -- Print EOF
+    case am_eof $ anns an of
+      Nothing -> return ()
+      Just (pos, prior) -> do
+        let dp = origDelta pos prior
+        printStringAtLsDelta dp ""
 
     let anf = an0 { anns = (anns an0) { am_decls = am_decls' }}
     debugM $ "HsModule, anf=" ++ showAst anf
