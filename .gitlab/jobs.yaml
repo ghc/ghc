@@ -676,7 +676,7 @@
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
-    "allow_failure": true,
+    "allow_failure": false,
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
@@ -2312,7 +2312,7 @@
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
-    "allow_failure": true,
+    "allow_failure": false,
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
@@ -3228,7 +3228,7 @@
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
-    "allow_failure": true,
+    "allow_failure": false,
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [

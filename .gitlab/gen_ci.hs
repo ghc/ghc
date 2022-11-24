@@ -826,7 +826,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , standardBuilds AArch64 (Linux Debian10)
      , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
      , standardBuilds I386 (Linux Debian9)
-     , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
+     , standardBuildsWithConfig Amd64 (Linux Alpine) static
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure")
