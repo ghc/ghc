@@ -16,6 +16,7 @@
 
 #include "sm/Storage.h"
 #include "sm/NonMovingMark.h"
+#include "Arena.h"
 #include <stdbool.h>
 
 #if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
@@ -1058,6 +1059,9 @@ extern char **environ;
       SymI_HasProto(stg_newPromptTagzh)                                 \
       SymI_HasProto(stg_promptzh)                                       \
       SymI_HasProto(stg_control0zh)                                     \
+      SymI_HasProto(newArena)                                           \
+      SymI_HasProto(arenaAlloc)                                         \
+      SymI_HasProto(arenaFree)                                          \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
