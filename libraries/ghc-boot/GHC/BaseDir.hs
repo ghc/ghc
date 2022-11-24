@@ -16,7 +16,8 @@ module GHC.BaseDir where
 
 import Prelude -- See Note [Why do we import Prelude here?]
 
-import Data.List (stripPrefix, uncons)
+import Data.List (stripPrefix)
+import Data.Maybe (listToMaybe)
 import System.FilePath
 
 -- Windows
@@ -37,7 +38,7 @@ expandTopDir = expandPathVar "topdir"
 expandPathVar :: String -> FilePath -> String -> String
 expandPathVar var value str
   | Just str' <- stripPrefix ('$':var) str
-  , maybe True (isPathSeparator . fst) (uncons str')
+  , maybe True isPathSeparator (listToMaybe str')
   = value ++ expandPathVar var value str'
 expandPathVar var value (x:xs) = x : expandPathVar var value xs
 expandPathVar _ _ [] = []

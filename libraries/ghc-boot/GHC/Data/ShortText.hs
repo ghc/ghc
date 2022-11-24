@@ -47,7 +47,6 @@ import Control.DeepSeq as DeepSeq
 import Data.Binary
 import qualified Data.ByteString.Char8 as B8
 import qualified Data.ByteString.Short.Internal as SBS
-import Data.List (uncons)
 import GHC.Exts
 import GHC.IO
 import GHC.Utils.Encoding
@@ -101,9 +100,11 @@ splitFilePath st = DeepSeq.force $ map (ShortText . SBS.toShort) $ B8.splitWith 
 -- question, this may or may not be the actual first character in the string due to Unicode
 -- non-printable characters.
 head :: ShortText -> Char
-head st = case uncons (unpack st) of
-  Nothing      -> error "head: Empty ShortText"
-  Just (hd, _) -> hd
+head st
+  | hd:_ <- unpack st
+  = hd
+  | otherwise
+  = error "head: Empty ShortText"
 
 -- | /O(n)/ The 'stripPrefix' function takes two 'ShortText's and returns 'Just' the remainder of
 -- the second iff the first is its prefix, and otherwise Nothing.
