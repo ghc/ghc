@@ -621,6 +621,7 @@ void checkNonmovingHeap (const struct NonmovingHeap *heap)
     for (unsigned int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
         const struct NonmovingAllocator *alloc = heap->allocators[i];
         checkNonmovingSegments(alloc->filled);
+        checkNonmovingSegments(alloc->saved_filled);
         checkNonmovingSegments(alloc->active);
         for (unsigned int cap=0; cap < getNumCapabilities(); cap++) {
             checkNonmovingSegments(alloc->current[cap]);
@@ -1049,6 +1050,7 @@ findMemoryLeak (void)
         for (i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
             struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
             markNonMovingSegments(alloc->filled);
+            markNonMovingSegments(alloc->saved_filled);
             markNonMovingSegments(alloc->active);
             for (j = 0; j < getNumCapabilities(); j++) {
                 markNonMovingSegments(alloc->current[j]);
