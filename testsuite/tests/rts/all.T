@@ -272,7 +272,8 @@ test('T7040_ghci',
       only_ways(['ghci']),
       # Fragile when unregisterised; see #16085
       when(unregisterised(), skip),
-      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup')],
+      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      compile_and_run, ['T7040_ghci_c.o'])
 
 test('T7227', [extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS')],
@@ -497,7 +498,8 @@ test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',
      [when(opsys('mingw32'), expect_broken(17447)),
-      extra_files(['T13676.hs'])],
+      extra_files(['T13676.hs']),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      ghci_script, ['T13676.script'])
 test('InitEventLogging',
      [ only_ways(['normal'])

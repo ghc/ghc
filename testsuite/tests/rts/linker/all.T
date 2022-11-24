@@ -59,7 +59,8 @@ def checkDynAsm(actual_file, normaliser):
 test('T5435_v_asm_a',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       req_rts_linker,
-      when(arch('arm'), expect_broken(17559))],
+      when(arch('arm'), expect_broken(17559)),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T5435_v_asm_a'])
 # this one just needs to run on linux, as darwin/mingw32 are covered
 # by the _a test already.
@@ -67,12 +68,14 @@ test('T5435_v_asm_b',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       req_rts_linker,
       when(arch('arm'), expect_broken(17559)),
-      when(opsys('darwin') or opsys('mingw32'), skip)],
+      when(opsys('darwin') or opsys('mingw32'), skip),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T5435_v_asm_b'])
 test('T5435_v_gcc',
      [extra_files(['T5435.hs', 'T5435_gcc.c']),
       req_rts_linker,
-      when(arch('arm'), expect_broken(17559))],
+      when(arch('arm'), expect_broken(17559)),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T5435_v_gcc'])
 test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
@@ -126,7 +129,7 @@ test('T7072',
 		req_rts_linker], 
 	makefile_test, ['T7072'])
 
-test('T20494', [req_rts_linker],
+test('T20494', [req_rts_linker, when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T20494'])
 
 test('T20918',

@@ -159,7 +159,8 @@ test('T6106', [extra_files(['../shell.hs']),
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
 test('ghci058', [extra_files(['../shell.hs']),
-                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
+                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
+                 when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])

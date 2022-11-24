@@ -115,7 +115,7 @@ test('T10294a',
       pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294a TOP={top}')],
      makefile_test, [])
 
-test('frontend01', [extra_files(['FrontendPlugin.hs'])],
+test('frontend01', [extra_files(['FrontendPlugin.hs']), when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
 
 test('T11244',
@@ -294,25 +294,30 @@ test('T20803b',
 
 test('test-echo-in-turn',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}')],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
 
 test('test-echo-in-line',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line TOP={top}')],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line TOP={top}'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
 
 test('test-echo-in-turn-many-args',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn-many-args TOP={top}')],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn-many-args TOP={top}'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
 
 test('test-echo-in-line-many-args',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}')],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
 
 test('plugins-external',
      [extra_files(['shared-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}')],
+      pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}'),
+      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, [])
