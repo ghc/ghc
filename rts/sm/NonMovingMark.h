@@ -63,7 +63,7 @@ INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
 {
     uintptr_t tag = (uintptr_t) ent->null_entry.p & TAG_MASK;
     ASSERT(tag <= MARK_ARRAY);
-    return tag;
+    return (enum EntryType) tag;
 }
 
 typedef struct {
@@ -155,7 +155,7 @@ void markQueueAddRoot(MarkQueue* q, StgClosure** root);
 
 void initMarkQueue(MarkQueue *queue);
 void freeMarkQueue(MarkQueue *queue);
-void nonmovingMark(struct MarkQueue_ *restrict queue);
+void nonmovingMark(struct MarkQueue_ *STG_RESTRICT queue);
 
 bool nonmovingTidyWeaks(struct MarkQueue_ *queue);
 void nonmovingTidyThreads(void);
