@@ -615,6 +615,7 @@ library
                  linker/elf_tlsgd.c
                  linker/elf_util.c
                  sm/BlockAlloc.c
+                 sm/CheckGc.cpp
                  sm/CNF.c
                  sm/Compact.c
                  sm/Evac.c

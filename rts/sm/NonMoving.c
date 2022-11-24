@@ -1255,6 +1255,7 @@ concurrent_marking:
 
 #if defined(THREADED_RTS) && defined(NONCONCURRENT_SWEEP)
 #if defined(DEBUG)
+    check_gc();
     checkNonmovingHeap(&nonmovingHeap);
     checkSanity(true, true);
 #endif
