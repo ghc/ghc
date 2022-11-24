@@ -152,6 +152,8 @@ library
         ld-options: -fsanitize=thread
         extra-libraries: tsan
 
+      extra-libraries: stdc++
+
       if os(linux)
          -- the RTS depends upon libc. while this dependency is generally
          -- implicitly added by `cc`, we must explicitly add it here to ensure
@@ -616,6 +618,7 @@ library
                  linker/elf_tlsgd.c
                  linker/elf_util.c
                  sm/BlockAlloc.c
+                 sm/CheckGc.cpp
                  sm/CNF.c
                  sm/Compact.c
                  sm/Evac.c
