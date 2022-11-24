@@ -56,7 +56,7 @@ INLINE_HEADER long sparkPoolSize  (SparkPool *pool);
 
 INLINE_HEADER StgClosure* reclaimSpark(SparkPool *pool)
 {
-    return popWSDeque(pool);
+    return (StgClosure*) popWSDeque(pool);
 }
 
 INLINE_HEADER bool looksEmpty(SparkPool* deque)
@@ -89,7 +89,7 @@ INLINE_HEADER void discardSparks (SparkPool *pool)
 
 INLINE_HEADER StgClosure * tryStealSpark (SparkPool *pool)
 {
-    return stealWSDeque_(pool);
+    return (StgClosure *) stealWSDeque_(pool);
     // use the no-loopy version, stealWSDeque_(), since if we get a
     // spurious NULL here the caller may want to try stealing from
     // other pools before trying again.
