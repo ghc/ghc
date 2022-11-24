@@ -131,7 +131,7 @@ setRecentActivity(enum RecentActivity new_value)
 INLINE_HEADER enum RecentActivity
 getRecentActivity(void)
 {
-    return RELAXED_LOAD_ALWAYS(&recent_activity);
+    return (enum RecentActivity) RELAXED_LOAD_ALWAYS(&recent_activity);
 }
 
 extern bool heap_overflow;

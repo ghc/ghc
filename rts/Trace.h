@@ -33,7 +33,9 @@ void tracingAddCapabilities (uint32_t from, uint32_t to);
 #endif /* TRACING */
 
 typedef StgWord32 CapsetID;
+#if !defined(__cplusplus)
 typedef StgWord16 CapsetType;
+#endif
 enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
                   CapsetTypeOsProcess = CAPSET_TYPE_OSPROCESS,
                   CapsetTypeClockdomain = CAPSET_TYPE_CLOCKDOMAIN };
