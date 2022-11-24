@@ -159,6 +159,7 @@ getRetFunLargeBitmapzh(P_ stack, W_ index){
 // TODO: Use generalized version unpackClosureReferencedByFramezh with offset=0
 unpackClosureFromStackFramezh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime;
+  // TODO: Rename closurePtr -> closurePtrAddr
   closurePtr = (StgStack_sp(stack) + WDS(index));
   closurePtrPrime = P_[closurePtr];
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
@@ -175,12 +176,13 @@ getUpdateFrameTypezh(P_ stack, W_ index){
   return (type);
 }
 
-// Reduce duplication by using offsets instead on pointer macros.
 unpackClosureReferencedByFramezh(W_ offset, P_ stack, W_ index){
-  P_ closurePtr, closurePtrPrime, codePtr;
+  P_ closurePtr, closurePtrPrime;
+  // TODO: Rename closurePtr -> closurePtrAddr
   closurePtr = (StgStack_sp(stack) + WDS(index) + offset);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  jump stg_unpackClosurezh(closurePtr);
+  closurePtrPrime = P_[closurePtr];
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
+  jump stg_unpackClosurezh(closurePtrPrime);
 }
 
 getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){

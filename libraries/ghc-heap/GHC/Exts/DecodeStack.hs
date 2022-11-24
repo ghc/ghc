@@ -12,6 +12,7 @@
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack (
@@ -25,10 +26,10 @@ import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import Data.Maybe
 import Data.Bits
 import Foreign
-import System.IO.Unsafe
 import Prelude
 import GHC.Stack.CloneStack
 import GHC.Exts.Heap hiding (bitmap, size)
+-- TODO: Remove before releasing
 import Debug.Trace
 import GHC.Exts
 import qualified GHC.Exts.Heap.Closures as CL
@@ -105,15 +106,18 @@ toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap bSize = BitmapEntry {
     isPrimitive = (bitmap .&. 1) /= 0
   } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (bSize - 1)
 
-toBitmapPayload :: BitmapEntry -> BitmapPayload
-toBitmapPayload e | isPrimitive e = Primitive . toWord . closureFrame $ e
+toBitmapPayload :: BitmapEntry -> IO BitmapPayload
+toBitmapPayload e | isPrimitive e = pure $ Primitive . toWord . closureFrame $ e
       where
         toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
-toBitmapPayload e = Closure . toClosure unpackClosureFromStackFrame# . closureFrame $ e
+toBitmapPayload e = Closure <$> toClosure unpackClosureFromStackFrame# (closureFrame e)
 
--- TODO: Get rid of unsafePerformIO
-toClosure :: (StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> CL.Closure
-toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
+-- TODO: Negative offsets won't work! Consider using Word
+getClosure :: StackFrameIter -> Int -> IO CL.Closure
+getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
+
+toClosure :: (StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO CL.Closure
+toClosure f# (StackFrameIter (# s#, i# #)) =
   case f# s# i# of
       (# infoTableAddr, heapRep, pointersArray #) -> do
           let infoTablePtr = Ptr infoTableAddr
@@ -124,26 +128,24 @@ toClosure f# (StackFrameIter (# s#, i# #)) = unsafePerformIO $
 
           getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
-decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> Word# -> [BitmapPayload]
+-- TODO: Make function more readable: No IO in let bindings
+decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> Word# -> IO [BitmapPayload]
 decodeLargeBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
       let !(# bitmapArray#, size# #) = getterFun# stackFrame# closureOffset#
           bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-          bes = wordsToBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #)) (trace ("bitmapWords" ++ show bitmapWords) bitmapWords) (trace ("XXX size " ++ show (W# size#))(W# size#))
-          payloads = map toBitmapPayload bes
+          bes = wordsToBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #)) bitmapWords (W# size#)
+          payloads = mapM toBitmapPayload bes
       in
         payloads
 
-decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> Word# -> [BitmapPayload]
+-- TODO: Make function more readable: No IO in let bindings
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> Word# -> IO [BitmapPayload]
 decodeSmallBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
       let !(# bitmap#, size# #) = getterFun# stackFrame# closureOffset#
           bes = toBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #))(W# bitmap#) (W# size#)
-          payloads = map toBitmapPayload bes
+          payloads = mapM toBitmapPayload bes
       in
         payloads
-
--- TODO: Negative offsets won't work! Consider using Word
-getClosure :: StackFrameIter -> Int -> CL.Closure
-getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
 
 -- TODO: Negative offsets won't work! Consider using Word
 getHalfWord :: StackFrameIter -> Int -> Word
@@ -153,84 +155,66 @@ getHalfWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getHalfWord# s# i
 getWord :: StackFrameIter -> Int -> Word
 getWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getWord# s# i# (intToWord# relativeOffset))
 
-unpackStackFrameIter :: StackFrameIter -> StackFrame
-unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) =
+unpackStackFrameIter :: StackFrameIter -> IO StackFrame
+unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " ++ show @ClosureType ((toEnum . fromIntegral) (W# (getInfoTableType# s# i#))) ++ "\n") $
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
-     RET_BCO -> let
-        instrs' = getClosure sfi offsetStgRetBCOFrameInstrs
-        literals' = getClosure sfi offsetStgRetBCOFrameLiterals
-        ptrs' = getClosure sfi offsetStgRetBCOFramePtrs
-        arity' = getHalfWord sfi offsetStgRetBCOFrameArity
-        size' = getHalfWord sfi offsetStgRetBCOFrameSize
-        payload' = decodeLargeBitmap getBCOLargeBitmap# sfi 2##
-        in
-       RetBCO {
-        instrs = instrs',
-          literals  = literals',
-          ptrs = ptrs',
-          arity = arity',
-          size = size',
-          payload = payload'
+     RET_BCO -> do
+        instrs' <- getClosure sfi offsetStgRetBCOFrameInstrs
+        literals'<- getClosure sfi offsetStgRetBCOFrameLiterals
+        ptrs' <- getClosure sfi offsetStgRetBCOFramePtrs
+        let arity' = getHalfWord sfi offsetStgRetBCOFrameArity
+            size' = getHalfWord sfi offsetStgRetBCOFrameSize
+        payload' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2##
+        pure $ RetBCO {
+                instrs = instrs',
+                literals  = literals',
+                ptrs = ptrs',
+                arity = arity',
+                size = size',
+                payload = payload'
               }
-     RET_SMALL -> let payloads = decodeSmallBitmap getSmallBitmap# sfi 1##
-                      special# = getRetSmallSpecialType# s# i#
-                      special = (toEnum . fromInteger . toInteger) (W# special#)
-                  in
-                    RetSmall special payloads
-     RET_BIG -> let payloads = decodeLargeBitmap getLargeBitmap# sfi 1##
-                in
-                  RetBig payloads
-     RET_FUN -> let
-        t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
-        size' = getWord sfi offsetStgRetFunFrameSize
-        fun' = getClosure sfi offsetStgRetFunFrameFun
-        payload' =
-          case t of
-              ARG_GEN_BIG ->
-                let
-                  payloads = decodeLargeBitmap getRetFunLargeBitmap# sfi 2##
-                in
-                  payloads
-              _ ->
-                let
-                  payloads = decodeSmallBitmap getRetFunSmallBitmap# sfi 2##
-                in
-                  payloads
-       in
-        RetFun t size' fun' payload'
+     RET_SMALL -> do
+                    payloads <- decodeSmallBitmap getSmallBitmap# sfi 1##
+                    let special# = getRetSmallSpecialType# s# i#
+                        special = (toEnum . fromInteger . toInteger) (W# special#)
+                    pure $ RetSmall special payloads
+     RET_BIG ->  RetBig <$> decodeLargeBitmap getLargeBitmap# sfi 1##
+     RET_FUN -> do
+        let t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
+            size' = getWord sfi offsetStgRetFunFrameSize
+        fun' <- getClosure sfi offsetStgRetFunFrameFun
+        payload' <-
+          if t == ARG_GEN_BIG then
+            decodeLargeBitmap getRetFunLargeBitmap# sfi 2##
+          else
+            decodeSmallBitmap getRetFunSmallBitmap# sfi 2##
+        pure $ RetFun t size' fun' payload'
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
-        c = getClosure sfi offsetStgUpdateFrameUpdatee
         !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
        in
-        UpdateFrame t c
-     CATCH_FRAME -> let
-        c = getClosure sfi offsetStgCatchFrameHandler
+        UpdateFrame t <$> getClosure sfi offsetStgUpdateFrameUpdatee
+     CATCH_FRAME -> do
         -- TODO: Replace with getWord# expression
-        exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
-       in
-        CatchFrame exceptionsBlocked c
+        let exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
+        c <- getClosure sfi offsetStgCatchFrameHandler
+        pure $ CatchFrame exceptionsBlocked c
      UNDERFLOW_FRAME -> let
           nextChunk# = getUnderflowFrameNextChunk# s# i#
         in
-          UnderflowFrame (StackSnapshot nextChunk#)
-     STOP_FRAME ->  StopFrame
-     ATOMICALLY_FRAME -> let
-          c = getClosure sfi offsetStgAtomicallyFrameCode
-          r = getClosure sfi offsetStgAtomicallyFrameResult
-       in
-         AtomicallyFrame c r
-     CATCH_RETRY_FRAME ->  let
-        running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
-        first_code' = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
-        alt_code' = getClosure sfi offsetStgCatchRetryFrameRunningAltCode
-       in
-         CatchRetryFrame running_alt_code' first_code' alt_code'
-     CATCH_STM_FRAME -> let
-          c = getClosure sfi offsetStgCatchSTMFrameCode
-          h = getClosure sfi offsetStgCatchSTMFrameHandler
-        in
-          CatchStmFrame c h
+          pure $ UnderflowFrame (StackSnapshot nextChunk#)
+     STOP_FRAME -> pure StopFrame
+     ATOMICALLY_FRAME -> AtomicallyFrame
+            <$> getClosure sfi offsetStgAtomicallyFrameCode
+            <*> getClosure sfi offsetStgAtomicallyFrameResult
+     CATCH_RETRY_FRAME -> do
+        let running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
+        first_code' <- getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
+        alt_code' <- getClosure sfi offsetStgCatchRetryFrameRunningAltCode
+        pure $ CatchRetryFrame running_alt_code' first_code' alt_code'
+     CATCH_STM_FRAME -> CatchStmFrame
+          <$> getClosure sfi offsetStgCatchSTMFrameCode
+          <*> getClosure sfi offsetStgCatchSTMFrameHandler
      x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- | Right-fold over the elements of a 'ByteArray'.
@@ -381,14 +365,14 @@ decodeStack s = do
 #if defined(DEBUG)
   belchStack s
 #endif
-  pure $ decodeStack' s
+  decodeStack' s
 
-decodeStack' :: StackSnapshot -> [StackFrame]
-decodeStack' s = unpackStackFrameIter (stackHead s) : go (advanceStackFrameIter (stackHead s))
+decodeStack' :: StackSnapshot -> IO [StackFrame]
+decodeStack' s = unpackStackFrameIter (stackHead s) >>= \frame -> (frame :) <$> go (advanceStackFrameIter (stackHead s))
   where
-    go :: Maybe StackFrameIter -> [StackFrame]
-    go Nothing = []
-    go (Just sfi) = unpackStackFrameIter sfi : go (advanceStackFrameIter sfi)
+    go :: Maybe StackFrameIter -> IO [StackFrame]
+    go Nothing = pure []
+    go (Just sfi) = (trace "decode\n" (unpackStackFrameIter sfi)) >>= \frame -> (frame :) <$> go (advanceStackFrameIter sfi)
 
 #else
 module GHC.Exts.DecodeStack where
