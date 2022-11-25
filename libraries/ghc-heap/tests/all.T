@@ -89,3 +89,10 @@ test('stack_stm_frames',
         ignore_stderr
       ],
      compile_and_run, ['-debug'])
+
+test('stack_comparison',
+     [extra_files(['stack_lib.c','TestUtils.hs']),
+      ignore_stdout,
+      ignore_stderr
+     ],
+     multi_compile_and_run, ['stack_comparison', [('stack_lib.c','')], '-debug -optc-g -g'])
