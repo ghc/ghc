@@ -193,6 +193,11 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
   return result;
 }
 
+// Copied from Cmm.h
+/* Converting quantities of words to bytes */
+#define SIZEOF_W SIZEOF_VOID_P
+#define WDS(n) ((n)*SIZEOF_W)
+
 StgArrBytes *createArrayClosure(ClosureTypeList *list) {
   Capability *cap = rts_lock();
   // Mapping closure types to StgWord is pretty generous as they would fit
@@ -201,7 +206,7 @@ StgArrBytes *createArrayClosure(ClosureTypeList *list) {
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
   SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
-  array->bytes = listSize(list);
+  array->bytes = WDS(listSize(list));
 
   for (int i = 0; list != NULL; i++) {
     array->payload[i] = list->closureType;
