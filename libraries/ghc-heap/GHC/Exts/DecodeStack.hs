@@ -305,6 +305,7 @@ data StackFrame =
   CatchStmFrame { code :: CL.Closure, handler :: CL.Closure  } |
   CatchRetryFrame {running_alt_code :: Word, first_code :: CL.Closure, alt_code :: CL.Closure} |
   AtomicallyFrame { code :: CL.Closure, result :: CL.Closure} |
+  -- TODO: nextChunk could be a CL.Closure, too! (StackClosure)
   UnderflowFrame { nextChunk:: StackSnapshot } |
   StopFrame |
   RetSmall { knownRetSmallType :: SpecialRetSmall, payload :: [BitmapPayload]} |
