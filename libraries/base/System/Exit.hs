@@ -45,16 +45,14 @@ import GHC.IO.Exception
 -- A program that terminates successfully without calling 'exitWith'
 -- explicitly is treated as if it had called 'exitWith' 'ExitSuccess'.
 --
--- As an 'ExitCode' is not an 'IOError', 'exitWith' bypasses
--- the error handling in the 'IO' monad and cannot be intercepted by
--- 'catch' from the "Prelude".  However it is a 'Control.Exception.SomeException', and can
--- be caught using the functions of "Control.Exception".  This means
--- that cleanup computations added with 'Control.Exception.bracket'
--- (from "Control.Exception") are also executed properly on 'exitWith'.
+-- As an 'ExitCode' is an 'Control.Exception.Exception', it can be
+-- caught using the functions of "Control.Exception".  This means that
+-- cleanup computations added with 'Control.Exception.bracket' (from
+-- "Control.Exception") are also executed properly on 'exitWith'.
 --
 -- Note: in GHC, 'exitWith' should be called from the main program
 -- thread in order to exit the process.  When called from another
--- thread, 'exitWith' will throw an 'ExitException' as normal, but the
+-- thread, 'exitWith' will throw an 'ExitCode' as normal, but the
 -- exception will not cause the process itself to exit.
 --
 exitWith :: ExitCode -> IO a
