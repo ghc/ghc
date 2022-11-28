@@ -56,6 +56,7 @@
     `malloc` for allocation. It avoids the O(n) overhead of maintaining a list
     of individually allocated pointers as well as freeing each one of them when
     freeing a `Pool`. (#14762) (#18338)
+  * `Type.Reflection.Unsafe` is now marked as unsafe.
 
 ## 4.17.0.0 *August 2022*
 

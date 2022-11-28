@@ -12,7 +12,7 @@
 -- type representations.
 --
 -----------------------------------------------------------------------------
-{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds, DataKinds, ScopedTypeVariables, Unsafe #-}
 
 module Type.Reflection.Unsafe (
       -- * Type representations
