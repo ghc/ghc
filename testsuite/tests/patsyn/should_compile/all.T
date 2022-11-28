@@ -82,3 +82,4 @@ test('T16682', [extra_files(['T16682.hs', 'T16682a.hs'])],
 test('T17775-singleton', normal, compile, [''])
 test('T14630', normal, compile, ['-Wname-shadowing'])
 test('T21531', [ grep_errmsg(r'INLINE') ], compile, ['-ddump-ds'])
+test('T22521', normal, compile, [''])

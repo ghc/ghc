@@ -45,7 +45,7 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkNakedTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkNakedKindFunTy,
+        mkFunTy, mkNakedFunTy,
         mkVisFunTy, mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTys,
@@ -799,10 +799,10 @@ mkTyCoVarTys = map mkTyCoVarTy
 
 infixr 3 `mkFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`
 
-mkNakedKindFunTy :: FunTyFlag -> Kind -> Kind -> Kind
+mkNakedFunTy :: FunTyFlag -> Kind -> Kind -> Kind
 -- See Note [Naked FunTy] in GHC.Builtin.Types
 -- Always Many multiplicity; kinds have no linearity
-mkNakedKindFunTy af arg res
+mkNakedFunTy af arg res
  =  FunTy { ft_af   = af, ft_mult = manyDataConTy
           , ft_arg  = arg, ft_res  = res }
 
