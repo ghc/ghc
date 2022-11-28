@@ -89,6 +89,7 @@ Library
         cbits/ctz.c
         cbits/debug.c
         cbits/longlong.c
+        cbits/mulIntMayOflo.c
         cbits/pdep.c
         cbits/pext.c
         cbits/popcnt.c

@@ -443,27 +443,22 @@ lower_MO_S_Shr lbl w0 [x, y] = case someWasmTypeFromCmmType (cmmBits w0) of
 lower_MO_S_Shr _ _ _ = panic "lower_MO_S_Shr: unreachable"
 
 -- | Lower a 'MO_MulMayOflo' operation. It's translated to a ccall to
--- one of the @hs_mulIntMayOflo@ functions in rts/wasm/Ops.c,
+-- @hs_mulIntMayOflo@ function in @ghc-prim/cbits/mulIntMayOflo@,
 -- otherwise it's quite non-trivial to implement as inline assembly.
 lower_MO_MulMayOflo ::
-  CLabel ->
-  Width ->
-  [CmmExpr] ->
-  WasmCodeGenM
-    w
-    (SomeWasmExpr w)
+  CLabel -> Width -> [CmmExpr] -> WasmCodeGenM w (SomeWasmExpr w)
 lower_MO_MulMayOflo lbl w0 [x, y] = case someWasmTypeFromCmmType ty_cmm of
   SomeWasmType ty -> do
     WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
     WasmExpr y_instr <- lower_CmmExpr_Typed lbl ty y
-    onFuncSym f [ty_cmm, ty_cmm] [ty_cmm]
+    onFuncSym "hs_mulIntMayOflo" [ty_cmm, ty_cmm] [ty_cmm]
     pure $
       SomeWasmExpr ty $
         WasmExpr $
-          x_instr `WasmConcat` y_instr `WasmConcat` WasmCCall f
+          x_instr
+            `WasmConcat` y_instr
+            `WasmConcat` WasmCCall "hs_mulIntMayOflo"
   where
-    f = fromString $ "hs_mulIntMayOflo" <> show (widthInBits w0)
-
     ty_cmm = cmmBits w0
 lower_MO_MulMayOflo _ _ _ = panic "lower_MO_MulMayOflo: unreachable"
 
