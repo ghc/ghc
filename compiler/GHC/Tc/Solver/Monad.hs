@@ -538,7 +538,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
     get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
                                        -- but flipping the flag
     get_pending dict dicts
-        | Just dict' <- isPendingScDict dict
+        | Just dict' <- pendingScDict_maybe dict
         , belongs_to_this_level (ctEvidence dict)
         = dict' : dicts
         | otherwise
@@ -551,7 +551,7 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
     get_pending_inst cts qci@(QCI { qci_ev = ev })
-       | Just qci' <- isPendingScInst qci
+       | Just qci' <- pendingScInst_maybe qci
        , belongs_to_this_level ev
        = (CQuantCan qci' : cts, qci')
        | otherwise

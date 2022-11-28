@@ -9,14 +9,15 @@
 -- in the type-checker and constraint solver.
 module GHC.Tc.Types.Constraint (
         -- QCInst
-        QCInst(..), isPendingScInst,
+        QCInst(..), pendingScInst_maybe,
 
         -- Canonical constraints
         Xi, Ct(..), Cts,
         emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
-        isPendingScDict, superClassesMightHelp, getPendingWantedScs,
+        isPendingScDict, pendingScDict_maybe,
+        superClassesMightHelp, getPendingWantedScs,
         isWantedCt, isGivenCt,
         isUserTypeError, getUserTypeErrorMsg,
         ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
@@ -899,18 +900,24 @@ isUserTypeError pred = case getUserTypeErrorMsg pred of
                              Just _ -> True
                              _      -> False
 
-isPendingScDict :: Ct -> Maybe Ct
+isPendingScDict :: Ct -> Bool
+isPendingScDict (CDictCan { cc_pend_sc = psc }) = psc
+-- Says whether this is a CDictCan with cc_pend_sc is True;
+-- i.e. pending un-expanded superclasses
+isPendingScDict _ = False
+
+pendingScDict_maybe :: Ct -> Maybe Ct
 -- Says whether this is a CDictCan with cc_pend_sc is True,
 -- AND if so flips the flag
-isPendingScDict ct@(CDictCan { cc_pend_sc = True })
-                  = Just (ct { cc_pend_sc = False })
-isPendingScDict _ = Nothing
+pendingScDict_maybe ct@(CDictCan { cc_pend_sc = True })
+                      = Just (ct { cc_pend_sc = False })
+pendingScDict_maybe _ = Nothing
 
-isPendingScInst :: QCInst -> Maybe QCInst
+pendingScInst_maybe :: QCInst -> Maybe QCInst
 -- Same as isPendingScDict, but for QCInsts
-isPendingScInst qci@(QCI { qci_pend_sc = True })
-                  = Just (qci { qci_pend_sc = False })
-isPendingScInst _ = Nothing
+pendingScInst_maybe qci@(QCI { qci_pend_sc = True })
+                      = Just (qci { qci_pend_sc = False })
+pendingScInst_maybe _ = Nothing
 
 superClassesMightHelp :: WantedConstraints -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
@@ -932,7 +939,7 @@ getPendingWantedScs :: Cts -> ([Ct], Cts)
 getPendingWantedScs simples
   = mapAccumBagL get [] simples
   where
-    get acc ct | Just ct' <- isPendingScDict ct
+    get acc ct | Just ct' <- pendingScDict_maybe ct
                = (ct':acc, ct')
                | otherwise
                = (acc,     ct)

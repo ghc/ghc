@@ -442,8 +442,8 @@ instance Outputable InteractResult where
   ppr KeepInert = text "keep inert"
   ppr KeepWork  = text "keep work-item"
 
-solveOneFromTheOther :: CtEvidence  -- Inert    (Dict or Irred)
-                     -> CtEvidence  -- WorkItem (same predicate as inert)
+solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
+                     -> Ct  -- WorkItem (same predicate as inert)
                      -> TcS InteractResult
 -- Precondition:
 -- * inert and work item represent evidence for the /same/ predicate
@@ -453,23 +453,40 @@ solveOneFromTheOther :: CtEvidence  -- Inert    (Dict or Irred)
 -- although we don't rewrite wanteds with wanteds, we can combine
 -- two wanteds into one by solving one from the other
 
-solveOneFromTheOther ev_i ev_w
+solveOneFromTheOther ct_i ct_w
   | CtWanted { ctev_loc = loc_w } <- ev_w
   , prohibitedSuperClassSolve loc_i loc_w
-  = -- inert must be Given
+  = -- Inert must be Given
     do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
        ; return KeepWork }
 
   | CtWanted {} <- ev_w
-       -- Inert is Given or Wanted
-  = return $ case ev_i of
-               CtWanted {} -> choose_better_loc
-                 -- both are Wanted; choice of which to keep is
-                 -- arbitrary. So we look at the context to choose
-                 -- which would make a better error message
+  = -- Inert is Given or Wanted
+    case ev_i of
+      CtGiven {} -> return KeepInert
+        -- work is Wanted; inert is Given: easy choice.
 
-               _           -> KeepInert
-                 -- work is Wanted; inert is Given: easy choice.
+      CtWanted {} -- Both are Wanted
+        -- If only one has no pending superclasses, use it
+        -- Otherwise we can get infinite superclass expansion (#22516)
+        -- in silly cases like   class C T b => C a b where ...
+        | not is_psc_i, is_psc_w     -> return KeepInert
+        | is_psc_i,     not is_psc_w -> return KeepWork
+
+        -- If only one is a WantedSuperclassOrigin (arising from expanding
+        -- a Wanted class constraint), keep the other: wanted superclasses
+        -- may be unexpected by users
+        | not is_wsc_orig_i, is_wsc_orig_w     -> return KeepInert
+        | is_wsc_orig_i,     not is_wsc_orig_w -> return KeepWork
+
+        -- otherwise, just choose the lower span
+        -- reason: if we have something like (abs 1) (where the
+        -- Num constraint cannot be satisfied), it's better to
+        -- get an error about abs than about 1.
+        -- This test might become more elaborate if we see an
+        -- opportunity to improve the error messages
+        | ((<) `on` ctLocSpan) loc_i loc_w -> return KeepInert
+        | otherwise                        -> return KeepWork
 
   -- From here on the work-item is Given
 
@@ -492,31 +509,21 @@ solveOneFromTheOther ev_i ev_w
   | otherwise   -- Both are Given, levels differ
   = return different_level_strategy
   where
+     ev_i  = ctEvidence ct_i
+     ev_w  = ctEvidence ct_w
+
      pred  = ctEvPred ev_i
+
      loc_i = ctEvLoc ev_i
      loc_w = ctEvLoc ev_w
      lvl_i = ctLocLevel loc_i
      lvl_w = ctLocLevel loc_w
 
-     choose_better_loc
-       -- if only one is a WantedSuperclassOrigin (arising from expanding
-       -- a Wanted class constraint), keep the other: wanted superclasses
-       -- may be unexpected by users
-       | is_wanted_superclass_loc loc_i
-       , not (is_wanted_superclass_loc loc_w) = KeepWork
+     is_psc_w = isPendingScDict ct_w
+     is_psc_i = isPendingScDict ct_i
 
-       | not (is_wanted_superclass_loc loc_i)
-       , is_wanted_superclass_loc loc_w = KeepInert
-
-        -- otherwise, just choose the lower span
-        -- reason: if we have something like (abs 1) (where the
-        -- Num constraint cannot be satisfied), it's better to
-        -- get an error about abs than about 1.
-        -- This test might become more elaborate if we see an
-        -- opportunity to improve the error messages
-       | ((<) `on` ctLocSpan) loc_i loc_w = KeepInert
-       | otherwise                        = KeepWork
-
+     is_wsc_orig_i = is_wanted_superclass_loc loc_i
+     is_wsc_orig_w = is_wanted_superclass_loc loc_w
      is_wanted_superclass_loc = isWantedSuperclassOrigin . ctLocOrigin
 
      different_level_strategy  -- Both Given
@@ -644,28 +651,28 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
+interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
   | isInsolubleReason reason
                -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
-  = continueWith workItem
+  = continueWith ct_w
 
   | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
   , ((ct_i, swap) : _rest) <- bagToList matching_irreds
         -- See Note [Multiple matching irreds]
   , let ev_i = ctEvidence ct_i
-  = do { what_next <- solveOneFromTheOther ev_i ev_w
-       ; traceTcS "iteractIrred" (ppr workItem $$ ppr what_next $$ ppr ct_i)
+  = do { what_next <- solveOneFromTheOther ct_i ct_w
+       ; traceTcS "iteractIrred" (ppr ct_w $$ ppr what_next $$ ppr ct_i)
        ; case what_next of
             KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
                             ; return (Stop ev_w (text "Irred equal" <+> parens (ppr what_next))) }
             KeepWork ->  do { setEvBindIfWanted ev_i (swap_me swap ev_w)
                             ; updInertIrreds (\_ -> others)
-                            ; continueWith workItem } }
+                            ; continueWith ct_w } }
 
   | otherwise
-  = continueWith workItem
+  = continueWith ct_w
 
   where
     swap_me :: SwapFlag -> CtEvidence -> EvTerm
@@ -995,7 +1002,7 @@ and Given/instance fundeps entirely.
 -}
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
-interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
+interactDict inerts ct_w@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
   | Just ct_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
   , let ev_i = ctEvidence ct_i
   = -- There is a matching dictionary in the inert set
@@ -1009,22 +1016,22 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
 
     do { -- Ths short-cut solver didn't fire, so we
          -- solve ev_w from the matching inert ev_i we found
-         what_next <- solveOneFromTheOther ev_i ev_w
+         what_next <- solveOneFromTheOther ct_i ct_w
        ; traceTcS "lookupInertDict" (ppr what_next)
        ; case what_next of
            KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
            KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
                            ; updInertDicts $ \ ds -> delDict ds cls tys
-                           ; continueWith workItem } } }
+                           ; continueWith ct_w } } }
 
   | cls `hasKey` ipClassKey
   , isGiven ev_w
-  = interactGivenIP inerts workItem
+  = interactGivenIP inerts ct_w
 
   | otherwise
   = do { addFunDepWork inerts ev_w cls
-       ; continueWith workItem  }
+       ; continueWith ct_w  }
 
 interactDict _ wi = pprPanic "interactDict" (ppr wi)
 
