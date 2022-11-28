@@ -1815,8 +1815,8 @@ only about /completeness/.
 
 Note [Decomposing newtypes a bit more aggressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. https://github.com/ghc-proposals/ghc-proposals/pull/549
-and discussion on !9282.
+c.f. https://github.com/ghc-proposals/ghc-proposals/pull/549,
+issue #22441, and discussion on !9282.
 
 Consider [G] c, [W] (IO Int) ~R (IO Age)
 where IO is abstract, and
