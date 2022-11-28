@@ -27,7 +27,7 @@ type MCoercionN = MCoercion
 
 mkForAllTy       :: VarBndr Var ForAllTyFlag -> Type -> Type
 mkNakedTyConTy   :: TyCon -> Type
-mkNakedKindFunTy :: FunTyFlag -> Type -> Type -> Type
+mkNakedFunTy     :: FunTyFlag -> Type -> Type -> Type
 
 
 -- To support Data instances in GHC.Core.Coercion.Axiom

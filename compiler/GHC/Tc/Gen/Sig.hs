@@ -52,9 +52,10 @@ import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core( hasSomeUnfolding )
 import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
+import GHC.Core.TyCo.Rep( mkNakedFunTy )
 
 import GHC.Types.Error
-import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
+import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
                      , mkLocalId, realIdUnfolding )
 import GHC.Types.Basic
@@ -485,10 +486,18 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
     build_patsyn_type implicit_bndrs univ_bndrs req ex_bndrs prov body
       = mkInvisForAllTys implicit_bndrs $
         mkInvisForAllTys univ_bndrs $
-        mkPhiTy req $
+        mk_naked_phi_ty req $
         mkInvisForAllTys ex_bndrs $
-        mkPhiTy prov $
+        mk_naked_phi_ty prov $
         body
+
+    -- Use mk_naked_phi_ty because we call build_patsyn_type /before zonking/
+    -- just before kindGeneraliseAll, and the invariants that mkPhiTy checks
+    -- don't hold of the un-zonked types.  #22521 was a case in point.
+    -- (We also called build_patsyn_type on the fully zonked type, so mkPhiTy
+    --  would work; but it doesn't seem worth duplicating the code.)
+    mk_naked_phi_ty :: [TcPredType] -> TcType -> TcType
+    mk_naked_phi_ty theta body = foldr (mkNakedFunTy invisArgTypeLike) body theta
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
