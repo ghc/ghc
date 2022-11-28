@@ -1451,7 +1451,6 @@ genMachOp _ op [x] = case op of
     MO_S_MulMayOflo _ -> panicOp
     MO_S_Quot _       -> panicOp
     MO_S_Rem _        -> panicOp
-    MO_U_MulMayOflo _ -> panicOp
     MO_U_Quot _       -> panicOp
     MO_U_Rem _        -> panicOp
 
@@ -1632,8 +1631,6 @@ genMachOp_slow opt op [x, y] = case op of
     MO_Add _ -> genBinMach LM_MO_Add
     MO_Sub _ -> genBinMach LM_MO_Sub
     MO_Mul _ -> genBinMach LM_MO_Mul
-
-    MO_U_MulMayOflo _ -> panic "genMachOp: MO_U_MulMayOflo unsupported!"
 
     MO_S_MulMayOflo w -> isSMulOK w x y
 

@@ -656,7 +656,6 @@ lower_CmmMachOp lbl (MO_S_Neg w0) [x] =
     lbl
     (MO_Sub w0)
     [CmmLit $ CmmInt 0 w0, x]
-lower_CmmMachOp lbl (MO_U_MulMayOflo w0) xs = lower_MO_MulMayOflo lbl w0 xs
 lower_CmmMachOp lbl (MO_U_Quot w0) xs =
   lower_MO_Bin_Homo
     (WasmDiv Unsigned)

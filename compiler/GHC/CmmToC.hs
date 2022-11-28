@@ -430,8 +430,7 @@ pprMachOpApp :: Platform -> MachOp -> [CmmExpr] -> SDoc
 pprMachOpApp platform op args
   | isMulMayOfloOp op
   = text "mulIntMayOflo" <> parens (commafy (map (pprExpr platform) args))
-  where isMulMayOfloOp (MO_U_MulMayOflo _) = True
-        isMulMayOfloOp (MO_S_MulMayOflo _) = True
+  where isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
 
 pprMachOpApp platform mop args
@@ -774,10 +773,6 @@ pprMachOp_for_C platform mop = case mop of
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
                                 (text "MO_S_MulMayOflo")
                                 (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
-                                      ++ " should have been handled earlier!")
-        MO_U_MulMayOflo _ -> pprTrace "offending mop:"
-                                (text "MO_U_MulMayOflo")
-                                (panic $ "PprC.pprMachOp_for_C: MO_U_MulMayOflo"
                                       ++ " should have been handled earlier!")
 
         MO_V_Insert {}    -> pprTrace "offending mop:"

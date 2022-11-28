@@ -65,7 +65,6 @@ data MachOp
   | MO_S_Neg  Width             -- unary -
 
   -- Unsigned multiply/divide
-  | MO_U_MulMayOflo Width       -- nonzero if unsigned multiply overflows
   | MO_U_Quot Width             -- unsigned / (same semantics as WordQuotOp)
   | MO_U_Rem  Width             -- unsigned % (same semantics as WordRemOp)
 
@@ -251,7 +250,6 @@ isCommutableMachOp mop =
         MO_Ne _                 -> True
         MO_Mul _                -> True
         MO_S_MulMayOflo _       -> True
-        MO_U_MulMayOflo _       -> True
         MO_And _                -> True
         MO_Or _                 -> True
         MO_Xor _                -> True
@@ -379,7 +377,6 @@ machOpResultType platform mop tys =
     MO_S_Quot r         -> cmmBits r
     MO_S_Rem  r         -> cmmBits r
     MO_S_Neg  r         -> cmmBits r
-    MO_U_MulMayOflo r   -> cmmBits r
     MO_U_Quot r         -> cmmBits r
     MO_U_Rem  r         -> cmmBits r
 
@@ -473,7 +470,6 @@ machOpArgReps platform op =
     MO_S_Quot r         -> [r,r]
     MO_S_Rem  r         -> [r,r]
     MO_S_Neg  r         -> [r]
-    MO_U_MulMayOflo r   -> [r,r]
     MO_U_Quot r         -> [r,r]
     MO_U_Rem  r         -> [r,r]
 

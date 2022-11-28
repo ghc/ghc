@@ -910,7 +910,6 @@ getRegister' config plat expr
                       intOp True w (\d x y -> toOL [ SDIV t x y, MSUB d t y x ])
 
         -- Unsigned multiply/divide
-        MO_U_MulMayOflo _w -> unsupportedP plat expr
         MO_U_Quot w -> intOp False w (\d x y -> unitOL $ UDIV d x y)
         MO_U_Rem w  -> withTempIntReg w $ \t ->
                        intOp False w (\d x y -> toOL [ UDIV t x y, MSUB d t y x ])
@@ -962,9 +961,6 @@ getRegister' config plat expr
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
   where
-    unsupportedP :: OutputableP env a => env -> a -> b
-    unsupportedP platform op = pprPanic "Unsupported op:" (pdoc platform op)
-
     isNbitEncodeable :: Int -> Integer -> Bool
     isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
     -- This needs to check if n can be encoded as a bitmask immediate:
