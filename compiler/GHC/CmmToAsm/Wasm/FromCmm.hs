@@ -1238,8 +1238,13 @@ lower_CallishMachOp lbl (MO_Memcmp {}) rs xs =
     CmmMayReturn
     rs
     xs
-lower_CallishMachOp lbl (MO_PopCnt {}) rs xs =
-  lower_CMO_Un_Prim lbl WasmPopcnt rs xs
+lower_CallishMachOp lbl (MO_PopCnt w0) rs xs =
+  lower_CmmUnsafeForeignCall
+    lbl
+    (Left $ fromString $ "hs_popcnt" <> show (widthInBits w0))
+    CmmMayReturn
+    rs
+    xs
 lower_CallishMachOp lbl (MO_Pdep w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
@@ -1254,8 +1259,20 @@ lower_CallishMachOp lbl (MO_Pext w0) rs xs =
     CmmMayReturn
     rs
     xs
-lower_CallishMachOp lbl (MO_Clz {}) rs xs = lower_CMO_Un_Prim lbl WasmClz rs xs
-lower_CallishMachOp lbl (MO_Ctz {}) rs xs = lower_CMO_Un_Prim lbl WasmCtz rs xs
+lower_CallishMachOp lbl (MO_Clz w0) rs xs =
+  lower_CmmUnsafeForeignCall
+    lbl
+    (Left $ fromString $ "hs_clz" <> show (widthInBits w0))
+    CmmMayReturn
+    rs
+    xs
+lower_CallishMachOp lbl (MO_Ctz w0) rs xs =
+  lower_CmmUnsafeForeignCall
+    lbl
+    (Left $ fromString $ "hs_ctz" <> show (widthInBits w0))
+    CmmMayReturn
+    rs
+    xs
 lower_CallishMachOp lbl (MO_BSwap w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl

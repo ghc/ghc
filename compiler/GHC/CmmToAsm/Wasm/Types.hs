@@ -279,9 +279,6 @@ data WasmInstr :: WasmType -> [WasmType] -> [WasmType] -> Type where
       w
       (t0 : pre)
       (t1 : pre)
-  WasmClz :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
-  WasmCtz :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
-  WasmPopcnt :: WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)
   WasmAdd :: WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)
   WasmSub :: WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)
   WasmMul :: WasmTypeTag t -> WasmInstr w (t : t : pre) (t : pre)

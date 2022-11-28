@@ -308,9 +308,6 @@ asmTellWasmInstr ty_word instr = case instr of
   WasmConvert Unsigned t0 t1 ->
     asmTellLine $
       asmFromWasmType t1 <> ".convert_" <> asmFromWasmType t0 <> "_u"
-  WasmClz ty -> asmTellLine $ asmFromWasmType ty <> ".clz"
-  WasmCtz ty -> asmTellLine $ asmFromWasmType ty <> ".ctz"
-  WasmPopcnt ty -> asmTellLine $ asmFromWasmType ty <> ".popcnt"
   WasmAdd ty -> asmTellLine $ asmFromWasmType ty <> ".add"
   WasmSub ty -> asmTellLine $ asmFromWasmType ty <> ".sub"
   WasmMul ty -> asmTellLine $ asmFromWasmType ty <> ".mul"
