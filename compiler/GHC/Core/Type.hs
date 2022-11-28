@@ -1483,24 +1483,31 @@ tyConAppResKind :: TyCon -> [Type] -> Kind
 -- Its specification is:
 --   tyConAppResKind tc tys = piResultTys (tyConKind tc) tys
 tyConAppResKind tc args
-  | null args = tc_kind
-  | otherwise
+  | null args = tyConKind tc
+
+tyConAppResKind tc args
   = go1 tc_bndrs args
   where
     !(tc_kind, tc_bndrs, !tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
     init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes args)
 
     go1 :: [TyConBinder] -> [Type] -> Type
-    go1 []    []   = tc_res_kind
     go1 []    args = piResultTys tc_res_kind args
     go1 bndrs []   = mkTyConKind bndrs tc_res_kind
     go1 (Bndr tv vis : bndrs) (arg:args)
       | AnonTCB {}  <- vis = go1 bndrs args
-      | NamedTCB {} <- vis = go2 (extendTCvSubst init_subst tv arg) bndrs args
+      | NamedTCB {} <- vis = try_fast_path tv bndrs arg args
+
+    try_fast_path tv bndrs arg args
+       | closed_res_kind = go_fast bndrs args
+       | otherwise       = bale_out
+      where
+         bale_out = go2 (extendTCvSubst init_subst tv arg) bndrs args
+         go_fast []        args     = piResultTys tc_res_kind args
+         go_fast (_:bndrs) (_:args) = go_fast bndrs args
+         go_fast _         _        = bale_out  -- Under-saturated
 
     go2 :: Subst -> [TyConBinder] -> [Type] -> Type
-    go2 subst [] [] | closed_res_kind = tc_res_kind
-                    | otherwise       = substTy subst tc_res_kind
     go2 subst []    args = piResultTysX subst tc_res_kind args
     go2 subst bndrs []   = substTy subst (mkTyConKind bndrs tc_res_kind)
     go2 subst (Bndr tv vis : bndrs) (arg:args)
