@@ -62,7 +62,7 @@ runInjectRPaths logger dflags lib_paths dylib = do
   -- inject the rpaths
   case rpaths of
     [] -> return ()
-    _  -> runInstallNameTool logger dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
+    _  -> runInstallNameTool logger (toolSettings dflags) $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
 get_rpath :: String -> Maybe FilePath
 get_rpath l = case readP_to_S rpath_parser l of

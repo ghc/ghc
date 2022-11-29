@@ -16,6 +16,8 @@ import GHC.IO (catchException)
 
 import GHC.CmmToLlvm.Config (LlvmVersion, llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
 
+import GHC.Settings
+
 import GHC.SysTools.Process
 import GHC.SysTools.Info
 
@@ -368,9 +370,9 @@ askOtool logger dflags mb_cwd args = do
   runSomethingWith logger "otool" otool args $ \real_args ->
     readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
 
-runInstallNameTool :: Logger -> DynFlags -> [Option] -> IO ()
-runInstallNameTool logger dflags args = do
-  let tool = pgm_install_name_tool dflags
+runInstallNameTool :: Logger -> ToolSettings -> [Option] -> IO ()
+runInstallNameTool logger toolSettings args = do
+  let tool = toolSettings_pgm_install_name_tool toolSettings
   runSomethingFiltered logger id "Install Name Tool" tool args Nothing Nothing
 
 runRanlib :: Logger -> DynFlags -> [Option] -> IO ()
