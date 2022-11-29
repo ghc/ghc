@@ -421,6 +421,7 @@ Library
         GHC.Driver.Config.HsToCore
         GHC.Driver.Config.HsToCore.Ticks
         GHC.Driver.Config.HsToCore.Usage
+        GHC.Driver.Config.Linker
         GHC.Driver.Config.Logger
         GHC.Driver.Config.Parser
         GHC.Driver.Config.Stg.Debug
@@ -529,6 +530,7 @@ Library
         GHC.JS.Syntax
         GHC.JS.Transform
         GHC.Linker
+        GHC.Linker.Config
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj
         GHC.Linker.Loader

@@ -29,6 +29,7 @@ import GHC.Linker.ExtraObj
 import GHC.Linker.Windows
 import GHC.Linker.Static.Utils
 
+import GHC.Driver.Config.Linker
 import GHC.Driver.Session
 
 import System.FilePath
@@ -171,7 +172,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
 
     -- frameworks
     pkg_framework_opts <- getUnitFrameworkOpts unit_env dep_units
-    let framework_opts = getFrameworkOpts dflags platform
+    let framework_opts = getFrameworkOpts (initFrameworkOpts dflags) platform
 
         -- probably _stub.o files
     let extra_ld_inputs = ldInputs dflags

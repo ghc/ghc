@@ -9,6 +9,8 @@ where
 import GHC.Prelude
 import GHC.Platform
 
+import GHC.Linker.Config
+
 import GHC.Driver.Session
 
 import GHC.Unit.Types
@@ -95,15 +97,15 @@ getUnitFrameworkOpts unit_env dep_packages
 
   | otherwise = return []
 
-getFrameworkOpts :: DynFlags -> Platform -> [String]
-getFrameworkOpts dflags platform
+getFrameworkOpts :: FrameworkOpts -> Platform -> [String]
+getFrameworkOpts fwOpts platform
   | platformUsesFrameworks platform = framework_path_opts ++ framework_opts
   | otherwise = []
   where
-    framework_paths     = frameworkPaths dflags
+    framework_paths     = foFrameworkPaths fwOpts
     framework_path_opts = map ("-F" ++) framework_paths
 
-    frameworks     = cmdlineFrameworks dflags
+    frameworks     = foCmdlineFrameworks fwOpts
     -- reverse because they're added in reverse order from the cmd line:
     framework_opts = concat [ ["-framework", fw]
                             | fw <- reverse frameworks ]

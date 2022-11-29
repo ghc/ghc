@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 
+import GHC.Driver.Config.Linker
 import GHC.Driver.Session
 
 import GHC.Unit.Env
@@ -95,7 +96,7 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
 
     -- frameworks
     pkg_framework_opts <- getUnitFrameworkOpts unit_env (map unitId pkgs)
-    let framework_opts = getFrameworkOpts dflags platform
+    let framework_opts = getFrameworkOpts (initFrameworkOpts dflags) platform
 
     case os of
         OSMinGW32 -> do
