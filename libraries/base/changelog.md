@@ -57,6 +57,7 @@
     of individually allocated pointers as well as freeing each one of them when
     freeing a `Pool`. (#14762) (#18338)
   * `Type.Reflection.Unsafe` is now marked as unsafe.
+  * Add `Data.Typeable.heqT`, a kind-heterogeneous version of `Data.Typeable.eqT`.
 
 ## 4.17.0.0 *August 2022*
 

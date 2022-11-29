@@ -4,6 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -56,6 +57,7 @@ module Data.Typeable
       -- * Type-safe cast
     , cast
     , eqT
+    , heqT
     , gcast                -- a generalisation of cast
 
       -- * Generalized casts for higher-order kinds
@@ -135,8 +137,14 @@ cast x
 -- @since 4.7.0.0
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
 eqT
-  | Just HRefl <- ta `I.eqTypeRep` tb = Just Refl
-  | otherwise                         = Nothing
+  | Just HRefl <- heqT @a @b = Just Refl
+  | otherwise                = Nothing
+
+-- | Extract a witness of heterogeneous equality of two types
+--
+-- @since 4.18.0.0
+heqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~~: b)
+heqT = ta `I.eqTypeRep` tb
   where
     ta = I.typeRep :: I.TypeRep a
     tb = I.typeRep :: I.TypeRep b
