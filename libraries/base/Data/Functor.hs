@@ -43,10 +43,12 @@ module Data.Functor
       ($>),
       (<$>),
       (<&>),
+      unzip,
       void,
     ) where
 
 import GHC.Base ( Functor(..), flip )
+import Data.Tuple ( fst, snd )
 
 -- $setup
 -- Allow the use of Prelude in doctests.
@@ -158,6 +160,9 @@ infixl 4 $>
 --
 ($>) :: Functor f => f a -> b -> f b
 ($>) = flip (<$)
+
+unzip :: Functor f => f (a,b) -> (f a, f b)
+unzip xs = (fst <$> xs, snd <$> xs)
 
 -- | @'void' value@ discards or ignores the result of evaluation, such
 -- as the return value of an 'System.IO.IO' action.

@@ -11,6 +11,7 @@
       ([CLC proposal #113](https://github.com/haskell/core-libraries-committee/issues/113))
   * Add `Type.Reflection.decTypeRep`, `Data.Typeable.decT` and `Data.Typeable.hdecT` equality decisions functions.
       ([CLC proposal #98](https://github.com/haskell/core-libraries-committee/issues/98))
+  * Add `Data.Functor.unzip` ([CLC proposal #88](https://github.com/haskell/core-libraries-committee/issues/88))
 
 ## 4.18.0.0 *TBA*
 
