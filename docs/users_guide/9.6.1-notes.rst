@@ -129,6 +129,9 @@ Runtime system
   Previously only live blocks were taken into account.
   This makes it more likely to trigger promptly when the heap is highly fragmented.
 
+- Fixed a bug that sometimes caused live sparks to be GC'ed too early either during
+  minor GC or major GC with workstealing disabled. See #22528.
+
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -149,9 +152,9 @@ Runtime system
 
 - Updated to `Unicode 15.0.0 <https://www.unicode.org/versions/Unicode15.0.0/>`_.
 
-- Add standard Unicode case predicates :base-ref:`Data.Char.isUpperCase` and 
-  :base-ref:`Data.Char.isLowerCase`. These predicates use the standard Unicode 
-  case properties and are more intuitive than :base-ref:`Data.Char.isUpper` and 
+- Add standard Unicode case predicates :base-ref:`Data.Char.isUpperCase` and
+  :base-ref:`Data.Char.isLowerCase`. These predicates use the standard Unicode
+  case properties and are more intuitive than :base-ref:`Data.Char.isUpper` and
   :base-ref:`Data.Char.isLower`.
 
 ``ghc-prim`` library
