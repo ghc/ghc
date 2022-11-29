@@ -364,9 +364,9 @@ runAr logger dflags cwd args = traceSystoolCommand logger "ar" $ do
   let ar = pgm_ar dflags
   runSomethingFiltered logger id "Ar" ar args cwd Nothing
 
-askOtool :: Logger -> DynFlags -> Maybe FilePath -> [Option] -> IO String
-askOtool logger dflags mb_cwd args = do
-  let otool = pgm_otool dflags
+askOtool :: Logger -> ToolSettings -> Maybe FilePath -> [Option] -> IO String
+askOtool logger toolSettings mb_cwd args = do
+  let otool = toolSettings_pgm_otool toolSettings
   runSomethingWith logger "otool" otool args $ \real_args ->
     readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
 
