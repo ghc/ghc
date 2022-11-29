@@ -2212,6 +2212,10 @@ tyop :: { (LocatedN RdrName, PromotionFlag) }
         | SIMPLEQUOTE varop             {% do { op <- amsrn (sLL $1 (reLoc $>) (unLoc $2))
                                                             (NameAnnQuote (glAA $1) (gl $2) [])
                                               ; return (op, IsPromoted) } }
+rtype :: { LHsType GhcPs }
+        : '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (Just $ listAsAnchor $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
+                                               ; checkRecordSyntax decls }}
+                                                        -- Constructor sigs only
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
@@ -2224,9 +2228,6 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% acsA (\cs -> sLLlA $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnTilde $1] cs) SrcLazy $2)) }
         | PREFIX_BANG  atype             {% acsA (\cs -> sLLlA $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnBang $1] cs) SrcStrict $2)) }
 
-        | '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (Just $ listAsAnchor $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
-                                               ; checkRecordSyntax decls }}
-                                                        -- Constructor sigs only
         | '(' ')'                        {% acsA (\cs -> sLL $1 $> $ HsTupleTy (EpAnn (glR $1) (AnnParen AnnParens (glAA $1) (glAA $2)) cs)
                                                     HsBoxedOrConstraintTuple []) }
         | '(' ktype ',' comma_types1 ')' {% do { h <- addTrailingCommaA $2 (gl $3)
@@ -2386,8 +2387,45 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
     -- TODO:AZ capture the optSemi. Why leading?
-        : optSemi con_list '::' sigtype
-                {% mkGadtDecl (comb2A $2 $>) (unLoc $2) (hsUniTok $3) $4 }
+        : optSemi con_list '::' gadt_con_sig
+                {% mkGadtDecl (comb2A $2 $>) (unLoc $2) (hsUniTok $3) (hsTypeToHsSigType $4) }
+
+gadt_con_sig :: { LHsType GhcPs }
+        : btype %shift                 { $1 }
+
+        | rtype '->' gadt_con_sig             {% acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
+
+        -- PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
+        | rtype mult '->' gadt_con_sig    {% hintLinear (getLoc $2)
+                                       >> let arr = (unLoc $2) (hsUniTok $3)
+                                          in acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                           $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) arr $1 $4) }
+
+        -- PsErrIllegalGadtRecordMultiplicity !(HsArrow GhcPs)
+        | rtype '->.' gadt_con_sig     {% hintLinear (getLoc $2) >>
+                                          acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
+
+        | btype '->' gadt_con_sig             {% acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
+
+        | btype mult '->' gadt_con_sig    {% hintLinear (getLoc $2)
+                                       >> let arr = (unLoc $2) (hsUniTok $3)
+                                          in acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                           $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) arr $1 $4) }
+
+        | btype '->.' gadt_con_sig     {% hintLinear (getLoc $2) >>
+                                          acsA (\cs -> sLL (reLoc $1) (reLoc $>)
+                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
+        | forall_telescope gadt_con_sig      { reLocA $ sLL $1 (reLoc $>) $
+                                              HsForAllTy { hst_tele = unLoc $1
+                                                         , hst_xforall = noExtField
+                                                         , hst_body = $2 } }
+        | context '=>' gadt_con_sig          {% acsA (\cs -> (sLL (reLoc $1) (reLoc $>) $
+                                            HsQualTy { hst_ctxt = addTrailingDarrowC $1 $2 cs
+                                                     , hst_xqual = NoExtField
+                                                     , hst_body = $3 })) }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2437,6 +2475,11 @@ constr_stuff :: { Located (LocatedN RdrName, HsConDeclH98Details GhcPs) }
         : infixtype       {% fmap (reLoc. (fmap (\b -> (dataConBuilderCon b,
                                                           dataConBuilderDetails b))))
                                      (runPV $1) }
+        | gtycon rtype    {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) >>= \ $1 ->
+                             runPV (mkHsAppTyHeadPV $1) >>= \ $1 ->
+                             fmap (reLoc. (fmap (\b -> (dataConBuilderCon b,
+                                                          dataConBuilderDetails b))))
+                                     (runPV (mkHsAppTyPV $1 $2)) }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }
