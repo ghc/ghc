@@ -35,6 +35,7 @@ import GHC.JS.Make
 
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Arg
+import GHC.StgToJS.Closure
 import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.FFI
 import GHC.StgToJS.Heap
@@ -1006,7 +1007,7 @@ allocDynAll haveDecl middle cls = do
                         ]
             (ex:es)  -> mconcat
                         [ toJExpr i .^ closureField1_ |= toJExpr ex
-                        , toJExpr i .^ closureField2_ |= toJExpr (jhFromList (zip dataFieldNames es))
+                        , toJExpr i .^ closureField2_ |= toJExpr (jhFromList (zip (map dataFieldName [1..]) es))
                         ]
       | otherwise = case es of
             []      -> mempty

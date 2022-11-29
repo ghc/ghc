@@ -10,6 +10,15 @@ module GHC.StgToJS.Closure
   , assignClosure
   , CopyCC (..)
   , copyClosure
+  , mkClosure
+  -- $names
+  , allocData
+  , allocClsA
+  , dataName
+  , clsName
+  , dataFieldName
+  , varName
+  , jsClosureCount
   )
 where
 
@@ -24,6 +33,9 @@ import GHC.StgToJS.Regs (stack,sp)
 import GHC.JS.Make
 import GHC.JS.Syntax
 
+import GHC.Types.Unique.Map
+
+import Data.Array
 import Data.Monoid
 import qualified Data.Bits as Bits
 
@@ -154,3 +166,78 @@ copyClosure copy_cc t s = BlockStat
   ] <> case copy_cc of
       DontCopyCC -> mempty
       CopyCC     -> closureCC t |= closureCC s
+
+mkClosure :: JExpr -> [JExpr] -> JExpr -> Maybe JExpr -> Closure
+mkClosure entry fields meta cc = Closure
+  { clEntry  = entry
+  , clField1 = x1
+  , clField2 = x2
+  , clMeta   = meta
+  , clCC     = cc
+  }
+  where
+    x1 = case fields of
+           []  -> null_
+           x:_ -> x
+    x2 = case fields of
+           []     -> null_
+           [_]    -> null_
+           [_,x]  -> x
+           _:x:xs -> ValExpr . JHash . listToUniqMap $ zip (map dataFieldName [1..]) (x:xs)
+
+
+-------------------------------------------------------------------------------
+--                             Name Caches
+-------------------------------------------------------------------------------
+-- $names
+
+-- | Cache "dXXX" field names
+dataFieldCache :: Array Int FastString
+dataFieldCache = listArray (0,nFieldCache) (map (mkFastString . ('d':) . show) [(0::Int)..nFieldCache])
+
+-- | Data names are used in the AST, and logging has determined that 255 is the maximum number we see.
+nFieldCache :: Int
+nFieldCache  = 255
+
+-- | We use this in the RTS to determine the number of generated closures. These closures use the names
+-- cached here, so we bind them to the same number.
+jsClosureCount :: Int
+jsClosureCount  = 24
+
+dataFieldName :: Int -> FastString
+dataFieldName i
+  | i < 0 || i > nFieldCache = mkFastString ('d' : show i)
+  | otherwise                = dataFieldCache ! i
+
+-- | Cache "h$dXXX" names
+dataCache :: Array Int FastString
+dataCache = listArray (0,jsClosureCount) (map (mkFastString . ("h$d"++) . show) [(0::Int)..jsClosureCount])
+
+dataName :: Int -> FastString
+dataName i
+  | i < 0 || i > nFieldCache = mkFastString ("h$d" ++ show i)
+  | otherwise                = dataCache ! i
+
+allocData :: Int -> JExpr
+allocData i = toJExpr (TxtI (dataName i))
+
+-- | Cache "h$cXXX" names
+clsCache :: Array Int FastString
+clsCache = listArray (0,jsClosureCount) (map (mkFastString . ("h$c"++) . show) [(0::Int)..jsClosureCount])
+
+clsName :: Int -> FastString
+clsName i
+  | i < 0 || i > jsClosureCount = mkFastString ("h$c" ++ show i)
+  | otherwise                   = clsCache ! i
+
+allocClsA :: Int -> JExpr
+allocClsA i = toJExpr (TxtI (clsName i))
+
+-- | Cache "xXXX" names
+varCache :: Array Int Ident
+varCache = listArray (0,jsClosureCount) (map (TxtI . mkFastString . ('x':) . show) [(0::Int)..jsClosureCount])
+
+varName :: Int -> Ident
+varName i
+  | i < 0 || i > jsClosureCount = TxtI $ mkFastString ('x' : show i)
+  | otherwise                   = varCache ! i

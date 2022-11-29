@@ -81,36 +81,8 @@ resetResultVar r = toJExpr r |= null_
 -- JIT can optimize better.
 closureConstructors :: StgToJSConfig -> JStat
 closureConstructors s = BlockStat
-  [ declClsConstr "h$c" ["f"] $ Closure
-      { clEntry  = var "f"
-      , clField1 = null_
-      , clField2 = null_
-      , clMeta   = 0
-      , clCC     = ccVal
-      }
-  , declClsConstr "h$c0" ["f"] $ Closure
-      { clEntry  = var "f"
-      , clField1 = null_
-      , clField2 = null_
-      , clMeta   = 0
-      , clCC     = ccVal
-      }
-  , declClsConstr "h$c1" ["f", "x1"] $ Closure
-      { clEntry  = var "f"
-      , clField1 = var "x1"
-      , clField2 = null_
-      , clMeta   = 0
-      , clCC     = ccVal
-      }
-  , declClsConstr "h$c2" ["f", "x1", "x2"] $ Closure
-      { clEntry  = var "f"
-      , clField1 = var "x1"
-      , clField2 = var "x2"
-      , clMeta   = 0
-      , clCC     = ccVal
-      }
-  , mconcat (map mkClosureCon [3..24])
-  , mconcat (map mkDataFill [1..24])
+  [ mconcat (map mkClosureCon (Nothing : map Just [0..jsClosureCount]))
+  , mconcat (map mkDataFill [1..jsClosureCount])
   ]
   where
     prof = csProf s
@@ -118,18 +90,7 @@ closureConstructors s = BlockStat
       -- the cc argument happens to be named just like the cc field...
       | prof      = ([TxtI closureCC_], Just (var closureCC_))
       | otherwise = ([], Nothing)
-    addCCArg as = map TxtI as ++ ccArg
     addCCArg' as = as ++ ccArg
-
-    declClsConstr i as cl = TxtI i ||= ValExpr (JFunc (addCCArg as)
-      ( jVar $ \x ->
-          [ checkC
-          , x |= newClosure cl
-          , notifyAlloc x
-          , traceAlloc x
-          , returnS x
-          ]
-         ))
 
     traceAlloc x | csTraceRts s = appS "h$traceAlloc" [x]
                  | otherwise    = mempty
@@ -172,29 +133,24 @@ closureConstructors s = BlockStat
 
            | otherwise = mempty
 
-    mkClosureCon :: Int -> JStat
-    mkClosureCon n = funName ||= toJExpr fun
+    mkClosureCon :: Maybe Int -> JStat
+    mkClosureCon n0 = funName ||= toJExpr fun
       where
-        funName = TxtI $ mkFastString ("h$c" ++ show n)
+        n | Just n' <- n0 = n'
+          | Nothing <- n0 = 0
+        funName | Just n' <- n0 = TxtI $ clsName n'
+                | Nothing <- n0 = TxtI $ mkFastString "h$c"
         -- args are: f x1 x2 .. xn [cc]
-        args   = TxtI "f" : addCCArg' (map (TxtI . mkFastString . ('x':) . show) [(1::Int)..n])
+        args   = TxtI "f" : addCCArg' (map varName [1..n])
         fun    = JFunc args funBod
         -- x1 goes into closureField1. All the other args are bundled into an
         -- object in closureField2: { d1 = x2, d2 = x3, ... }
         --
-        extra_args = ValExpr . JHash . listToUniqMap $ zip
-                   (map (mkFastString . ('d':) . show) [(1::Int)..])
-                   (map (toJExpr . TxtI . mkFastString . ('x':) . show) [2..n])
+        vars   = map (toJExpr . varName) [1..n]
 
         funBod = jVar $ \x ->
             [ checkC
-            , x |= newClosure Closure
-               { clEntry  = var "f"
-               , clField1 = var "x1"
-               , clField2 = extra_args
-               , clMeta   = 0
-               , clCC     = ccVal
-               }
+            , x |= newClosure (mkClosure (var "f") vars 0 ccVal)
             , notifyAlloc x
             , traceAlloc x
             , returnS x
@@ -203,8 +159,8 @@ closureConstructors s = BlockStat
     mkDataFill :: Int -> JStat
     mkDataFill n = funName ||= toJExpr fun
       where
-        funName    = TxtI $ mkFastString ("h$d" ++ show n)
-        ds         = map (mkFastString . ('d':) . show) [(1::Int)..n]
+        funName    = TxtI $ dataName n
+        ds         = map dataFieldName [1..n]
         extra_args = ValExpr . JHash . listToUniqMap . zip ds $ map (toJExpr . TxtI) ds
         fun        = JFunc (map TxtI ds) (checkD <> returnS extra_args)
 
@@ -215,7 +171,7 @@ stackManip = mconcat (map mkPush [1..32]) <>
   where
     mkPush :: Int -> JStat
     mkPush n = let funName = TxtI $ mkFastString ("h$p" ++ show n)
-                   as      = map (TxtI . mkFastString . ('x':) . show) [1..n]
+                   as      = map varName [1..n]
                    fun     = JFunc as ((sp |= sp + toJExpr n)
                                        <> mconcat (zipWith (\i a -> stack .! (sp - toJExpr (n-i)) |= toJExpr a)
                                                    [1..] as))
@@ -228,7 +184,7 @@ stackManip = mconcat (map mkPush [1..32]) <>
                       bits    = bitsIdx sig
                       n       = length bits
                       h       = last bits
-                      args    = map (TxtI . mkFastString . ('x':) . show) [1..n]
+                      args    = map varName [1..n]
                       fun     = JFunc args $
                         mconcat [ sp |= sp + toJExpr (h+1)
                                 , mconcat (zipWith (\b a -> stack .! (sp - toJExpr (h-b)) |= toJExpr a) bits args)
@@ -288,7 +244,7 @@ loadRegs :: JStat
 loadRegs = mconcat $ map mkLoad [1..32]
   where
     mkLoad :: Int -> JStat
-    mkLoad n = let args   = map (TxtI . mkFastString . ("x"++) . show) [1..n]
+    mkLoad n = let args   = map varName [1..n]
                    assign = zipWith (\a r -> toJExpr r |= toJExpr a)
                               args (reverse $ take n regsFromR1)
                    fname  = TxtI $ mkFastString ("h$l" ++ show n)
