@@ -292,6 +292,7 @@ GarbageCollect (uint32_t collect_gen,
       any_work, scav_find_work, max_n_todo_overflow;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
+  bool gc_sparks_all_caps;
 #endif
   uint32_t g, n;
   // The time we should report our heap census as occurring at, if necessary.
@@ -556,6 +557,9 @@ GarbageCollect (uint32_t collect_gen,
   StgTSO *resurrected_threads = END_TSO_QUEUE;
   // must be last...  invariant is that everything is fully
   // scavenged at this point.
+#if defined(THREADED_RTS)
+  gc_sparks_all_caps = !work_stealing || !is_par_gc();
+#endif
   work_stealing = false;
   while (traverseWeakPtrList(&dead_weak_ptr_list, &resurrected_threads))
   {
@@ -568,7 +572,8 @@ GarbageCollect (uint32_t collect_gen,
   gcStableNameTable();
 
 #if defined(THREADED_RTS)
-  if (!is_par_gc()) {
+  // See Note [Pruning the spark pool]
+  if (gc_sparks_all_caps) {
       for (n = 0; n < getNumCapabilities(); n++) {
           pruneSparkQueue(false, capabilities[n]);
       }
@@ -1372,7 +1377,6 @@ void
 gcWorkerThread (Capability *cap)
 {
     gc_thread *saved_gct;
-
     // necessary if we stole a callee-saves register for gct:
     saved_gct = gct;
 
@@ -1403,13 +1407,10 @@ gcWorkerThread (Capability *cap)
     scavenge_until_all_done();
 
 #if defined(THREADED_RTS)
-    // Now that the whole heap is marked, we discard any sparks that
-    // were found to be unreachable.  The main GC thread is currently
-    // marking heap reachable via weak pointers, so it is
-    // non-deterministic whether a spark will be retained if it is
-    // only reachable via weak pointers.  To fix this problem would
-    // require another GC barrier, which is too high a price.
-    pruneSparkQueue(false, cap);
+    // See Note [Pruning the spark pool]
+    if(work_stealing && is_par_gc()) {
+        pruneSparkQueue(false, cap);
+    }
 #endif
 
     // Wait until we're told to continue
