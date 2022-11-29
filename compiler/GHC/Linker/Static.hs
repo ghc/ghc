@@ -183,7 +183,9 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
     let link dflags args | platformOS platform == OSDarwin
                             = do
                                  GHC.SysTools.runLink logger tmpfs dflags args
-                                 GHC.Linker.MacOS.runInjectRPaths logger dflags pkg_lib_paths output_fn
+                                 -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
+                                 when (gopt Opt_RPath dflags) $
+                                   GHC.Linker.MacOS.runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
                          | otherwise
                             = GHC.SysTools.runLink logger tmpfs dflags args
 

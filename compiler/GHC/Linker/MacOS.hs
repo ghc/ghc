@@ -15,6 +15,7 @@ import GHC.Unit.Types
 import GHC.Unit.State
 import GHC.Unit.Env
 
+import GHC.Settings
 import GHC.SysTools.Tasks
 
 import GHC.Runtime.Interpreter
@@ -46,15 +47,13 @@ import Text.ParserCombinators.ReadP as Parser
 -- dynamic library through @-add_rpath@.
 --
 -- See Note [Dynamic linking on macOS]
-runInjectRPaths :: Logger -> DynFlags -> [FilePath] -> FilePath -> IO ()
--- Make sure to honour -fno-use-rpaths if set on darwin as well see #20004
-runInjectRPaths _ dflags _ _ | not (gopt Opt_RPath dflags) = return ()
-runInjectRPaths logger dflags lib_paths dylib = do
-  info <- lines <$> askOtool logger (toolSettings dflags) Nothing [Option "-L", Option dylib]
+runInjectRPaths :: Logger -> ToolSettings -> [FilePath] -> FilePath -> IO ()
+runInjectRPaths logger toolSettings lib_paths dylib = do
+  info <- lines <$> askOtool logger toolSettings Nothing [Option "-L", Option dylib]
   -- filter the output for only the libraries. And then drop the @rpath prefix.
   let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
   -- find any pre-existing LC_PATH items
-  info <- lines <$> askOtool logger (toolSettings dflags) Nothing [Option "-l", Option dylib]
+  info <- lines <$> askOtool logger toolSettings Nothing [Option "-l", Option dylib]
   let paths = mapMaybe get_rpath info
       lib_paths' = [ p | p <- lib_paths, not (p `elem` paths) ]
   -- only find those rpaths, that aren't already in the library.
@@ -62,7 +61,7 @@ runInjectRPaths logger dflags lib_paths dylib = do
   -- inject the rpaths
   case rpaths of
     [] -> return ()
-    _  -> runInstallNameTool logger (toolSettings dflags) $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
+    _  -> runInstallNameTool logger toolSettings $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
 
 get_rpath :: String -> Maybe FilePath
 get_rpath l = case readP_to_S rpath_parser l of

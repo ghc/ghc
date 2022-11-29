@@ -23,6 +23,7 @@ import GHC.SysTools.Tasks
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
+import Control.Monad (when)
 import System.FilePath
 
 linkDynLib :: Logger -> TmpFs -> DynFlags -> UnitEnv -> [String] -> [UnitId] -> IO ()
@@ -193,7 +194,9 @@ linkDynLib logger tmpfs dflags0 unit_env o_files dep_packages
                  -- See Note [Dynamic linking on macOS]
                  ++ [ Option "-Wl,-dead_strip_dylibs", Option "-Wl,-headerpad,8000" ]
               )
-            runInjectRPaths logger dflags pkg_lib_paths output_fn
+            -- Make sure to honour -fno-use-rpaths if set on darwin as well; see #20004
+            when (gopt Opt_RPath dflags) $
+              runInjectRPaths logger (toolSettings dflags) pkg_lib_paths output_fn
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO
