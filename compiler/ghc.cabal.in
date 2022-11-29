@@ -440,6 +440,12 @@ Library
         GHC.Driver.LlvmConfigCache
         GHC.Driver.Main
         GHC.Driver.Make
+        GHC.Driver.Make.Downsweep
+        GHC.Driver.Make.Upsweep
+        GHC.Driver.Make.Analysis
+        GHC.Driver.Make.ModIfaceCache
+        GHC.Driver.Make.BuildPlan
+        GHC.Driver.Make.Types
         GHC.Driver.MakeFile
         GHC.Driver.Monad
         GHC.Driver.Phases
