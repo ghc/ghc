@@ -458,7 +458,44 @@ setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 }
 #endif
 
-#if !defined(THREADED_RTS)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+
+void syncIOWaitReady(Capability   *cap USED_IF_NOT_THREADS,
+                     StgTSO       *tso USED_IF_NOT_THREADS,
+                     IOReadOrWrite rw  USED_IF_NOT_THREADS,
+                     HsInt         fd  USED_IF_NOT_THREADS)
+{
+    ASSERT(tso->why_blocked == NotBlocked);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+        {
+            StgWord why_blocked = rw == IORead ? BlockedOnRead : BlockedOnWrite;
+            tso->block_info.fd = fd;
+            RELEASE_STORE(&tso->why_blocked, why_blocked);
+            appendToIOBlockedQueue(cap, tso);
+            break;
+        }
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+        {
+            StgWord why_blocked = rw == IORead ? BlockedOnRead : BlockedOnWrite;
+            tso->block_info.fd = fd;
+            RELEASE_STORE(&tso->why_blocked, why_blocked);
+            appendToIOBlockedQueue(cap, tso);
+            break;
+        }
+#endif
+        default:
+            barf("waitRead# / waitWrite# not available for current I/O manager");
+    }
+}
+#pragma GCC diagnostic pop
+
+
+#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)
 {
     CapIOManager *iomgr = cap->iomgr;
@@ -470,7 +507,9 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)
     }
     iomgr->blocked_queue_tl = tso;
 }
+#endif
 
+#if defined(IOMGR_ENABLED_SELECT)
 void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target)
 {
     CapIOManager *iomgr = cap->iomgr;

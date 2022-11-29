@@ -2548,34 +2548,16 @@ stg_whereFromzh (P_ clos, W_ buf)
 
 stg_waitReadzh ( W_ fd )
 {
-#if defined(THREADED_RTS)
-    ccall barf("waitRead# on threaded RTS") never returns;
-#else
-
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
-    StgTSO_block_info(CurrentTSO) = fd;
-    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I32;
-    // No locking - we're not going to use this interface in the
-    // threaded RTS anyway.
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+    ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+                          /* IORead */ 0::I32, fd);
     jump stg_block_noregs();
-#endif
 }
 
 stg_waitWritezh ( W_ fd )
 {
-#if defined(THREADED_RTS)
-    ccall barf("waitWrite# on threaded RTS") never returns;
-#else
-
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
-    StgTSO_block_info(CurrentTSO) = fd;
-    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I32;
-    // No locking - we're not going to use this interface in the
-    // threaded RTS anyway.
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+    ccall syncIOWaitReady(MyCapability() "ptr", CurrentTSO "ptr",
+                          /* IOWrite */ 1::I32, fd);
     jump stg_block_noregs();
-#endif
 }
 
 stg_delayzh ( W_ us_delay )

@@ -272,6 +272,13 @@ void wakeupIOManager(void);
 void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
 
 
+/* Several code paths are almost identical between read and write paths. In
+ * such cases we use a shared code path with an enum to say which we're doing.
+ */
+typedef enum { IORead, IOWrite } IOReadOrWrite;
+
+void syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+
 #if !defined(THREADED_RTS)
 /* Add a thread to the end of the queue of threads blocked on I/O.
  *
