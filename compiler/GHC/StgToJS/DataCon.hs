@@ -42,11 +42,9 @@ import GHC.StgToJS.Ids
 import GHC.Core.DataCon
 
 import GHC.Types.CostCentre
-import GHC.Types.Unique.Map
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.FastString
 
 import Data.Maybe
 
@@ -97,23 +95,11 @@ allocDynamicE :: Bool          -- ^ csInlineAlloc from StgToJSConfig
               -> Maybe JExpr
               -> JExpr
 allocDynamicE  inline_alloc entry free cc
-  | inline_alloc || length free > 24 = newClosure $ Closure
-      { clEntry  = entry
-      , clField1 = fillObj1
-      , clField2 = fillObj2
-      , clMeta   = ValExpr (JInt 0)
-      , clCC     = cc
-      }
+  | inline_alloc || length free > jsClosureCount
+    = newClosure $ mkClosure entry free (ValExpr (JInt 0)) cc
   | otherwise = ApplExpr allocFun (toJExpr entry : free ++ maybeToList cc)
   where
     allocFun = allocClsA (length free)
-    (fillObj1,fillObj2)
-       = case free of
-                []  -> (null_, null_)
-                [x] -> (x,null_)
-                [x,y] -> (x,y)
-                (x:xs) -> (x,toJExpr (JHash $ listToUniqMap (zip dataFields xs)))
-    dataFields = map (mkFastString . ('d':) . show) [(1::Int)..]
 
 -- | Allocate a dynamic object
 allocDynamic :: StgToJSConfig -> Bool -> Ident -> JExpr -> [JExpr] -> Maybe JExpr -> JStat

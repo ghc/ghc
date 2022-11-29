@@ -126,10 +126,6 @@ module GHC.JS.Make
     math_cosh, math_sinh, math_tanh, math_expm1, math_log1p, math_fround
   -- * Statement helpers
   , decl
-  -- * Miscellaneous
-  -- $misc
-  , allocData, allocClsA
-  , dataFieldName, dataFieldNames
   )
 where
 
@@ -139,13 +135,10 @@ import GHC.JS.Syntax
 
 import Control.Arrow ((***))
 
-import Data.Array
 import qualified Data.Map as M
 
-import GHC.Utils.Outputable (Outputable (..))
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
-import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Unique.Map
 
@@ -629,43 +622,6 @@ instance Num JExpr where
 instance Fractional JExpr where
     x / y = InfixExpr DivOp x y
     fromRational x = ValExpr (JDouble (realToFrac x))
-
-
---------------------------------------------------------------------------------
---                             Miscellaneous
---------------------------------------------------------------------------------
--- $misc
--- Everything else,
-
--- | Cache "dXXX" field names
-dataFieldCache :: Array Int FastString
-dataFieldCache = listArray (0,nFieldCache) (map (mkFastString . ('d':) . show) [(0::Int)..nFieldCache])
-
-nFieldCache :: Int
-nFieldCache  = 16384
-
-dataFieldName :: Int -> FastString
-dataFieldName i
-  | i < 1 || i > nFieldCache = panic "dataFieldName" (ppr i)
-  | otherwise                = dataFieldCache ! i
-
-dataFieldNames :: [FastString]
-dataFieldNames = fmap dataFieldName [1..nFieldCache]
-
-
--- | Cache "h$dXXX" names
-dataCache :: Array Int FastString
-dataCache = listArray (0,1024) (map (mkFastString . ("h$d"++) . show) [(0::Int)..1024])
-
-allocData :: Int -> JExpr
-allocData i = toJExpr (TxtI (dataCache ! i))
-
--- | Cache "h$cXXX" names
-clsCache :: Array Int FastString
-clsCache = listArray (0,1024) (map (mkFastString . ("h$c"++) . show) [(0::Int)..1024])
-
-allocClsA :: Int -> JExpr
-allocClsA i = toJExpr (TxtI (clsCache ! i))
 
 
 --------------------------------------------------------------------------------
