@@ -126,8 +126,8 @@ nodeKeyUnitId (NodeKey_Unit iu)   = instUnitInstanceOf iu
 nodeKeyUnitId (NodeKey_Module mk) = mnkUnitId mk
 nodeKeyUnitId (NodeKey_Link uid)  = uid
 
-data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: ModuleNameWithIsBoot
-                                           , mnkUnitId     :: UnitId } deriving (Eq, Ord)
+data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
+                                           , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
 
 instance Outputable ModNodeKeyWithUid where
   ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
