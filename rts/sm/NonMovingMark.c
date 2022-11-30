@@ -648,6 +648,16 @@ void updateRemembSetPushThunkEager(Capability *cap,
         }
         break;
     }
+    case THUNK_SELECTOR:
+    {
+        StgSelector *sel = (StgSelector *) thunk;
+        if (check_in_nonmoving_heap(sel->selectee)) {
+            // Don't bother to push origin; it makes the barrier needlessly
+            // expensive with little benefit.
+            push_closure(queue, sel->selectee, NULL);
+        }
+        break;
+    }
     case AP:
     {
         StgAP *ap = (StgAP *) thunk;
@@ -657,9 +667,11 @@ void updateRemembSetPushThunkEager(Capability *cap,
         trace_PAP_payload(queue, ap->fun, ap->payload, ap->n_args);
         break;
     }
-    case THUNK_SELECTOR:
+    // We may end up here if a thunk update races with another update.
+    // In this case there is nothing to do as the other thread will have
+    // already pushed the updated thunk's free variables to the update
+    // remembered set.
     case BLACKHOLE:
-        // TODO: This is right, right?
         break;
     // The selector optimization performed by the nonmoving mark may have
     // overwritten a thunk which we are updating with an indirection.
@@ -1588,8 +1600,15 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case THUNK_SELECTOR:
-        nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
+    {
+        StgSelector *sel = (StgSelector *) p;
+        // We may be able to evaluate this selector which may render the
+        // selectee unreachable. However, we must mark the selectee regardless
+        // to satisfy the snapshot invariant.
+        PUSH_FIELD(sel, selectee);
+        nonmoving_eval_thunk_selector(queue, sel, origin);
         break;
+    }
 
     case AP_STACK: {
         StgAP_STACK *ap = (StgAP_STACK *)p;
