@@ -1361,7 +1361,7 @@ void locate_object(P_ obj)
     // Search allocators
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
-        for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
+        for (uint32_t cap_n = 0; cap_n < nonmovingHeap.n_caps; ++cap_n) {
             Capability *cap = capabilities[cap_n];
             struct NonmovingSegment *seg = cap->current_segments[alloca_idx];
             if (obj >= (P_)seg && obj < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
