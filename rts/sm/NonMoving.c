@@ -844,7 +844,7 @@ static void nonmovingPrepareMark(void)
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
 
         // Update current segments' snapshot pointers
-        for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
+        for (uint32_t cap_n = 0; cap_n < nonmovingHeap.n_caps; ++cap_n) {
             struct NonmovingSegment *seg = alloca->current[cap_n];
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
@@ -1293,7 +1293,7 @@ void assert_in_nonmoving_heap(StgPtr p)
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
         // Search current segments
-        for (uint32_t cap_idx = 0; cap_idx < getNumCapabilities(); ++cap_idx) {
+        for (uint32_t cap_idx = 0; cap_idx < nonmovingHeap.n_caps; ++cap_idx) {
             struct NonmovingSegment *seg = alloca->current[cap_idx];
             if (p >= (P_)seg && p < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 return;
@@ -1365,7 +1365,7 @@ void nonmovingPrintAllocator(struct NonmovingAllocator *alloc)
         debugBelch("%p ", (void*)seg);
     }
     debugBelch("\nCurrent segments:\n");
-    for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
+    for (uint32_t i = 0; i < nonmovingHeap.n_caps; ++i) {
         debugBelch("%p ", alloc->current[i]);
     }
     debugBelch("\n");
@@ -1376,7 +1376,7 @@ void locate_object(P_ obj)
     // Search allocators
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
-        for (uint32_t cap = 0; cap < getNumCapabilities(); ++cap) {
+        for (uint32_t cap = 0; cap < nonmovingHeap.n_caps; ++cap) {
             struct NonmovingSegment *seg = alloca->current[cap];
             if (obj >= (P_)seg && obj < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 debugBelch("%p is in current segment of capability %d of allocator %d at %p\n", obj, cap, alloca_idx, (void*)seg);
