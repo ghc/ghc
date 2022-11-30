@@ -134,8 +134,8 @@ nodeKeyModName :: NodeKey -> Maybe ModuleName
 nodeKeyModName (NodeKey_Module mk) = Just (gwib_mod $ mnkModuleName mk)
 nodeKeyModName _ = Nothing
 
-data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: ModuleNameWithIsBoot
-                                           , mnkUnitId     :: UnitId } deriving (Eq, Ord)
+data ModNodeKeyWithUid = ModNodeKeyWithUid { mnkModuleName :: !ModuleNameWithIsBoot
+                                           , mnkUnitId     :: !UnitId } deriving (Eq, Ord)
 
 instance Outputable ModNodeKeyWithUid where
   ppr (ModNodeKeyWithUid mnwib uid) = ppr uid <> colon <> ppr mnwib
