@@ -1232,7 +1232,7 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
    -------------------------------------------------------------------------- */
 
 static void
-eval_thunk_selector (StgClosure **q, StgSelector *p, bool evac)
+eval_thunk_selector (StgClosure **const q, StgSelector *p, bool evac)
                  // NB. for legacy reasons, p & q are swapped around :(
 {
     uint32_t field;
@@ -1252,14 +1252,24 @@ selector_chain:
 
     bd = Bdescr((StgPtr)p);
     if (HEAP_ALLOCED_GC(p)) {
+        const uint16_t flags = RELAXED_LOAD(&bd->flags);
+
+        // We should never see large objects here
+        ASSERT(!(flags & BF_LARGE));
+
         // If the THUNK_SELECTOR is in to-space or in a generation that we
         // are not collecting, then bale out early.  We won't be able to
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        uint16_t flags = RELAXED_LOAD(&bd->flags);
         if (flags & (BF_EVACUATED | BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
+            if (flags & BF_NONMOVING) {
+                // The selector is reachable therefore we must push to the
+                // update remembered set in a preparatory collection.
+                // See Note [Non-moving GC: Marking evacuated objects].
+                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure*) p);
+            }
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
             if (evac && bd->gen_no < gct->evac_gen_no) {
@@ -1314,6 +1324,12 @@ selector_chain:
             //   - undo the chain we've built to point to p.
             SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
             RELEASE_STORE(q, (StgClosure *) p);
+            if (Bdescr((StgPtr)p)->flags & BF_NONMOVING) {
+                // See Note [Non-moving GC: Marking evacuated objects].
+                // TODO: This really shouldn't be necessary since whoever won
+                // the race should have pushed
+                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure*) p);
+            }
             if (evac) evacuate(q);
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             return;
@@ -1404,6 +1420,11 @@ selector_loop:
                   case THUNK_SELECTOR:
                       // Use payload to make a list of thunk selectors, to be
                       // used in unchain_thunk_selectors
+                      //
+                      // FIXME: This seems racy; should we lock this selector to
+                      // ensure that another thread doesn't clobber this node
+                      // of the chain. This would result in some previous
+                      // selectors not being updated when we unchain.
                       RELAXED_STORE(&((StgClosure*)p)->payload[0], (StgClosure *)prev_thunk_selector);
                       prev_thunk_selector = p;
                       p = (StgSelector*)val;
@@ -1427,7 +1448,15 @@ selector_loop:
               // evacuate() cannot recurse through
               // eval_thunk_selector(), because we know val is not
               // a THUNK_SELECTOR.
-              if (evac) evacuate(q);
+              if (evac) {
+                  evacuate(q);
+              } else if (isNonmovingClosure(*q)) {
+                  // Even if `evac` is false we must ensure that the closure is
+                  // pushed since it is reachable.
+                  // See Note [Non-moving GC: Marking evacuated objects].
+                  markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure*) *q);
+              }
+
               return;
           }
 
@@ -1472,6 +1501,10 @@ selector_loop:
           // recurse indefinitely, so we impose a depth bound.
           // See Note [Selector optimisation depth limit].
           if (gct->thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
+              if (isNonmovingClosure((StgClosure *) p)) {
+                  // See Note [Non-moving GC: Marking evacuated objects].
+                  markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure*) p);
+              }
               goto bale_out;
           }
 
@@ -1517,6 +1550,10 @@ bale_out:
     *q = (StgClosure *)p;
     if (evac) {
         copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
+    }
+    if (isNonmovingClosure(*q)) {
+        // See Note [Non-moving GC: Marking evacuated objects].
+        markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, *q);
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
 }
