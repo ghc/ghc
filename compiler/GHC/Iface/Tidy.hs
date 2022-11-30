@@ -1073,7 +1073,8 @@ tidyTopName mod name_cache maybe_ref occ_env id
   -- we have to update the name cache in a nice atomic fashion
 
   | local  && internal = do uniq <- takeUniqFromNameCache name_cache
-                            let new_local_name = mkInternalName uniq occ' loc
+                            -- See #19619
+                            let new_local_name = occ' `seq` mkInternalName uniq occ' loc
                             return (occ_env', new_local_name)
         -- Even local, internal names must get a unique occurrence, because
         -- if we do -split-objs we externalise the name later, in the code generator
