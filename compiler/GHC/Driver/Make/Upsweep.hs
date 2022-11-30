@@ -193,11 +193,11 @@ upsweep
     -> IO (SuccessFlag, HscEnv)
 upsweep n_jobs hsc_env hmi_cache mHscMessage old_hpt build_plan = do
     (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
+    let !meta = strictMap make_action_meta pipelines
     runPipelines n_jobs hsc_env mHscMessage pipelines
     res <-
       if dopt Opt_D_dump_make_stats (hsc_dflags hsc_env)
         then do
-          let !meta = strictMap make_action_meta pipelines
           collect_result <* analyseBuildGraph (hsc_logger hsc_env) meta
         else
           collect_result
