@@ -1249,7 +1249,8 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if (RELAXED_LOAD(&bd->flags) & (BF_EVACUATED | BF_NONMOVING)) {
+        uint16_t flags = RELAXED_LOAD(&bd->flags);
+        if (flags & (BF_EVACUATED | BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
@@ -1265,7 +1266,7 @@ selector_chain:
         // (scavenge_mark_stack doesn't deal with IND).  BEWARE!  This
         // bit is very tricky to get right.  If you make changes
         // around here, test by compiling stage 3 with +RTS -c -RTS.
-        if (bd->flags & BF_MARKED) {
+        if (flags & BF_MARKED) {
             // must call evacuate() to mark this closure if evac==true
             *q = (StgClosure *)p;
             if (evac) evacuate(q);
