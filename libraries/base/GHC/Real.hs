@@ -671,27 +671,37 @@ odd             =  not . even
 
 -------------------------------------------------------
 -- | raise a number to a non-negative integral power
-{-# SPECIALISE [1] (^) ::
-        Integer -> Integer -> Integer,
-        Integer -> Int -> Integer,
-        Int -> Int -> Int #-}
-{-# INLINABLE [1] (^) #-}    -- See Note [Inlining (^)]
+{-# INLINE [1] (^) #-}    -- See Note [Inlining (^)]
 (^) :: (Num a, Integral b) => a -> b -> a
 x0 ^ y0 | y0 < 0    = errorWithoutStackTrace "Negative exponent"
         | y0 == 0   = 1
-        | otherwise = f x0 y0
-    where -- f : x0 ^ y0 = x ^ y
-          f x y | even y    = f (x * x) (y `quot` 2)
-                | y == 1    = x
-                | otherwise = g (x * x) (y `quot` 2) x         -- See Note [Half of y - 1]
-          -- g : x0 ^ y0 = (x ^ y) * z
-          g x y z | even y = g (x * x) (y `quot` 2) z
-                  | y == 1 = x * z
-                  | otherwise = g (x * x) (y `quot` 2) (x * z) -- See Note [Half of y - 1]
+        | otherwise = powImpl x0 y0
+
+{-# SPECIALISE powImpl ::
+        Integer -> Integer -> Integer,
+        Integer -> Int -> Integer,
+        Int -> Int -> Int #-}
+{-# INLINABLE powImpl #-}    -- See Note [Inlining (^)]
+powImpl :: (Num a, Integral b) => a -> b -> a
+-- powImpl : x0 ^ y0 = (x ^ y)
+powImpl x y | even y    = powImpl (x * x) (y `quot` 2)
+            | y == 1    = x
+            | otherwise = powImplAcc (x * x) (y `quot` 2) x -- See Note [Half of y - 1]
+
+{-# SPECIALISE powImplAcc ::
+        Integer -> Integer -> Integer -> Integer,
+        Integer -> Int -> Integer -> Integer,
+        Int -> Int -> Int -> Int #-}
+{-# INLINABLE powImplAcc #-}    -- See Note [Inlining (^)]
+powImplAcc :: (Num a, Integral b) => a -> b -> a -> a
+-- powImplAcc : x0 ^ y0 = (x ^ y) * z
+powImplAcc x y z | even y    = powImplAcc (x * x) (y `quot` 2) z
+                 | y == 1    = x * z
+                 | otherwise = powImplAcc (x * x) (y `quot` 2) (x * z) -- See Note [Half of y - 1]
 
 -- | raise a number to an integral power
 (^^)            :: (Fractional a, Integral b) => a -> b -> a
-{-# INLINABLE [1] (^^) #-}         -- See Note [Inlining (^)
+{-# INLINE [1] (^^) #-}         -- See Note [Inlining (^)
 x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 
 {- Note [Half of y - 1]
@@ -699,17 +709,40 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
 Since y is guaranteed to be odd and positive here,
 half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
 
-Note [Inlining (^)
-~~~~~~~~~~~~~~~~~~
-The INLINABLE [1] pragma allows (^) to be specialised at its call sites.
-If it is called repeatedly at the same type, that can make a huge
-difference, because of those constants which can be repeatedly
-calculated.
+Note [Inlining (^)]
+~~~~~~~~~~~~~~~~~~~
+We want to achieve the following:
+* Noting that (^) is lazy in its first argument, we'd still like to avoid allocating a box for
+  the first argument.   Example: nofib/imaginary/x2n1, which makes many calls to (^) with
+  different first arguments each time.
 
-We don't inline until phase 1, to give a chance for the RULES
-"^2/Int" etc to fire first.
+  Solution: split (^) into a small INLINE wrapper that tests the second arg, which then calls the
+  strict (and recursive) auxiliary function `powImpl`.
 
-Currently the fromInteger calls are not floated because we get
+* Don't inline (^) too early because we want rewrite rules to optimise calls to (^) with
+  small exponents.  See Note [Powers with small exponent].
+
+  Solution: use INLINE[1] to delay inlining to phase 1, giving the rewrite rules time to fire.
+
+* (^) is overloaded on two different type parameters.  We want to specialise.
+
+  Solution: make `powImpl` (and its friend `powImplAcc`) INLINEABLE, so they can be specialised
+  at call sites.  Also give them some common specialisations right here, to avoid duplicating
+  that specialisation in clients.
+
+Specialisation can make a huge difference for repeated calls, because of
+constants which would otherwise be calculated repeatedly and unboxing of
+arguments.
+
+Why not make (^) strict in `x0` with a bang and make it INLINABLE? Well, because
+it is futile: Being strict in the `Complex Double` pair won't be enough to unbox
+the `Double`s anyway. Even after deep specisalisation, we will only unbox the
+`Double`s when we inline (^), because (^) remains lazy in the `Double` fields.
+Given that (^) must always inline to yield good code, we can just as well mark
+it as such.
+
+A small note on perf: Currently the fromInteger calls from the desugaring of
+literals are not floated because we get
           \d1 d2 x y -> blah
 after the gentle round of simplification.
 
