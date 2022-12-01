@@ -1517,8 +1517,10 @@ onFuncSym sym arg_tys ret_tys = wasmModifyM $
 -- 'CmmStatic's or 'CmmExpr's.
 onAnySym :: CLabel -> WasmCodeGenM w ()
 onAnySym lbl = case sym_kind of
-  SymFunc -> wasmModifyM $ \s@WasmCodeGenState {..} ->
-    s {funcTypes = addToUniqMap_C const funcTypes sym ([], [])}
+  SymFunc -> do
+    ty_word <- wasmWordTypeM
+    wasmModifyM $ \s@WasmCodeGenState {..} ->
+      s {funcTypes = addToUniqMap_C const funcTypes sym ([], [SomeWasmType ty_word])}
   _ -> pure ()
   where
     sym = symNameFromCLabel lbl
