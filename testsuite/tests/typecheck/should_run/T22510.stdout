@@ -1,0 +1,16 @@
+Levity: GHC.Types
+'Lifted: GHC.Types
+RuntimeRep: GHC.Types
+'IntRep: GHC.Types
+'BoxedRep: GHC.Types
+'Lifted: GHC.Types
+VecCount: GHC.Types
+'Vec2: GHC.Types
+VecElem: GHC.Types
+'Int8ElemRep: GHC.Types
+((),()): GHC.Tuple.Prim
+(#,#) ('BoxedRep 'Lifted) ('BoxedRep 'Lifted) () (): GHC.Prim
+Int64#: GHC.Prim
+Word64#: GHC.Prim
+TYPE: GHC.Prim
+CONSTRAINT: GHC.Prim
