@@ -3235,22 +3235,29 @@ ensureSubUsage Zero       described_mult err_msg = ensureSubMult ManyTy describe
 ensureSubUsage (MUsage m) described_mult err_msg = ensureSubMult m described_mult err_msg
 
 ensureSubMult :: Mult -> Mult -> SDoc -> LintM ()
-ensureSubMult actual_usage described_usage err_msg = do
+ensureSubMult actual_mult described_mult err_msg = do
     flags <- getLintFlags
-    when (lf_check_linearity flags) $ case actual_usage' `submult` described_usage' of
-      Submult -> return ()
-      Unknown -> case isMultMul actual_usage' of
-                     Just (m1, m2) -> ensureSubMult m1 described_usage' err_msg >>
-                                      ensureSubMult m2 described_usage' err_msg
-                     Nothing -> when (not (actual_usage' `eqType` described_usage')) (addErrL err_msg)
-
-   where actual_usage' = normalize actual_usage
-         described_usage' = normalize described_usage
-
-         normalize :: Mult -> Mult
-         normalize m = case isMultMul m of
-                         Just (m1, m2) -> mkMultMul (normalize m1) (normalize m2)
-                         Nothing -> m
+    when (lf_check_linearity flags) $
+      unless (deepSubMult actual_mult described_mult) $
+        addErrL err_msg
+  where
+    -- Check for submultiplicity using the following rules:
+    -- 1. x*y <= z when x <= z and y <= z.
+    --    This rule follows from the fact that x*y = sup{x,y} for any
+    --    multiplicities x,y.
+    -- 2. x <= y*z when x <= y or x <= z.
+    --    This rule is not complete: when x = y*z, we cannot
+    --    change y*z <= y*z to y*z <= y or y*z <= z.
+    --    However, we eliminate products on the LHS in step 1.
+    -- 3. One <= x and x <= Many for any x, as checked by 'submult'.
+    -- 4. x <= x.
+    -- Otherwise, we fail.
+    deepSubMult :: Mult -> Mult -> Bool
+    deepSubMult m n
+      | Just (m1, m2) <- isMultMul m = deepSubMult m1 n  && deepSubMult m2 n
+      | Just (n1, n2) <- isMultMul n = deepSubMult m  n1 || deepSubMult m  n2
+      | Submult <- m `submult` n = True
+      | otherwise = m `eqType` n
 
 lintRole :: Outputable thing
           => thing     -- where the role appeared
