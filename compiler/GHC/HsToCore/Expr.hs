@@ -984,7 +984,8 @@ dsDo ctx stmts
            ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
-                   = do { var   <- selectSimpleMatchVarL Many pat
+                   = putSrcSpanDs (getLocA pat) $
+                     do { var   <- selectSimpleMatchVarL Many pat
                         ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
