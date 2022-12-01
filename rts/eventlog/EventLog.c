@@ -1074,7 +1074,16 @@ void postCapsetVecEvent (EventTypeNum tag,
 
     for (int i = 0; i < argc; i++) {
         // 1 + strlen to account for the trailing \0, used as separator
-        size += 1 + strlen(argv[i]);
+        int increment = 1 + strlen(argv[i]);
+        if (size + increment > EVENT_PAYLOAD_SIZE_MAX) {
+            errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, record only %d out of %d args",
+                       i,
+                       argc);
+            argc = i;
+            break;
+        } else {
+            size += increment;
+        }
     }
 
     ACQUIRE_LOCK(&eventBufMutex);
