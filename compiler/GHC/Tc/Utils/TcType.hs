@@ -348,7 +348,7 @@ type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
 type TcReqTVBinder     = ReqTVBinder
 
--- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+-- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 type TcTyCon       = TyCon
 type MonoTcTyCon   = TcTyCon
 type PolyTcTyCon   = TcTyCon
@@ -382,50 +382,6 @@ type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
 
-{- Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Note [How TcTyCons work] in GHC.Tc.TyCl
-
-Invariants:
-
-* TcTyCon: a TyCon built with the TcTyCon constructor
-
-* TcTyConBinder: a TyConBinder with a TcTyVar inside (not a TyVar)
-
-* TcTyCons contain TcTyVars
-
-* MonoTcTyCon:
-  - Flag tcTyConIsPoly = False
-
-  - tyConScopedTyVars is important; maps a Name to a TyVarTv unification variable
-    The order is important: Specified then Required variables.   E.g. in
-        data T a (b :: k) = ...
-    the order will be [k, a, b].
-
-    NB: There are no Inferred binders in tyConScopedTyVars; 'a' may
-    also be poly-kinded, but that kind variable will be added by
-    generaliseTcTyCon, in the passage to a PolyTcTyCon.
-
-  - tyConBinders are irrelevant; we just use tcTyConScopedTyVars
-    Well not /quite/ irrelevant: its length gives the number of Required binders,
-    and so allows up to distinguish between the Specified and Required elements of
-    tyConScopedTyVars.
-
-* PolyTcTyCon:
-  - Flag tcTyConIsPoly = True; this is used only to short-cut zonking
-
-  - tyConBinders are still TcTyConBinders, but they are /skolem/ TcTyVars,
-    with fixed kinds, and accurate skolem info: no unification variables here
-
-    tyConBinders includes the Inferred binders if any
-
-    tyConBinders uses the Names from the original, renamed program.
-
-  - tcTyConScopedTyVars is irrelevant: just use (binderVars tyConBinders)
-    All the types have been swizzled back to use the original Names
-    See Note [tyConBinders and lexical scoping] in GHC.Core.TyCon
-
--}
 
 {- *********************************************************************
 *                                                                      *

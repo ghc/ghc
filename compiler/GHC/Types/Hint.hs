@@ -328,6 +328,14 @@ data GhcHint
     -}
   | SuggestAddStandaloneDerivation
 
+    {-| Suggests to add a standalone kind signature when GHC
+        can't perform kind inference.
+
+        Triggered by: 'GHC.Tc.Errors.Types.TcRnInvisBndrWithoutSig'
+        Test case(s): typecheck/should_fail/T22560_fail_d
+    -}
+  | SuggestAddStandaloneKindSignature Name
+
     {-| Suggests the user to fill in the wildcard constraint to
         disambiguate which constraint that is.
 

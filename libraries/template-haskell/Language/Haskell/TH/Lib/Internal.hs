@@ -79,6 +79,7 @@ type InjectivityAnn      = TH.InjectivityAnn
 
 type TyVarBndrUnit       = TyVarBndr ()
 type TyVarBndrSpec       = TyVarBndr Specificity
+type TyVarBndrVis        = TyVarBndr BndrVis
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -418,14 +419,14 @@ funD nm cs =
     ; pure (FunD nm cs1)
     }
 
-tySynD :: Quote m => Name -> [m (TyVarBndr ())] -> m Type -> m Dec
+tySynD :: Quote m => Name -> [m (TyVarBndr BndrVis)] -> m Type -> m Dec
 tySynD tc tvs rhs =
   do { tvs1 <- sequenceA tvs
      ; rhs1 <- rhs
      ; pure (TySynD tc tvs1 rhs1)
      }
 
-dataD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> [m Con]
+dataD :: Quote m => m Cxt -> Name -> [m (TyVarBndr BndrVis)] -> Maybe (m Kind) -> [m Con]
       -> [m DerivClause] -> m Dec
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -436,7 +437,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequenceA derivs
     pure (DataD ctxt1 tc tvs1 ksig1 cons1 derivs1)
 
-newtypeD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> m Con
+newtypeD :: Quote m => m Cxt -> Name -> [m (TyVarBndr BndrVis)] -> Maybe (m Kind) -> m Con
          -> [m DerivClause] -> m Dec
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -447,7 +448,7 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequenceA derivs
     pure (NewtypeD ctxt1 tc tvs1 ksig1 con1 derivs1)
 
-typeDataD :: Quote m => Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> [m Con]
+typeDataD :: Quote m => Name -> [m (TyVarBndr BndrVis)] -> Maybe (m Kind) -> [m Con]
       -> m Dec
 typeDataD tc tvs ksig cons =
   do
@@ -456,7 +457,7 @@ typeDataD tc tvs ksig cons =
     cons1   <- sequenceA cons
     pure (TypeDataD tc tvs1 ksig1 cons1)
 
-classD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> [FunDep] -> [m Dec] -> m Dec
+classD :: Quote m => m Cxt -> Name -> [m (TyVarBndr BndrVis)] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
     tvs1  <- sequenceA tvs
@@ -577,20 +578,20 @@ tySynInstD eqn =
     eqn1 <- eqn
     pure (TySynInstD eqn1)
 
-dataFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> m Dec
+dataFamilyD :: Quote m => Name -> [m (TyVarBndr BndrVis)] -> Maybe (m Kind) -> m Dec
 dataFamilyD tc tvs kind =
   do tvs'  <- sequenceA tvs
      kind' <- sequenceA kind
      pure $ DataFamilyD tc tvs' kind'
 
-openTypeFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> m FamilyResultSig
+openTypeFamilyD :: Quote m => Name -> [m (TyVarBndr BndrVis)] -> m FamilyResultSig
                 -> Maybe InjectivityAnn -> m Dec
 openTypeFamilyD tc tvs res inj =
   do tvs' <- sequenceA tvs
      res' <- res
      pure $ OpenTypeFamilyD (TypeFamilyHead tc tvs' res' inj)
 
-closedTypeFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> m FamilyResultSig
+closedTypeFamilyD :: Quote m => Name -> [m (TyVarBndr BndrVis)] -> m FamilyResultSig
                   -> Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
 closedTypeFamilyD tc tvs result injectivity eqns =
   do tvs1    <- sequenceA tvs
@@ -885,17 +886,29 @@ plainTV n = pure $ PlainTV n ()
 plainInvisTV :: Quote m => Name -> Specificity -> m (TyVarBndr Specificity)
 plainInvisTV n s = pure $ PlainTV n s
 
+plainBndrTV :: Quote m => Name -> BndrVis -> m (TyVarBndr BndrVis)
+plainBndrTV n v = pure $ PlainTV n v
+
 kindedTV :: Quote m => Name -> m Kind -> m (TyVarBndr ())
 kindedTV n = fmap (KindedTV n ())
 
 kindedInvisTV :: Quote m => Name -> Specificity -> m Kind -> m (TyVarBndr Specificity)
 kindedInvisTV n s = fmap (KindedTV n s)
 
+kindedBndrTV :: Quote m => Name -> BndrVis -> m Kind -> m (TyVarBndr BndrVis)
+kindedBndrTV n v = fmap (KindedTV n v)
+
 specifiedSpec :: Specificity
 specifiedSpec = SpecifiedSpec
 
 inferredSpec :: Specificity
 inferredSpec = InferredSpec
+
+bndrReq :: BndrVis
+bndrReq = BndrReq
+
+bndrInvis :: BndrVis
+bndrInvis = BndrInvis
 
 varK :: Name -> Kind
 varK = VarT
@@ -1097,7 +1110,7 @@ funD_doc nm cs mfun_doc arg_docs = do
     Nothing -> funD nm cs
 
 -- | Variant of 'dataD' that attaches Haddock documentation.
-dataD_doc :: Q Cxt -> Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+dataD_doc :: Q Cxt -> Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
           -> [(Q Con, Maybe String, [Maybe String])]
           -- ^ List of constructors, documentation for the constructor, and
           -- documentation for the arguments
@@ -1111,7 +1124,7 @@ dataD_doc ctxt tc tvs ksig cons_with_docs derivs mdoc = do
   maybe dec (flip withDecDoc dec) mdoc
 
 -- | Variant of 'newtypeD' that attaches Haddock documentation.
-newtypeD_doc :: Q Cxt -> Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+newtypeD_doc :: Q Cxt -> Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
              -> (Q Con, Maybe String, [Maybe String])
              -- ^ The constructor, documentation for the constructor, and
              -- documentation for the arguments
@@ -1125,7 +1138,7 @@ newtypeD_doc ctxt tc tvs ksig con_with_docs@(con, _, _) derivs mdoc = do
   maybe dec (flip withDecDoc dec) mdoc
 
 -- | Variant of 'typeDataD' that attaches Haddock documentation.
-typeDataD_doc :: Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+typeDataD_doc :: Name -> [Q (TyVarBndr BndrVis)] -> Maybe (Q Kind)
           -> [(Q Con, Maybe String, [Maybe String])]
           -- ^ List of constructors, documentation for the constructor, and
           -- documentation for the arguments

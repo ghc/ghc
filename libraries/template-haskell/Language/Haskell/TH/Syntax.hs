@@ -3,7 +3,8 @@
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
              MagicHash, KindSignatures, PolyKinds, TypeApplications, DataKinds,
              GADTs, UnboxedTuples, UnboxedSums, TypeOperators,
-             Trustworthy, DeriveFunctor, BangPatterns, RecordWildCards, ImplicitParams #-}
+             Trustworthy, DeriveFunctor, DeriveTraversable,
+             BangPatterns, RecordWildCards, ImplicitParams #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
@@ -2413,22 +2414,22 @@ data Range = FromR Exp | FromThenR Exp Exp
 data Dec
   = FunD Name [Clause]            -- ^ @{ f p1 p2 = b where decs }@
   | ValD Pat Body [Dec]           -- ^ @{ p = b where decs }@
-  | DataD Cxt Name [TyVarBndr ()]
+  | DataD Cxt Name [TyVarBndr BndrVis]
           (Maybe Kind)            -- Kind signature (allowed only for GADTs)
           [Con] [DerivClause]
                                   -- ^ @{ data Cxt x => T x = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
-  | NewtypeD Cxt Name [TyVarBndr ()]
+  | NewtypeD Cxt Name [TyVarBndr BndrVis]
              (Maybe Kind)         -- Kind signature
              Con [DerivClause]    -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W Q)
                                   --       deriving stock Eq }@
-  | TypeDataD Name [TyVarBndr ()]
+  | TypeDataD Name [TyVarBndr BndrVis]
           (Maybe Kind)            -- Kind signature (allowed only for GADTs)
           [Con]                   -- ^ @{ type data T x = A x | B (T x) }@
-  | TySynD Name [TyVarBndr ()] Type -- ^ @{ type T x = (x,x) }@
-  | ClassD Cxt Name [TyVarBndr ()]
+  | TySynD Name [TyVarBndr BndrVis] Type -- ^ @{ type T x = (x,x) }@
+  | ClassD Cxt Name [TyVarBndr BndrVis]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
   | InstanceD (Maybe Overlap) Cxt Type [Dec]
                                   -- ^ @{ instance {\-\# OVERLAPS \#-\}
@@ -2445,7 +2446,7 @@ data Dec
   | PragmaD Pragma                -- ^ @{ {\-\# INLINE [1] foo \#-\} }@
 
   -- | data families (may also appear in [Dec] of 'ClassD' and 'InstanceD')
-  | DataFamilyD Name [TyVarBndr ()]
+  | DataFamilyD Name [TyVarBndr BndrVis]
                (Maybe Kind)
          -- ^ @{ data family T a b c :: * }@
 
@@ -2569,7 +2570,7 @@ type PatSynType = Type
 -- @TypeFamilyHead@ is defined to be the elements of the declaration
 -- between @type family@ and @where@.
 data TypeFamilyHead =
-  TypeFamilyHead Name [TyVarBndr ()] FamilyResultSig (Maybe InjectivityAnn)
+  TypeFamilyHead Name [TyVarBndr BndrVis] FamilyResultSig (Maybe InjectivityAnn)
   deriving( Show, Eq, Ord, Data, Generic )
 
 -- | One equation of a type family instance or closed type family. The
@@ -2845,9 +2846,19 @@ data Specificity = SpecifiedSpec          -- ^ @a@
                  | InferredSpec           -- ^ @{a}@
       deriving( Show, Eq, Ord, Data, Generic )
 
+-- | The @flag@ type parameter is instantiated to one of the following types:
+--
+--   * 'Specificity' (examples: 'ForallC', 'ForallT')
+--   * 'BndrVis' (examples: 'DataD', 'ClassD', etc.)
+--   * '()', a catch-all type for other forms of binders, including 'ForallVisT', 'DataInstD', 'RuleP', and 'TyVarSig'
+--
 data TyVarBndr flag = PlainTV  Name flag      -- ^ @a@
                     | KindedTV Name flag Kind -- ^ @(a :: k)@
-      deriving( Show, Eq, Ord, Data, Generic, Functor )
+      deriving( Show, Eq, Ord, Data, Generic, Functor, Foldable, Traversable )
+
+data BndrVis = BndrReq                    -- ^ @a@
+             | BndrInvis                  -- ^ @\@a@
+      deriving( Show, Eq, Ord, Data, Generic )
 
 -- | Type family result signature
 data FamilyResultSig = NoSig              -- ^ no signature

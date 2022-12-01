@@ -27,6 +27,7 @@ instance Binary TH.Info
 instance Binary TH.Type
 instance Binary TH.TyLit
 instance Binary TH.Specificity
+instance Binary TH.BndrVis
 instance Binary flag => Binary (TH.TyVarBndr flag)
 instance Binary TH.Role
 instance Binary TH.Lit

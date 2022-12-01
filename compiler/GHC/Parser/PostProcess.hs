@@ -890,38 +890,37 @@ checkTyVars pp_what equals_or_where tc tparms
   = do { tvs <- mapM check tparms
        ; return (mkHsQTvs tvs) }
   where
-    check (HsTypeArg _ ki@(L loc _)) = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
-                                         (PsErrUnexpectedTypeAppInDecl ki pp_what (unLoc tc))
-    check (HsValArg ty) = chkParens [] [] emptyComments ty
+    check (HsTypeArg at ki) = chkParens [] [] emptyComments (HsBndrInvisible at) ki
+    check (HsValArg ty) = chkParens [] [] emptyComments HsBndrRequired ty
     check (HsArgPar sp) = addFatalError $ mkPlainErrorMsgEnvelope sp $
                             (PsErrMalformedDecl pp_what (unLoc tc))
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> LHsType GhcPs
-              -> P (LHsTyVarBndr () GhcPs)
-    chkParens ops cps cs (L l (HsParTy an ty))
+    chkParens :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> HsBndrVis GhcPs -> LHsType GhcPs
+              -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
+    chkParens ops cps cs bvis (L l (HsParTy an ty))
       = let
           (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
         in
-          chkParens (o:ops) (c:cps) (cs Semi.<> epAnnComments an) ty
-    chkParens ops cps cs ty = chk ops cps cs ty
+          chkParens (o:ops) (c:cps) (cs Semi.<> epAnnComments an) bvis ty
+    chkParens ops cps cs bvis ty = chk ops cps cs bvis ty
 
         -- Check that the name space is correct!
-    chk :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> LHsType GhcPs -> P (LHsTyVarBndr () GhcPs)
-    chk ops cps cs (L l (HsKindSig annk (L annt (HsTyVar ann _ (L lv tv))) k))
+    chk :: [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> HsBndrVis GhcPs -> LHsType GhcPs -> P (LHsTyVarBndr (HsBndrVis GhcPs) GhcPs)
+    chk ops cps cs bvis (L l (HsKindSig annk (L annt (HsTyVar ann _ (L lv tv))) k))
         | isRdrTyVar tv
             = let
                 an = (reverse ops) ++ cps
               in
                 return (L (widenLocatedAn (l Semi.<> annt) an)
-                       (KindedTyVar (addAnns (annk Semi.<> ann) an cs) () (L lv tv) k))
-    chk ops cps cs (L l (HsTyVar ann _ (L ltv tv)))
+                       (KindedTyVar (addAnns (annk Semi.<> ann) an cs) bvis (L lv tv) k))
+    chk ops cps cs bvis (L l (HsTyVar ann _ (L ltv tv)))
         | isRdrTyVar tv
             = let
                 an = (reverse ops) ++ cps
               in
                 return (L (widenLocatedAn l an)
-                                     (UserTyVar (addAnns ann an cs) () (L ltv tv)))
-    chk _ _ _ t@(L loc _)
+                                     (UserTyVar (addAnns ann an cs) bvis (L ltv tv)))
+    chk _ _ _ _ t@(L loc _)
         = addFatalError $ mkPlainErrorMsgEnvelope (locA loc) $
             (PsErrUnexpectedTypeInDecl t pp_what (unLoc tc) tparms equals_or_where)
 

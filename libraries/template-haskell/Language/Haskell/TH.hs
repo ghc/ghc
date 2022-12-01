@@ -89,6 +89,7 @@ module Language.Haskell.TH(
     -- ** Types
         Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
         Syntax.Specificity(..),
+        Syntax.BndrVis(..),
         FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType, BangType, VarBangType,
 
     -- ** Documentation

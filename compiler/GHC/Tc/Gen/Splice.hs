@@ -2140,7 +2140,7 @@ reifyTyCon tc
                                      injRHS = map (reifyName . tyVarName)
                                                   (filterByList ms tvs)
                      in (sig, inj)
-       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
+       ; tvs' <- reifyTyConBinders tc
        ; let tfHead =
                TH.TypeFamilyHead (reifyName tc) tvs' resultSig injectivity
        ; if isOpenTypeFamilyTyCon tc
@@ -2161,7 +2161,7 @@ reifyTyCon tc
 
        ; kind' <- fmap Just (reifyKind res_kind)
 
-       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
+       ; tvs' <- reifyTyConBinders tc
        ; fam_envs <- tcGetFamInstEnvs
        ; instances <- reifyFamilyInstances tc (familyInstances fam_envs tc)
        ; return (TH.FamilyI
@@ -2169,7 +2169,7 @@ reifyTyCon tc
 
   | Just (_, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
   = do { rhs' <- reifyType rhs
-       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
+       ; tvs' <- reifyTyConBinders tc
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
        }
@@ -2187,7 +2187,7 @@ reifyTyCon tc
               dataCons = tyConDataCons tc
               isGadt   = isGadtSyntaxTyCon tc
         ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
-        ; r_tvs <- reifyTyVars (tyConVisibleTyVars tc)
+        ; r_tvs <- reifyTyConBinders tc
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
               decl | isTypeDataTyCon tc =
@@ -2316,7 +2316,7 @@ reifyClass cls
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
         ; assocTys <- concatMapM reifyAT ats
         ; ops <- concatMapM reify_op op_stuff
-        ; tvs' <- reifyTyVars (tyConVisibleTyVars (classTyCon cls))
+        ; tvs' <- reifyTyConBinders (classTyCon cls)
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' (assocTys ++ ops)
         ; return (TH.ClassI dec insts) }
   where
@@ -2659,6 +2659,43 @@ instance ReifyFlag () () where
 instance ReifyFlag Specificity TH.Specificity where
     reifyFlag SpecifiedSpec = TH.SpecifiedSpec
     reifyFlag InferredSpec  = TH.InferredSpec
+
+instance ReifyFlag TyConBndrVis (Maybe TH.BndrVis) where
+    reifyFlag AnonTCB              = Just TH.BndrReq
+    reifyFlag (NamedTCB Required)  = Just TH.BndrReq
+    reifyFlag (NamedTCB (Invisible _)) =
+      Nothing -- See Note [Reifying invisible type variable binders] and #22828.
+
+-- Currently does not return invisible type variable binders (@k-binders).
+-- See Note [Reifying invisible type variable binders] and #22828.
+reifyTyConBinders :: TyCon -> TcM [TH.TyVarBndr TH.BndrVis]
+reifyTyConBinders tc = fmap (mapMaybe get_bndr) (reifyTyVarBndrs (tyConBinders tc))
+  where
+    get_bndr :: TH.TyVarBndr (Maybe flag) -> Maybe (TH.TyVarBndr flag)
+    get_bndr = sequenceA
+
+{- Note [Reifying invisible type variable binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In reifyFlag for TyConBndrVis, we have the following clause:
+
+    reifyFlag (NamedTCB (Invisible _)) = Nothing
+
+This means that reifyTyConBinders doesn't reify invisible type variables as
+@k-binders. However, it is possible (and not hard) to change this.
+Just replace the above clause with:
+
+    reifyFlag (NamedTCB Specified) = Just TH.BndrInvis
+    reifyFlag (NamedTCB Inferred)  = Nothing    -- Inferred variables can not be bound
+
+There are two reasons we opt not to do that for now.
+  1. It would be a (sometimes silent) breaking change affecting th-abstraction,
+     aeson, and other libraries that assume that reified binders are visible.
+  2. It would create an asymmetry with visible kind applications, which are
+     not reified either.
+
+This decision is not set in stone. If a use case for reifying invisible type
+variable binders presents itself, we can reconsider. See #22828.
+-}
 
 reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr ()]
 reifyTyVars = reifyTyVarBndrs . map mk_bndr

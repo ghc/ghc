@@ -68,7 +68,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:5:21 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:5:15 })
            (Unqual
@@ -158,7 +158,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:6:22 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:6:15 })
            (Unqual
@@ -260,7 +260,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:26 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:8:16-18 })
            (Unqual
@@ -292,7 +292,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:45 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:8:31-34 })
            (Unqual
@@ -324,7 +324,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:8:75 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:8:50-52 })
            (Unqual
@@ -456,7 +456,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:27 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:9:16-18 })
            (Unqual
@@ -490,7 +490,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:46 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:9:31-34 })
            (Unqual
@@ -524,7 +524,7 @@
            ,(AddEpAnn AnnCloseP (EpaSpan { T20452.hs:9:76 }))]
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T20452.hs:9:50-52 })
            (Unqual

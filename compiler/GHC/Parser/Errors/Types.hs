@@ -367,9 +367,6 @@ data PsMessage
    -- | Malformed ... declaration for ...
    | PsErrMalformedDecl !SDoc !RdrName
 
-   -- | Unexpected type application in a declaration
-   | PsErrUnexpectedTypeAppInDecl !(LHsType GhcPs) !SDoc !RdrName
-
    -- | Not a data constructor
    | PsErrNotADataCon !RdrName
 

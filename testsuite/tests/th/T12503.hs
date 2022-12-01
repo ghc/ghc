@@ -9,7 +9,7 @@ import Language.Haskell.TH
 data T1 k
 class C1 a
 
-$(do TyConI (DataD [] tName [ KindedTV kName () kKind] _ _ _)
+$(do TyConI (DataD [] tName [KindedTV kName BndrReq kKind] _ _ _)
        <- reify ''T1
      d <- instanceD (cxt [])
                     (conT ''C1 `appT`

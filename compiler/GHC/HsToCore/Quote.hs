@@ -2,6 +2,7 @@
 
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE PatternSynonyms        #-}
@@ -513,7 +514,7 @@ repKiSigD (L loc kisig) =
 
 -------------------------
 repDataDefn :: Core TH.Name
-            -> Either (Core [(M (TH.TyVarBndr ()))])
+            -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
                         -- the repTyClD case
                       (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
                         -- the repDataFamInstD case
@@ -536,7 +537,7 @@ repDataDefn tc opts
                                          derivs1 }
        }
 
-repSynDecl :: Core TH.Name -> Core [(M (TH.TyVarBndr ()))]
+repSynDecl :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
            -> LHsType GhcRn
            -> MetaM (Core (M TH.Dec))
 repSynDecl tc bndrs ty
@@ -1179,6 +1180,17 @@ rep_flag :: Specificity -> MetaM (Core TH.Specificity)
 rep_flag SpecifiedSpec = rep2_nw specifiedSpecName []
 rep_flag InferredSpec  = rep2_nw inferredSpecName []
 
+instance RepTV (HsBndrVis GhcRn) TH.BndrVis where
+    tyVarBndrName = tyVarBndrVisTyConName
+    repPlainTV  (MkC nm) vis          = do { (MkC vis') <- rep_bndr_vis vis
+                                           ; rep2 plainBndrTVName  [nm, vis'] }
+    repKindedTV (MkC nm) vis (MkC ki) = do { (MkC vis') <- rep_bndr_vis vis
+                                           ; rep2 kindedBndrTVName [nm, vis', ki] }
+
+rep_bndr_vis :: HsBndrVis GhcRn -> MetaM (Core TH.BndrVis)
+rep_bndr_vis HsBndrRequired      = rep2_nw bndrReqName []
+rep_bndr_vis (HsBndrInvisible _) = rep2_nw bndrInvisName []
+
 addHsOuterFamEqnTyVarBinds ::
      HsOuterFamEqnTyVarBndrs GhcRn
   -> (Core (Maybe [M TH.TyVarBndrUnit]) -> MetaM (Core (M a)))
@@ -1284,7 +1296,7 @@ addHsTyVarBinds fresh_or_reuse exp_tvs thing_inside
 
 addQTyVarBinds :: FreshOrReuse
                -> LHsQTyVars GhcRn -- the binders to be added
-               -> (Core [(M (TH.TyVarBndr ()))] -> MetaM (Core (M a))) -- action in the ext env
+               -> (Core [(M (TH.TyVarBndr TH.BndrVis))] -> MetaM (Core (M a))) -- action in the ext env
                -> MetaM (Core (M a))
 addQTyVarBinds fresh_or_reuse qtvs thing_inside =
   let HsQTvs { hsq_ext      = imp_tvs
@@ -2540,7 +2552,7 @@ repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 repData :: Bool -- ^ @True@ for a @type data@ declaration.
                 -- See Note [Type data declarations] in GHC.Rename.Module
         -> Core (M TH.Cxt) -> Core TH.Name
-        -> Either (Core [(M (TH.TyVarBndr ()))])
+        -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
                   (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
         -> Core (Maybe (M TH.Kind)) -> Core [(M TH.Con)] -> Core [M TH.DerivClause]
         -> MetaM (Core (M TH.Dec))
@@ -2552,7 +2564,7 @@ repData _ (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
   = rep2 dataInstDName [cxt, mb_bndrs, ty, ksig, cons, derivs]
 
 repNewtype :: Core (M TH.Cxt) -> Core TH.Name
-           -> Either (Core [(M (TH.TyVarBndr ()))])
+           -> Either (Core [(M (TH.TyVarBndr TH.BndrVis))])
                      (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
            -> Core (Maybe (M TH.Kind)) -> Core (M TH.Con) -> Core [M TH.DerivClause]
            -> MetaM (Core (M TH.Dec))
@@ -2563,7 +2575,7 @@ repNewtype (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC con)
            (MkC derivs)
   = rep2 newtypeInstDName [cxt, mb_bndrs, ty, ksig, con, derivs]
 
-repTySyn :: Core TH.Name -> Core [(M (TH.TyVarBndr ()))]
+repTySyn :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
          -> Core (M TH.Type) -> MetaM (Core (M TH.Dec))
 repTySyn (MkC nm) (MkC tvs) (MkC rhs)
   = rep2 tySynDName [nm, tvs, rhs]
@@ -2621,7 +2633,7 @@ repOverlap mb =
   just    = coreJust overlapTyConName
 
 
-repClass :: Core (M TH.Cxt) -> Core TH.Name -> Core [(M (TH.TyVarBndr ()))]
+repClass :: Core (M TH.Cxt) -> Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
          -> Core [TH.FunDep] -> Core [(M TH.Dec)]
          -> MetaM (Core (M TH.Dec))
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
@@ -2670,13 +2682,13 @@ repTySynInst :: Core (M TH.TySynEqn) -> MetaM (Core (M TH.Dec))
 repTySynInst (MkC eqn)
     = rep2 tySynInstDName [eqn]
 
-repDataFamilyD :: Core TH.Name -> Core [(M (TH.TyVarBndr ()))]
+repDataFamilyD :: Core TH.Name -> Core [(M (TH.TyVarBndr TH.BndrVis))]
                -> Core (Maybe (M TH.Kind)) -> MetaM (Core (M TH.Dec))
 repDataFamilyD (MkC nm) (MkC tvs) (MkC kind)
     = rep2 dataFamilyDName [nm, tvs, kind]
 
 repOpenFamilyD :: Core TH.Name
-               -> Core [(M (TH.TyVarBndr ()))]
+               -> Core [(M (TH.TyVarBndr TH.BndrVis))]
                -> Core (M TH.FamilyResultSig)
                -> Core (Maybe TH.InjectivityAnn)
                -> MetaM (Core (M TH.Dec))
@@ -2684,7 +2696,7 @@ repOpenFamilyD (MkC nm) (MkC tvs) (MkC result) (MkC inj)
     = rep2 openTypeFamilyDName [nm, tvs, result, inj]
 
 repClosedFamilyD :: Core TH.Name
-                 -> Core [(M (TH.TyVarBndr ()))]
+                 -> Core [(M (TH.TyVarBndr TH.BndrVis))]
                  -> Core (M TH.FamilyResultSig)
                  -> Core (Maybe TH.InjectivityAnn)
                  -> Core [(M TH.TySynEqn)]

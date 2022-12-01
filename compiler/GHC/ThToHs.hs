@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstrainedClassMethods #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -478,7 +479,7 @@ cvtDec (TH.ImplicitParamBindD _ _)
   = failWith InvalidImplicitParamBinding
 
 -- Convert a @data@ declaration.
-cvtDataDec :: TH.Cxt -> TH.Name -> [TH.TyVarBndr ()]
+cvtDataDec :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
     -> Maybe TH.Kind -> [TH.Con] -> [TH.DerivClause]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtDataDec = cvtGenDataDec False
@@ -486,14 +487,14 @@ cvtDataDec = cvtGenDataDec False
 -- Convert a @type data@ declaration.
 -- These have neither contexts nor derived clauses.
 -- See Note [Type data declarations] in GHC.Rename.Module.
-cvtTypeDataDec :: TH.Name -> [TH.TyVarBndr ()] -> Maybe TH.Kind -> [TH.Con]
+cvtTypeDataDec :: TH.Name -> [TH.TyVarBndr TH.BndrVis] -> Maybe TH.Kind -> [TH.Con]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtTypeDataDec tc tvs ksig constrs
   = cvtGenDataDec True [] tc tvs ksig constrs []
 
 -- Convert a @data@ or @type data@ declaration (flagged by the Bool arg).
 -- See Note [Type data declarations] in GHC.Rename.Module.
-cvtGenDataDec :: Bool -> TH.Cxt -> TH.Name -> [TH.TyVarBndr ()]
+cvtGenDataDec :: Bool -> TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
     -> Maybe TH.Kind -> [TH.Con] -> [TH.DerivClause]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
@@ -588,7 +589,7 @@ cvt_ci_decs declDescr decs
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
-cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr ()]
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
              -> CvtM ( LHsContext GhcPs
                      , LocatedN RdrName
                      , LHsQTyVars GhcPs)
@@ -1521,6 +1522,10 @@ instance CvtFlag () () where
 instance CvtFlag TH.Specificity Hs.Specificity where
   cvtFlag TH.SpecifiedSpec = Hs.SpecifiedSpec
   cvtFlag TH.InferredSpec  = Hs.InferredSpec
+
+instance CvtFlag TH.BndrVis (HsBndrVis GhcPs) where
+  cvtFlag TH.BndrReq   = HsBndrRequired
+  cvtFlag TH.BndrInvis = HsBndrInvisible noHsTok
 
 cvtTvs :: CvtFlag flag flag' => [TH.TyVarBndr flag] -> CvtM [LHsTyVarBndr flag' GhcPs]
 cvtTvs tvs = mapM cvt_tv tvs

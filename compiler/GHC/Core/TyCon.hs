@@ -25,7 +25,8 @@ module GHC.Core.TyCon(
         mkRequiredTyConBinder,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderForAllTyFlag, tyConBndrVisForAllTyFlag, isNamedTyConBinder,
-        isVisibleTyConBinder, isInvisibleTyConBinder, isVisibleTcbVis,
+        isVisibleTyConBinder, isInvisibleTyConBinder,
+        isVisibleTcbVis, isInvisSpecTcbVis,
 
         -- ** Field labels
         tyConFieldLabels, lookupTyConFieldLabel,
@@ -508,6 +509,10 @@ isVisibleTcbVis :: TyConBndrVis -> Bool
 isVisibleTcbVis (NamedTCB vis) = isVisibleForAllTyFlag vis
 isVisibleTcbVis AnonTCB        = True
 
+isInvisSpecTcbVis :: TyConBndrVis -> Bool
+isInvisSpecTcbVis (NamedTCB Specified) = True
+isInvisSpecTcbVis _                    = False
+
 isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
@@ -889,8 +894,8 @@ data TyConDetails =
         promDcInfo    :: PromDataConInfo  -- ^ See comments with 'PromDataConInfo'
     }
 
-  -- | These exist only during type-checking. See Note [How TcTyCons work]
-  -- in "GHC.Tc.TyCl"
+  -- | These exist only during type-checking.
+  -- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in "GHC.Tc.TyCl"
   | TcTyCon {
           -- NB: the tyConArity of a TcTyCon must match
           -- the number of Required (positional, user-specified)
@@ -924,7 +929,7 @@ where
    * tyConArity = length required_tvs
 
 tcTyConScopedTyVars are used only for MonoTcTyCons, not PolyTcTyCons.
-See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType.
+See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
 Note [Representation-polymorphic TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1843,13 +1848,11 @@ mkSumTyCon name binders res_kind cons parent
 -- right-hand side. It lives only during the type-checking of a
 -- mutually-recursive group of tycons; it is then zonked to a proper
 -- TyCon in zonkTcTyCon.
--- See also Note [Kind checking recursive type and class declarations]
--- in "GHC.Tc.TyCl".
+-- See Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in "GHC.Tc.TyCl"
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
-                                 -- see Note [How TcTyCons work] in GHC.Tc.TyCl
           -> Bool                -- ^ Is this TcTyCon generalised already?
           -> TyConFlavour TyCon  -- ^ What sort of 'TyCon' this represents
           -> TyCon
@@ -1997,7 +2000,7 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
     go (TcTyCon {})                  _                = True
 
   -- Reply True for TcTyCon to minimise knock on type errors
-  -- See Note [How TcTyCons work] item (1) in GHC.Tc.TyCl
+  -- See (W1) in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds

@@ -66,7 +66,7 @@
            []
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:5:19 })
            (Unqual

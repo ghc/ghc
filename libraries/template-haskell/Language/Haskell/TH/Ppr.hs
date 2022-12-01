@@ -949,6 +949,14 @@ instance PprFlag Specificity where
     pprTyVarBndr (KindedTV nm SpecifiedSpec k) = parens (ppr nm <+> dcolon <+> ppr k)
     pprTyVarBndr (KindedTV nm InferredSpec  k) = braces (ppr nm <+> dcolon <+> ppr k)
 
+instance PprFlag BndrVis where
+    pprTyVarBndr (PlainTV nm vis)    = pprBndrVis vis (ppr nm)
+    pprTyVarBndr (KindedTV nm vis k) = pprBndrVis vis (parens (ppr nm <+> dcolon <+> ppr k))
+
+pprBndrVis :: BndrVis -> Doc -> Doc
+pprBndrVis BndrReq   d = d
+pprBndrVis BndrInvis d = char '@' <> d
+
 instance PprFlag flag => Ppr (TyVarBndr flag) where
     ppr bndr = pprTyVarBndr bndr
 

@@ -24,7 +24,7 @@ module Language.Haskell.TH.Lib (
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,
         FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
         FamilyResultSigQ, DerivStrategyQ,
-        TyVarBndrUnit, TyVarBndrSpec,
+        TyVarBndrUnit, TyVarBndrSpec, TyVarBndrVis,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -77,9 +77,12 @@ module Language.Haskell.TH.Lib (
     varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
 
     -- *** Type variable binders
+    DefaultBndrFlag(defaultBndrFlag),
     plainTV, kindedTV,
     plainInvisTV, kindedInvisTV,
+    plainBndrTV, kindedBndrTV,
     specifiedSpec, inferredSpec,
+    bndrReq, bndrInvis,
 
     -- *** Roles
     nominalR, representationalR, phantomR, inferR,
@@ -192,10 +195,10 @@ import Prelude hiding (Applicative(..))
 -------------------------------------------------------------------------------
 -- *   Dec
 
-tySynD :: Quote m => Name -> [TyVarBndr ()] -> m Type -> m Dec
+tySynD :: Quote m => Name -> [TyVarBndr BndrVis] -> m Type -> m Dec
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> Maybe Kind -> [m Con] -> [m DerivClause]
+dataD :: Quote m => m Cxt -> Name -> [TyVarBndr BndrVis] -> Maybe Kind -> [m Con] -> [m DerivClause]
       -> m Dec
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -204,7 +207,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequenceA derivs
     return (DataD ctxt1 tc tvs ksig cons1 derivs1)
 
-newtypeD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> Maybe Kind -> m Con -> [m DerivClause]
+newtypeD :: Quote m => m Cxt -> Name -> [TyVarBndr BndrVis] -> Maybe Kind -> m Con -> [m DerivClause]
          -> m Dec
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -213,14 +216,14 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequenceA derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
 
-typeDataD :: Quote m => Name -> [TyVarBndr ()] -> Maybe Kind -> [m Con]
+typeDataD :: Quote m => Name -> [TyVarBndr BndrVis] -> Maybe Kind -> [m Con]
       -> m Dec
 typeDataD tc tvs ksig cons =
   do
     cons1 <- sequenceA cons
     return (TypeDataD tc tvs ksig cons1)
 
-classD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> [FunDep] -> [m Dec] -> m Dec
+classD :: Quote m => m Cxt -> Name -> [TyVarBndr BndrVis] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
     decs1 <- sequenceA decs
@@ -255,16 +258,16 @@ newtypeInstD ctxt tc tys ksig con derivs =
     derivs1 <- sequenceA derivs
     return (NewtypeInstD ctxt1 Nothing ty1 ksig con1 derivs1)
 
-dataFamilyD :: Quote m => Name -> [TyVarBndr ()] -> Maybe Kind -> m Dec
+dataFamilyD :: Quote m => Name -> [TyVarBndr BndrVis] -> Maybe Kind -> m Dec
 dataFamilyD tc tvs kind
     = pure $ DataFamilyD tc tvs kind
 
-openTypeFamilyD :: Quote m => Name -> [TyVarBndr ()] -> FamilyResultSig
+openTypeFamilyD :: Quote m => Name -> [TyVarBndr BndrVis] -> FamilyResultSig
                 -> Maybe InjectivityAnn -> m Dec
 openTypeFamilyD tc tvs res inj
     = pure $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
 
-closedTypeFamilyD :: Quote m => Name -> [TyVarBndr ()] -> FamilyResultSig
+closedTypeFamilyD :: Quote m => Name -> [TyVarBndr BndrVis] -> FamilyResultSig
                   -> Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
 closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequenceA eqns
@@ -296,13 +299,28 @@ sigT t k
       return $ SigT t' k
 
 -------------------------------------------------------------------------------
+-- *   Type variable binders
+
+class DefaultBndrFlag flag where
+  defaultBndrFlag :: flag
+
+instance DefaultBndrFlag () where
+  defaultBndrFlag = ()
+
+instance DefaultBndrFlag Specificity where
+  defaultBndrFlag = SpecifiedSpec
+
+instance DefaultBndrFlag BndrVis where
+  defaultBndrFlag = BndrReq
+
+plainTV :: DefaultBndrFlag flag => Name -> TyVarBndr flag
+plainTV n = PlainTV n defaultBndrFlag
+
+kindedTV :: DefaultBndrFlag flag => Name -> Kind -> TyVarBndr flag
+kindedTV n k = KindedTV n defaultBndrFlag k
+
+-------------------------------------------------------------------------------
 -- *   Kind
-
-plainTV :: Name -> TyVarBndr ()
-plainTV n = PlainTV n ()
-
-kindedTV :: Name -> Kind -> TyVarBndr ()
-kindedTV n k = KindedTV n () k
 
 starK :: Kind
 starK = StarT

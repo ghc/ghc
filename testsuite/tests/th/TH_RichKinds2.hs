@@ -14,10 +14,10 @@ import Data.List (splitAt, span, elemIndex)
 import Language.Haskell.TH
 
 $(return [OpenTypeFamilyD (TypeFamilyHead
-          (mkName "Map") [KindedTV (mkName "f") ()
+          (mkName "Map") [KindedTV (mkName "f") BndrReq
                           (AppT (AppT ArrowT (VarT (mkName "k1")))
                            (VarT (mkName "k2"))),
-                          KindedTV (mkName "l") ()
+                          KindedTV (mkName "l") BndrReq
                           (AppT ListT
                            (VarT (mkName "k1")))]
           (KindSig (AppT ListT (VarT (mkName "k2")))) Nothing)])

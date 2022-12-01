@@ -2304,10 +2304,10 @@ data InitialKindStrategy
   | InitialKindInfer
 
 -- Does the declaration have a standalone kind signature (SAKS) or a complete
--- user-specified kind (CUSK)?
+-- user-supplied kind (CUSK)?
 data SAKS_or_CUSK
   = SAKS Kind  -- Standalone kind signature, fully zonked! (zonkTcTypeToType)
-  | CUSK       -- Complete user-specified kind (CUSK)
+  | CUSK       -- Complete user-supplied kind (CUSK)
 
 instance Outputable SAKS_or_CUSK where
   ppr (SAKS k) = text "SAKS" <+> ppr k
@@ -2364,7 +2364,7 @@ kcCheckDeclHeader_cusk name flav
   -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
     do { skol_info <- mkSkolemInfo skol_info_anon
-       ; (tclvl, wanted, (scoped_kvs, (tc_tvs, res_kind)))
+       ; (tclvl, wanted, (scoped_kvs, (tc_bndrs, res_kind)))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_cusk" $
               bindImplicitTKBndrs_Q_Skol skol_info kv_ns                      $
               bindExplicitTKBndrs_Q_Skol skol_info ctxt_kind hs_tvs           $
@@ -2372,7 +2372,7 @@ kcCheckDeclHeader_cusk name flav
 
            -- Now, because we're in a CUSK,
            -- we quantify over the mentioned kind vars
-       ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
+       ; let spec_req_tkvs = scoped_kvs ++ binderVars tc_bndrs
              all_kinds     = res_kind : map tyVarKind spec_req_tkvs
 
        ; candidates <- candidateQTyVarsOfKinds all_kinds
@@ -2384,11 +2384,11 @@ kcCheckDeclHeader_cusk name flav
                      candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
-       ; (scoped_kvs, tc_tvs, res_kind) <- liftZonkM $
-          do { scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs  -- scoped_kvs and tc_tvs are skolems,
-             ; tc_tvs     <- mapM zonkTyCoVarKind tc_tvs      -- so zonkTyCoVarKind suffices
-             ; res_kind   <- zonkTcType           res_kind
-             ; return (scoped_kvs, tc_tvs, res_kind) }
+       ; (scoped_kvs, tc_bndrs, res_kind) <- liftZonkM $
+          do { scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs      -- scoped_kvs and tc_bndrs are skolems,
+             ; tc_bndrs   <- mapM zonkTyCoVarBndrKind tc_bndrs    -- so zonkTyCoVarBndrKind suffices
+             ; res_kind   <- zonkTcType res_kind
+             ; return (scoped_kvs, tc_bndrs, res_kind) }
 
        ; let mentioned_kv_set = candidateKindVars candidates
              specified        = scopedSort scoped_kvs
@@ -2396,15 +2396,15 @@ kcCheckDeclHeader_cusk name flav
 
              all_tcbs =  mkNamedTyConBinders Inferred  inferred
                       ++ mkNamedTyConBinders Specified specified
-                      ++ map (mkRequiredTyConBinder mentioned_kv_set) tc_tvs
+                      ++ map (mkExplicitTyConBinder mentioned_kv_set) tc_bndrs
 
        -- Eta expand if necessary; we are building a PolyTyCon
        ; (eta_tcbs, res_kind) <- etaExpandAlgTyCon flav skol_info all_tcbs res_kind
 
-       ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+       ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ binderVars tc_bndrs)
              final_tcbs = all_tcbs `chkAppend` eta_tcbs
              tycon = mkTcTyCon name final_tcbs res_kind all_tv_prs
-                               True -- it is generalised
+                               True -- Make a PolyTcTyCon, fully generalised
                                flav
 
        ; reportUnsolvedEqualities skol_info (binderVars final_tcbs)
@@ -2424,7 +2424,7 @@ kcCheckDeclHeader_cusk name flav
               , text "scoped_kvs" <+> ppr scoped_kvs
               , text "spec_req_tvs" <+> pprTyVars spec_req_tkvs
               , text "all_kinds" <+> ppr all_kinds
-              , text "tc_tvs" <+> pprTyVars tc_tvs
+              , text "tc_tvs" <+> pprTyVars (binderVars tc_bndrs)
               , text "res_kind" <+> ppr res_kind
               , text "inferred" <+> ppr inferred
               , text "specified" <+> ppr specified
@@ -2439,6 +2439,15 @@ kcCheckDeclHeader_cusk name flav
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
+-- | Create a TyConBinder for a user-written type variable binder.
+mkExplicitTyConBinder :: TyCoVarSet -- variables that are used dependently
+                      -> VarBndr TyVar (HsBndrVis GhcRn)
+                      -> TyConBinder
+mkExplicitTyConBinder dep_set (Bndr tv flag) =
+  case flag of
+    HsBndrRequired    -> mkRequiredTyConBinder dep_set tv
+    HsBndrInvisible{} -> mkNamedTyConBinder Specified tv
+
 -- | Kind-check a 'LHsQTyVars'. Used in 'inferInitialKind' (for tycon kinds and
 -- other kinds).
 --
@@ -2451,15 +2460,16 @@ kcInferDeclHeader
   -> TcM MonoTcTyCon    -- ^ A suitably-kinded non-generalized TcTyCon
 kcInferDeclHeader name flav
               (HsQTvs { hsq_ext = kv_ns
-                      , hsq_explicit = hs_tvs }) kc_res_ki
+                      , hsq_explicit = hs_bndrs }) kc_res_ki
   -- No standalone kind signature and no CUSK.
   -- See Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
-    do { (scoped_kvs, (tc_tvs, res_kind))
+    do { rejectInvisibleBinders name hs_bndrs
+       ; (scoped_kvs, (tc_bndrs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
-           <- bindImplicitTKBndrs_Q_Tv kv_ns            $
-              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_tvs $
+           <- bindImplicitTKBndrs_Q_Tv kv_ns              $
+              bindExplicitTKBndrs_Q_Tv ctxt_kind hs_bndrs $
               newExpectedKind =<< kc_res_ki
               -- Why "_Tv" not "_Skol"? See third wrinkle in
               -- Note [Inferring kinds for type declarations] in GHC.Tc.TyCl,
@@ -2469,12 +2479,17 @@ kcInferDeclHeader name flav
                -- recursive group.
                -- See Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
 
+             tc_tvs = binderVars tc_bndrs
+               -- Discard visibility flags. We made sure all of them are HsBndrRequired
+               -- by the call to rejectInvisibleBinders above.
+
              tc_binders = mkAnonTyConBinders tc_tvs
-               -- Also, note that tc_binders has the tyvars from only the
-               -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
-               -- in GHC.Tc.TyCl
+               -- This has to be mkAnonTyConBinder!
+               -- See Note [No polymorphic recursion in type decls] in GHC.Tc.TyCl
                --
-               -- mkAnonTyConBinder: see Note [No polymorphic recursion]
+               -- Also, note that tc_binders has the tyvars from only the
+               -- user-written type variable binders.
+               -- See S1 Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
              all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
                -- NB: bindExplicitTKBndrs_Q_Tv does not clone;
@@ -2482,17 +2497,28 @@ kcInferDeclHeader name flav
                -- See Note [Cloning for type variable binders]
 
              tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
-                               False -- not yet generalised
+                               False -- Make a MonoTcTyCon
                                flav
 
        ; traceTc "kcInferDeclHeader: not-cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_tvs
+         vcat [ ppr name, ppr kv_ns, ppr hs_bndrs
               , ppr scoped_kvs
               , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
        ; return tycon }
   where
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
+
+-- rejectInvisibleBinders is called on on the inference code path; there is
+-- no standalone kind signature, nor CUSK.
+-- See Note [No inference for invisible binders in type decls] in GHC.Tc.TyCl
+rejectInvisibleBinders :: Name -> [LHsTyVarBndr (HsBndrVis GhcRn) GhcRn] -> TcM ()
+rejectInvisibleBinders name = mapM_ check_bndr_vis
+  where
+    check_bndr_vis :: LHsTyVarBndr (HsBndrVis GhcRn) GhcRn -> TcM ()
+    check_bndr_vis bndr =
+      when (isHsBndrInvisible (hsTyVarBndrFlag (unLoc bndr))) $
+        addErr (TcRnInvisBndrWithoutSig name bndr)
 
 -- | Kind-check a declaration header against a standalone kind signature.
 -- See Note [kcCheckDeclHeader_sig]
@@ -2523,7 +2549,7 @@ kcCheckDeclHeader_sig sig_kind name flav
        ; (tclvl, wanted, (implicit_tvs, (skol_tcbs, (extra_tcbs, tycon_res_kind))))
            <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
               bindImplicitTKBndrs_Q_Tv implicit_nms                $  -- Q means don't clone
-              matchUpSigWithDecl sig_tcbs sig_res_kind hs_tv_bndrs $ \ excess_sig_tcbs sig_res_kind ->
+              matchUpSigWithDecl name sig_tcbs sig_res_kind hs_tv_bndrs $ \ excess_sig_tcbs sig_res_kind ->
               do { -- Kind-check the result kind annotation, if present:
                    --    data T a b :: res_ki where ...
                    --               ^^^^^^^^^
@@ -2602,7 +2628,9 @@ kcCheckDeclHeader_sig sig_kind name flav
         -- NB: all_tcbs must bind the tyvars in the range of all_tv_prs
         --     because the tv_prs is used when (say) typechecking the RHS of
         --     a type synonym.
-        ; let tc = mkTcTyCon name swizzled_tcbs swizzled_kind all_tv_prs True flav
+        ; let tc = mkTcTyCon name swizzled_tcbs swizzled_kind all_tv_prs
+                             True -- Make a PolyTcTyCon, fully generalised
+                             flav
 
         ; traceTc "kcCheckDeclHeader_sig }" $ vcat
           [ text "tyConName = " <+> ppr (tyConName tc)
@@ -2614,9 +2642,10 @@ kcCheckDeclHeader_sig sig_kind name flav
         ; return tc }
 
 matchUpSigWithDecl
-  :: [TcTyConBinder]             -- TcTyConBinders (with skolem TcTyVars) from the separate kind signature
+  :: Name                        -- Name of the type constructor for error messages
+  -> [TcTyConBinder]             -- TcTyConBinders (with skolem TcTyVars) from the separate kind signature
   -> TcKind                      -- The tail end of the kind signature
-  -> [LHsTyVarBndr () GhcRn]     -- User-written binders in decl
+  -> [LHsTyVarBndr (HsBndrVis GhcRn) GhcRn]     -- User-written binders in decl
   -> ([TcTyConBinder] -> TcKind -> TcM a)  -- All user-written binders are in scope
                                            --   Argument is excess TyConBinders and tail kind
   -> TcM ( [TcTyConBinder]       -- Skolemised binders, with TcTyVars
@@ -2624,7 +2653,7 @@ matchUpSigWithDecl
 -- See Note [Matching a kind signature with a declaration]
 -- Invariant: Length of returned TyConBinders + length of excess TyConBinders
 --            = length of incoming TyConBinders
-matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
+matchUpSigWithDecl name sig_tcbs sig_res_kind hs_bndrs thing_inside
   = go emptySubst sig_tcbs hs_bndrs
   where
     go subst tcbs []
@@ -2635,23 +2664,22 @@ matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
     go _ [] hs_bndrs
       = failWithTc (TcRnTooManyBinders sig_res_kind hs_bndrs)
 
-    go subst (tcb : tcbs') hs_bndrs
-      | Bndr tv vis <- tcb
-      , isVisibleTcbVis vis
-      , (L _ hs_bndr : hs_bndrs') <- hs_bndrs  -- hs_bndrs is non-empty
+    go subst (tcb : tcbs') hs_bndrs@(hs_bndr : hs_bndrs')
+      | zippable (binderFlag tcb) (hsTyVarBndrFlag (unLoc hs_bndr))
       = -- Visible TyConBinder, so match up with the hs_bndrs
-        do { let tv' = updateTyVarKind (substTy subst) $
+        do { let Bndr tv vis = tcb
+                 tv' = updateTyVarKind (substTy subst) $
                        setTyVarName tv (getName hs_bndr)
                    -- Give the skolem the Name of the HsTyVarBndr, so that if it
                    -- appears in an error message it has a name and binding site
                    -- that come from the type declaration, not the kind signature
                  subst' = extendTCvSubstWithClone subst tv tv'
-           ; tc_hs_bndr hs_bndr (tyVarKind tv')
+           ; tc_hs_bndr (unLoc hs_bndr) (tyVarKind tv')
            ; (tcbs', res) <- tcExtendTyVarEnv [tv'] $
                              go subst' tcbs' hs_bndrs'
            ; return (Bndr tv' vis : tcbs', res) }
 
-      | otherwise
+      | skippable (binderFlag tcb)
       = -- Invisible TyConBinder, so do not consume one of the hs_bndrs
         do { let (subst', tcb') = substTyConBinderX subst tcb
            ; (tcbs', res) <- go subst' tcbs' hs_bndrs
@@ -2659,13 +2687,31 @@ matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
                    --     HsTyVarBndr for an invisible TyConBinder
            ; return (tcb' : tcbs', res) }
 
-    tc_hs_bndr :: HsTyVarBndr () GhcRn -> TcKind -> TcM ()
+      | otherwise =
+          -- At this point we conclude that:
+          --   * the quantifier (tcb) is visible: (ty -> ...), (forall a -> ...)
+          --   * the binder (hs_bndr) is invisible: @t, @(t :: k)
+          -- Any other combination should have been handled by the zippable/skippable clauses.
+          failWithTc (TcRnInvalidInvisTyVarBndr name hs_bndr)
+
+    tc_hs_bndr :: HsTyVarBndr (HsBndrVis GhcRn) GhcRn -> TcKind -> TcM ()
     tc_hs_bndr (UserTyVar _ _ _) _
       = return ()
     tc_hs_bndr (KindedTyVar _ _ (L _ hs_nm) lhs_kind) expected_kind
       = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) lhs_kind
            ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
              unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
+
+    -- See GHC Proposal #425, section "Kind checking",
+    -- where zippable and skippable are defined.
+    zippable :: TyConBndrVis -> HsBndrVis GhcRn -> Bool
+    zippable vis HsBndrRequired      = isVisibleTcbVis vis
+    zippable vis (HsBndrInvisible _) = isInvisSpecTcbVis vis
+
+    -- See GHC Proposal #425, section "Kind checking",
+    -- where zippable and skippable are defined.
+    skippable :: TyConBndrVis -> Bool
+    skippable vis = not (isVisibleTcbVis vis)
 
 substTyConBinderX :: Subst -> TyConBinder -> (Subst, TyConBinder)
 substTyConBinderX subst (Bndr tv vis)
@@ -2706,7 +2752,7 @@ Basic plan is this:
     NB: these TyConBinders contain TyVars, not TcTyVars.
 
   * matchUpSigWithDecl: match the [TyConBinder] from the signature with
-    the [LHsTyVarBndr () GhcRn] from the declaration.  The latter are the
+    the [LHsTyVarBndr (HsBndrVis GhcRn) GhcRn] from the declaration.  The latter are the
     explicit, user-written binders.  e.g.
         data T (a :: k) b = ....
     There may be more of the former than the latter, because the former
@@ -2855,54 +2901,6 @@ signature, not by the inline kind annotation:
 
 This (Id Bool) will not show up anywhere after we're done validating it, so we
 have no use for the produced coercion.
--}
-
-{- Note [No polymorphic recursion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should this kind-check?
-  data T ka (a::ka) b  = MkT (T Type           Int   Bool)
-                             (T (Type -> Type) Maybe Bool)
-
-Notice that T is used at two different kinds in its RHS.  No!
-This should not kind-check.  Polymorphic recursion is known to
-be a tough nut.
-
-Previously, we laboriously (with help from the renamer)
-tried to give T the polymorphic kind
-   T :: forall ka -> ka -> kappa -> Type
-where kappa is a unification variable, even in the inferInitialKinds
-phase (which is what kcInferDeclHeader is all about).  But
-that is dangerously fragile (see the ticket).
-
-Solution: make kcInferDeclHeader give T a straightforward
-monomorphic kind, with no quantification whatsoever. That's why
-we use mkAnonTyConBinder for all arguments when figuring out
-tc_binders.
-
-But notice that (#16322 comment:3)
-
-* The algorithm successfully kind-checks this declaration:
-    data T2 ka (a::ka) = MkT2 (T2 Type a)
-
-  Starting with (inferInitialKinds)
-    T2 :: (kappa1 :: kappa2 :: *) -> (kappa3 :: kappa4 :: *) -> *
-  we get
-    kappa4 := kappa1   -- from the (a:ka) kind signature
-    kappa1 := Type     -- From application T2 Type
-
-  These constraints are soluble so generaliseTcTyCon gives
-    T2 :: forall (k::Type) -> k -> *
-
-  But now the /typechecking/ (aka desugaring, tcTyClDecl) phase
-  fails, because the call (T2 Type a) in the RHS is ill-kinded.
-
-  We'd really prefer all errors to show up in the kind checking
-  phase.
-
-* This algorithm still accepts (in all phases)
-     data T3 ka (a::ka) = forall b. MkT3 (T3 Type b)
-  although T3 is really polymorphic-recursive too.
-  Perhaps we should somehow reject that.
 
 Note [Kind variable ordering for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3049,7 +3047,7 @@ tcTKTelescope mode tele thing_inside = case tele of
 --    HsOuterTyVarBndrs
 --------------------------------------
 
-bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed
+bindOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed  -- Only to support traceTc
                   => SkolemMode
                   -> HsOuterTyVarBndrs flag GhcRn
                   -> TcM a
@@ -3126,7 +3124,7 @@ bindOuterFamEqnTKBndrs skol_info
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 ---------------
-tcOuterTKBndrs :: OutputableBndrFlag flag 'Renamed
+tcOuterTKBndrs :: OutputableBndrFlag flag 'Renamed   -- Only to support traceTc
                => SkolemInfo
                -> HsOuterTyVarBndrs flag GhcRn
                -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
@@ -3137,7 +3135,7 @@ tcOuterTKBndrs skol_info
   -- Do not clone the outer binders
   -- See Note [Cloning for type variable binders] under "must not"
 
-tcOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed
+tcOuterTKBndrsX :: OutputableBndrFlag flag 'Renamed   -- Only to support traceTc
                 => SkolemMode -> SkolemInfo
                 -> HsOuterTyVarBndrs flag GhcRn
                 -> TcM a -> TcM (HsOuterTyVarBndrs flag GhcTc, a)
@@ -3158,7 +3156,7 @@ tcOuterTKBndrsX skol_mode skol_info outer_bndrs thing_inside
 --    Explicit tyvar binders
 --------------------------------------
 
-tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed
+tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed    -- Only to suppor traceTc
                   => SkolemInfo
                   -> [LHsTyVarBndr flag GhcRn]
                   -> TcM a
@@ -3166,7 +3164,7 @@ tcExplicitTKBndrs :: OutputableBndrFlag flag 'Renamed
 tcExplicitTKBndrs skol_info
   = tcExplicitTKBndrsX (smVanilla { sm_clone = True, sm_tvtv = SMDSkolemTv skol_info })
 
-tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed
+tcExplicitTKBndrsX :: OutputableBndrFlag flag 'Renamed    -- Only to suppor traceTc
                    => SkolemMode
                    -> [LHsTyVarBndr flag GhcRn]
                    -> TcM a
@@ -3201,14 +3199,14 @@ tcExplicitTKBndrsX skol_mode bndrs thing_inside = case nonEmpty bndrs of
 -- | Skolemise the 'HsTyVarBndr's in an 'HsForAllTelescope' with the supplied
 -- 'TcTyMode'.
 bindExplicitTKBndrs_Skol
-    :: (OutputableBndrFlag flag 'Renamed)
+    :: (OutputableBndrFlag flag 'Renamed)      -- Only to suppor traceTc
     => SkolemInfo
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
 
 bindExplicitTKBndrs_Tv
-    :: (OutputableBndrFlag flag 'Renamed)
+    :: (OutputableBndrFlag flag 'Renamed)    -- Only to suppor traceTc
     => [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
@@ -3218,33 +3216,34 @@ bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (smVanilla { sm_clone = True, sm
    -- sm_clone: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrs_Q_Skol
-    :: SkolemInfo
+    :: (OutputableBndrFlag flag 'Renamed)   -- Only to support traceTc
+    => SkolemInfo
     -> ContextKind
-    -> [LHsTyVarBndr () GhcRn]
+    -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
-    -> TcM ([TcTyVar], a)
+    -> TcM ([VarBndr TyVar flag], a)
 
 bindExplicitTKBndrs_Q_Tv
-    :: ContextKind
-    -> [LHsTyVarBndr () GhcRn]
+    :: (OutputableBndrFlag flag 'Renamed)   -- Only to support traceTc
+    => ContextKind
+    -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
-    -> TcM ([TcTyVar], a)
+    -> TcM ([VarBndr TyVar flag], a)
 -- These do not clone: see Note [Cloning for type variable binders]
 bindExplicitTKBndrs_Q_Skol skol_info ctxt_kind hs_bndrs thing_inside
-  = mapFst binderVars $
-    bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+  = bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                     , sm_kind = ctxt_kind, sm_tvtv = SMDSkolemTv skol_info })
                          hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
 bindExplicitTKBndrs_Q_Tv  ctxt_kind hs_bndrs thing_inside
-  = mapFst binderVars $
-    bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
+  = bindExplicitTKBndrsX (smVanilla { sm_clone = False, sm_parent = True
                                     , sm_tvtv = SMDTyVarTv, sm_kind = ctxt_kind })
                          hs_bndrs thing_inside
     -- sm_clone=False: see Note [Cloning for type variable binders]
 
-bindExplicitTKBndrsX :: (OutputableBndrFlag flag 'Renamed)
+bindExplicitTKBndrsX
+    :: (OutputableBndrFlag flag 'Renamed)   -- Only to support traceTc
     => SkolemMode
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a

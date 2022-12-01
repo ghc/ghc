@@ -93,3 +93,99 @@ additional conservative restriction, that type variables occurring in patterns m
 already be in scope, and so are always new variables that only bind whatever type is
 matched, rather than ever referring to a variable from an outer scope. Type wildcards
 ``_`` may be used in any place where no new variable needs binding.
+
+.. _invisible-binders-in-type-declarations:
+
+Invisible Binders in Type Declarations
+--------------------------------------
+
+Syntax
+~~~~~~
+
+The type abstraction syntax can be used in type declaration headers, including
+``type``, ``data``, ``newtype``, ``class``, ``type family``, and ``data family``
+declarations. Here are a few examples::
+
+    type C :: forall k. k -> Constraint
+    class C @k a where ...
+            ^^
+
+    type D :: forall k j. k -> j -> Type
+    data D @k @j (a :: k) (b :: j) = ...
+           ^^ ^^
+
+    type F :: forall p q. p -> q -> (p, q)
+    type family F @p @q a b where ...
+                  ^^ ^^
+
+Just as ordinary type parameters, invisible type variable binders may have kind
+annotations::
+
+    type F :: forall p q. p -> q -> (p, q)
+    type family F @(p :: Type) @(q :: Type) (a :: p) (b :: q) where ...
+
+Scope
+~~~~~
+
+The ``@k``-binders scope over the body of the declaration and can be used to bring
+implicit type or kind variables into scope. Consider::
+
+    type C :: forall i. (i -> i -> i) -> Constraint
+    class C @i a where
+        p :: P a i
+
+Without the ``@i`` binder in ``C @i a``, the ``i`` in ``P a i`` would no longer
+refer to the class variable ``i`` and would be implicitly quantified in the
+method signature instead.
+
+Type checking
+~~~~~~~~~~~~~
+
+Invisible type variable binders require either a standalone kind signature or a
+complete user-supplied kind.
+
+If a standalone kind signature is given, GHC will match up ``@k``-binders with
+the corresponding ``forall k.`` quantifiers in the signature::
+
+    type B :: forall k. k -> forall j. j -> Type
+    data B @k (a :: k) @j (b :: j)
+
++------------------------------------+
+|   Quantifier-binder pairs of ``B`` |
++==============+=====================+
+| ``forall k.``| ``@k``              |
++--------------+---------------------+
+| ``k ->``     | ``(a :: k)``        |
++--------------+---------------------+
+| ``forall j.``| ``@j``              |
++--------------+---------------------+
+| ``j ->``     | ``(b :: j)``        |
++--------------+---------------------+
+
+The matching is done left-to-right. Consider::
+
+    type S :: forall a b. a -> b -> Type
+    type S @k x y = ...
+
+In this example, ``@k`` is matched with ``forall a.``, not ``forall b.``:
+
++-------------------------------------+
+|   Quantifier-binder pairs of ``S``  |
++==============+======================+
+| ``forall a.``| ``@k``               |
++--------------+----------------------+
+| ``forall b.``|                      |
++--------------+----------------------+
+| ``a ->``     | ``x``                |
++--------------+----------------------+
+| ``b ->``     | ``y``                |
++--------------+----------------------+
+
+When a standalone kind signature is absent but the definition has a complete
+user-supplied kind (and the :extension:`CUSKs` extension is enabled),
+a ``@k``-binder gives rise to a ``forall k.`` quantifier in the inferred kind
+signature. The inferred ``forall k.`` does not float to the left; the order of
+quantifiers continues to match the order of binders in the header::
+
+    -- Inferred kind: forall k. k -> forall j. j -> Type
+    data B @(k :: Type) (a :: k) @(j :: Type) (b :: j)

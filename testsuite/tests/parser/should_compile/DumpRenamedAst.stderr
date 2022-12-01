@@ -306,7 +306,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:12:30 }))]
               (EpaComments
                []))
-             (())
+             (HsBndrRequired)
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:12:21-22 })
               {Name: as})
@@ -754,7 +754,7 @@
              []
              (EpaComments
               []))
-            (())
+            (HsBndrRequired)
             (L
              (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:8 })
              {Name: f})))
@@ -770,7 +770,7 @@
              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:22:17 }))]
              (EpaComments
               []))
-            (())
+            (HsBndrRequired)
             (L
              (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:11 })
              {Name: a})
@@ -965,7 +965,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:23 }))]
               (EpaComments
                []))
-             (())
+             (HsBndrRequired)
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:17 })
               {Name: a})
@@ -989,7 +989,7 @@
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:40 }))]
               (EpaComments
                []))
-             (())
+             (HsBndrRequired)
              (L
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:26 })
               {Name: f})
@@ -1075,7 +1075,7 @@
              []
              (EpaComments
               []))
-            (())
+            (HsBndrRequired)
             (L
              (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:27:9 })
              {Name: a})))])
@@ -1105,7 +1105,7 @@
                 []
                 (EpaComments
                  []))
-               (())
+               (HsBndrRequired)
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:28:10 })
                 {Name: a})))
@@ -1119,7 +1119,7 @@
                 []
                 (EpaComments
                  []))
-               (())
+               (HsBndrRequired)
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:28:12 })
                 {Name: b})))])

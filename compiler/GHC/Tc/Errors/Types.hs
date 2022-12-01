@@ -2262,7 +2262,7 @@ data TcRnMessage where
 
     Test cases: saks/should_fail/saks_fail008
   -}
-  TcRnTooManyBinders :: !Kind -> ![LHsTyVarBndr () GhcRn] -> TcRnMessage
+  TcRnTooManyBinders :: !Kind -> ![LHsTyVarBndr (HsBndrVis GhcRn) GhcRn] -> TcRnMessage
 
   {-| TcRnDifferentNamesForTyVar is an error that indicates different names being
      used for the same type variable.
@@ -3062,6 +3062,50 @@ data TcRnMessage where
      Test cases: rename/should_fail/RnMultipleMinimalPragmaFail
   -}
   TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
+
+  {-| 'TcRnIllegalInvisTyVarBndr' is an error that occurs
+      when invisible type variable binders in type declarations
+      are used without enabling the @TypeAbstractions@ extension.
+
+      Example:
+        {-# LANGUAGE NoTypeAbstractions #-}         -- extension disabled
+        data T @k (a :: k) @(j :: Type) (b :: j)
+               ^^          ^^^^^^^^^^^^
+
+      Test case: T22560_fail_ext
+  -}
+  TcRnIllegalInvisTyVarBndr
+    :: !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
+    -> TcRnMessage
+
+  {-| 'TcRnInvalidInvisTyVarBndr' is an error that occurs
+      when an invisible type variable binder has no corresponding
+      @forall k.@ quantifier in the standalone kind signature.
+
+      Example:
+        type P :: forall a -> Type
+        data P @a = MkP
+
+      Test cases: T22560_fail_a T22560_fail_b
+  -}
+  TcRnInvalidInvisTyVarBndr
+    :: !Name
+    -> !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
+    -> TcRnMessage
+
+  {-| 'TcRnInvisBndrWithoutSig' is an error triggered by attempting to use
+      an invisible type variable binder in a type declaration without a
+      standalone kind signature or a complete user-supplied kind.
+
+      Example:
+        data T @k (a :: k)     -- No CUSK, no SAKS
+
+      Test case: T22560_fail_d
+  -}
+  TcRnInvisBndrWithoutSig
+    :: !Name
+    -> !(LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
+    -> TcRnMessage
 
   {-| TcRnLoopySuperclassSolve is a warning, controlled by @-Wloopy-superclass-solve@,
       that is triggered when GHC solves a constraint in a possibly-loopy way,

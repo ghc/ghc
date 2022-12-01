@@ -145,6 +145,8 @@ instance Outputable GhcHint where
           Just (DataFamilyInst {}) -> text "data family"
     SuggestAddStandaloneDerivation
       -> text "Use a standalone deriving declaration instead"
+    SuggestAddStandaloneKindSignature name
+      -> text "Add a standalone kind signature for" <+> quotes (ppr name)
     SuggestFillInWildcardConstraint
       -> text "Fill in the wildcard constraint yourself"
     SuggestRenameForall

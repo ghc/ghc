@@ -29,7 +29,7 @@ module GHC.Tc.Zonk.TcType
   , zonkDTyCoVarSetAndFV
 
     -- ** Zonking 'CoVar's and 'Id's
-  , zonkId, zonkCoVar, zonkTyCoVar, zonkTyCoVarKind
+  , zonkId, zonkCoVar, zonkTyCoVar, zonkTyCoVarKind, zonkTyCoVarBndrKind
 
     -- ** Zonking skolem info
   , zonkSkolemInfo, zonkSkolemInfoAnon
@@ -329,6 +329,11 @@ zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 zonkTyCoVarKind :: TyCoVar -> ZonkM TyCoVar
 zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind') }
+
+zonkTyCoVarBndrKind :: VarBndr TyCoVar flag -> ZonkM (VarBndr TyCoVar flag)
+zonkTyCoVarBndrKind (Bndr tv flag) =
+  do { tv' <- zonkTyCoVarKind tv
+     ; return (Bndr tv' flag) }
 
 -- | zonkId is used *during* typechecking just to zonk the 'Id''s type
 zonkId :: TcId -> ZonkM TcId

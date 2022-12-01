@@ -14,7 +14,7 @@ import Language.Haskell.TH
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "F")
-       [ PlainTV (mkName "a") (), PlainTV (mkName "b") (), PlainTV (mkName "c") () ]
+       [ PlainTV (mkName "a") BndrReq, PlainTV (mkName "b") BndrReq, PlainTV (mkName "c") BndrReq ]
        (TyVarSig (KindedTV (mkName "result") () (VarT (mkName "k"))))
        (Just $ InjectivityAnn (mkName "result")
                              [(mkName "a"), (mkName "b"), (mkName "c") ]))
@@ -41,7 +41,7 @@ $( return
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "J")
-       [ PlainTV (mkName "a") (), KindedTV (mkName "b") () (VarT (mkName "k")) ]
+       [ PlainTV (mkName "a") BndrReq, KindedTV (mkName "b") BndrReq (VarT (mkName "k")) ]
        (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r") [mkName "a"]))
    , TySynInstD
@@ -60,8 +60,8 @@ $( return
 $( return
    [ ClosedTypeFamilyD (TypeFamilyHead
        (mkName "I")
-       [ KindedTV (mkName "a") () StarT, KindedTV (mkName "b") () StarT
-       , KindedTV (mkName "c") () StarT ]
+       [ KindedTV (mkName "a") BndrReq StarT, KindedTV (mkName "b") BndrReq StarT
+       , KindedTV (mkName "c") BndrReq StarT ]
        (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r") [(mkName "a"), (mkName "b")]))
 
@@ -98,7 +98,7 @@ $( do { decl@([ClosedTypeFamilyD (TypeFamilyHead _ _ _ (Just inj)) _]) <-
 $( return
    [ OpenTypeFamilyD (TypeFamilyHead
        (mkName "H")
-       [ PlainTV (mkName "a") (), PlainTV (mkName "b") (), PlainTV (mkName "c") () ]
+       [ PlainTV (mkName "a") BndrReq, PlainTV (mkName "b") BndrReq, PlainTV (mkName "c") BndrReq ]
        (TyVarSig (PlainTV (mkName "r") ()))
        (Just $ InjectivityAnn (mkName "r")
                              [(mkName "a"), (mkName "b") ]))

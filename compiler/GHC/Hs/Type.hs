@@ -32,6 +32,7 @@ module GHC.Hs.Type (
 
         HsType(..), HsCoreTy, LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), EpAnnForallTy, HsTyVarBndr(..), LHsTyVarBndr,
+        HsBndrVis(..), isHsBndrInvisible,
         LHsQTyVars(..),
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
@@ -83,7 +84,7 @@ module GHC.Hs.Type (
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigWcType, hsPatSigType,
         hsTyKindSig,
-        setHsTyVarBndrFlag, hsTyVarBndrFlag,
+        setHsTyVarBndrFlag, hsTyVarBndrFlag, updateHsTyVarBndrFlag,
 
         -- Printing
         pprHsType, pprHsForAll,
@@ -188,7 +189,7 @@ mkHsForAllInvisTele :: EpAnnForallTy
 mkHsForAllInvisTele an invis_bndrs =
   HsForAllInvis { hsf_xinvis = an, hsf_invis_bndrs = invis_bndrs }
 
-mkHsQTvs :: [LHsTyVarBndr () GhcPs] -> LHsQTyVars GhcPs
+mkHsQTvs :: [LHsTyVarBndr (HsBndrVis GhcPs) GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }
 
 emptyLHsQTvs :: LHsQTyVars GhcRn
@@ -289,12 +290,22 @@ type instance XXTyVarBndr   (GhcPass _) = DataConCantHappen
 hsTyVarBndrFlag :: HsTyVarBndr flag (GhcPass pass) -> flag
 hsTyVarBndrFlag (UserTyVar _ fl _)     = fl
 hsTyVarBndrFlag (KindedTyVar _ fl _ _) = fl
+-- By specialising to (GhcPass p) we know that XXTyVarBndr is DataConCantHappen
+-- so these two equations are exhaustive: extension construction can't happen
 
 -- | Set the attached flag
 setHsTyVarBndrFlag :: flag -> HsTyVarBndr flag' (GhcPass pass)
   -> HsTyVarBndr flag (GhcPass pass)
 setHsTyVarBndrFlag f (UserTyVar x _ l)     = UserTyVar x f l
 setHsTyVarBndrFlag f (KindedTyVar x _ l k) = KindedTyVar x f l k
+
+-- | Update the attached flag
+updateHsTyVarBndrFlag
+  :: (flag -> flag')
+  -> HsTyVarBndr flag  (GhcPass pass)
+  -> HsTyVarBndr flag' (GhcPass pass)
+updateHsTyVarBndrFlag f (UserTyVar   x flag name)    = UserTyVar   x (f flag) name
+updateHsTyVarBndrFlag f (KindedTyVar x flag name ki) = KindedTyVar x (f flag) name ki
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
 hsTvbAllKinded :: LHsQTyVars (GhcPass p) -> Bool
@@ -990,6 +1001,15 @@ instance OutputableBndrFlag Specificity p where
     pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
     pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
     pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
+
+instance OutputableBndrFlag (HsBndrVis p') p where
+    pprTyVarBndr (UserTyVar _ vis n) = pprHsBndrVis vis $ ppr n
+    pprTyVarBndr (KindedTyVar _ vis n k) =
+      pprHsBndrVis vis $ parens $ hsep [ppr n, dcolon, ppr k]
+
+pprHsBndrVis :: HsBndrVis pass -> SDoc -> SDoc
+pprHsBndrVis HsBndrRequired d = d
+pprHsBndrVis (HsBndrInvisible _) d = char '@' <> d
 
 instance OutputableBndrId p => Outputable (HsSigType (GhcPass p)) where
     ppr (HsSig { sig_bndrs = outer_bndrs, sig_body = body }) =

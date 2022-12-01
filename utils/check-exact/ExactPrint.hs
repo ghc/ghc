@@ -3747,6 +3747,16 @@ instance ExactPrintTVFlag Specificity where
         SpecifiedSpec -> (AnnOpenP, AnnCloseP)
         InferredSpec  -> (AnnOpenC, AnnCloseC)
 
+instance ExactPrintTVFlag (HsBndrVis GhcPs) where
+  exactTVDelimiters an0 bvis thing_inside = do
+    case bvis of
+      HsBndrRequired -> return ()
+      HsBndrInvisible at -> markToken at >> return ()
+    an1 <- markEpAnnAllL an0 lid AnnOpenP
+    r <- thing_inside
+    an2 <- markEpAnnAllL an1 lid AnnCloseP
+    return (an2, r)
+
 instance ExactPrintTVFlag flag => ExactPrint (HsTyVarBndr flag GhcPs) where
   getAnnotationEntry (UserTyVar an _ _)     = fromAnn an
   getAnnotationEntry (KindedTyVar an _ _ _) = fromAnn an

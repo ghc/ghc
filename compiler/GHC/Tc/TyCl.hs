@@ -360,6 +360,268 @@ support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
 See tc269 for an example.
 
+Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A TcTyCon is one of the variants of TyCon.  First, here are its invariants:
+
+* TcTyCon: a TyCon built with the TcTyCon constructor
+  A TcTyCon contains TcTyVars in its binders and kind
+
+* TcTyConBinder: a TyConBinder with a TcTyVar inside (not a TyVar)
+
+* MonoTcTyCon: a form of TcTyCon
+  - Flag tcTyConIsPoly = False
+
+  - tyConBinders are TcTyConBinders: they contain TcTyVars, which are
+    unification variables (TyVarTv), and whose kinds may contain
+    unification variables.
+
+  - tyConKind: the Monomorphic Recursion Principle:
+       a MonoTcTyCon has a /monomorphic kind/.
+    See Note [No polymorphic recursion in type decls].
+    But the tyConKind may contain free unification variables.
+
+  - tyConScopedTyVars is important; maps a Name to a TyVarTv unification variable
+    The order matters: Specified then Required variables.
+    E.g. in
+        data T a (b :: k) = ...
+    the order will be [k, a, b].
+
+    We do not allow @k-binders in inference mode, so we do not need to worry about
+       data T a @k (b :: k) = ...
+    where we would have to put `k` (Specified) after `a` (Required)
+
+    NB: There are no Inferred binders in tyConScopedTyVars; 'a' may
+    also be poly-kinded, but that kind variable will be added by
+    generaliseTcTyCon, in the passage to a PolyTcTyCon.
+
+  - tyConBinders are irrelevant; we just use tcTyConScopedTyVars
+    Well not /quite/ irrelevant:
+      * its length gives the number of explicit binders, and so allows us to
+        distinguish between the implicit and explicit elements of
+        tyConScopedTyVars.
+      * at construction time (mkTcTyCon) for a MonoTcTyCon (the call to mkTcTyCon
+        in GHC.Tc.Gen.HsType.kcInferDeclHeader) the tyConBinders are used to
+        construct the tyConKind; all must have AnonTCB visiblity so we we get
+        a monokind.
+
+* PolyTcTyCon: a form of TcTyCon
+  - Flag tcTyConIsPoly = True; this is used only to short-cut zonking
+
+  - tyConBinders are still TcTyConBinders, but they are /skolem/ TcTyVars,
+    with fixed kinds, and accurate skolem info: no unification variables here
+
+    tyConBinders includes the Inferred binders if any
+
+    tyConBinders uses the Names from the original, renamed program.
+
+  - tcTyConScopedTyVars is irrelevant: just use (binderVars tyConBinders)
+    All the types have been swizzled back to use the original Names
+    See Note [tyConBinders and lexical scoping] in GHC.Core.TyCon
+
+The main purpose of these TcTyCons is during kind-checking of
+type/class declarations (in GHC.Tc.TyCl).  During kind checking we
+come upon knowledge of the eventual tycon in bits and pieces, and we
+use a TcTyCon to record what we know before we are ready to build the
+final TyCon.  Here is the plan:
+
+* Step 1 (inferInitialKinds, called from kcTyClGroup
+          inference only, skipped for checking):
+  Make a MonoTcTyCon whose binders are TcTyVars,
+  that may contain free unification variables.
+  See Note [No polymorphic recursion in type decls]
+
+* Step 2 (kcTyClDecl, called from kcTyClGroup)
+  Kind-check the declarations of the group; this step just does
+  unifications that affect the unification variables created in
+  Step 1
+
+* Step 3 (generaliseTcTyCon, called from kcTyClGroup)
+  Generalise that MonoTcTyCon to make a PolyTcTyCon
+  Its binders are skolem TcTyVars, with accurate SkolemInfo
+
+* Step 4 (tcTyClDecl, called from tcTyClDecls)
+  Typecheck the type and class decls to produce a final TyCon
+  Its binders are final TyVars, not TcTyVars
+
+Note that a MonoTcTyCon can contain unification variables, but a
+PolyTcTyCon does not: only skolem TcTyVars.  See the invariants above.
+
+More details about /kind inference/:
+
+S1) In kcTyClGroup, we use inferInitialKinds to look over the
+    declaration of any TyCon that lacks a kind signature or
+    CUSK, to determine its "shape"; for example, the number of
+    parameters, and any kind signatures.
+
+    We record that shape record that shape in a MonoTcTyCon; it is
+    "mono" because it has not been been generalised, and its binders
+    and result kind may have free unification variables.
+
+S2) Still in kcTyClGroup, we use kcLTyClDecl to kind-check the
+    body (class methods, data constructors, etc.) of each of
+    these MonoTcTyCons, which has the effect of filling in the
+    metavariables in the tycon's initial kind.
+
+S3) Still in kcTyClGroup, we use generaliseTyClDecl to generalize
+    each MonoTcTyCon to get a PolyTcTyCon, with skolem TcTyVars in it,
+    and a final, fixed kind.
+
+S4) Finally, back in tcTyClDecls, we extend the environment with
+    the PolyTcTyCons, and typecheck each declaration (regardless
+    of kind signatures etc) to get final TyCon.
+
+More details about /kind checking/
+
+S5) In kcTyClGroup, we use checkInitialKinds to get the
+    utterly-final Kind of all TyCons in the group that
+      (a) have a standalone kind signature or
+      (b) have a CUSK.
+    This produces a PolyTcTyCon, that is, a TcTyCon in which the binders
+    and result kind are full of TyVars (not TcTyVars).  No unification
+    variables here; everything is in its final form.
+
+Wrinkles:
+
+(W1) When recovering from a type error in a type declaration,
+     we want to put the erroneous TyCon in the environment in a
+     way that won't lead to more errors.  We use a PolyTcTyCon for this;
+     see makeRecoveryTyCon.
+
+(W2) tyConScopedTyVars.  A challenging piece in all of this is that we
+     end up taking three separate passes over every declaration:
+       - one in inferInitialKind (this pass look only at the head, not the body)
+       - one in kcTyClDecls (to kind-check the body)
+       - a final one in tcTyClDecls (to desugar)
+
+     In the latter two passes, we need to connect the user-written type
+     variables in an LHsQTyVars with the variables in the tycon's
+     inferred kind. Because the tycon might not have a CUSK, this
+     matching up is, in general, quite hard to do.  (Look through the
+     git history between Dec 2015 and Apr 2016 for
+     GHC.Tc.Gen.HsType.splitTelescopeTvs!)
+
+     Instead of trying, we just store the list of type variables to
+     bring into scope, in the tyConScopedTyVars field of a MonoTcTyCon.
+     These tyvars are brought into scope by the calls to
+        tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon)
+     in kcTyClDecl.
+
+     In a TcTyCon, why is tyConScopedTyVars :: [(Name,TcTyVar)] rather
+     than just [TcTyVar]?  Consider these mutually-recursive decls
+        data T (a :: k1) b = MkT (S a b)
+        data S (c :: k2) d = MkS (T c d)
+     We start with k1 bound to kappa1, and k2 to kappa2; so initially
+     in the (Name,TcTyVar) pairs the Name is that of the TcTyVar. But
+     then kappa1 and kappa2 get unified; so after the zonking in
+     'generalise' in 'kcTyClGroup' the Name and TcTyVar may differ.
+
+See also Note [Type checking recursive type and class declarations].
+
+Note [No polymorphic recursion in type decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC.Tc.HsType.kcInferDeclHeader we use mkAnonTyConBinders to make
+the TyConBinders for the MonoTcTyCon.  Here is why.
+
+Should this kind-check (cf #16344)?
+  data T ka (a::ka) b  = MkT (T Type           Int   Bool)
+                             (T (Type -> Type) Maybe Bool)
+
+Notice that T is used at two different kinds in its RHS.  No!
+This should not kind-check.  Polymorphic recursion is known to
+be a tough nut.
+
+Many moons ago, we laboriously (with help from the renamer) tried to give T
+the polymorphic kind
+   T :: forall ka -> ka -> kappa -> Type
+where kappa is a unification variable, even in the inferInitialKinds phase
+(which is what kcInferDeclHeader is all about).  But that is dangerously
+fragile (see #16344), because `kappa` might get unified with `ka`, and
+depending on just /when/ that unification happens, the instantiation of T's
+kind would vary between different call sites of T.
+
+We encountered similar trickiness with invisible binders in type
+declarations: see Note [No inference for invisible binders in type decls]
+
+Solution: the Monomorphic Recursion Principle:
+
+    A MonoTcTyCon has a monomoprhic kind (no foralls!)
+
+See the invariants on MonoTcTyCon in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon].
+
+So kcInferDeclHeader gives T a straightforward monomorphic kind, with no
+quantification whatsoever. That's why we always use mkAnonTyConBinder for
+all arguments when figuring out tc_binders.
+
+But notice that (#16344 comment:3)
+
+* Consider this declaration:
+    data T2 ka (a::ka) = MkT2 (T2 Type a)
+
+  Starting with inferInitialKinds
+  (Step 1 of Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]):
+    MonoTcTyCon binders:
+      ka[tyv] :: (kappa1[tau] :: Type)
+       a[tyv] :: (ka[tyv]     :: Type)
+    MonoTcTyCon kind:
+      T2 :: kappa1[tau] -> ka[tyv] -> Type
+
+  Given this kind for T2, in Step 2 we kind-check (T2 Type a)
+  from where we see
+    T2's first arg:  (kappa1 ~ Type)
+    T2's second arg: (ka ~ ka)
+  These constraints are soluble by (kappa1 := Type)
+  so generaliseTcTyCon (Step 3) gives
+    T2 :: forall (k::Type) -> k -> *
+
+  But now the /typechecking/ (Step 4, aka desugaring, tcTyClDecl)
+  phase fails, because the call (T2 Type a) in the RHS is ill-kinded.
+
+  We'd really prefer all errors to show up in the kind checking phase.
+
+* This algorithm still accepts (in all phases)
+     data T3 ka (a::ka) = forall b. MkT3 (T3 Type b)
+  although T3 is really polymorphic-recursive too.
+  Perhaps we should somehow reject that.
+
+Note [No inference for invisible binders in type decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have (#22560):
+   data T @k (a::k) = MkT (...(T ty)...)
+What monokind can we give to T after step 1 of the kind inference
+algorithm described in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon]?
+Remember: Step 1 generates a MonoTcTyCon.
+
+It can't be
+  T :: kappa1 -> kappa2 -> Type
+because the invocation `(T ty)` doesn't have a visible argument for `kappa`.
+Nor can it be
+  T :: forall k. kappa2 -> Type
+because that breaks the Monomorphic Recursion Principle: MonoTcTyCons have
+monomorphic kinds; see Note [No polymorphic recursion in type decls]. It could be
+  T :: kappa1 ->. kappa2 -> type
+where `->.` is a new kind of arrow in kinds, which (like a type-class argument
+in terms) is invisibly instantiated.  Or we could fake it with
+  T :: forall _. kappa2 -> Type
+where `_` is a completely fresh variable, but that seems very smelly and makes it
+harder to talk about the Monomorphic Recursion Principle.  Moreover we'd need
+some extra fancy types in TyConBinders to record this extra information.
+
+Note that in *terms* we do not allow
+  f @a (x::a) = rhs
+unless `f` has a type signature.  So we do the same for types:
+
+  We allow `@` binders in data type declarations ONLY if the
+  type constructor has a standalone kind signature (or a CUSK).
+
+That means that GHC.Tc.Gen.HsType.kcInferDeclHeader, which is used when we
+don't have a kind signature or CUSK, and builds a MonoTcTyCon, we can simply
+reject invisible binders outright (GHC.Tc.Gen.HsType.rejectInvisibleBinders);
+and continue to use mkAnonTyConBinders as described in
+Note [No polymorphic recursion in type decls].
+
+If we get cries of pain we can revist this decision.
+
 Note [CUSKs and PolyKinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -410,100 +672,6 @@ the kinds of *associated* families into the construction of the initial kind
 environment. (This is handled by `allDecls').
 
 See also Note [Kind checking recursive type and class declarations]
-
-Note [How TcTyCons work]
-~~~~~~~~~~~~~~~~~~~~~~~~
-TcTyCons are used for two distinct purposes
-
-1.  When recovering from a type error in a type declaration,
-    we want to put the erroneous TyCon in the environment in a
-    way that won't lead to more errors.  We use a TcTyCon for this;
-    see makeRecoveryTyCon.
-
-2.  When checking a type/class declaration (in module GHC.Tc.TyCl), we come
-    upon knowledge of the eventual tycon in bits and pieces, and we use
-    a TcTyCon to record what we know before we are ready to build the
-    final TyCon.  Here is the plan:
-
-    Step 1 (inferInitialKinds, inference only, skipped for checking):
-       Make a MonoTcTyCon whose binders are TcTyVars,
-       which may contain free unification variables
-
-    Step 2 (generaliseTcTyCon)
-       Generalise that MonoTcTyCon to make a PolyTcTyCon
-       Its binders are skolem TcTyVars, with accurate SkolemInfo
-
-    Step 3 (tcTyClDecl)
-       Typecheck the type and class decls to produce a final TyCon
-       Its binders are final TyVars, not TcTyVars
-
-    Note that a MonoTcTyCon can contain unification variables,
-    but a PolyTcTyCon does not: only skolem TcTyVars.  See
-    Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.Utils.TcType
-
-    More details about /kind inference/:
-
-      S1) In kcTyClGroup, we use inferInitialKinds to look over the
-          declaration of any TyCon that lacks a kind signature or
-          CUSK, to determine its "shape"; for example, the number of
-          parameters, and any kind signatures.
-
-          We record that shape record that shape in a MonoTcTyCon; it is
-          "mono" because it has not been been generalised, and its binders
-          and result kind may have free unification variables.
-
-      S2) Still in kcTyClGroup, we use kcLTyClDecl to kind-check the
-          body (class methods, data constructors, etc.) of each of
-          these MonoTcTyCons, which has the effect of filling in the
-          metavariables in the tycon's initial kind.
-
-      S3) Still in kcTyClGroup, we use generaliseTyClDecl to generalize
-          each MonoTcTyCon to get a PolyTcTyCon, with skolem TcTyVars in it,
-          and a final, fixed kind.
-
-      S4) Finally, back in TcTyClDecls, we extend the environment with
-          the PolyTcTyCons, and typecheck each declaration (regardless
-          of kind signatures etc) to get final TyCon.
-
-    More details about /kind checking/
-
-      S5) In kcTyClGroup, we use checkInitialKinds to get the
-          utterly-final Kind of all TyCons in the group that
-            (a) have a separate kind signature or
-            (b) have a CUSK.
-          This produces a PolyTcTyCon, that is, a TcTyCon in which the binders
-          and result kind are full of TyVars (not TcTyVars).  No unification
-          variables here; everything is in its final form.
-
-3.  tyConScopedTyVars.  A challenging piece in all of this is that we
-    end up taking three separate passes over every declaration:
-      - one in inferInitialKind (this pass look only at the head, not the body)
-      - one in kcTyClDecls (to kind-check the body)
-      - a final one in tcTyClDecls (to desugar)
-
-    In the latter two passes, we need to connect the user-written type
-    variables in an LHsQTyVars with the variables in the tycon's
-    inferred kind. Because the tycon might not have a CUSK, this
-    matching up is, in general, quite hard to do.  (Look through the
-    git history between Dec 2015 and Apr 2016 for
-    GHC.Tc.Gen.HsType.splitTelescopeTvs!)
-
-    Instead of trying, we just store the list of type variables to
-    bring into scope, in the tyConScopedTyVars field of a MonoTcTyCon.
-    These tyvars are brought into scope by the calls to
-       tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon)
-    in kcTyClDecl.
-
-    In a TcTyCon, why is tyConScopedTyVars :: [(Name,TcTyVar)] rather
-    than just [TcTyVar]?  Consider these mutually-recursive decls
-       data T (a :: k1) b = MkT (S a b)
-       data S (c :: k2) d = MkS (T c d)
-    We start with k1 bound to kappa1, and k2 to kappa2; so initially
-    in the (Name,TcTyVar) pairs the Name is that of the TcTyVar. But
-    then kappa1 and kappa2 get unified; so after the zonking in
-    'generalise' in 'kcTyClGroup' the Name and TcTyVar may differ.
-
-See also Note [Type checking recursive type and class declarations].
 
 Note [Swizzling the tyvars before generaliseTcTyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1111,7 +1279,7 @@ Test cases (and tickets) relevant to these design decisions
 Note [Inferring kinds for type declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This note deals with /inference/ for type declarations
-that do not have a CUSK.  Consider
+that do not have a CUSK or a SAKS.  Consider
   data T (a :: k1) k2 (x :: k2) = MkT (S a k2 x)
   data S (b :: k3) k4 (y :: k4) = MkS (T b k4 y)
 
@@ -1275,18 +1443,17 @@ It's hard to know when we've actually been tripped up by polymorphic recursion
 specifically, so we just include a note to users whenever we infer VDQ. The
 testsuite did not show up a single spurious inclusion of this message.
 
-The context is added in addVDQNote, which looks for a visible TyConBinder
-that also appears in the TyCon's kind. (I first looked at the kind for
-a visible, dependent quantifier, but Note [No polymorphic recursion] in
-GHC.Tc.Gen.HsType defeats that approach.) addVDQNote is used in kcTyClDecl,
-which is used only when inferring the kind of a tycon (never with a CUSK or
-SAK).
+The context is added in addVDQNote, which looks for a visible
+TyConBinder that also appears in the TyCon's kind. (I first looked at
+the kind for a visible, dependent quantifier, but
+  Note [No polymorphic recursion in type decls]
+in GHC.Tc.Gen.HsType defeats that approach.) addVDQNote is used in
+kcTyClDecl, which is used only when inferring the kind of a tycon
+(never with a CUSK or SAKS).
 
 Once upon a time, I (Richard E) thought that the tycon-kind could
 not be a forall-type. But this is wrong: data T :: forall k. k -> Type
 (with -XNoCUSKs) could end up here. And this is all OK.
-
-
 -}
 
 --------------
@@ -1581,7 +1748,7 @@ kcTyClDecl :: TyClDecl GhcRn -> MonoTcTyCon -> TcM ()
 -- TcTyVars rather than create skolemised variables for the bound variables.
 -- - inferInitialKinds makes the TcTyCon where the  tyvars are TcTyVars
 -- - In this function, those TcTyVars are unified with other kind variables during
---   kind inference (see [How TcTyCons work])
+--   kind inference (see GHC.Tc.TyCl Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon])
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ _name), tcdDataDefn = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } }) tycon
   = tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
@@ -5150,7 +5317,7 @@ tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
 
 addVDQNote :: TcTyCon -> TcM a -> TcM a
 -- See Note [Inferring visible dependent quantification]
--- Only types without a signature (CUSK or SAK) here
+-- Only types without a signature (CUSK or SAKS) here
 addVDQNote tycon thing_inside
   | assertPpr (isMonoTcTyCon tycon) (ppr tycon $$ ppr tc_kind)
     has_vdq

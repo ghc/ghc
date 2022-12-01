@@ -1827,6 +1827,30 @@ instance Diagnostic TcRnMessage where
       text "Quasi-quotes are not permitted without QuasiQuotes"
     TcRnTHError err -> pprTHError err
 
+    TcRnIllegalInvisTyVarBndr bndr ->
+      mkSimpleDecorated $
+        hang (text "Illegal invisible type variable binder:")
+           2 (ppr bndr)
+
+    TcRnInvalidInvisTyVarBndr name hs_bndr ->
+      mkSimpleDecorated $
+        vcat [ hang (text "Invalid invisible type variable binder:")
+                  2 (ppr hs_bndr)
+             , text "There is no matching forall-bound variable"
+             , text "in the standalone kind signature for" <+> quotes (ppr name) <> dot
+             , text "NB." <+> vcat [
+                text "Only" <+> quotes (text "forall a.") <+> text "-quantification matches invisible binders,",
+                text "whereas" <+> quotes (text "forall {a}.") <+> text "and" <+> quotes (text "forall a ->") <+> text "do not."
+             ]]
+
+    TcRnInvisBndrWithoutSig _ hs_bndr ->
+      mkSimpleDecorated $
+        vcat [ hang (text "Invalid invisible type variable binder:")
+                  2 (ppr hs_bndr)
+             , text "Either a standalone kind signature (SAKS)"
+             , text "or a complete user-supplied kind (CUSK, legacy feature)"
+             , text "is required to use invisible binders." ]
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2437,6 +2461,12 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMissingRoleAnnotation{}
       -> WarningWithFlag Opt_WarnMissingRoleAnnotations
+    TcRnIllegalInvisTyVarBndr{}
+      -> ErrorWithoutFlag
+    TcRnInvalidInvisTyVarBndr{}
+      -> ErrorWithoutFlag
+    TcRnInvisBndrWithoutSig{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3094,6 +3124,12 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMissingRoleAnnotation{}
       -> noHints
+    TcRnIllegalInvisTyVarBndr{}
+      -> [suggestExtension LangExt.TypeAbstractions]
+    TcRnInvalidInvisTyVarBndr{}
+      -> noHints
+    TcRnInvisBndrWithoutSig name _
+      -> [SuggestAddStandaloneKindSignature name]
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode

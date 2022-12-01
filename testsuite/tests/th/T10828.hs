@@ -31,7 +31,7 @@ $( do { decl <- [d| data family D a :: Type -> Type
 
 $( return
    [ DataD [] (mkName "T")
-           [ PlainTV (mkName "a") () ]
+           [ PlainTV (mkName "a") BndrReq ]
            (Just StarT)
            [ GadtC [mkName "MkT"]
                    [ ( Bang NoSourceUnpackedness NoSourceStrictness

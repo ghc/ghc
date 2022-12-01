@@ -958,7 +958,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
            -- This is the only call site for bindLHsTyVarBndrs where we pass
            -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
            -- See Note [Suppress -Wunused-foralls when binding LHsQTyVars].
-    do { let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
+    do { rn_bndrs <- traverse rnLHsTyVarBndrVisFlag rn_bndrs
+       ; let -- The SrcSpan that rnImplicitTvOccs will attach to each Name will
              -- span the entire declaration to which the LHsQTyVars belongs,
              -- which will be reflected in warning and error messages. We can
              -- be a little more precise than that by pointing to the location
@@ -986,7 +987,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     -- The in-tree API annotations extend the LHsTyVarBndr location to
     -- include surrounding parens. for error messages to be
     -- compatible, we recreate the location from the contents
-    get_bndr_loc :: LHsTyVarBndr () GhcPs -> SrcSpan
+    get_bndr_loc :: LHsTyVarBndr flag GhcPs -> SrcSpan
     get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocA ln
     get_bndr_loc (L _ (KindedTyVar _ _ ln lk))
       = combineSrcSpans (getLocA ln) (getLocA lk)
@@ -1221,6 +1222,25 @@ bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x fl lrdr@(L lv _) kind))
            ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
                $ thing_inside (L loc (KindedTyVar x fl (L lv tv_nm) kind'))
            ; return (b, fvs1 `plusFV` fvs2) }
+
+-- Check for TypeAbstractions and update the type parameter of HsBndrVis.
+-- The binder itself is already renamed and is returned unmodified.
+rnLHsTyVarBndrVisFlag
+  :: LHsTyVarBndr (HsBndrVis GhcPs) GhcRn
+  -> RnM (LHsTyVarBndr (HsBndrVis GhcRn) GhcRn)
+rnLHsTyVarBndrVisFlag (L loc bndr) = do
+  let lbndr = L loc (updateHsTyVarBndrFlag rnHsBndrVis bndr)
+  unlessXOptM LangExt.TypeAbstractions $
+    when (isHsBndrInvisible (hsTyVarBndrFlag bndr)) $
+      addErr (TcRnIllegalInvisTyVarBndr lbndr)
+  return lbndr
+
+-- rnHsBndrVis is a no-op. We could use 'coerce' in an ideal world,
+-- but GHC can't crack this nut because type families are involved:
+-- HsBndrInvisible stores (LHsToken "@" pass), which is defined via XRec.
+rnHsBndrVis :: HsBndrVis GhcPs -> HsBndrVis GhcRn
+rnHsBndrVis HsBndrRequired = HsBndrRequired
+rnHsBndrVis (HsBndrInvisible at) = HsBndrInvisible at
 
 newTyVarNameRn :: Maybe a -- associated class
                -> LocatedN RdrName -> RnM Name

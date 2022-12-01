@@ -8,7 +8,7 @@ import System.IO
 -- attempting to mix GADT and normal constructors
 $( return
    [ DataD [] (mkName "T")
-           [ PlainTV (mkName "a") () ]
+           [ PlainTV (mkName "a") BndrReq ]
            (Just StarT)
            [ NormalC
                (mkName "MkT")

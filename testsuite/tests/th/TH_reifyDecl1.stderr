@@ -1,6 +1,9 @@
-data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
+data TH_reifyDecl1.T
+    = TH_reifyDecl1.A
+    | TH_reifyDecl1.B
 data TH_reifyDecl1.R (a_0 :: *)
-    = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
+    = TH_reifyDecl1.C a_0
+    | TH_reifyDecl1.D
 data TH_reifyDecl1.List (a_0 :: *)
     = TH_reifyDecl1.Nil
     | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)

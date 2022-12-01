@@ -291,7 +291,7 @@
            []
            (EpaComments
             []))
-          (())
+          (HsBndrRequired)
           (L
            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:21:11 })
            (Unqual

@@ -381,7 +381,7 @@ only required for ``newtype instance`` declarations, such as ``FooKeyBoolC``
 and ``BarTypeWorkRepC`` above.
 
 This extension impacts the determination of whether or not a newtype has
-a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
+a Complete User-Supplied Kind (CUSK). The exact impact is specified
 `the section on CUSKs <#complete-kind-signatures>`__.
 
 Unlifted Datatypes

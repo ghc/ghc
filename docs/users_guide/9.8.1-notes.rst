@@ -10,6 +10,15 @@ Language
   sized primitive literals, e.g. ``123#Int8`` is a literal of type ``Int8#``.
   See the GHC proposal `#451 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0451-sized-literals.rst>`_.
 
+- GHC Proposal `#425
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
+  has been partially implemented. Namely, the ``@k``-binders in type declarations are now permitted::
+
+    type T :: forall k. k -> forall j. j -> Type
+    data T @k (a :: k) @(j :: Type) (b :: j)
+
+  This feature is guarded behind :extension:`TypeAbstractions`.
+
 Compiler
 ~~~~~~~~
 
