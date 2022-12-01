@@ -452,48 +452,91 @@ function h$base_c_s_isfifo(mode) {
 }
 
 #ifndef GHCJS_BROWSER
+// The `fileStat` is filled according to the layout of Emscripten's `stat`
+// struct - defined in stat.h. We must use this layout due to this header
+// file being used to retrieve the offsets for hsc files that peek into
+// memory locations of structs directly. For more information see:
+// https://gitlab.haskell.org/ghc/ghc/-/issues/22573
 function h$base_fillStat(fs, b, off) {
     if(off%4) throw "h$base_fillStat: not aligned";
     var o = off>>2;
-    b.i3[o+0] = fs.mode;
-    h$long_from_number(fs.size, (h,l) => {
-      b.i3[o+1] = h;
-      b.i3[o+2] = l;
-    });
 
-    b.i3[o+3] = 0; // fixme
-    b.i3[o+4] = 0; // fixme
-    b.i3[o+5] = fs.dev;
-    h$long_from_number(fs.ino, (h,l) => {
-      b.i3[o+6] = h;
-      b.i3[o+7] = l;
+    b.i3[o+0] = fs.dev;
+    b.i3[o+1] = 0; // __st_dev_padding;
+    b.i3[o+2] = 0; // __st_ino_truncated;
+    b.i3[o+3] = fs.mode;
+    h$long_from_number(fs.nlink, (h,l) => {
+      b.i3[o+4] = h;
+      b.i3[o+5] = l;
     });
-    b.i3[o+8] = fs.uid;
-    b.i3[o+9] = fs.gid;
+    b.i3[o+6] = fs.uid;
+    b.i3[o+7] = fs.gid;
+    b.i3[o+8] = fs.rdev;
+    b.i3[o+9] = 0; // __st_rdev_padding;
+    h$long_from_number(fs.size, (h,l) => {
+      b.i3[o+10] = h;
+      b.i3[o+11] = l;
+    });
+    b.i3[o+12] = fs.blksize;
+    b.i3[o+13] = fs.blocks;
+    atimeS = Math.floor(fs.atimeMs/1000);
+    h$long_from_number(atimeS, (h,l) => {
+      b.i3[o+14] = h;
+      b.i3[o+15] = l;
+    });
+    atimeNs = (fs.atimeMs/1000 - atimeS) * 1000000000;
+    h$long_from_number(atimeNs, (h,l) => {
+      b.i3[o+16] = h;
+      b.i3[o+17] = l;
+    });
+    mtimeS = Math.floor(fs.mtimeMs/1000);
+    h$long_from_number(mtimeS, (h,l) => {
+      b.i3[o+18] = h;
+      b.i3[o+19] = l;
+    });
+    mtimeNs = (fs.mtimeMs/1000 - mtimeS) * 1000000000;
+    h$long_from_number(mtimeNs, (h,l) => {
+      b.i3[o+20] = h;
+      b.i3[o+21] = l;
+    });
+    ctimeS = Math.floor(fs.ctimeMs/1000);
+    h$long_from_number(ctimeS, (h,l) => {
+      b.i3[o+22] = h;
+      b.i3[o+23] = l;
+    });
+    ctimeNs = (fs.ctimeMs/1000 - ctimeS) * 1000000000;
+    h$long_from_number(ctimeNs, (h,l) => {
+      b.i3[o+24] = h;
+      b.i3[o+25] = l;
+    });
+    h$long_from_number(fs.ino, (h,l) => {
+      b.i3[o+26] = h;
+      b.i3[o+27] = l;
+    });
 }
 #endif
 
 // [mode,size1,size2,mtime1,mtime2,dev,ino1,ino2,uid,gid] all 32 bit
-/** @const */ var h$base_sizeof_stat = 40;
+/** @const */ var h$base_sizeof_stat = 112;
 
 function h$base_st_mtime(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+3], stat.i3[(stat_off>>2)+4]);
+    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+18], stat.i3[(stat_off>>2)+19]);
 }
 
 function h$base_st_size(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+1], stat.i3[(stat_off>>2)+2]);
+    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+10], stat.i3[(stat_off>>2)+11]);
 }
 
 function h$base_st_mode(stat, stat_off) {
-    return stat.i3[stat_off>>2];
+    return stat.i3[(stat_off>>2)+3];
 }
 
 function h$base_st_dev(stat, stat_off) {
-    return stat.i3[(stat_off>>2)+5];
+    return stat.i3[(stat_off>>2)+0];
 }
 
 function h$base_st_ino(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+6], stat.i3[(stat_off>>2)+7]);
+    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+26], stat.i3[(stat_off>>2)+27]);
 }
 
 /** @const */ var h$base_echo            = 1;
