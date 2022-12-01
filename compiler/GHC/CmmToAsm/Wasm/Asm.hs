@@ -374,7 +374,6 @@ asmTellWasmControl ty_word c = case c of
   WasmLoop bt c -> do
     asmTellLine $ "loop" <> asmFromWasmBlockType ty_word bt
     asmWithTab $ asmTellWasmControl ty_word c
-    -- asmTellLine "br 0"
     asmTellLine "end_loop"
   WasmIfTop bt t f -> do
     asmTellLine $ "if" <> asmFromWasmBlockType ty_word bt
