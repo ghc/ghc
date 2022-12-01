@@ -136,6 +136,7 @@ import GHC.Types.Unique.Set
 import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
+import GHC.Settings
 
 import Data.List (sortBy)
 import Data.List.NonEmpty (groupAllWith, head)
@@ -146,10 +147,10 @@ import System.IO
 import System.Directory ( getCurrentDirectory )
 
 --------------------
-nativeCodeGen :: forall a . Logger -> NCGConfig -> ModLocation -> Handle -> UniqSupply
+nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle -> UniqSupply
               -> Stream IO RawCmmGroup a
               -> IO a
-nativeCodeGen logger config modLoc h us cmms
+nativeCodeGen logger ts config modLoc h us cmms
  = let platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
@@ -169,7 +170,7 @@ nativeCodeGen logger config modLoc h us cmms
       ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-      ArchWasm32    -> Wasm32.ncgWasm platform us modLoc h cmms
+      ArchWasm32    -> Wasm32.ncgWasm platform ts us modLoc h cmms
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.

@@ -198,7 +198,7 @@ structuredControl platform txExpr txBlock g =
                         <$> txExpr xlabel e
                         <*> doBranch fty xlabel t (IfThenElse maybeMarks `inside` context)
                         <*> doBranch fty xlabel f (IfThenElse maybeMarks `inside` context)
-               TailCall e -> (WasmPush TagI32 <$> txExpr xlabel e) <<>> pure (WasmReturnTop TagI32)
+               TailCall e -> WasmTailCall <$> txExpr xlabel e
                Switch e range targets default' ->
                    WasmBrTable <$>  txExpr xlabel e
                                <$~> range

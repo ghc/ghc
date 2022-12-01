@@ -201,7 +201,7 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
   let ncg_config = initNCGConfig dflags this_mod
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
-      nativeCodeGen logger ncg_config location h ncg_uniqs cmm_stream
+      nativeCodeGen logger (toolSettings dflags) ncg_config location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************
@@ -397,4 +397,3 @@ ipInitCode do_info_table platform this_mod
 
    ipe_buffer_decl =
        text "extern IpeBufferListNode" <+> ipe_buffer_label <> text ";"
-

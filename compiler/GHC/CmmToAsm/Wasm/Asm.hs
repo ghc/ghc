@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Strict #-}
@@ -32,13 +33,13 @@ import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic (panic)
 
 -- | Reads current indentation, appends result to state
-newtype WasmAsmM a = WasmAsmM (Builder -> State Builder a)
+newtype WasmAsmM a = WasmAsmM (Bool -> Builder -> State Builder a)
   deriving
     ( Functor,
       Applicative,
       Monad
     )
-    via (ReaderT Builder (State Builder))
+    via (ReaderT Bool (ReaderT Builder (State Builder)))
 
 instance Semigroup a => Semigroup (WasmAsmM a) where
   (<>) = liftA2 (<>)
@@ -46,27 +47,33 @@ instance Semigroup a => Semigroup (WasmAsmM a) where
 instance Monoid a => Monoid (WasmAsmM a) where
   mempty = pure mempty
 
+-- | To tail call or not, that is the question
+doTailCall :: WasmAsmM Bool
+doTailCall = WasmAsmM $ \do_tail_call _ -> pure do_tail_call
+
 -- | Default indent level is none
-execWasmAsmM :: WasmAsmM a -> Builder
-execWasmAsmM (WasmAsmM m) = execState (m mempty) mempty
+execWasmAsmM :: Bool -> WasmAsmM a -> Builder
+execWasmAsmM do_tail_call (WasmAsmM m) =
+  execState (m do_tail_call mempty) mempty
 
 -- | Increase indent level by a tab
 asmWithTab :: WasmAsmM a -> WasmAsmM a
-asmWithTab (WasmAsmM m) = WasmAsmM $ \t -> m $! char7 '\t' <> t
+asmWithTab (WasmAsmM m) =
+  WasmAsmM $ \do_tail_call t -> m do_tail_call $! char7 '\t' <> t
 
 -- | Writes a single line starting with the current indent
 asmTellLine :: Builder -> WasmAsmM ()
-asmTellLine b = WasmAsmM $ \t -> modify $ \acc -> acc <> t <> b <> char7 '\n'
+asmTellLine b = WasmAsmM $ \_ t -> modify $ \acc -> acc <> t <> b <> char7 '\n'
 
 -- | Writes a single line break
 asmTellLF :: WasmAsmM ()
-asmTellLF = WasmAsmM $ \_ -> modify $ \acc -> acc <> char7 '\n'
+asmTellLF = WasmAsmM $ \_ _ -> modify $ \acc -> acc <> char7 '\n'
 
 -- | Writes a line starting with a single tab, ignoring current indent
 -- level
 asmTellTabLine :: Builder -> WasmAsmM ()
 asmTellTabLine b =
-  WasmAsmM $ \_ -> modify $ \acc -> acc <> char7 '\t' <> b <> char7 '\n'
+  WasmAsmM $ \_ _ -> modify $ \acc -> acc <> char7 '\t' <> b <> char7 '\n'
 
 asmFromWasmType :: WasmTypeTag t -> Builder
 asmFromWasmType ty = case ty of
@@ -386,7 +393,25 @@ asmTellWasmControl ty_word c = case c of
   WasmBrTable (WasmExpr e) _ ts t -> do
     asmTellWasmInstr ty_word e
     asmTellLine $ "br_table {" <> builderCommas intDec (ts <> [t]) <> "}"
-  WasmReturnTop _ -> asmTellLine "return"
+  -- See Note [WasmTailCall]
+  WasmTailCall (WasmExpr e) -> do
+    do_tail_call <- doTailCall
+    if
+        | do_tail_call,
+          WasmSymConst sym <- e ->
+            asmTellLine $ "return_call " <> asmFromSymName sym
+        | do_tail_call ->
+            do
+              asmTellWasmInstr ty_word e
+              asmTellLine $
+                "return_call_indirect "
+                  <> asmFromFuncType
+                    []
+                    [SomeWasmType ty_word]
+        | otherwise ->
+            do
+              asmTellWasmInstr ty_word e
+              asmTellLine "return"
   WasmActions (WasmStatements a) -> asmTellWasmInstr ty_word a
   WasmSeq c0 c1 -> do
     asmTellWasmControl ty_word c0
@@ -465,18 +490,20 @@ asmTellProducers = do
 
 asmTellTargetFeatures :: WasmAsmM ()
 asmTellTargetFeatures = do
+  do_tail_call <- doTailCall
   asmTellSectionHeader ".custom_section.target_features"
   asmTellVec
     [ do
         asmTellTabLine ".int8 0x2b"
         asmTellBS feature
       | feature <-
-          [ "bulk-memory",
-            "mutable-globals",
-            "nontrapping-fptoint",
-            "reference-types",
-            "sign-ext"
-          ]
+          ["tail-call" | do_tail_call]
+            <> [ "bulk-memory",
+                 "mutable-globals",
+                 "nontrapping-fptoint",
+                 "reference-types",
+                 "sign-ext"
+               ]
     ]
 
 asmTellEverything :: WasmTypeTag w -> WasmCodeGenState w -> WasmAsmM ()

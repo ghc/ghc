@@ -1,10 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds, GADTs, RankNTypes, TypeOperators, KindSignatures #-}
+{-# LANGUAGE DataKinds, GADTs, RankNTypes, KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module GHC.Wasm.ControlFlow
-  ( WasmControl(..), (<>), pattern WasmIf, wasmReturn
+  ( WasmControl(..), (<>), pattern WasmIf
   , BrTableInterval(..), inclusiveInterval
 
   , WasmType, WasmTypeTag(..)
@@ -47,7 +47,3 @@ pattern WasmIf :: WasmFunctionType pre post
 
 pattern WasmIf ty e t f =
     WasmPush TagI32 e `WasmSeq` WasmIfTop ty t f
-
--- More syntactic sugar.
-wasmReturn :: WasmTypeTag t -> e -> WasmControl s e (t ': t1star) t2star
-wasmReturn tag e = WasmPush tag e `WasmSeq` WasmReturnTop tag

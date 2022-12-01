@@ -352,9 +352,30 @@ data WasmControl :: Type -> Type -> [WasmType] -> [WasmType] -> Type where
     WasmControl s e dropped destination
   -- invariant: the table interval is contained
   -- within [0 .. pred (length targets)]
-  WasmReturnTop ::
-    WasmTypeTag t ->
-    WasmControl s e (t : t1star) t2star -- as per type system
+
+  -- Note [WasmTailCall]
+  -- ~~~~~~~~~~~~~~~~~~~
+  -- This represents the exit point of each CmmGraph: tail calling the
+  -- destination in CmmCall. The STG stack may grow before the call,
+  -- but it's always a tail call in the sense that the C call stack is
+  -- guaranteed not to grow.
+  --
+  -- In the wasm backend, WasmTailCall is lowered to different
+  -- assembly code given whether the wasm tail-call extension is
+  -- enabled:
+  --
+  -- When tail-call is not enabled (which is the default as of today),
+  -- a WasmTailCall is lowered to code that pushes the callee function
+  -- pointer onto the value stack and returns immediately. The actual
+  -- call is done by the trampoline in StgRun.
+  --
+  -- When tail-call is indeed enabled via passing -mtail-call in
+  -- CONF_CC_OPTS_STAGE2 at configure time, a WasmTailCall is lowered
+  -- to return_call/return_call_indirect, thus tail calling into its
+  -- callee without returning to StgRun.
+  WasmTailCall ::
+    e ->
+    WasmControl s e t1star t2star -- as per type system
   WasmActions ::
     s ->
     WasmControl s e stack stack -- basic block: one entry, one exit

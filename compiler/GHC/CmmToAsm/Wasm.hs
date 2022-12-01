@@ -14,22 +14,28 @@ import GHC.CmmToAsm.Wasm.Types
 import GHC.Data.Stream (Stream, StreamS (..), runStream)
 import GHC.Platform
 import GHC.Prelude
+import GHC.Settings
 import GHC.Types.Unique.Supply
 import GHC.Unit
+import GHC.Utils.CliOption
 import System.IO
 
 ncgWasm ::
   Platform ->
+  ToolSettings ->
   UniqSupply ->
   ModLocation ->
   Handle ->
   Stream IO RawCmmGroup a ->
   IO a
-ncgWasm platform us loc h cmms = do
+ncgWasm platform ts us loc h cmms = do
   (r, s) <- streamCmmGroups platform us cmms
   hPutBuilder h $ "# " <> string7 (fromJust $ ml_hs_file loc) <> "\n\n"
-  hPutBuilder h $ execWasmAsmM $ asmTellEverything TagI32 s
+  hPutBuilder h $ execWasmAsmM do_tail_call $ asmTellEverything TagI32 s
   pure r
+  where
+    -- See Note [WasmTailCall]
+    do_tail_call = doTailCall ts
 
 streamCmmGroups ::
   Platform ->
@@ -43,3 +49,8 @@ streamCmmGroups platform us cmms =
     go s (Done r) = pure (r, s)
     go s (Effect m) = m >>= go s
     go s (Yield cmm k) = go (wasmExecM (onCmmGroup cmm) s) k
+
+doTailCall :: ToolSettings -> Bool
+doTailCall ts = Option "-mtail-call" `elem` as_args
+  where
+    (_, as_args) = toolSettings_pgm_a ts
