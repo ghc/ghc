@@ -172,7 +172,7 @@ mkTypeableBinds
        } } }
   where
     needs_typeable_binds tc
-      | tc `elem` [runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon]
+      | tc `elem` ghcTypesTypeableTyCons
       = False
       | otherwise =
           isAlgTyCon tc
@@ -335,7 +335,14 @@ mkPrimTypeableTodos
                    ; todo2 <- todoForTyCons gHC_PRIM ghc_prim_module_id
                                             ghcPrimTypeableTyCons
 
-                   ; return ( gbl_env' , [todo1, todo2])
+                   ; tcg_env <- getGblEnv
+                   ; let mod_id = case tcg_tr_module tcg_env of  -- Should be set by now
+                                   Just mod_id -> mod_id
+                                   Nothing     -> pprPanic "tcMkTypeableBinds" empty
+
+                   ; todo3 <- todoForTyCons gHC_TYPES mod_id ghcTypesTypeableTyCons
+
+                   ; return ( gbl_env' , [todo1, todo2, todo3])
                    }
            else do gbl_env <- getGblEnv
                    return (gbl_env, [])
@@ -350,11 +357,17 @@ mkPrimTypeableTodos
 -- Note [Built-in syntax and the OrigNameCache] in "GHC.Iface.Env" for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon ]
-    , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
+    [ map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons
     ]
+
+-- | These are types which are defined in GHC.Types but are needed in order to
+-- typecheck the other generated bindings, therefore to avoid ordering issues we
+-- generate them up-front along with the bindings from GHC.Prim.
+ghcTypesTypeableTyCons :: [TyCon]
+ghcTypesTypeableTyCons = [ runtimeRepTyCon, levityTyCon
+                         , vecCountTyCon, vecElemTyCon ]
 
 data TypeableStuff
     = Stuff { platform       :: Platform        -- ^ Target platform
