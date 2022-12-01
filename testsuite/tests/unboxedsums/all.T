@@ -45,7 +45,7 @@ test('unpack_sums_2', normal, compile, ['-O'])
 test('unpack_sums_3', normal, compile_and_run, ['-O'])
 test('unpack_sums_4', normal, compile_and_run, ['-O'])
 test('unpack_sums_5', normal, compile, [''])
-test('unpack_sums_6', fragile(22504), compile_and_run, ['-O'])
+test('unpack_sums_6', [fragile(22504), js_broken(22374)], compile_and_run, ['-O'])
 test('unpack_sums_7', normal, makefile_test, [])
 test('unpack_sums_8', normal, compile_and_run, [""])
 test('unpack_sums_9', normal, compile, [""])
@@ -59,6 +59,7 @@ test('T22208', normal, compile, ['-dstg-lint -dcmm-lint'])
 test('ManyUbxSums',
      [ pre_cmd('{compiler} --run ./GenManyUbxSums.hs'),
        extra_files(['GenManyUbxSums.hs', 'ManyUbxSums_Addr.hs']),
+       js_broken(22576)
      ],
      multi_compile_and_run,
      ['ManyUbxSums',

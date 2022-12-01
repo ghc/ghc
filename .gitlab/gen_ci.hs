@@ -882,7 +882,7 @@ job_groups =
      , standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" NoEmulatorNeeded (Just "emconfigure")
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "js-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
         )
         { bignumBackend = Native
         }

@@ -278,7 +278,7 @@ test('T13604a',
   ], makefile_test, [])
 # omitting hpc and profasm because they affect the
 # inlining and unfoldings
-test('inline-check', omit_ways(['hpc', 'profasm'])
+test('inline-check', [omit_ways(['hpc', 'profasm']), js_broken(22576)]
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
@@ -319,4 +319,4 @@ test('T21869', [js_broken(22261), when(unregisterised(), skip)], makefile_test, 
 test('T22044', normal, makefile_test, [])
 test('T22048', [only_ways(['normal']), grep_errmsg("_rule")], compile, ["-O -fomit-interface-pragmas -ddump-simpl"])
 test('T21722', normal, compile_fail, ['-fno-show-error-context'])
-test('T22669', normal, makefile_test, [])
+test('T22669', js_skip, makefile_test, [])

@@ -5,9 +5,9 @@ test('plusMinusInteger', [omit_ways(['ghci'])], compile_and_run, [''])
 test('integerConstantFolding', normal, makefile_test, ['integerConstantFolding'])
 test('naturalConstantFolding', normal, makefile_test, ['naturalConstantFolding'])
 
-test('fromToInteger', normal, makefile_test, ['fromToInteger'])
+test('fromToInteger', js_broken(22576), makefile_test, ['fromToInteger'])
 
-test('IntegerConversionRules', [], makefile_test, ['IntegerConversionRules'])
+test('IntegerConversionRules', [js_broken(22576)], makefile_test, ['IntegerConversionRules'])
 test('gcdInteger', normal, compile_and_run, [''])
 test('gcdeInteger', normal, compile_and_run, [''])
 test('integerPowMod', [], compile_and_run, [''])

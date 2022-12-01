@@ -79,5 +79,5 @@ test('IntegerToFloat', normal, compile_and_run, [''])
 
 test('T20291', normal, compile_and_run, [''])
 test('T22282', normal, compile_and_run, [''])
-test('T22671', normal, compile_and_run, [''])
-test('foundation', normal, compile_and_run, ['-O -package transformers'])
+test('T22671', js_broken(22835), compile_and_run, [''])
+test('foundation', js_broken(22576), compile_and_run, ['-O -package transformers'])

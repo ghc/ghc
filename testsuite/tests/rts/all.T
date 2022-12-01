@@ -404,7 +404,7 @@ test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
                ], makefile_test, ['T11788'])
 
-test('T10296a', [req_ghc_smp], makefile_test, ['T10296a'])
+test('T10296a', [req_ghc_smp, req_c], makefile_test, ['T10296a'])
 
 test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 
@@ -429,7 +429,9 @@ test('T12903', [ when(opsys('mingw32'), skip)
                , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
-test('T13894', normal, compile_and_run, [''])
+# js_skip T13894 because the JS backend only allocates pinned arrays so this
+# test will always fail
+test('T13894', js_skip, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])

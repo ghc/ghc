@@ -1505,6 +1505,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
+      "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "js-unknown-ghcjs",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
@@ -4048,6 +4049,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
+      "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "js-unknown-ghcjs",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate"
     }

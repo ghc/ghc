@@ -601,6 +601,16 @@ function test_hadrian() {
   if [[ "${CROSS_EMULATOR:-}" == "NOT_SET" ]]; then
     info "Cannot test cross-compiled build without CROSS_EMULATOR being set."
     return
+    # special case for JS backend
+  elif [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" == "js-emulator" ]; then
+    # run "hadrian test" directly, not using the bindist, even though it did get installed.
+    # This is a temporary solution, See !9515 for the status of hadrian support.
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      --test-have-intree-files    \
+      --docs=none                 \
+      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "cross-compiled hadrian main testsuite"
   elif [ -n "${CROSS_TARGET:-}" ]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"

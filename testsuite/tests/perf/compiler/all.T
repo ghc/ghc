@@ -657,6 +657,6 @@ test('T21839c',
     ['-O'])
 
 test ('InfiniteListFusion',
-      [collect_stats('bytes allocated',2), when(arch('i386'), skip)],
+      [collect_stats('bytes allocated',2), when(arch('i386'), skip), js_broken(22576)],
       compile_and_run,
       ['-O2 -package ghc'])
