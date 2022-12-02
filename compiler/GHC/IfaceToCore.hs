@@ -1722,12 +1722,12 @@ tcLFInfo lfi = case lfi of
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 -- See Note [Lazily checking Unfoldings]
-tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
+tcUnfolding toplvl name _ info (IfCoreUnfold stable cache if_expr)
   = do  { uf_opts <- unfoldingOpts <$> getDynFlags
         ; expr <- tcUnfoldingRhs False toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
-        ; return $ mkFinalUnfolding uf_opts unf_src strict_sig expr }
+        ; return $ mkFinalUnfolding uf_opts unf_src strict_sig expr (Just cache) }
   where
     -- Strictness should occur before unfolding!
     strict_sig = dmdSigInfo info
@@ -1738,7 +1738,7 @@ tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
 
 tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do  { expr <- tcUnfoldingRhs False toplvl name if_expr
-        ; return $ mkCoreUnfolding InlineStable True expr guidance }
+        ; return $ mkCoreUnfolding InlineStable True expr Nothing guidance }
   where
     guidance = UnfWhen { ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
 
@@ -1749,6 +1749,49 @@ tcUnfolding _toplvl name dfun_ty _ (IfDFunUnfold bs ops)
   where
     doc = text "Class ops for dfun" <+> ppr name
     (_, _, cls, _) = tcSplitDFunTy dfun_ty
+
+{- Note [Tying the 'CoreUnfolding' knot]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The unfolding of recursive definitions can contain references to the
+Id being defined. Consider the following example:
+
+    foo :: ()
+    foo = foo
+
+The unfolding template of 'foo' is, of course, 'foo'; so the interface
+file for this module contains:
+
+    foo :: ();  Unfolding = foo
+
+When rehydrating the interface file we are going to make an Id for
+'foo' (in GHC.IfaceToCore), with an 'Unfolding'. We used to make this
+'Unfolding' by calling 'mkFinalUnfolding', but that needs to populate,
+among other fields, the 'uf_is_value' field, by computing
+'exprIsValue' of the template (in this case, 'foo').
+
+'exprIsValue e' looks at the unfoldings of variables in 'e' to see if
+they are evaluated; so it consults the `uf_is_value` field of
+variables in `e`. Now we can see the problem: to set the `uf_is_value`
+field of `foo`'s unfolding, we look at its unfolding (in this case
+just `foo` itself!). Loop. This is the root cause of ticket #22272.
+
+The simple solution we chose is to serialise the various auxiliary
+fields of `CoreUnfolding` so that we don't need to recreate them when
+rehydrating. Specifically, the following fields are moved to the
+'UnfoldingCache', which is persisted in the interface file:
+
+* 'uf_is_conlike'
+* 'uf_is_value'
+* 'uf_is_work_free'
+* 'uf_expandable'
+
+These four bits make the interface files only one byte larger per
+unfolding; on the other hand, this does save calls to 'exprIsValue',
+'exprIsExpandable' etc for every imported Id.
+
+We could choose to do this only for loop breakers. But that's a bit
+more complicated and it seems good all round.
+-}
 
 {- Note [Lazily checking Unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

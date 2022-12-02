@@ -6,6 +6,7 @@ module GHC.Core.Unfold.Make
    , mkUnfolding
    , mkCoreUnfolding
    , mkFinalUnfolding
+   , mkFinalUnfolding'
    , mkSimpleUnfolding
    , mkWorkerUnfolding
    , mkInlineUnfolding
@@ -36,15 +37,24 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
+import Data.Maybe ( fromMaybe )
+
 -- the very simple optimiser is used to optimise unfoldings
 import {-# SOURCE #-} GHC.Core.SimpleOpt
 
 
 
-mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Unfolding
+mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Maybe UnfoldingCache -> Unfolding
 -- "Final" in the sense that this is a GlobalId that will not be further
 -- simplified; so the unfolding should be occurrence-analysed
-mkFinalUnfolding opts src strict_sig expr
+mkFinalUnfolding opts src strict_sig expr = mkFinalUnfolding' opts src strict_sig expr
+
+-- See Note [Tying the 'CoreUnfolding' knot] for why interfaces need
+-- to pass a precomputed 'UnfoldingCache'
+mkFinalUnfolding' :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Maybe UnfoldingCache -> Unfolding
+-- "Final" in the sense that this is a GlobalId that will not be further
+-- simplified; so the unfolding should be occurrence-analysed
+mkFinalUnfolding' opts src strict_sig expr
   = mkUnfolding opts src
                 True {- Top level -}
                 (isDeadEndSig strict_sig)
@@ -59,7 +69,7 @@ mkCompulsoryUnfolding opts expr = mkCompulsoryUnfolding' (simpleOptExpr opts exp
 mkCompulsoryUnfolding' :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding' expr
   = mkCoreUnfolding InlineCompulsory True
-                    expr
+                    expr Nothing
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
 
@@ -71,7 +81,7 @@ mkCompulsoryUnfolding' expr
 
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
-  = mkUnfolding opts InlineRhs False False rhs
+  = mkUnfolding opts InlineRhs False False rhs Nothing
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -85,7 +95,7 @@ mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 -- after demand/CPR analysis
 mkWrapperUnfolding opts expr arity
   = mkCoreUnfolding InlineStable True
-                    (simpleOptExpr opts expr)
+                    (simpleOptExpr opts expr) Nothing
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
                              , ug_boring_ok = boringCxtNotOk })
@@ -96,7 +106,7 @@ mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })
   | isStableSource src
-  = mkCoreUnfolding src top_lvl new_tmpl guidance
+  = mkCoreUnfolding src top_lvl new_tmpl Nothing guidance
   where
     new_tmpl = simpleOptExpr opts (work_fn tmpl)
     guidance = calcUnfoldingGuidance (so_uf_opts opts) False new_tmpl
@@ -111,7 +121,7 @@ mkInlineUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfolding opts expr
   = mkCoreUnfolding InlineStable
                     True         -- Note [Top-level flag on inline rules]
-                    expr' guide
+                    expr' Nothing guide
   where
     expr' = simpleOptExpr opts expr
     guide = UnfWhen { ug_arity = manifestArity expr'
@@ -125,7 +135,7 @@ mkInlineUnfoldingWithArity :: Arity -> SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfoldingWithArity arity opts expr
   = mkCoreUnfolding InlineStable
                     True         -- Note [Top-level flag on inline rules]
-                    expr' guide
+                    expr' Nothing guide
   where
     expr' = simpleOptExpr opts expr
     guide = UnfWhen { ug_arity = arity
@@ -138,7 +148,7 @@ mkInlineUnfoldingWithArity arity opts expr
 
 mkInlinableUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts expr
-  = mkUnfolding (so_uf_opts opts) InlineStable False False expr'
+  = mkUnfolding (so_uf_opts opts) InlineStable False False expr' Nothing
   where
     expr' = simpleOptExpr opts expr
 
@@ -172,7 +182,7 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
  , UnfWhen { ug_arity = old_arity } <- old_guidance
- = mkCoreUnfolding src top_lvl new_tmpl
+ = mkCoreUnfolding src top_lvl new_tmpl Nothing
                    (old_guidance { ug_arity = old_arity - arity_decrease })
  where
    new_tmpl = simpleOptExpr opts $
@@ -286,11 +296,12 @@ mkUnfolding :: UnfoldingOpts
             -> Bool       -- Definitely a bottoming binding
                           -- (only relevant for top-level bindings)
             -> CoreExpr
+            -> Maybe UnfoldingCache
             -> Unfolding
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
-mkUnfolding opts src top_lvl is_bottoming expr
-  = mkCoreUnfolding src top_lvl expr guidance
+mkUnfolding opts src top_lvl is_bottoming expr cache
+  = mkCoreUnfolding src top_lvl expr cache guidance
   where
     is_top_bottoming = top_lvl && is_bottoming
     guidance         = calcUnfoldingGuidance opts is_top_bottoming expr
@@ -298,32 +309,32 @@ mkUnfolding opts src top_lvl is_bottoming expr
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
-                -> UnfoldingGuidance -> Unfolding
--- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding src top_lvl expr guidance
-  =
+                -> Maybe UnfoldingCache -> UnfoldingGuidance -> Unfolding
+mkCoreUnfolding src top_lvl expr precomputed_cache guidance
+  = CoreUnfolding { uf_tmpl = cache `seq`
+                              occurAnalyseExpr expr
+      -- occAnalyseExpr: see Note [Occurrence analysis of unfoldings]
+      -- See #20905 for what a discussion of this 'seq'.
+      -- We are careful to make sure we only
+      -- have one copy of an unfolding around at once.
+      -- Note [Thoughtful forcing in mkCoreUnfolding]
 
-  let is_value = exprIsHNF expr
-      is_conlike = exprIsConLike expr
-      is_work_free = exprIsWorkFree expr
-      is_expandable = exprIsExpandable expr
-  in
-  -- See #20905 for what is going on here. We are careful to make sure we only
-  -- have one copy of an unfolding around at once.
-  -- Note [Thoughtful forcing in mkCoreUnfolding]
-  CoreUnfolding { uf_tmpl         = is_value `seq`
-                                    is_conlike `seq`
-                                    is_work_free `seq`
-                                    is_expandable `seq`
-                                      occurAnalyseExpr expr,
-                      -- See Note [Occurrence analysis of unfoldings]
-                    uf_src          = src,
-                    uf_is_top       = top_lvl,
-                    uf_is_value     = is_value,
-                    uf_is_conlike   = is_conlike,
-                    uf_is_work_free = is_work_free,
-                    uf_expandable   = is_expandable,
-                    uf_guidance     = guidance }
+                  , uf_src          = src
+                  , uf_is_top       = top_lvl
+                  , uf_cache        = cache
+                  , uf_guidance     = guidance }
+  where
+    is_value      = exprIsHNF expr
+    is_conlike    = exprIsConLike expr
+    is_work_free  = exprIsWorkFree expr
+    is_expandable = exprIsExpandable expr
+
+    recomputed_cache = UnfoldingCache { uf_is_value = is_value
+                                      , uf_is_conlike = is_conlike
+                                      , uf_is_work_free = is_work_free
+                                      , uf_expandable = is_expandable }
+
+    cache = fromMaybe recomputed_cache precomputed_cache
 
 ----------------
 certainlyWillInline :: UnfoldingOpts -> IdInfo -> CoreExpr -> Maybe Unfolding
@@ -454,4 +465,3 @@ reducing memory pressure.
 The result of fixing this led to a 1G reduction in peak memory usage (12G -> 11G) when
 compiling a very large module (peak 3 million terms). For more discussion see #20905.
 -}
-

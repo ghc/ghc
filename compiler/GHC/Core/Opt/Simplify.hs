@@ -4077,7 +4077,7 @@ simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
 mkLetUnfolding !uf_opts top_lvl src id new_rhs
-  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
+  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs Nothing)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -4144,7 +4144,7 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
                         -- A test case is #4138
                         -- But retain a previous boring_ok of True; e.g. see
                         -- the way it is set in calcUnfoldingGuidanceWithArity
-                        in return (mkCoreUnfolding src is_top_lvl expr' guide')
+                        in return (mkCoreUnfolding src is_top_lvl expr' Nothing guide')
                             -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
 
                   _other              -- Happens for INLINABLE things

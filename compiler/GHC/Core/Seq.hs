@@ -104,10 +104,11 @@ seqAlts (Alt c bs e:alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts al
 
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
-                uf_is_value = b1, uf_is_work_free = b2,
-                uf_expandable = b3, uf_is_conlike = b4,
-                uf_guidance = g})
-  = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
+                uf_cache = cache, uf_guidance = g})
+  = seqExpr e `seq` top `seq` cache `seq` seqGuidance g
+    -- The unf_cache :: UnfoldingCache field is a strict data type,
+    -- so it is sufficient to use plain `seq` for this field
+    -- See Note [UnfoldingCache] in GHC.Core
 
 seqUnfolding _ = ()
 

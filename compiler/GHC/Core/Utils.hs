@@ -2308,10 +2308,9 @@ diffUnfold env (DFunUnfolding bs1 c1 a1)
   | c1 == c2 && equalLength bs1 bs2
   = concatMap (uncurry (diffExpr False env')) (zip a1 a2)
   where env' = rnBndrs2 env bs1 bs2
-diffUnfold env (CoreUnfolding t1 _ _ v1 cl1 wf1 x1 g1)
-               (CoreUnfolding t2 _ _ v2 cl2 wf2 x2 g2)
-  | v1 == v2 && cl1 == cl2
-    && wf1 == wf2 && x1 == x2 && g1 == g2
+diffUnfold env (CoreUnfolding t1 _ _ c1 g1)
+               (CoreUnfolding t2 _ _ c2 g2)
+  | c1 == c2 && g1 == g2
   = diffExpr False env t1 t2
 diffUnfold _   uf1 uf2
   = [fsep [ppr uf1, text "/=", ppr uf2]]

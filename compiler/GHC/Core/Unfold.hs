@@ -1035,11 +1035,11 @@ callSiteInline logger opts !case_depth id active_unfolding lone_variable arg_inf
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
         CoreUnfolding { uf_tmpl = unf_template
-                      , uf_is_work_free = is_wf
-                      , uf_guidance = guidance, uf_expandable = is_exp }
+                      , uf_cache = unf_cache
+                      , uf_guidance = guidance }
           | active_unfolding -> tryUnfolding logger opts case_depth id lone_variable
                                     arg_infos cont_info unf_template
-                                    is_wf is_exp guidance
+                                    unf_cache guidance
           | otherwise -> traceInline logger opts id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
         BootUnfolding    -> Nothing
@@ -1161,11 +1161,10 @@ needed on a per-module basis.
 -}
 
 tryUnfolding :: Logger -> UnfoldingOpts -> Int -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
+             -> CoreExpr -> UnfoldingCache -> UnfoldingGuidance
              -> Maybe CoreExpr
-tryUnfolding logger opts !case_depth id lone_variable
-             arg_infos cont_info unf_template
-             is_wf is_exp guidance
+tryUnfolding logger opts !case_depth id lone_variable arg_infos
+             cont_info unf_template unf_cache guidance
  = case guidance of
      UnfNever -> traceInline logger opts id str (text "UnfNever") Nothing
 
@@ -1177,7 +1176,7 @@ tryUnfolding logger opts !case_depth id lone_variable
         -> traceInline logger opts id str (mk_doc some_benefit empty False) Nothing
         where
           some_benefit = calc_some_benefit uf_arity
-          enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
+          enough_args  = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
         | unfoldingVeryAggressive opts
@@ -1188,9 +1187,6 @@ tryUnfolding logger opts !case_depth id lone_variable
         -> traceInline logger opts id str (mk_doc some_benefit extra_doc False) Nothing
         where
           some_benefit = calc_some_benefit (length arg_discounts)
-          extra_doc = vcat [ text "case depth =" <+> int case_depth
-                           , text "depth based penalty =" <+> int depth_penalty
-                           , text "discounted size =" <+> int adjusted_size ]
           -- See Note [Avoid inlining into deeply nested cases]
           depth_treshold = unfoldingCaseThreshold opts
           depth_scaling = unfoldingCaseScaling opts
@@ -1200,7 +1196,18 @@ tryUnfolding logger opts !case_depth id lone_variable
           small_enough = adjusted_size <= unfoldingUseThreshold opts
           discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
+          extra_doc = vcat [ text "case depth =" <+> int case_depth
+                           , text "depth based penalty =" <+> int depth_penalty
+                           , text "discounted size =" <+> int adjusted_size ]
+
   where
+    -- Unpack the UnfoldingCache lazily because it may not be needed, and all
+    -- its fields are strict; so evaluating unf_cache at all forces all the
+    -- isWorkFree etc computations to take place.  That risks wasting effort for
+    -- Ids that are never going to inline anyway.
+    -- See Note [UnfoldingCache] in GHC.Core
+    UnfoldingCache{ uf_is_work_free = is_wf, uf_expandable = is_exp } = unf_cache
+
     mk_doc some_benefit extra_doc yes_or_no
       = vcat [ text "arg infos" <+> ppr arg_infos
              , text "interesting continuation" <+> ppr cont_info
