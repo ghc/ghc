@@ -38,7 +38,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
-import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar)
+import GHC.HsToCore.Utils (isTrueLHsExpr, selectMatchVar, decideBangHood)
 import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
 import GHC.HsToCore.Monad
 import GHC.Core.TyCo.Rep
@@ -334,7 +334,10 @@ desugarMatches vars matches =
 -- Desugar a single match
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
 desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'  <- concat <$> zipWithM desugarLPat vars pats
+  dflags <- getDynFlags
+  -- decideBangHood: See Note [Desugaring -XStrict matches in Pmc]
+  let banged_pats = map (decideBangHood dflags) pats
+  pats'  <- concat <$> zipWithM desugarLPat vars banged_pats
   grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
@@ -533,4 +536,30 @@ the whole point.
 The place to store the 'PmLet' guards for @where@ clauses (which are per
 'GRHSs') is as a field of 'PmGRHSs'. For plain @let@ guards as in the guards of
 @x@, we can simply add them to the 'pg_grds' field of 'PmGRHS'.
+
+Note [Desugaring -XStrict matches in Pmc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#21761)
+
+  {-# LANGUAGE Strict #-}
+  idV :: Void -> Void
+  idV v = v
+
+Without -XStrict, we would not warn here. But with -XStrict, there is an
+implicit bang on `v` and we should give an inaccessible warning for the RHS.
+The way we account for that is by calling `decideBangHood` on patterns
+in a `Match`, which inserts the implicit bang.
+
+Making the call here actually seems redundant with the call to `decideBangHood`
+in `GHC.HsToCore.Match.matchWrapper`, which does it *after* it calls the
+pattern-match checker on the Match's patterns. It would be great if we could expect
+`matchWrapper` to pass the bang-adorned `Match` to the pattern-match checker,
+but sadly then we get worse warning messages which would print `idV` as if the
+user *had* written a bang:
+
+     Pattern match has inaccessible right hand side
+-    In an equation for ‘idV’: idV v = ...
++    In an equation for ‘idV’: idV !v = ...
+
+So we live with the duplication.
 -}
