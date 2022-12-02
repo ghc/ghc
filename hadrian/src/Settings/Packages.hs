@@ -315,7 +315,6 @@ rtsPackageArgs = package rts ? do
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
-          , arg "-g"
 
           , arg "-Irts"
           , arg $ "-I" ++ path
