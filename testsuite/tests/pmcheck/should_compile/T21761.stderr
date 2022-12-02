@@ -1,0 +1,24 @@
+
+T21761.hs:10:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘idV’: idV v = ...
+
+T21761.hs:13:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘idV'’: idV' v = ...
+
+T21761.hs:13:20: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In a case alternative: w -> ...
+
+T21761.hs:16:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘bangIdV’: bangIdV !v = ...
+
+T21761.hs:19:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘bangIdV'’: bangIdV' v = ...
+
+T21761.hs:19:24: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In a case alternative: !w -> ...
