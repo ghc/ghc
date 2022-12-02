@@ -517,19 +517,15 @@ scanl' = scanlGo'
 -- See Note [scanl rewrite rules]
 {-# RULES
 "scanl'"  [~1] forall f a bs . scanl' f a bs =
-  build (\c n -> a `c` foldr (scanlFB' f c) (flipSeqScanl' n) bs a)
+  build (\c n -> a `c` foldr (scanlFB' f c) (flipSeq n) bs a)
 "scanlList'" [1] forall f a bs .
-    foldr (scanlFB' f (:)) (flipSeqScanl' []) bs a = tail (scanl' f a bs)
+    foldr (scanlFB' f (:)) (flipSeq []) bs a = tail (scanl' f a bs)
  #-}
 
 {-# INLINE [0] scanlFB' #-} -- See Note [Inline FB functions]
 scanlFB' :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
 scanlFB' f c = \b g -> oneShot (\x -> let !b' = f x b in b' `c` g b')
   -- See Note [Left folds via right fold]
-
-{-# INLINE [0] flipSeqScanl' #-}
-flipSeqScanl' :: a -> b -> a
-flipSeqScanl' a !_b = a
 
 {-
 Note [scanl rewrite rules]
@@ -890,11 +886,22 @@ takeWhileFB p c n = \x r -> if p x then x `c` r else n
 -- []
 -- >>> dropWhile (< 0) [1,2,3]
 -- [1,2,3]
+{-# NOINLINE [1] dropWhile #-}
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
+
+{-# INLINE [0] dropWhileFB #-} -- See Note [Inline FB functions]
+dropWhileFB :: (a -> Bool) -> (a -> b -> b) -> b -> a -> (Bool -> b) -> Bool -> b
+dropWhileFB p c _n x xs = \drp -> if drp && p x then xs True else x `c` xs False
+
+{-# RULES
+"dropWhile"     [~1] forall p xs. dropWhile p xs =
+                                build (\c n -> foldr (dropWhileFB p c n) (flipSeq n) xs True)
+"dropWhileList" [1]  forall p xs. foldr (dropWhileFB p (:) []) (flipSeq []) xs True = dropWhile p xs
+ #-}
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
 -- of length @n@, or @xs@ itself if @n >= 'length' xs@.
@@ -932,7 +939,7 @@ take n xs | 0 < n     = unsafeTake n xs
 
 -- A version of take that takes the whole list if it's given an argument less
 -- than 1.
-{-# NOINLINE [1] unsafeTake #-}
+{-# NOINLINE [0] unsafeTake #-} -- See Note [Inline FB functions]
 unsafeTake :: Int -> [a] -> [a]
 unsafeTake !_  []     = []
 unsafeTake 1   (x: _) = [x]
@@ -941,20 +948,18 @@ unsafeTake m   (x:xs) = x : unsafeTake (m - 1) xs
 {-# RULES
 "take"     [~1] forall n xs . take n xs =
   build (\c nil -> if 0 < n
-                   then foldr (takeFB c nil) (flipSeqTake nil) xs n
+                   then foldr (takeFB c nil) (flipSeq nil) xs n
                    else nil)
-"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeqTake []) xs n
+"unsafeTakeList"  [1] forall n xs . foldr (takeFB (:) []) (flipSeq []) xs n
                                         = unsafeTake n xs
  #-}
 
-{-# INLINE [0] flipSeqTake #-}
--- Just flip seq, specialized to Int, but not inlined too early.
--- It's important to force the numeric argument here, even though
--- it's not used. Otherwise, take n [] doesn't force n. This is
--- bad for strictness analysis and unboxing, and leads to increased
--- allocation in T7257.
-flipSeqTake :: a -> Int -> a
-flipSeqTake x !_n = x
+{-# INLINE [0] flipSeq #-}
+-- Just flip seq, but not inlined too early.
+-- It's important to force the argument here, even though it's not used.
+-- Otherwise, take n [] can't unbox n, leading to increased allocation in T7257.
+flipSeq :: a -> b -> a
+flipSeq x !_n = x
 
 {-# INLINE [0] takeFB #-} -- See Note [Inline FB functions]
 takeFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
@@ -993,17 +998,31 @@ drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
 #else /* hack away */
-{-# INLINE drop #-}
+{-# INLINE[1] drop #-} -- Why [1]? See justification on take! => RULES
 drop n ls
   | n <= 0     = ls
   | otherwise  = unsafeDrop n ls
-  where
-    -- A version of drop that drops the whole list if given an argument
-    -- less than 1
-    unsafeDrop :: Int -> [a] -> [a]
-    unsafeDrop !_ []     = []
-    unsafeDrop 1  (_:xs) = xs
-    unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
+
+-- A version of drop that drops the whole list if given an argument
+-- less than 1
+{-# NOINLINE [0] unsafeDrop #-} -- See Note [Inline FB functions]
+unsafeDrop :: Int -> [a] -> [a]
+unsafeDrop !_ []     = []
+unsafeDrop 1  (_:xs) = xs
+unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
+
+{-# RULES
+"drop"     [~1] forall n xs . drop n xs =
+  build (\c nil -> if n <= 0
+                   then foldr c nil xs
+                   else foldr (dropFB c nil) (flipSeq nil) xs n)
+"unsafeDropList"  [1] forall n xs . foldr (dropFB (:) []) (flipSeq []) xs n
+                                        = unsafeDrop n xs
+ #-}
+
+{-# INLINE [0] dropFB #-} -- See Note [Inline FB functions]
+dropFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
+dropFB c _n x xs = \ m -> if m <= 0 then x `c` xs m else xs (m-1)
 #endif
 
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
