@@ -408,3 +408,5 @@ test('T21839r',
         only_ways(['normal'])],
     compile_and_run,
     ['-O'])
+
+test('T18964', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O'])
