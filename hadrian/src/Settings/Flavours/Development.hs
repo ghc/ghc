@@ -16,12 +16,12 @@ developmentFlavour ghcStage = defaultFlavour
     , libraryWays = pure $ Set.fromList [vanilla]
     , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
     , dynamicGhcPrograms = return False
-    , ghcDebugAssertions = (>= Stage2) }
+    , ghcDebugAssertions = (== ghcStage) }
     where
       stageString Stage2 = "2"
       stageString Stage1 = "1"
       stageString Stage3 = "3"
-      stageString s = error ("developmentFlavour not support for " ++ show s)
+      stageString s = error ("developmentFlavour not supported for " ++ show s)
 
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do

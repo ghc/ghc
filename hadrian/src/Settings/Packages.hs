@@ -13,7 +13,6 @@ packageArgs :: Args
 packageArgs = do
     stage        <- getStage
     path         <- getBuildPath
-    root         <- getBuildRoot
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
 
     let -- Do not bind the result to a Boolean: this forces the configure rule
@@ -29,7 +28,10 @@ packageArgs = do
     cursesLibraryDir <- getSetting CursesLibDir
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    debugAssertions  <- ghcDebugAssertions <$> expr flavour
+    debugAssertions  <- ( `ghcDebugAssertions` (succStage stage) ) <$> expr flavour
+      -- NB: in this function, "stage" is the stage of the compiler we are
+      -- using to build, but ghcDebugAssertions wants the stage of the compiler
+      -- we are building, which we get using succStage.
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -52,7 +54,7 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ debugAssertions stage ?  arg "-DDEBUG"
+            [ debugAssertions ? arg "-DDEBUG"
 
             , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
@@ -83,7 +85,7 @@ packageArgs = do
         , package ghc ? mconcat
           [ builder Ghc ? mconcat
              [ arg ("-I" ++ compilerPath)
-             , debugAssertions stage ? arg "-DDEBUG" ]
+             , debugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
