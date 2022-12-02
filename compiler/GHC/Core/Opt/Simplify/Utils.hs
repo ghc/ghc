@@ -2077,7 +2077,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
       = (poly_id `setIdUnfolding` unf, poly_rhs)
       where
         poly_rhs = mkLams tvs_here rhs
-        unf = mkUnfolding uf_opts InlineRhs is_top_lvl False poly_rhs
+        unf = mkUnfolding uf_opts InlineRhs is_top_lvl False poly_rhs Nothing
 
         -- We want the unfolding.  Consider
         --      let

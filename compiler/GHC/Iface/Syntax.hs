@@ -47,7 +47,7 @@ import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
-import GHC.Core( IsOrphan, isOrphan )
+import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Class
@@ -359,7 +359,7 @@ data IfaceInfoItem
 -- only later attached to the Id.  Partial reason: some are orphans.
 
 data IfaceUnfolding
-  = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
+  = IfCoreUnfold Bool IfUnfoldingCache IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
                                 -- Possibly could eliminate the Bool here, the information
                                 -- is also in the InlinePragma.
 
@@ -373,6 +373,8 @@ data IfaceUnfolding
                  IfaceExpr
 
   | IfDFunUnfold [IfaceBndr] [IfaceExpr]
+
+type IfUnfoldingCache = UnfoldingCache
 
 
 -- We only serialise the IdDetails of top-level Ids, and even then
@@ -1488,7 +1490,7 @@ instance Outputable IfaceJoinInfo where
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
-  ppr (IfCoreUnfold s e)   = (if s
+  ppr (IfCoreUnfold s _ e)   = (if s
                                 then text "<stable>"
                                 else Outputable.empty)
                               <+> parens (ppr e)
@@ -1741,7 +1743,7 @@ freeNamesItem (HsLFInfo (IfLFCon n)) = unitNameSet n
 freeNamesItem _                      = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
-freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
+freeNamesIfUnfold (IfCoreUnfold _ _ e)     = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = freeNamesIfBndrs bs &&& fnList freeNamesIfExpr es
@@ -2265,9 +2267,10 @@ instance Binary IfaceInfoItem where
             _ -> HsTagSig <$> get bh
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold s e) = do
+    put_ bh (IfCoreUnfold s c e) = do
         putByte bh 0
         put_ bh s
+        putUnfoldingCache bh c
         put_ bh e
     put_ bh (IfInlineRule a b c d) = do
         putByte bh 1
@@ -2286,8 +2289,9 @@ instance Binary IfaceUnfolding where
         h <- getByte bh
         case h of
             0 -> do s <- get bh
+                    c <- getUnfoldingCache bh
                     e <- get bh
-                    return (IfCoreUnfold s e)
+                    return (IfCoreUnfold s c e)
             1 -> do a <- get bh
                     b <- get bh
                     c <- get bh
@@ -2298,6 +2302,26 @@ instance Binary IfaceUnfolding where
                     return (IfDFunUnfold as bs)
             _ -> do e <- get bh
                     return (IfCompulsory e)
+
+putUnfoldingCache :: BinHandle -> IfUnfoldingCache -> IO ()
+putUnfoldingCache bh (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
+                                     , uf_is_work_free = wf, uf_expandable = exp }) = do
+    let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp
+    putByte bh b
+
+getUnfoldingCache :: BinHandle -> IO IfUnfoldingCache
+getUnfoldingCache bh = do
+    b <- getByte bh
+    let hnf     = testBit b 3
+        conlike = testBit b 2
+        wf      = testBit b 1
+        exp     = testBit b 0
+    return (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
+                           , uf_is_work_free = wf, uf_expandable = exp })
+
+infixl 9 .<<|.
+(.<<|.) :: (Bits a) => a -> Bool -> a
+x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
 
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do
@@ -2614,8 +2638,9 @@ instance NFData IfaceInfoItem where
 
 instance NFData IfaceUnfolding where
   rnf = \case
-    IfCoreUnfold inlinable expr ->
-      rnf inlinable `seq` rnf expr
+    IfCoreUnfold inlinable cache expr ->
+      rnf inlinable `seq` cache `seq` rnf expr
+    -- See Note [UnfoldingCache] in GHC.Core for why it suffices to merely `seq` on cache
     IfCompulsory expr ->
       rnf expr
     IfInlineRule arity b1 b2 e ->

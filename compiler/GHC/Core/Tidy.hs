@@ -362,15 +362,16 @@ tidyNestedUnfolding tidy_env df@(DFunUnfolding { df_bndrs = bndrs, df_args = arg
     (tidy_env', bndrs') = tidyBndrs tidy_env bndrs
 
 tidyNestedUnfolding tidy_env
-    unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_is_value = is_value })
+    unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_cache = cache })
   | isStableSource src
   = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
-            -- This seqIt avoids a space leak: otherwise the uf_is_value,
-            -- uf_is_conlike, ... fields may retain a reference to the
-            -- pre-tidied expression forever (GHC.CoreToIface doesn't look at them)
+            -- This seqIt avoids a space leak: otherwise the uf_cache
+            -- field may retain a reference to the pre-tidied
+            -- expression forever (GHC.CoreToIface doesn't look at
+            -- them)
 
   -- Discard unstable unfoldings, but see Note [Preserve evaluatedness]
-  | is_value = evaldUnfolding
+  | uf_is_value cache = evaldUnfolding
   | otherwise = noUnfolding
 
   where

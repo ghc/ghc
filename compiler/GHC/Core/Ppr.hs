@@ -623,18 +623,14 @@ instance Outputable Unfolding where
                 <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
             2 (ppr con <+> sep (map ppr args))
   ppr (CoreUnfolding { uf_src = src
-                     , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
-                     , uf_is_conlike=conlike, uf_is_work_free=wf
-                     , uf_expandable=exp, uf_guidance=g })
+                     , uf_tmpl=rhs, uf_is_top=top
+                     , uf_cache=cache, uf_guidance=g })
         = text "Unf" <> braces (pp_info $$ pp_rhs)
     where
       pp_info = fsep $ punctuate comma
                 [ text "Src="        <> ppr src
                 , text "TopLvl="     <> ppr top
-                , text "Value="      <> ppr hnf
-                , text "ConLike="    <> ppr conlike
-                , text "WorkFree="   <> ppr wf
-                , text "Expandable=" <> ppr exp
+                , ppr cache
                 , text "Guidance="   <> ppr g ]
       pp_tmpl = ppUnlessOption sdocSuppressUnfoldings
                   (text "Tmpl=" <+> ppr rhs)
@@ -642,6 +638,15 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic
             -- blowup in the size of the printout!
+
+instance Outputable UnfoldingCache where
+    ppr (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
+                        , uf_is_work_free = wf, uf_expandable = exp })
+        = fsep $ punctuate comma
+          [ text "Value="      <> ppr hnf
+          , text "ConLike="    <> ppr conlike
+          , text "WorkFree="   <> ppr wf
+          , text "Expandable=" <> ppr exp ]
 
 {-
 -----------------------------------------------------

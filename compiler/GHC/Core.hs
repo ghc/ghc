@@ -53,7 +53,7 @@ module GHC.Core (
         isRuntimeArg, isRuntimeVar,
 
         -- * Unfolding data types
-        Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
+        Unfolding(..),  UnfoldingCache(..), UnfoldingGuidance(..), UnfoldingSource(..),
 
         -- ** Constructing 'Unfolding's
         noUnfolding, bootUnfolding, evaldUnfolding, mkOtherCon,
@@ -1368,15 +1368,8 @@ data Unfolding
         uf_tmpl       :: CoreExpr,        -- Template; occurrence info is correct
         uf_src        :: UnfoldingSource, -- Where the unfolding came from
         uf_is_top     :: Bool,          -- True <=> top level binding
-        uf_is_value   :: Bool,          -- exprIsHNF template (cached); it is ok to discard
-                                        --      a `seq` on this variable
-        uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
-                                        --      Cached version of exprIsConLike
-        uf_is_work_free :: Bool,                -- True <=> doesn't waste (much) work to expand
-                                        --          inside an inlining
-                                        --      Cached version of exprIsCheap
-        uf_expandable :: Bool,          -- True <=> can expand in RULE matching
-                                        --      Cached version of exprIsExpandable
+        uf_cache      :: UnfoldingCache,        -- Cache of flags computable from the expr
+                                                -- See Note [Tying the 'CoreUnfolding' knot]
         uf_guidance   :: UnfoldingGuidance      -- Tells about the *size* of the template.
     }
   -- ^ An unfolding with redundant cached information. Parameters:
@@ -1426,6 +1419,21 @@ data UnfoldingSource
                        -- Inline absolutely always, however boring the context.
 
 
+-- | Properties of a 'CoreUnfolding' that could be computed on-demand from its template.
+-- See Note [UnfoldingCache]
+data UnfoldingCache
+  = UnfoldingCache {
+        uf_is_value   :: !Bool,         -- exprIsHNF template (cached); it is ok to discard
+                                        --      a `seq` on this variable
+        uf_is_conlike :: !Bool,         -- True <=> applicn of constructor or CONLIKE function
+                                        --      Cached version of exprIsConLike
+        uf_is_work_free :: !Bool,       -- True <=> doesn't waste (much) work to expand
+                                        --          inside an inlining
+                                        --      Cached version of exprIsCheap
+        uf_expandable :: !Bool          -- True <=> can expand in RULE matching
+                                        --      Cached version of exprIsExpandable
+    }
+  deriving (Eq)
 
 -- | 'UnfoldingGuidance' says when unfolding should take place
 data UnfoldingGuidance
@@ -1456,7 +1464,23 @@ data UnfoldingGuidance
   | UnfNever        -- The RHS is big, so don't inline it
   deriving (Eq)
 
-{-
+{- Note [UnfoldingCache]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The UnfoldingCache field of an Unfolding holds four (strict) booleans,
+all derived from the uf_tmpl field of the unfolding.
+
+* We serialise the UnfoldingCache to and from interface files, for
+  reasons described in  Note [Tying the 'CoreUnfolding' knot] in
+  GHC.IfaceToCore
+
+* Because it is a strict data type, we must be careful not to
+  pattern-match on it until we actually want its values.  E.g
+  GHC.Core.Unfold.callSiteInline/tryUnfolding are careful not to force
+  it unnecessarily.  Just saves a bit of work.
+
+* When `seq`ing Core to eliminate space leaks, to suffices to `seq` on
+  the cache, but not its fields, because it is strict in all fields.
+
 Note [Historical note: unfoldings for wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We used to have a nice clever scheme in interface files for
@@ -1563,8 +1587,8 @@ otherCons _               = []
 -- yield a value (something in HNF): returns @False@ if unsure
 isValueUnfolding :: Unfolding -> Bool
         -- Returns False for OtherCon
-isValueUnfolding (CoreUnfolding { uf_is_value = is_evald }) = is_evald
-isValueUnfolding _                                          = False
+isValueUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_value cache
+isValueUnfolding _                                    = False
 
 -- | Determines if it possibly the case that the unfolding will
 -- yield a value. Unlike 'isValueUnfolding' it returns @True@
@@ -1572,31 +1596,33 @@ isValueUnfolding _                                          = False
 isEvaldUnfolding :: Unfolding -> Bool
         -- Returns True for OtherCon
 isEvaldUnfolding (OtherCon _)                               = True
-isEvaldUnfolding (CoreUnfolding { uf_is_value = is_evald }) = is_evald
+isEvaldUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_value cache
 isEvaldUnfolding _                                          = False
 
 -- | @True@ if the unfolding is a constructor application, the application
 -- of a CONLIKE function or 'OtherCon'
 isConLikeUnfolding :: Unfolding -> Bool
-isConLikeUnfolding (OtherCon _)                             = True
-isConLikeUnfolding (CoreUnfolding { uf_is_conlike = con })  = con
-isConLikeUnfolding _                                        = False
+isConLikeUnfolding (OtherCon _)                         = True
+isConLikeUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_conlike cache
+isConLikeUnfolding _                                    = False
 
 -- | Is the thing we will unfold into certainly cheap?
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding { uf_is_work_free = is_wf }) = is_wf
-isCheapUnfolding _                                           = False
+isCheapUnfolding (CoreUnfolding { uf_cache = cache }) = uf_is_work_free cache
+isCheapUnfolding _                                    = False
 
 isExpandableUnfolding :: Unfolding -> Bool
-isExpandableUnfolding (CoreUnfolding { uf_expandable = is_expable }) = is_expable
-isExpandableUnfolding _                                              = False
+isExpandableUnfolding (CoreUnfolding { uf_cache = cache }) = uf_expandable cache
+isExpandableUnfolding _                                    = False
 
 expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- Expand an expandable unfolding; this is used in rule matching
 --   See Note [Expanding variables] in GHC.Core.Rules
 -- The key point here is that CONLIKE things can be expanded
-expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
-expandUnfolding_maybe _                                                       = Nothing
+expandUnfolding_maybe (CoreUnfolding { uf_cache = cache, uf_tmpl = rhs })
+  | uf_expandable cache
+    = Just rhs
+expandUnfolding_maybe _ = Nothing
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True

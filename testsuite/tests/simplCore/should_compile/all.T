@@ -396,6 +396,5 @@ test('T21144',  normal, compile, ['-O'])
 test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
 
 test('T22491', normal, compile, ['-O2'])
-test('T22623', normal, multimod_compile, ['T22623', '-O -v0'])
-test('T22662', normal, compile, [''])
-test('T22725', normal, compile, ['-O'])
+test('T21476', normal, compile, [''])
+test('T22272', normal, multimod_compile, ['T22272', '-O -fexpose-all-unfoldings -fno-omit-interface-pragmas -fno-ignore-interface-pragmas'])

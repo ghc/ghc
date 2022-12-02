@@ -600,8 +600,8 @@ rnIfaceInfoItem i
     = pure i
 
 rnIfaceUnfolding :: Rename IfaceUnfolding
-rnIfaceUnfolding (IfCoreUnfold stable if_expr)
-    = IfCoreUnfold stable <$> rnIfaceExpr if_expr
+rnIfaceUnfolding (IfCoreUnfold stable cache if_expr)
+    = IfCoreUnfold stable cache <$> rnIfaceExpr if_expr
 rnIfaceUnfolding (IfCompulsory if_expr)
     = IfCompulsory <$> rnIfaceExpr if_expr
 rnIfaceUnfolding (IfInlineRule arity unsat_ok boring_ok if_expr)
