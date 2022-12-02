@@ -285,6 +285,14 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    includes all top-level definitions down to but not including the first
    top-level declaration splice.
 
+   Each group is compiled just like a separately compiled module. That is:
+
+   - Later groups can "see" declarations, and instance declarations, from
+     earlier groups;
+
+   - But earlier groups cannot "see" declarations, or instance declarations,
+     from later groups.
+
    Each declaration group is mutually recursive only within the group.
    Declaration groups can refer to definitions within previous groups,
    but not later ones.
@@ -374,6 +382,70 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
       Monad, so we may simply ``return`` the empty list of declarations).
    3. Since the declaration group containing ``D`` is in the previous
       declaration group, the splice ``$(th2 ...)`` *can* refer to ``D``.
+
+   Note that in some cases, the presence or absence of top-level declaration
+   splices can affect the *runtime* behavior of the surrounding code, because
+   the resolution of instances may differ depending on their visiblity. One
+   case where this arises is with
+   :ref:`incoherent instances <instance-overlap>` ::
+
+       module Main where
+
+       main :: IO ()
+       main = do
+         let i :: Int
+             i = 42
+         putStrLn (m1 i)
+         putStrLn (m2 i)
+
+       class C1 a where
+         m1 :: a -> String
+
+       instance {-# INCOHERENT #-} C1 a where
+         m1 _ = "C1 incoherent"
+
+       instance C1 Int where
+         m1 = show
+
+       class C2 a where
+         m2 :: a -> String
+
+       instance {-# INCOHERENT #-} C2 a where
+         m2 _ = "C2 incoherent"
+
+       $(return [])
+
+       instance C2 Int where
+         m2 = show
+
+   Here, ``C1`` and ``C2`` are the same classes with nearly identical
+   instances. The only significant differences between ``C1`` and ``C2``, aside
+   from the minor name change, is that all of ``C1``'s instances are defined
+   within the same declaration group, whereas the ``C2 Int`` instance is put in
+   a separate declaration group from the incoherent ``C2 a`` instance. This has
+   an impact on the runtime behavior of the ``main`` function ::
+
+       $ runghc Main.hs
+       42
+       C2 incoherent
+
+   Note that ``m1 i`` returns ``"42"``, but ``m2 i`` returns
+   ``"C2 incoherent"``. When each of these expressions are typechecked, GHC
+   must figure out which ``C1 Int`` and ``C2 Int`` instances to use:
+
+   1. When resolving the ``C1 Int`` instance, GHC discovers two possible
+      instances in the same declaration group: the incoherent ``C1 a`` instance
+      and the non-incoherent ``C1 Int`` instance. According to the instance
+      search rules described in :ref:`instance-overlap`, because there is
+      exactly one non-incoherent instance to pick, GHC will choose the
+      ``C1 Int`` instance. As a result, ``m1 i`` will be equivalent to
+      ``show i`` (i.e., ``"42"``).
+   2. When resolving the ``C2 Int`` instance, GHC only discovers one instance
+      in the same declaration group: the incoherent ``C2 a`` instance. Note
+      that GHC does *not* see the ``C2 Int`` instance, as that is in a later
+      declaration group that is made separate by the intervening declaration
+      splice. As a result, GHC will choose the ``C2 a`` instance, making
+      ``m2 i`` equivalent to ``"C2 incoherent"``.
 
 -  Expression quotations accept most Haskell language constructs.
    However, there are some GHC-specific extensions which expression
