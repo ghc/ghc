@@ -69,7 +69,7 @@ templateHaskellNames = [
     -- Stmt
     bindSName, letSName, noBindSName, parSName, recSName,
     -- Dec
-    funDName, valDName, dataDName, newtypeDName, tySynDName,
+    funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName,
     classDName, instanceWithOverlapDName,
     standaloneDerivWithStrategyDName, sigDName, kiSigDName, forImpDName,
     pragInlDName, pragOpaqueDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
@@ -354,7 +354,7 @@ parSName    = libFun (fsLit "parS")    parSIdKey
 recSName    = libFun (fsLit "recS")    recSIdKey
 
 -- data Dec = ...
-funDName, valDName, dataDName, newtypeDName, tySynDName, classDName,
+funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName, classDName,
     instanceWithOverlapDName, sigDName, kiSigDName, forImpDName, pragInlDName,
     pragSpecDName, pragSpecInlDName, pragSpecInstDName, pragRuleDName,
     pragAnnDName, standaloneDerivWithStrategyDName, defaultSigDName, defaultDName,
@@ -366,6 +366,7 @@ funDName                         = libFun (fsLit "funD")                        
 valDName                         = libFun (fsLit "valD")                         valDIdKey
 dataDName                        = libFun (fsLit "dataD")                        dataDIdKey
 newtypeDName                     = libFun (fsLit "newtypeD")                     newtypeDIdKey
+typeDataDName                    = libFun (fsLit "typeDataD")                    typeDataDIdKey
 tySynDName                       = libFun (fsLit "tySynD")                       tySynDIdKey
 classDName                       = libFun (fsLit "classD")                       classDIdKey
 instanceWithOverlapDName         = libFun (fsLit "instanceWithOverlapD")         instanceWithOverlapDIdKey
@@ -888,7 +889,7 @@ funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
     newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivWithStrategyDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey, patSynDIdKey,
     patSynSigDIdKey, pragCompleteDIdKey, implicitParamBindDIdKey,
-    kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey :: Unique
+    kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey, typeDataDIdKey :: Unique
 funDIdKey                         = mkPreludeMiscIdUnique 320
 valDIdKey                         = mkPreludeMiscIdUnique 321
 dataDIdKey                        = mkPreludeMiscIdUnique 322
@@ -923,7 +924,8 @@ pragCompleteDIdKey                = mkPreludeMiscIdUnique 350
 implicitParamBindDIdKey           = mkPreludeMiscIdUnique 351
 kiSigDIdKey                       = mkPreludeMiscIdUnique 352
 defaultDIdKey                     = mkPreludeMiscIdUnique 353
-pragOpaqueDIdKey                   = mkPreludeMiscIdUnique 354
+pragOpaqueDIdKey                  = mkPreludeMiscIdUnique 354
+typeDataDIdKey                    = mkPreludeMiscIdUnique 355
 
 -- type Cxt = ...
 cxtIdKey :: Unique

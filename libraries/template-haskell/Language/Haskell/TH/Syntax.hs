@@ -2399,6 +2399,9 @@ data Dec
              Con [DerivClause]    -- ^ @{ newtype Cxt x => T x = A (B x)
                                   --       deriving (Z,W Q)
                                   --       deriving stock Eq }@
+  | TypeDataD Name [TyVarBndr ()]
+          (Maybe Kind)            -- Kind signature (allowed only for GADTs)
+          [Con]                   -- ^ @{ type data T x = A x | B (T x) }@
   | TySynD Name [TyVarBndr ()] Type -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr ()]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@

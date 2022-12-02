@@ -528,10 +528,10 @@ repDataDefn tc opts
                                    ; ksig' <- repMaybeLTy ksig
                                    ; repNewtype cxt1 tc opts ksig' con'
                                                 derivs1 }
-           DataTypeCons _ cons -> do { ksig' <- repMaybeLTy ksig
+           DataTypeCons type_data cons -> do { ksig' <- repMaybeLTy ksig
                                ; consL <- mapM repC cons
                                ; cons1 <- coreListM conTyConName consL
-                               ; repData cxt1 tc opts ksig' cons1
+                               ; repData type_data cxt1 tc opts ksig' cons1
                                          derivs1 }
        }
 
@@ -2528,14 +2528,17 @@ repVal (MkC p) (MkC b) (MkC ds) = rep2 valDName [p, b, ds]
 repFun :: Core TH.Name -> Core [(M TH.Clause)] -> MetaM (Core (M TH.Dec))
 repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 
-repData :: Core (M TH.Cxt) -> Core TH.Name
+repData :: Bool -- ^ @True@ for a @type data@ declaration.
+                -- See Note [Type data declarations] in GHC.Rename.Module
+        -> Core (M TH.Cxt) -> Core TH.Name
         -> Either (Core [(M (TH.TyVarBndr ()))])
                   (Core (Maybe [(M (TH.TyVarBndr ()))]), Core (M TH.Type))
         -> Core (Maybe (M TH.Kind)) -> Core [(M TH.Con)] -> Core [M TH.DerivClause]
         -> MetaM (Core (M TH.Dec))
-repData (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC cons) (MkC derivs)
-  = rep2 dataDName [cxt, nm, tvs, ksig, cons, derivs]
-repData (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
+repData type_data (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC cons) (MkC derivs)
+  | type_data = rep2 typeDataDName [nm, tvs, ksig, cons]
+  | otherwise = rep2 dataDName [cxt, nm, tvs, ksig, cons, derivs]
+repData _ (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
         (MkC derivs)
   = rep2 dataInstDName [cxt, mb_bndrs, ty, ksig, cons, derivs]
 

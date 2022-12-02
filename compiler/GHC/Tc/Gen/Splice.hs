@@ -2681,7 +2681,7 @@ reify_tc_app tc tys
          | tc `hasKey` heqTyConKey        = TH.EqualityT
          | tc `hasKey` eqPrimTyConKey     = TH.EqualityT
          | tc `hasKey` eqReprPrimTyConKey = TH.ConT (reifyName coercibleTyCon)
-         | isPromotedDataCon tc           = TH.PromotedT (reifyName tc)
+         | isDataKindsPromotedDataCon tc  = TH.PromotedT (reifyName tc)
          | otherwise                      = TH.ConT (reifyName tc)
 
     -- See Note [When does a tycon application need an explicit kind

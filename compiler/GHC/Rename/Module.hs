@@ -2130,6 +2130,10 @@ The main parts of the implementation are:
   of the `IfDataTyCon` constructor of `IfaceConDecls` by
   GHC.Iface.Make.tyConToIfaceDecl.
 
+* The Template Haskell `Dec` type has an constructor `TypeDataD` for
+  `type data` declarations.  When these are converted back to Hs types
+  in a splice, the constructors are placed in the TcCls namespace.
+
 -}
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)

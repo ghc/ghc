@@ -86,7 +86,7 @@ module Language.Haskell.TH.Lib (
 
     -- *** Top Level Declarations
     -- **** Data
-    valD, funD, tySynD, dataD, newtypeD,
+    valD, funD, tySynD, dataD, newtypeD, typeDataD,
     derivClause, DerivClause(..),
     stockStrategy, anyclassStrategy, newtypeStrategy,
     viaStrategy, DerivStrategy(..),
@@ -131,8 +131,8 @@ module Language.Haskell.TH.Lib (
     thisModule,
 
     -- ** Documentation
-    withDecDoc, withDecsDoc, funD_doc, dataD_doc, newtypeD_doc, dataInstD_doc,
-    newtypeInstD_doc, patSynD_doc
+    withDecDoc, withDecsDoc, funD_doc, dataD_doc, newtypeD_doc,
+    typeDataD_doc, dataInstD_doc, newtypeInstD_doc, patSynD_doc
 
    ) where
 
@@ -140,6 +140,7 @@ import Language.Haskell.TH.Lib.Internal hiding
   ( tySynD
   , dataD
   , newtypeD
+  , typeDataD
   , classD
   , pragRuleD
   , dataInstD
@@ -211,6 +212,13 @@ newtypeD ctxt tc tvs ksig con derivs =
     con1 <- con
     derivs1 <- sequenceA derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
+
+typeDataD :: Quote m => Name -> [TyVarBndr ()] -> Maybe Kind -> [m Con]
+      -> m Dec
+typeDataD tc tvs ksig cons =
+  do
+    cons1 <- sequenceA cons
+    return (TypeDataD tc tvs ksig cons1)
 
 classD :: Quote m => m Cxt -> Name -> [TyVarBndr ()] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =

@@ -5,6 +5,9 @@
   * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 
   * The values of named precedence levels like `Ppr.appPrec` have changed.
 
+  * Add `TypeDataD` constructor to the `Dec` type for `type data`
+    declarations (GHC proposal #106).
+
 ## 2.19.0.0
 
   * Add `DefaultD` constructor to support Haskell `default` declarations.

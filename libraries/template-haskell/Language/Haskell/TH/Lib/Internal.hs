@@ -441,6 +441,15 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequenceA derivs
     pure (NewtypeD ctxt1 tc tvs1 ksig1 con1 derivs1)
 
+typeDataD :: Quote m => Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> [m Con]
+      -> m Dec
+typeDataD tc tvs ksig cons =
+  do
+    tvs1    <- sequenceA tvs
+    ksig1   <- sequenceA ksig
+    cons1   <- sequenceA cons
+    pure (TypeDataD tc tvs1 ksig1 cons1)
+
 classD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
@@ -1033,6 +1042,7 @@ withDecDoc doc dec = do
     doc_loc (ValD (VarP n) _ _)                            = Just $ DeclDoc n
     doc_loc (DataD _ n _ _ _ _)                            = Just $ DeclDoc n
     doc_loc (NewtypeD _ n _ _ _ _)                         = Just $ DeclDoc n
+    doc_loc (TypeDataD n _ _ _)                            = Just $ DeclDoc n
     doc_loc (TySynD n _ _)                                 = Just $ DeclDoc n
     doc_loc (ClassD _ n _ _ _)                             = Just $ DeclDoc n
     doc_loc (SigD n _)                                     = Just $ DeclDoc n
@@ -1106,6 +1116,19 @@ newtypeD_doc :: Q Cxt -> Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
 newtypeD_doc ctxt tc tvs ksig con_with_docs@(con, _, _) derivs mdoc = do
   qAddModFinalizer $ docCons con_with_docs
   let dec = newtypeD ctxt tc tvs ksig con derivs
+  maybe dec (flip withDecDoc dec) mdoc
+
+-- | Variant of 'typeDataD' that attaches Haddock documentation.
+typeDataD_doc :: Name -> [Q (TyVarBndr ())] -> Maybe (Q Kind)
+          -> [(Q Con, Maybe String, [Maybe String])]
+          -- ^ List of constructors, documentation for the constructor, and
+          -- documentation for the arguments
+          -> Maybe String
+          -- ^ Documentation to attach to the data declaration
+          -> Q Dec
+typeDataD_doc tc tvs ksig cons_with_docs mdoc = do
+  qAddModFinalizer $ mapM_ docCons cons_with_docs
+  let dec = typeDataD tc tvs ksig (map (\(con, _, _) -> con) cons_with_docs)
   maybe dec (flip withDecDoc dec) mdoc
 
 -- | Variant of 'dataInstD' that attaches Haddock documentation.

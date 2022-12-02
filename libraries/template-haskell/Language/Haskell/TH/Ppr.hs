@@ -399,6 +399,8 @@ ppr_dec _ (DataD ctxt t xs ksig cs decs)
   = ppr_data empty ctxt (Just t) (hsep (map ppr xs)) ksig cs decs
 ppr_dec _ (NewtypeD ctxt t xs ksig c decs)
   = ppr_newtype empty ctxt (Just t) (sep (map ppr xs)) ksig c decs
+ppr_dec _ (TypeDataD t xs ksig cs)
+  = ppr_type_data empty [] (Just t) (hsep (map ppr xs)) ksig cs []
 ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
@@ -494,6 +496,10 @@ ppr_data = ppr_typedef "data"
 ppr_newtype :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> Con -> [DerivClause]
             -> Doc
 ppr_newtype maybeInst ctxt t argsDoc ksig c decs = ppr_typedef "newtype" maybeInst ctxt t argsDoc ksig [c] decs
+
+ppr_type_data :: Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
+         -> Doc
+ppr_type_data = ppr_typedef "type data"
 
 ppr_typedef :: String -> Doc -> Cxt -> Maybe Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause] -> Doc
 ppr_typedef data_or_newtype maybeInst ctxt t argsDoc ksig cs decs
