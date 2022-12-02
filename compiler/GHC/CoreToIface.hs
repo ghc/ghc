@@ -508,9 +508,10 @@ toIfaceJoinInfo Nothing   = IfaceNotJoinPoint
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem
 toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
                                 , uf_src = src
+                                , uf_cache = cache
                                 , uf_guidance = guidance })
   = Just $ HsUnfold lb $
-    IfCoreUnfold src (toIfGuidance src guidance) (toIfaceExpr rhs)
+    IfCoreUnfold src cache (toIfGuidance src guidance) (toIfaceExpr rhs)
         -- Yes, even if guidance is UnfNever, expose the unfolding
         -- If we didn't want to expose the unfolding, GHC.Iface.Tidy would
         -- have stuck in NoUnfolding.  For supercompilation we want

@@ -49,7 +49,7 @@ import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
 import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
-import GHC.Core( IsOrphan, isOrphan )
+import GHC.Core( IsOrphan, isOrphan, UnfoldingCache(..) )
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Class
@@ -365,8 +365,13 @@ data IfaceInfoItem
 -- only later attached to the Id.  Partial reason: some are orphans.
 
 data IfaceUnfolding
-  = IfCoreUnfold UnfoldingSource IfGuidance IfaceExpr
+  = IfCoreUnfold UnfoldingSource
+                 IfUnfoldingCache -- See Note [Tying the 'CoreUnfolding' knot]
+                 IfGuidance
+                 IfaceExpr
   | IfDFunUnfold [IfaceBndr] [IfaceExpr]
+
+type IfUnfoldingCache = UnfoldingCache
 
 data IfGuidance
   = IfNoGuidance            -- Compute it from the IfaceExpr
@@ -1522,7 +1527,7 @@ instance Outputable IfaceJoinInfo where
   ppr (IfaceJoinPoint ar) = angleBrackets (text "join" <+> ppr ar)
 
 instance Outputable IfaceUnfolding where
-  ppr (IfCoreUnfold src guide e)
+  ppr (IfCoreUnfold src _ guide e)
     = sep [ text "Core:" <+> ppr src <+> ppr guide, ppr e ]
   ppr (IfDFunUnfold bs es) = hang (text "DFun:" <+> sep (map ppr bs) <> dot)
                                 2 (sep (map pprParendIfaceExpr es))
@@ -1774,7 +1779,7 @@ freeNamesItem (HsLFInfo (IfLFCon n)) = unitNameSet n
 freeNamesItem _                      = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
-freeNamesIfUnfold (IfCoreUnfold _ _ e)   = freeNamesIfExpr e
+freeNamesIfUnfold (IfCoreUnfold _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = freeNamesIfBndrs bs &&& fnList freeNamesIfExpr es
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
@@ -2296,9 +2301,10 @@ instance Binary IfaceInfoItem where
             _ -> HsTagSig <$> get bh
 
 instance Binary IfaceUnfolding where
-    put_ bh (IfCoreUnfold s g e) = do
+    put_ bh (IfCoreUnfold s c g e) = do
         putByte bh 0
         put_ bh s
+        putUnfoldingCache bh c
         put_ bh g
         put_ bh e
     put_ bh (IfDFunUnfold as bs) = do
@@ -2309,9 +2315,10 @@ instance Binary IfaceUnfolding where
         h <- getByte bh
         case h of
             0 -> do s <- get bh
+                    c <- getUnfoldingCache bh
                     g <- get bh
                     e <- get bh
-                    return (IfCoreUnfold s g e)
+                    return (IfCoreUnfold s c g e)
             _ -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
@@ -2331,6 +2338,26 @@ instance Binary IfGuidance where
                     b <- get bh
                     c <- get bh
                     return (IfWhen a b c)
+
+putUnfoldingCache :: BinHandle -> IfUnfoldingCache -> IO ()
+putUnfoldingCache bh (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
+                                     , uf_is_work_free = wf, uf_expandable = exp }) = do
+    let b = zeroBits .<<|. hnf .<<|. conlike .<<|. wf .<<|. exp
+    putByte bh b
+
+getUnfoldingCache :: BinHandle -> IO IfUnfoldingCache
+getUnfoldingCache bh = do
+    b <- getByte bh
+    let hnf     = testBit b 3
+        conlike = testBit b 2
+        wf      = testBit b 1
+        exp     = testBit b 0
+    return (UnfoldingCache { uf_is_value = hnf, uf_is_conlike = conlike
+                           , uf_is_work_free = wf, uf_expandable = exp })
+
+infixl 9 .<<|.
+(.<<|.) :: (Bits a) => a -> Bool -> a
+x .<<|. b = (if b then (`setBit` 0) else id) (x `shiftL` 1)
 
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do
@@ -2688,8 +2715,9 @@ instance NFData IfGuidance where
 
 instance NFData IfaceUnfolding where
   rnf = \case
-    IfCoreUnfold src guidance expr -> src `seq` rnf guidance `seq` rnf expr
-    IfDFunUnfold bndrs exprs       -> rnf bndrs `seq` rnf exprs
+    IfCoreUnfold src cache guidance expr -> src `seq` cache `seq` rnf guidance `seq` rnf expr
+    IfDFunUnfold bndrs exprs             -> rnf bndrs `seq` rnf exprs
+    -- See Note [UnfoldingCache] in GHC.Core for why it suffices to merely `seq` on cache
 
 instance NFData IfaceExpr where
   rnf = \case

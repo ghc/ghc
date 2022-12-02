@@ -596,8 +596,8 @@ rnIfaceInfoItem i
     = pure i
 
 rnIfaceUnfolding :: Rename IfaceUnfolding
-rnIfaceUnfolding (IfCoreUnfold src guide if_expr)
-    = IfCoreUnfold src guide <$> rnIfaceExpr if_expr
+rnIfaceUnfolding (IfCoreUnfold src cache guide if_expr)
+    = IfCoreUnfold src cache guide <$> rnIfaceExpr if_expr
 rnIfaceUnfolding (IfDFunUnfold bs ops)
     = IfDFunUnfold <$> rnIfaceBndrs bs <*> mapM rnIfaceExpr ops
 
