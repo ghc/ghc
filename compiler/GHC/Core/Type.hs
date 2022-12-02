@@ -1488,7 +1488,7 @@ tyConAppResKind tc args
 tyConAppResKind tc args
   = go1 tc_bndrs args
   where
-    !(tc_kind, tc_bndrs, !tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
+    !(_, tc_bndrs, !tc_res_kind, closed_res_kind) = tyConTypeKindPieces tc
     init_subst = mkEmptySubst $ mkInScopeSet (tyCoVarsOfTypes args)
 
     go1 :: [TyConBinder] -> [Type] -> Type
