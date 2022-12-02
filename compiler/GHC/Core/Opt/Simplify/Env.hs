@@ -1065,6 +1065,8 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
       new_unique <- getUniqueM
       let
         !id1  = setVarUnique old_id new_unique
+        -- CHANGE1: Use fresh unique setVarUnique rather than uniqAway
+--        !id1  = uniqAway in_scope old_id
         !id2  = substIdType env id1
         !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
                                           -- and fragile OccInfo
