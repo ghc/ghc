@@ -15,6 +15,7 @@ module Flavour
   , disableProfiledLibs
   , enableLinting
   , enableHaddock
+  , enableHiCore
   , useNativeBignum
   , omitPragmas
 
@@ -62,6 +63,7 @@ flavourTransformers = M.fromList
     , "debug_stage1_ghc" =: debugGhc stage0InTree
     , "lint"             =: enableLinting
     , "haddock"          =: enableHaddock
+    , "hi_core"          =: enableHiCore
     , "late_ccs"         =: enableLateCCS
     ]
   where (=:) = (,)
@@ -179,6 +181,13 @@ enableHaddock =
     haddock = mconcat
       [ arg "-haddock"
       ]
+
+-- | Build stage2 dependencies with options to emit Core into
+-- interface files which is sufficient to restart code generation.
+enableHiCore :: Flavour -> Flavour
+enableHiCore = addArgs
+    $ notStage0 ? builder (Ghc CompileHs)
+    ? pure ["-fwrite-if-simplified-core"]
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate.
