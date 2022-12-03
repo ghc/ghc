@@ -532,21 +532,21 @@ ppTypeSig nms ty unicode =
     <+> dcolon unicode
     <+> ppSigType unicode ty
 
-ppHsOuterTyVarBndrs :: HsOuterTyVarBndrs flag DocNameI -> Bool -> LaTeX
+ppHsOuterTyVarBndrs :: RenderableBndrFlag flag => HsOuterTyVarBndrs flag DocNameI -> Bool -> LaTeX
 ppHsOuterTyVarBndrs (HsOuterImplicit{}) _ = empty
 ppHsOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) unicode =
-    hsep (forallSymbol unicode : ppTyVars bndrs) <> dot
+    hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> dot
 
 ppHsForAllTelescope :: HsForAllTelescope DocNameI -> Bool -> LaTeX
 ppHsForAllTelescope tele unicode = case tele of
   HsForAllVis { hsf_vis_bndrs = bndrs } ->
-    hsep (forallSymbol unicode : ppTyVars bndrs) <> text "\\" <> arrow unicode
+    hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> text "\\" <> arrow unicode
   HsForAllInvis { hsf_invis_bndrs = bndrs } ->
-    hsep (forallSymbol unicode : ppTyVars bndrs) <> dot
+    hsep (forallSymbol unicode : ppTyVars unicode bndrs) <> dot
 
 
-ppTyVars :: [LHsTyVarBndr flag DocNameI] -> [LaTeX]
-ppTyVars = map (ppSymName . getName . hsLTyVarNameI)
+ppTyVars :: RenderableBndrFlag flag => Bool -> [LHsTyVarBndr flag DocNameI] -> [LaTeX]
+ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
 
 
 tyvarNames :: LHsQTyVars DocNameI -> [Name]
@@ -1069,15 +1069,15 @@ class RenderableBndrFlag flag where
 instance RenderableBndrFlag () where
   ppHsTyVarBndr _ (UserTyVar _ _ (L _ name)) = ppDocName name
   ppHsTyVarBndr unicode (KindedTyVar _ _ (L _ name) kind) =
-    parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+    parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
 instance RenderableBndrFlag Specificity where
   ppHsTyVarBndr _ (UserTyVar _ SpecifiedSpec (L _ name)) = ppDocName name
   ppHsTyVarBndr _ (UserTyVar _ InferredSpec (L _ name)) = braces $ ppDocName name
   ppHsTyVarBndr unicode (KindedTyVar _ SpecifiedSpec (L _ name) kind) =
-    parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+    parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
   ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
-    braces (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+    braces (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
