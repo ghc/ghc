@@ -18,6 +18,10 @@ main = do
     "Stack contains one catch stm frame"
     (== 1)
     (length $ filter isCatchStmFrame decodedStack)
+  assertThat
+    "Stack contains one atomically frame"
+    (== 1)
+    (length $ filter isAtomicallyFrame decodedStack)
 
 getDecodedStack :: IO (StackSnapshot, [StackFrame])
 getDecodedStack = do
@@ -28,3 +32,7 @@ getDecodedStack = do
 isCatchStmFrame :: StackFrame -> Bool
 isCatchStmFrame (CatchStmFrame _ _) = True
 isCatchStmFrame _ = False
+
+isAtomicallyFrame :: StackFrame -> Bool
+isAtomicallyFrame (AtomicallyFrame _ _) = True
+isAtomicallyFrame _ = False
