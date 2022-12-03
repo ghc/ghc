@@ -20,7 +20,7 @@ getStack = do
   !decodedStack <- decodeStack s
   -- Uncomment to see the frames (for debugging purposes)
   -- hPutStrLn stderr $ "Stack frames : " ++ show decodedStack
-  assertStackInvariants decodedStack
+  assertStackInvariants s decodedStack
   assertThat
     "Stack contains underflow frames"
     (== True)

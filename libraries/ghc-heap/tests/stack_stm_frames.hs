@@ -9,18 +9,21 @@ import TestUtils
 
 main :: IO ()
 main = do
-  decodedStack <-
+  (stackSnapshot, decodedStack) <-
     atomically $
       catchSTM @SomeException (unsafeIOToSTM getDecodedStack) throwSTM
 
-  assertStackInvariants decodedStack
+  assertStackInvariants stackSnapshot decodedStack
   assertThat
     "Stack contains one catch stm frame"
     (== 1)
     (length $ filter isCatchStmFrame decodedStack)
 
-getDecodedStack :: IO [StackFrame]
-getDecodedStack = cloneMyStack >>= decodeStack
+getDecodedStack :: IO (StackSnapshot, [StackFrame])
+getDecodedStack = do
+  s <-cloneMyStack
+  fs <- decodeStack s
+  pure (s, fs)
 
 isCatchStmFrame :: StackFrame -> Bool
 isCatchStmFrame (CatchStmFrame _ _) = True

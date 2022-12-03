@@ -87,6 +87,7 @@ ClosureTypeList *foldLargeBitmapToList(StgPtr spBottom, StgPtr payload,
     for (; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1) {
       if ((bitmap & 1) == 0) {
         StgClosure *c = (StgClosure *)payload[i];
+        c = UNTAG_CONST_CLOSURE(c);
         list = add(list, get_itbl(c)->type);
       }
       // TODO: Primitives are ignored here.
@@ -114,7 +115,7 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
     }
     case UPDATE_FRAME: {
       StgUpdateFrame *f = (StgUpdateFrame *)sp;
-      result = add(result, get_itbl(f->updatee)->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->updatee))->type);
       continue;
     }
     case CATCH_FRAME: {
@@ -127,14 +128,14 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
     }
     case CATCH_STM_FRAME: {
       StgCatchSTMFrame *f = (StgCatchSTMFrame *)sp;
-      result = add(result, get_itbl(f->code)->type);
-      result = add(result, get_itbl(f->handler)->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->code))->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->handler))->type);
       continue;
     }
     case ATOMICALLY_FRAME: {
       StgAtomicallyFrame *f = (StgAtomicallyFrame *)sp;
-      result = add(result, get_itbl(f->code)->type);
-      result = add(result, get_itbl(f->result)->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->code))->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->result))->type);
       continue;
     }
     case RET_SMALL: {
