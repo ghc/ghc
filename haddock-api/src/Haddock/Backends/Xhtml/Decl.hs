@@ -1151,8 +1151,7 @@ ppSigType unicode qual emptyCtxts sig_ty = ppr_sig_ty (reparenSigType sig_ty) un
 
 ppLHsTypeArg :: Unicode -> Qualification -> HideEmptyContexts -> LHsTypeArg DocNameI -> Html
 ppLHsTypeArg unicode qual emptyCtxts (HsValArg ty) = ppLParendType unicode qual emptyCtxts ty
-ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign unicode <>
-                                                       ppLParendType unicode qual emptyCtxts ki
+ppLHsTypeArg unicode qual emptyCtxts (HsTypeArg _ ki) = atSign <> ppLParendType unicode qual emptyCtxts ki
 ppLHsTypeArg _ _ _ (HsArgPar _) = toHtml ""
 
 class RenderableBndrFlag flag where
@@ -1284,7 +1283,7 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode qual _
 
 ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode qual _
   = hsep [ppr_mono_lty fun_ty unicode qual HideEmptyContexts
-         , atSign unicode <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts]
+         , atSign <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts]
 
 ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode qual _
   = ppr_mono_lty ty1 unicode qual HideEmptyContexts <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode qual HideEmptyContexts

@@ -188,13 +188,15 @@ ubxparens :: Html -> Html
 ubxparens h = toHtml "(#" <+> h <+> toHtml "#)"
 
 
-dcolon, arrow, lollipop, darrow, forallSymbol, atSign :: Bool -> Html
+dcolon, arrow, lollipop, darrow, forallSymbol :: Bool -> Html
 dcolon unicode = toHtml (if unicode then "∷" else "::")
 arrow  unicode = toHtml (if unicode then "→" else "->")
 lollipop unicode = toHtml (if unicode then "⊸" else "%1 ->")
 darrow unicode = toHtml (if unicode then "⇒" else "=>")
 forallSymbol unicode = if unicode then toHtml "∀" else keyword "forall"
-atSign unicode = toHtml (if unicode then "@" else "@")
+
+atSign :: Html
+atSign = toHtml "@"
 
 multAnnotation :: Html
 multAnnotation = toHtml "%"

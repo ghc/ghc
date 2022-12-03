@@ -1060,8 +1060,7 @@ ppSigType unicode sig_ty = ppr_sig_ty (reparenSigType sig_ty) unicode
 
 ppLHsTypeArg :: Bool -> LHsTypeArg DocNameI -> LaTeX
 ppLHsTypeArg unicode (HsValArg ty) = ppLParendType unicode ty
-ppLHsTypeArg unicode (HsTypeArg _ ki) = atSign unicode <>
-                                       ppLParendType unicode ki
+ppLHsTypeArg unicode (HsTypeArg _ ki) = atSign <> ppLParendType unicode ki
 ppLHsTypeArg _ (HsArgPar _) = text ""
 
 class RenderableBndrFlag flag where
@@ -1132,7 +1131,7 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
   = hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 
 ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode
-  = hsep [ppr_mono_lty fun_ty unicode, atSign unicode <> ppr_mono_lty arg_ki unicode]
+  = hsep [ppr_mono_lty fun_ty unicode, atSign <> ppr_mono_lty arg_ki unicode]
 
 ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode
   = ppr_mono_lty ty1 unicode <+> ppr_op_prom <+> ppr_mono_lty ty2 unicode
@@ -1410,21 +1409,22 @@ quote :: LaTeX -> LaTeX
 quote doc = text "\\begin{quote}" $$ doc $$ text "\\end{quote}"
 
 
-dcolon, arrow, lollipop, darrow, forallSymbol, starSymbol, atSign :: Bool -> LaTeX
+dcolon, arrow, lollipop, darrow, forallSymbol, starSymbol :: Bool -> LaTeX
 dcolon unicode = text (if unicode then "∷" else "::")
 arrow  unicode = text (if unicode then "→" else "->")
 lollipop unicode = text (if unicode then "⊸" else "%1 ->")
 darrow unicode = text (if unicode then "⇒" else "=>")
 forallSymbol unicode = text (if unicode then "∀" else "forall")
 starSymbol unicode = text (if unicode then "★" else "*")
-atSign unicode = text (if unicode then "@" else "@")
+
+atSign :: LaTeX
+atSign = char '@'
 
 multAnnotation :: LaTeX
-multAnnotation = text "%"
+multAnnotation = char '%'
 
 dot :: LaTeX
 dot = char '.'
-
 
 parenList :: [LaTeX] -> LaTeX
 parenList = parens . hsep . punctuate comma
