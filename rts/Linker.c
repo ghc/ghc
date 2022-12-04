@@ -135,8 +135,7 @@ extern void iconv();
    This is to enable lazy loading of symbols. Eager loading is problematic
    as it means that all symbols must be available, even those which we will
    never use. This is especially painful on Windows, where the number of
-   libraries required to link things like mingwex (TODO: We no longer depend
-   on mingwex, so think of a different example here) grows to be quite high.
+   libraries required to link things like QT or WxWidgets grows to be quite high.
 
    We proceed through these stages as follows,
 
@@ -194,8 +193,7 @@ extern void iconv();
 
    1) Dependency chains, if A.o required a .o in libB but A.o isn't required to link
       then we don't need to load libB. This means the dependency chain for libraries
-      such as mingw32 and mingwex (TODO: We no longer depend on mingwex, so think of
-      a different example here) can be broken down.
+      such as ucrt can be broken down.
 
    2) The number of duplicate symbols, since now only symbols that are
       true duplicates will display the error.
@@ -228,7 +226,7 @@ static void ghciRemoveSymbolTable(StrHashTable *table, const SymbolName* key,
 static const char *
 symbolTypeString (SymType type)
 {
-    switch (type) {
+    switch (type & ~SYM_TYPE_DUP_DISCARD) {
         case SYM_TYPE_CODE: return "code";
         case SYM_TYPE_DATA: return "data";
         case SYM_TYPE_INDIRECT_DATA: return "indirect-data";
@@ -277,14 +275,18 @@ int ghciInsertSymbolTable(
       insertStrHashTable(table, key, pinfo);
       return 1;
    }
-   else if (pinfo->type != type)
+   else if (pinfo->type ^ type)
    {
-       debugBelch("Symbol type mismatch.\n");
-       debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
-                  key, obj_name, symbolTypeString(type));
-       debugBelch("      yet was defined by %" PATH_FMT " to be a %s symbol.\n",
-                  pinfo->owner ? pinfo->owner->fileName : WSTR("<builtin>"),
-                  symbolTypeString(pinfo->type));
+       /* We were asked to discard the symbol on duplicates, do so quietly.  */
+       if (!(type & SYM_TYPE_DUP_DISCARD))
+       {
+         debugBelch("Symbol type mismatch.\n");
+         debugBelch("Symbol %s was defined by %" PATH_FMT " to be a %s symbol.\n",
+                    key, obj_name, symbolTypeString(type));
+         debugBelch("      yet was defined by %" PATH_FMT " to be a %s symbol.\n",
+                    pinfo->owner ? pinfo->owner->fileName : WSTR("<builtin>"),
+                    symbolTypeString(pinfo->type));
+       }
        return 1;
    }
    else if (pinfo->strength == STRENGTH_STRONG)
