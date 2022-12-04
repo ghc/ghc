@@ -2011,14 +2011,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise             = L l (IEName    noExtField         (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (la2e l)   (L (la2na l) n))
+  | otherwise             = L l (IEName    noExtField (L (la2na l) n))
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (EpaSpan $ la2r l) (L (la2na l) n))
-  | otherwise                   = L l (IEName noExtField         (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (la2e l)   (L (la2na l) n))
+  | otherwise                   = L l (IEName noExtField (L (la2na l) n))
   where occ = occName n
 
 {-

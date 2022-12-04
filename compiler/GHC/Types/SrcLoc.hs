@@ -70,6 +70,7 @@ module GHC.Types.SrcLoc (
         BufSpan(..),
         getBufSpan,
         removeBufSpan,
+        combineBufSpans,
 
         -- * Located
         Located,

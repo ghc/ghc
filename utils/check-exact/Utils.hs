@@ -119,7 +119,7 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
     fc = co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp)
+undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp Strict.Nothing)
   where
     (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
     len = length (keywordToString kw)
@@ -256,7 +256,7 @@ sortEpaComments cs = sortBy cmp cs
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
-mkKWComment kw (EpaSpan ss)
+mkKWComment kw (EpaSpan ss _)
   = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
 mkKWComment kw (EpaDelta dp _)
   = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
@@ -373,7 +373,7 @@ addEpAnnLoc (AddEpAnn _ l) = l
 
 -- TODO: move this to GHC
 anchorToEpaLocation :: Anchor -> EpaLocation
-anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r
+anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r Strict.Nothing
 anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
 
 -- ---------------------------------------------------------------------

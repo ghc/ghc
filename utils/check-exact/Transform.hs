@@ -213,7 +213,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
       L (SrcSpanAnn EpAnnNotUsed   ll) _ -> realSrcSpan ll
       L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
     dc' = case dca of
-      EpaSpan r -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
+      EpaSpan r _ -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
       EpaDelta _ _ -> AddEpAnn kw dca
 
     -- ---------------------------------
@@ -223,7 +223,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
       (L (SrcSpanAnn EpAnnNotUsed    ll) b)
         -> let
              op = case dca of
-               EpaSpan r -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
+               EpaSpan r _ -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
                EpaDelta _ _ -> MovedAnchor (SameLine 1)
            in (L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan ll) op) mempty emptyComments) ll) b)
       (L (SrcSpanAnn (EpAnn (Anchor r op) a c) ll) b)
@@ -231,7 +231,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
               op' = case op of
                 MovedAnchor _ -> op
                 _ -> case dca of
-                  EpaSpan dcr -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
+                  EpaSpan dcr _ -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
                   EpaDelta _ _ -> MovedAnchor (SameLine 1)
            in (L (SrcSpanAnn (EpAnn (Anchor r op') a c) ll) b)
 
@@ -341,13 +341,13 @@ getEntryDP _ = SameLine 1
 
 addEpaLocationDelta :: LayoutStartCol -> RealSrcSpan -> EpaLocation -> EpaLocation
 addEpaLocationDelta _off _anc (EpaDelta d cs) = EpaDelta d cs
-addEpaLocationDelta  off  anc (EpaSpan r)
+addEpaLocationDelta  off  anc (EpaSpan r _)
   = EpaDelta (adjustDeltaForOffset off (ss2deltaEnd anc r)) []
 
 -- Set the entry DP for an element coming after an existing keyword annotation
 setEntryDPFromAnchor :: LayoutStartCol -> EpaLocation -> LocatedA t -> LocatedA t
 setEntryDPFromAnchor _off (EpaDelta _ _) (L la a) = L la a
-setEntryDPFromAnchor  off (EpaSpan anc) ll@(L la _) = setEntryDP ll dp'
+setEntryDPFromAnchor  off (EpaSpan anc _) ll@(L la _) = setEntryDP ll dp'
   where
     r = case la of
       (SrcSpanAnn EpAnnNotUsed l) -> realSrcSpan l
@@ -944,7 +944,7 @@ instance HasDecls (LocatedA (HsExpr GhcPs)) where
               (L (TokenLoc l) ls, L (TokenLoc i) is) ->
                 let
                   off = case l of
-                          (EpaSpan r) -> LayoutStartCol $ snd $ ss2pos r
+                          (EpaSpan r _) -> LayoutStartCol $ snd $ ss2pos r
                           (EpaDelta (SameLine _) _) -> LayoutStartCol 0
                           (EpaDelta (DifferentLine _ c) _) -> LayoutStartCol c
                   ex'' = setEntryDPFromAnchor off i ex

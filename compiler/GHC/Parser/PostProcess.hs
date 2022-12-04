@@ -471,13 +471,13 @@ annBinds a cs (HsIPBinds an bs)   = (HsIPBinds (add_where a an cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
 add_where :: AddEpAnn -> EpAnn AnnList -> EpAnnComments -> EpAnn AnnList
-add_where an@(AddEpAnn _ (EpaSpan rs)) (EpAnn a (AnnList anc o c r t) cs) cs2
+add_where an@(AddEpAnn _ (EpaSpan rs _)) (EpAnn a (AnnList anc o c r t) cs) cs2
   | valid_anchor (anchor a)
   = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) (cs Semi.<> cs2)
   | otherwise
   = EpAnn (patch_anchor rs a)
           (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
-add_where an@(AddEpAnn _ (EpaSpan rs)) EpAnnNotUsed cs
+add_where an@(AddEpAnn _ (EpaSpan rs _)) EpAnnNotUsed cs
   = EpAnn (Anchor rs UnchangedAnchor)
            (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) cs
 add_where (AddEpAnn _ (EpaDelta _ _)) _ _ = panic "add_where"
@@ -501,7 +501,7 @@ fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
 -- | The 'Anchor' for a stmtlist is based on either the location or
 -- the first semicolon annotion.
 stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Anchor
-stmtsAnchor (L l ((ConsOL (AddEpAnn _ (EpaSpan r)) _), _))
+stmtsAnchor (L l ((ConsOL (AddEpAnn _ (EpaSpan r _)) _), _))
   = widenAnchorR (Anchor (realSrcSpan l) UnchangedAnchor) r
 stmtsAnchor (L l _) = Anchor (realSrcSpan l) UnchangedAnchor
 
@@ -1039,13 +1039,13 @@ checkTyClHdr is_cls ty
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c []) cs)
+        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (srcSpan2e l) c []) cs)
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (EpaSpan $ realSrcSpan l) c ta) (csp Semi.<> cs))
+        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs))
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
 
 -- | Yield a parse error if we have a function applied directly to a do block
@@ -2855,7 +2855,7 @@ checkImportSpec ie@(L _ specs) =
 mkImpExpSubSpec :: [LocatedA ImpExpQcSpec] -> P ([AddEpAnn], ImpExpSubSpec)
 mkImpExpSubSpec [] = return ([], ImpExpList [])
 mkImpExpSubSpec [L la ImpExpQcWildcard] =
-  return ([AddEpAnn AnnDotdot (EpaSpan $ la2r la)], ImpExpAll)
+  return ([AddEpAnn AnnDotdot (la2e la)], ImpExpAll)
 mkImpExpSubSpec xs =
   if (any (isImpExpQcWildcard . unLoc) xs)
     then return $ ([], ImpExpAllWith xs)
@@ -3124,14 +3124,14 @@ mkMultTy pct t arr = HsExplicitMult pct t arr
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
-mkTokenLocation (RealSrcSpan r _)  = TokenLoc (EpaSpan r)
+mkTokenLocation (RealSrcSpan r mb) = TokenLoc (EpaSpan r mb)
 
 -- Precondition: the TokenLocation has EpaSpan, never EpaDelta.
 token_location_widenR :: TokenLocation -> SrcSpan -> TokenLocation
 token_location_widenR NoTokenLoc _ = NoTokenLoc
 token_location_widenR tl (UnhelpfulSpan _) = tl
-token_location_widenR (TokenLoc (EpaSpan r1)) (RealSrcSpan r2 _) =
-                      (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2)))
+token_location_widenR (TokenLoc (EpaSpan r1 mb1)) (RealSrcSpan r2 mb2) =
+                      (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2) (liftA2 combineBufSpans mb1 mb2)))
 token_location_widenR (TokenLoc (EpaDelta _ _)) _ =
   -- Never happens because the parser does not produce EpaDelta.
   panic "token_location_widenR: EpaDelta"

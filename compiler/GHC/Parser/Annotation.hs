@@ -51,7 +51,7 @@ module GHC.Parser.Annotation (
   la2na, na2la, n2l, l2n, l2l, la2la,
   reLoc, reLocA, reLocL, reLocC, reLocN,
 
-  la2r, realSrcSpan,
+  srcSpan2e, la2e, realSrcSpan,
 
   -- ** Building up annotations
   extraToAnnList, reAnn,
@@ -403,7 +403,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- in the @'EpaDelta'@ variant captures any comments between the prior
 -- output and the thing being marked here, since we cannot otherwise
 -- sort the relative order.
-data EpaLocation = EpaSpan !RealSrcSpan
+data EpaLocation = EpaSpan !RealSrcSpan !(Strict.Maybe BufSpan)
                  | EpaDelta !DeltaPos ![LEpaComment]
                deriving (Data,Eq)
 
@@ -447,15 +447,15 @@ getDeltaLine (DifferentLine r _) = r
 -- 'EpaLocation'. The parser will never insert a 'DeltaPos', so the
 -- partial function is safe.
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
-epaLocationRealSrcSpan (EpaSpan r) = r
+epaLocationRealSrcSpan (EpaSpan r _) = r
 epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
-epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l)
-epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc)
+epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l) Strict.Nothing
+epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc) Strict.Nothing
 
 instance Outputable EpaLocation where
-  ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
+  ppr (EpaSpan r _) = text "EpaSpan" <+> ppr r
   ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
 
 instance Outputable AddEpAnn where
@@ -916,8 +916,12 @@ realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
   where
     l = mkRealSrcLoc (fsLit "foo") (-1) (-1)
 
-la2r :: SrcSpanAnn' a -> RealSrcSpan
-la2r l = realSrcSpan (locA l)
+srcSpan2e :: SrcSpan -> EpaLocation
+srcSpan2e (RealSrcSpan s mb) = EpaSpan s mb
+srcSpan2e span = EpaSpan (realSrcSpan span) Strict.Nothing
+
+la2e :: SrcSpanAnn' a -> EpaLocation
+la2e = srcSpan2e . locA
 
 extraToAnnList :: AnnList -> [AddEpAnn] -> AnnList
 extraToAnnList (AnnList a o c e t) as = AnnList a o c (e++as) t
@@ -976,7 +980,7 @@ widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s):rest) = RealSrcSpan s Strict.Nothing : go rest
+    go (AddEpAnn _ (EpaSpan s mb):rest) = RealSrcSpan s mb : go rest
     go (AddEpAnn _ (EpaDelta _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
@@ -985,7 +989,7 @@ widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
 widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s):rest) = s : go rest
+    go (AddEpAnn _ (EpaSpan s _):rest) = s : go rest
     go (AddEpAnn _ (EpaDelta _ _):rest) =     go rest
 
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor

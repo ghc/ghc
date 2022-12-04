@@ -3058,34 +3058,34 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
            : texp commas_tup_tail
                            { unECP $1 >>= \ $1 ->
                              $2 >>= \ $2 ->
-                             do { t <- amsA $1 [AddCommaAnn (EpaSpan $ rs $ fst $2)]
+                             do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
                                 ; return (Tuple (Right t : snd $2)) } }
            | commas tup_tail
                  { $2 >>= \ $2 ->
-                   do { let {cos = map (\ll -> (Left (EpAnn (anc $ rs ll) (EpaSpan $ rs ll) emptyComments))) (fst $1) }
+                   do { let {cos = map (\ll -> (Left (EpAnn (anc $ rs ll) (srcSpan2e ll) emptyComments))) (fst $1) }
                       ; return (Tuple (cos ++ $2)) } }
 
            | texp bars   { unECP $1 >>= \ $1 -> return $
-                            (Sum 1  (snd $2 + 1) $1 [] (map (EpaSpan . realSrcSpan) $ fst $2)) }
+                            (Sum 1  (snd $2 + 1) $1 [] (map srcSpan2e $ fst $2)) }
 
            | bars texp bars0
                 { unECP $2 >>= \ $2 -> return $
                   (Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2
-                    (map (EpaSpan . realSrcSpan) $ fst $1)
-                    (map (EpaSpan . realSrcSpan) $ fst $3)) }
+                    (map srcSpan2e $ fst $1)
+                    (map srcSpan2e $ fst $3)) }
 
 -- Always starts with commas; always follows an expr
 commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn EpaLocation) (LocatedA b)]) }
 commas_tup_tail : commas tup_tail
         { $2 >>= \ $2 ->
-          do { let {cos = map (\l -> (Left (EpAnn (anc $ rs l) (EpaSpan $ rs l) emptyComments))) (tail $ fst $1) }
+          do { let {cos = map (\l -> (Left (EpAnn (anc $ rs l) (srcSpan2e l) emptyComments))) (tail $ fst $1) }
              ; return ((head $ fst $1, cos ++ $2)) } }
 
 -- Always follows a comma
 tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn EpaLocation) (LocatedA b)] }
           : texp commas_tup_tail { unECP $1 >>= \ $1 ->
                                    $2 >>= \ $2 ->
-                                   do { t <- amsA $1 [AddCommaAnn (EpaSpan $ rs $ fst $2)]
+                                   do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
                                       ; return (Right t : snd $2) } }
           | texp                 { unECP $1 >>= \ $1 ->
                                    return [Right $1] }
@@ -3564,10 +3564,10 @@ qcon_list : qcon                  { sL1N $1 [$1] }
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
         : '(' ')'               {% amsrn (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
         | '(' commas ')'        {% amsrn (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
-                                       (NameAnnCommas NameParens (glAA $1) (map (EpaSpan . realSrcSpan) (fst $2)) (glAA $3) []) }
+                                       (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(#' '#)'             {% amsrn (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly NameParensHash (glAA $1) (glAA $2) []) }
         | '(#' commas '#)'      {% amsrn (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
-                                       (NameAnnCommas NameParensHash (glAA $1) (map (EpaSpan . realSrcSpan) (fst $2)) (glAA $3) []) }
+                                       (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
 
 -- See Note [Empty lists] in GHC.Hs.Expr
 sysdcon :: { LocatedN DataCon }
@@ -3601,12 +3601,12 @@ ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit
         : oqtycon               { $1 }
         | '(' commas ')'        {% amsrn (sLL $1 $> $ getRdrName (tupleTyCon Boxed
                                                         (snd $2 + 1)))
-                                       (NameAnnCommas NameParens (glAA $1) (map (EpaSpan . realSrcSpan) (fst $2)) (glAA $3) []) }
+                                       (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(#' commas '#)'      {% amsrn (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
-                                       (NameAnnCommas NameParensHash (glAA $1) (map (EpaSpan . realSrcSpan) (fst $2)) (glAA $3) []) }
+                                       (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(#' bars '#)'        {% amsrn (sLL $1 $> $ getRdrName (sumTyCon (snd $2 + 1)))
-                                       (NameAnnBars NameParensHash (glAA $1) (map (EpaSpan . realSrcSpan) (fst $2)) (glAA $3) []) }
+                                       (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(' '->' ')'          {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
         | '[' ']'               {% amsrn (sLL $1 $> $ listTyCon_RDR)
@@ -4210,27 +4210,27 @@ in GHC.Parser.Annotation
 -- |Construct an AddEpAnn from the annotation keyword and the location
 -- of the keyword itself
 mj :: AnnKeywordId -> Located e -> AddEpAnn
-mj a l = AddEpAnn a (EpaSpan $ rs $ gl l)
+mj a l = AddEpAnn a (srcSpan2e $ gl l)
 
 mjN :: AnnKeywordId -> LocatedN e -> AddEpAnn
-mjN a l = AddEpAnn a (EpaSpan $ rs $ glN l)
+mjN a l = AddEpAnn a (srcSpan2e $ glN l)
 
 -- |Construct an AddEpAnn from the annotation keyword and the location
 -- of the keyword itself, provided the span is not zero width
 mz :: AnnKeywordId -> Located e -> [AddEpAnn]
-mz a l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn a (EpaSpan $ rs $ gl l)]
+mz a l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn a (srcSpan2e $ gl l)]
 
 msemi :: Located e -> [TrailingAnn]
-msemi l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (EpaSpan $ rs $ gl l)]
+msemi l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (srcSpan2e $ gl l)]
 
 msemim :: Located e -> Maybe EpaLocation
-msemim l = if isZeroWidthSpan (gl l) then Nothing else Just (EpaSpan $ rs $ gl l)
+msemim l = if isZeroWidthSpan (gl l) then Nothing else Just (srcSpan2e $ gl l)
 
 -- |Construct an AddEpAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the
 -- unicode variant of the annotation.
 mu :: AnnKeywordId -> Located Token -> AddEpAnn
-mu a lt@(L l t) = AddEpAnn (toUnicodeAnn a lt) (EpaSpan $ rs l)
+mu a lt@(L l t) = AddEpAnn (toUnicodeAnn a lt) (srcSpan2e l)
 
 -- | If the 'Token' is using its unicode variant return the unicode variant of
 --   the annotation
@@ -4253,7 +4253,7 @@ glR :: Located a -> Anchor
 glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
 
 glAA :: Located a -> EpaLocation
-glAA = EpaSpan <$> realSrcSpan . getLoc
+glAA = srcSpan2e . getLoc
 
 glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan . getLoc
@@ -4265,7 +4265,7 @@ glNR :: LocatedN a -> Anchor
 glNR ln = Anchor (realSrcSpan $ getLocA ln) UnchangedAnchor
 
 glNRR :: LocatedN a -> EpaLocation
-glNRR = EpaSpan <$> realSrcSpan . getLocA
+glNRR = srcSpan2e . getLocA
 
 anc :: RealSrcSpan -> Anchor
 anc r = Anchor r UnchangedAnchor
@@ -4395,7 +4395,7 @@ rs _ = panic "Parser should only have RealSrcSpan"
 
 hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
-  = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (EpaSpan $ rs l)] []
+  = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
 listAsAnchor :: [LocatedAn t a] -> Anchor
 listAsAnchor [] = spanAsAnchor noSrcSpan
@@ -4435,16 +4435,16 @@ addTrailingAnnA (L (SrcSpanAnn anns l) a) ss ta = do
   let
     anns' = if isZeroWidthSpan ss
               then anns
-              else addTrailingAnnToA l (ta (EpaSpan $ rs ss)) cs anns
+              else addTrailingAnnToA l (ta (srcSpan2e ss)) cs anns
   return (L (SrcSpanAnn anns' l) a)
 
 -- -------------------------------------
 
 addTrailingVbarL :: MonadP m => LocatedL a -> SrcSpan -> m (LocatedL a)
-addTrailingVbarL  la span = addTrailingAnnL la (AddVbarAnn (EpaSpan $ rs span))
+addTrailingVbarL  la span = addTrailingAnnL la (AddVbarAnn (srcSpan2e span))
 
 addTrailingCommaL :: MonadP m => LocatedL a -> SrcSpan -> m (LocatedL a)
-addTrailingCommaL  la span = addTrailingAnnL la (AddCommaAnn (EpaSpan $ rs span))
+addTrailingCommaL  la span = addTrailingAnnL la (AddCommaAnn (srcSpan2e span))
 
 addTrailingAnnL :: MonadP m => LocatedL a -> TrailingAnn -> m (LocatedL a)
 addTrailingAnnL (L (SrcSpanAnn anns l) a) ta = do
@@ -4462,7 +4462,7 @@ addTrailingCommaN (L (SrcSpanAnn anns l) a) span = do
   -- AZ:TODO: generalise updating comments into an annotation
   let anns' = if isZeroWidthSpan span
                 then anns
-                else addTrailingCommaToN l anns (EpaSpan $ rs span)
+                else addTrailingCommaToN l anns (srcSpan2e span)
   return (L (SrcSpanAnn anns' l) a)
 
 addTrailingCommaS :: Located StringLiteral -> EpaLocation -> Located StringLiteral

@@ -543,7 +543,7 @@ printStringAtAAL (EpAnn anc an cs) l str = do
 
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
-printStringAtAAC capture (EpaSpan r) s = printStringAtRsC capture r s
+printStringAtAAC capture (EpaSpan r _) s = printStringAtRsC capture r s
 printStringAtAAC capture (EpaDelta d cs) s = do
   mapM_ (printOneComment . tokComment) cs
   pe1 <- getPriorEndD
@@ -4108,7 +4108,7 @@ printUnicode anc n = do
               s -> s
   loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
   case loc of
-    EpaSpan _ -> return anc
+    EpaSpan _ _ -> return anc
     EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp }
     EpaDelta _ _cs -> error "printUnicode should not capture comments"
 

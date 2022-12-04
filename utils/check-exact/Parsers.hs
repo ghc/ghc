@@ -285,7 +285,7 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
     rebalance al cs = cs'
       where
         cs' = case GHC.al_close al of
-          Just (GHC.AddEpAnn _ (GHC.EpaSpan ss)) ->
+          Just (GHC.AddEpAnn _ (GHC.EpaSpan ss _)) ->
             let
               pc = GHC.priorComments cs
               fc = GHC.getFollowingComments cs
