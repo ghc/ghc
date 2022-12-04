@@ -343,7 +343,7 @@ INLINE_HEADER bool nonmovingClosureBeingSwept(StgClosure *p)
 
 INLINE_HEADER bool isNonmovingClosure(StgClosure *p)
 {
-    return !HEAP_ALLOCED_GC(p) || Bdescr((P_)p)->flags & BF_NONMOVING;
+    return RtsFlags.GcFlags.useNonmoving && (!HEAP_ALLOCED_GC(p) || Bdescr((P_)p)->flags & BF_NONMOVING);
 }
 
 #if defined(DEBUG)
