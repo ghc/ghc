@@ -261,6 +261,54 @@
             .asciiz "libfoo_data"
 
 
+   Note [GHC Linking model and import libraries]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   The above describes how import libraries work for static linking.
+   Fundamentally this does not apply to dynamic linking as we do in GHC.
+   The issue is two-folds:
+
+   1. In the linking model above it is expected that the .idata sections be
+      materialized into PLTs during linking.  However in GHC we never create
+      PLTs,  but have out own mechanism for this which is the jump island
+      machinery.   This is required for efficiency.  For one materializing the
+      .idata sections would result in wasting pages.   We'd use one page for
+      every ~100 bytes.  This is extremely wasteful and also fragments the
+      memory.  Secondly the dynamic linker is lazy.  We only perform the final
+      loading if the symbol is used, however with an import library we can
+      discard the actual OC immediately after reading it.   This prevents us from
+      keeping ~1k in memory per symbol for no reason.
+
+   2. GHC itself does not observe symbol visibility correctly during NGC.   This
+      in itself isn't an academic exercise.  The issue stems from GHC using one
+      mechanism for providing two incompatible linking modes:
+      a)  The first mode is generating Haskell shared libraries which are
+           intended to be used by other Haskell code.   This requires us to
+           export the info, data and closures.   For this GHC just re-exports
+           all symbols.  But it doesn't correcly mark data/code.  Symbol
+           visibility is overwritten by telling the linker to export all
+           symbols.
+      b)  The second code is producing code that's supposed to be call-able
+          through a C insterface.   This in reality does not require the
+          export of closures and info tables.  But also does not require the
+          inclusion of the RTS inside the DLL.  Hover this is done today
+          because we don't properly have the RTS as a dynamic library.
+          i.e.  GHC does not only export symbols denoted by foreign export.
+          Also GHC should depend on an RTS library, but at the moment it
+          cannot because of TNTC is incompatible with dynamic linking.
+
+   These two issues mean that for GHC we need to take a different approach
+   to handling import libraries.  For normal C libraries we have proper
+   differentiation between CODE and DATA.   For GHC produced import libraries
+   we do not.   As such the SYM_TYPE_DUP_DISCARD tells the linker that if a
+   duplicate symbol is found, and we were going to discard it anyway, just do
+   so quitely.  This works because the RTS symbols themselves are provided by
+   the currently loaded RTS as built-in symbols.
+
+   Secondly we cannot rely on a text symbol being available.   As such we
+   should only depend on the symbols as defined in the .idata sections,
+   otherwise we would not be able to correctly link against GHC produced
+   import libraries.
+
    Note [Memory allocation]
    ~~~~~~~~~~~~~~~~~~~~~~~~
    The loading of an object begins in `preloadObjectFile`, which allocates a buffer,
@@ -1658,7 +1706,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (   secNumber != IMAGE_SYM_UNDEFINED
           && secNumber > 0
           && section
-          && section->kind != SECTIONKIND_BFD_IMPORT_LIBRARY) {
+          /* Skip all BFD import sections.  */
+          && section->kind != SECTIONKIND_IMPORT
+          && section->kind != SECTIONKIND_BFD_IMPORT_LIBRARY
+          && section->kind != SECTIONKIND_BFD_IMPORT_LIBRARY_HEAD) {
          /* This symbol is global and defined, viz, exported */
          /* for IMAGE_SYMCLASS_EXTERNAL
                 && !IMAGE_SYM_UNDEFINED,
@@ -1691,12 +1742,49 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           IF_DEBUG(linker_verbose, debugBelch("bss symbol @ %p %u\n", addr, symValue));
       }
       else if (section && section->kind == SECTIONKIND_BFD_IMPORT_LIBRARY) {
-          setImportSymbol(oc, sname);
+          /* Disassembly of section .idata$5:
+
+             0000000000000000 <__imp_Insert>:
+             ...
+                        0: IMAGE_REL_AMD64_ADDR32NB     .idata$6
+
+             The first two bytes contain the ordinal of the function
+             in the format of lowpart highpart. The two bytes combined
+             for the total range of 16 bits which is the function export limit
+             of DLLs.  See note [GHC Linking model and import libraries].  */
+          sname = (SymbolName*)section->start+2;
+          COFF_symbol* sym = &oc->info->symbols[info->numberOfSymbols-1];
+          addr = get_sym_name( getSymShortName (info, sym), oc);
+
+          IF_DEBUG(linker,
+                   debugBelch("addImportSymbol `%s' => `%s'\n",
+                              sname, (char*)addr));
+          /* We're going to free the any data associated with the import
+             library without copying the sections.  So we have to duplicate
+             the symbol name and values before the pointers become invalid.  */
+          sname = strdup (sname);
+          addr  = strdup (addr);
+          type = has_code_section ? SYM_TYPE_CODE : SYM_TYPE_DATA;
+          type |= SYM_TYPE_DUP_DISCARD;
+          if (!ghciInsertSymbolTable(oc->fileName, symhash, sname,
+                                     addr, false, type, oc)) {
+             releaseOcInfo (oc);
+             stgFree (oc->image);
+             oc->image = NULL;
+             return false;
+          }
+          setImportSymbol (oc, sname);
+
+          /* Don't process this oc any further. Just exit.  */
+          oc->n_symbols = 0;
+          oc->symbols   = NULL;
+          stgFree (oc->image);
+          oc->image = NULL;
+          releaseOcInfo (oc);
           // There is nothing that we need to resolve in this object since we
           // will never call the import stubs in its text section
           oc->status = OBJECT_DONT_RESOLVE;
-
-          IF_DEBUG(linker_verbose, debugBelch("import symbol %s\n", sname));
+          return true;
       }
       else if (secNumber > 0
                && section

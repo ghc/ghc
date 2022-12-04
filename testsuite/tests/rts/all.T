@@ -411,7 +411,7 @@ test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 test('numa001', [ extra_run_opts('8'), unless(unregisterised(), extra_ways(['debug_numa'])) ]
                 , compile_and_run, [''])
 
-test('T12497', [ unless(opsys('mingw32'), skip)
+test('T12497', [ unless(opsys('mingw32'), skip), expect_broken(22694)
                ],
                makefile_test, ['T12497'])
 
