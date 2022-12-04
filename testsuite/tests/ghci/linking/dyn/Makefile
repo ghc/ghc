@@ -88,10 +88,6 @@ compile_libAB_dyn:
 
 .PHONY: compile_libAS_impl_gcc
 compile_libAS_impl_gcc:
-	rm -rf bin_impl_gcc
-	mkdir bin_impl_gcc
-	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_impl_gcc" -shared A.c -o "bin_impl_gcc/$(call DLL,ASimpL)"
-	mv bin_impl_gcc/libASimpL.dll.a bin_impl_gcc/libASx.dll.a
 	echo "main" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) T11072.hs -lASx -L./bin_impl_gcc
 
 .PHONY: compile_libAS_impl_msvc
