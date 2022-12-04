@@ -904,6 +904,7 @@ foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
 
 {-
 Note [Windows types]
+~~~~~~~~~~~~~~~~~~~~
 
 Windows' _read and _write have types that differ from POSIX. They take an
 unsigned int for length and return a signed int where POSIX uses size_t and

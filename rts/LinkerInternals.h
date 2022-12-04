@@ -54,11 +54,16 @@ typedef struct _Section    Section;
  */
 
 /* What kind of thing a symbol identifies. We need to know this to determine how
- * to process overflowing relocations. See Note [Processing overflowed relocations]. */
+ * to process overflowing relocations. See Note [Processing overflowed relocations].
+ * This is bitfield however only the option SYM_TYPE_DUP_DISCARD can be combined
+ * with the other values. */
 typedef enum _SymType {
-    SYM_TYPE_CODE, /* the symbol is a function and can be relocated via a jump island */
-    SYM_TYPE_DATA, /* the symbol is data */
-    SYM_TYPE_INDIRECT_DATA, /* see Note [_iob_func symbol] */
+    SYM_TYPE_CODE = 1 << 0, /* the symbol is a function and can be relocated via a jump island */
+    SYM_TYPE_DATA = 1 << 1, /* the symbol is data */
+    SYM_TYPE_INDIRECT_DATA = 1 << 2, /* see Note [_iob_func symbol] */
+    SYM_TYPE_DUP_DISCARD = 1 << 3, /* the symbol is a symbol in a BFD import library
+                                      however if a duplicate is found with a mismatching
+                                      SymType then discard this one.  */
 } SymType;
 
 
