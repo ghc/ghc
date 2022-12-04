@@ -41,7 +41,7 @@ update_selector_chain(
 ) {
     ASSERT(val != NULL);
 
-    // Make sure we don't introduce non-moving-to-moving pointers here.
+    // Make sure we don't introduce nonmoving-to-moving pointers here.
     ASSERT(isNonmovingClosure(val));
 
     // This case we can't handle because we don't know info ptr of the closure
