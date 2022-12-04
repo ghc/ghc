@@ -1795,8 +1795,9 @@ mk_apps head_ty type_args = do
         case arg of
           HsValArg ty  -> do p_ty <- add_parens ty
                              mk_apps (HsAppTy noExtField phead_ty p_ty) args
-          HsTypeArg l ki -> do p_ki <- add_parens ki
-                               mk_apps (HsAppKindTy l phead_ty p_ki) args
+          HsTypeArg at ki ->
+                          do p_ki <- add_parens ki
+                             mk_apps (HsAppKindTy noExtField phead_ty at p_ki) args
           HsArgPar _   -> mk_apps (HsParTy noAnn phead_ty) args
 
   go type_args
@@ -1841,7 +1842,7 @@ split_ty_app ty = go ty []
   where
     go (AppT f a) as' = do { a' <- cvtType a; go f (HsValArg a':as') }
     go (AppKindT ty ki) as' = do { ki' <- cvtKind ki
-                                 ; go ty (HsTypeArg noSrcSpan ki':as') }
+                                 ; go ty (HsTypeArg noHsTok ki' : as') }
     go (ParensT t) as' = do { loc <- getL; go t (HsArgPar loc: as') }
     go f as           = return (f,as)
 

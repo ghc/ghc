@@ -628,13 +628,13 @@ nlHsTyConApp prom fixity tycon tys
     mk_app fun@(L _ (HsOpTy {})) arg = mk_app (noLocA $ HsParTy noAnn fun) arg
       -- parenthesize things like `(A + B) C`
     mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun (parenthesizeHsType appPrec ty))
-    mk_app fun (HsTypeArg _ ki) = noLocA (HsAppKindTy noSrcSpan fun (parenthesizeHsType appPrec ki))
+    mk_app fun (HsTypeArg at ki) = noLocA (HsAppKindTy noExtField fun at (parenthesizeHsType appPrec ki))
     mk_app fun (HsArgPar _) = noLocA (HsParTy noAnn fun)
 
 nlHsAppKindTy ::
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
 nlHsAppKindTy f k
-  = noLocA (HsAppKindTy noSrcSpan f (parenthesizeHsType appPrec k))
+  = noLocA (HsAppKindTy noExtField f noHsTok (parenthesizeHsType appPrec k))
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack

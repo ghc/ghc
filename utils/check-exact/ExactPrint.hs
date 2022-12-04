@@ -1998,12 +1998,12 @@ exactHsFamInstLHS an thing bndrs typats fixity mb_ctxt = do
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
-     =>  ExactPrint (HsArg tm ty) where
+     =>  ExactPrint (HsArg GhcPs tm ty) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ = a
 
   exact a@(HsValArg tm)    = markAnnotated tm >> return a
-  exact a@(HsTypeArg ss ty) = printStringAtSs ss "@" >> markAnnotated ty >> return a
+  exact a@(HsTypeArg at ty) = markToken at >> markAnnotated ty >> return a
   exact x@(HsArgPar _sp)   = withPpr x -- Does not appear in original source
 
 -- ---------------------------------------------------------------------
@@ -3777,7 +3777,7 @@ instance ExactPrint (HsType GhcPs) where
   getAnnotationEntry (HsQualTy _ _ _)          = NoEntryVal
   getAnnotationEntry (HsTyVar an _ _)          = fromAnn an
   getAnnotationEntry (HsAppTy _ _ _)           = NoEntryVal
-  getAnnotationEntry (HsAppKindTy _ _ _)       = NoEntryVal
+  getAnnotationEntry (HsAppKindTy _ _ _ _)     = NoEntryVal
   getAnnotationEntry (HsFunTy an _ _ _)        = fromAnn an
   getAnnotationEntry (HsListTy an _)           = fromAnn an
   getAnnotationEntry (HsTupleTy an _ _)        = fromAnn an
@@ -3801,7 +3801,7 @@ instance ExactPrint (HsType GhcPs) where
   setAnnotationAnchor a@(HsQualTy _ _ _)          _ _s = a
   setAnnotationAnchor (HsTyVar an a b)          anc cs = (HsTyVar (setAnchorEpa an anc cs) a b)
   setAnnotationAnchor a@(HsAppTy _ _ _)           _ _s = a
-  setAnnotationAnchor a@(HsAppKindTy _ _ _)       _ _s = a
+  setAnnotationAnchor a@(HsAppKindTy _ _ _ _)     _ _s = a
   setAnnotationAnchor (HsFunTy an a b c)        anc cs = (HsFunTy (setAnchorEpa an anc cs) a b c)
   setAnnotationAnchor (HsListTy an a)           anc cs = (HsListTy (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsTupleTy an a b)        anc cs = (HsTupleTy (setAnchorEpa an anc cs) a b)
@@ -3842,11 +3842,11 @@ instance ExactPrint (HsType GhcPs) where
     t1' <- markAnnotated t1
     t2' <- markAnnotated t2
     return (HsAppTy an t1' t2')
-  exact (HsAppKindTy ss ty ki) = do
+  exact (HsAppKindTy ss ty at ki) = do
     ty' <- markAnnotated ty
-    printStringAtSs ss "@"
+    at' <- markToken at
     ki' <- markAnnotated ki
-    return (HsAppKindTy ss ty' ki')
+    return (HsAppKindTy ss ty' at' ki')
   exact (HsFunTy an mult ty1 ty2) = do
     ty1' <- markAnnotated ty1
     mult' <- markArrow mult

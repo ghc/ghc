@@ -693,12 +693,12 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
        ; return (HsAppTy noExtField ty1' ty2', fvs1 `plusFV` fvs2) }
 
-rnHsTyKi env (HsAppKindTy l ty k)
+rnHsTyKi env (HsAppKindTy _ ty at k)
   = do { kind_app <- xoptM LangExt.TypeApplications
        ; unless kind_app (addErr (typeAppErr "kind" k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
-       ; return (HsAppKindTy l ty' k', fvs1 `plusFV` fvs2) }
+       ; return (HsAppKindTy noExtField ty' at k', fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env t@(HsIParamTy x n ty)
   = do { notInKinds env t
@@ -1929,7 +1929,7 @@ extract_lty (L _ ty) acc
                                            flds
       HsAppTy _ ty1 ty2           -> extract_lty ty1 $
                                      extract_lty ty2 acc
-      HsAppKindTy _ ty k          -> extract_lty ty $
+      HsAppKindTy _ ty _ k        -> extract_lty ty $
                                      extract_lty k acc
       HsListTy _ ty               -> extract_lty ty acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc

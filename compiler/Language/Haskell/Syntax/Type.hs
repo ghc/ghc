@@ -756,6 +756,7 @@ data HsType pass
 
   | HsAppKindTy         (XAppKindTy pass) -- type level type app
                         (LHsType pass)
+                       !(LHsToken "@" pass)
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
@@ -1181,14 +1182,13 @@ if they correspond to a visible 'forall'.
 -}
 
 -- | Arguments in an expression/type after splitting
-data HsArg tm ty
+data HsArg p tm ty
   = HsValArg tm   -- Argument is an ordinary expression     (f arg)
-  | HsTypeArg SrcSpan ty -- Argument is a visible type application (f @ty)
-                         -- SrcSpan is location of the `@`
+  | HsTypeArg !(LHsToken "@" p) ty -- Argument is a visible type application (f @ty)
   | HsArgPar SrcSpan -- See Note [HsArgPar]
 
 -- type level equivalent
-type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
+type LHsTypeArg p = HsArg p (LHsType p) (LHsKind p)
 
 {-
 Note [HsArgPar]

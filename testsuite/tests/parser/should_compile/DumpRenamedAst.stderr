@@ -868,7 +868,10 @@
                [{Name: a}
                ,{Name: f}])
               [(HsTypeArg
-                { DumpRenamedAst.hs:25:6 }
+                (L
+                 (TokenLoc
+                  (EpaSpan { DumpRenamedAst.hs:25:6 }))
+                 (HsTok))
                 (L
                  (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:25:7-11 })
                  (HsTyVar
@@ -907,7 +910,7 @@
                   (L
                    (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:25:19-26 })
                    (HsAppKindTy
-                    { DumpRenamedAst.hs:25:21 }
+                    (NoExtField)
                     (L
                      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:25:19 })
                      (HsTyVar
@@ -916,6 +919,10 @@
                       (L
                        (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:25:19 })
                        {Name: DumpRenamedAst.T})))
+                    (L
+                     (TokenLoc
+                      (EpaSpan { DumpRenamedAst.hs:25:21 }))
+                     (HsTok))
                     (L
                      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:25:22-26 })
                      (HsTyVar

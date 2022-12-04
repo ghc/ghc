@@ -570,7 +570,7 @@ instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
     HsOuterExplicit{hso_bndrs = tvs} ->
       foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
 
-instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
+instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg p tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
   loc (HsArgPar sp)  = sp
@@ -1773,7 +1773,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
         [ toHie a
         , toHie b
         ]
-      HsAppKindTy _ ty ki ->
+      HsAppKindTy _ ty _ ki ->
         [ toHie ty
         , toHie ki
         ]
@@ -1831,7 +1831,7 @@ instance ToHie (LocatedA (HsType GhcRn)) where
       HsStarTy _ _ -> []
       XHsType _ -> []
 
-instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
+instance (ToHie tm, ToHie ty) => ToHie (HsArg p tm ty) where
   toHie (HsValArg tm) = toHie tm
   toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = locOnly sp

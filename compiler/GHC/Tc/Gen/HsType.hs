@@ -1517,11 +1517,11 @@ splitHsAppTys hs_ty
     is_app _                       = False
 
     go :: LHsType GhcRn
-       -> [HsArg (LHsType GhcRn) (LHsKind GhcRn)]
+       -> [HsArg GhcRn (LHsType GhcRn) (LHsKind GhcRn)]
        -> (LHsType GhcRn,
-           [HsArg (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
+           [HsArg GhcRn (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
-    go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
+    go (L _  (HsAppKindTy _ ty at k)) as = go ty (HsTypeArg at k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
       = ( L (na2la sp) (HsTyVar noAnn prom op)
@@ -1698,7 +1698,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         substed_fun_ki = substTy subst fun_ki
         hs_ty          = appTypeToArg orig_hs_ty (take (n-1) orig_hs_args)
 
-    n_initial_val_args :: [HsArg tm ty] -> Arity
+    n_initial_val_args :: [HsArg p tm ty] -> Arity
     -- Count how many leading HsValArgs we have
     n_initial_val_args (HsValArg {} : args) = 1 + n_initial_val_args args
     n_initial_val_args (HsArgPar {} : args) = n_initial_val_args args
@@ -1890,10 +1890,10 @@ unsaturated arguments: see #11246.  Hence doing this in tcInferApps.
 
 appTypeToArg :: LHsType GhcRn -> [LHsTypeArg GhcRn] -> LHsType GhcRn
 appTypeToArg f []                       = f
-appTypeToArg f (HsValArg arg    : args) = appTypeToArg (mkHsAppTy f arg) args
-appTypeToArg f (HsArgPar _      : args) = appTypeToArg f                 args
-appTypeToArg f (HsTypeArg l arg : args)
-  = appTypeToArg (mkHsAppKindTy l f arg) args
+appTypeToArg f (HsValArg arg     : args) = appTypeToArg (mkHsAppTy f arg) args
+appTypeToArg f (HsArgPar _       : args) = appTypeToArg f                 args
+appTypeToArg f (HsTypeArg at arg : args)
+  = appTypeToArg (mkHsAppKindTy f at arg) args
 
 
 {- *********************************************************************

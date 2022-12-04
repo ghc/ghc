@@ -1,5 +1,6 @@
 
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -94,6 +95,7 @@ import Language.Haskell.Syntax.Type
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprUntypedSplice, HsUntypedSpliceResult(..) )
 
+import Language.Haskell.Syntax.Concrete
 import Language.Haskell.Syntax.Extension
 import GHC.Core.DataCon( SrcStrictness(..), SrcUnpackedness(..), HsImplBang(..) )
 import GHC.Hs.Extension
@@ -312,7 +314,7 @@ type instance XIParamTy        (GhcPass _) = EpAnn [AddEpAnn]
 type instance XStarTy          (GhcPass _) = NoExtField
 type instance XKindSig         (GhcPass _) = EpAnn [AddEpAnn]
 
-type instance XAppKindTy       (GhcPass _) = SrcSpan -- Where the `@` lives
+type instance XAppKindTy       (GhcPass _) = NoExtField
 
 type instance XSpliceTy        GhcPs = NoExtField
 type instance XSpliceTy        GhcRn = HsUntypedSpliceResult (LHsType GhcRn)
@@ -489,10 +491,10 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
 mkHsAppTys = foldl' mkHsAppTy
 
-mkHsAppKindTy :: XAppKindTy (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+mkHsAppKindTy :: LHsType (GhcPass p) -> LHsToken "@" (GhcPass p) -> LHsType (GhcPass p)
               -> LHsType (GhcPass p)
-mkHsAppKindTy ext ty k
-  = addCLocAA ty k (HsAppKindTy ext ty k)
+mkHsAppKindTy ty at k
+  = addCLocAA ty k (HsAppKindTy noExtField ty at k)
 
 {-
 ************************************************************************
@@ -541,7 +543,7 @@ hsTyGetAppHead_maybe = go
   where
     go (L _ (HsTyVar _ _ ln))          = Just ln
     go (L _ (HsAppTy _ l _))           = go l
-    go (L _ (HsAppKindTy _ t _))       = go t
+    go (L _ (HsAppKindTy _ t _ _))     = go t
     go (L _ (HsOpTy _ _ _ ln _))       = Just ln
     go (L _ (HsParTy _ t))             = go t
     go (L _ (HsKindSig _ t _))         = go t
@@ -553,12 +555,12 @@ hsTyGetAppHead_maybe = go
 lhsTypeArgSrcSpan :: LHsTypeArg (GhcPass pass) -> SrcSpan
 lhsTypeArgSrcSpan arg = case arg of
   HsValArg  tm    -> getLocA tm
-  HsTypeArg at ty -> at `combineSrcSpans` getLocA ty
+  HsTypeArg at ty -> getTokenSrcSpan (getLoc at) `combineSrcSpans` getLocA ty
   HsArgPar  sp    -> sp
 
 --------------------------------
 
-numVisibleArgs :: [HsArg tm ty] -> Arity
+numVisibleArgs :: [HsArg p tm ty] -> Arity
 numVisibleArgs = count is_vis
   where is_vis (HsValArg _) = True
         is_vis _            = False
@@ -576,7 +578,7 @@ numVisibleArgs = count is_vis
 -- pprHsArgsApp (++) Infix [HsValArg Char, HsValArg Double, HsVarArg Ordering] = (Char ++ Double) Ordering
 -- @
 pprHsArgsApp :: (OutputableBndr id, Outputable tm, Outputable ty)
-             => id -> LexicalFixity -> [HsArg tm ty] -> SDoc
+             => id -> LexicalFixity -> [HsArg p tm ty] -> SDoc
 pprHsArgsApp thing fixity (argl:argr:args)
   | Infix <- fixity
   = let pp_op_app = hsep [ ppr_single_hs_arg argl
@@ -591,7 +593,7 @@ pprHsArgsApp thing _fixity args
 
 -- | Pretty-print a prefix identifier to a list of 'HsArg's.
 ppr_hs_args_prefix_app :: (Outputable tm, Outputable ty)
-                        => SDoc -> [HsArg tm ty] -> SDoc
+                        => SDoc -> [HsArg p tm ty] -> SDoc
 ppr_hs_args_prefix_app acc []         = acc
 ppr_hs_args_prefix_app acc (arg:args) =
   case arg of
@@ -601,7 +603,7 @@ ppr_hs_args_prefix_app acc (arg:args) =
 
 -- | Pretty-print an 'HsArg' in isolation.
 ppr_single_hs_arg :: (Outputable tm, Outputable ty)
-                  => HsArg tm ty -> SDoc
+                  => HsArg p tm ty -> SDoc
 ppr_single_hs_arg (HsValArg tm)    = ppr tm
 ppr_single_hs_arg (HsTypeArg _ ty) = char '@' <> ppr ty
 -- GHC shouldn't be constructing ASTs such that this case is ever reached.
@@ -611,9 +613,9 @@ ppr_single_hs_arg (HsArgPar{})     = empty
 
 -- | This instance is meant for debug-printing purposes. If you wish to
 -- pretty-print an application of 'HsArg's, use 'pprHsArgsApp' instead.
-instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
+instance (Outputable tm, Outputable ty) => Outputable (HsArg (GhcPass p) tm ty) where
   ppr (HsValArg tm)     = text "HsValArg"  <+> ppr tm
-  ppr (HsTypeArg sp ty) = text "HsTypeArg" <+> ppr sp <+> ppr ty
+  ppr (HsTypeArg at ty) = text "HsTypeArg" <+> ppr at <+> ppr ty
   ppr (HsArgPar sp)     = text "HsArgPar"  <+> ppr sp
 
 --------------------------------
@@ -1180,7 +1182,7 @@ ppr_mono_ty (HsStarTy _ isUni)  = char (if isUni then '★' else '*')
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
-ppr_mono_ty (HsAppKindTy _ ty k)
+ppr_mono_ty (HsAppKindTy _ ty _ k)
   = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
 ppr_mono_ty (HsOpTy _ prom ty1 (L _ op) ty2)
   = sep [ ppr_mono_lty ty1
@@ -1295,7 +1297,7 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsWildCardTy{})      = False
     go (HsStarTy{})          = False
     go (HsAppTy _ t _)       = goL t
-    go (HsAppKindTy _ t _)   = goL t
+    go (HsAppKindTy _ t _ _) = goL t
     go (HsParTy{})           = False
     go (HsDocTy _ t _)       = goL t
     go (XHsType{})           = False

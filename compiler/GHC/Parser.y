@@ -2199,7 +2199,7 @@ ftype :: { forall b. DisambTD b => PV (LocatedA b) }
         | ftype tyarg                   { $1 >>= \ $1 ->
                                           mkHsAppTyPV $1 $2 }
         | ftype PREFIX_AT atype         { $1 >>= \ $1 ->
-                                          mkHsAppKindTyPV $1 (getLoc $2) $3 }
+                                          mkHsAppKindTyPV $1 (hsTok $2) $3 }
 
 tyarg :: { LHsType GhcPs }
         : atype                         { $1 }
