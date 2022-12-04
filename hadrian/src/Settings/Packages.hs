@@ -403,7 +403,7 @@ rtsPackageArgs = package rts ? do
         , builder HsCpp ? pure
           [ "-DTOP="             ++ show top ]
 
-        , builder HsCpp ? flag UseLibdw ? arg "-DUSE_LIBDW"
+        , builder HsCpp ? flag UseLibdw ? arg "-DUSE_LIBDW" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the

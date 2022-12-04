@@ -41,9 +41,9 @@ test('T10458',
       extra_hc_opts('-L"$PWD/T10458dir" -lAS')],
      ghci_script, ['T10458.script'])
 
-test('T11072gcc', [extra_files(['A.c', 'T11072.hs']),
-                   expect_broken(18718),
-                   unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
+test('T11072gcc', [extra_files(['A.c', 'T11072.hs', 'bin_impl_gcc/']),
+                   unless(doing_ghci, skip), unless(opsys('mingw32'), skip),
+                   unless(arch('x86_64'), skip)],
      makefile_test, ['compile_libAS_impl_gcc'])
 
 test('T11072msvc', [extra_files(['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_64/']),
