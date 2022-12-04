@@ -1310,8 +1310,11 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             goto done;
 
         case WHITEHOLE:
-            while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
-                // busy_wait_nop(); // FIXME
+            while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info)
+#if defined(PARALLEL_GC)
+                busy_wait_nop()
+#endif
+                ;
             goto try_again;
 
         default:
