@@ -1606,7 +1606,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         // selectee unreachable. However, we must mark the selectee regardless
         // to satisfy the snapshot invariant.
         PUSH_FIELD(sel, selectee);
-        nonmoving_eval_thunk_selector(queue, sel, origin);
+        //nonmoving_eval_thunk_selector(queue, sel, origin);
         break;
     }
 
