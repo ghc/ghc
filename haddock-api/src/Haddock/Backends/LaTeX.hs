@@ -1079,6 +1079,17 @@ instance RenderableBndrFlag Specificity where
   ppHsTyVarBndr unicode (KindedTyVar _ InferredSpec (L _ name) kind) =
     braces (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 
+instance RenderableBndrFlag (HsBndrVis pass) where
+  ppHsTyVarBndr _ (UserTyVar _ bvis (L _ name)) =
+    ppHsBndrVis bvis $ ppDocName name
+  ppHsTyVarBndr unicode (KindedTyVar _ bvis (L _ name) kind) =
+    ppHsBndrVis bvis $
+    parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
+
+ppHsBndrVis :: HsBndrVis pass -> LaTeX -> LaTeX
+ppHsBndrVis HsBndrRequired d = d
+ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
+
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
 

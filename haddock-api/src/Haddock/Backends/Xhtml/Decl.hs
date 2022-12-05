@@ -1176,6 +1176,19 @@ instance RenderableBndrFlag Specificity where
       braces (ppDocName qual Raw False (unL name) <+> dcolon unicode <+>
               ppLKind unicode qual kind)
 
+instance RenderableBndrFlag (HsBndrVis pass) where
+  ppHsTyVarBndr _ qual (UserTyVar _ bvis (L _ name)) =
+      ppHsBndrVis bvis $
+      ppDocName qual Raw False name
+  ppHsTyVarBndr unicode qual (KindedTyVar _ bvis name kind) =
+      ppHsBndrVis bvis $
+      parens (ppDocName qual Raw False (unL name) <+> dcolon unicode <+>
+              ppLKind unicode qual kind)
+
+ppHsBndrVis :: HsBndrVis pass -> Html -> Html
+ppHsBndrVis HsBndrRequired d = d
+ppHsBndrVis (HsBndrInvisible _) d = atSign <> d
+
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
 

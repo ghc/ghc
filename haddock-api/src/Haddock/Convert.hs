@@ -227,8 +227,8 @@ synifyTyCon prr _coax tc
   where
     -- tyConTyVars doesn't work on fun/prim, but we can make them up:
     mk_hs_tv realKind fakeTyVar
-      | isLiftedTypeKind realKind = noLocA $ UserTyVar noAnn () (noLocA (getName fakeTyVar))
-      | otherwise = noLocA $ KindedTyVar noAnn () (noLocA (getName fakeTyVar)) (synifyKindSig realKind)
+      | isLiftedTypeKind realKind = noLocA $ UserTyVar noAnn HsBndrRequired (noLocA (getName fakeTyVar))
+      | otherwise = noLocA $ KindedTyVar noAnn HsBndrRequired (noLocA (getName fakeTyVar)) (synifyKindSig realKind)
 
     conKind = defaultType prr (tyConKind tc)
     tyVarKinds = fst . splitFunTys . snd . splitInvisPiTys $ conKind
@@ -476,8 +476,8 @@ synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn
 synifyTyVars ktvs = HsQTvs { hsq_ext = []
                            , hsq_explicit = map synifyTyVar ktvs }
 
-synifyTyVar :: TyVar -> LHsTyVarBndr () GhcRn
-synifyTyVar = synify_ty_var emptyVarSet ()
+synifyTyVar :: TyVar -> LHsTyVarBndr (HsBndrVis GhcRn) GhcRn
+synifyTyVar = synify_ty_var emptyVarSet HsBndrRequired
 
 synifyTyVarBndr :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcRn
 synifyTyVarBndr = synifyTyVarBndr' emptyVarSet

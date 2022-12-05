@@ -231,7 +231,7 @@ renameFamilyResultSig (L loc (KindSig _ ki))
     = do { ki' <- renameLKind ki
          ; return (L loc (KindSig noExtField ki')) }
 renameFamilyResultSig (L loc (TyVarSig _ bndr))
-    = do { bndr' <- renameLTyVarBndr bndr
+    = do { bndr' <- renameLTyVarBndr return bndr
          ; return (L loc (TyVarSig noExtField bndr')) }
 
 renameInjectivityAnn :: LInjectivityAnn GhcRn -> RnM (LInjectivityAnn DocNameI)
@@ -333,25 +333,31 @@ renameSigType (HsSig { sig_bndrs = bndrs, sig_body = body }) = do
 
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })
-  = do { tvs' <- mapM renameLTyVarBndr tvs
+  = do { tvs' <- mapM (renameLTyVarBndr renameHsBndrVis) tvs
        ; return (HsQTvs { hsq_ext = noExtField
                         , hsq_explicit = tvs' }) }
 
+renameHsBndrVis :: HsBndrVis GhcRn -> RnM (HsBndrVis DocNameI)
+renameHsBndrVis HsBndrRequired = return HsBndrRequired
+renameHsBndrVis (HsBndrInvisible at) = return (HsBndrInvisible at)
+
 renameHsForAllTelescope :: HsForAllTelescope GhcRn -> RnM (HsForAllTelescope DocNameI)
 renameHsForAllTelescope tele = case tele of
-  HsForAllVis   _ bndrs -> do bndrs' <- mapM renameLTyVarBndr bndrs
+  HsForAllVis   _ bndrs -> do bndrs' <- mapM (renameLTyVarBndr return) bndrs
                               pure $ HsForAllVis noExtField bndrs'
-  HsForAllInvis _ bndrs -> do bndrs' <- mapM renameLTyVarBndr bndrs
+  HsForAllInvis _ bndrs -> do bndrs' <- mapM (renameLTyVarBndr return) bndrs
                               pure $ HsForAllInvis noExtField bndrs'
 
-renameLTyVarBndr :: LHsTyVarBndr flag GhcRn -> RnM (LHsTyVarBndr flag DocNameI)
-renameLTyVarBndr (L loc (UserTyVar _ fl (L l n)))
-  = do { n' <- rename n
-       ; return (L loc (UserTyVar noExtField fl (L l n'))) }
-renameLTyVarBndr (L loc (KindedTyVar _ fl (L lv n) kind))
-  = do { n' <- rename n
+renameLTyVarBndr :: (flag -> RnM flag') -> LHsTyVarBndr flag GhcRn -> RnM (LHsTyVarBndr flag' DocNameI)
+renameLTyVarBndr rn_flag (L loc (UserTyVar _ fl (L l n)))
+  = do { fl' <- rn_flag fl
+       ; n' <- rename n
+       ; return (L loc (UserTyVar noExtField fl' (L l n'))) }
+renameLTyVarBndr rn_flag (L loc (KindedTyVar _ fl (L lv n) kind))
+  = do { fl' <- rn_flag fl
+       ; n' <- rename n
        ; kind' <- renameLKind kind
-       ; return (L loc (KindedTyVar noExtField fl (L lv n') kind')) }
+       ; return (L loc (KindedTyVar noExtField fl' (L lv n') kind')) }
 
 renameLContext :: LocatedC [LHsType GhcRn] -> RnM (LocatedC [LHsType DocNameI])
 renameLContext (L loc context) = do
@@ -513,7 +519,7 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                            , con_doc = mbldoc
                            , con_forall = forall_ }) = do
       lname'    <- renameL lname
-      ltyvars'  <- mapM renameLTyVarBndr ltyvars
+      ltyvars'  <- mapM (renameLTyVarBndr return) ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameH98Details details
       mbldoc'   <- mapM (renameLDocHsSyn) mbldoc
@@ -705,7 +711,7 @@ renameOuterTyVarBndrs :: HsOuterTyVarBndrs flag GhcRn
 renameOuterTyVarBndrs (HsOuterImplicit{}) =
   pure $ HsOuterImplicit{hso_ximplicit = noExtField}
 renameOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = exp_bndrs}) =
-  HsOuterExplicit noExtField <$> mapM renameLTyVarBndr exp_bndrs
+  HsOuterExplicit noExtField <$> mapM (renameLTyVarBndr return) exp_bndrs
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs GhcRn in_thing
