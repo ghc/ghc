@@ -324,6 +324,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     if (RtsFlags.GcFlags.useNonmoving) {
         nonmovingAddCapabilities(to);
         for (i = from; i < to; ++i) {
+            capabilities[i]->upd_rem_set.queue.blocks = NULL;
             nonmovingInitUpdRemSet(&capabilities[i]->upd_rem_set);
         }
     }
