@@ -851,6 +851,7 @@ static void nonmovingPrepareMark(void)
 
         // Save the filled segments for later processing during the concurrent
         // mark phase.
+        ASSERT(alloca->saved_filled == NULL);
         alloca->saved_filled = alloca->filled;
         alloca->filled = NULL;
 
@@ -926,6 +927,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     ASSERT(n_nonmoving_marked_compact_blocks == 0);
 
     MarkQueue *mark_queue = stgMallocBytes(sizeof(MarkQueue), "mark queue");
+    mark_queue->blocks = NULL;
     initMarkQueue(mark_queue);
     current_mark_queue = mark_queue;
 
@@ -1089,6 +1091,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
             seg->link = nonmovingHeap.sweep_list;
             nonmovingHeap.sweep_list = filled;
         }
+        nonmovingHeap.allocators[alloca_idx]->saved_filled = NULL;
     }
 
     // Mark Weak#s
