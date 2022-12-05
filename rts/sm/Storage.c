@@ -324,7 +324,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     // Initialize NonmovingAllocators and UpdRemSets
     if (RtsFlags.GcFlags.useNonmoving) {
         nonmovingAddCapabilities(to);
-        for (i = 0; i < to; ++i) {
+        for (i = from; i < to; ++i) {
             nonmovingInitUpdRemSet(&getCapability(i)->upd_rem_set);
         }
     }
