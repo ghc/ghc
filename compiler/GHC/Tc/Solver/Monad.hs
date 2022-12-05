@@ -25,7 +25,7 @@ module GHC.Tc.Solver.Monad (
     updWorkListTcS,
     pushLevelNoWorkList,
 
-    runTcPluginTcS, addUsedGRE, addUsedGREs, keepAlive,
+    runTcPluginTcS, recordUsedGREs,
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
@@ -151,7 +151,7 @@ import GHC.Core.TyCon
 import GHC.Types.Error ( mkPlainError, noHints )
 import GHC.Types.Name
 import GHC.Types.TyThing
-import GHC.Types.Name.Reader ( GlobalRdrEnv, GlobalRdrElt )
+import GHC.Types.Name.Reader
 
 import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import qualified GHC.Rename.Env as TcM
@@ -175,7 +175,8 @@ import Control.Monad
 import GHC.Utils.Monad
 import Data.IORef
 import GHC.Exts (oneShot)
-import Data.List ( mapAccumL, partition, find )
+import Data.List ( mapAccumL, partition )
+import Data.Foldable
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
@@ -1373,17 +1374,22 @@ tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
 tcLookupId :: Name -> TcS Id
 tcLookupId n = wrapTcS $ TcM.tcLookupId n
 
--- Setting names as used (used in the deriving of Coercible evidence)
--- Too hackish to expose it to TcS? In that case somehow extract the used
--- constructors from the result of solveInteract
-addUsedGREs :: [GlobalRdrElt] -> TcS ()
-addUsedGREs gres = wrapTcS  $ TcM.addUsedGREs gres
+-- Any use of this function is a bit suspect, because it violates the
+-- pure veneer of TcS. But it's just about warnings around unused imports
+-- and local constructors (GHC will issue fewer warnings than it otherwise
+-- might), so it's not worth losing sleep over.
+recordUsedGREs :: Bag GlobalRdrElt -> TcS ()
+recordUsedGREs gres
+  = do { wrapTcS $ TcM.addUsedGREs gre_list
+         -- If a newtype constructor was imported, don't warn about not
+         -- importing it...
+       ; wrapTcS $ traverse_ (TcM.keepAlive . greMangledName) gre_list }
+         -- ...and similarly, if a newtype constructor was defined in the same
+         -- module, don't warn about it being unused.
+         -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.
 
-addUsedGRE :: Bool -> GlobalRdrElt -> TcS ()
-addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
-
-keepAlive :: Name -> TcS ()
-keepAlive = wrapTcS . TcM.keepAlive
+  where
+    gre_list = bagToList gres
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

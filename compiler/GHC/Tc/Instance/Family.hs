@@ -519,16 +519,16 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
   = Nothing
 
 -- | 'tcTopNormaliseNewTypeTF_maybe' gets rid of top-level newtypes,
--- potentially looking through newtype /instances/.
+-- potentially looking through newtype /instances/ and type synonyms.
 --
 -- It is only used by the type inference engine (specifically, when
 -- solving representational equality), and hence it is careful to unwrap
 -- only if the relevant data constructor is in scope.  That's why
 -- it gets a GlobalRdrEnv argument.
 --
--- It is careful not to unwrap data/newtype instances if it can't
--- continue unwrapping.  Such care is necessary for proper error
--- messages.
+-- It is careful not to unwrap data/newtype instances nor synonyms
+-- if it can't continue unwrapping.  Such care is necessary for proper
+-- error messages.
 --
 -- It does not look through type families.
 -- It does not normalise arguments to a tycon.

@@ -61,7 +61,6 @@ import GHC.Types.Basic
 
 import qualified Data.Semigroup as S
 import Data.Bifunctor ( bimap )
-import Data.Foldable ( traverse_ )
 
 {-
 ************************************************************************
@@ -1085,7 +1084,7 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
-can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
+can_eq_nc' rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
    -- we want to catch e.g. Maybe Int ~ (Int -> Int) here for better
@@ -1093,7 +1092,7 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
    -- hence no direct match on TyConApp
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
-  = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
+  = canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            s1@(ForAllTy (Bndr _ vis1) _) _
@@ -1115,11 +1114,8 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 -------------------
 
 -- No similarity in type structure detected. Rewrite and try again.
-can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ps_ty1
-       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ps_ty2
-       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
-       ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
+can_eq_nc' False _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
+  = rewrite_and_try_again ev eq_rel ps_ty1 ps_ty2
 
 ----------------------------
 -- Look for a canonical LHS. See Note [Canonical LHS].
@@ -1156,6 +1152,16 @@ can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
             NomEq  -> continueWith (mkIrredCt ShapeMismatchReason ev) }
           -- No need to call canEqFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
+
+-- Rewrite the two types and try again
+rewrite_and_try_again :: CtEvidence -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
+rewrite_and_try_again ev eq_rel ty1 ty2
+  = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ty1
+       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ty2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
+       ; rdr_env <- getGlobalRdrEnvTcS
+       ; envs <- getFamInstEnvs
+       ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1379,45 +1385,84 @@ zonk_eq_types = go
     combine_rev f (Right tys) (Left elt) = Left (f <$> elt     <*> pure tys)
     combine_rev f (Right tys) (Right ty) = Right (f ty tys)
 
-{- See Note [Unwrap newtypes first]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Unwrap newtypes first]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Decomposing newtype equalities]
 
 Consider
   newtype N m a = MkN (m a)
-Then N will get a conservative, Nominal role for its second parameter 'a',
+N will get a conservative, Nominal role for its second parameter 'a',
 because it appears as an argument to the unknown 'm'. Now consider
   [W] N Maybe a  ~R#  N Maybe b
 
-If we decompose, we'll get
+If we /decompose/, we'll get
   [W] a ~N# b
 
-But if instead we unwrap we'll get
+But if instead we /unwrap/ we'll get
   [W] Maybe a ~R# Maybe b
 which in turn gives us
   [W] a ~R# b
 which is easier to satisfy.
 
-Bottom line: unwrap newtypes before decomposing them!
-c.f. #9123 comment:52,53 for a compelling example.
+Conclusion: we must unwrap newtypes before decomposing them. This happens
+in `can_eq_newtype_nc`
 
-Note [Newtypes can blow the stack]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
+But even this is challenging. Here are two cases to consider:
 
-  newtype X = MkX (Int -> X)
-  newtype Y = MkY (Int -> Y)
+Case 1:
 
-and now wish to prove
+  newtype Age = MkAge Int
+  [G] c
+  [W] w1 :: IO Age ~R# IO Int
 
-  [W] X ~R Y
+Case 2:
 
-This Wanted will loop, expanding out the newtypes ever deeper looking
-for a solid match or a solid discrepancy. Indeed, there is something
-appropriate to this looping, because X and Y *do* have the same representation,
-in the limit -- they're both (Fix ((->) Int)). However, no finitely-sized
-coercion will ever witness it. This loop won't actually cause GHC to hang,
-though, because we check our depth when unwrapping newtypes.
+  newtype A = MkA [A]
+  [W] A ~R# [A]
+
+For Case 1, recall that IO is an abstract newtype. Then read Note
+[Decomposing newtype equalities]. According to that Note, we should not
+decompose w1, because we have an Irred Given. Yet we still want to solve
+the wanted!  We can do so by unwrapping the (non-abstract) Age newtype
+underneath the IO, giving
+   [W] w2 :: IO Int ~R# IO Int
+   w1 = (IO unwrap-Age ; w2)
+where unwrap-Age :: Age ~R# Int. Now we case solve w2 by reflexivity;
+see Note [Eager reflexivity check].
+
+Conclusion: unwrap newtypes (deeply, inside types) in the rewriter:
+specifically in GHC.Tc.Solver.Rewrite.rewrite_newtype_app.
+
+Yet for Case 2, deep rewriting would be a disaster: we would loop.
+  [W] A ~R# [A] ---> {unwrap}
+                     [W] [A] ~R# [[A]]
+                ---> {decompose}
+                     [W] A ~R# [A]
+
+In this case, we just want to unwrap newtypes /at the top level/, allowing us
+to succeed via Note [Eager reflexivity check]:
+  [W] A ~R# [A] ---> {unwrap at top level only}
+                     [W] [A] ~R# [A]
+                ---> {reflexivity} success
+
+Conclusion: to satisfy Case 1 and Case 2, we unwrap
+* /both/ at top level, in can_eq_nc'
+* /and/ deeply, in the rewriter, rewrite_newtype_app
+
+The former unwraps outer newtypes (when the data constructor is in scope).
+The latter unwraps deeply -- but it won't be invoked in Case 2, when we can
+recognize an equality between the types [A] and [A] before rewriting
+deeply.
+
+This "before" business is delicate -- there is still a real risk of a loop
+in the type checker with recursive newtypes -- but I think we're doomed to do
+*something* delicate, as we're really trying to solve for equirecursive
+type equality. Bottom line for users: recursive newtypes are dangerous.
+See also Section 5.3.1 and 5.3.4 of
+"Safe Zero-cost Coercions for Haskell" (JFP 2016).
+
+Another approach -- which we ultimately decided against -- is described in
+Note [Decomposing newtypes a bit more aggressively].
 
 Note [Eager reflexivity check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1462,28 +1507,22 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
   = do { traceTcS "can_eq_newtype_nc" $
          vcat [ ppr ev, ppr swapped, ppr co1, ppr gres, ppr ty1', ppr ty2 ]
 
-         -- check for blowing our stack:
+         -- Check for blowing our stack, and increase the depth
          -- See Note [Newtypes can blow the stack]
-       ; checkReductionDepth (ctEvLoc ev) ty1
+       ; let loc = ctEvLoc ev
+             ev' = ev `setCtEvLoc` bumpCtLocDepth loc
+       ; checkReductionDepth loc ty1
 
          -- Next, we record uses of newtype constructors, since coercing
          -- through newtypes is tantamount to using their constructors.
-       ; addUsedGREs gre_list
-         -- If a newtype constructor was imported, don't warn about not
-         -- importing it...
-       ; traverse_ keepAlive $ map greMangledName gre_list
-         -- ...and similarly, if a newtype constructor was defined in the same
-         -- module, don't warn about it being unused.
-         -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.
+       ; recordUsedGREs gres
 
        ; let redn1 = mkReduction co1 ty1'
 
-       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev' swapped
                      redn1
                      (mkReflRedn Representational ps_ty2)
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
-  where
-    gre_list = bagToList gres
 
 ---------
 -- ^ Decompose a type application.
@@ -1559,7 +1598,8 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
     role = eqRelRole eq_rel
 
 ------------------------
-canTyConApp :: CtEvidence -> EqRel
+canTyConApp :: Bool   -- True <=> the types have been rewritten
+            -> CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
@@ -1567,13 +1607,17 @@ canTyConApp :: CtEvidence -> EqRel
 -- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
 -- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
 -- But they can be data families.
-canTyConApp ev eq_rel tc1 tys1 tc2 tys2
+canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
          then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-         else canEqFailure ev eq_rel ty1 ty2 }
+         else if rewritten
+              then canEqFailure ev eq_rel ty1 ty2
+              else rewrite_and_try_again ev eq_rel ty1 ty2 }
+              -- Why rewrite and try again?  See Case 1
+              -- of Note [Unwrap newtypes first]
 
   -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
@@ -1851,8 +1895,12 @@ only about /completeness/.
 
 Note [Decomposing newtypes a bit more aggressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-c.f. https://github.com/ghc-proposals/ghc-proposals/pull/549,
-issue #22441, and discussion on !9282.
+IMPORTANT: the ideas in this Note are *not* implemented. Instead, the
+current approach is detailed in Note [Unwrap newtypes first].
+For more details about the ideas in this Note see
+  * GHC propoosal: https://github.com/ghc-proposals/ghc-proposals/pull/549
+  * issue #22441
+  * discussion on !9282.
 
 Consider [G] c, [W] (IO Int) ~R (IO Age)
 where IO is abstract, and
@@ -2091,8 +2139,8 @@ canEqHardFailure :: CtEvidence
 -- See Note [Make sure that insolubles are fully rewritten]
 canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
-       ; (redn1, rewriters1) <- rewrite ev ty1
-       ; (redn2, rewriters2) <- rewrite ev ty2
+       ; (redn1, rewriters1) <- rewriteForErrors ev ty1
+       ; (redn2, rewriters2) <- rewriteForErrors ev ty2
        ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
@@ -3203,12 +3251,12 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
   = do { let new_tm = evCoercion ( mkSymCo lhs_co
                                   `mkTransCo` maybeSymCo swapped (mkCoVarCo old_evar)
                                   `mkTransCo` rhs_co)
-       ; newGivenEvVar loc' (new_pred, new_tm) }
+       ; newGivenEvVar loc (new_pred, new_tm) }
 
   | CtWanted { ctev_dest = dest
              , ctev_rewriters = rewriters } <- old_ev
   , let rewriters' = rewriters S.<> new_rewriters
-  = do { (new_ev, hole_co) <- newWantedEq loc' rewriters'
+  = do { (new_ev, hole_co) <- newWantedEq loc rewriters'
                                           (ctEvRole old_ev) nlhs nrhs
        ; let co = maybeSymCo swapped $
                   lhs_co
@@ -3228,12 +3276,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
 #endif
   where
     new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
-
-      -- equality is like a type class. Bumping the depth is necessary because
-      -- of recursive newtypes, where "reducing" a newtype can actually make
-      -- it bigger. See Note [Newtypes can blow the stack].
     loc      = ctEvLoc old_ev
-    loc'     = bumpCtLocDepth loc
 
 {-
 ************************************************************************
