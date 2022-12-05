@@ -35,3 +35,4 @@ main = do
     testRoundtrip (typeRep :: TypeRep 5)
     testRoundtrip (typeRep :: TypeRep "hello world")
     testRoundtrip (typeRep :: TypeRep ('Just 5))
+    testRoundtrip (typeRep :: TypeRep [])

@@ -13,3 +13,4 @@ good: Int -> Int
 good: 5
 good: "hello world"
 good: 'Just Natural 5
+good: []
