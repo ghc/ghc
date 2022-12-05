@@ -698,19 +698,24 @@ funSize opts top_args fun n_val_args voids
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
-
 -- See Note [Unboxed tuple size and result discount]
   | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
 
 -- See Note [Constructor size and result discount]
-  | otherwise = SizeIs (callSize n_val_args 0) emptyBag 10
+  | otherwise = SizeIs (6 * n_val_args) emptyBag 10
 
 {- Note [Constructor size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We generally compute the size of a constructor application as if it was
-a regular function call (#22317); the size of the code we generate is similar.
-We have an extra case for when it's a nullary application, in which case it is
+Constructor applications are generally a bit smaller than function calls, but
+we have to ensure that we don't duplicate a lot of big record updates.
+So every value argument contributes a size of 6, but SG's experiments concluded
+that any factor between 6 and 9 would work:
+  * A factor of 10 means we don't inline eftWord anymore (undesirable for
+    T15263)
+  * But a factor of 5 means we get too much inlining in T22317b.
+Picking 6 seems to have the lowest potential for breaking performance changes,
+so that's what we go with.
+A side effect of the formula is that a nullary constructor application is
 treated the same as a lone variable.
 
 The "result discount" is applied if the result of the call is

@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 125, types: 68, coercions: 4, joins: 0/0}
+  = {terms: 124, types: 69, coercions: 4, joins: 1/1}
 
 lvl = "error"#
 
@@ -48,12 +48,13 @@ index
   = \ l u i ->
       case l of { I# x ->
       case i of { I# y ->
+      join { $j = case u of { I# ww -> $wlvl y ww x } } in
       case <=# x y of {
-        __DEFAULT -> case u of { I# ww -> $wlvl y ww x };
+        __DEFAULT -> jump $j;
         1# ->
           case u of { I# y1 ->
           case <# y y1 of {
-            __DEFAULT -> $wlvl y y1 x;
+            __DEFAULT -> jump $j;
             1# -> I# (-# y x)
           }
           }
@@ -66,7 +67,7 @@ index
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 108, types: 46, coercions: 0, joins: 3/3}
+  = {terms: 107, types: 47, coercions: 0, joins: 4/5}
 
 $trModule4 = "main"#
 
@@ -82,25 +83,27 @@ i = I# 1#
 
 l = I# 0#
 
-lvl = \ x ww -> indexError $fShowInt x (I# ww) i
+lvl = \ x y -> indexError $fShowInt x y i
 
-lvl1 = \ ww -> indexError $fShowInt l (I# ww) l
+lvl1 = \ y -> indexError $fShowInt l y l
 
 $wtheresCrud
   = \ ww ww1 ->
+      let { y = I# ww1 } in
       join {
         exit
           = case <# 0# ww1 of {
-              __DEFAULT -> case lvl1 ww1 of wild { };
+              __DEFAULT -> case lvl1 y of wild { };
               1# -> 0#
             } } in
       join {
         exit1
-          = case <=# ww 1# of {
-              __DEFAULT -> case lvl (I# ww) ww1 of wild { };
+          = join { $j = case lvl (I# ww) y of wild { } } in
+            case <=# ww 1# of {
+              __DEFAULT -> jump $j;
               1# ->
                 case <# 1# ww1 of {
-                  __DEFAULT -> case lvl (I# ww) ww1 of wild { };
+                  __DEFAULT -> jump $j;
                   1# -> -# 1# ww
                 }
             } } in
