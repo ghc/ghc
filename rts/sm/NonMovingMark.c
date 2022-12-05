@@ -271,6 +271,7 @@ static void nonmovingAddUpdRemSetBlocks_(MarkQueue *rset)
     bdescr *end = start;
     while (end->link != NULL)
         end = end->link;
+    rset->blocks = NULL;
 
     // add the blocks to the global remembered set
     ACQUIRE_LOCK(&upd_rem_set_lock);
@@ -930,6 +931,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
 static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+    ASSERT(queue->blocks == NULL);
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
