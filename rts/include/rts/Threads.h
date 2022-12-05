@@ -85,4 +85,4 @@ extern Capability MainCapability;
 // Change the number of capabilities (only supports increasing the
 // current value at the moment).
 //
-extern void setNumCapabilities (uint32_t new_);
+extern int setNumCapabilities (uint32_t new_);

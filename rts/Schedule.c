@@ -2228,9 +2228,12 @@ forkProcess(HsStablePtr *entry
  * Finally we release the Capabilities we are holding, and start
  * worker Tasks on the new Capabilities we created.
  *
+ * One wrinkle here is that we must also ensure that we don't change the
+ * capability count while the nonmoving mark thread is active.
+ *
  * ------------------------------------------------------------------------- */
 
-void
+int
 setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 {
 #if !defined(THREADED_RTS)
@@ -2250,11 +2253,15 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     Capability *old_capabilities = NULL;
     uint32_t old_n_capabilities = n_capabilities;
 
+    if (RELAXED_LOAD(&concurrent_coll_running)) {
+        return 1;
+    }
+
     if (new_n_capabilities == enabled_capabilities) {
-        return;
+        return 0;
     } else if (new_n_capabilities <= 0) {
         errorBelch("setNumCapabilities: Capability count must be positive");
-        return;
+        return 1;
     }
 
 
@@ -2357,6 +2364,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 
     rts_unlock(cap);
 
+    return 0;
 #endif // THREADED_RTS
 }
 

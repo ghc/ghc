@@ -380,10 +380,15 @@ to avoid contention with other processes in the machine.
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i
   | i <= 0    = failIO $ "setNumCapabilities: Capability count ("++show i++") must be positive"
-  | otherwise = c_setNumCapabilities (fromIntegral i)
+  | otherwise = do
+      ret <- c_setNumCapabilities (fromIntegral i)
+      case ret of
+        0 -> return ()
+        1 -> yield >> setNumCapabilities i
+        _ -> failIO $ "setNumCapabilities: Unknown result"
 
 foreign import ccall safe "setNumCapabilities"
-  c_setNumCapabilities :: CUInt -> IO ()
+  c_setNumCapabilities :: CUInt -> IO CInt
 
 -- | Returns the number of CPUs that the machine has
 --
