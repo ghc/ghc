@@ -81,7 +81,6 @@ import GHC.Data.FastString
 import GHC.Data.Graph.UnVar
 import GHC.Data.Pair
 
-import GHC.Utils.GlobalVars( unsafeHasNoStateHack )
 import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -138,13 +137,14 @@ joinRhsArity _         = 0
 
 
 ---------------
-exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, DmdSig, CprSig)
+exprBotStrictness_maybe :: StateHackFlag -> CoreExpr -> Maybe (Arity, DmdSig, CprSig)
 -- A cheap and cheerful function that identifies bottoming functions
 -- and gives them a suitable strictness and CPR signatures.
 -- It's used during float-out
-exprBotStrictness_maybe e = arityTypeBotSigs_maybe (cheapArityType e)
+exprBotStrictness_maybe st_hack e =
+  arityTypeBotSigs_maybe (cheapArityType st_hack e)
 
-arityTypeBotSigs_maybe :: ArityType ->  Maybe (Arity, DmdSig, CprSig)
+arityTypeBotSigs_maybe :: ArityType -> Maybe (Arity, DmdSig, CprSig)
 -- Arity of a divergent function
 arityTypeBotSigs_maybe (AT lams div)
   | isDeadEndDiv div = Just ( arity
@@ -203,11 +203,12 @@ typeArity ty0 =
       | otherwise
       = acc
 
-typeOneShots :: Type -> [OneShotInfo]
+
+typeOneShots :: StateHackFlag -> Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
 -- We look through foralls, and newtypes
 -- See Note [Arity invariants for bindings]
-typeOneShots ty
+typeOneShots st_hack ty
   = go initRecTc ty
   where
     go rec_nts ty
@@ -215,7 +216,7 @@ typeOneShots ty
       = go rec_nts ty'
 
       | Just (_,_,arg,res) <- splitFunTy_maybe ty
-      = typeOneShot arg : go rec_nts res
+      = typeOneShot st_hack arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -235,17 +236,17 @@ typeOneShots ty
       | otherwise
       = []
 
-typeOneShot :: Type -> OneShotInfo
-typeOneShot ty
-   | isStateHackType ty = OneShotLam
-   | otherwise          = NoOneShotInfo
+typeOneShot :: StateHackFlag -> Type -> OneShotInfo
+typeOneShot st_hack ty
+   | isStateHackType st_hack ty = OneShotLam
+   | otherwise                  = NoOneShotInfo
 
 -- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
 -- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
-idStateHackOneShotInfo :: Id -> OneShotInfo
-idStateHackOneShotInfo id
-    | isStateHackType (idType id) = OneShotLam
-    | otherwise                   = idOneShotInfo id
+idStateHackOneShotInfo :: StateHackFlag -> Id -> OneShotInfo
+idStateHackOneShotInfo st_hack id
+    | isStateHackType st_hack (idType id) = OneShotLam
+    | otherwise                           = idOneShotInfo id
 
 -- | Returns whether the lambda associated with the 'Id' is
 --   certainly applied at most once
@@ -253,15 +254,15 @@ idStateHackOneShotInfo id
 -- It works on type variables as well as Ids, returning True
 -- Its main purpose is to encapsulate the Horrible State Hack
 -- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
-isOneShotBndr :: Var -> Bool
-isOneShotBndr var
-  | isTyVar var                              = True
-  | OneShotLam <- idStateHackOneShotInfo var = True
-  | otherwise                                = False
+isOneShotBndr :: StateHackFlag -> Var -> Bool
+isOneShotBndr st_hack var
+  | isTyVar var                                      = True
+  | OneShotLam <- idStateHackOneShotInfo st_hack var = True
+  | otherwise                                        = False
 
-isStateHackType :: Type -> Bool
-isStateHackType ty
-  | unsafeHasNoStateHack   -- Switch off with -fno-state-hack
+isStateHackType :: StateHackFlag -> Type -> Bool
+isStateHackType st_hack ty
+  | not (stateHackEnabled st_hack)  -- Switch off with -fno-state-hack
   = False
   | otherwise
   = case tyConAppTyCon_maybe ty of
@@ -419,17 +420,17 @@ The test simplCore/should_compile/T3722 is an excellent example.
 *                                                                      *
 ********************************************************************* -}
 
-zapLamBndrs :: FullArgCount -> [Var] -> [Var]
+zapLamBndrs :: StateHackFlag -> FullArgCount -> [Var] -> [Var]
 -- If (\xyz. t) appears under-applied to only two arguments,
 -- we must zap the occ-info on x,y, because they appear (in 't') under the \z.
 -- See Note [Occurrence analysis for lambda binders] in GHc.Core.Opt.OccurAnal
 --
 -- NB: both `arg_count` and `bndrs` include both type and value args/bndrs
-zapLamBndrs arg_count bndrs
+zapLamBndrs st_hack arg_count bndrs
   | no_need_to_zap = bndrs
   | otherwise      = zap_em arg_count bndrs
   where
-    no_need_to_zap = all isOneShotBndr (drop arg_count bndrs)
+    no_need_to_zap = all (isOneShotBndr st_hack) (drop arg_count bndrs)
 
     zap_em :: FullArgCount -> [Var] -> [Var]
     zap_em 0 bs = bs
@@ -864,6 +865,7 @@ trimArityType max_arity at@(AT lams _)
 data ArityOpts = ArityOpts
   { ao_ped_bot :: !Bool -- See Note [Dealing with bottom]
   , ao_dicts_cheap :: !Bool -- See Note [Eta expanding through dictionaries]
+  , ao_state_hack :: !StateHackFlag
   }
 
 -- | The Arity returned is the number of value args the
@@ -917,6 +919,8 @@ findRhsArity opts is_rec bndr rhs
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
 
+    st_hack = ao_state_hack opts
+
     -- Non-join-points only
     non_join_arity_type = case is_rec of
                              Recursive    -> go 0 botArityType
@@ -928,7 +932,7 @@ findRhsArity opts is_rec bndr rhs
     -- and Note [Arity for recursive join bindings]
     join_arity_type = case is_rec of
                          Recursive    -> go 0 botArityType
-                         NonRecursive -> trimArityType ty_arity (cheapArityType rhs)
+                         NonRecursive -> trimArityType ty_arity (cheapArityType st_hack rhs)
 
     ty_arity     = typeArity (idType bndr)
     id_one_shots = idDemandOneShots bndr
@@ -1235,12 +1239,12 @@ in the main arityType function.)
 *                                                                      *
 ********************************************************************* -}
 
-arityLam :: Id -> ArityType -> ArityType
-arityLam id (AT oss div)
+arityLam :: StateHackFlag -> Id -> ArityType -> ArityType
+arityLam st_hack id (AT oss div)
   = AT ((IsCheap, one_shot) : oss) div
   where
     one_shot | isDeadEndDiv div = OneShotLam
-             | otherwise        = idStateHackOneShotInfo id
+             | otherwise        = idStateHackOneShotInfo st_hack id
     -- If the body diverges, treat it as one-shot: no point
     -- in floating out, and no penalty for floating in
     -- See Wrinkle [Bottoming functions] in Note [ArityType]
@@ -1513,17 +1517,18 @@ arityType env (Var v)
   = assertPpr (freeJoinsOK env || not (isJoinId v)) (ppr v) $
     -- All join-point should be in the ae_sigs
     -- See Note [No free join points in arityType]
-    idArityType v
+    idArityType (ao_state_hack $ am_opts env) v
 
 arityType env (Cast e _)
   = arityType env e
 
         -- Lambdas; increase arity
 arityType env (Lam x e)
-  | isId x    = arityLam x (arityType env' e)
+  | isId x    = arityLam st_hack x (arityType env' e)
   | otherwise = arityType env' e
   where
     env' = delInScope env x
+    st_hack = ao_state_hack (am_opts env)
 
         -- Applications; decrease arity, except for types
 arityType env (App fun (Type _))
@@ -1573,9 +1578,10 @@ arityType env (Let (Rec prs) e)
   where
     bind_cost (b,e) = exprCost env' e (Just (idType b))
     env'            = foldl extend_rec env prs
+    st_hack         = ao_state_hack (am_opts env)
     extend_rec :: ArityEnv -> (Id,CoreExpr) -> ArityEnv
     extend_rec env (b,_) = extendSigEnv env b  $
-                           idArityType b
+                           idArityType st_hack b
       -- See Note [arityType for recursive let-bindings]
 
 arityType env (Tick t e)
@@ -1584,8 +1590,8 @@ arityType env (Tick t e)
 arityType _ _ = topArityType
 
 --------------------
-idArityType :: Id -> ArityType
-idArityType v
+idArityType :: StateHackFlag -> Id -> ArityType
+idArityType st_hack v
   | strict_sig <- idDmdSig v
   , (ds, div) <- splitDmdSig strict_sig
   , isDeadEndDiv div
@@ -1600,10 +1606,11 @@ idArityType v
     id_ty = idType v
 
     one_shots :: [(Cost,OneShotInfo)]  -- One-shot-ness derived from the type
-    one_shots = repeat IsCheap `zip` typeOneShots id_ty
+    one_shots = repeat IsCheap `zip` typeOneShots st_hack id_ty
 
 --------------------
-cheapArityType :: HasDebugCallStack => CoreExpr -> ArityType
+cheapArityType :: HasDebugCallStack
+               => StateHackFlag -> CoreExpr -> ArityType
 -- A fast and cheap version of arityType.
 -- Returns an ArityType with IsCheap everywhere
 -- c.f. GHC.Core.Utils.exprIsDeadEnd
@@ -1614,11 +1621,11 @@ cheapArityType :: HasDebugCallStack => CoreExpr -> ArityType
 --
 -- Returns ArityType, not SafeArityType.  The caller must do
 -- trimArityType if necessary.
-cheapArityType e = go e
+cheapArityType st_hack e = go e
   where
-    go (Var v)                  = idArityType v
+    go (Var v)                  = idArityType st_hack v
     go (Cast e _)               = go e
-    go (Lam x e)  | isId x      = arityLam x (go e)
+    go (Lam x e)  | isId x      = arityLam st_hack x (go e)
                   | otherwise   = go e
     go (App e a)  | isTypeArg a = go e
                   | otherwise   = arity_app a (go e)

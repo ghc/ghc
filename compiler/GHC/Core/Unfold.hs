@@ -55,6 +55,7 @@ import GHC.Data.Bag
 import GHC.Utils.Logger
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Types.Basic ( StateHackFlag )
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Tickish
@@ -88,10 +89,12 @@ data UnfoldingOpts = UnfoldingOpts
 
    , unfoldingReportPrefix :: !(Maybe String)
       -- ^ Only report inlining decisions for names with this prefix
+
+   , unfoldingStateHack :: !StateHackFlag
    }
 
-defaultUnfoldingOpts :: UnfoldingOpts
-defaultUnfoldingOpts = UnfoldingOpts
+defaultUnfoldingOpts :: StateHackFlag -> UnfoldingOpts
+defaultUnfoldingOpts st_hack = UnfoldingOpts
    { unfoldingCreationThreshold = 750
       -- The unfoldingCreationThreshold threshold must be reasonably high
       -- to take account of possible discounts.
@@ -122,6 +125,8 @@ defaultUnfoldingOpts = UnfoldingOpts
 
       -- Don't filter inlining decision reports
    , unfoldingReportPrefix = Nothing
+
+   , unfoldingStateHack = st_hack
    }
 
 -- Helpers for "GHC.Driver.Session"

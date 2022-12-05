@@ -92,14 +92,16 @@ data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    , so_eta_red :: !Bool            -- ^ Eta reduction on?
+   , so_st_hack :: !StateHackFlag   -- ^ State hack on?
    }
 
 -- | Default options for the Simple optimiser.
-defaultSimpleOpts :: SimpleOpts
-defaultSimpleOpts = SimpleOpts
-   { so_uf_opts = defaultUnfoldingOpts
+defaultSimpleOpts :: StateHackFlag -> SimpleOpts
+defaultSimpleOpts st_hack = SimpleOpts
+   { so_uf_opts = defaultUnfoldingOpts st_hack
    , so_co_opts = OptCoercionOpts { optCoercionEnabled = False }
    , so_eta_red = False
+   , so_st_hack = st_hack
    }
 
 simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
@@ -145,9 +147,10 @@ simpleOptExpr opts expr
 simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
-  = simple_opt_expr init_env (occurAnalyseExpr expr)
+  = simple_opt_expr init_env (occurAnalyseExpr st_hack expr)
   where
     init_env = (emptyEnv opts) { soe_subst = subst }
+    st_hack = so_st_hack opts
 
 ----------------------
 simpleOptPgm :: SimpleOpts
@@ -159,7 +162,7 @@ simpleOptPgm :: SimpleOpts
 simpleOptPgm opts this_mod binds rules =
     (reverse binds', rules', occ_anald_binds)
   where
-    occ_anald_binds  = occurAnalysePgm this_mod
+    occ_anald_binds  = occurAnalysePgm (so_st_hack opts) this_mod
                           (\_ -> True)  {- All unfoldings active -}
                           (\_ -> False) {- No rules active -}
                           rules binds
@@ -348,7 +351,7 @@ simple_app env (App e1 e2) as
   = simple_app env e1 ((env, e2) : as)
 
 simple_app env e@(Lam {}) as@(_:_)
-  = do_beta env (zapLambdaBndrs e n_args) as
+  = do_beta env (zapLambdaBndrs st_hack e n_args) as
     -- Be careful to zap the lambda binders if necessary
     -- c.f. the Lam case of simplExprF1 in GHC.Core.Opt.Simplify
     -- Lacking this zap caused #19347, when we had a redex
@@ -356,6 +359,7 @@ simple_app env e@(Lam {}) as@(_:_)
     -- where (as it happens) the eta-expanded K is produced by
     -- Note [Typechecking data constructors] in GHC.Tc.Gen.Head
   where
+    st_hack = so_st_hack (soe_opts env)
     n_args = length as
 
     do_beta env (Lam b body) (a:as)
@@ -1421,23 +1425,23 @@ Currently, it is used in GHC.Core.Rules.match, and is required to make
 -}
 
 exprIsLambda_maybe :: HasDebugCallStack
-                   => InScopeEnv -> CoreExpr
+                   => StateHackFlag -> InScopeEnv -> CoreExpr
                    -> Maybe (Var, CoreExpr,[CoreTickish])
     -- See Note [exprIsLambda_maybe]
 
 -- The simple case: It is a lambda already
-exprIsLambda_maybe _ (Lam x e)
+exprIsLambda_maybe _ _ (Lam x e)
     = Just (x, e, [])
 
 -- Still straightforward: Ticks that we can float out of the way
-exprIsLambda_maybe (in_scope_set, id_unf) (Tick t e)
+exprIsLambda_maybe st_hack (in_scope_set, id_unf) (Tick t e)
     | tickishFloatable t
-    , Just (x, e, ts) <- exprIsLambda_maybe (in_scope_set, id_unf) e
+    , Just (x, e, ts) <- exprIsLambda_maybe st_hack (in_scope_set, id_unf) e
     = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
-exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
-    | Just (x, e,ts) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
+exprIsLambda_maybe st_hack (in_scope_set, id_unf) (Cast casted_e co)
+    | Just (x, e,ts) <- exprIsLambda_maybe st_hack (in_scope_set, id_unf) casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
@@ -1448,19 +1452,19 @@ exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
       res
 
 -- Another attempt: See if we find a partial unfolding
-exprIsLambda_maybe (in_scope_set, id_unf) e
+exprIsLambda_maybe st_hack (in_scope_set, id_unf) e
     | (Var f, as, ts) <- collectArgsTicks tickishFloatable e
     , idArity f > count isValArg as
     -- Make sure there is hope to get a lambda
     , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction
-    , let e' = simpleOptExprWith defaultSimpleOpts (mkEmptySubst in_scope_set) (rhs `mkApps` as)
+    , let e' = simpleOptExprWith (defaultSimpleOpts st_hack) (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts
-    , Just (x', e'', ts') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
+    , Just (x', e'', ts') <- exprIsLambda_maybe st_hack (in_scope_set, id_unf) e'
     , let res = Just (x', e'', ts++ts')
     = -- pprTrace "exprIsLambda_maybe:Unfold" (vcat [ppr e, ppr (x',e'')])
       res
 
-exprIsLambda_maybe _ _e
+exprIsLambda_maybe _ _ _e
     = -- pprTrace "exprIsLambda_maybe:Fail" (vcat [ppr _e])
       Nothing

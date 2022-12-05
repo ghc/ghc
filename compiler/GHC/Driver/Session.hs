@@ -247,7 +247,7 @@ import GHC.Utils.Monad
 import GHC.Types.Error (DiagnosticReason(..))
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
-import GHC.Types.Basic ( IntWithInf, treatZeroAsInf )
+import GHC.Types.Basic ( IntWithInf, treatZeroAsInf, StateHackFlag(..) )
 import GHC.Types.ProfAuto
 import qualified GHC.Types.FieldLabel as FieldLabel
 import GHC.Data.FastString
@@ -1251,7 +1251,7 @@ defaultDynFlags mySettings =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
-        unfoldingOpts = defaultUnfoldingOpts,
+        unfoldingOpts = defaultUnfoldingOpts (StateHackFlag True),
         maxWorkerArgs = 10,
 
         ghciHistSize = 50, -- keep a log of length 50 by default

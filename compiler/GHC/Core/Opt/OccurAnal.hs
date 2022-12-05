@@ -73,17 +73,18 @@ Here's the externally-callable interface:
 -}
 
 -- | Do occurrence analysis, and discard occurrence info returned
-occurAnalyseExpr :: CoreExpr -> CoreExpr
-occurAnalyseExpr expr = expr'
+occurAnalyseExpr :: StateHackFlag -> CoreExpr -> CoreExpr
+occurAnalyseExpr st_hack expr = expr'
   where
-    (WithUsageDetails _ expr') = occAnal initOccEnv expr
+    (WithUsageDetails _ expr') = occAnal (initOccEnv st_hack) expr
 
-occurAnalysePgm :: Module         -- Used only in debug output
+occurAnalysePgm :: StateHackFlag
+                -> Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
                 -> (Activation -> Bool) -- Active rules
                 -> [CoreRule]           -- Local rules for imported Ids
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_unf active_rule imp_rules binds
+occurAnalysePgm st_hack this_mod active_unf active_rule imp_rules binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -91,8 +92,8 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   = warnPprTrace True "Glomming in" (hang (ppr this_mod <> colon) 2 (ppr final_usage))
     occ_anald_glommed_binds
   where
-    init_env = initOccEnv { occ_rule_act = active_rule
-                          , occ_unf_act  = active_unf }
+    init_env = (initOccEnv st_hack) { occ_rule_act = active_rule
+                                    , occ_unf_act  = active_unf }
 
     (WithUsageDetails final_usage occ_anald_binds) = go init_env binds
     (WithUsageDetails _ occ_anald_glommed_binds) = occAnalRecBind init_env TopLevel
@@ -840,8 +841,9 @@ occAnalRec :: OccEnv -> TopLevelFlag
            -> WithUsageDetails [CoreBind]
 
         -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec !_ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
-                                  , nd_uds = rhs_uds }))
+occAnalRec !env lvl
+           (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
+                           , nd_uds = rhs_uds }))
            (WithUsageDetails body_uds binds)
   | not (bndr `usedIn` body_uds)
   = WithUsageDetails body_uds binds -- See Note [Dead code]
@@ -851,8 +853,9 @@ occAnalRec !_ lvl (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs
                      (NonRec tagged_bndr rhs : binds)
   where
     (body_uds', tagged_bndr) = tagNonRecBinder lvl body_uds bndr
-    rhs_uds'      = adjustRhsUsage mb_join_arity rhs rhs_uds
+    rhs_uds'      = adjustRhsUsage st_hack mb_join_arity rhs rhs_uds
     mb_join_arity = willBeJoinId_maybe tagged_bndr
+    st_hack       = occ_state_hack env
 
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
@@ -1477,7 +1480,7 @@ mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
 mkLoopBreakerNodes !env lvl body_uds details_s
   = WithUsageDetails final_uds (zipWithEqual "mkLoopBreakerNodes" mk_lb_node details_s bndrs')
   where
-    (final_uds, bndrs') = tagRecBinders lvl body_uds details_s
+    (final_uds, bndrs') = tagRecBinders (occ_state_hack env) lvl body_uds details_s
 
     mk_lb_node nd@(ND { nd_bndr = old_bndr, nd_inl = inl_fvs }) new_bndr
       = DigraphNode { node_payload      = new_nd
@@ -1772,20 +1775,22 @@ recognises except that the latter looks through (some) ticks.  Maybe a lambda
 group should also look through (some) ticks?
 -}
 
-isOneShotFun :: CoreExpr -> Bool
+isOneShotFun :: StateHackFlag -> CoreExpr -> Bool
 -- The top level lambdas, ignoring casts, of the expression
 -- are all one-shot.  If there aren't any lambdas at all, this is True
-isOneShotFun (Lam b e)  = isOneShotBndr b && isOneShotFun e
-isOneShotFun (Cast e _) = isOneShotFun e
-isOneShotFun _          = True
+isOneShotFun st_hack = go
+  where
+    go (Lam b e)  = isOneShotBndr st_hack b && go e
+    go (Cast e _) = go e
+    go _          = True
 
-zapLambdaBndrs :: CoreExpr -> FullArgCount -> CoreExpr
+zapLambdaBndrs :: StateHackFlag -> CoreExpr -> FullArgCount -> CoreExpr
 -- If (\xyz. t) appears under-applied to only two arguments,
 -- we must zap the occ-info on x,y, because they appear under the \z
 -- See Note [Occurrence analysis for lambda binders] in GHc.Core.Opt.OccurAnal
 --
 -- NB: `arg_count` includes both type and value args
-zapLambdaBndrs fun arg_count
+zapLambdaBndrs st_hack fun arg_count
   = -- If the lambda is fully applied, leave it alone; if not
     -- zap the OccInfo on the lambdas that do have arguments,
     -- so they beta-reduce to use-many Lets rather than used-once ones.
@@ -1794,8 +1799,8 @@ zapLambdaBndrs fun arg_count
     zap :: FullArgCount -> CoreExpr -> Maybe CoreExpr
     -- Nothing => No need to change the occ-info
     -- Just e  => Had to change
-    zap 0 e | isOneShotFun e = Nothing  -- All remaining lambdas are one-shot
-            | otherwise      = Just e   -- in which case no need to zap
+    zap 0 e | isOneShotFun st_hack e = Nothing  -- All remaining lambdas are one-shot
+            | otherwise              = Just e   -- in which case no need to zap
     zap n (Cast e co) = do { e' <- zap n e; return (Cast e' co) }
     zap n (Lam b e)   = do { e' <- zap (n-1) e
                            ; return (Lam (zap_bndr b) e') }
@@ -1904,7 +1909,8 @@ occAnalRhs !env is_rec mb_join_arity rhs
            -- do the markAllInsideLam and markNonTailCall stuff before
            -- we've had a chance to help with join points; that comes next
         rhs2      = markJoinOneShots is_rec mb_join_arity rhs1
-        rhs_usage = adjustRhsUsage mb_join_arity rhs2 usage
+        rhs_usage = adjustRhsUsage st_hack mb_join_arity rhs2 usage
+        st_hack   = occ_state_hack env
     in WithUsageDetails rhs_usage rhs2
 
 
@@ -2209,8 +2215,9 @@ occAnal env app@(App _ _)
 
 occAnal env expr@(Lam {})
   = let (WithUsageDetails usage expr') = occAnalLam env expr
-        final_usage = markAllInsideLamIf (not (isOneShotFun expr')) $
+        final_usage = markAllInsideLamIf (not (isOneShotFun st_hack expr')) $
                       markAllNonTail usage
+        st_hack = occ_state_hack env
     in WithUsageDetails final_usage expr'
 
 occAnal env (Case scrut bndr ty alts)
@@ -2470,6 +2477,7 @@ data OccEnv
            , occ_bs_rng  :: !VarSet   -- Vars free in the range of occ_bs_env
                    -- Domain is Global and Local Ids
                    -- Range is just Local Ids
+           , occ_state_hack :: !StateHackFlag
     }
 
 
@@ -2502,8 +2510,8 @@ instance Outputable OccEncl where
 -- See Note [OneShots]
 type OneShots = [OneShotInfo]
 
-initOccEnv :: OccEnv
-initOccEnv
+initOccEnv :: StateHackFlag -> OccEnv
+initOccEnv st_hack
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
 
@@ -2513,7 +2521,9 @@ initOccEnv
            , occ_rule_act  = \_ -> True
 
            , occ_bs_env = emptyVarEnv
-           , occ_bs_rng = emptyVarSet }
+           , occ_bs_rng = emptyVarSet
+           , occ_state_hack = st_hack
+           }
 
 noBinderSwaps :: OccEnv -> Bool
 noBinderSwaps (OccEnv { occ_bs_env = bs_env }) = isEmptyVarEnv bs_env
@@ -3132,17 +3142,18 @@ flattenUsageDetails ud@(UD { ud_env = env })
 
 -------------------
 -- See Note [Adjusting right-hand sides]
-adjustRhsUsage :: Maybe JoinArity
+adjustRhsUsage :: StateHackFlag
+               -> Maybe JoinArity
                -> CoreExpr       -- Rhs, AFTER occ anal
                -> UsageDetails   -- From body of lambda
                -> UsageDetails
-adjustRhsUsage mb_join_arity rhs usage
+adjustRhsUsage st_hack mb_join_arity rhs usage
   = -- c.f. occAnal (Lam {})
     markAllInsideLamIf (not one_shot) $
     markAllNonTailIf (not exact_join) $
     usage
   where
-    one_shot   = isOneShotFun rhs
+    one_shot   = isOneShotFun st_hack rhs
     exact_join = exactJoin mb_join_arity bndrs
     (bndrs,_)  = collectBinders rhs
 
@@ -3200,7 +3211,8 @@ tagNonRecBinder lvl usage binder
    in
    usage' `seq` (usage', binder')
 
-tagRecBinders :: TopLevelFlag           -- At top level?
+tagRecBinders :: StateHackFlag
+              -> TopLevelFlag           -- At top level?
               -> UsageDetails           -- Of body of let ONLY
               -> [Details]
               -> (UsageDetails,         -- Adjusted details for whole scope,
@@ -3208,7 +3220,7 @@ tagRecBinders :: TopLevelFlag           -- At top level?
                   [IdWithOccInfo])      -- Tagged binders
 -- Substantially more complicated than non-recursive case. Need to adjust RHS
 -- details *before* tagging binders (because the tags depend on the RHSes).
-tagRecBinders lvl body_uds details_s
+tagRecBinders st_hack lvl body_uds details_s
  = let
      bndrs    = map nd_bndr details_s
      rhs_udss = map nd_uds  details_s
@@ -3224,7 +3236,7 @@ tagRecBinders lvl body_uds details_s
 
      -- 2. Adjust usage details of each RHS, taking into account the
      --    join-point-hood decision
-     rhs_udss' = [ adjustRhsUsage (mb_join_arity bndr) rhs rhs_uds
+     rhs_udss' = [ adjustRhsUsage st_hack (mb_join_arity bndr) rhs rhs_uds
                  | ND { nd_bndr = bndr, nd_uds = rhs_uds
                       , nd_rhs = rhs } <- details_s ]
 

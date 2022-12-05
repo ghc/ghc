@@ -1,10 +1,11 @@
 module GHC.Core.Unfold where
 
 import GHC.Prelude
+import GHC.Types.Basic ( StateHackFlag )
 
 data UnfoldingOpts
 
-defaultUnfoldingOpts :: UnfoldingOpts
+defaultUnfoldingOpts :: StateHackFlag -> UnfoldingOpts
 
 updateCreationThreshold :: Int -> UnfoldingOpts -> UnfoldingOpts
 updateUseThreshold      :: Int -> UnfoldingOpts -> UnfoldingOpts

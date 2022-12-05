@@ -51,12 +51,13 @@ mkFinalUnfolding opts src strict_sig expr
 
 -- | Same as 'mkCompulsoryUnfolding' but simplifies the unfolding first
 mkCompulsoryUnfolding' :: SimpleOpts -> CoreExpr -> Unfolding
-mkCompulsoryUnfolding' opts expr = mkCompulsoryUnfolding (simpleOptExpr opts expr)
+mkCompulsoryUnfolding' opts expr
+  = mkCompulsoryUnfolding (simpleOptExpr opts expr)
 
 -- | Used for things that absolutely must be unfolded
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr
-  = mkCoreUnfolding CompulsorySrc True
+  = mkCoreUnfolding (StateHackFlag True) CompulsorySrc True
                     expr
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
@@ -71,17 +72,17 @@ mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
   = mkUnfolding opts VanillaSrc False False rhs
 
-mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
-mkDFunUnfolding bndrs con ops
+mkDFunUnfolding :: StateHackFlag -> [Var] -> DataCon -> [CoreExpr] -> Unfolding
+mkDFunUnfolding st_hack bndrs con ops
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
-                  , df_args = map occurAnalyseExpr ops }
+                  , df_args = map (occurAnalyseExpr st_hack) ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
-mkDataConUnfolding :: CoreExpr -> Unfolding
+mkDataConUnfolding :: StateHackFlag -> CoreExpr -> Unfolding
 -- Used for non-newtype data constructors with non-trivial wrappers
-mkDataConUnfolding expr
-  = mkCoreUnfolding StableSystemSrc True expr guide
+mkDataConUnfolding st_hack expr
+  = mkCoreUnfolding st_hack StableSystemSrc True expr guide
     -- No need to simplify the expression
   where
     guide = UnfWhen { ug_arity     = manifestArity expr
@@ -92,11 +93,13 @@ mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
 mkWrapperUnfolding opts expr arity
-  = mkCoreUnfolding StableSystemSrc True
+  = mkCoreUnfolding st_hack StableSystemSrc True
                     (simpleOptExpr opts expr)
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
                              , ug_boring_ok = boringCxtNotOk })
+  where
+    st_hack = so_st_hack opts
 
 mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
 -- See Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
@@ -104,10 +107,11 @@ mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                                  , uf_is_top = top_lvl })
   | isStableSource src
-  = mkCoreUnfolding src top_lvl new_tmpl guidance
+  = mkCoreUnfolding st_hack src top_lvl new_tmpl guidance
   where
     new_tmpl = simpleOptExpr opts (work_fn tmpl)
     guidance = calcUnfoldingGuidance (so_uf_opts opts) False new_tmpl
+    st_hack = so_st_hack opts
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
@@ -117,7 +121,7 @@ mkWorkerUnfolding _ _ _ = noUnfolding
 -- resolve before doing any work).
 mkInlineUnfoldingNoArity :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
 mkInlineUnfoldingNoArity opts src expr
-  = mkCoreUnfolding src
+  = mkCoreUnfolding st_hack src
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
@@ -126,12 +130,13 @@ mkInlineUnfoldingNoArity opts src expr
                     , ug_unsat_ok = unSaturatedOk
                     , ug_boring_ok = boring_ok }
     boring_ok = inlineBoringOk expr'
+    st_hack = so_st_hack opts
 
 -- | Make an INLINE unfolding that will be used once the RHS has been saturated
 -- to the given arity.
 mkInlineUnfoldingWithArity :: SimpleOpts -> UnfoldingSource -> Arity -> CoreExpr -> Unfolding
 mkInlineUnfoldingWithArity opts src arity expr
-  = mkCoreUnfolding src
+  = mkCoreUnfolding st_hack src
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
@@ -143,6 +148,7 @@ mkInlineUnfoldingWithArity opts src arity expr
     -- at the arity here.
     boring_ok | arity == 0 = True
               | otherwise  = inlineBoringOk expr'
+    st_hack = so_st_hack opts
 
 mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts src expr
@@ -163,7 +169,7 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
   = assertPpr (rule_lhs_args `equalLength` old_bndrs)
               (ppr df $$ ppr rule_lhs_args) $
            -- For this ASSERT see Note [Specialising DFuns] in GHC.Core.Opt.Specialise
-    mkDFunUnfolding spec_bndrs con (map spec_arg args)
+    mkDFunUnfolding (so_st_hack opts) spec_bndrs con (map spec_arg args)
       -- For DFunUnfoldings we transform
       --       \obs. MkD <op1> ... <opn>
       -- to
@@ -180,7 +186,7 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
  , UnfWhen { ug_arity = old_arity } <- old_guidance
- = mkCoreUnfolding src top_lvl new_tmpl
+ = mkCoreUnfolding st_hack src top_lvl new_tmpl
                    (old_guidance { ug_arity = old_arity - arity_decrease })
  where
    new_tmpl = simpleOptExpr opts $
@@ -188,6 +194,7 @@ specUnfolding opts spec_bndrs spec_app rule_lhs_args
               spec_app tmpl  -- The beta-redexes created by spec_app
                              -- will be simplified away by simplOptExpr
    arity_decrease = count isValArg rule_lhs_args - count isId spec_bndrs
+   st_hack = so_st_hack opts
 
 
 specUnfolding _ _ _ _ _ = noUnfolding
@@ -314,22 +321,23 @@ mkUnfolding :: UnfoldingOpts
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
 mkUnfolding opts src top_lvl is_bottoming expr
-  = mkCoreUnfolding src top_lvl expr guidance
+  = mkCoreUnfolding st_hack src top_lvl expr guidance
   where
     is_top_bottoming = top_lvl && is_bottoming
     guidance         = calcUnfoldingGuidance opts is_top_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
+    st_hack          = unfoldingStateHack opts
 
-mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
+mkCoreUnfolding :: StateHackFlag -> UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
-mkCoreUnfolding src top_lvl expr guidance
+mkCoreUnfolding st_hack src top_lvl expr guidance
   = CoreUnfolding { uf_tmpl = is_value `seq`
                               is_conlike `seq`
                               is_work_free `seq`
                               is_expandable `seq`
-                              occurAnalyseExpr expr
+                              occurAnalyseExpr st_hack expr
       -- occAnalyseExpr: see Note [Occurrence analysis of unfoldings]
       -- See #20905 for what a discussion of these 'seq's
       -- We are careful to make sure we only
@@ -371,7 +379,7 @@ certainlyWillInline opts fn_info rhs'
                | otherwise              = StableSystemSrc
 
           tmpl' | isStableSource src = uf_tmpl fn_unf
-                | otherwise          = occurAnalyseExpr rhs'
+                | otherwise          = occurAnalyseExpr st_hack rhs'
                 -- Do not overwrite stable unfoldings!
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
@@ -381,6 +389,7 @@ certainlyWillInline opts fn_info rhs'
       _other_unf       -> Nothing
 
   where
+    st_hack  = unfoldingStateHack opts
     noinline = isNoInlinePragma (inlinePragInfo fn_info)
     fn_unf   = unfoldingInfo fn_info -- NB: loop-breakers never inline
 

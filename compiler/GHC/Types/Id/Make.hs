@@ -488,7 +488,8 @@ mkDictSelId name clas
 
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity
+                                           (defaultSimpleOpts (StateHackFlag True))
                                            StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
@@ -497,7 +498,8 @@ mkDictSelId name clas
          | otherwise
          = base_info `setRuleInfo` mkRuleInfo [rule]
                      `setInlinePragInfo` neverInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity
+                                           (defaultSimpleOpts (StateHackFlag True))
                                            StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)
                    -- Add a magic BuiltinRule, but no unfolding

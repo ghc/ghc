@@ -59,6 +59,9 @@ module GHC.Types.Basic (
         UnboxedTupleOrSum(..), unboxedTupleOrSumExtension,
         sumParens, pprAlternative,
 
+        -- ** Enabling the state hack
+        StateHackFlag(..),
+
         -- ** The OneShotInfo type
         OneShotInfo(..),
         noOneShotInfo, hasNoOneShotInfo, isOneShotInfo,
@@ -326,6 +329,8 @@ Other notes
 
   But the `\y` is most definitely not one-shot!
 -}
+
+newtype StateHackFlag = StateHackFlag { stateHackEnabled :: Bool }
 
 -- | If the 'Id' is a lambda-bound variable then it may have lambda-bound
 -- variable info. Sometimes we know whether the lambda binding this variable

@@ -28,7 +28,7 @@ import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( RecFlag(..), isRec, Levity(Unlifted) )
+import GHC.Types.Basic      ( RecFlag(..), isRec, Levity(Unlifted), StateHackFlag )
 import GHC.Types.Id         ( idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
@@ -43,13 +43,13 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 -}
 
-floatInwards :: Platform -> CoreProgram -> CoreProgram
-floatInwards platform binds = map (fi_top_bind platform) binds
+floatInwards :: Platform -> StateHackFlag -> CoreProgram -> CoreProgram
+floatInwards platform st_hack binds = map (fi_top_bind platform) binds
   where
     fi_top_bind platform (NonRec binder rhs)
-      = NonRec binder (fiExpr platform [] (freeVars rhs))
+      = NonRec binder (fiExpr platform st_hack [] (freeVars rhs))
     fi_top_bind platform (Rec pairs)
-      = Rec [ (b, fiExpr platform [] (freeVars rhs)) | (b, rhs) <- pairs ]
+      = Rec [ (b, fiExpr platform st_hack [] (freeVars rhs)) | (b, rhs) <- pairs ]
 
 
 {-
@@ -136,19 +136,20 @@ type FloatInBinds = [FloatInBind]
         -- In reverse dependency order (innermost binder first)
 
 fiExpr :: Platform
+       -> StateHackFlag
        -> FloatInBinds      -- Binds we're trying to drop
                             -- as far "inwards" as possible
        -> CoreExprWithFVs   -- Input expr
        -> CoreExpr          -- Result
 
-fiExpr _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
+fiExpr _ _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
                                        -- See Note [Dead bindings]
-fiExpr _ to_drop (_, AnnType ty)     = assert (null to_drop) $ Type ty
-fiExpr _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
-fiExpr _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
-fiExpr platform to_drop (_, AnnCast expr (co_ann, co))
+fiExpr _ _ to_drop (_, AnnType ty)     = assert (null to_drop) $ Type ty
+fiExpr _ _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
+fiExpr _ _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
+fiExpr platform st_hack to_drop (_, AnnCast expr (co_ann, co))
   = wrapFloats (drop_here ++ co_drop) $
-    Cast (fiExpr platform e_drop expr) co
+    Cast (fiExpr platform st_hack e_drop expr) co
   where
     [drop_here, e_drop, co_drop]
       = sepBindsByDropPoint platform False
@@ -161,11 +162,11 @@ need to get at all the arguments.  The next simplifier run will
 pull out any silly ones.
 -}
 
-fiExpr platform to_drop ann_expr@(_,AnnApp {})
+fiExpr platform st_hack to_drop ann_expr@(_,AnnApp {})
   = wrapFloats drop_here $ wrapFloats extra_drop $
     mkTicks ticks $
-    mkApps (fiExpr platform fun_drop ann_fun)
-           (zipWithEqual "fiExpr" (fiExpr platform) arg_drops ann_args)
+    mkApps (fiExpr platform st_hack fun_drop ann_fun)
+           (zipWithEqual "fiExpr" (fiExpr platform st_hack) arg_drops ann_args)
            -- use zipWithEqual, we should have
            -- length ann_args = length arg_fvs = length arg_drops
   where
@@ -196,7 +197,7 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
     add_arg (fun_ty, extra_fvs) (_, AnnType ty)
       = (piResultTy fun_ty ty, extra_fvs)
     add_arg (fun_ty, extra_fvs) (arg_fvs, arg)
-      | noFloatIntoArg arg
+      | noFloatIntoArg st_hack arg
       = (funResultTy fun_ty, extra_fvs `unionDVarSet` arg_fvs)
       | otherwise
       = (funResultTy fun_ty, extra_fvs)
@@ -294,13 +295,13 @@ be dropped right away.
 
 -}
 
-fiExpr platform to_drop lam@(_, AnnLam _ _)
-  | noFloatIntoLam bndrs       -- Dump it all here
+fiExpr platform st_hack to_drop lam@(_, AnnLam _ _)
+  | noFloatIntoLam st_hack bndrs       -- Dump it all here
      -- NB: Must line up with noFloatIntoRhs (AnnLam...); see #7088
-  = wrapFloats to_drop (mkLams bndrs (fiExpr platform [] body))
+  = wrapFloats to_drop (mkLams bndrs (fiExpr platform st_hack [] body))
 
   | otherwise           -- Float inside
-  = mkLams bndrs (fiExpr platform to_drop body)
+  = mkLams bndrs (fiExpr platform st_hack to_drop body)
 
   where
     (bndrs, body) = collectAnnBndrs lam
@@ -312,12 +313,12 @@ We don't float lets inwards past an SCC.
         cc, change current cc to the new one and float binds into expr.
 -}
 
-fiExpr platform to_drop (_, AnnTick tickish expr)
+fiExpr platform st_hack to_drop (_, AnnTick tickish expr)
   | tickish `tickishScopesLike` SoftScope
-  = Tick tickish (fiExpr platform to_drop expr)
+  = Tick tickish (fiExpr platform st_hack to_drop expr)
 
   | otherwise -- Wimp out for now - we could push values in
-  = wrapFloats to_drop (Tick tickish (fiExpr platform [] expr))
+  = wrapFloats to_drop (Tick tickish (fiExpr platform st_hack [] expr))
 
 {-
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}
@@ -370,11 +371,11 @@ idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
 idFreeVars.
 -}
 
-fiExpr platform to_drop (_,AnnLet bind body)
-  = fiExpr platform (after ++ new_float : before) body
+fiExpr platform st_hack to_drop (_,AnnLet bind body)
+  = fiExpr platform st_hack (after ++ new_float : before) body
            -- to_drop is in reverse dependency order
   where
-    (before, new_float, after) = fiBind platform to_drop bind body_fvs
+    (before, new_float, after) = fiBind platform st_hack to_drop bind body_fvs
     body_fvs    = freeVarsOf body
 
 {- Note [Floating primops]
@@ -435,17 +436,17 @@ bindings are:
 
 -}
 
-fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
+fiExpr platform st_hack to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs])
   | isUnliftedType (idType case_bndr)
      -- binders have a fixed RuntimeRep so it's OK to call isUnliftedType
   , exprOkForSideEffects (deAnnotate scrut)
       -- See Note [Floating primops]
   = wrapFloats shared_binds $
-    fiExpr platform (case_float : rhs_binds) rhs
+    fiExpr platform st_hack (case_float : rhs_binds) rhs
   where
     case_float = FB (mkDVarSet (case_bndr : alt_bndrs)) scrut_fvs
                     (FloatCase scrut' case_bndr con alt_bndrs)
-    scrut'     = fiExpr platform scrut_binds scrut
+    scrut'     = fiExpr platform st_hack scrut_binds scrut
     rhs_fvs    = freeVarsOf rhs `delDVarSetList` (case_bndr : alt_bndrs)
     scrut_fvs  = freeVarsOf scrut
 
@@ -454,10 +455,10 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr _ [AnnAlt con alt_bndrs rhs]
            [scrut_fvs, rhs_fvs]
            to_drop
 
-fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
+fiExpr platform st_hack to_drop (_, AnnCase scrut case_bndr ty alts)
   = wrapFloats drop_here1 $
     wrapFloats drop_here2 $
-    Case (fiExpr platform scrut_drops scrut) case_bndr ty
+    Case (fiExpr platform st_hack scrut_drops scrut) case_bndr ty
          (zipWithEqual "fiExpr" fi_alt alts_drops_s alts)
          -- use zipWithEqual, we should have length alts_drops_s = length alts
   where
@@ -480,10 +481,11 @@ fiExpr platform to_drop (_, AnnCase scrut case_bndr ty alts)
            -- Delete case_bndr and args from free vars of rhs
            -- to get free vars of alt
 
-    fi_alt to_drop (AnnAlt con args rhs) = Alt con args (fiExpr platform to_drop rhs)
+    fi_alt to_drop (AnnAlt con args rhs) = Alt con args (fiExpr platform st_hack to_drop rhs)
 
 ------------------
 fiBind :: Platform
+       -> StateHackFlag
        -> FloatInBinds      -- Binds we're trying to drop
                             -- as far "inwards" as possible
        -> CoreBindWithFVs   -- Input binding
@@ -492,7 +494,7 @@ fiBind :: Platform
           , FloatInBind     -- The binding itself
           , FloatInBinds)   -- Land these after
 
-fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
+fiBind platform st_hack to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   = ( extra_binds ++ shared_binds          -- Land these before
                                            -- See Note [extra_fvs (1)] and Note [extra_fvs (2)]
     , FB (unitDVarSet id) rhs_fvs'         -- The new binding itself
@@ -503,7 +505,7 @@ fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
     body_fvs2 = body_fvs `delDVarSet` id
 
     rule_fvs = bndrRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2)]
-    extra_fvs | noFloatIntoRhs NonRecursive id rhs
+    extra_fvs | noFloatIntoRhs st_hack NonRecursive id rhs
               = rule_fvs `unionDVarSet` rhs_fvs
               | otherwise
               = rule_fvs
@@ -518,11 +520,11 @@ fiBind platform to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
             to_drop
 
         -- Push rhs_binds into the right hand side of the binding
-    rhs'     = fiRhs platform rhs_binds id ann_rhs
+    rhs'     = fiRhs platform st_hack rhs_binds id ann_rhs
     rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
                         -- Don't forget the rule_fvs; the binding mentions them!
 
-fiBind platform to_drop (AnnRec bindings) body_fvs
+fiBind platform st_hack to_drop (AnnRec bindings) body_fvs
   = ( extra_binds ++ shared_binds
     , FB (mkDVarSet ids) rhs_fvs'
          (FloatLet (Rec (fi_bind rhss_binds bindings)))
@@ -535,7 +537,7 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
     rule_fvs = mapUnionDVarSet bndrRuleAndUnfoldingVarsDSet ids
     extra_fvs = rule_fvs `unionDVarSet`
                 unionDVarSets [ rhs_fvs | (bndr, (rhs_fvs, rhs)) <- bindings
-                              , noFloatIntoRhs Recursive bndr rhs ]
+                              , noFloatIntoRhs st_hack Recursive bndr rhs ]
 
     (shared_binds:extra_binds:body_binds:rhss_binds)
         = sepBindsByDropPoint platform False
@@ -552,28 +554,28 @@ fiBind platform to_drop (AnnRec bindings) body_fvs
             -> [(Id, CoreExpr)]
 
     fi_bind to_drops pairs
-      = [ (binder, fiRhs platform to_drop binder rhs)
+      = [ (binder, fiRhs platform st_hack to_drop binder rhs)
         | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
 
 ------------------
-fiRhs :: Platform -> FloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
-fiRhs platform to_drop bndr rhs
+fiRhs :: Platform -> StateHackFlag -> FloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
+fiRhs platform st_hack to_drop bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   , let (bndrs, body) = collectNAnnBndrs join_arity rhs
-  = mkLams bndrs (fiExpr platform to_drop body)
+  = mkLams bndrs (fiExpr platform st_hack to_drop body)
   | otherwise
-  = fiExpr platform to_drop rhs
+  = fiExpr platform st_hack to_drop rhs
 
 ------------------
-noFloatIntoLam :: [Var] -> Bool
-noFloatIntoLam bndrs = any bad bndrs
+noFloatIntoLam :: StateHackFlag -> [Var] -> Bool
+noFloatIntoLam st_hack bndrs = any bad bndrs
   where
-    bad b = isId b && not (isOneShotBndr b)
+    bad b = isId b && not (isOneShotBndr st_hack b)
     -- Don't float inside a non-one-shot lambda
 
-noFloatIntoRhs :: RecFlag -> Id -> CoreExprWithFVs' -> Bool
+noFloatIntoRhs :: StateHackFlag -> RecFlag -> Id -> CoreExprWithFVs' -> Bool
 -- ^ True if it's a bad idea to float bindings into this RHS
-noFloatIntoRhs is_rec bndr rhs
+noFloatIntoRhs st_hack is_rec bndr rhs
   | isJoinId bndr
   = isRec is_rec -- Joins are one-shot iff non-recursive
 
@@ -581,13 +583,13 @@ noFloatIntoRhs is_rec bndr rhs
   = True  -- Preserve let-can-float invariant, see Note [noFloatInto considerations]
 
   | otherwise
-  = noFloatIntoArg rhs
+  = noFloatIntoArg st_hack rhs
 
-noFloatIntoArg :: CoreExprWithFVs' -> Bool
-noFloatIntoArg expr
+noFloatIntoArg :: StateHackFlag -> CoreExprWithFVs' -> Bool
+noFloatIntoArg st_hack expr
    | AnnLam bndr e <- expr
    , (bndrs, _) <- collectAnnBndrs e
-   =  noFloatIntoLam (bndr:bndrs)  -- Wrinkle 1 (a)
+   =  noFloatIntoLam st_hack (bndr:bndrs)  -- Wrinkle 1 (a)
    || all isTyVar (bndr:bndrs)     -- Wrinkle 1 (b)
       -- See Note [noFloatInto considerations] wrinkle 2
 
