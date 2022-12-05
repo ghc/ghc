@@ -1791,7 +1791,7 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 --
 -- > topNormaliseNewType_maybe rec_nts ty = Just (co, ty')
 --
--- then (a)  @co : ty ~ ty'@.
+-- then (a)  @co : ty ~R ty'@.
 --      (b)  ty' is not a newtype.
 --
 -- The function returns @Nothing@ for non-@newtypes@,
