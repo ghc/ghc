@@ -836,6 +836,8 @@ instance Show (TypeRep (a :: k)) where
 showTypeable :: Int -> TypeRep (a :: k) -> ShowS
 showTypeable _ TrType = showChar '*'
 showTypeable _ rep
+  | isListTyCon tc, [] <- tys =
+    showString "[]"
   | isListTyCon tc, [ty] <- tys =
     showChar '[' . shows ty . showChar ']'
 
