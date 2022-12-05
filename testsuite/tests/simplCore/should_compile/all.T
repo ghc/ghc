@@ -453,6 +453,10 @@ test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeab
 test('T21851_2', [grep_errmsg(r'wwombat') ], multimod_compile, ['T21851_2', '-O -dno-typeable-binds -dsuppress-uniques'])
 # Should not inline m, so there shouldn't be a single YES
 test('T22317', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check m -ddebug-output'])
+# Should not inline *any* join point, but after #22317 we still fail to come up
+# with a good argument discount for the inner-most join point and hence inline it.
+# It's important that we don't inline more, though! So 3 times YES is expected, but not more often
+test('T22317b', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check \$j -ddebug-output'])
 
 test('T22494', [grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T22491', normal, compile, ['-O2'])

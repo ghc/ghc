@@ -669,7 +669,7 @@ jumpSize n_val_args voids = 2 * (1 + n_val_args - voids)
   -- better solution?
 
 funSize :: UnfoldingOpts -> [Id] -> Id -> Int -> Int -> ExprSize
--- Size for functions that are not constructors or primops
+-- Size for function calls that are not constructors or primops
 -- Note [Function applications]
 funSize opts top_args fun n_val_args voids
   | fun `hasKey` buildIdKey   = buildSize
@@ -704,15 +704,14 @@ conSize dc n_val_args
   | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
 
 -- See Note [Constructor size and result discount]
-  | otherwise = SizeIs 10 emptyBag 10
+  | otherwise = SizeIs (callSize n_val_args 0) emptyBag 10
 
 {- Note [Constructor size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Treat a constructors application as size 10, regardless of how many
-arguments it has; we are keen to expose them (and we charge separately
-for their args).  We can't treat them as size zero, else we find that
-(Just x) has size 0, which is the same as a lone variable; and hence
-'v' will always be replaced by (Just x), where v is bound to Just x.
+We generally compute the size of a constructor application as if it was
+a regular function call (#22317); the size of the code we generate is similar.
+We have an extra case for when it's a nullary application, in which case it is
+treated the same as a lone variable.
 
 The "result discount" is applied if the result of the call is
 scrutinised (say by a case).  For a constructor application that will
@@ -743,6 +742,14 @@ discount: (10 * (10 + n_val_args)), and said it was an "unambiguous
 win", but its terribly dangerous because a function with many many
 case branches, each finishing with a constructor, can have an
 arbitrarily large discount.  This led to terrible code bloat: see #6099.
+
+Historical note 3: Until Dec 22 we used to give all DataCon apps had size 10.
+(We can't treat them as size zero, else we find that (Just x) has size 0,
+which is the same as a lone variable; and hence 'v' will always be replaced by
+(Just x), where v is bound to Just x.)
+But constant size 10 turned out to cause unnecessary code bloat in #22317
+(T22317b). The higher the number of fields, the more code we generate for each
+DataCon app, so we should really treat a DataCon app more like a function app.
 
 Note [Unboxed tuple size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

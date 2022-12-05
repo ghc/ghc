@@ -1550,10 +1550,12 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
   = case occ_info of
       OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
         -- See Note [Inline small things to avoid creating a thunk]
+        --- | BC_Let{} <- bind_cxt -- No! "thing" also includes join points
+                                   -- See the Note.
 
-        -> n_br < 100  -- See Note [Suppress exponential blowup]
+        | n_br < 100  -- See Note [Suppress exponential blowup]
 
-           && smallEnoughToInline uf_opts unfolding     -- Small enough to dup
+        , smallEnoughToInline uf_opts unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
                         -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
@@ -1564,7 +1566,7 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
                         -- PRINCIPLE: when we've already simplified an expression once,
                         -- make sure that we only inline it if it's reasonably small.
 
-           && (in_lam == NotInsideLam ||
+        , in_lam == NotInsideLam ||
                         -- Outside a lambda, we want to be reasonably aggressive
                         -- about inlining into multiple branches of case
                         -- e.g. let x = <non-value>
@@ -1573,10 +1575,11 @@ postInlineUnconditionally env bind_cxt bndr occ_info rhs
                         -- the uses in C1, C2 are not 'interesting'
                         -- An example that gets worse if you add int_cxt here is 'clausify'
 
-                (isCheapUnfolding unfolding && int_cxt == IsInteresting))
+                (isCheapUnfolding unfolding && int_cxt == IsInteresting)
                         -- isCheap => acceptable work duplication; in_lam may be true
                         -- int_cxt to prevent us inlining inside a lambda without some
                         -- good reason.  See the notes on int_cxt in preInlineUnconditionally
+        -> True
 
       IAmDead -> True   -- This happens; for example, the case_bndr during case of
                         -- known constructor:  case (a,b) of x { (p,q) -> ... }
@@ -1610,17 +1613,39 @@ The point of examining occ_info here is that for *non-values* that
 occur outside a lambda, the call-site inliner won't have a chance
 (because it doesn't know that the thing only occurs once).  The
 pre-inliner won't have gotten it either, if the thing occurs in more
-than one branch So the main target is things like
+than one branch. So the main target is things like $ssieve from wheel-sieve1
 
-     let x = f y in
-     case v of
-        True  -> case x of ...
-        False -> case x of ...
+   let ds1 = <huge> in
+   let ds2 = case x of I# x# -> case y of I# y# -> I# (x# +# y#) in
+   join $j = ds2 : ds1 in
+   if z > 2
+     then jump $j
+     else if $wnotDivBy ... (unI# ds2) ...
+            then ds1
+            else jump $j
 
-This is very important in practice; e.g. wheel-seive1 doubles
-in allocation if you miss this out.  And bits of GHC itself start
-to allocate more.  An egregious example is test perf/compiler/T14697,
-where GHC.Driver.CmdLine.$wprocessArgs allocated hugely more.
+Here, we want to inline the small join point $j. By itself, that is not an
+improvement, but after inlining, we see that `ds1` and `ds2` become OneOcc, too:
+
+   let ds1 = <huge> in
+   let ds2 = case x of I# x# -> case y of I# y# -> I# (x# +# y#) in
+   if z > 2
+     then ds2 : ds1
+     else if $wnotDivBy ... <strict context>(unI# ds2) ...
+            then ds1
+            else ds2 : ds1
+
+And now we can inline `ds1` and `ds2`. The latter can even be unboxed in the hot
+path when z <= 2!
+
+So by inlining the join point, we have greatly improved clarity for occurrence
+analysis. This is very important in practice; e.g. wheel-sieve1 doubles
+in allocation if you miss this out. And bits of GHC itself start to
+allocate more. An egregious example is test perf/compiler/T14697, where
+GHC.Driver.CmdLine.$wprocessArgs allocated hugely more.
+
+Ideally, occurrence analysis would simply look through $j without the Simplifier
+needing to inline $j; that's discussed in #22404.
 
 Note [Suppress exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
