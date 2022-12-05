@@ -179,12 +179,29 @@ When we come to an application we check that the arg is trivial.
 ********************************************************************* -}
 
 
+typeArity' :: Type -> Arity
+typeArity' ty = length $ typeOneShots (StateHackFlag True) ty
+
 typeArity :: Type -> Arity
 -- ^ (typeArity ty) says how many arrows GHC can expose in 'ty', after
 -- looking through newtypes.  More generally, (typeOneShots ty) returns
 -- ty's [OneShotInfo], based only on the type itself, using typeOneShot
 -- on the argument type to access the "state hack".
-typeArity = length . typeOneShots
+typeArity ty0 =
+    assert (res == typeArity' ty0) res
+  where
+    res = go initRecTc 0 ty0
+    go rec_nts !acc ty
+      | Just (_, ty')  <- splitForAllTyCoVar_maybe ty
+      = go rec_nts acc ty'
+      | Just (_,_,_,res) <- splitFunTy_maybe ty
+      = go rec_nts (acc+1) res
+      | Just (tc,tys) <- splitTyConApp_maybe ty
+      , Just (ty', _) <- instNewTyCon_maybe tc tys
+      , Just rec_nts' <- checkRecTc rec_nts tc  -- See Note [Expanding newtypes and products]
+      = go rec_nts' acc ty'
+      | otherwise
+      = acc
 
 typeOneShots :: Type -> [OneShotInfo]
 -- How many value arrows are visible in the type?
