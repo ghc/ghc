@@ -637,12 +637,13 @@ void checkNonmovingHeap (const struct NonmovingHeap *heap)
     checkLargeObjects(nonmoving_marked_large_objects);
     checkCompactObjects(nonmoving_compact_objects);
     for (unsigned int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
-        const struct NonmovingAllocator *alloc = heap->allocators[i];
+        const struct NonmovingAllocator *alloc = &heap->allocators[i];
         checkNonmovingSegments(alloc->filled);
         checkNonmovingSegments(alloc->saved_filled);
         checkNonmovingSegments(alloc->active);
-        for (unsigned int cap=0; cap < getNumCapabilities(); cap++) {
-            checkNonmovingSegments(alloc->current[cap]);
+        for (unsigned int cap_n=0; cap_n < getNumCapabilities(); cap_n++) {
+            Capability *cap = getCapability(cap_n);
+            checkNonmovingSegments(cap->current_segments[i]);
         }
     }
 }
@@ -1070,12 +1071,13 @@ findMemoryLeak (void)
         markBlocks(nonmoving_compact_objects);
         markBlocks(nonmoving_marked_compact_objects);
         for (i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-            struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
+            struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[i];
             markNonMovingSegments(alloc->filled);
             markNonMovingSegments(alloc->saved_filled);
             markNonMovingSegments(alloc->active);
             for (j = 0; j < getNumCapabilities(); j++) {
-                markNonMovingSegments(alloc->current[j]);
+                Capability *cap = getCapability(j);
+                markNonMovingSegments(cap->current_segments[i]);
             }
         }
         markNonMovingSegments(nonmovingHeap.sweep_list);
@@ -1181,22 +1183,17 @@ countNonMovingSegments(struct NonmovingSegment *segs)
 }
 
 static W_
-countNonMovingAllocator(struct NonmovingAllocator *alloc)
-{
-    W_ ret = countNonMovingSegments(alloc->filled)
-           + countNonMovingSegments(alloc->active);
-    for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
-        ret += countNonMovingSegments(alloc->current[i]);
-    }
-    return ret;
-}
-
-static W_
 countNonMovingHeap(struct NonmovingHeap *heap)
 {
     W_ ret = 0;
     for (int alloc_idx = 0; alloc_idx < NONMOVING_ALLOCA_CNT; alloc_idx++) {
-        ret += countNonMovingAllocator(heap->allocators[alloc_idx]);
+        struct NonmovingAllocator *alloc = &heap->allocators[alloc_idx];
+        ret += countNonMovingSegments(alloc->filled);
+        ret += countNonMovingSegments(alloc->active);
+        for (uint32_t c = 0; c < getNumCapabilities(); ++c) {
+            Capability *cap = getCapability(c);
+            ret += countNonMovingSegments(cap->current_segments[alloc_idx]);
+        }
     }
     ret += countNonMovingSegments(heap->sweep_list);
     ret += countNonMovingSegments(heap->free);

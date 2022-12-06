@@ -2331,7 +2331,9 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
             moreCapabilities(n_capabilities, new_n_capabilities);
 
             // Resize and update storage manager data structures
+            ACQUIRE_SM_LOCK;
             storageAddCapabilities(n_capabilities, new_n_capabilities);
+            RELEASE_SM_LOCK;
         }
     }
 

@@ -293,6 +293,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->saved_mut_lists = stgMallocBytes(sizeof(bdescr *) *
                                           RtsFlags.GcFlags.generations,
                                           "initCapability");
+    cap->current_segments = NULL;
 
 
     // At this point storage manager is not initialized yet, so this will be
@@ -1258,6 +1259,9 @@ freeCapability (Capability *cap)
 {
     stgFree(cap->mut_lists);
     stgFree(cap->saved_mut_lists);
+    if (cap->current_segments) {
+        stgFree(cap->current_segments);
+    }
 #if defined(THREADED_RTS)
     freeSparkPool(cap->sparks);
 #endif
