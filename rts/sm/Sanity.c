@@ -909,7 +909,7 @@ static void checkGeneration (generation *gen,
     uint32_t n;
     gen_workspace *ws;
 
-    //ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
 #if defined(THREADED_RTS)
