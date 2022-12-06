@@ -2469,18 +2469,7 @@ findBndrDmd env dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-{- Note [Bringing a new variable into scope]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f x = blah
-   g = ...(\f. ...f...)...
-
-In the body of the '\f', any occurrence of `f` refers to the lambda-bound `f`,
-not the top-level `f` (which will be in `ae_sigs`).  So it's very important
-to delete `f` from `ae_sigs` when we pass a lambda/case/let-up binding of `f`.
-Otherwise chaos results (#22718).
-
-Note [Making dictionary parameters strict]
+{- Note [Making dictionary parameters strict]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
 
