@@ -262,6 +262,10 @@ The supported transformers are listed below:
         </td>
     </tr>
     <tr>
+        <td><code>native_bignum</code></td>
+        <td>Use the native <code>ghc-bignum</code> backend.</td>
+    </tr>
+    <tr>
         <td><code>no_profiled_libs</code></td>
         <td>Disables building of libraries in profiled build ways.</td>
     </tr>
@@ -299,6 +303,18 @@ The supported transformers are listed below:
         <td><code>lint</code></td>
         <td>Enable Core, STG, and C-- linting in all compilation with the stage1
         compiler.</td>
+    </tr>
+    <tr>
+        <td><code>haddock</code></td>
+        <td>Emit haddock documentation into the interface files via <code>-haddock</code>.</td>
+    </tr>
+    <tr>
+        <td><code>hi_core</code></td>
+        <td>Emit whole Core bindings into the interface files via <code>-fwrite-if-simplified-core</code>.</td>
+    </tr>
+    <tr>
+        <td><code>late_ccs</code></td>
+        <td>Enable <code>-fprof-late</code> in profiled libraries.</td>
     </tr>
 </table>
 
