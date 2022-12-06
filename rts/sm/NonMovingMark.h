@@ -140,7 +140,7 @@ extern MarkQueue *current_mark_queue;
 extern bdescr *upd_rem_set_block_list;
 
 
-void nonmovingMarkInitUpdRemSet(void);
+void nonmovingMarkInit(void);
 
 void nonmovingInitUpdRemSet(UpdRemSet *rset);
 void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
