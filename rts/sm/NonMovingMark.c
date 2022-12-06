@@ -251,7 +251,7 @@ StgWord nonmoving_write_barrier_enabled = false;
 MarkQueue *current_mark_queue = NULL;
 
 /* Initialise update remembered set data structures */
-void nonmovingMarkInitUpdRemSet() {
+void nonmovingMarkInit() {
 #if defined(THREADED_RTS)
     initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
@@ -295,8 +295,8 @@ static void nonmovingAddUpdRemSetBlocks_lock(MarkQueue *rset)
     // Reset the state of the remembered set.
     ACQUIRE_SM_LOCK;
     init_mark_queue_(rset);
-    rset->is_upd_rem_set = true;
     RELEASE_SM_LOCK;
+    rset->is_upd_rem_set = true;
 }
 
 /*
