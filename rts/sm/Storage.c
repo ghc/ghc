@@ -1407,7 +1407,10 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
 void
 dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
+#if !defined(THREADED_RTS)
+    // This doesn't hold in the threaded RTS as we may race with another thread.
     ASSERT(RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info);
+#endif
 
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
