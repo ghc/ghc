@@ -494,16 +494,22 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
           -- Don't want: if tvs' are in-scope in the scope of this let-binding, we may do
           -- more renaming than necessary => extra work (see !7777 and test T16577).
           -- Don't need: we wrap tvs' around the RHS anyway.
+        -- V1: Using substExpr strictly
+        -- ; (body_floats2a, body2a) <- uniqifyFloats_strict (seUnfoldingOpts env) top_lvl body_floats2 body2
+        -- V2: Using let bindings
+        -- ; (body_floats2a, body2a) <- uniqifyFloats_lazy (seUnfoldingOpts env) top_lvl body_floats2 body2
+        -- V3: Rely on fresh Unique in subst_id_bndr
+        ; let (body_floats2a, body2a) = (body_floats2, body2)
 
         ; (rhs_floats, body3)
             <-  if isEmptyFloats body_floats2 || null tvs then   -- Simple floating
                      {-#SCC "simplLazyBind-simple-floating" #-}
-                     return (body_floats2, body2)
+                     return (body_floats2a, body2a)
 
                 else -- Non-empty floats, and non-empty tyvars: do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
                      do { (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
-                                                                tvs' body_floats2 body2
+                                                                tvs' body_floats2a body2a
                         ; let poly_floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; return (poly_floats, body3) }
 

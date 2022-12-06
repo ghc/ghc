@@ -36,7 +36,7 @@ module GHC.Core.Opt.Simplify.Utils (
         pushSimplifiedArgs, pushSimplifiedRevArgs,
         isStrictArgInfo, lazyArgContext,
 
-        abstractFloats,
+        abstractFloats, uniqifyFloats_strict, uniqifyFloats_lazy,
 
         -- Utilities
         isExitJoinId
@@ -1903,6 +1903,149 @@ wantEtaExpansion (App e _)              = wantEtaExpansion e
 wantEtaExpansion (Var {})               = False
 wantEtaExpansion (Lit {})               = False
 wantEtaExpansion _                      = True
+
+-- | For all the floats give them a unique unique rather than one derived from an InScopeSet.
+uniqifyFloats_lazy :: UnfoldingOpts -> TopLevelFlag -> SimplFloats
+              -> OutExpr -> SimplM (SimplFloats, OutExpr)
+-- CHANGE 2: Uncomment to
+--uniqifyFloats _ _ floats1 body = return (floats1, body)
+uniqifyFloats_lazy uf_opts TopLevel floats1 body = do
+
+    do  { ((subst, mk_let), float_binds) <- mapAccumLM abstract (empty_subst, id) body_floats
+        ; return (foldl' extendFloats (empty_floats (getSubstInScope subst)) float_binds, mk_let body) }
+  where
+    empty_floats in_scope = SimplFloats emptyLetFloats (sfJoinFloats floats1) in_scope
+    body_floats = letFloatBinds (sfLetFloats floats1)
+    empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats1)
+
+    abstract :: (GHC.Core.Subst.Subst, CoreExpr -> CoreExpr) -> OutBind -> SimplM ((GHC.Core.Subst.Subst, CoreExpr -> CoreExpr), OutBind)
+    abstract (subst, mk_let) (NonRec id rhs)
+      = do { (poly_id1, poly_app) <- mk_poly1 id
+           ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 rhs'
+                 !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
+           ; return ((subst',mkLet (NonRec id poly_app) . mk_let),  NonRec poly_id2 poly_rhs) }
+      where
+        rhs' = mk_let rhs
+
+        -- tvs_here: see Note [Which type variables to abstract over]
+
+    abstract (subst, mk_let) (Rec prs)
+       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 ) ids
+            ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
+                  mk_let' = mkLets [Rec $ ids `zip` poly_apps] . mk_let
+                  poly_pairs = [ mk_poly2 poly_id rhs'
+                               | (poly_id, rhs) <- poly_ids `zip` rhss
+                               , let rhs' = mk_let' rhs ]
+            ; return ((subst', mk_let'), Rec poly_pairs) }
+       where
+         (ids,rhss) = unzip prs
+                -- For a recursive group, it's a bit of a pain to work out the minimal
+                -- set of tyvars over which to abstract:
+                --      /\ a b c.  let x = ...a... in
+                --                 letrec { p = ...x...q...
+                --                          q = .....p...b... } in
+                --                 ...
+                -- Since 'x' is abstracted over 'a', the {p,q} group must be abstracted
+                -- over 'a' (because x is replaced by (poly_x a)) as well as 'b'.
+                -- Since it's a pain, we just use the whole set, which is always safe
+                --
+                -- If you ever want to be more selective, remember this bizarre case too:
+                --      x::a = x
+                -- Here, we must abstract 'x' over 'a'.
+
+    mk_poly1 :: Id -> SimplM (Id, CoreExpr)
+    mk_poly1 var
+      = do { uniq <- getUniqueM
+           ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
+                  poly_ty   = idType var
+                  poly_id   = mkLocalId poly_name (idMult var) poly_ty
+           ; return (poly_id, Var poly_id )  }
+
+    mk_poly2 :: Id -> CoreExpr -> (Id, CoreExpr)
+    mk_poly2 poly_id rhs = (poly_id `setIdUnfolding` unf, poly_rhs)
+      where
+        poly_rhs = rhs
+        unf = mkUnfolding uf_opts VanillaSrc True False poly_rhs
+
+        -- We want the unfolding.  Consider
+        --      let
+        --            x = /\a. let y = ... in Just y
+        --      in body
+        -- Then we float the y-binding out (via abstractFloats and addPolyBind)
+        -- but 'x' may well then be inlined in 'body' in which case we'd like the
+        -- opportunity to inline 'y' too.
+uniqifyFloats_lazy _ _ floats1 body = return (floats1, body)
+
+-- | For all the floats give them a unique unique rather than one derived from an InScopeSet.
+uniqifyFloats_strict :: UnfoldingOpts -> TopLevelFlag -> SimplFloats
+              -> OutExpr -> SimplM (SimplFloats, OutExpr)
+-- CHANGE 2: Uncomment to
+--uniqifyFloats _ _ floats1 body = return (floats1, body)
+uniqifyFloats_strict uf_opts TopLevel floats1 body = do
+
+    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
+        ; return (foldl' extendFloats (empty_floats (getSubstInScope subst)) float_binds, GHC.Core.Subst.substExpr subst body) }
+  where
+    empty_floats in_scope = SimplFloats emptyLetFloats (sfJoinFloats floats1) in_scope
+    body_floats = letFloatBinds (sfLetFloats floats1)
+    empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats1)
+
+    abstract :: (GHC.Core.Subst.Subst) -> OutBind -> SimplM ((GHC.Core.Subst.Subst), OutBind)
+    abstract (subst) (NonRec id rhs)
+      = do { (poly_id1, poly_app) <- mk_poly1 id
+           ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 rhs'
+                 !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
+           ; return (subst',  NonRec poly_id2 poly_rhs) }
+      where
+        rhs' = GHC.Core.Subst.substExpr subst rhs
+
+        -- tvs_here: see Note [Which type variables to abstract over]
+
+    abstract (subst) (Rec prs)
+       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 ) ids
+            ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
+                  poly_pairs = [ mk_poly2 poly_id rhs'
+                               | (poly_id, rhs) <- poly_ids `zip` rhss
+                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
+            ; return (subst', Rec poly_pairs) }
+       where
+         (ids,rhss) = unzip prs
+                -- For a recursive group, it's a bit of a pain to work out the minimal
+                -- set of tyvars over which to abstract:
+                --      /\ a b c.  let x = ...a... in
+                --                 letrec { p = ...x...q...
+                --                          q = .....p...b... } in
+                --                 ...
+                -- Since 'x' is abstracted over 'a', the {p,q} group must be abstracted
+                -- over 'a' (because x is replaced by (poly_x a)) as well as 'b'.
+                -- Since it's a pain, we just use the whole set, which is always safe
+                --
+                -- If you ever want to be more selective, remember this bizarre case too:
+                --      x::a = x
+                -- Here, we must abstract 'x' over 'a'.
+
+    mk_poly1 :: Id -> SimplM (Id, CoreExpr)
+    mk_poly1 var
+      = do { uniq <- getUniqueM
+           ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
+                  poly_ty   = idType var
+                  poly_id   = mkLocalId poly_name (idMult var) poly_ty
+           ; return (poly_id, Var poly_id )  }
+
+    mk_poly2 :: Id -> CoreExpr -> (Id, CoreExpr)
+    mk_poly2 poly_id rhs = (poly_id `setIdUnfolding` unf, poly_rhs)
+      where
+        poly_rhs = rhs
+        unf = mkUnfolding uf_opts VanillaSrc True False poly_rhs
+
+        -- We want the unfolding.  Consider
+        --      let
+        --            x = /\a. let y = ... in Just y
+        --      in body
+        -- Then we float the y-binding out (via abstractFloats and addPolyBind)
+        -- but 'x' may well then be inlined in 'body' in which case we'd like the
+        -- opportunity to inline 'y' too.
+uniqifyFloats_strict _ _ floats1 body = return (floats1, body)
 
 {-
 Note [Eta-expanding at let bindings]
