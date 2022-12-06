@@ -2322,7 +2322,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
             // must be done before calling moreCapabilities(), because that
             // will emit events about creating the new capabilities and adding
             // them to existing capsets.
-            tracingAddCapapilities(n_capabilities, new_n_capabilities);
+            tracingAddCapabilities(n_capabilities, new_n_capabilities);
 #endif
 
             // Resize the capabilities array
