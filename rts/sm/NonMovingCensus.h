@@ -20,10 +20,10 @@ struct NonmovingAllocCensus {
 
 
 struct NonmovingAllocCensus
-nonmovingAllocatorCensusWithWords(struct NonmovingAllocator *alloc);
+nonmovingAllocatorCensusWithWords(uint32_t alloc_idx);
 
 struct NonmovingAllocCensus
-nonmovingAllocatorCensus(struct NonmovingAllocator *alloc);
+nonmovingAllocatorCensus(uint32_t alloc_idx);
 
 void nonmovingPrintAllocatorCensus(bool collect_live_words);
 void nonmovingTraceAllocatorCensus(void);

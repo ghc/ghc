@@ -85,8 +85,7 @@ struct NonmovingAllocator {
     struct NonmovingSegment *filled;
     struct NonmovingSegment *saved_filled;
     struct NonmovingSegment *active;
-    // indexed by capability number
-    struct NonmovingSegment *current[];
+    // N.B. Per-capabilty "current" segment lives in Capability
 };
 
 // first allocator is of size 2^NONMOVING_ALLOCA0 (in bytes)
@@ -100,7 +99,7 @@ struct NonmovingAllocator {
 #define NONMOVING_MAX_FREE 16
 
 struct NonmovingHeap {
-    struct NonmovingAllocator *allocators[NONMOVING_ALLOCA_CNT];
+    struct NonmovingAllocator allocators[NONMOVING_ALLOCA_CNT];
     // free segment list. This is a cache where we keep up to
     // NONMOVING_MAX_FREE segments to avoid thrashing the block allocator.
     // Note that segments in this list are still counted towards
@@ -150,7 +149,7 @@ void nonmovingCollect(StgWeak **dead_weaks,
                        StgTSO **resurrected_threads);
 
 void *nonmovingAllocate(Capability *cap, StgWord sz);
-void nonmovingAddCapabilities(uint32_t new_n_caps);
+void nonmovingInitCapability(Capability *cap);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
 void nonmovingClearBitmap(struct NonmovingSegment *seg);
 
@@ -167,7 +166,7 @@ INLINE_HEADER uint8_t nonmovingSegmentLogBlockSize(struct NonmovingSegment *seg)
 INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
-        nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+        &nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     SET_SEGMENT_STATE(seg, ACTIVE);
     while (true) {
         struct NonmovingSegment *current_active = RELAXED_LOAD(&alloc->active);
@@ -182,7 +181,7 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
     struct NonmovingAllocator *alloc =
-        nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+        &nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
     SET_SEGMENT_STATE(seg, FILLED);
     while (true) {
         struct NonmovingSegment *current_filled = (struct NonmovingSegment*) RELAXED_LOAD(&alloc->filled);
