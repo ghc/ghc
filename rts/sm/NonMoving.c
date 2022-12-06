@@ -711,10 +711,11 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     // object and not moved) which is covered by allocator 9.
     ASSERT(log_block_size < NONMOVING_ALLOCA0 + NONMOVING_ALLOCA_CNT);
 
-    struct NonmovingAllocator *alloca = nonmovingHeap.allocators[log_block_size - NONMOVING_ALLOCA0];
+    unsigned int alloca_idx = log_block_size - NONMOVING_ALLOCA0;
+    struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
 
     // Allocate into current segment
-    struct NonmovingSegment *current = alloca->current[cap->no];
+    struct NonmovingSegment *current = cap->current_segments[alloca_idx];
     ASSERT(current); // current is never NULL
     void *ret = nonmovingSegmentGetBlock_(current, log_block_size, current->next_free);
     ASSERT(GET_CLOSURE_TAG(ret) == 0); // check alignment
@@ -749,27 +750,10 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
         // make it current
         new_current->link = NULL;
         SET_SEGMENT_STATE(new_current, CURRENT);
-        alloca->current[cap->no] = new_current;
+        cap->current_segments[alloca_idx] = new_current;
     }
 
     return ret;
-}
-
-/* Allocate a nonmovingAllocator */
-static struct NonmovingAllocator *alloc_nonmoving_allocator(uint32_t n_caps)
-{
-    size_t allocator_sz =
-        sizeof(struct NonmovingAllocator) +
-        sizeof(void*) * n_caps; // current segment pointer for each capability
-    struct NonmovingAllocator *alloc =
-        stgMallocBytes(allocator_sz, "nonmovingInit");
-    memset(alloc, 0, allocator_sz);
-    return alloc;
-}
-
-static void free_nonmoving_allocator(struct NonmovingAllocator *alloc)
-{
-    stgFree(alloc);
 }
 
 void nonmovingInit(void)
@@ -780,10 +764,7 @@ void nonmovingInit(void)
     initCondition(&concurrent_coll_finished);
     initMutex(&concurrent_coll_finished_lock);
 #endif
-    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(getNumCapabilities());
-    }
-    nonmovingMarkInitUpdRemSet();
+    nonmovingMarkInit();
 }
 
 // Stop any nonmoving collection in preparation for RTS shutdown.
@@ -816,44 +797,24 @@ void nonmovingExit(void)
     closeCondition(&concurrent_coll_finished);
     closeMutex(&nonmoving_collection_mutex);
 #endif
-
-    for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        free_nonmoving_allocator(nonmovingHeap.allocators[i]);
-    }
 }
 
-/*
- * Assumes that no garbage collector or mutator threads are running to safely
- * resize the nonmoving_allocators.
- */
-void nonmovingAddCapabilities(uint32_t new_n_caps)
+/* Initialize a new capability. Caller must hold SM_LOCK */
+void nonmovingInitCapability(Capability *cap)
 {
-    unsigned int old_n_caps = nonmovingHeap.n_caps;
-    struct NonmovingAllocator **allocs = nonmovingHeap.allocators;
-
-    ACQUIRE_SM_LOCK;
+    // Initialize current segment array
+    struct NonmovingSegment **segs =
+        stgMallocBytes(sizeof(struct NonmovingSegment*) * NONMOVING_ALLOCA_CNT, "current segment array");
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        struct NonmovingAllocator *old = allocs[i];
-        allocs[i] = alloc_nonmoving_allocator(new_n_caps);
-
-        // Copy the old state
-        allocs[i]->filled = old->filled;
-        allocs[i]->active = old->active;
-        for (unsigned int j = 0; j < old_n_caps; j++) {
-            allocs[i]->current[j] = old->current[j];
-        }
-        stgFree(old);
-
-        // Initialize current segments for the new capabilities
-        for (unsigned int j = old_n_caps; j < new_n_caps; j++) {
-            allocs[i]->current[j] = nonmovingAllocSegment(getCapability(j)->node);
-            nonmovingInitSegment(allocs[i]->current[j], NONMOVING_ALLOCA0 + i);
-            SET_SEGMENT_STATE(allocs[i]->current[j], CURRENT);
-            allocs[i]->current[j]->link = NULL;
-        }
+        segs[i] = nonmovingAllocSegment(cap->node);
+        nonmovingInitSegment(segs[i], NONMOVING_ALLOCA0 + i);
+        SET_SEGMENT_STATE(segs[i], CURRENT);
     }
-    nonmovingHeap.n_caps = new_n_caps;
-    RELEASE_SM_LOCK;
+    cap->current_segments = segs;
+
+    // Initialize update remembered set
+    cap->upd_rem_set.queue.blocks = NULL;
+    nonmovingInitUpdRemSet(&cap->upd_rem_set);
 }
 
 void nonmovingClearBitmap(struct NonmovingSegment *seg)
@@ -875,11 +836,12 @@ static void nonmovingPrepareMark(void)
 
     nonmovingBumpEpoch();
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
-        struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
+        struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
 
         // Update current segments' snapshot pointers
         for (uint32_t cap_n = 0; cap_n < nonmovingHeap.n_caps; ++cap_n) {
-            struct NonmovingSegment *seg = alloca->current[cap_n];
+            Capability *cap = getCapability(cap_n);
+            struct NonmovingSegment *seg = cap->current_segments[alloca_idx];
             nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
         }
 
@@ -962,7 +924,9 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 
     MarkQueue *mark_queue = stgMallocBytes(sizeof(MarkQueue), "mark queue");
     mark_queue->blocks = NULL;
+    ACQUIRE_SM_LOCK;
     initMarkQueue(mark_queue);
+    RELEASE_SM_LOCK;
     current_mark_queue = mark_queue;
 
     // Mark roots
@@ -1112,7 +1076,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // Walk the list of filled segments that we collected during preparation,
     // updated their snapshot pointers and move them to the sweep list.
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
-        struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx]->saved_filled;
+        struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx].saved_filled;
         uint32_t n_filled = 0;
         if (filled) {
             struct NonmovingSegment *seg = filled;
@@ -1131,7 +1095,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
             seg->link = nonmovingHeap.sweep_list;
             nonmovingHeap.sweep_list = filled;
         }
-        nonmovingHeap.allocators[alloca_idx]->saved_filled = NULL;
+        nonmovingHeap.allocators[alloca_idx].saved_filled = NULL;
     }
 
     // Mark Weak#s
@@ -1346,10 +1310,12 @@ void assert_in_nonmoving_heap(StgPtr p)
     }
 
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
-        struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
+        struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
+
         // Search current segments
         for (uint32_t cap_idx = 0; cap_idx < nonmovingHeap.n_caps; ++cap_idx) {
-            struct NonmovingSegment *seg = alloca->current[cap_idx];
+            Capability *cap = getCapability(cap_idx);
+            struct NonmovingSegment *seg = cap->current_segments[alloca_idx];
             if (p >= (P_)seg && p < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 return;
             }
@@ -1408,33 +1374,16 @@ void nonmovingPrintSegment(struct NonmovingSegment *seg)
     debugBelch("End of segment\n\n");
 }
 
-void nonmovingPrintAllocator(struct NonmovingAllocator *alloc)
-{
-    debugBelch("Allocator at %p\n", (void*)alloc);
-    debugBelch("Filled segments:\n");
-    for (struct NonmovingSegment *seg = alloc->filled; seg != NULL; seg = seg->link) {
-        debugBelch("%p ", (void*)seg);
-    }
-    debugBelch("\nActive segments:\n");
-    for (struct NonmovingSegment *seg = alloc->active; seg != NULL; seg = seg->link) {
-        debugBelch("%p ", (void*)seg);
-    }
-    debugBelch("\nCurrent segments:\n");
-    for (uint32_t i = 0; i < nonmovingHeap.n_caps; ++i) {
-        debugBelch("%p ", alloc->current[i]);
-    }
-    debugBelch("\n");
-}
-
 void locate_object(P_ obj)
 {
     // Search allocators
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
-        struct NonmovingAllocator *alloca = nonmovingHeap.allocators[alloca_idx];
-        for (uint32_t cap = 0; cap < nonmovingHeap.n_caps; ++cap) {
-            struct NonmovingSegment *seg = alloca->current[cap];
+        struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
+        for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
+            Capability *cap = getCapability(cap_n);
+            struct NonmovingSegment *seg = cap->current_segments[alloca_idx];
             if (obj >= (P_)seg && obj < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
-                debugBelch("%p is in current segment of capability %d of allocator %d at %p\n", obj, cap, alloca_idx, (void*)seg);
+                debugBelch("%p is in current segment of capability %d of allocator %d at %p\n", obj, cap_n, alloca_idx, (void*)seg);
                 return;
             }
         }

@@ -837,11 +837,13 @@ GarbageCollect (uint32_t collect_gen,
 
   // Flush the update remembered sets. See Note [Eager update remembered set
   // flushing] in NonMovingMark.c
+  ACQUIRE_SM_LOCK;
   if (RtsFlags.GcFlags.useNonmoving) {
       for (n = 0; n < getNumCapabilities(); n++) {
           nonmovingAddUpdRemSetBlocks(&getCapability(n)->upd_rem_set);
       }
   }
+  RELEASE_SM_LOCK;
 
   // Mark and sweep the oldest generation.
   // N.B. This can only happen after we've moved

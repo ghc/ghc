@@ -251,7 +251,7 @@ StgWord nonmoving_write_barrier_enabled = false;
 MarkQueue *current_mark_queue = NULL;
 
 /* Initialise update remembered set data structures */
-void nonmovingMarkInitUpdRemSet() {
+void nonmovingMarkInit() {
 #if defined(THREADED_RTS)
     initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
@@ -293,7 +293,9 @@ static void nonmovingAddUpdRemSetBlocks_lock(MarkQueue *rset)
 
     nonmovingAddUpdRemSetBlocks_(rset);
     // Reset the state of the remembered set.
+    ACQUIRE_SM_LOCK;
     init_mark_queue_(rset);
+    RELEASE_SM_LOCK;
     rset->is_upd_rem_set = true;
 }
 
@@ -926,7 +928,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
 /* Must hold sm_mutex. */
 static void init_mark_queue_ (MarkQueue *queue)
 {
-    bdescr *bd = allocGroup_lock(MARK_QUEUE_BLOCKS);
+    bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
     ASSERT(queue->blocks == NULL);
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
@@ -937,12 +939,14 @@ static void init_mark_queue_ (MarkQueue *queue)
 #endif
 }
 
+/* Must hold sm_mutex */
 void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->is_upd_rem_set = false;
 }
 
+/* Must hold sm_mutex */
 void nonmovingInitUpdRemSet (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);

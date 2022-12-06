@@ -1257,6 +1257,9 @@ freeCapability (Capability *cap)
 {
     stgFree(cap->mut_lists);
     stgFree(cap->saved_mut_lists);
+    if (cap->current_segments) {
+        stgFree(cap->current_segments);
+    }
 #if defined(THREADED_RTS)
     freeSparkPool(cap->sparks);
 #endif

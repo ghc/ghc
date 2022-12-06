@@ -213,13 +213,10 @@ initStorage (void)
       generations[g].to = &generations[g+1];
   }
   oldest_gen->to = oldest_gen;
-  RELEASE_SM_LOCK;
 
   // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
   nonmovingInit();
-
-  if (RtsFlags.GcFlags.useNonmoving)
-      nonmovingAddCapabilities(getNumCapabilities());
+  RELEASE_SM_LOCK;
 
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
@@ -313,16 +310,14 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
                 allocBlockOnNode(capNoToNumaNode(n));
         }
     }
-    RELEASE_SM_LOCK;
 
-    // Initialize NonmovingAllocators and UpdRemSets
+    // Initialize non-moving collector
     if (RtsFlags.GcFlags.useNonmoving) {
-        nonmovingAddCapabilities(to);
         for (i = from; i < to; i++) {
-            getCapability(i)->upd_rem_set.queue.blocks = NULL;
-            nonmovingInitUpdRemSet(&getCapability(i)->upd_rem_set);
+            nonmovingInitCapability(getCapability(i));
         }
     }
+    RELEASE_SM_LOCK;
 
 #if defined(THREADED_RTS) && defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
     newThreadLocalKey(&gctKey);
