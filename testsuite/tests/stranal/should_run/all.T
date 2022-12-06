@@ -27,3 +27,5 @@ test('T14290', normal, compile_and_run, [''])
 test('T14285', normal, multimod_compile_and_run, ['T14285', ''])
 test('T17676', normal, compile_and_run, [''])
 test('T19053', normal, compile_and_run, [''])
+# T22549: Do not strictify DFuns, otherwise we will <<loop>>
+test('T22549', normal, compile_and_run, ['-fdicts-strict -fno-specialise'])

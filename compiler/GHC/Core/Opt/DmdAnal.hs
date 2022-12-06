@@ -248,8 +248,10 @@ dmdAnalBind
 dmdAnalBind top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | useLetUp top_lvl id
-    -> dmdAnalBindLetUp   top_lvl env     id rhs anal_body
-  _ -> dmdAnalBindLetDown top_lvl env dmd bind   anal_body
+    -> dmdAnalBindLetUp   top_lvl env_rhs     id rhs anal_body
+  _ -> dmdAnalBindLetDown top_lvl env_rhs dmd bind   anal_body
+  where
+    env_rhs = enterDFun bind env
 
 -- | Annotates uninteresting top level functions ('isInterestingTopLevelFn')
 -- with 'topDmd', the rest with the given demand.
@@ -1492,12 +1494,17 @@ flag in finaliseArgBoxities (see the isClassPred test).
 
 Historical note: #14955 describes how I got this fix wrong the first time.
 
-Note that the simplicity of this fix implies that INLINE functions (such as
-wrapper functions after the WW run) will never say that they unbox class
-dictionaries. That's not ideal, but not worth losing sleep over, as INLINE
-functions will have been inlined by the time we run demand analysis so we'll
-see the unboxing around the worker in client modules. I got aware of the issue
-in T5075 by the change in boxity of loop between demand analysis runs.
+2. -fspecialise-aggressively.  As #21286 shows, the same phenomenon can occur
+   occur without INLINABLE, when we use -fexpose-all-unfoldings and
+   -fspecialise-aggressively to do vigorous cross-module specialisation.
+
+3. #18421 found that unboxing a dictionary can also make the worker less likely
+   to inline; the inlining heuristics seem to prefer to inline a function
+   applied to a dictionary over a function applied to a bunch of functions.
+
+TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
+a raft of higher-order functions isn't a huge win anyway -- you really want to
+specialise the function.
 
 Note [Worker argument budget]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1842,14 +1849,6 @@ addLazyFVs dmd_ty lazy_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-{-
-Note [Do not strictify the argument dictionaries of a dfun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker can tie recursive knots involving dfuns, so we do the
-conservative thing and refrain from strictifying a dfun's argument
-dictionaries.
--}
-
 setBndrsDemandInfo :: HasCallStack => [Var] -> [Demand] -> [Var]
 setBndrsDemandInfo (b:bs) ds
   | isTyVar b = b : setBndrsDemandInfo bs ds
@@ -1988,6 +1987,16 @@ emptyAnalEnv opts fam_envs
          , ae_rec_dc       = memoiseUniqueFun (isRecDataCon fam_envs 3)
          }
 
+-- | Unset the 'dmd_strict_dicts' flag if any of the given bindings is a DFun
+-- binding. Part of the mechanism that detects
+-- Note [Do not strictify a DFun's parameter dictionaries].
+enterDFun :: CoreBind -> AnalEnv -> AnalEnv
+enterDFun bind env
+  | any isDFunId (bindersOf bind)
+  = env { ae_opts = (ae_opts env) { dmd_strict_dicts = False } }
+  | otherwise
+  = env
+
 emptySigEnv :: SigEnv
 emptySigEnv = emptyVarEnv
 
@@ -2039,31 +2048,29 @@ findBndrDmd env dmd_ty id
     id_ty = idType id
 
     strictify dmd
-      -- See Note [Making dictionaries strict]
+      -- See Note [Making dictionary parameters strict]
+      -- and Note [Do not strictify a DFun's parameter dictionaries]
       | dmd_strict_dicts (ae_opts env)
-             -- We never want to strictify a recursive let. At the moment
-             -- findBndrDmd is never called for recursive lets; if that
-             -- changes, we need a RecFlag parameter and another guard here.
       = strictifyDictDmd id_ty dmd
       | otherwise
       = dmd
 
     fam_envs = ae_fam_envs env
 
-{- Note [Making dictionaries strict]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Making dictionary parameters strict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
 
 * Generally CBV is more efficient.
 
-* Dictionaries are always non-bottom; and never take much work to
-  compute.  E.g. a dfun from an instance decl always returns a dicionary
+* A datatype dictionary is always non-bottom and never takes much work to
+  compute.  E.g. a DFun from an instance decl always returns a dictionary
   record immediately.  See DFunUnfolding in CoreSyn.
   See also Note [Recursive superclasses] in TcInstDcls.
 
-* The strictness analyser will then unbox dictionaries and pass the
-  methods individually, rather than in a bundle.  If there are a lot of
-  methods that might be bad; but worker/wrapper already does throttling.
+See #17758 for more background and perf numbers.
+
+Wrinkles:
 
 * A newtype dictionary is *not* always non-bottom.  E.g.
       class C a where op :: a -> a
@@ -2071,26 +2078,44 @@ The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
   Now a value of type (C Int) is just a newtype wrapper (a cast) around
   the error thunk.  Don't strictify these!
 
-See #17758 for more background and perf numbers.
+* Strictifying DFuns risks destroying the invariant that DFuns never take much
+  work to compute, so we don't do it.
+  See Note [Do not strictify a DFun's parameter dictionaries] for details.
+
+* Although worker/wrapper *could* unbox strictly used dictionaries, we do not do
+  so; see Note [Do not unbox class dictionaries].
 
 The implementation is extremly simple: just make the strictness
 analyser strictify the demand on a dictionary binder in
-'findBndrDmd'.
+'findBndrDmd' if the binder does not belong to a DFun.
 
-However there is one case where this can make performance worse.
-For the principle consider some function at the core level:
-    myEq :: Eq a => a -> a -> Bool
-    myEq eqDict x y = ((==) eqDict) x y
-If we make the dictionary strict then WW can fire turning this into:
-    $wmyEq :: (a -> a -> Bool) -> a -> a -> Bool
-    $wmyEq eq x y = eq x y
-Which *usually* performs better. However if the dictionary is known we
-are far more likely to inline a function applied to the dictionary than
-to inline one applied to a function. Sometimes this makes just enough
-of a difference to stop a function from inlining. This is documented in #18421.
+Note [Do not strictify a DFun's parameter dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The typechecker can tie recursive knots involving (non-recursive) DFuns, so
+we must not strictify a DFun's parameter dictionaries (#22549).
+T22549 has an example involving undecidable instances that <<loop>>s when we
+strictify the DFun of, e.g., `$fEqSeqT`:
 
-It's somewhat similar to Note [Do not unbox class dictionaries] although
-here our problem is with the inliner, not the specializer.
+  Main.$fEqSeqT
+    = \@m @a ($dEq :: Eq (m (ViewT m a))) ($dMonad :: Monad m) ->
+        GHC.Classes.C:Eq @(SeqT m a) ($c== @m @a $dEq $dMonad)
+                                     ($c/= @m @a $dEq $dMonad)
+
+  Rec {
+    $dEq_a = Main.$fEqSeqT @Identity @Int $dEq_b Main.$fMonadIdentity
+    $dEq_b = ... $dEq_a ... <another strict context due to DFun>
+  }
+
+If we make `$fEqSeqT` strict in `$dEq`, we'll collapse the Rec group into a
+giant, <<loop>>ing thunk.
+
+To prevent that, we never strictify dictionary params when inside a DFun.
+That is implemented by unsetting 'dmd_strict_dicts' when entering a DFun.
+
+See also Note [Speculative evaluation] in GHC.CoreToStg.Prep which has a rather
+similar example in #20836. We may never speculate *arguments* of (recursive)
+DFun calls, likewise we should not mark *formal parameters* of recursive DFuns
+as strict.
 
 Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
