@@ -1708,6 +1708,10 @@ Fortunately, pce_rec_ids already has all the information we need in that case.
 The problem is very similar to Note [Eta reduction in recursive RHSs].
 Here as well as there it is *unsound* to change the termination properties
 of the very function whose termination properties we are exploiting.
+
+It is also similar to Note [Do not strictify a DFun's parameter dictionaries],
+where marking recursive DFuns (of undecidable *instances*) strict in dictionary
+*parameters* leads to quite the same change in termination as above.
 -}
 
 data FloatingBind
