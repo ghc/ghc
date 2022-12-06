@@ -88,6 +88,9 @@ struct Capability_ {
 
     // The update remembered set for the non-moving collector
     UpdRemSet upd_rem_set;
+    // Array of current segments for the non-moving collector.
+    // Of length NONMOVING_ALLOCA_CNT.
+    struct NonmovingSegment **current_segments;
 
     // block for allocating pinned objects into
     bdescr *pinned_object_block;

@@ -193,14 +193,13 @@ initStorage (void)
   initMutex(&sm_mutex);
 #endif
 
-  ACQUIRE_SM_LOCK;
-
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations
                                              * sizeof(struct generation_),
                                              "initStorage: gens");
 
   /* Initialise all generations */
+  ACQUIRE_SM_LOCK;
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
       initGeneration(&generations[g], g);
   }
@@ -215,17 +214,14 @@ initStorage (void)
   }
   oldest_gen->to = oldest_gen;
 
-  // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
-  nonmovingInit();
-
 #if defined(THREADED_RTS)
   // nonmovingAddCapabilities allocates segments, which requires taking the gc
   // sync lock, so initialize it before nonmovingAddCapabilities
   initSpinLock(&gc_alloc_block_sync);
 #endif
 
-  if (RtsFlags.GcFlags.useNonmoving)
-      nonmovingAddCapabilities(getNumCapabilities());
+  // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
+  nonmovingInit();
 
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
@@ -264,9 +260,9 @@ initStorage (void)
   RELEASE_SM_LOCK;
 
   traceInitEvent(traceHeapInfo);
-
 }
 
+// Caller must hold SM_LOCK.
 void storageAddCapabilities (uint32_t from, uint32_t to)
 {
     uint32_t n, g, i, new_n_nurseries;
@@ -321,12 +317,10 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
         }
     }
 
-    // Initialize NonmovingAllocators and UpdRemSets
+    // Initialize non-moving collector
     if (RtsFlags.GcFlags.useNonmoving) {
-        nonmovingAddCapabilities(to);
         for (i = from; i < to; i++) {
-            getCapability(i)->upd_rem_set.queue.blocks = NULL;
-            nonmovingInitUpdRemSet(&getCapability(i)->upd_rem_set);
+            nonmovingInitCapability(getCapability(i));
         }
     }
 

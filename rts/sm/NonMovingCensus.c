@@ -21,10 +21,12 @@
 // stopped. In this case is safe to look at active and current segments so we can
 // also collect statistics on live words.
 static struct NonmovingAllocCensus
-nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_words)
+nonmovingAllocatorCensus_(uint32_t alloc_idx, bool collect_live_words)
 {
     struct NonmovingAllocCensus census = {collect_live_words, 0, 0, 0, 0};
+    struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[alloc_idx];
 
+    // filled segments
     for (struct NonmovingSegment *seg = alloc->filled;
          seg != NULL;
          seg = seg->link)
@@ -40,6 +42,7 @@ nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_wo
         }
     }
 
+    // active segments
     for (struct NonmovingSegment *seg = alloc->active;
          seg != NULL;
          seg = seg->link)
@@ -56,9 +59,11 @@ nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_wo
         }
     }
 
-    for (unsigned int cap=0; cap < getNumCapabilities(); cap++)
+    // current segments
+    for (unsigned int cap_n=0; cap_n < getNumCapabilities(); cap_n++)
     {
-        struct NonmovingSegment *seg = alloc->current[cap];
+        Capability *cap = getCapability(cap_n);
+        struct NonmovingSegment *seg = cap->current_segments[alloc_idx];
         unsigned int n = nonmovingSegmentBlockCount(seg);
         for (unsigned int i=0; i < n; i++) {
             if (nonmovingGetMark(seg, i)) {
@@ -76,15 +81,15 @@ nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_wo
  * all blocks in nonmoving heap are valid closures.
  */
 struct NonmovingAllocCensus
-nonmovingAllocatorCensusWithWords(struct NonmovingAllocator *alloc)
+nonmovingAllocatorCensusWithWords(uint32_t alloc_idx)
 {
-    return nonmovingAllocatorCensus_(alloc, true);
+    return nonmovingAllocatorCensus_(alloc_idx, true);
 }
 
 struct NonmovingAllocCensus
-nonmovingAllocatorCensus(struct NonmovingAllocator *alloc)
+nonmovingAllocatorCensus(uint32_t alloc_idx)
 {
-    return nonmovingAllocatorCensus_(alloc, false);
+    return nonmovingAllocatorCensus_(alloc_idx, false);
 }
 
 
@@ -130,7 +135,7 @@ void nonmovingPrintAllocatorCensus(bool collect_live_words)
 
     for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
         struct NonmovingAllocCensus census =
-            nonmovingAllocatorCensus_(nonmovingHeap.allocators[i], collect_live_words);
+            nonmovingAllocatorCensus_(i, collect_live_words);
 
         print_alloc_census(i, census);
     }
@@ -143,8 +148,7 @@ void nonmovingTraceAllocatorCensus()
         return;
 
     for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
-        const struct NonmovingAllocCensus census =
-            nonmovingAllocatorCensus(nonmovingHeap.allocators[i]);
+        const struct NonmovingAllocCensus census = nonmovingAllocatorCensus(i);
         const uint32_t log_blk_size = i + NONMOVING_ALLOCA0;
         traceNonmovingHeapCensus(log_blk_size, &census);
     }
