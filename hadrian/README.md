@@ -164,6 +164,18 @@ build stage2:lib:text
 build stage1:exe:haddock
 ```
 
+#### Choosing the compiler used to build Hadrian
+
+The `GHC` environment variable can be used to control which GHC is used to build hadrian. By
+default the version of GHC on your path is used to build hadrian.
+This can be a different version of GHC to the one you want to use as the boot compiler (which
+is selected during ./configure).
+
+```
+GHC=$(which ghc-9.4.2) ./hadrian/build
+-- hadrian is built using ghc-9.4.2
+```
+
 #### Fast feedback using ghci
 
 Running the `./hadrian/ghci` script will load the main compiler into
