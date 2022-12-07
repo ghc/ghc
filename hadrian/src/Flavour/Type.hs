@@ -38,6 +38,7 @@ data Flavour = Flavour {
     ghcDebugAssertions :: Bool,
     -- | Build the GHC executable against the threaded runtime system.
     ghcThreaded :: Bool,
+    ghcSplitSections :: Bool, -- ^ Whether to enable split sections
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets }

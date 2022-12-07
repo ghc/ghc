@@ -218,6 +218,10 @@ The supported transformers are listed below:
             library due to the long linking times that this causes).</td>
     </tr>
     <tr>
+        <td><code>no_split_sections</code></td>
+        <td>Disable section splitting for all libraries.</td>
+    </tr>
+    <tr>
         <td><code>thread_sanitizer</code></td>
         <td>Build the runtime system with ThreadSanitizer support</td>
     </tr>

@@ -5,7 +5,7 @@ module Flavour
     -- * Flavour transformers
   , flavourTransformers
   , addArgs
-  , splitSections, splitSectionsIf
+  , splitSections
   , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
@@ -31,7 +31,6 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
-import Oracles.Setting
 
 
 flavourTransformers :: Map String (Flavour -> Flavour)
@@ -40,6 +39,7 @@ flavourTransformers = M.fromList
     , "debug_info" =: enableDebugInfo
     , "ticky_ghc" =: enableTickyGhc
     , "split_sections" =: splitSections
+    , "no_split_sections" =: noSplitSections
     , "thread_sanitizer" =: enableThreadSanitizer
     , "llvm" =: viaLlvmBackend
     , "profiled_ghc" =: enableProfiledGhc
@@ -142,27 +142,13 @@ enableHaddock =
       ]
 
 -- | Transform the input 'Flavour' so as to build with
---   @-split-sections@ whenever appropriate. You can
---   select which package gets built with split sections
---   by passing a suitable predicate. If the predicate holds
---   for a given package, then @split-sections@ is used when
---   building it. Note that this transformer doesn't do anything
+--   @-split-sections@ whenever appropriate.
+--   Note that this transformer doesn't do anything
 --   on darwin because on darwin platforms we always enable subsections
 --   via symbols.
-splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
-splitSectionsIf pkgPredicate = addArgs $ do
-    pkg <- getPackage
-    osx <- expr isOsxTarget
-    not osx ? -- osx doesn't support split sections
-      pkgPredicate pkg ? -- Only apply to these packages
-        builder (Ghc CompileHs) ? arg "-split-sections"
-
--- | Like 'splitSectionsIf', but with a fixed predicate: use
---   split sections for all packages but the GHC library.
-splitSections :: Flavour -> Flavour
-splitSections = splitSectionsIf (/=ghc)
--- Disable section splitting for the GHC library. It takes too long and
--- there is little benefit.
+splitSections, noSplitSections :: Flavour -> Flavour
+splitSections f = f { ghcSplitSections = True }
+noSplitSections f = f { ghcSplitSections = False }
 
 enableThreadSanitizer :: Flavour -> Flavour
 enableThreadSanitizer = addArgs $ mconcat

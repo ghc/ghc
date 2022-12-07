@@ -39,6 +39,7 @@ import Settings.Builders.Ar
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.MergeObjects
+import Settings.Builders.SplitSections
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
@@ -245,6 +246,7 @@ defaultFlavour = Flavour
     , ghcDebugged        = False
     , ghcDebugAssertions = False
     , ghcThreaded        = True
+    , ghcSplitSections   = False
     , ghcDocs            = cmdDocsArgs }
 
 -- | Default logic for determining whether to build
@@ -281,6 +283,7 @@ defaultBuilderArgs = mconcat
     , validateBuilderArgs
     , xelatexBuilderArgs
     , win32TarballsArgs
+    , splitSectionsArgs
     -- Generic builders from the Hadrian library:
     , builder (Sphinx HtmlMode ) ? Hadrian.Builder.Sphinx.args HtmlMode
     , builder (Sphinx LatexMode) ? Hadrian.Builder.Sphinx.args LatexMode
