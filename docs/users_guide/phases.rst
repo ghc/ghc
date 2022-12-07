@@ -909,10 +909,12 @@ for example).
     option for Apple's Linker (``-F`` already means something else for
     GHC).
 
-.. ghc-flag:: -split-sections
+.. ghc-flag:: -fsplit-sections
+              -split-sections
     :shortdesc: Split sections for link-time dead-code stripping
     :type: dynamic
     :category: linking
+    :reverse: -fno-split-sections
 
     Place each generated function or data item into its own section in the
     output file if the target supports arbitrary sections. The name of the
