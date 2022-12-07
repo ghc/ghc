@@ -599,7 +599,7 @@ function h$scheduleMainLoop() {
             // node.js 0.10.30 has trouble with non-integral delays
             h$mainLoopTimeout = setTimeout(h$mainLoop, Math.round(delay));
         } else {
-            h$mainLoopImmediate = setImmediate(h$mainLoop);
+            h$mainLoopImmediate = h$setImmediate(h$mainLoop);
         }
 #ifndef GHCJS_BROWSER
     }
@@ -617,13 +617,22 @@ function h$clearScheduleMainLoop() {
         h$mainLoopTimeout = null;
     }
     if(h$mainLoopImmediate) {
-        clearImmediate(h$mainLoopImmediate);
+        h$clearImmediate(h$mainLoopImmediate);
         h$mainLoopImmediate = null;
     }
     if(h$mainLoopFrame) {
         cancelAnimationFrame(h$mainLoopFrame);
         h$mainLoopFrame = null;
     }
+}
+
+var h$setImmediate, h$clearImmediate;
+if(typeof setImmediate !== 'undefined') {
+  h$setImmediate = function(f) { return setImmediate(f); }
+  h$clearImmediate = function(h) { clearImmediate(h); }
+} else {
+  h$setImmediate = function(f) { return setTimeout(f, 0); }
+  h$clearImmediate = function(h) { clearTimeout(h); }
 }
 
 function h$startMainLoop() {
@@ -634,7 +643,7 @@ function h$startMainLoop() {
 #endif
         if(!h$mainLoopImmediate) {
             h$clearScheduleMainLoop();
-            h$mainLoopImmediate = setImmediate(h$mainLoop);
+            h$mainLoopImmediate = h$setImmediate(h$mainLoop);
         }
 #ifndef GHCJS_BROWSER
     } else {
@@ -717,7 +726,7 @@ function h$actualMainLoop() {
       if(h$animationFrameMainLoop) {
         h$mainLoopFrame = requestAnimationFrame(h$mainLoop);
       } else {
-        h$mainLoopImmediate = setImmediate(h$mainLoop);
+        h$mainLoopImmediate = h$setImmediate(h$mainLoop);
       }
       return;
     }
