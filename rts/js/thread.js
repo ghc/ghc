@@ -153,7 +153,7 @@ function h$forkThread(a, inherit) {
 
 function h$threadStatus(t) {
   // status, capability, locked
-  RETURN_UBX_TUP3(t.status, 1, 0);
+  RETURN_UBX_TUP3(t.status, 0, 1);
 }
 
 function h$waitRead(fd) {
