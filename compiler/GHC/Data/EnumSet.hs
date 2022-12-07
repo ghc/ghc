@@ -15,11 +15,12 @@ module GHC.Data.EnumSet
 
 import GHC.Prelude
 import GHC.Utils.Binary
+import Control.DeepSeq
 
 import qualified Data.IntSet as IntSet
 
 newtype EnumSet a = EnumSet IntSet.IntSet
-  deriving (Semigroup, Monoid)
+  deriving (Semigroup, Monoid, NFData)
 
 member :: Enum a => a -> EnumSet a -> Bool
 member x (EnumSet s) = IntSet.member (fromEnum x) s

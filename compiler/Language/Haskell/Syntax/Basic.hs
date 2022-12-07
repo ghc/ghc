@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 module Language.Haskell.Syntax.Basic where
 
 import Data.Data
@@ -8,6 +9,7 @@ import Data.Bool
 import Data.Int (Int)
 
 import GHC.Data.FastString (FastString)
+import Control.DeepSeq
 
 {-
 ************************************************************************
@@ -54,7 +56,7 @@ Field Labels
 -- | Field labels are just represented as strings;
 -- they are not necessarily unique (even within a module)
 newtype FieldLabelString = FieldLabelString { field_label:: FastString }
-  deriving (Data, Eq)
+  deriving (Data, Eq, NFData)
 
 {-
 ************************************************************************
