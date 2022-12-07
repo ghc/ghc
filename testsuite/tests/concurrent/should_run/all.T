@@ -149,7 +149,7 @@ test('conc021',
   compile_and_run, [''])
 test('conc022', normal, compile_and_run, [''])
 
-test('conc024', normal, compile_and_run, [''])
+test('conc024', when(opsys('mingw32'), fragile(17733)), compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
 test('conc026', normal, compile_and_run, [''])
 test('conc028', normal, compile_and_run, [''])
