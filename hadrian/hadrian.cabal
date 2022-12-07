@@ -112,6 +112,7 @@ executable hadrian
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
                        , Settings.Builders.MergeObjects
+                       , Settings.Builders.SplitSections
                        , Settings.Builders.RunTest
                        , Settings.Builders.Win32Tarballs
                        , Settings.Builders.Xelatex
