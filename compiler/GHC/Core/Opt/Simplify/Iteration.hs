@@ -4198,7 +4198,7 @@ simplLetUnfolding :: SimplEnv
                   -> Unfolding -> SimplM Unfolding
 simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
   | isStableUnfolding unf
-  = simplStableUnfolding env bind_cxt id rhs_ty arity unf
+  = simplStableUnfolding env bind_cxt id rhs_ty arity unf new_rhs
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
   | otherwise
@@ -4230,9 +4230,10 @@ simplStableUnfolding :: SimplEnv -> BindContext
                      -> OutType
                      -> ArityType      -- Used to eta expand, but only for non-join-points
                      -> Unfolding
+                     -> CoreExpr
                      ->SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
+simplStableUnfolding env bind_cxt id rhs_ty id_arity unf opt_rhs
   = case unf of
       NoUnfolding   -> return unf
       BootUnfolding -> return unf
@@ -4243,38 +4244,57 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
               ; args' <- mapM (simplExpr env') args
               ; return (mkDFunUnfolding bndrs' con args') }
 
+
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
-        -> do { expr' <- case bind_cxt of
+        -> do { unf_expr' <- case bind_cxt of
                   BC_Join _ cont    -> -- Binder is a join point
                                        -- See Note [Rules and unfolding for join points]
                                        simplJoinRhs unf_env id expr cont
                   BC_Let _ is_rec -> -- Binder is not a join point
                                      do { let cont = mkRhsStop rhs_ty is_rec topDmd
                                            -- mkRhsStop: switch off eta-expansion at the top level
-                                        ; expr' <- simplExprC unf_env expr cont
-                                        ; return (eta_expand expr') }
+                                        ; unf_expr' <- simplExprC unf_env expr cont
+                                        ; return (eta_expand unf_expr') }
               ; case guide of
+                  -- If we ever considered it ok to inline the stable expression keep
+                  -- it that way.
                   UnfWhen { ug_boring_ok = boring_ok }
                      -- Happens for INLINE things
                      -- Really important to force new_boring_ok since otherwise
                      --   `ug_boring_ok` is a thunk chain of
                      --   inlineBoringExprOk expr0 || inlineBoringExprOk expr1 || ...
                      -- See #20134
-                     -> let !new_boring_ok = boring_ok || inlineBoringOk expr'
+                     -> let !new_boring_ok = boring_ok || inlineBoringOk unf_expr'
                             guide' = guide { ug_boring_ok = new_boring_ok }
-                        -- Refresh the boring-ok flag, in case expr'
+                        -- Refresh the boring-ok flag, in case unf_expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see
                         -- Note [Single-method classes] in GHC.Tc.TyCl.Instance.
                         -- A test case is #4138
                         -- But retain a previous boring_ok of True; e.g. see
                         -- the way it is set in calcUnfoldingGuidanceWithArity
-                        in return (mkCoreUnfolding src is_top_lvl expr' guide')
+                        in return (mkCoreUnfolding src is_top_lvl unf_expr' guide')
                             -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
+                  -- The unoptimized unfolding might be too big to inline. Calculate guidance
+                  -- based on the size of the optimized core. After all this is what the unfolding
+                  -- will optimize to eventually!
+                  _other -> do
+                    let rhs_guide = calcUnfoldingGuidance uf_opts (is_top_lvl && is_bottoming) src opt_rhs
+                    return (mkCoreUnfolding src is_top_lvl unf_expr' rhs_guide)
 
-                  _other              -- Happens for INLINABLE things
-                     -> mkLetUnfolding uf_opts top_lvl src id expr' }
+                    -- return $ CoreUnfolding { uf_tmpl = unf_expr', uf_src = src, uf_guidance = rhs_guide }
+              }
+
+                  -- UnfIfGoodArgs {ug_args=_ug_args, ug_size=_ug_size, ug_res=_ug_res}
+                  --    -- Happens for INLINEABLE things
+                  --    -> do  fake_unfolding <- mkLetUnfolding uf_opts top_lvl src id opt_rhs
+                  --           case fake_unfolding of
+                  --             CoreUnfolding { uf_guidance = new_guideance }
+                  --               -> return $ fake_unfolding { uf_tmpl = unf_expr' }
+                  --             _ -> mkLetUnfolding uf_opts top_lvl src id unf_expr'
+                  -- _other              -- Happens for INLINABLE things too big to ever inline
+                  --    -> mkLetUnfolding uf_opts top_lvl src id unf_expr' }
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
@@ -4286,6 +4306,7 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
     -- is small and easy to compute so might as well force it.
     top_lvl     = bindContextLevel bind_cxt
     !is_top_lvl = isTopLevel top_lvl
+    is_bottoming = isDeadEndId id
     act        = idInlineActivation id
     unf_env    = updMode (updModeForStableUnfoldings act) env
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils

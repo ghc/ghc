@@ -107,7 +107,7 @@ mkWorkerUnfolding opts work_fn
   = mkCoreUnfolding src top_lvl new_tmpl guidance
   where
     new_tmpl = simpleOptExpr opts (work_fn tmpl)
-    guidance = calcUnfoldingGuidance (so_uf_opts opts) False new_tmpl
+    guidance = calcUnfoldingGuidance (so_uf_opts opts) False src new_tmpl
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
@@ -317,7 +317,7 @@ mkUnfolding opts src top_lvl is_bottoming expr
   = mkCoreUnfolding src top_lvl expr guidance
   where
     is_top_bottoming = top_lvl && is_bottoming
-    guidance         = calcUnfoldingGuidance opts is_top_bottoming expr
+    guidance         = calcUnfoldingGuidance opts is_top_bottoming src expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 

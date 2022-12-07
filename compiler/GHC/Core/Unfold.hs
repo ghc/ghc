@@ -229,12 +229,13 @@ inlineBoringOk e
 calcUnfoldingGuidance
         :: UnfoldingOpts
         -> Bool          -- Definitely a top-level, bottoming binding
+        -> UnfoldingSource -- Tells us if this is a stable unfolding
         -> CoreExpr      -- Expression to look at
         -> UnfoldingGuidance
-calcUnfoldingGuidance opts is_top_bottoming (Tick t expr)
+calcUnfoldingGuidance opts is_top_bottoming src (Tick t expr)
   | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
-  = calcUnfoldingGuidance opts is_top_bottoming expr
-calcUnfoldingGuidance opts is_top_bottoming expr
+  = calcUnfoldingGuidance opts is_top_bottoming src expr
+calcUnfoldingGuidance opts is_top_bottoming src expr
   = case sizeExpr opts bOMB_OUT_SIZE val_bndrs body of
       TooBig -> UnfNever
       SizeIs size cased_bndrs scrut_discount
@@ -253,8 +254,8 @@ calcUnfoldingGuidance opts is_top_bottoming expr
 
   where
     (bndrs, body) = collectBinders expr
+    -- Bomb out if size gets bigger than this
     bOMB_OUT_SIZE = unfoldingCreationThreshold opts
-           -- Bomb out if size gets bigger than this
     val_bndrs   = filter isId bndrs
     n_val_bndrs = length val_bndrs
 
