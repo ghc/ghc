@@ -471,25 +471,27 @@ annBinds a cs (HsIPBinds an bs)   = (HsIPBinds (add_where a an cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
 add_where :: AddEpAnn -> EpAnn AnnList -> EpAnnComments -> EpAnn AnnList
-add_where an@(AddEpAnn _ (EpaSpan rs _)) (EpAnn a (AnnList anc o c r t) cs) cs2
-  | valid_anchor (anchor a)
+add_where an@(AddEpAnn _ (EpaSpan rs _rb)) (EpAnn a (AnnList anc o c r t) cs) cs2
+  | valid_anchor a
   = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) (cs Semi.<> cs2)
   | otherwise
   = EpAnn (patch_anchor rs a)
           (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
-add_where an@(AddEpAnn _ (EpaSpan rs _)) EpAnnNotUsed cs
-  = EpAnn (Anchor rs UnchangedAnchor)
-           (AnnList (Just $ Anchor rs UnchangedAnchor) Nothing Nothing [an] []) cs
+add_where an@(AddEpAnn _ (EpaSpan rs rb)) EpAnnNotUsed cs
+  = EpAnn (EpaSpan rs rb)
+           (AnnList (Just $ EpaSpan rs rb) Nothing Nothing [an] []) cs
 add_where (AddEpAnn _ (EpaDelta _ _)) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
-valid_anchor :: RealSrcSpan -> Bool
-valid_anchor r = srcSpanStartLine r >= 0
+valid_anchor :: Anchor -> Bool
+valid_anchor (EpaSpan _ _) = True
+valid_anchor (EpaDelta _ _) = False
 
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. In this case, use the parent one
 patch_anchor :: RealSrcSpan -> Anchor -> Anchor
-patch_anchor r1 (Anchor r0 op) = Anchor r op
+patch_anchor r (EpaDelta _ _) = EpaSpan r Strict.Nothing -- AZ:DANGER
+patch_anchor r1 (EpaSpan r0 b0) = EpaSpan r b0
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
 
@@ -500,10 +502,11 @@ fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
 
 -- | The 'Anchor' for a stmtlist is based on either the location or
 -- the first semicolon annotion.
-stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Anchor
-stmtsAnchor (L l ((ConsOL (AddEpAnn _ (EpaSpan r _)) _), _))
-  = widenAnchorR (Anchor (realSrcSpan l) UnchangedAnchor) r
-stmtsAnchor (L l _) = Anchor (realSrcSpan l) UnchangedAnchor
+stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe Anchor
+stmtsAnchor (L (RealSrcSpan l br) ((ConsOL (AddEpAnn _ (EpaSpan r bs)) _), _))
+  = Just $ widenAnchorS (EpaSpan l br) (RealSrcSpan r bs)
+stmtsAnchor (L (RealSrcSpan l br) _) = Just $ EpaSpan l br
+stmtsAnchor _ = Nothing
 
 stmtsLoc :: Located (OrdList AddEpAnn,a) -> SrcSpan
 stmtsLoc (L l ((ConsOL aa _), _))
@@ -1033,19 +1036,20 @@ checkTyClHdr is_cls ty
       = addFatalError $ mkPlainErrorMsgEnvelope l $
           (PsErrMalformedTyOrClDecl ty)
 
+
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
     newAnns :: SrcSpanAnnA -> EpAnn AnnParen -> SrcSpanAnnN
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (srcSpan2e l) c []) cs)
+        an = (EpAnn (EpaSpan lr Strict.Nothing) (NameAnn NameParens o (srcSpan2e l) c []) cs) --AZ:DANGER
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (EpAnn (Anchor lr UnchangedAnchor) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs))
+        an = (EpAnn (ap Semi.<> as) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs))
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
 
 -- | Yield a parse error if we have a function applied directly to a do block

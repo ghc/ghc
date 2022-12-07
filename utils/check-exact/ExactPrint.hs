@@ -328,10 +328,10 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   setExtraDP Nothing
   let edp = case med of
         Nothing -> edp''
-        Just (Anchor _ (MovedAnchor dp)) -> dp
+        Just (EpaDelta dp _) -> dp
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
-        Just (Anchor r _) -> dp
+        Just (EpaSpan r _) -> dp
           where
             dp = adjustDeltaForOffset
                    off (ss2delta priorEndAfterComments r)
@@ -379,7 +379,8 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
        printStringAtLsDelta dp ""
        setEofPos Nothing -- Only do this once
 
-  let newAchor = anchor' { anchor_op = MovedAnchor edp }
+  -- let newAchor = anchor' { anchor_op = MovedAnchor edp }
+  let newAchor = EpaDelta edp []
   let r = case canUpdateAnchor of
             CanUpdateAnchor -> setAnnotationAnchor a' newAchor (mkEpaComments (priorCs++ postCs) [])
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor emptyComments
@@ -1244,7 +1245,7 @@ printOneComment c@(Comment _str loc _r _mo) = do
         adjustDeltaForOffsetM dp
   mep <- getExtraDP
   dp' <- case mep of
-    Just (Anchor _ (MovedAnchor edp)) -> do
+    Just (EpaDelta edp _) -> do
       debugM $ "printOneComment:edp=" ++ show edp
       ddd <- fmap unTweakDelta $ adjustDeltaForOffsetM edp
       debugM $ "printOneComment:ddd=" ++ show ddd
@@ -1265,30 +1266,65 @@ unTweakDelta (SameLine d) = SameLine d
 unTweakDelta (DifferentLine l d) = DifferentLine l (d+1)
 
 
+-- updateAndApplyComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
+-- updateAndApplyComment (Comment str anc pp mo) dp = do
+--   -- debugM $ "updateAndApplyComment: (dp,anc',co)=" ++ showAst (dp,anc',co)
+--   applyComment (Comment str anc' pp mo)
+--   where
+--     anc' = anc { anchor_op = op}
+
+--     (r,c) = ss2posEnd pp
+--     la = anchor anc
+--     dp'' = if r == 0
+--            then (ss2delta (r,c+0) la)
+--            else (ss2delta (r,c)   la)
+--     dp' = if pp == anchor anc
+--              then dp
+--              else dp''
+--     op' = case dp' of
+--             SameLine n -> if n >= 0
+--                             then MovedAnchor dp'
+--                             else MovedAnchor dp
+--             _ -> MovedAnchor dp'
+--     op = if str == "" && op' == MovedAnchor (SameLine 0) -- EOF comment
+--            then MovedAnchor dp
+--            -- else op'
+--            else MovedAnchor dp
 updateAndApplyComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
 updateAndApplyComment (Comment str anc pp mo) dp = do
   -- debugM $ "updateAndApplyComment: (dp,anc',co)=" ++ showAst (dp,anc',co)
   applyComment (Comment str anc' pp mo)
   where
-    anc' = anc { anchor_op = op}
+    -- anc' = anc { anchor_op = op}
+    anc' = op
 
     (r,c) = ss2posEnd pp
-    la = anchor anc
-    dp'' = if r == 0
-           then (ss2delta (r,c+0) la)
-           else (ss2delta (r,c)   la)
-    dp' = if pp == anchor anc
-             then dp
-             else dp''
+    -- la = anchor anc
+    -- dp'' = if r == 0
+    --        then (ss2delta (r,c+0) la)
+    --        else (ss2delta (r,c)   la)
+    -- la = anchor anc
+    dp'' = case anc of
+      EpaDelta dp0 _ -> dp0
+      EpaSpan la _ ->
+           if r == 0
+             then (ss2delta (r,c+0) la)
+             else (ss2delta (r,c)   la)
+    dp' = case anc of
+      EpaDelta _ _ -> dp''
+      EpaSpan r0  _ ->
+          if pp == r0
+                 then dp
+                 else dp''
     op' = case dp' of
             SameLine n -> if n >= 0
-                            then MovedAnchor dp'
-                            else MovedAnchor dp
-            _ -> MovedAnchor dp'
-    op = if str == "" && op' == MovedAnchor (SameLine 0) -- EOF comment
-           then MovedAnchor dp
-           -- else op'
-           else MovedAnchor dp
+                            then EpaDelta dp' []
+                            else EpaDelta dp  []
+            _ -> EpaDelta dp' []
+    op = if str == "" && op' == EpaDelta (SameLine 0) [] -- EOF comment
+           then EpaDelta dp []
+           else EpaDelta dp []
+
 
 -- ---------------------------------------------------------------------
 
@@ -4116,13 +4152,26 @@ printUnicode :: (Monad m, Monoid w) => Anchor -> RdrName -> EP w m Anchor
 printUnicode anc n = do
   let str = case (showPprUnsafe n) of
             -- TODO: unicode support?
-              "forall" -> if spanLength (anchor anc) == 1 then "∀" else "forall"
+              -- "forall" -> if spanLength (anchor anc) == 1 then "∀" else "forall"
+              "forall" -> case anc of
+                           EpaSpan r _ -> if spanLength r == 1 then "∀" else "forall"
+                           EpaDelta _ _ -> "forall"
               s -> s
-  loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
+  loc <- printStringAtAAC NoCaptureComments anc str
   case loc of
     EpaSpan _ _ -> return anc
-    EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp }
+    EpaDelta dp [] -> return $ EpaDelta dp []
     EpaDelta _ _cs -> error "printUnicode should not capture comments"
+  ------------------
+  -- let str = case (showPprUnsafe n) of
+  --           -- TODO: unicode support?
+  --             "forall" -> if spanLength (anchor anc) == 1 then "∀" else "forall"
+  --             s -> s
+  -- loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
+  -- case loc of
+  --   EpaSpan _ _ -> return anc
+  --   EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp }
+  --   EpaDelta _ _cs -> error "printUnicode should not capture comments"
 
 
 markName :: (Monad m, Monoid w)
@@ -4567,9 +4616,9 @@ instance ExactPrint (Pat GhcPs) where
   setAnnotationAnchor (SigPat an a b)          anc cs = (SigPat (setAnchorEpa an anc cs) a b)
 
   exact (WildPat w) = do
-    anchor <- getAnchorU
-    debugM $ "WildPat:anchor=" ++ show anchor
-    _ <- printStringAtRs anchor "_"
+    anchor' <- getAnchorU
+    debugM $ "WildPat:anchor'=" ++ show anchor'
+    _ <- printStringAtRs anchor' "_"
     return (WildPat w)
   exact (VarPat x n) = do
     -- The parser inserts a placeholder value for a record pun rhs. This must be

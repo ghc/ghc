@@ -95,6 +95,7 @@ import qualified Control.Monad.Fail as Fail
 import GHC  hiding (parseModule, parsedSource)
 import GHC.Data.Bag
 import GHC.Data.FastString
+import qualified GHC.Data.Strict as Strict
 
 import Data.Data
 import Data.List ( sortBy )
@@ -201,7 +202,6 @@ captureLineSpacing (de1:d2:ds) = de1:captureLineSpacing (d2':ds)
     d2' = setEntryDP d2 (deltaPos (l2-l1) 0)
 
 -- ---------------------------------------------------------------------
-
 captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
 captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (HsWC xw ty))))
   = (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc' rs') cs) ns (HsWC xw ty'))))
@@ -209,6 +209,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
     -- we want DPs for the distance from the end of the ns to the
     -- AnnDColon, and to the start of the ty
     AddEpAnn kw dca = dc
+        `debug` ("captureTypeSigSpacing: anc'=" ++ (showAst $ last ns))
     rd = case last ns of
       L (SrcSpanAnn EpAnnNotUsed   ll) _ -> realSrcSpan ll
       L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
@@ -223,19 +224,55 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
       (L (SrcSpanAnn EpAnnNotUsed    ll) b)
         -> let
              op = case dca of
-               EpaSpan r _ -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
-               EpaDelta _ _ -> MovedAnchor (SameLine 1)
-           in (L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan ll) op) mempty emptyComments) ll) b)
-      (L (SrcSpanAnn (EpAnn (Anchor r op) a c) ll) b)
+               EpaSpan r _ -> ss2delta (ss2posEnd r) (realSrcSpan ll)
+               EpaDelta _ _ -> SameLine 1
+           in (L (SrcSpanAnn (EpAnn (EpaDelta op []) mempty emptyComments) ll) b)
+      (L (SrcSpanAnn (EpAnn anc0 a c) ll) b)
         -> let
-              op' = case op of
-                MovedAnchor _ -> op
+              anc' = case anc0 of
+                EpaDelta _  _ -> anc0
                 _ -> case dca of
-                  EpaSpan dcr _ -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
-                  EpaDelta _ _ -> MovedAnchor (SameLine 1)
-           in (L (SrcSpanAnn (EpAnn (Anchor r op') a c) ll) b)
+                  EpaSpan _dcr _ -> error "todo"
+                  EpaDelta _ _   -> EpaDelta (SameLine 1) []
+           in (L (SrcSpanAnn (EpAnn anc' a c) ll) b)
 
 captureTypeSigSpacing s = s
+
+------------------------
+-- captureTypeSigSpacing :: LHsDecl GhcPs -> LHsDecl GhcPs
+-- captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (HsWC xw ty))))
+--   = (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc' rs') cs) ns (HsWC xw ty'))))
+--   where
+--     -- we want DPs for the distance from the end of the ns to the
+--     -- AnnDColon, and to the start of the ty
+--     AddEpAnn kw dca = dc
+--     rd = case last ns of
+--       L (SrcSpanAnn EpAnnNotUsed   ll) _ -> realSrcSpan ll
+--       L (SrcSpanAnn (EpAnn anc' _ _) _) _ -> anchor anc' -- TODO MovedAnchor?
+--     dc' = case dca of
+--       EpaSpan r _ -> AddEpAnn kw (EpaDelta (ss2delta (ss2posEnd rd) r) [])
+--       EpaDelta _ _ -> AddEpAnn kw dca
+
+--     -- ---------------------------------
+
+--     ty' :: LHsSigType GhcPs
+--     ty' = case ty of
+--       (L (SrcSpanAnn EpAnnNotUsed    ll) b)
+--         -> let
+--              op = case dca of
+--                EpaSpan r _ -> MovedAnchor (ss2delta (ss2posEnd r) (realSrcSpan ll))
+--                EpaDelta _ _ -> MovedAnchor (SameLine 1)
+--            in (L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan ll) op) mempty emptyComments) ll) b)
+--       (L (SrcSpanAnn (EpAnn (Anchor r op) a c) ll) b)
+--         -> let
+--               op' = case op of
+--                 MovedAnchor _ -> op
+--                 _ -> case dca of
+--                   EpaSpan dcr _ -> MovedAnchor (ss2delta (ss2posEnd dcr) r)
+--                   EpaDelta _ _ -> MovedAnchor (SameLine 1)
+--            in (L (SrcSpanAnn (EpAnn (Anchor r op') a c) ll) b)
+
+-- captureTypeSigSpacing s = s
 
 -- ---------------------------------------------------------------------
 
@@ -284,17 +321,11 @@ setEntryDPDecl d dp = setEntryDP d dp
 -- element. This is the 'DeltaPos' ignoring any comments.
 setEntryDP :: Default t => LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP (L (SrcSpanAnn EpAnnNotUsed l) a) dp
-  = L (SrcSpanAnn
-           (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) def emptyComments)
-           l) a
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an (EpaComments [])) l) a) dp
-  = L (SrcSpanAnn
-           (EpAnn (Anchor r (MovedAnchor dp)) an (EpaComments []))
-           l) a
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r (MovedAnchor d)) an cs) l) a) dp
-  = L (SrcSpanAnn
-           (EpAnn (Anchor r (MovedAnchor d')) an cs')
-           l) a
+  = L (SrcSpanAnn (EpAnn (EpaDelta dp []) def emptyComments) l) a
+setEntryDP (L (SrcSpanAnn (EpAnn _ an (EpaComments [])) l) a) dp
+  = L (SrcSpanAnn (EpAnn (EpaDelta dp []) an (EpaComments [])) l) a
+setEntryDP (L (SrcSpanAnn (EpAnn (EpaDelta d _) an cs) l) a) dp
+  = L (SrcSpanAnn (EpAnn (EpaDelta d' []) an cs') l) a
   where
     (d',cs') = case cs of
       EpaComments (h:t) ->
@@ -308,33 +339,88 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r (MovedAnchor d)) an cs) l) a) dp
         in
           (dp0, EpaCommentsBalanced (c':t) ts)
       _ -> (dp, cs)
-    go (L (Anchor rr (MovedAnchor ma)) c) = (d,  L (Anchor rr (MovedAnchor ma)) c)
-    go (L (Anchor rr                _) c) = (d,  L (Anchor rr (MovedAnchor dp)) c)
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
+    go (L (EpaDelta ma c0) c) = (d,  L (EpaDelta ma c0) c)
+    go (L (EpaSpan _r _)   c) = (d,  L (EpaDelta dp []) c)
+setEntryDP (L (SrcSpanAnn (EpAnn (EpaSpan r _) an cs) l) a) dp
   = case sortEpaComments (priorComments cs) of
-      [] ->
-        L (SrcSpanAnn
-               (EpAnn (Anchor r (MovedAnchor dp)) an cs)
-               l) a
+      [] -> L (SrcSpanAnn (EpAnn (EpaDelta dp []) an cs) l) a
       (L ca c:cs') ->
-        L (SrcSpanAnn
-               (EpAnn (Anchor r (MovedAnchor edp)) an cs'')
-               l) a
+        L (SrcSpanAnn (EpAnn (EpaDelta edp []) an cs'') l) a
               where
-                cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
+                cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
                 lc = head $ reverse $ (L ca c:cs')
-                delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                delta = case getLoc lc of
+                          EpaSpan rr  _  -> tweakDelta $ ss2delta (ss2pos rr) r
+                          EpaDelta dp0 _ -> tweakDelta dp0
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
                                     else DifferentLine line col
-                edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (ss2pos $ anchor $ getLoc lc), r))
+                edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (getLoc lc), r))
+ -----------------
+  -- = case sortEpaComments (priorComments cs) of
+  --     [] ->
+  --       L (SrcSpanAnn
+  --              (EpAnn (EpaDelta dp) an cs)
+  --              l) a
+  --     (L ca c:cs') ->
+  --       L (SrcSpanAnn
+  --              (EpAnn (EpaDelta edp) an cs'')
+  --              l) a
+  --             where
+  --               cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
+  --               lc = head $ reverse $ (L ca c:cs')
+  --               delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+  --               line = getDeltaLine delta
+  --               col = deltaColumn delta
+  --               edp' = if line == 0 then SameLine col
+  --                                   else DifferentLine line col
+  --               edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (ss2pos $ anchor $ getLoc lc), r))
+--------------------------------------
+-- setEntryDP (L (EpAnnS _ an (EpaComments [])) a) dp
+--   = L (EpAnnS (EpaDelta dp []) an (EpaComments [])) a
+-- setEntryDP (L (EpAnnS (EpaDelta d _) an cs) a) dp
+--   = L (EpAnnS (EpaDelta d' []) an cs') a
+--   where
+--     (d',cs') = case cs of
+--       EpaComments (h:t) ->
+--         let
+--           (dp0,c') = go h
+--         in
+--           (dp0, EpaComments (c':t))
+--       EpaCommentsBalanced (h:t) ts ->
+--         let
+--           (dp0,c') = go h
+--         in
+--           (dp0, EpaCommentsBalanced (c':t) ts)
+--       _ -> (dp, cs)
+--     go (L (EpaDelta ma c0) c) = (d,  L (EpaDelta ma c0) c)
+--     go (L (EpaSpan _r)     c) = (d,  L (EpaDelta dp []) c)
+-- setEntryDP (L (EpAnnS (EpaSpan r) an cs) a) dp
+--   = case sortEpaComments (priorComments cs) of
+--       [] -> L (EpAnnS (EpaDelta dp []) an cs) a
+--       (L ca c:cs') ->
+--         L (EpAnnS (EpaDelta edp []) an cs'') a
+--               where
+--                 cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
+--                 lc = head $ reverse $ (L ca c:cs')
+--                 -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+--                 delta = case getLoc lc of
+--                           EpaSpan rr -> tweakDelta $ ss2delta (ss2pos rr) r
+--                           EpaDelta dp0 _ -> tweakDelta dp0
+--                 line = getDeltaLine delta
+--                 col = deltaColumn delta
+--                 edp' = if line == 0 then SameLine col
+--                                     else DifferentLine line col
+--                 edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (getLoc lc), r))
+
 
 
 -- ---------------------------------------------------------------------
 
 getEntryDP :: LocatedAn t a -> DeltaPos
-getEntryDP (L (SrcSpanAnn (EpAnn (Anchor _ (MovedAnchor dp)) _ _) _) _) = dp
+getEntryDP (L (SrcSpanAnn (EpAnn (EpaDelta dp []) _ _) _) _) = dp
 getEntryDP _ = SameLine 1
 
 -- ---------------------------------------------------------------------
@@ -349,10 +435,11 @@ setEntryDPFromAnchor :: LayoutStartCol -> EpaLocation -> LocatedA t -> LocatedA 
 setEntryDPFromAnchor _off (EpaDelta _ _) (L la a) = L la a
 setEntryDPFromAnchor  off (EpaSpan anc _) ll@(L la _) = setEntryDP ll dp'
   where
-    r = case la of
-      (SrcSpanAnn EpAnnNotUsed l) -> realSrcSpan l
-      (SrcSpanAnn (EpAnn (Anchor r' _) _ _) _) -> r'
-    dp' = adjustDeltaForOffset off (ss2deltaEnd anc r)
+    dp' = case la of
+      (SrcSpanAnn EpAnnNotUsed l) -> adjustDeltaForOffset off (ss2deltaEnd anc (realSrcSpan l))
+      (SrcSpanAnn (EpAnn (EpaSpan r' _) _ _) _) -> adjustDeltaForOffset off (ss2deltaEnd anc r')
+      (SrcSpanAnn (EpAnn (EpaDelta dp _) _ _) _) -> adjustDeltaForOffset off dp
+
 
 -- ---------------------------------------------------------------------
 
@@ -381,7 +468,9 @@ transferEntryDP (L (SrcSpanAnn EpAnnNotUsed _l1) _) (L (SrcSpanAnn (EpAnn anc2 a
   return (L (SrcSpanAnn (EpAnn anc2' an2 cs2) l2) b)
     where
       anc2' = case anc2 of
-        Anchor _a op   -> Anchor (realSrcSpan l2) op
+        EpaDelta _dp _cs -> anc2
+        EpaSpan _a _b    -> EpaSpan (realSrcSpan l2) Strict.Nothing
+
 
 
 -- |If a and b are the same type return first arg, else return second
@@ -617,34 +706,41 @@ priorCommentsDeltas anc cs = go anc (reverse $ sortEpaComments cs)
 splitCommentsEnd :: RealSrcSpan -> EpAnnComments -> EpAnnComments
 splitCommentsEnd p (EpaComments cs) = cs'
   where
-    cmp (L (Anchor l _) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaSpan l _b) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaDelta _ _) _) = ss2pos placeholderRealSpan > ss2posEnd p
     (before, after) = break cmp cs
     cs' = case after of
       [] -> EpaComments cs
       _ -> EpaCommentsBalanced before after
 splitCommentsEnd p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
   where
-    cmp (L (Anchor l _) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaSpan l _b) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaDelta _ _) _) = ss2pos placeholderRealSpan > ss2posEnd p
     (before, after) = break cmp cs
     cs' = before
     ts' = after <> ts
 
--- | Split comments into ones occuring before the start of the reference
--- span, and those after it.
+
+
+-- | Split comments into ones occuring before the start of the
+-- reference span, and those after it.
 splitCommentsStart :: RealSrcSpan -> EpAnnComments -> EpAnnComments
 splitCommentsStart p (EpaComments cs) = cs'
   where
-    cmp (L (Anchor l _) _) = ss2pos l > ss2pos p
+    cmp (L (EpaSpan l _b) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaDelta _ _) _) = ss2pos placeholderRealSpan > ss2posEnd p
     (before, after) = break cmp cs
     cs' = case after of
       [] -> EpaComments cs
       _ -> EpaCommentsBalanced before after
 splitCommentsStart p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
   where
-    cmp (L (Anchor l _) _) = ss2pos l > ss2pos p
+    cmp (L (EpaSpan l _b) _) = ss2pos l > ss2posEnd p
+    cmp (L (EpaDelta _ _) _) = ss2pos placeholderRealSpan > ss2posEnd p
     (before, after) = break cmp cs
     cs' = before
     ts' = after <> ts
+
 
 moveLeadingComments :: (Data t, Data u, Monoid t, Monoid u)
   => LocatedAn t a -> SrcAnn u -> (LocatedAn t a, SrcAnn u)
@@ -692,20 +788,23 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
 -- `MovedAnchor` operation based on the original location, only if it
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
-commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
-  = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
+commentOrigDelta (L (EpaSpan la _lb) (GHC.EpaComment t pp))
+  = (L op (GHC.EpaComment t pp))
                   `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
   where
         (r,c) = ss2posEnd pp
 
         op' = if r == 0
-               then MovedAnchor (ss2delta (r,c+1) la)
-               -- then MovedAnchor (ss2delta (r,c+0) la)
-               -- else MovedAnchor (ss2delta (r,c)   la)
-               else MovedAnchor (tweakDelta $ ss2delta (r,c)   la)
-        op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0)
-               then MovedAnchor (DifferentLine 1 0)
+               then EpaDelta (ss2delta (r,c+1) la) []
+               else EpaDelta (tweakDelta $ ss2delta (r,c)   la) []
+        op = if t == EpaEofComment && op' == EpaDelta (SameLine 0) []
+               then EpaDelta (DifferentLine 1 0) []
                else op'
+commentOrigDelta (L anc (GHC.EpaComment t pp))
+  = (L anc (GHC.EpaComment t pp))
+
+
+
 
 -- ---------------------------------------------------------------------
 
@@ -761,7 +860,7 @@ commentsOrigDeltasDecl (L (SrcSpanAnn an l) d) = L (SrcSpanAnn an' l) d
 -- given @DeltaPos@.
 noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP l dp
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp)) mempty emptyComments) l
+  = SrcSpanAnn (EpAnn (EpaDelta dp []) mempty emptyComments) l
 
 noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (SameLine 0)
@@ -781,14 +880,14 @@ d1 = EpaDelta (SameLine 1) []
 dn :: Int -> EpaLocation
 dn n = EpaDelta (SameLine n) []
 
-m0 :: AnchorOperation
-m0 = MovedAnchor $ SameLine 0
+m0 :: DeltaPos
+m0 = SameLine 0
 
-m1 :: AnchorOperation
-m1 = MovedAnchor $ SameLine 1
+m1 :: DeltaPos
+m1 = SameLine 1
 
-mn :: Int -> AnchorOperation
-mn n = MovedAnchor $ SameLine n
+mn :: Int -> DeltaPos
+mn n = SameLine n
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
 addComma (SrcSpanAnn EpAnnNotUsed l)
@@ -1102,14 +1201,12 @@ replaceDeclsValbinds w (EmptyLocalBinds _) new
 oldWhereAnnotation :: (Monad m)
   => EpAnn AnnList -> WithWhere -> RealSrcSpan -> TransformT m (EpAnn AnnList)
 oldWhereAnnotation EpAnnNotUsed ww _oldSpan = do
-  newSpan <- uniqueSrcSpanT
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []
-  let anc2' = Anchor (rs newSpan) (MovedAnchor (SameLine 1))
+  let anc2' = EpaDelta (SameLine 1) []
   (anc, anc2) <- do
-          newSpan' <- uniqueSrcSpanT
-          return ( Anchor (rs newSpan') (MovedAnchor (DifferentLine 1 2))
+          return (EpaDelta (DifferentLine 1 2) []
                  , anc2')
   let an = EpAnn anc
                   (AnnList (Just anc2) Nothing Nothing w [])
@@ -1132,9 +1229,8 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
 
 newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
-  newSpan <- uniqueSrcSpanT
-  let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2))
-  let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4))
+  let anc  = EpaDelta (DifferentLine 1 2) []
+  let anc2 = EpaDelta (DifferentLine 1 4) []
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []

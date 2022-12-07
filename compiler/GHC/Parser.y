@@ -3337,9 +3337,9 @@ apats  :: { [LPat GhcPs] }
 
 stmtlist :: { forall b. DisambECP b => PV (LocatedL [LocatedA (Stmt GhcPs (LocatedA b))]) }
         : '{'           stmts '}'       { $2 >>= \ $2 ->
-                                          amsrl (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (Just $ stmtsAnchor $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
+                                          amsrl (sLL $1 $> (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) (Just $ moc $1) (Just $ mcc $3) (fromOL $ fst $ unLoc $2) []) }
         |     vocurly   stmts close     { $2 >>= \ $2 -> amsrl
-                                          (L (stmtsLoc $2) (reverse $ snd $ unLoc $2)) (AnnList (Just $ stmtsAnchor $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
+                                          (L (stmtsLoc $2) (reverse $ snd $ unLoc $2)) (AnnList (stmtsAnchor $2) Nothing Nothing (fromOL $ fst $ unLoc $2) []) }
 
 --      do { ;; s ; s ; ; s ;; }
 -- The last Stmt should be an expression, but that's hard to enforce
@@ -4252,7 +4252,7 @@ glN :: LocatedN a -> SrcSpan
 glN = getLocA
 
 glR :: Located a -> Anchor
-glR la = Anchor (realSrcSpan $ getLoc la) UnchangedAnchor
+glR la = spanAsAnchor$ getLoc la
 
 glAA :: Located a -> EpaLocation
 glAA = srcSpan2e . getLoc
@@ -4261,16 +4261,16 @@ glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan . getLoc
 
 glAR :: LocatedAn t a -> Anchor
-glAR la = Anchor (realSrcSpan $ getLocA la) UnchangedAnchor
+glAR la = spanAsAnchor $ getLocA la
 
 glNR :: LocatedN a -> Anchor
-glNR ln = Anchor (realSrcSpan $ getLocA ln) UnchangedAnchor
+glNR ln = spanAsAnchor $ getLocA ln
 
 glNRR :: LocatedN a -> EpaLocation
 glNRR = srcSpan2e . getLocA
 
 anc :: RealSrcSpan -> Anchor
-anc r = Anchor r UnchangedAnchor
+anc r = EpaSpan r Strict.Nothing -- AZ:DANGER
 
 acs :: MonadP m => (EpAnnComments -> Located a) -> m (Located a)
 acs a = do
@@ -4381,7 +4381,7 @@ parseModule :: P (Located (HsModule GhcPs))
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
 
 commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
-commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
+commentsA loc cs = SrcSpanAnn (EpAnn (spanAsAnchor loc) mempty cs) loc
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
