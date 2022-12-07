@@ -82,6 +82,9 @@ inTreeOutTree inTree outTree = do
 testsuiteDeps :: Rules ()
 testsuiteDeps = do
   root <- buildRootRules
+  "test:all_deps" ~> do
+    need ("test:ghc" : map cp_target checkPrograms)
+
   "test:ghc" ~> inTreeOutTree
                     (\stg -> do
                       needTestsuitePackages stg
