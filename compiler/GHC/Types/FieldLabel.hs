@@ -95,6 +95,7 @@ import GHC.Utils.Binary
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
+import Control.DeepSeq
 import Data.Bool
 import Data.Data
 
@@ -129,6 +130,8 @@ instance Outputable FieldLabelString where
 instance Uniquable FieldLabelString where
   getUnique (FieldLabelString fs) = getUnique fs
 
+instance NFData FieldLabel where
+  rnf (FieldLabel a b c d) = rnf a `seq` rnf b `seq` rnf c `seq` rnf d
 
 -- | Flag to indicate whether the DuplicateRecordFields extension is enabled.
 data DuplicateRecordFields
@@ -144,6 +147,8 @@ instance Outputable DuplicateRecordFields where
     ppr DuplicateRecordFields   = text "+dup"
     ppr NoDuplicateRecordFields = text "-dup"
 
+instance NFData DuplicateRecordFields where
+  rnf x = x `seq` ()
 
 -- | Flag to indicate whether the FieldSelectors extension is enabled.
 data FieldSelectors
@@ -159,6 +164,8 @@ instance Outputable FieldSelectors where
     ppr FieldSelectors   = text "+sel"
     ppr NoFieldSelectors = text "-sel"
 
+instance NFData FieldSelectors where
+  rnf x = x `seq` ()
 
 -- | We need the @Binary Name@ constraint here even though there is an instance
 -- defined in "GHC.Types.Name", because the we have a SOURCE import, so the

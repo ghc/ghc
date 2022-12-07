@@ -38,6 +38,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Set
 import GHC.Driver.Flags
 
+import Control.DeepSeq
 import Data.Data
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
@@ -74,6 +75,8 @@ data WithHsDocIdentifiers a pass = WithHsDocIdentifiers
 
 deriving instance (Data pass, Data (IdP pass), Data a) => Data (WithHsDocIdentifiers a pass)
 deriving instance (Eq (IdP pass), Eq a) => Eq (WithHsDocIdentifiers a pass)
+instance (NFData (IdP pass), NFData a) => NFData (WithHsDocIdentifiers a pass) where
+  rnf (WithHsDocIdentifiers d i) = rnf d `seq` rnf i
 
 -- | For compatibility with the existing @-ddump-parsed' output, we only show
 -- the docstring.
@@ -118,19 +121,19 @@ type LHsDoc pass = Located (HsDoc pass)
 
 -- | A simplified version of 'HsImpExp.IE'.
 data DocStructureItem
-  = DsiSectionHeading Int (HsDoc GhcRn)
-  | DsiDocChunk (HsDoc GhcRn)
-  | DsiNamedChunkRef String
-  | DsiExports Avails
+  = DsiSectionHeading !Int !(HsDoc GhcRn)
+  | DsiDocChunk !(HsDoc GhcRn)
+  | DsiNamedChunkRef !(String)
+  | DsiExports !Avails
   | DsiModExport
-      (NonEmpty ModuleName) -- ^ We might re-export avails from multiple
+      !(NonEmpty ModuleName) -- ^ We might re-export avails from multiple
                             -- modules with a single export declaration. E.g.
                             -- when we have
                             --
                             -- > module M (module X) where
                             -- > import R0 as X
                             -- > import R1 as X
-      Avails
+      !Avails
 
 instance Binary DocStructureItem where
   put_ bh = \case
@@ -179,6 +182,15 @@ instance Outputable DocStructureItem where
     DsiModExport mod_names avails ->
       text "re-exported module(s):" <+> ppr mod_names $$ nest 2 (ppr avails)
 
+instance NFData DocStructureItem where
+  rnf = \case
+    DsiSectionHeading level doc -> rnf level `seq` rnf doc
+    DsiDocChunk doc -> rnf doc
+    DsiNamedChunkRef name -> rnf name
+    DsiExports avails -> rnf avails
+    DsiModExport mod_names avails -> rnf mod_names `seq` rnf avails
+
+
 type DocStructure = [DocStructureItem]
 
 data Docs = Docs
@@ -202,6 +214,12 @@ data Docs = Docs
   , docs_extensions   :: EnumSet Extension
     -- ^ The full set of language extensions used in the module.
   }
+
+instance NFData Docs where
+  rnf (Docs mod_hdr decls args structure named_chunks haddock_opts language extentions)
+    = rnf mod_hdr `seq` rnf decls `seq` rnf args `seq` rnf structure `seq` rnf named_chunks
+    `seq` rnf haddock_opts `seq` rnf language `seq` rnf extentions
+    `seq` ()
 
 instance Binary Docs where
   put_ bh docs = do

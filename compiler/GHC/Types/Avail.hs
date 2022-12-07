@@ -50,6 +50,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
 
+import Control.DeepSeq
 import Data.Data ( Data )
 import Data.Either ( partitionEithers )
 import Data.Functor.Classes ( liftCompare )
@@ -272,6 +273,10 @@ instance Outputable GreName where
   ppr (NormalGreName n) = ppr n
   ppr (FieldGreName fl) = ppr fl
 
+instance NFData GreName where
+  rnf (NormalGreName n) = rnf n
+  rnf (FieldGreName f) = rnf f
+
 instance HasOccName GreName where
   occName (NormalGreName n) = occName n
   occName (FieldGreName fl) = occName fl
@@ -385,6 +390,10 @@ instance Binary AvailInfo where
                       ac <- get bh
                       return (AvailTC ab ac)
 
+instance NFData AvailInfo where
+  rnf (Avail n) = rnf n
+  rnf (AvailTC a b) = rnf a `seq` rnf b
+
 instance Binary GreName where
     put_ bh (NormalGreName aa) = do
             putByte bh 0
@@ -399,3 +408,4 @@ instance Binary GreName where
                       return (NormalGreName aa)
               _ -> do ab <- get bh
                       return (FieldGreName ab)
+

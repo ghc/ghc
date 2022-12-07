@@ -735,6 +735,8 @@ pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
 -- | We attach SrcSpans to lots of things, so let's have a datatype for it.
 data GenLocated l e = L l e
   deriving (Eq, Ord, Show, Data, Functor, Foldable, Traversable)
+instance (NFData l, NFData e) => NFData (GenLocated l e) where
+  rnf (L l e) = rnf l `seq` rnf e
 
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan

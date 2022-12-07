@@ -8,6 +8,7 @@ import {-# SOURCE #-} GHC.Types.Name.Occurrence
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import Data.Data (Data)
+import Control.DeepSeq (NFData)
 
 data Name
 
@@ -15,6 +16,7 @@ instance Eq Name
 instance Data Name
 instance Uniquable Name
 instance Outputable Name
+instance NFData Name
 
 class NamedThing a where
     getOccName :: a -> OccName

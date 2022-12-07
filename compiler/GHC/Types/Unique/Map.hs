@@ -59,6 +59,7 @@ import Data.Semigroup as Semi ( Semigroup(..) )
 import Data.Coerce
 import Data.Maybe
 import Data.Data
+import Control.DeepSeq
 
 -- | Maps indexed by 'Uniquable' keys
 newtype UniqMap k a = UniqMap { getUniqMap :: UniqFM k (k, a) }
@@ -77,6 +78,9 @@ instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
         brackets $ fsep $ punctuate comma $
         [ ppr k <+> text "->" <+> ppr v
         | (k, v) <- nonDetEltsUFM m ]
+
+instance (NFData k, NFData a) => NFData (UniqMap k a) where
+  rnf (UniqMap fm) = seqEltsUFM rnf fm
 
 liftC :: (a -> a -> a) -> (k, a) -> (k, a) -> (k, a)
 liftC f (_, v) (k', v') = (k', f v v')

@@ -26,6 +26,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Data.EnumSet as EnumSet
 
+import Control.DeepSeq
 import Control.Monad (guard)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (fromMaybe,mapMaybe)
@@ -39,6 +40,9 @@ instance Outputable Language where
 instance Binary Language where
   put_ bh = put_ bh . fromEnum
   get bh = toEnum <$> get bh
+
+instance NFData Language where
+  rnf x = x `seq` ()
 
 -- | Debugging flags
 data DumpFlag

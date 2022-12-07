@@ -1,5 +1,7 @@
 -- | An exactprintable structure for docstrings
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module GHC.Hs.DocString
   ( LHsDocString
@@ -27,6 +29,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable as Outputable hiding ((<>))
 import GHC.Types.SrcLoc
+import Control.DeepSeq
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -58,6 +61,11 @@ data HsDocString
 
 instance Outputable HsDocString where
   ppr = text . renderHsDocString
+
+instance NFData HsDocString where
+  rnf (MultiLineDocString a b) = rnf a `seq` rnf b
+  rnf (NestedDocString a b) = rnf a `seq` rnf b
+  rnf (GeneratedDocString a) = rnf a
 
 -- | Annotate a pretty printed thing with its doc
 -- The docstring comes after if is 'HsDocStringPrevious'
@@ -101,6 +109,12 @@ data HsDocStringDecorator
 instance Outputable HsDocStringDecorator where
   ppr = text . printDecorator
 
+instance NFData HsDocStringDecorator where
+  rnf HsDocStringNext = ()
+  rnf HsDocStringPrevious = ()
+  rnf (HsDocStringNamed x) = rnf x
+  rnf (HsDocStringGroup x) = rnf x
+
 printDecorator :: HsDocStringDecorator -> String
 printDecorator HsDocStringNext = "|"
 printDecorator HsDocStringPrevious = "^"
@@ -126,7 +140,8 @@ type LHsDocStringChunk = Located HsDocStringChunk
 
 -- | A contiguous chunk of documentation
 newtype HsDocStringChunk = HsDocStringChunk ByteString
-  deriving (Eq,Ord,Data, Show)
+  deriving stock (Eq,Ord,Data, Show)
+  deriving newtype (NFData)
 
 instance Binary HsDocStringChunk where
   put_ bh (HsDocStringChunk bs) = put_ bh bs
@@ -134,7 +149,6 @@ instance Binary HsDocStringChunk where
 
 instance Outputable HsDocStringChunk where
   ppr = text . unpackHDSC
-
 
 mkHsDocStringChunk :: String -> HsDocStringChunk
 mkHsDocStringChunk s = HsDocStringChunk (utf8EncodeByteString s)

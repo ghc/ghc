@@ -240,7 +240,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- See Note [Trust Own Package] in GHC.Rename.Names
         mi_complete_matches :: ![IfaceCompleteMatch],
 
-        mi_docs :: Maybe Docs,
+        mi_docs :: !(Maybe Docs),
                 -- ^ Docstrings and related data for use by haddock, the ghci
                 -- @:doc@ command, and other tools.
                 --
@@ -554,7 +554,7 @@ instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclE
                 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f10 `seq` rnf f11 `seq` rnf f12 `seq` f13 `seq` rnf f14 `seq` rnf f15 `seq` rnf f16 `seq`
-    rnf f17 `seq` f18 `seq` rnf f19 `seq` rnf f20 `seq` f21 `seq` f22 `seq` f23 `seq` rnf f24
+    rnf f17 `seq` f18 `seq` rnf f19 `seq` rnf f20 `seq` rnf f21 `seq` f22 `seq` f23 `seq` rnf f24
     `seq` ()
 
 
