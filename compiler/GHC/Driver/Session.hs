@@ -2192,14 +2192,10 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "split-objs"
       (NoArg $ addWarn "ignoring -split-objs")
 
+    -- N.B. We may someday deprecate this in favor of -fsplit-sections,
+    -- which has the benefit of also having a negating -fno-split-sections.
   , make_ord_flag defGhcFlag "split-sections"
-      (noArgM (\dflags -> do
-        if platformHasSubsectionsViaSymbols (targetPlatform dflags)
-          then do addWarn $
-                    "-split-sections is not useful on this platform " ++
-                    "since it always uses subsections via symbols. Ignoring."
-                  return dflags
-          else return (gopt_set dflags Opt_SplitSections)))
+      (NoArg $ setGeneralFlag Opt_SplitSections)
 
         -------- ghc -M -----------------------------------------------------
   , make_ord_flag defGhcFlag "dep-suffix"              (hasArg addDepSuffix)
@@ -3514,7 +3510,8 @@ fFlagsDeps = [
                (addWarn "-compact-unwind is only implemented by the darwin platform. Ignoring.")
         return dflags)),
   flagSpec "show-error-context"               Opt_ShowErrorContext,
-  flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer
+  flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
+  flagSpec "split-sections"                   Opt_SplitSections
   ]
   ++ fHoleFlags
 
@@ -4798,6 +4795,13 @@ makeDynFlagsConsistent dflags
  | ways dflags `hasWay` WayDyn && gopt Opt_BuildDynamicToo dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn = "-dynamic-too is ignored when using -dynamic"
+      in loop dflags' warn
+
+ | gopt Opt_SplitSections dflags
+ , platformHasSubsectionsViaSymbols (targetPlatform dflags)
+    = let dflags' = gopt_unuset dflags Opt_SplitSections
+          warn = "-fsplit-sections is not useful on this platform " ++
+                 "since it uses subsections-via-symbols. Ignoring."
       in loop dflags' warn
 
    -- Via-C backend only supports unregisterised ABI. Switch to a backend
