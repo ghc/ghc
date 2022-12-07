@@ -15,6 +15,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE BlockArguments       #-}
 {-# LANGUAGE UndecidableInstances  #-} -- For the (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ExactPrint instance
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module ExactPrint
   (
@@ -2933,7 +2934,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsUntypedBracket an (DecBrL a e)) = do
     an0 <- markEpAnnLMS an lidl AnnOpen (Just "[d|")
-    an1 <- markEpAnnL an lidl AnnOpenC
+    an1 <- markEpAnnL an0 lidl AnnOpenC
     e' <- markAnnotated e
     an2 <- markEpAnnL an1 lidl AnnCloseC
     an3 <- markEpAnnL an2 lidl AnnCloseQ -- "|]"
