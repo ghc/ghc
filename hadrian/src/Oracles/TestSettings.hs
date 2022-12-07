@@ -31,6 +31,7 @@ data TestSetting = TestHostOS
                  | TestGhcWithInterpreter
                  | TestGhcWithRtsLinker
                  | TestGhcUnregisterised
+                 | TestGhcTablesNextToCode
                  | TestGhcWithSMP
                  | TestGhcDynamic
                  | TestGhcProfiled
@@ -61,6 +62,7 @@ testSetting key = do
         TestGhcWithInterpreter    -> "GhcWithInterpreter"
         TestGhcWithRtsLinker      -> "GhcWithRtsLinker"
         TestGhcUnregisterised     -> "GhcUnregisterised"
+        TestGhcTablesNextToCode   -> "GhcTablesNextToCode"
         TestGhcWithSMP            -> "GhcWithSMP"
         TestGhcDynamic            -> "GhcDynamic"
         TestGhcProfiled           -> "GhcProfiled"
