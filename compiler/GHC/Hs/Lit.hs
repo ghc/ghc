@@ -117,6 +117,9 @@ hsOverLitNeedsParens _ (XOverLit { }) = False
 
 -- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
 -- to be parenthesized under precedence @p@.
+--
+-- See Note [Printing of literals in Core] in GHC.Types.Literal
+-- for the reasoning.
 hsLitNeedsParens :: PprPrec -> HsLit x -> Bool
 hsLitNeedsParens p = go
   where
@@ -125,14 +128,14 @@ hsLitNeedsParens p = go
     go (HsString {})      = False
     go (HsStringPrim {})  = False
     go (HsInt _ x)        = p > topPrec && il_neg x
-    go (HsIntPrim _ x)    = p > topPrec && x < 0
+    go (HsIntPrim {})     = False
     go (HsWordPrim {})    = False
-    go (HsInt64Prim _ x)  = p > topPrec && x < 0
+    go (HsInt64Prim {})   = False
     go (HsWord64Prim {})  = False
     go (HsInteger _ x _)  = p > topPrec && x < 0
     go (HsRat _ x _)      = p > topPrec && fl_neg x
-    go (HsFloatPrim _ x)  = p > topPrec && fl_neg x
-    go (HsDoublePrim _ x) = p > topPrec && fl_neg x
+    go (HsFloatPrim {})   = False
+    go (HsDoublePrim {})  = False
     go (XLit _)           = False
 
 -- | Convert a literal from one index type to another
@@ -169,7 +172,7 @@ Equivalently it's True if
 -- Instance specific to GhcPs, need the SourceText
 instance Outputable (HsLit (GhcPass p)) where
     ppr (HsChar st c)       = pprWithSourceText st (pprHsChar c)
-    ppr (HsCharPrim st c)   = pp_st_suffix st primCharSuffix (pprPrimChar c)
+    ppr (HsCharPrim st c)   = pprWithSourceText st (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
     ppr (HsInt _ i)
@@ -180,12 +183,8 @@ instance Outputable (HsLit (GhcPass p)) where
     ppr (HsDoublePrim _ d)  = ppr d <> primDoubleSuffix
     ppr (HsIntPrim st i)    = pprWithSourceText st (pprPrimInt i)
     ppr (HsWordPrim st w)   = pprWithSourceText st (pprPrimWord w)
-    ppr (HsInt64Prim st i)  = pp_st_suffix st primInt64Suffix  (pprPrimInt64 i)
-    ppr (HsWord64Prim st w) = pp_st_suffix st primWord64Suffix (pprPrimWord64 w)
-
-pp_st_suffix :: SourceText -> SDoc -> SDoc -> SDoc
-pp_st_suffix NoSourceText         _ doc = doc
-pp_st_suffix (SourceText st) suffix _   = text st <> suffix
+    ppr (HsInt64Prim st i)  = pprWithSourceText st (pprPrimInt64 i)
+    ppr (HsWord64Prim st w) = pprWithSourceText st (pprPrimWord64 w)
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndrId p

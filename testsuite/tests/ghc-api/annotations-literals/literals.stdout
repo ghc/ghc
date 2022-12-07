@@ -98,7 +98,7 @@
 
 (LiteralsTest.hs:19:11,ITequal,[=]),
 
-(LiteralsTest.hs:19:13-19,ITprimchar (SourceText "'\\x41'") 'A',['\x41'#]),
+(LiteralsTest.hs:19:13-19,ITprimchar (SourceText "'\\x41'#") 'A',['\x41'#]),
 
 (LiteralsTest.hs:20:5,ITsemi,[]),
 

@@ -2172,10 +2172,12 @@ finish_char_tok buf loc ch  -- We've already seen the closing quote
         let src = lexemeToString buf (cur bufEnd - cur buf)
         if magicHash then do
             case alexGetChar' i of
-              Just ('#',i@(AI end _)) -> do
+              Just ('#',i@(AI end bufEnd')) -> do
                 setInput i
+                -- Include the trailing # in SourceText
+                let src' = lexemeToString buf (cur bufEnd' - cur buf)
                 return (L (mkPsSpan loc end)
-                          (ITprimchar (SourceText src) ch))
+                          (ITprimchar (SourceText src') ch))
               _other ->
                 return (L (mkPsSpan loc end)
                           (ITchar (SourceText src) ch))

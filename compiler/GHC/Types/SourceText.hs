@@ -76,15 +76,15 @@ text is stored in literals where this can occur.
 
 Motivating examples for HsLit
 
-  HsChar          '\n'       == '\x20`
-  HsCharPrim      '\x41`#    == `A`
+  HsChar          '\n'       == '\x20'
+  HsCharPrim      '\x41'#    == 'A'#
   HsString        "\x20\x41" == " A"
   HsStringPrim    "\x20"#    == " "#
   HsInt           001        == 1
   HsIntPrim       002#       == 2#
   HsWordPrim      003##      == 3##
-  HsInt64Prim     004##      == 4##
-  HsWord64Prim    005##      == 5##
+  HsInt64Prim     004#Int64  == 4#Int64
+  HsWord64Prim    005#Word64 == 5#Word64
   HsInteger       006        == 6
 
 For OverLitVal
@@ -293,7 +293,7 @@ instance Outputable FractionalLit where
 -- source to source manipulation tools.
 data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
-                                              -- See not [Literal source text]
+                                              -- See Note [Literal source text]
                          sl_fs :: FastString, -- literal string value
                          sl_tc :: Maybe RealSrcSpan -- Location of
                                                     -- possible
