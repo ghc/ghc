@@ -111,6 +111,11 @@ typedef struct {
     MarkQueue queue;
 } UpdRemSet;
 
+// How much marking work we are allowed to perform
+// See Note [Sync phase marking budget] in NonMoving.c
+typedef int64_t MarkBudget;
+#define UNLIMITED_MARK_BUDGET INT64_MIN
+
 // Number of blocks to allocate for a mark queue
 #define MARK_QUEUE_BLOCKS 16
 
@@ -155,7 +160,11 @@ void markQueueAddRoot(MarkQueue* q, StgClosure** root);
 
 void initMarkQueue(MarkQueue *queue);
 void freeMarkQueue(MarkQueue *queue);
-void nonmovingMark(struct MarkQueue_ *restrict queue);
+void nonmovingMark(MarkBudget *budget, struct MarkQueue_ *queue);
+INLINE_HEADER void nonmovingMarkUnlimitedBudget(struct MarkQueue_ *queue) {
+    MarkBudget budget = UNLIMITED_MARK_BUDGET;
+    nonmovingMark(&budget, queue);
+}
 
 void nonmovingMarkWeakPtrList(struct MarkQueue_ *queue);
 bool nonmovingTidyWeaks(struct MarkQueue_ *queue);
