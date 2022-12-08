@@ -48,8 +48,8 @@ import Types
 
 -- |Global switch to enable debug tracing in ghc-exactprint Delta / Print
 debugEnabledFlag :: Bool
--- debugEnabledFlag = True
-debugEnabledFlag = False
+debugEnabledFlag = True
+-- debugEnabledFlag = False
 
 -- |Provide a version of trace that comes at the end of the line, so it can
 -- easily be commented out when debugging different things.
@@ -261,11 +261,11 @@ mkEpaComments priorCs postCs
 comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
-mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
+mkLEpaComment :: String -> EpaLocation -> RealSrcSpan -> LEpaComment
 mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
-mkComment :: String -> Anchor -> RealSrcSpan -> Comment
+mkComment :: String -> EpaLocation -> RealSrcSpan -> Comment
 mkComment c anc r = Comment c anc r Nothing
 
 -- Windows comments include \r in them from the lexer.
@@ -303,7 +303,7 @@ isKWComment c = isJust (commentOrigin c)
 noKWComments :: [Comment] -> [Comment]
 noKWComments = filter (\c -> not (isKWComment c))
 
-sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+sortAnchorLocated :: [GenLocated EpaLocation a] -> [GenLocated EpaLocation a]
 sortAnchorLocated = sortBy (compareAnchor `on` getLoc)
 
 -- | Calculates the distance from the start of a string to the end of
@@ -362,7 +362,7 @@ locatedAnAnchor _ = error "locatedAnAnchor"
 
 -- ---------------------------------------------------------------------
 
-setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAn :: (Default an) => LocatedAn an a -> EpaLocation -> EpAnnComments -> LocatedAn an a
 setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
   = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
@@ -370,15 +370,15 @@ setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
+setAnchorEpa :: (Default an) => EpAnn an -> EpaLocation -> EpAnnComments -> EpAnn an
 setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
 setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
 
-setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
+setAnchorEpaL :: EpAnn AnnList -> EpaLocation -> EpAnnComments -> EpAnn AnnList
 setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
 setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
 
-setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
+setAnchorHsModule :: HsModule GhcPs -> EpaLocation -> EpAnnComments -> HsModule GhcPs
 setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
   where
     -- anc' = anc { anchor_op = UnchangedAnchor }
@@ -411,7 +411,7 @@ addEpAnnLoc (AddEpAnn _ l) = l
 
 -- TODO: move this to GHC
 -- AZ:Remove this
-anchorToEpaLocation :: Anchor -> EpaLocation
+anchorToEpaLocation :: EpaLocation -> EpaLocation
 anchorToEpaLocation = id
 
 -- ---------------------------------------------------------------------
@@ -439,7 +439,7 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 -}
 
-hackSrcSpanToAnchor :: SrcSpan -> Anchor
+hackSrcSpanToAnchor :: SrcSpan -> EpaLocation
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
 hackSrcSpanToAnchor (RealSrcSpan r b)
   = case b of
@@ -451,7 +451,7 @@ hackSrcSpanToAnchor (RealSrcSpan r b)
     _ -> EpaSpan r b
 
 -- TODO:AZ get rid of this
-hackAnchorToSrcSpan :: Anchor -> SrcSpan
+hackAnchorToSrcSpan :: EpaLocation -> SrcSpan
 hackAnchorToSrcSpan (EpaSpan r b) = RealSrcSpan r b
 hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 

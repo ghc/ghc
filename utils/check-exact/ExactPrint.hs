@@ -113,6 +113,7 @@ defaultEPState = EPState
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
              , uExtraDP = Nothing
+             , pAcceptSpan = False
              , epComments = []
              , epCommentsApplied = []
              , epEof = Nothing
@@ -172,8 +173,15 @@ data EPState = EPState
              { uAnchorSpan :: !RealSrcSpan -- ^ in pre-changed AST
                                           -- reference frame, from
                                           -- Annotation
-             , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
+             , uExtraDP :: !(Maybe EpaLocation) -- ^ Used to anchor a
                                              -- list
+             , pAcceptSpan :: Bool -- ^ When we have processed an
+                                   -- entry of EpaDelta, accept the
+                                   -- next `EpaSpan` start as the
+                                   -- current output position. i.e. do
+                                   -- not advance epPos. Achieved by
+                                   -- setting dPriorEndPosition to the
+                                   -- end of the span.
 
              -- Print phase
              , epPos        :: !Pos -- ^ Current output position
@@ -218,14 +226,14 @@ data CanUpdateAnchor = CanUpdateAnchor
                      | NoCanUpdateAnchor
                    deriving (Eq, Show)
 
-data Entry = Entry Anchor EpAnnComments FlushComments CanUpdateAnchor
+data Entry = Entry EpaLocation EpAnnComments FlushComments CanUpdateAnchor
            | NoEntryVal
 
 -- | For flagging whether to capture comments in an EpaDelta or not
 data CaptureComments = CaptureComments
                      | NoCaptureComments
 
-mkEntry :: Anchor -> EpAnnComments -> Entry
+mkEntry :: EpaLocation -> EpAnnComments -> Entry
 mkEntry anc cs = Entry anc cs NoFlushComments CanUpdateAnchor
 
 instance HasEntry (SrcSpanAnn' (EpAnn an)) where
@@ -255,6 +263,7 @@ cua NoCanUpdateAnchor _ = return []
 
 -- | "Enter" an annotation, by using the associated 'anchor' field as
 -- the new reference point for calculating all DeltaPos positions.
+-- This is the heart of the exact printing process.
 --
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
@@ -267,6 +276,11 @@ enterAnn NoEntryVal a = do
   debugM $ "enterAnn:done:NO ANN:p =" ++ show (p, astId a)
   return r
 enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
+  acceptSpan <- getAcceptSpan
+  setAcceptSpan False
+  case anchor' of
+    EpaDelta _ _ -> setAcceptSpan True
+    EpaSpan _ _ -> return ()
   p <- getPosP
   debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
   -- debugM $ "enterAnn:(cs) =" ++ showGhc (cs)
@@ -291,7 +305,10 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
       -- fragment has a reference
       setPriorEndNoLayoutD (ss2pos curAnchor)
     _ -> do
-      return ()
+      if acceptSpan
+        then setPriorEndNoLayoutD (ss2pos curAnchor)
+        else return ()
+
   -- -------------------------
   if ((fst $ fst $ rs2range curAnchor) >= 0)
     then
@@ -472,7 +489,7 @@ withPpr a = do
 -- 'ppr'.
 class (Typeable a) => ExactPrint a where
   getAnnotationEntry :: a -> Entry
-  setAnnotationAnchor :: a -> Anchor -> EpAnnComments -> a
+  setAnnotationAnchor :: a -> EpaLocation -> EpAnnComments -> a
   exact :: (Monad m, Monoid w) => a -> EP w m a
 
 -- ---------------------------------------------------------------------
@@ -787,7 +804,7 @@ limportDeclAnnPackage k annImp = fmap (\new -> annImp { importDeclAnnPackage = n
 
 -- data AnnList
 --   = AnnList {
---       al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
+--       al_anchor    :: Maybe EpaLocation, -- ^ start point of a list having layout
 --       al_open      :: Maybe AddEpAnn,
 --       al_close     :: Maybe AddEpAnn,
 --       al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
@@ -4151,7 +4168,7 @@ instance ExactPrint (LocatedN RdrName) where
 locFromAdd :: AddEpAnn -> EpaLocation
 locFromAdd (AddEpAnn _ loc) = loc
 
-printUnicode :: (Monad m, Monoid w) => Anchor -> RdrName -> EP w m Anchor
+printUnicode :: (Monad m, Monoid w) => EpaLocation -> RdrName -> EP w m EpaLocation
 printUnicode anc n = do
   let str = case (showPprUnsafe n) of
             -- TODO: unicode support?
@@ -4887,10 +4904,10 @@ setPosP l = do
   -- debugM $ "setPosP:" ++ show l
   modify (\s -> s {epPos = l})
 
-getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe Anchor)
+getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe EpaLocation)
 getExtraDP = gets uExtraDP
 
-setExtraDP :: (Monad m, Monoid w) => Maybe Anchor -> EP w m ()
+setExtraDP :: (Monad m, Monoid w) => Maybe EpaLocation -> EP w m ()
 setExtraDP md = do
   debugM $ "setExtraDP:" ++ show md
   modify (\s -> s {uExtraDP = md})
@@ -4900,6 +4917,13 @@ getPriorEndD = gets dPriorEndPosition
 
 getAnchorU :: (Monad m, Monoid w) => EP w m RealSrcSpan
 getAnchorU = gets uAnchorSpan
+
+getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
+getAcceptSpan = gets pAcceptSpan
+
+setAcceptSpan ::(Monad m, Monoid w) => Bool -> EP w m ()
+setAcceptSpan f =
+  modify (\s -> s { pAcceptSpan = f })
 
 setPriorEndD :: (Monad m, Monoid w) => Pos -> EP w m ()
 setPriorEndD pe = do

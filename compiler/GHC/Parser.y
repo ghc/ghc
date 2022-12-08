@@ -4251,7 +4251,7 @@ glA = getLocA
 glN :: LocatedN a -> SrcSpan
 glN = getLocA
 
-glR :: Located a -> Anchor
+glR :: Located a -> EpaLocation
 glR la = spanAsAnchor$ getLoc la
 
 glAA :: Located a -> EpaLocation
@@ -4260,16 +4260,16 @@ glAA = srcSpan2e . getLoc
 glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan . getLoc
 
-glAR :: LocatedAn t a -> Anchor
+glAR :: LocatedAn t a -> EpaLocation
 glAR la = spanAsAnchor $ getLocA la
 
-glNR :: LocatedN a -> Anchor
+glNR :: LocatedN a -> EpaLocation
 glNR ln = spanAsAnchor $ getLocA ln
 
 glNRR :: LocatedN a -> EpaLocation
 glNRR = srcSpan2e . getLocA
 
-anc :: RealSrcSpan -> Anchor
+anc :: RealSrcSpan -> EpaLocation
 anc r = EpaSpan r Strict.Nothing -- AZ:DANGER
 
 acs :: MonadP m => (EpAnnComments -> Located a) -> m (Located a)
@@ -4399,7 +4399,7 @@ hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAn t a] -> Anchor
+listAsAnchor :: [LocatedAn t a] -> EpaLocation
 listAsAnchor [] = spanAsAnchor noSrcSpan
 listAsAnchor (L l _:_) = spanAsAnchor (locA l)
 

@@ -3682,7 +3682,7 @@ splitPriorComments ss prior_comments =
   in
     go [] ss prior_comments
 
-anchor :: Anchor -> RealSrcSpan
+anchor :: EpaLocation -> RealSrcSpan
 anchor (EpaSpan r _) = r
 anchor (EpaDelta _ _) = panic "anchor"
 

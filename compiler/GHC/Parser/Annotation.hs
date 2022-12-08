@@ -18,8 +18,7 @@ module GHC.Parser.Annotation (
   getTokenSrcSpan,
   DeltaPos(..), deltaPos, getDeltaLine,
 
-  EpAnn(..), Anchor, AnchorOperation(..),
-  -- anchor, anchor_op,
+  EpAnn(..),
   spanAsAnchor, realSpanAsAnchor,
   noAnn,
 
@@ -504,7 +503,7 @@ instance Outputable AddEpAnn where
 -- new AST fragments out of old ones, and have them still printed out
 -- in a precise way.
 data EpAnn ann
-  = EpAnn { entry   :: !Anchor
+  = EpAnn { entry   :: !EpaLocation
            -- ^ Base location for the start of the syntactic element
            -- holding the annotations.
            , anns     :: !ann -- ^ Annotations added by the Parser
@@ -531,37 +530,16 @@ data EpAnn ann
 --                             , anchor_op :: AnchorOperation }
 --         deriving (Data, Eq, Show)
 
-type Anchor = EpaLocation -- Transitional
+-- type Anchor = EpaLocation -- Transitional
 
--- anchor :: Anchor -> RealSrcSpan
--- anchor (EpaSpan r _) = r
--- anchor (EpaDelta _ _) = panic "anchor"
--- -- anchor (EpaDelta _ _) = placeholderRealSpan
-
--- -- AZ:TODO: remove AnchorOperation
--- anchor_op :: Anchor -> AnchorOperation
--- anchor_op (EpaSpan _ _) = UnchangedAnchor
--- anchor_op (EpaDelta dp _) = MovedAnchor dp
-
-
--- | If tools modify the parsed source, the 'MovedAnchor' variant can
--- directly provide the spacing for this item relative to the previous
--- one when printing. This allows AST fragments with a particular
--- anchor to be freely moved, without worrying about recalculating the
--- appropriate anchor span.
-data AnchorOperation = UnchangedAnchor
-                     | MovedAnchor DeltaPos
-        deriving (Data, Eq, Show)
-
-
-spanAsAnchor :: SrcSpan -> Anchor
+spanAsAnchor :: SrcSpan -> EpaLocation
 spanAsAnchor (RealSrcSpan s b)  = EpaSpan s b
 spanAsAnchor _  = noSpanAnchor
 
-realSpanAsAnchor :: RealSrcSpan -> Anchor
+realSpanAsAnchor :: RealSrcSpan -> EpaLocation
 realSpanAsAnchor s = EpaSpan s Strict.Nothing -- AZ:DANGER
 
-noSpanAnchor :: Anchor
+noSpanAnchor :: EpaLocation
 noSpanAnchor =  EpaDelta (SameLine 0) []
 
 -- ---------------------------------------------------------------------
@@ -580,7 +558,7 @@ data EpAnnComments = EpaComments
                         , followingComments :: ![LEpaComment] }
         deriving (Data, Eq)
 
-type LEpaComment = GenLocated Anchor EpaComment
+type LEpaComment = GenLocated EpaLocation EpaComment
 
 emptyComments :: EpAnnComments
 emptyComments = EpaComments []
@@ -686,7 +664,7 @@ data AnnListItem
 -- keywords such as 'where'.
 data AnnList
   = AnnList {
-      al_anchor    :: Maybe Anchor, -- ^ start point of a list having layout
+      al_anchor    :: Maybe EpaLocation, -- ^ start point of a list having layout
       al_open      :: Maybe AddEpAnn,
       al_close     :: Maybe AddEpAnn,
       al_rest      :: [AddEpAnn], -- ^ context, such as 'where' keyword
@@ -1028,7 +1006,7 @@ realSpanFromAnns as = go Nothing as
     go acc (AddEpAnn _ (EpaSpan s _):rest)  = go (combine acc s) rest
     go acc (AddEpAnn _ (EpaDelta _ _):rest) = go acc rest
 
-widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
+widenAnchor :: EpaLocation -> [AddEpAnn] -> EpaLocation
 widenAnchor (EpaSpan s b) as = EpaSpan (widenRealSpan s as) b
 widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
                                     Nothing -> a
@@ -1037,11 +1015,11 @@ widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
 -- widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
 -- widenAnchorR (Anchor s op) r = Anchor (combineRealSrcSpans s r) op
 
-widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
+widenAnchorR :: EpaLocation -> RealSrcSpan -> EpaLocation
 widenAnchorR (EpaSpan s bs) r = EpaSpan (combineRealSrcSpans s r) bs
 widenAnchorR (EpaDelta _ _) r = EpaSpan r Strict.Nothing -- AZ:DANGER
 
-widenAnchorS :: Anchor -> SrcSpan -> Anchor
+widenAnchorS :: EpaLocation -> SrcSpan -> EpaLocation
 widenAnchorS (EpaSpan s bs) (RealSrcSpan r br) = EpaSpan (combineRealSrcSpans s r) (bs <> br)
 widenAnchorS (EpaDelta _ _) (RealSrcSpan r b) = EpaSpan r b
 widenAnchorS anc _ = anc
@@ -1272,18 +1250,11 @@ instance (Outputable a) => Outputable (EpAnn a) where
 instance Outputable NoEpAnns where
   ppr NoEpAnns = text "NoEpAnns"
 
--- instance Outputable Anchor where
---   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
-
-instance Outputable AnchorOperation where
-  ppr UnchangedAnchor   = text "UnchangedAnchor"
-  ppr (MovedAnchor d)   = text "MovedAnchor" <+> ppr d
-
 instance Outputable DeltaPos where
   ppr (SameLine c) = text "SameLine" <+> ppr c
   ppr (DifferentLine l c) = text "DifferentLine" <+> ppr l <+> ppr c
 
-instance Outputable (GenLocated Anchor EpaComment) where
+instance Outputable (GenLocated EpaLocation EpaComment) where
   ppr (L l c) = text "L" <+> ppr l <+> ppr c
 
 instance Outputable EpAnnComments where
