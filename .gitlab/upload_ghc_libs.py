@@ -51,15 +51,19 @@ def prep_base():
 def build_copy_file(pkg: Package, f: Path):
     target = Path('_build') / 'stage1' / pkg.path / 'build' / f
     dest = pkg.path / f
-    print(f'Building {target} for {dest}...')
+    build_file_hadrian(target)
+    print(f'Copying {target} to {dest}...')
+    dest.parent.mkdir(exist_ok=True, parents=True)
+    shutil.copyfile(target, dest)
 
+
+def build_file_hadrian(target: Path):
     build_cabal = Path('hadrian') / 'build-cabal'
     if not build_cabal.is_file():
         build_cabal = Path('hadrian') / 'build.cabal.sh'
 
+    print(f'Building {target}...')
     run([build_cabal, target], check=True)
-    dest.parent.mkdir(exist_ok=True, parents=True)
-    shutil.copyfile(target, dest)
 
 def modify_file(pkg: Package, fname: Path, f: Callable[[str], str]):
     target = pkg.path / fname
@@ -116,6 +120,7 @@ def prepare_sdist(pkg: Package):
 
     print(f'Preparing package {pkg.name}...')
     shutil.rmtree(pkg.path / 'dist-newstyle', ignore_errors=True)
+    build_file_hadrian(pkg.path / '{}.cabal'.format(pkg.name))
     pkg.prepare_sdist()
 
     # Upload source tarball
