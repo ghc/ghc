@@ -36,7 +36,7 @@ main1 :: FilePath -> IO ()
 main1 planPath = do
     meta <- I.cachedHackageMetadata
     plan <- P.decodePlanJson planPath
-    main2 meta plan
+    main2 (snd meta) plan
 
 main2 :: Map.Map C.PackageName I.PackageInfo -> P.PlanJson -> IO ()
 main2 meta plan = do
