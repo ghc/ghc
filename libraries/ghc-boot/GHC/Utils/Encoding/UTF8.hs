@@ -44,16 +44,19 @@ module GHC.Utils.Encoding.UTF8
 import Prelude
 
 import Foreign
+import GHC.IO
+#if MIN_VERSION_base(4,18,0)
+import GHC.Encoding.UTF8
+#else
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Data.Char
-import GHC.IO
+import GHC.Exts
 import GHC.ST
+#endif
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BS
 import Data.ByteString.Short.Internal (ShortByteString(..))
-
-import GHC.Exts
 
 -- | Find the start of the codepoint preceding the codepoint at the given
 -- 'Ptr'. This is undefined if there is no previous valid codepoint.
