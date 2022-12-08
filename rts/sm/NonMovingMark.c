@@ -1767,15 +1767,23 @@ done:
  *  b. the nursery has been fully evacuated into the non-moving generation.
  *  c. the mark queue has been seeded with a set of roots.
  *
+ * If budget is not UNLIMITED_MARK_BUDGET, then we will mark no more than the
+ * indicated number of objects and deduct the work done from the budget.
  */
 GNUC_ATTR_HOT void
-nonmovingMark (MarkQueue *queue)
+nonmovingMark (MarkBudget* budget, MarkQueue *queue)
 {
     traceConcMarkBegin();
     debugTrace(DEBUG_nonmoving_gc, "Starting mark pass");
-    unsigned int count = 0;
+    uint64_t count = 0;
     while (true) {
         count++;
+        if (*budget == 0) {
+            return;
+        } else if (*budget != UNLIMITED_MARK_BUDGET) {
+            *budget -= 1;
+        }
+
         MarkQueueEnt ent = markQueuePop(queue);
 
         switch (nonmovingMarkQueueEntryType(&ent)) {
