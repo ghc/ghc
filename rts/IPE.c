@@ -62,7 +62,10 @@ this all IPE lists of all IpeBufferListNode are traversed to insert all IPEs.
 After the content of a IpeBufferListNode has been inserted, it's freed.
 */
 
+#if defined(THREADED_RTS)
 static Mutex ipeMapLock;
+#endif
+// Protected by ipeMapLock
 static HashTable *ipeMap = NULL;
 
 // Accessed atomically
