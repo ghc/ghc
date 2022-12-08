@@ -19,7 +19,7 @@ module GHC.Parser.Annotation (
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor, AnchorOperation(..),
-  anchor, anchor_op,
+  -- anchor, anchor_op,
   spanAsAnchor, realSpanAsAnchor,
   noAnn,
 
@@ -459,7 +459,7 @@ epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
 epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l) Strict.Nothing
-epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc) Strict.Nothing
+epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = anc
 
 instance Outputable EpaLocation where
   ppr (EpaSpan r _) = text "EpaSpan" <+> ppr r
@@ -533,15 +533,15 @@ data EpAnn ann
 
 type Anchor = EpaLocation -- Transitional
 
-anchor :: Anchor -> RealSrcSpan
-anchor (EpaSpan r _) = r
-anchor (EpaDelta _ _) = panic "anchor"
--- anchor (EpaDelta _ _) = placeholderRealSpan
+-- anchor :: Anchor -> RealSrcSpan
+-- anchor (EpaSpan r _) = r
+-- anchor (EpaDelta _ _) = panic "anchor"
+-- -- anchor (EpaDelta _ _) = placeholderRealSpan
 
--- AZ:TODO: remove AnchorOperation
-anchor_op :: Anchor -> AnchorOperation
-anchor_op (EpaSpan _ _) = UnchangedAnchor
-anchor_op (EpaDelta dp _) = MovedAnchor dp
+-- -- AZ:TODO: remove AnchorOperation
+-- anchor_op :: Anchor -> AnchorOperation
+-- anchor_op (EpaSpan _ _) = UnchangedAnchor
+-- anchor_op (EpaDelta dp _) = MovedAnchor dp
 
 
 -- | If tools modify the parsed source, the 'MovedAnchor' variant can

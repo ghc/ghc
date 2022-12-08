@@ -1042,13 +1042,20 @@ checkTyClHdr is_cls ty
     newAnns :: SrcSpanAnnA -> EpAnn AnnParen -> SrcSpanAnnN
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
-        lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
+        lr = case as of
+          EpaSpan r _ -> combineRealSrcSpans (realSrcSpan l) r
+          EpaDelta _ _ -> realSrcSpan l -- This should not occur while parsing
         an = (EpAnn (EpaSpan lr Strict.Nothing) (NameAnn NameParens o (srcSpan2e l) c []) cs) --AZ:DANGER
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
-        lr = combineRealSrcSpans (anchor ap) (anchor as)
+        -- lr = combineRealSrcSpans (anchor ap) (anchor as)
+        lr = case (ap, as) of
+          (EpaSpan pr _pb,  EpaSpan sr _sb)   -> combineRealSrcSpans pr sr
+          (EpaSpan pr _pb,  EpaDelta _sr _sb) -> pr
+          (EpaDelta _ _pb, EpaSpan sr _sb)    -> sr
+          (EpaDelta _ _pb, EpaDelta _r _sb)   -> panic "newAnns" -- Should not happen while parsing
         an = (EpAnn (ap Semi.<> as) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs))
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
 

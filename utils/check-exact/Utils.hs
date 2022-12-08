@@ -137,6 +137,18 @@ adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
 
 -- ---------------------------------------------------------------------
 
+srcAnn2epaLocation :: SrcAnn a -> EpaLocation
+srcAnn2epaLocation (SrcSpanAnn EpAnnNotUsed _) = EpaDelta (SameLine 0) []
+srcAnn2epaLocation (SrcSpanAnn (EpAnn anc _ _) _) = anc
+
+epaLocationToPos :: EpaLocation -> Pos
+epaLocationToPos (EpaSpan r _) = ss2pos r
+epaLocationToPos (EpaDelta _ _) = (0,0)
+
+epaLocationToPosEnd :: EpaLocation -> Pos
+epaLocationToPosEnd (EpaSpan r _) = ss2posEnd r
+epaLocationToPosEnd (EpaDelta _ _) = (0,0)
+
 ss2pos :: RealSrcSpan -> Pos
 ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
 
@@ -264,7 +276,7 @@ normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- |Must compare without span filenames, for CPP injected comments with fake filename
 cmpComments :: Comment -> Comment -> Ordering
-cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compareAnchor l1 l2
 
 -- |Sort, comparing without span filenames, for CPP injected comments with fake filename
 sortComments :: [Comment] -> [Comment]
@@ -274,7 +286,7 @@ sortComments cs = sortBy cmpComments cs
 sortEpaComments :: [LEpaComment] -> [LEpaComment]
 sortEpaComments cs = sortBy cmp cs
   where
-    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    cmp (L l1 _) (L l2 _) = compareAnchor l1 l2
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
@@ -292,7 +304,7 @@ noKWComments :: [Comment] -> [Comment]
 noKWComments = filter (\c -> not (isKWComment c))
 
 sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
-sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
+sortAnchorLocated = sortBy (compareAnchor `on` getLoc)
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
@@ -345,7 +357,8 @@ name2String = showPprUnsafe
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
 locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
-locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
+locatedAnAnchor (L (SrcSpanAnn (EpAnn (EpaSpan r _) _ _) _) _) = r
+locatedAnAnchor _ = error "locatedAnAnchor"
 
 -- ---------------------------------------------------------------------
 

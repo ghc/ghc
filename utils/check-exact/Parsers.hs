@@ -64,6 +64,10 @@ import qualified GHC.Types.SrcLoc       as GHC
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import qualified GHC.Data.Strict as Strict
+
+import Types
+
 -- ---------------------------------------------------------------------
 
 -- | Wrapper function which returns Annotations along with the parsed
@@ -289,7 +293,8 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
             let
               pc = GHC.priorComments cs
               fc = GHC.getFollowingComments cs
-              bf (GHC.L anc _) = GHC.anchor anc > ss
+              -- bf (GHC.L anc _) = GHC.anchor anc > ss
+              bf (GHC.L anc _) = compareAnchor anc (GHC.EpaSpan ss Strict.Nothing) == GT
               (prior,f) = break bf fc
               cs'' = GHC.EpaCommentsBalanced (pc <> prior) f
             in cs''

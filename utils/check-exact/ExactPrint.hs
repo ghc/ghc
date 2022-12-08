@@ -270,7 +270,11 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   p <- getPosP
   debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
   -- debugM $ "enterAnn:(cs) =" ++ showGhc (cs)
-  let curAnchor = anchor anchor' -- As a base for the current AST element
+  -- let curAnchor = anchor anchor' -- As a base for the current AST element
+  priorAnchor <- getAnchorU
+  let curAnchor = case anchor' of -- As a base for the current AST element
+        EpaSpan r _ -> r
+        EpaDelta _ _ -> priorAnchor
   debugM $ "enterAnn:(curAnchor):=" ++ show (rs2range curAnchor)
   case canUpdateAnchor of
     CanUpdateAnchor -> pushAppliedComments
@@ -280,8 +284,8 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   printComments curAnchor
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
-  case anchor_op anchor' of
-    MovedAnchor dp -> do
+  case anchor' of
+    EpaDelta dp _ -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
       -- Set the original anchor as prior end, so the rest of this AST
       -- fragment has a reference
@@ -319,8 +323,8 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
                -- changed.
                off (ss2delta priorEndAfterComments curAnchor)
   debugM $ "enterAnn: (edp',off,priorEndAfterComments,curAnchor):" ++ show (edp',off,priorEndAfterComments,rs2range curAnchor)
-  let edp'' = case anchor_op anchor' of
-        MovedAnchor dp -> dp
+  let edp'' = case anchor' of
+        EpaDelta dp _ -> dp
         _ -> edp'
   -- ---------------------------------------------
   -- let edp = edp''
@@ -342,7 +346,6 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
     debugM $ "enterAnn.dPriorEndPosition:spanStart=" ++ show spanStart
     modify (\s -> s { dPriorEndPosition    = spanStart } ))
 
-  debugM $ "enterAnn: (anchor_op, curAnchor):" ++ show (anchor_op anchor', rs2range curAnchor)
   debugM $ "enterAnn: (dLHS,spanStart,pec,edp)=" ++ show (off,spanStart,priorEndAfterComments,edp)
   p0 <- getPosP
   d <- getPriorEndD
@@ -1236,12 +1239,12 @@ printComments ss = do
 printOneComment :: (Monad m, Monoid w) => Comment -> EP w m ()
 printOneComment c@(Comment _str loc _r _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
-  dp <-case anchor_op loc of
-    MovedAnchor dp -> return dp
-    _ -> do
+  dp <-case loc of
+    EpaDelta dp _ -> return dp
+    EpaSpan r _ -> do
         pe <- getPriorEndD
-        let dp = ss2delta pe (anchor loc)
-        debugM $ "printOneComment:(dp,pe,anchor loc)=" ++ showGhc (dp,pe,ss2pos $ anchor loc)
+        let dp = ss2delta pe r
+        debugM $ "printOneComment:(dp,pe,epaLocationToPos loc)=" ++ showGhc (dp,pe,epaLocationToPos loc)
         adjustDeltaForOffsetM dp
   mep <- getExtraDP
   dp' <- case mep of
@@ -1257,7 +1260,7 @@ printOneComment c@(Comment _str loc _r _mo) = do
   -- End of debug printing
   -- setPriorEndD (ss2posEnd (anchor loc))
   updateAndApplyComment c dp'
-  printQueuedComment (anchor loc) c dp'
+  printQueuedComment c dp'
 
 -- | For comment-related deltas starting on a new line we have an
 -- off-by-one problem. Adjust
@@ -1335,7 +1338,7 @@ commentAllocation ss = do
   -- RealSrcSpan, which affects comparison, as the Ord instance for
   -- RealSrcSpan compares the file first. So we sort via ss2pos
   -- TODO: this is inefficient, use Pos all the way through
-  let (earlier,later) = partition (\(Comment _str loc _r _mo) -> (ss2pos $ anchor loc) <= (ss2pos ss)) cs
+  let (earlier,later) = partition (\(Comment _str loc _r _mo) -> (epaLocationToPos loc) <= (ss2pos ss)) cs
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
@@ -4831,8 +4834,8 @@ isGoodDeltaWithOffset dp colOffset = isGoodDelta (deltaPos l c)
 
 -- | Print a comment, using the current layout offset to convert the
 -- @DeltaPos@ to an absolute position.
-printQueuedComment :: (Monad m, Monoid w) => RealSrcSpan -> Comment -> DeltaPos -> EP w m ()
-printQueuedComment _loc Comment{commentContents} dp = do
+printQueuedComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
+printQueuedComment Comment{commentContents} dp = do
   p <- getPosP
   d <- getPriorEndD
   colOffset <- getLayoutOffsetP

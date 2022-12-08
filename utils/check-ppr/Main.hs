@@ -102,6 +102,10 @@ getPragmas (L _ (HsModule { hsmodExt = XModulePs { hsmodAnn = anns' } })) = prag
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
+anchor :: EpaLocation -> (Int,Int)
+anchor (EpaSpan r _) = (srcSpanStartLine r,srcSpanStartCol r)
+anchor (EpaDelta _ _) = (0,0) -- Should not happen for newly-parsed files
+
 pp :: (Outputable a) => a -> String
 pp a = showPprUnsafe a
 

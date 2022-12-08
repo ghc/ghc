@@ -45,9 +45,19 @@ instance Ord Comment where
   -- When we have CPP injected comments with a fake filename, or LINE
   -- pragma, the file name changes, so we need to compare the
   -- locations only, with out the filename.
-  compare (Comment _ ss1 _ _) (Comment _ ss2 _ _) = compare (ss2pos $ anchor ss1) (ss2pos $ anchor ss2)
+  compare (Comment _ ss1 _ _) (Comment _ ss2 _ _) = compareAnchor ss1 ss2
     where
       ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
+
+compareAnchor :: EpaLocation -> EpaLocation -> Ordering
+compareAnchor a1 a2 = go a1 a2
+  where
+      ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
+
+      go (EpaSpan r1 _) (EpaSpan r2 _) = compare (ss2pos r1) (ss2pos r2)
+      go (EpaSpan _ _) (EpaDelta _ _) = GT
+      go (EpaDelta _ _) (EpaSpan _ _) = LT
+      go (EpaDelta _ _) (EpaDelta _ _) = EQ
 
 instance Outputable Comment where
   ppr x = text (show x)
