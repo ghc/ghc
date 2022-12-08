@@ -254,6 +254,9 @@ Mutex concurrent_coll_finished_lock;
  *  - Note [Weak pointer processing and the non-moving GC] (MarkWeak.c) describes
  *    how weak pointers are handled when the non-moving GC is in use.
  *
+ *  - Note [Sync phase marking budget] describes how we avoid long mutator
+ *    pauses during the sync phase
+ *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
  *   collector for functional programs on multicore processors. SIGPLAN Not. 51,
@@ -505,9 +508,43 @@ Mutex concurrent_coll_finished_lock;
  * remembered set during the preparatory GC. This allows us to safely skip the
  * non-moving write barrier without jeopardizing the snapshot invariant.
  *
+ *
+ * Note [Sync phase marking budget]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The non-moving collector is intended to provide reliably low collection
+ * latencies. These latencies are primarily due to two sources:
+ *
+ *  a. the preparatory moving collection at the beginning of the major GC cycle
+ *  b. the post-mark synchronization pause at the end
+ *
+ * While the cost of (a) is inherently bounded by the young generation size,
+ * (b) can in principle be unbounded since the mutator may hide large swathes
+ * of heap from the collector's concurrent mark phase via mutation. These will
+ * only become visible to the collector during the post-mark synchronization
+ * phase.
+ *
+ * Since we don't want to do unbounded marking work in the pause, we impose a
+ * limit (specifically, sync_phase_marking_budget) on the amount of work
+ * (namely, the number of marked closures) that we can do during the pause. If
+ * we deplete our marking budget during the pause then we allow the mutators to
+ * resume and return to concurrent marking (keeping the update remembered set
+ * write barrier enabled). After we have finished marking we will again
+ * attempt the post-mark synchronization.
+ *
+ * The choice of sync_phase_marking_budget was made empirically. On 2022
+ * hardware and a "typical" test program we tend to mark ~10^7 closures per
+ * second. Consequently, a sync_phase_marking_budget of 10^5 should produce
+ * ~10 ms pauses, which seems like a reasonable tradeoff.
+ *
+ * TODO: Perhaps sync_phase_marking_budget should be controllable via a
+ * command-line argument?
+ *
  */
 
 memcount nonmoving_live_words = 0;
+
+// See Note [Sync phase marking budget].
+MarkBudget sync_phase_marking_budget = 200000;
 
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
@@ -1027,19 +1064,25 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 }
 
 /* Mark queue, threads, and weak pointers until no more weaks have been
- * resuscitated
+ * resuscitated. If *budget is non-zero then we will mark no more than
+ * Returns true if we there is no more marking work to be done, false if
+ * we exceeded our marking budget.
  */
-static void nonmovingMarkThreadsWeaks(MarkQueue *mark_queue)
+static bool nonmovingMarkThreadsWeaks(MarkBudget *budget, MarkQueue *mark_queue)
 {
     while (true) {
         // Propagate marks
-        nonmovingMark(mark_queue);
+        nonmovingMark(budget, mark_queue);
+        if (*budget == 0) {
+            return false;
+        }
 
         // Tidy threads and weaks
         nonmovingTidyThreads();
 
-        if (! nonmovingTidyWeaks(mark_queue))
-            return;
+        if (! nonmovingTidyWeaks(mark_queue)) {
+            return true;
+        }
     }
 }
 
@@ -1098,7 +1141,13 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingMarkWeakPtrList(mark_queue);
 
     // Do concurrent marking; most of the heap will get marked here.
-    nonmovingMarkThreadsWeaks(mark_queue);
+#if defined(THREADED_RTS)
+concurrent_marking:
+#endif
+    {
+        MarkBudget budget = UNLIMITED_MARK_BUDGET;
+        nonmovingMarkThreadsWeaks(&budget, mark_queue);
+    }
 
 #if defined(THREADED_RTS)
     Task *task = newBoundTask();
@@ -1121,9 +1170,17 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingBeginFlush(task);
 
     bool all_caps_syncd;
+    MarkBudget sync_marking_budget = sync_phase_marking_budget;
     do {
         all_caps_syncd = nonmovingWaitForFlush();
-        nonmovingMarkThreadsWeaks(mark_queue);
+        if (nonmovingMarkThreadsWeaks(&sync_marking_budget, mark_queue) == false) {
+            // We ran out of budget for marking. Abort sync.
+            // See Note [Sync phase marking budget].
+            traceConcSyncEnd();
+            stat_endNonmovingGcSync();
+            releaseAllCapabilities(n_capabilities, NULL, task);
+            goto concurrent_marking;
+        }
     } while (!all_caps_syncd);
 #endif
 
@@ -1134,7 +1191,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // Do last marking of weak pointers
     while (true) {
         // Propagate marks
-        nonmovingMark(mark_queue);
+        nonmovingMarkUnlimitedBudget(mark_queue);
 
         if (!nonmovingTidyWeaks(mark_queue))
             break;
@@ -1143,7 +1200,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingMarkDeadWeaks(mark_queue, dead_weaks);
 
     // Propagate marks
-    nonmovingMark(mark_queue);
+    nonmovingMarkUnlimitedBudget(mark_queue);
 
     // Now remove all dead objects from the mut_list to ensure that a younger
     // generation collection doesn't attempt to look at them after we've swept.
