@@ -54,6 +54,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
+import GHC.Core.FamInstEnv( compatibleBranches )
 import GHC.Core.Unify
 import GHC.Core.Coercion.Opt ( checkAxInstCo )
 import GHC.Core.Opt.Arity    ( typeArity, exprIsDeadEnd )
@@ -2640,8 +2641,10 @@ lint_family_branch fam_tc br@(CoAxBranch { cab_tvs     = tvs
        ; lintL (null cvs)
                (text "Coercion variables bound in family axiom")
        ; forM_ incomps $ \ br' ->
-           lintL (not (compatible_branches br br')) $
-           text "Incorrect incompatible branch:" <+> ppr br' }
+           lintL (not (compatibleBranches br br')) $
+           hang (text "Incorrect incompatible branches:")
+              2 (vcat [text "Branch:"       <+> ppr br,
+                       text "Bogus incomp:" <+> ppr br']) }
 
 lint_axiom_group :: NonEmpty (CoAxiom Branched) -> LintM ()
 lint_axiom_group (_  :| []) = return ()
@@ -2663,7 +2666,7 @@ lint_axiom_pair tc (ax1, ax2)
   , Just br2@(CoAxBranch { cab_tvs = tvs2
                          , cab_lhs = lhs2
                          , cab_rhs = rhs2 }) <- coAxiomSingleBranch_maybe ax2
-  = lintL (compatible_branches br1 br2) $
+  = lintL (compatibleBranches br1 br2) $
     vcat [ hsep [ text "Axioms", ppr ax1, text "and", ppr ax2
                 , text "are incompatible" ]
          , text "tvs1 =" <+> pprTyVars tvs1
@@ -2676,27 +2679,6 @@ lint_axiom_pair tc (ax1, ax2)
   | otherwise
   = addErrL (text "Open type family axiom has more than one branch: either" <+>
              ppr ax1 <+> text "or" <+> ppr ax2)
-
-compatible_branches :: CoAxBranch -> CoAxBranch -> Bool
--- True <=> branches are compatible. See Note [Compatibility] in GHC.Core.FamInstEnv.
-compatible_branches (CoAxBranch { cab_tvs = tvs1
-                                , cab_lhs = lhs1
-                                , cab_rhs = rhs1 })
-                    (CoAxBranch { cab_tvs = tvs2
-                                , cab_lhs = lhs2
-                                , cab_rhs = rhs2 })
-  = -- we need to freshen ax2 w.r.t. ax1
-    -- do this by pretending tvs1 are in scope when processing tvs2
-    let in_scope       = mkInScopeSetList tvs1
-        subst0         = mkEmptySubst in_scope
-        (subst, _)     = substTyVarBndrs subst0 tvs2
-        lhs2'          = substTys subst lhs2
-        rhs2'          = substTy  subst rhs2
-    in
-    case tcUnifyTys alwaysBindFun lhs1 lhs2' of
-      Just unifying_subst -> substTy unifying_subst rhs1  `eqType`
-                             substTy unifying_subst rhs2'
-      Nothing             -> True
 
 {-
 ************************************************************************
@@ -3325,33 +3307,8 @@ dumpLoc (InType ty)
 dumpLoc (InCo co)
   = (noSrcLoc, text "In the coercion" <+> quotes (ppr co))
 dumpLoc (InAxiom ax)
-  = (getSrcLoc ax_name, text "In the coercion axiom" <+> ppr ax_name <+> dcolon <+> pp_ax)
-  where
-    CoAxiom { co_ax_name     = ax_name
-            , co_ax_tc       = tc
-            , co_ax_role     = ax_role
-            , co_ax_branches = branches } = ax
-    branch_list = fromBranches branches
-
-    pp_ax
-      | [branch] <- branch_list
-      = pp_branch branch
-
-      | otherwise
-      = braces $ vcat (map pp_branch branch_list)
-
-    pp_branch (CoAxBranch { cab_tvs = tvs
-                          , cab_cvs = cvs
-                          , cab_lhs = lhs_tys
-                          , cab_rhs = rhs_ty })
-      = sep [ brackets (pprWithCommas pprTyVar (tvs ++ cvs)) <> dot
-            , ppr (mkTyConApp tc lhs_tys)
-            , text "~_" <> pp_role ax_role
-            , ppr rhs_ty ]
-
-    pp_role Nominal          = text "N"
-    pp_role Representational = text "R"
-    pp_role Phantom          = text "P"
+  = (getSrcLoc ax, hang (text "In the coercion axiom")
+                      2 (pprCoAxiom ax))
 
 pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
