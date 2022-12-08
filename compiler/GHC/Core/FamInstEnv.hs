@@ -25,7 +25,7 @@ module GHC.Core.FamInstEnv (
         FamInstMatch(..),
         lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvByTyCon,
 
-        isDominatedBy, apartnessCheck,
+        isDominatedBy, apartnessCheck, compatibleBranches,
 
         -- Injectivity
         InjectivityCheckResult(..),
@@ -531,15 +531,16 @@ fails anyway.
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = let (commonlhs1, commonlhs2) = zipAndUnzip lhs1 lhs2
-             -- See Note [Compatibility of eta-reduced axioms]
-    in case tcUnifyTysFG alwaysBindFun commonlhs1 commonlhs2 of
-      SurelyApart -> True
-      Unifiable subst
-        | Type.substTyAddInScope subst rhs1 `eqType`
-          Type.substTyAddInScope subst rhs2
-        -> True
-      _ -> False
+  = case tcUnifyTysFG alwaysBindFun commonlhs1 commonlhs2 of
+      -- Here we need the cab_tvs of the two branches to be disinct.
+      -- See Note [CoAxBranch type variables] in GHC.Core.Coercion.Axiom.
+      SurelyApart     -> True
+      MaybeApart {}   -> False
+      Unifiable subst -> Type.substTyAddInScope subst rhs1 `eqType`
+                         Type.substTyAddInScope subst rhs2
+  where
+     (commonlhs1, commonlhs2) = zipAndUnzip lhs1 lhs2
+     -- See Note [Compatibility of eta-reduced axioms]
 
 -- | Result of testing two type family equations for injectiviy.
 data InjectivityCheckResult
@@ -590,7 +591,7 @@ computeAxiomIncomps branches
   where
     go :: [CoAxBranch] -> CoAxBranch -> ([CoAxBranch], CoAxBranch)
     go prev_brs cur_br
-       = (cur_br : prev_brs, new_br)
+       = (new_br : prev_brs, new_br)
        where
          new_br = cur_br { cab_incomps = mk_incomps prev_brs cur_br }
 

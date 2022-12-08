@@ -216,8 +216,8 @@ etaExpandCoAxBranch (CoAxBranch { cab_tvs = tvs
 pprCoAxiom :: CoAxiom br -> SDoc
 -- Used in debug-printing only
 pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
-  = hang (text "axiom" <+> ppr ax <+> dcolon)
-       2 (vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
+  = hang (text "axiom" <+> ppr ax)
+       2 (braces $ vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
 
 pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
 -- Used when printing injectivity errors (FamInst.reportInjectivityErrors)
@@ -251,8 +251,12 @@ ppr_co_ax_branch ppr_rhs fam_tc branch
     [ pprUserForAll (mkTyCoVarBinders Inferred bndrs')
          -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     , pp_lhs <+> ppr_rhs tidy_env ee_rhs
-    , text "-- Defined" <+> pp_loc ]
+    , vcat [ text "-- Defined" <+> pp_loc
+           , ppUnless (null incomps) $ whenPprDebug $
+             text "-- Incomps:" <+> vcat (map (pprCoAxBranch fam_tc) incomps) ]
+    ]
   where
+    incomps = coAxBranchIncomps branch
     loc = coAxBranchSpan branch
     pp_loc | isGoodSrcSpan loc = text "at" <+> ppr (srcSpanStart loc)
            | otherwise         = text "in" <+> ppr loc

@@ -36,7 +36,7 @@ module GHC.Core.Coercion.Axiom (
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
-import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprTyVar )
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -275,7 +275,6 @@ coAxiomArity ax index
   = length tvs + length cvs
   where
     CoAxBranch { cab_tvs = tvs, cab_cvs = cvs } = coAxiomNthBranch ax index
-
 coAxiomName :: CoAxiom br -> Name
 coAxiomName = co_ax_name
 
@@ -331,7 +330,7 @@ placeHolderIncomps = panic "placeHolderIncomps"
 Note [CoAxBranch type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the case of a CoAxBranch of an associated type-family instance,
-we use the *same* type variables (where possible) as the
+we use the *same* type variables in cab_tvs (where possible) as the
 enclosing class or instance.  Consider
 
   instance C Int [z] where
@@ -341,8 +340,11 @@ In the CoAxBranch in the instance decl (F Int [z]) we use the
 same 'z', so that it's easy to check that that type is the same
 as that in the instance header.
 
-So, unlike FamInsts, there is no expectation that the cab_tvs
-are fresh wrt each other, or any other CoAxBranch.
+However, I believe that the cab_tvs of any CoAxBranch are distinct
+from the cab_tvs of other CoAxBranches in the same CoAxiom.  This is
+important when checking for compatiblity and apartness; e.g. see
+GHC.Core.FamInstEnv.compatibleBranches.  (The story seems a bit wobbly
+here, but it seems to work.)
 
 Note [CoAxBranch roles]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -458,15 +460,18 @@ See also:
 * Note [RoughMap and rm_empty] for how this complicates the RoughMap implementation slightly.
 -}
 
+{- *********************************************************************
+*                                                                      *
+              Instances, especially pretty-printing
+*                                                                      *
+********************************************************************* -}
+
 instance Eq (CoAxiom br) where
     a == b = getUnique a == getUnique b
     a /= b = getUnique a /= getUnique b
 
 instance Uniquable (CoAxiom br) where
     getUnique = co_ax_unique
-
-instance Outputable (CoAxiom br) where
-    ppr = ppr . getName
 
 instance NamedThing (CoAxiom br) where
     getName = co_ax_name
@@ -477,13 +482,22 @@ instance Typeable br => Data.Data (CoAxiom br) where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "CoAxiom"
 
+instance Outputable (CoAxiom br) where
+  -- You may want GHC.Core.Coercion.pprCoAxiom instead
+  ppr = ppr . getName
+
 instance Outputable CoAxBranch where
-  ppr (CoAxBranch { cab_loc = loc
-                  , cab_lhs = lhs
-                  , cab_rhs = rhs }) =
-    text "CoAxBranch" <+> parens (ppr loc) <> colon
-      <+> brackets (fsep (punctuate comma (map pprType lhs)))
-      <+> text "=>" <+> pprType rhs
+  -- This instance doesn't know the name of the type family
+  -- If possible, use GHC.Core.Coercion.pprCoAxBranch instead
+  ppr (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                  , cab_lhs = lhs_tys, cab_rhs = rhs, cab_incomps = incomps })
+    = text "CoAxBranch" <+> braces payload
+    where
+      payload = hang (text "forall" <+> pprWithCommas pprTyVar (tvs ++ cvs) <> dot)
+                   2 (vcat [ text "<tycon>" <+> sep (map pprType lhs_tys)
+                           , nest 2 (text "=" <+> ppr rhs)
+                           , ppUnless (null incomps) $
+                             text "incomps:" <+> vcat (map ppr incomps) ])
 
 {-
 ************************************************************************
