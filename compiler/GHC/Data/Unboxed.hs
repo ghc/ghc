@@ -1,6 +1,5 @@
 -- Unboxed counterparts to data structures
 
-{-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnliftedNewtypes #-}
