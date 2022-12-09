@@ -61,7 +61,7 @@ import GHC.Types.Basic   ( UnboxedTupleOrSum(..), unboxedTupleOrSumExtension )
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), mkTyVar )
+import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar )
 import GHC.Utils.FV
 import GHC.Utils.Error
 import GHC.Driver.Session
@@ -1731,6 +1731,13 @@ the instance head, we'll expand the synonym on fly, and it'll look like
   instance (%,%) (Show Int, Show Int)
 and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
+
+For similar reasons, we do not use tcSplitSigmaTy when decomposing the instance
+context, as the looks through type synonyms. If we looked through type
+synonyms, then it could be possible to write an instance for a type synonym
+involving a quantified constraint (see #22570). Instead, we define
+splitInstTyForValidity, a specialized version of tcSplitSigmaTy (local to
+GHC.Tc.Validity) that does not expand type synonyms.
 -}
 
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
@@ -1774,10 +1781,30 @@ checkValidInstance ctxt hs_type ty = case tau of
         ; return () }
   _ -> failWithTc (TcRnNoClassInstHead tau)
   where
-    (_tvs, theta, tau)   = tcSplitSigmaTy ty
+    (theta, tau) = splitInstTyForValidity ty
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
+
+-- | Split an instance type of the form @forall tvbs. inst_ctxt => inst_head@
+-- and return @(inst_ctxt, inst_head)@. This function makes no attempt to look
+-- through type synonyms. See @Note [Instances and constraint synonyms]@.
+splitInstTyForValidity :: Type -> (ThetaType, Type)
+splitInstTyForValidity = split_context [] . drop_foralls
+  where
+    -- This is like 'dropForAlls', except that it does not look through type
+    -- synonyms.
+    drop_foralls :: Type -> Type
+    drop_foralls (ForAllTy (Bndr _tv argf) ty)
+      | isInvisibleForAllTyFlag argf = drop_foralls ty
+    drop_foralls ty = ty
+
+    -- This is like 'tcSplitPhiTy', except that it does not look through type
+    -- synonyms.
+    split_context :: ThetaType -> Type -> (ThetaType, Type)
+    split_context preds (FunTy { ft_af = af, ft_arg = pred, ft_res = tau })
+      | isInvisibleFunArg af = split_context (pred:preds) tau
+    split_context preds ty = (reverse preds, ty)
 
 {-
 Note [Paterson conditions]
