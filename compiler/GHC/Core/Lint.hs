@@ -2,7 +2,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnboxedSums #-}
 
 {-
 (c) The University of Glasgow 2006
