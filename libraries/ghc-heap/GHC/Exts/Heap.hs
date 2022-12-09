@@ -27,6 +27,9 @@ module GHC.Exts.Heap (
     , PrimType(..)
     , WhatNext(..)
     , WhyBlocked(..)
+    , UpdateFrameType(..)
+    , SpecialRetSmall(..)
+    , RetFunType(..)
     , TsoFlags(..)
     , HasHeapRep(getClosureData)
     , getClosureDataFromHeapRep
@@ -60,22 +63,24 @@ module GHC.Exts.Heap (
 import Prelude
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Constants
 import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
 #endif
-import GHC.Exts.Heap.Utils
-import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
-import qualified GHC.Exts.Heap.ProfInfo.PeekProfInfo as PPI
+import GHC.Exts.DecodeHeap
 
 import Data.Bits
 import Foreign
 import GHC.Exts
 import GHC.Int
 import GHC.Word
+#if MIN_VERSION_base(4,17,0)
+import GHC.Stack.CloneStack
+import GHC.Exts.DecodeStack
+#endif
+
 
 #include "ghcconfig.h"
 
@@ -129,6 +134,11 @@ instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
 instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
     getClosureData x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
+
+#if MIN_VERSION_base(4,17,0)
+instance HasHeapRep StackSnapshot# where
+    getClosureData s# = decodeStack (StackSnapshot s#)
+#endif
 
 -- | Get the heap representation of a closure _at this moment_, even if it is
 -- unevaluated or an indirection or other exotic stuff. Beware when passing

@@ -26,15 +26,25 @@ import Control.Concurrent.MVar
 import Data.Maybe (catMaybes)
 import Foreign
 import GHC.Conc.Sync
-import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#)
+import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofArray#, indexArray#, State#, StablePtr#, Word#, unsafeCoerce#, eqWord#, isTrue#)
 import GHC.IO (IO (..))
 import GHC.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Stable
+import qualified GHC.Generics
 
 -- | A frozen snapshot of the state of an execution stack.
 --
 -- @since 4.17.0.0
 data StackSnapshot = StackSnapshot !StackSnapshot#
+
+
+-- TODO: Cast to Addr representation instead?
+instance Eq StackSnapshot where
+  (StackSnapshot s1#) == (StackSnapshot s2#) = isTrue# (((unsafeCoerce# s1#) :: Word#) `eqWord#` ((unsafeCoerce# s2#) :: Word#))
+
+-- TODO: Show and Eq instances are mainly here to fulfill Closure deriving requirements
+instance Show StackSnapshot where
+  show _ = "StackSnapshot"
 
 foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr InfoProvEnt) #)
 

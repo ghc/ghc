@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP #-}
+    CPP, MagicHash, TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -53,7 +53,11 @@ import qualified Language.Haskell.TH.Syntax as TH
 import System.Exit
 import System.IO
 import System.IO.Error
-
+#if MIN_VERSION_base(4,17,0)
+import GHC.Stack.CloneStack
+import GHC.Word (Word(W#))
+import GHC.Exts (Word#, unsafeCoerce#, StackSnapshot#)
+#endif
 -- -----------------------------------------------------------------------------
 -- The RPC protocol between GHC and the interactive server
 
@@ -469,6 +473,21 @@ instance Binary Heap.IndexTable
 instance Binary Heap.WhatNext
 instance Binary Heap.WhyBlocked
 instance Binary Heap.TsoFlags
+#endif
+
+#if MIN_VERSION_base(4,17,0)
+instance Binary Heap.SpecialRetSmall
+instance Binary Heap.UpdateFrameType
+instance Binary Heap.RetFunType
+-- TODO: Revisit this. This instance is pretty hacky (unsafeCoerce# ...)
+instance Binary StackSnapshot where
+  get = do
+          v <- get @Word
+          pure $ StackSnapshot (toPrim v)
+    where
+      toPrim :: Word -> StackSnapshot#
+      toPrim (W# w#) = unsafeCoerce# w#
+  put (StackSnapshot s#) = put (W# ((unsafeCoerce# s#) :: Word#))
 #endif
 
 instance Binary Heap.StgInfoTable

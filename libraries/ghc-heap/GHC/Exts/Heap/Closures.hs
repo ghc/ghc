@@ -15,8 +15,12 @@ module GHC.Exts.Heap.Closures (
     , WhatNext(..)
     , WhyBlocked(..)
     , TsoFlags(..)
+    , UpdateFrameType(..)
+    , SpecialRetSmall(..)
+    , RetFunType(..)
     , allClosures
     , closureSize
+    , RetFunType(..)
 
     -- * Boxes
     , Box(..)
@@ -47,6 +51,10 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
+
+#if MIN_VERSION_base(4,17,0)
+import GHC.Stack.CloneStack (StackSnapshot(..))
+#endif
 
 ------------------------------------------------------------------------
 -- Boxes
@@ -303,6 +311,70 @@ data GenClosure b
 #endif
       }
 
+#if MIN_VERSION_base(4,17,0)
+    -- TODO: I could model stack chunks here (much better). However, I need the
+    -- code to typecheck, now.
+  | SimpleStack {
+      stackClosures :: ![b]
+                }
+ -- TODO: Add `info :: !StgInfoTable` fields
+  | UpdateFrame
+      { knownUpdateFrameType :: !UpdateFrameType
+      , updatee :: !b
+      }
+
+  | CatchFrame
+      { exceptions_blocked :: Word
+      , handler :: !b
+      }
+
+  | CatchStmFrame
+      { catchFrameCode :: !b
+      , handler :: !b
+      }
+
+  | CatchRetryFrame
+      { running_alt_code :: !Word
+      , first_code :: !b
+      , alt_code :: !b
+      }
+
+  | AtomicallyFrame
+      { atomicallyFrameCode :: !b
+      , result :: !b
+      }
+
+    -- TODO: nextChunk could be a CL.Closure, too! (StackClosure)
+  | UnderflowFrame
+      { nextChunk:: !StackSnapshot }
+
+  | StopFrame
+
+  | RetSmall
+      { knownRetSmallType :: !SpecialRetSmall
+      , payload :: ![b]
+      }
+
+  | RetBig
+      { payload :: ![b] }
+
+  | RetFun
+      { retFunType :: RetFunType
+      , retFunSize :: Word
+      , retFunFun :: !b
+      , retFunPayload :: ![b]
+      }
+
+  |  RetBCO
+    -- TODO: Add pre-defined BCO closures (like knownUpdateFrameType)
+      { bcoInstrs :: !b
+      , bcoLiterals :: !b
+      , bcoPtrs :: !b
+      , bcoArity :: !Word
+      , bcoSize :: !Word
+      , bcoPayload :: ![b]
+      }
+#endif
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
@@ -354,8 +426,73 @@ data GenClosure b
   | UnsupportedClosure
         { info       :: !StgInfoTable
         }
+
+  |  UnknownTypeWordSizedPrimitive
+        { wordVal :: !Word }
   deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
 
+-- TODO There are likely more. See MiscClosures.h
+data SpecialRetSmall =
+  -- TODO: Shoudn't `None` be better `Maybe ...`?
+  None |
+  ApV |
+  ApF |
+  ApD |
+  ApL |
+  ApN |
+  ApP |
+  ApPP |
+  ApPPP |
+  ApPPPP |
+  ApPPPPP |
+  ApPPPPPP |
+  RetV |
+  RetP |
+  RetN |
+  RetF |
+  RetD |
+  RetL |
+  RestoreCCCS |
+  RestoreCCCSEval
+  deriving (Enum, Eq, Show, Generic)
+
+data UpdateFrameType =
+  NormalUpdateFrame |
+  BhUpdateFrame |
+  MarkedUpdateFrame
+  deriving (Enum, Eq, Show, Generic, Ord)
+
+data RetFunType =
+      ARG_GEN     |
+      ARG_GEN_BIG |
+      ARG_BCO     |
+      ARG_NONE    |
+      ARG_N       |
+      ARG_P       |
+      ARG_F       |
+      ARG_D       |
+      ARG_L       |
+      ARG_V16     |
+      ARG_V32     |
+      ARG_V64     |
+      ARG_NN      |
+      ARG_NP      |
+      ARG_PN      |
+      ARG_PP      |
+      ARG_NNN     |
+      ARG_NNP     |
+      ARG_NPN     |
+      ARG_NPP     |
+      ARG_PNN     |
+      ARG_PNP     |
+      ARG_PPN     |
+      ARG_PPP     |
+      ARG_PPPP    |
+      ARG_PPPPP   |
+      ARG_PPPPPP  |
+      ARG_PPPPPPP |
+      ARG_PPPPPPPP
+      deriving (Show, Eq, Enum, Generic)
 
 data PrimType
   = PInt

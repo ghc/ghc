@@ -39,6 +39,7 @@ library
                     GHC.Exts.Heap.Closures
                     GHC.Exts.Heap.ClosureTypes
                     GHC.Exts.Heap.Constants
+                    GHC.Exts.DecodeHeap
                     GHC.Exts.DecodeStack
                     GHC.Exts.Heap.InfoTable
                     GHC.Exts.Heap.InfoTable.Types
