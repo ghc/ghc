@@ -1,0 +1,10 @@
+
+T22570.hs:11:10: error: [GHC-53946]
+    • Illegal instance for a type synonym
+      A class instance must be for a class
+    • In the instance declaration for ‘SomeClassUnit’
+
+T22570.hs:15:10: error: [GHC-53946]
+    • Illegal instance for a type synonym
+      A class instance must be for a class
+    • In the instance declaration for ‘SomeClassSyn ()’
