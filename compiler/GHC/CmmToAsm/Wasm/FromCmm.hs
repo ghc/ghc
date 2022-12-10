@@ -13,7 +13,13 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use camelCase" #-}
-module GHC.CmmToAsm.Wasm.FromCmm where
+module GHC.CmmToAsm.Wasm.FromCmm
+  ( alignmentFromWordType,
+    globalInfoFromCmmGlobalReg,
+    supportedCmmGlobalRegs,
+    onCmmGroup,
+  )
+where
 
 import Control.Monad
 import qualified Data.ByteString as BS
@@ -195,41 +201,6 @@ supportedCmmGlobalRegs =
     <> [DoubleReg i | i <- [1 .. 6]]
     <> [LongReg i | i <- [1 .. 1]]
     <> [Sp, SpLim, Hp, HpLim, CCCS]
-
--- | Allocate a fresh symbol for an internal data section.
-allocDataSection :: DataSection -> WasmCodeGenM w SymName
-allocDataSection sec = do
-  u <- wasmUniq
-  let sym = fromString $ ".L" <> show u
-  wasmModifyM $ \s ->
-    s
-      { dataSections =
-          addToUniqMap (dataSections s) sym sec
-      }
-  pure sym
-
--- | Print a debug message to stderr by calling @fputs()@. We don't
--- bother to check @fputs()@ return value.
-wasmDebugMsg :: String -> WasmCodeGenM w (WasmStatements w)
-wasmDebugMsg msg = do
-  ty_word_cmm <- wasmWordCmmTypeM
-  sym_buf <-
-    allocDataSection
-      DataSection
-        { dataSectionKind =
-            SectionROData,
-          dataSectionAlignment =
-            mkAlignment 1,
-          dataSectionContents =
-            [DataASCII $ fromString $ msg <> "\NUL"]
-        }
-  onFuncSym "fputs" [ty_word_cmm, ty_word_cmm] [b32]
-  pure $
-    WasmStatements $
-      WasmSymConst sym_buf
-        `WasmConcat` WasmSymConst "__stderr_FILE"
-        `WasmConcat` WasmCCall "fputs"
-        `WasmConcat` WasmDrop
 
 -- | Truncate a subword.
 truncSubword :: Width -> WasmTypeTag t -> WasmExpr w t -> WasmExpr w t
@@ -1059,33 +1030,6 @@ lower_CMO_Un_Homo lbl op [reg] [x] = do
     WasmStatements $
       x_instr `WasmConcat` WasmCCall op `WasmConcat` WasmLocalSet ty ri
 lower_CMO_Un_Homo _ _ _ _ = panic "lower_CMO_Un_Homo: unreachable"
-
--- | Lower an unary homogeneous 'CallishMachOp' to inline assembly.
-lower_CMO_Un_Prim ::
-  CLabel ->
-  (forall pre t. WasmTypeTag t -> WasmInstr w (t : pre) (t : pre)) ->
-  [CmmFormal] ->
-  [CmmActual] ->
-  WasmCodeGenM w (WasmStatements w)
-lower_CMO_Un_Prim lbl op [reg] [x] = do
-  (ri, SomeWasmType ty) <- onCmmLocalReg reg
-  SomeWasmExpr ty_x (WasmExpr x_instr) <- lower_CmmExpr lbl x
-  if
-      | Just Refl <- ty `testEquality` ty_x ->
-          pure $
-            WasmStatements $
-              x_instr `WasmConcat` op ty_x `WasmConcat` WasmLocalSet ty ri
-      | TagI32 <- ty,
-        TagI64 <-
-          ty_x ->
-          pure $
-            WasmStatements $
-              x_instr
-                `WasmConcat` op ty_x
-                `WasmConcat` WasmI32WrapI64
-                `WasmConcat` WasmLocalSet ty ri
-      | otherwise -> panic "lower_CMO_Un_Prim: unreachable"
-lower_CMO_Un_Prim _ _ _ _ = panic "lower_CMO_Un_Prim: unreachable"
 
 -- | Lower a binary homogeneous 'CallishMachOp' to a ccall.
 lower_CMO_Bin_Homo ::
