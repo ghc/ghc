@@ -16,7 +16,7 @@ module GHC.Core.TyCo.Compare (
     tcEqTyConApps,
 
    -- * Visiblity comparision
-   eqForAllVis, cmpForAllVis
+   eqForAllVis,
 
    ) where
 
@@ -171,10 +171,9 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     go _   (LitTy lit1) (LitTy lit2)
       = lit1 == lit2
 
-    go env (ForAllTy (Bndr tv1 vis1) ty1)
-           (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 `eqForAllVis` vis2
-      && (vis_only || go env (varType tv1) (varType tv2))
+    go env (ForAllTy (Bndr tv1 _) ty1)
+           (ForAllTy (Bndr tv2 _) ty2)
+      = (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
     -- Make sure we handle all FunTy cases since falling through to the
@@ -224,7 +223,6 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
 {-# INLINE tc_eq_type #-} -- See Note [Specialising tc_eq_type].
 
-
 -- | Do these denote the same level of visibility? 'Required'
 -- arguments are visible, others are not. So this function
 -- equates 'Specified' and 'Inferred'. Used for printing.
@@ -235,17 +233,6 @@ eqForAllVis Required      Required      = True
 eqForAllVis (Invisible _) (Invisible _) = True
 eqForAllVis _             _             = False
 
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-cmpForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Ordering
--- See Note [ForAllTy and type equality]
--- If you change this, see IMPORTANT NOTE in the above Note
-cmpForAllVis Required      Required       = EQ
-cmpForAllVis Required      (Invisible {}) = LT
-cmpForAllVis (Invisible _) Required       = GT
-cmpForAllVis (Invisible _) (Invisible _)  = EQ
-
 
 {- Note [ForAllTy and type equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -253,7 +240,7 @@ When we compare (ForAllTy (Bndr tv1 vis1) ty1)
          and    (ForAllTy (Bndr tv2 vis2) ty2)
 what should we do about `vis1` vs `vis2`.
 
-First, we always compare with `eqForAllVis` and `cmpForAllVis`.
+First, we always compare with `eqForAllVis`.
 But what decision do we make?
 
 Should GHC type-check the following program (adapted from #15740)?
@@ -513,10 +500,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
-    go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
-      = liftOrdering (vis1 `cmpForAllVis` vis2)
-        `thenCmpTy` go env (varType tv1) (varType tv2)
-        `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
+    go env (ForAllTy (Bndr tv1 _) t1) (ForAllTy (Bndr tv2 _) t2)
+      = go env (varType tv1) (varType tv2)
+          `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 
         -- See Note [Equality on AppTys]
     go env (AppTy s1 t1) ty2

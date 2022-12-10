@@ -1,0 +1,7 @@
+
+T22648a.hs:7:14: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: () -> forall a b. a -> b -> a
+          Actual: () -> forall {a} {b}. a -> b -> a
+    • In the expression: const_inf
+      In an equation for ‘const_spec’: const_spec = const_inf

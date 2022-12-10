@@ -21,6 +21,7 @@ module GHC.Tc.Utils.Unify (
   unifyType, unifyKind, unifyExpectedType,
   uType, promoteTcType,
   swapOverTyVars, startSolvingByUnification,
+  tcSubVis,
 
   --------------------------------
   -- Holes
@@ -2636,12 +2637,13 @@ checkTypeEq :: CanEqLHS -> TcType -> CheckTyEqResult
 --      case-analysis on 'lhs')
 --    * checkEqCanLHSFinish, which does not know the form of 'lhs'
 checkTypeEq lhs ty
-  = go ty
+  = go ty S.<> check_kind_vis (canEqLHSKind lhs) (typeKind ty)
   where
     impredicative      = cteProblem cteImpredicative
     type_family        = cteProblem cteTypeFamily
     insoluble_occurs   = cteProblem cteInsolubleOccurs
     soluble_occurs     = cteProblem cteSolubleOccurs
+    forall_kind_vis_diff = cteProblem cteForallKindVisDiff
 
     -- The GHCi runtime debugger does its type-matching with
     -- unification variables that can unify with a polytype
@@ -2721,3 +2723,8 @@ checkTypeEq lhs ty
       | ghci_tv   = \ _tc -> cteOK
       | otherwise = \ tc  -> (if isTauTyCon tc then cteOK else impredicative) S.<>
                              (if isFamFreeTyCon tc then cteOK else type_family)
+
+    check_kind_vis :: TcKind -> TcKind -> CheckTyEqResult
+    check_kind_vis k1 k2
+      | tcEqVis k1 k2 = cteOK
+      | otherwise     = forall_kind_vis_diff

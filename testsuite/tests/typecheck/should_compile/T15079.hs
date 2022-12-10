@@ -15,7 +15,7 @@ import           GHC.Exts (Any)
 infixl 4 :==
 -- | Heterogeneous Leibnizian equality.
 newtype (a :: j) :== (b :: k)
-  = HRefl { hsubst :: forall (c :: forall (i :: Type). i -> Type). c a -> c b }
+  = HRefl { hsubst :: forall (c :: forall {i :: Type}. i -> Type). c a -> c b }
 
 -----
 
@@ -29,9 +29,9 @@ coerce f = uncoerce . hsubst f . Coerce
 
 -----
 
-newtype Flay :: (forall (i :: Type). i -> i -> Type)
+newtype Flay :: (forall {i :: Type}. i -> i -> Type)
              -> forall (j :: Type). j -> forall (k :: Type). k -> Type where
-  Flay :: forall (p :: forall (i :: Type). i -> i -> Type)
+  Flay :: forall (p :: forall {i :: Type}. i -> i -> Type)
                  (j :: Type) (k :: Type) (a :: j) (b :: k).
           { unflay :: p a (MassageKind j b) } -> Flay p a b
 
@@ -44,7 +44,7 @@ fromLeibniz f = unflay $ hsubst f $ Flay Eq.Refl
 
 -----
 
-newtype Foo (f :: forall (a :: Type). a -> Type) = MkFoo (f Int)
+newtype Foo (f :: forall {a :: Type}. a -> Type) = MkFoo (f Int)
 data InferredProxy a = MkInferredProxy
 
 foo :: Foo InferredProxy

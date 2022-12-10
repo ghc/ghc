@@ -1,0 +1,7 @@
+
+T15079_fail_a.hs:8:12: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: forall a. a -> *
+          Actual: forall {k}. k -> *
+    • In the first argument of ‘Foo’, namely ‘InferredProxy’
+      In the type signature: foo :: Foo InferredProxy

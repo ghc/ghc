@@ -1931,6 +1931,7 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 
        ; let res_ty = ty `mkAppTys` new_args
 
+       ; checkSubVis act_kind' (mkCheckExpType exp_kind)
        ; if act_kind' `tcEqType` exp_kind
          then return res_ty  -- This is very common
          else do { co_k <- uType KindLevel origin act_kind' exp_kind
@@ -2552,6 +2553,7 @@ kcCheckDeclHeader_sig sig_kind name flav
                  ; case ctx_k of
                       AnyKind -> return ()   -- No signature
                       _ -> do { res_ki <- newExpectedKind ctx_k
+                              ; checkSubVis res_ki (mkCheckExpType sig_res_kind')
                               ; discardResult (unifyKind Nothing sig_res_kind' res_ki) }
 
                  -- Add more binders for data/newtype, so the result kind has no arrows

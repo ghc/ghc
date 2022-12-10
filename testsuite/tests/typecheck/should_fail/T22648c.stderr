@@ -1,0 +1,35 @@
+
+T22648c.hs:17:23: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: * -> forall a -> a
+          Actual: * -> forall a. a
+    • In the type ‘Invis 0’
+      In the type instance declaration for ‘Vis’
+
+T22648c.hs:18:25: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: * -> forall a. a
+          Actual: * -> forall a -> a
+    • In the type ‘Vis 0’
+      In the type instance declaration for ‘Invis’
+
+T22648c.hs:20:23: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: * -> forall a -> a
+          Actual: * -> forall {a}. a
+    • In the type ‘Infer 0’
+      In the type instance declaration for ‘Vis’
+
+T22648c.hs:21:25: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: * -> forall {a}. a
+          Actual: * -> forall a -> a
+    • In the type ‘Vis 0’
+      In the type instance declaration for ‘Infer’
+
+T22648c.hs:23:25: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: * -> forall a. a
+          Actual: * -> forall {a}. a
+    • In the type ‘Infer 0’
+      In the type instance declaration for ‘Invis’

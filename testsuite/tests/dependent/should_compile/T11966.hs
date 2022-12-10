@@ -24,7 +24,7 @@ newtype HasDefault t = HasDefault t
 -- Interpretations
 data Expr k
 
-data Record (f :: forall k. k -> Type) =
+data Record (f :: forall {k}. k -> Type) =
   Record {rX :: Col f ('Column "x" 'PGInteger)
          ,rY :: Col f ('Column "y" ('Nullable 'PGInteger))
          ,rZ :: Col f ('HasDefault 'PGText)}

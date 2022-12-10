@@ -67,6 +67,10 @@ module GHC.Tc.Utils.TcMType (
   inferResultToType, ensureMonoType, promoteTcType,
 
   --------------------------------
+  -- Visibility subsumption
+  tcSubVis, tcEqVis, checkSubVis,
+
+  --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
   zonkTidyFRRInfos,
@@ -603,6 +607,79 @@ tc_infer mb_frr tc_check
        ; result <- tc_check res_ty
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }
+
+{- *********************************************************************
+*                                                                      *
+              Visibility subsumption
+*                                                                      *
+********************************************************************* -}
+
+checkSubVis :: TcType -> ExpType -> TcM ()
+checkSubVis _   (Infer _)   = return ()
+checkSubVis ty1 (Check ty2) =
+  unless (tcSubVis ty1 ty2) $
+    addErr $ TcRnIncompatibleForallVisibility ty1 ty2
+
+tcEqVis :: Type -> Type -> Bool
+tcEqVis ty1 ty2 =
+    Semi.getAll (zipForAllTyFlags eq_vis ty1 ty2)
+  where
+    eq_vis :: ForAllTyFlag -> ForAllTyFlag -> Semi.All
+    eq_vis flag1 flag2 = Semi.All (flag1 == flag2)
+
+tcSubVis
+  :: Type     -- actual
+  -> Type     -- expected
+  -> Bool
+tcSubVis actual expected =
+    Semi.getAll (zipForAllTyFlags sub_vis actual expected)
+  where
+    sub_vis :: ForAllTyFlag -> ForAllTyFlag -> Semi.All
+    sub_vis Specified Inferred = Semi.All True
+    sub_vis flag1     flag2    = Semi.All (flag1 == flag2)
+
+zipForAllTyFlags
+  :: forall m. Monoid m =>
+    (ForAllTyFlag -> ForAllTyFlag -> m)
+  -> Type     -- actual
+  -> Type     -- expected
+  -> m
+zipForAllTyFlags zip_flags actual expected =
+    go (typeKind actual) (typeKind expected) Semi.<>
+    go actual expected
+  where
+    go :: Type -> Type -> m
+
+    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type
+    go (TyConApp tc1 []) (TyConApp tc2 []) | tc1 == tc2 = mempty
+
+    go t1 t2 | Just t1' <- coreView t1 = go t1' t2
+    go t1 t2 | Just t2' <- coreView t2 = go t1 t2'
+
+    go (ForAllTy (Bndr tv1 vis1) ty1) (ForAllTy (Bndr tv2 vis2) ty2)
+      =  zip_flags vis1 vis2
+      Semi.<> go (varType tv1) (varType tv2)
+      Semi.<> go ty1 ty2
+
+    go (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2) =
+      go arg1 arg2 Semi.<> go res1 res2 Semi.<> go w1 w2
+
+    -- See Note [Equality on AppTys] in GHC.Core.Type
+    go (AppTy s1 t1) ty2
+      | Just (s2, t2) <- tcSplitAppTyNoView_maybe ty2
+      = go s1 s2 Semi.<> go t1 t2
+    go ty1 (AppTy s2 t2)
+      | Just (s1, t1) <- tcSplitAppTyNoView_maybe ty1
+      = go s1 s2 Semi.<> go t1 t2
+
+    go (TyConApp _ ts1) (TyConApp _ ts2) = gos ts1 ts2
+
+    go (CastTy t1 _) t2               = go t1 t2
+    go t1            (CastTy t2 _)    = go t1 t2
+    go _             _                = mempty
+
+    gos (t1:ts1) (t2:ts2) = go t1 t2 Semi.<> gos ts1 ts2
+    gos _        _        = mempty
 
 {- *********************************************************************
 *                                                                      *

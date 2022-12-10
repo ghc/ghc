@@ -1673,6 +1673,18 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
         -- to be helpful since this is just an unimplemented feature.
     return (main_msg, [])
 
+  -- The kinds of 'tv1' and 'ty2' contain forall-bound variables that
+  -- differ in visibility (ForAllTyFlag).
+  | check_eq_result `cterHasProblem` cteForallKindVisDiff
+  = do
+    let
+        reason = ForallKindVisDiff tv1 ty2
+        main_msg =
+          CannotUnifyVariable
+            { mismatchMsg       = headline_msg
+            , cannotUnifyReason = reason }
+    return (main_msg, [])
+
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)

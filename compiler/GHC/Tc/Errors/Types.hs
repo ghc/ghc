@@ -2924,6 +2924,29 @@ data TcRnMessage where
   -}
   TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
 
+  {-| TcRnIncompatibleForallVisibility is an error that occurs when
+      the expected and actual types contain forall-bound variables
+      that have incompatible visibility or specificity.
+
+      Example:
+        type family Invis :: Type -> forall a. a
+        type family Vis   :: Type -> forall a -> a
+        type instance Vis = Invis   -- Bad instance
+
+      Test cases:
+        T18863a
+        T15079_fail_a
+        T22648a
+        T22648b
+        T22648c
+        T22648v
+        T22648v_ql
+  -}
+  TcRnIncompatibleForallVisibility
+    :: TcType
+    -> TcType
+    -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -3787,6 +3810,20 @@ data CannotUnifyVariableReason
   -- type Int, or with a 'TyVarTv'.
   | DifferentTyVars TyVarInfo
   | RepresentationalEq TyVarInfo (Maybe CoercibleMsg)
+
+  -- | Can't unify a kind-polymorphic type variable with a type
+  -- due to visibility difference of forall-bound variables in their kinds.
+  --
+  -- Example:
+  --    data V k (a :: k) = MkV
+  --    f :: forall {k} {a :: k} (hk :: forall j. j -> Type). hk a -> ()
+  --    bad_infer = f MkV
+  --        -- we want to unify hk := V
+  --        --   but  hk :: forall j.   j -> Type
+  --        --        V  :: forall k -> k -> Type
+  --
+  -- Test cases: T15079_fail_b T22648v
+  | ForallKindVisDiff TyVar Type
   deriving Generic
 
 -- | Report a mismatch error without any extra

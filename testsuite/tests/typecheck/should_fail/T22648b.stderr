@@ -1,0 +1,7 @@
+
+T22648b.hs:11:19: error: [GHC-25115]
+    • Visibility of forall-bound variables is not compatible
+        Expected: forall k1 k2. k1 -> k2 -> *
+          Actual: forall {k1} {k2}. k1 -> k2 -> *
+    • In the type ‘D1’
+      In the type instance declaration for ‘F’

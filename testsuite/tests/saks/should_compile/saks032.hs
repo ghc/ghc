@@ -4,10 +4,12 @@
 module SAKS_032 where
 
 import Data.Kind
-import Data.Proxy
 
 type Const :: Type -> forall k. k -> Type
 data Const a b = Const a
+
+type Proxy :: forall k. k -> Type
+data Proxy a = Proxy
 
 type F :: Type -> Type -> forall k. k -> Type
 type family F a b :: forall k. k -> Type where

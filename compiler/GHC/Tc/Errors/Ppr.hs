@@ -1226,6 +1226,12 @@ instance Diagnostic TcRnMessage where
     TcRnSectionWithoutParentheses expr -> mkSimpleDecorated $
       hang (text "A section must be enclosed in parentheses")
          2 (text "thus:" <+> (parens (ppr expr)))
+    TcRnIncompatibleForallVisibility act exp ->
+      mkSimpleDecorated $
+        hang (text "Visibility of forall-bound variables is not compatible") 2 $
+        vcat
+          [ text "Expected:" <+> ppr exp
+          , text "  Actual:" <+> ppr act ]
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -1734,6 +1740,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnDuplicateMinimalSig{}
       -> ErrorWithoutFlag
+    TcRnIncompatibleForallVisibility{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2172,6 +2180,8 @@ instance Diagnostic TcRnMessage where
     TcRnBindInBootFile{}
       -> noHints
     TcRnDuplicateMinimalSig{}
+      -> noHints
+    TcRnIncompatibleForallVisibility{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -2970,6 +2980,10 @@ pprCannotUnifyVariableReason ctxt (DifferentTyVars tv_info)
 pprCannotUnifyVariableReason ctxt (RepresentationalEq tv_info mb_coercible_msg)
   = pprTyVarInfo ctxt tv_info
   $$ maybe empty pprCoercibleMsg mb_coercible_msg
+pprCannotUnifyVariableReason _ (ForallKindVisDiff tv1 ty2)
+  = hang (text "Visibility of forall-bound variables in kinds differs") 2 $
+    vcat [ ppr tv1 <+> text "::" <+> ppr (tyVarKind tv1)
+         , ppr ty2 <+> text "::" <+> ppr (typeKind ty2) ]
 
 pprMismatchMsg :: SolverReportErrCtxt -> MismatchMsg -> SDoc
 pprMismatchMsg ctxt

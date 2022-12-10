@@ -1,0 +1,11 @@
+
+T15079_fail_b.hs:21:23: error: [GHC-11809]
+    • Couldn't match type ‘c0’ with ‘Coerce’
+      Expected: c0 a -> Coerce b
+        Actual: c0 a -> c0 b
+      Visibility of forall-bound variables in kinds differs
+        c0 :: forall i. i -> *
+        Coerce :: forall {k}. k -> *
+    • In the first argument of ‘(.)’, namely ‘hsubst f’
+      In the second argument of ‘(.)’, namely ‘hsubst f . Coerce’
+      In the expression: uncoerce . hsubst f . Coerce

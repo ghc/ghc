@@ -321,6 +321,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "SkolemEscape"                                  = 46956
   GhcDiagnosticCode "DifferentTyVars"                               = 25897
   GhcDiagnosticCode "RepresentationalEq"                            = 10283
+  GhcDiagnosticCode "ForallKindVisDiff"                             = 11809
 
   -- Typechecker/renamer diagnostic codes
   GhcDiagnosticCode "TcRnRedundantConstraints"                      = 30606
@@ -512,6 +513,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
   GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
+  GhcDiagnosticCode "TcRnIncompatibleForallVisibility"              = 25115
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

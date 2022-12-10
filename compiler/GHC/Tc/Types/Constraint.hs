@@ -34,6 +34,7 @@ module GHC.Tc.Types.Constraint (
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
         cteOK, cteImpredicative, cteTypeFamily,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
+        cteForallKindVisDiff,
 
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
@@ -452,12 +453,13 @@ cterHasNoProblem _        = False
 -- | An individual problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
+cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs, cteForallKindVisDiff :: CheckTyEqProblem
 cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
 cteTypeFamily      = CTEP (bit 1)   -- type family encountered
 cteInsolubleOccurs = CTEP (bit 2)   -- occurs-check
 cteSolubleOccurs   = CTEP (bit 3)   -- occurs-check under a type function or in a coercion
                                     -- must be one bit to the left of cteInsolubleOccurs
+cteForallKindVisDiff = CTEP (bit 4) -- differing visibility of forall-bound variables in the kind
 -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
 
 cteProblem :: CheckTyEqProblem -> CheckTyEqResult
@@ -521,7 +523,8 @@ instance Outputable CheckTyEqResult where
       all_bits = [ (cteImpredicative,   "cteImpredicative")
                  , (cteTypeFamily,      "cteTypeFamily")
                  , (cteInsolubleOccurs, "cteInsolubleOccurs")
-                 , (cteSolubleOccurs,   "cteSolubleOccurs") ]
+                 , (cteSolubleOccurs,   "cteSolubleOccurs")
+                 , (cteForallKindVisDiff, "cteForallKindVisDiff") ]
       set_bits = [ text str
                  | (bitmask, str) <- all_bits
                  , cter `cterHasProblem` bitmask ]

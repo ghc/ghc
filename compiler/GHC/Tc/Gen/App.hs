@@ -362,6 +362,7 @@ tcApp rn_expr exp_res_ty
                  -- so with simple subsumption we can just unify them
                  -- No need to zonk; the unifier does that
                  do { co <- unifyExpectedType rn_expr app_res_rho exp_res_ty
+                    ; checkSubVis app_res_rho exp_res_ty
                     ; return (mkWpCastN co) }
 
             else -- Deep subsumption
@@ -371,6 +372,7 @@ tcApp rn_expr exp_res_ty
                  -- Zonk app_res_rho first, because QL may have instantiated some
                  -- delta variables to polytypes, and tcSubType doesn't expect that
                  do { app_res_rho <- zonkQuickLook do_ql app_res_rho
+                    ; checkSubVis app_res_rho exp_res_ty
                     ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
 
        -- Typecheck the value arguments
@@ -1052,7 +1054,7 @@ qlUnify delta ty1 ty2
                  kappa_kind = tyVarKind kappa
            ; co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                    -- unifyKind: see Note [Actual unification in qlUnify]
-
+           ; checkSubVis ty2_kind (Check kappa_kind)
            ; traceTc "qlUnify:update" $
              vcat [ hang (ppr kappa <+> dcolon <+> ppr kappa_kind)
                        2 (text ":=" <+> ppr ty2 <+> dcolon <+> ppr ty2_kind)
