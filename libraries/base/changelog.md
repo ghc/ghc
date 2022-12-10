@@ -58,6 +58,8 @@
     freeing a `Pool`. (#14762) (#18338)
   * `Type.Reflection.Unsafe` is now marked as unsafe.
   * Add `Data.Typeable.heqT`, a kind-heterogeneous version of `Data.Typeable.eqT`.
+  * Add `Data.List.!?` per
+    [CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110).
 
 ## 4.17.0.0 *August 2022*
 

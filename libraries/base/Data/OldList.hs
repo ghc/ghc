@@ -127,6 +127,7 @@ module Data.OldList
    -- | These functions treat a list @xs@ as a indexed collection,
    -- with indices ranging from 0 to @'length' xs - 1@.
 
+   , (!?)
    , (!!)
 
    , elemIndex

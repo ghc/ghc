@@ -31,7 +31,7 @@ module GHC.List (
    -- Other functions
    foldl1', concat, concatMap,
    map, (++), filter, lookup,
-   head, last, tail, init, uncons, (!!),
+   head, last, tail, init, uncons, (!?), (!!),
    scanl, scanl1, scanl', scanr, scanr1,
    iterate, iterate', repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break, reverse,
@@ -49,7 +49,7 @@ import GHC.Num (Num(..))
 import GHC.Num.Integer (Integer)
 import GHC.Stack.Types (HasCallStack)
 
-infixl 9  !!
+infixl 9  !?, !!
 infix  4 `elem`, `notElem`
 
 -- $setup
@@ -1370,9 +1370,10 @@ concat = foldr (++) []
 -- >>> ['a', 'b', 'c'] !! (-1)
 -- *** Exception: Prelude.!!: negative index
 --
--- WARNING: This function is partial. You can use
--- <https://hackage.haskell.org/package/safe/docs/Safe.html#v:atMay atMay>
--- instead.
+-- WARNING: This function is partial, and should only be used if you are
+-- sure that the indexing will not fail. Otherwise, use 'Data.List.!?'.
+--
+-- WARNING: This function takes linear time in the index.
 #if defined(USE_REPORT_PRELUDE)
 (!!)                    :: [a] -> Int -> a
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
@@ -1400,6 +1401,30 @@ xs !! n
                                    0 -> x
                                    _ -> r (k-1)) tooLarge xs n
 #endif
+
+-- | List index (subscript) operator, starting from 0. Returns 'Nothing'
+-- if the index is out of bounds
+--
+-- >>> ['a', 'b', 'c'] !? 0
+-- Just 'a'
+-- >>> ['a', 'b', 'c'] !? 2
+-- Just 'c'
+-- >>> ['a', 'b', 'c'] !? 3
+-- Nothing
+-- >>> ['a', 'b', 'c'] !? (-1)
+-- Nothing
+--
+-- This is the total variant of the partial '!!' operator.
+--
+-- WARNING: This function takes linear time in the index.
+(!?) :: [a] -> Int -> Maybe a
+
+{-# INLINABLE (!?) #-}
+xs !? n
+  | n < 0     = Nothing
+  | otherwise = foldr (\x r k -> case k of
+                                   0 -> Just x
+                                   _ -> r (k-1)) (const Nothing) xs n
 
 --------------------------------------------------------------
 -- The zip family
