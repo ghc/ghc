@@ -3686,6 +3686,25 @@ anchor :: EpaLocation -> RealSrcSpan
 anchor (EpaSpan r _) = r
 anchor (EpaDelta _ _) = panic "anchor"
 
+-- Comments appearing without a line-break before the first
+-- declaration are associated with the declaration
+splitPriorComments
+  :: RealSrcSpan
+  -> [LEpaComment]
+  -> ([LEpaComment], [LEpaComment])
+splitPriorComments ss prior_comments =
+  let
+    -- True if there is only one line between the earlier and later span
+    cmp later earlier
+         = srcSpanStartLine later - srcSpanEndLine earlier == 1
+
+    go decl _ [] = ([],decl)
+    go decl r (c@(L l _):cs) = if cmp r (anchor l)
+                              then go (c:decl) (anchor l) cs
+                              else (reverse (c:cs), decl)
+  in
+    go [] ss prior_comments
+
 allocatePriorComments
   :: RealSrcSpan
   -> [LEpaComment]
