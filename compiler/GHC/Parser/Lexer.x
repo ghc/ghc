@@ -3676,6 +3676,25 @@ allocateComments ss comment_q =
   in
     (comment_q', reverse newAnns)
 
+-- Comments appearing without a line-break before the first
+-- declaration are associated with the declaration
+splitPriorComments
+  :: RealSrcSpan
+  -> [LEpaComment]
+  -> ([LEpaComment], [LEpaComment])
+splitPriorComments ss prior_comments =
+  let
+    -- True if there is only one line between the earlier and later span
+    cmp later earlier
+         = srcSpanStartLine later - srcSpanEndLine earlier == 1
+
+    go decl _ [] = ([],decl)
+    go decl r (c@(L l _):cs) = if cmp r (anchor l)
+                              then go (c:decl) (anchor l) cs
+                              else (reverse (c:cs), decl)
+  in
+    go [] ss prior_comments
+
 allocatePriorComments
   :: RealSrcSpan
   -> [LEpaComment]
@@ -3684,12 +3703,13 @@ allocatePriorComments
 allocatePriorComments ss comment_q mheader_comments =
   let
     cmp (L l _) = anchor l <= ss
-    (before,after) = partition cmp comment_q
-    newAnns = before
+    (newAnns,after) = partition cmp comment_q
     comment_q'= after
+    (prior_comments, decl_comments) = splitPriorComments ss newAnns
   in
     case mheader_comments of
-      Strict.Nothing -> (Strict.Just (reverse newAnns), comment_q', [])
+      Strict.Nothing -> (Strict.Just prior_comments, comment_q', decl_comments)
+      -- Strict.Nothing -> (Strict.Just [], comment_q', newAnns)
       Strict.Just _ -> (mheader_comments, comment_q', reverse newAnns)
 
 allocateFinalComments

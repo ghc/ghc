@@ -1,4 +1,5 @@
 {-# LANGUAGE ImplicitParams, NamedFieldPuns, ParallelListComp, PatternGuards #-}
+
 spec :: Spec
 spec = do
   describe "split4'8" $ do
