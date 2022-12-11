@@ -941,23 +941,26 @@ getInfoForPrompt = do
 
   return (dots <> context_bit, modules_names, line)
 
-parseCallEscape :: String -> (String, String)
-parseCallEscape s
-  | not (all isSpace beforeOpen) = ("", "")
-  | null sinceOpen               = ("", "")
-  | null sinceClosed             = ("", "")
-  | null cmd                     = ("", "")
-  | otherwise                    = (cmd, tail sinceClosed)
-  where
-    (beforeOpen, sinceOpen) = span (/='(') s
-    (cmd, sinceClosed) = span (/=')') (tail sinceOpen)
+-- | Takes a string, presumably following "%call", and tries to parse
+-- a command and arguments in parentheses:
+--
+-- > parseCallEscape "  (cmd arg1 arg2)rest" = Just ("cmd" :| ["arg1", "arg2"], "rest")
+-- > parseCallEscape "( )rest" = Nothing
+--
+parseCallEscape :: String -> Maybe (NE.NonEmpty String, String)
+parseCallEscape s = case dropWhile isSpace s of
+  '(' : sinceOpen -> case span (/= ')') sinceOpen of
+    (call, ')' : sinceClosed)
+      | cmd : args <- words call -> Just (cmd NE.:| args, sinceClosed)
+    _ -> Nothing
+  _ -> Nothing
 
 checkPromptStringForErrors :: String -> Maybe String
 checkPromptStringForErrors ('%':'c':'a':'l':'l':xs) =
   case parseCallEscape xs of
-    ("", "") -> Just ("Incorrect %call syntax. " ++
+    Nothing  -> Just ("Incorrect %call syntax. " ++
                       "Should be %call(a command and arguments).")
-    (_, afterClosed) -> checkPromptStringForErrors afterClosed
+    Just (_, afterClosed) -> checkPromptStringForErrors afterClosed
 checkPromptStringForErrors ('%':'%':xs) = checkPromptStringForErrors xs
 checkPromptStringForErrors (_:xs) = checkPromptStringForErrors xs
 checkPromptStringForErrors "" = Nothing
@@ -1010,10 +1013,12 @@ generatePromptFunctionFromString promptS modules_names line =
         processString ('%':'V':xs) =
             liftM ((text $ showVersion compilerVersion) <>) (processString xs)
         processString ('%':'c':'a':'l':'l':xs) = do
+            -- Input has just been validated by parseCallEscape
+            let (cmd NE.:| args, afterClosed) = fromJust $ parseCallEscape xs
             respond <- liftIO $ do
                 (code, out, err) <-
                     readProcessWithExitCode
-                    (head list_words) (tail list_words) ""
+                    cmd args ""
                     `catchIO` \e -> return (ExitFailure 1, "", show e)
                 case code of
                     ExitSuccess -> return out
@@ -1021,9 +1026,6 @@ generatePromptFunctionFromString promptS modules_names line =
                         hPutStrLn stderr err
                         return ""
             liftM ((text respond) <>) (processString afterClosed)
-            where
-              (cmd, afterClosed) = parseCallEscape xs
-              list_words = words cmd
         processString ('%':'%':xs) =
             liftM ((char '%') <>) (processString xs)
         processString (x:xs) =
