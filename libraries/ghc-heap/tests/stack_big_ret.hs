@@ -10,7 +10,7 @@ import Data.Maybe
 import GHC.Exts (StackSnapshot#)
 import GHC.Exts.DecodeStack
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Closures qualified as CL
+import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.InfoTable.Types
 import GHC.IO.Unsafe
 import GHC.Stack (HasCallStack)
@@ -36,27 +36,27 @@ main = do
 
   mbStackSnapshot <- readIORef stackRef
   let stackSnapshot = fromJust mbStackSnapshot
-  !decodedStack <- decodeStack stackSnapshot
+  !decodedStack <- decodeStack' stackSnapshot
 
   assertStackInvariants stackSnapshot decodedStack
   assertThat
     "Stack contains one big return frame"
     (== 1)
     (length $ filter isBigReturnFrame decodedStack)
-  let  xs = zip [1 ..] $ (payload . head) $ filter isBigReturnFrame decodedStack
+  let  xs = zip [1 ..] $ (map unbox . payload . head) $ filter isBigReturnFrame decodedStack
   mapM_ (uncurry checkArg) xs
 
-checkArg :: Word -> BitmapPayload -> IO ()
+checkArg :: Word -> Closure -> IO ()
 checkArg w bp =
   case bp of
-    Primitive _ -> error "Unexpected payload type from bitmap."
-    Closure c -> do
-      assertEqual CONSTR_0_1 $ (tipe . CL.info) c
-      assertEqual "I#" (CL.name c)
-      assertEqual "ghc-prim" (CL.pkg c)
-      assertEqual "GHC.Types" (CL.modl c)
-      assertEqual True $ (null . CL.ptrArgs) c
-      assertEqual [w] (CL.dataArgs c)
+    UnknownTypeWordSizedPrimitive _ -> error "Unexpected payload type from bitmap."
+    c -> do
+      assertEqual CONSTR_0_1 $ (tipe . info) c
+      assertEqual "I#" (name c)
+      assertEqual "ghc-prim" (pkg c)
+      assertEqual "GHC.Types" (modl c)
+      assertEqual True $ (null . ptrArgs) c
+      assertEqual [w] (dataArgs c)
       pure ()
 
 isBigReturnFrame (RetBig _) = True

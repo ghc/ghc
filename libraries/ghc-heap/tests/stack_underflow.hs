@@ -3,6 +3,7 @@
 module Main where
 
 import Data.Bool (Bool (True))
+import GHC.Exts.Heap.Closures
 import GHC.Exts.DecodeStack
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
@@ -17,7 +18,7 @@ loop n = print "x" >> loop (n - 1) >> print "x"
 getStack :: HasCallStack => IO ()
 getStack = do
   !s <- cloneMyStack
-  !decodedStack <- decodeStack s
+  !decodedStack <- decodeStack' s
   -- Uncomment to see the frames (for debugging purposes)
   -- hPutStrLn stderr $ "Stack frames : " ++ show decodedStack
   assertStackInvariants s decodedStack
@@ -31,7 +32,7 @@ getStack = do
 isUnderflowFrame (UnderflowFrame _) = True
 isUnderflowFrame _ = False
 
-assertStackChunksAreDecodable :: HasCallStack => [StackFrame] -> IO ()
+assertStackChunksAreDecodable :: HasCallStack => [Closure] -> IO ()
 assertStackChunksAreDecodable s = do
   let underflowFrames = filter isUnderflowFrame s
   framesOfChunks <- mapM (decodeStack . nextChunk) underflowFrames

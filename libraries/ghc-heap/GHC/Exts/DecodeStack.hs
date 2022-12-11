@@ -16,7 +16,8 @@
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack (
-  decodeStack
+  decodeStack,
+  decodeStack'
                             ) where
 
 import GHC.Exts.StackConstants

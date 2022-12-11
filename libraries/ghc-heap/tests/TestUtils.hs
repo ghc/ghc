@@ -8,7 +8,8 @@
 module TestUtils
   ( assertEqual,
     assertThat,
-    assertStackInvariants
+    assertStackInvariants,
+    unbox
   )
 where
 
@@ -16,9 +17,11 @@ import Data.Array.Byte
 import GHC.Exts
 import GHC.Exts.DecodeStack
 import GHC.Exts.Heap
+import GHC.Exts.Heap.Closures
 import GHC.Records
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
+import Unsafe.Coerce (unsafeCoerce)
 
 assertEqual :: (HasCallStack, Monad m, Show a, Eq a) => a -> a -> m ()
 assertEqual a b
@@ -28,7 +31,7 @@ assertEqual a b
 assertThat :: (HasCallStack, Monad m) => String -> (a -> Bool) -> a -> m ()
 assertThat s f a = if f a then pure () else error s
 
-assertStackInvariants :: (HasCallStack, Monad m) => StackSnapshot -> [StackFrame] -> m ()
+assertStackInvariants :: (HasCallStack, Monad m) => StackSnapshot -> [Closure] -> m ()
 assertStackInvariants stack decodedStack = do
   assertThat
     "Last frame is stop frame"
@@ -47,7 +50,7 @@ class ToClosureTypes a where
 instance ToClosureTypes StackSnapshot where
   toClosureTypes = stackSnapshotToClosureTypes . foldStackToArrayClosure
 
-instance ToClosureTypes StackFrame where
+instance ToClosureTypes Closure where
   toClosureTypes = stackFrameToClosureTypes
 
 instance ToClosureTypes a => ToClosureTypes [a] where
@@ -81,23 +84,25 @@ stackSnapshotToClosureTypes = wordsToClosureTypes . toWords
 toInt# :: Int -> Int#
 toInt# (I# i#) = i#
 
-stackFrameToClosureTypes :: StackFrame -> [ClosureType]
-stackFrameToClosureTypes sf =
-  case sf of
-    (UpdateFrame {updatee, ..}) -> UPDATE_FRAME : getClosureTypes updatee
-    (CatchFrame {handler, ..}) -> CATCH_FRAME : getClosureTypes handler
-    (CatchStmFrame {code, handler}) -> CATCH_STM_FRAME : getClosureTypes code ++ getClosureTypes handler
-    (CatchRetryFrame {first_code, alt_code, ..}) -> CATCH_RETRY_FRAME : getClosureTypes first_code ++ getClosureTypes alt_code
-    (AtomicallyFrame {code, result}) -> ATOMICALLY_FRAME : getClosureTypes code ++ getClosureTypes result
-    (UnderflowFrame {..}) -> [UNDERFLOW_FRAME]
-    StopFrame -> [STOP_FRAME]
-    (RetSmall {payload, ..}) -> RET_SMALL : getBitmapClosureTypes payload
-    (RetBig {payload}) -> RET_BIG : getBitmapClosureTypes payload
-    (RetFun {fun, payload, ..}) -> RET_FUN : getClosureTypes fun ++ getBitmapClosureTypes payload
-    (RetBCO {instrs, literals, ptrs, payload, ..}) ->
-      RET_BCO : getClosureTypes instrs ++ getClosureTypes literals ++ getClosureTypes ptrs ++ getBitmapClosureTypes payload
+-- TODO: Can probably be simplified once all stack closures have into tables attached.
+stackFrameToClosureTypes :: Closure -> [ClosureType]
+stackFrameToClosureTypes = getClosureTypes
   where
     getClosureTypes :: Closure -> [ClosureType]
+    -- Stack frame closures
+    getClosureTypes (UpdateFrame {updatee, ..}) = UPDATE_FRAME : getClosureTypes (unbox updatee)
+    getClosureTypes (CatchFrame {handler, ..}) = CATCH_FRAME : getClosureTypes (unbox handler)
+    getClosureTypes (CatchStmFrame {catchFrameCode, handler}) = CATCH_STM_FRAME : getClosureTypes (unbox catchFrameCode) ++ getClosureTypes (unbox handler)
+    getClosureTypes (CatchRetryFrame {first_code, alt_code, ..}) = CATCH_RETRY_FRAME : getClosureTypes (unbox first_code) ++ getClosureTypes (unbox alt_code)
+    getClosureTypes (AtomicallyFrame {atomicallyFrameCode, result}) = ATOMICALLY_FRAME : getClosureTypes (unbox atomicallyFrameCode) ++ getClosureTypes (unbox result)
+    getClosureTypes (UnderflowFrame {..}) = [UNDERFLOW_FRAME]
+    getClosureTypes StopFrame = [STOP_FRAME]
+    getClosureTypes (RetSmall {payload, ..}) = RET_SMALL : getBitmapClosureTypes payload
+    getClosureTypes (RetBig {payload}) = RET_BIG : getBitmapClosureTypes payload
+    getClosureTypes (RetFun {retFunFun, retFunPayload, ..}) = RET_FUN : getClosureTypes (unbox retFunFun) ++ getBitmapClosureTypes retFunPayload
+    getClosureTypes (RetBCO {bcoInstrs, bcoLiterals, bcoPtrs, bcoPayload, ..}) =
+      RET_BCO : getClosureTypes (unbox bcoInstrs) ++ getClosureTypes (unbox bcoLiterals) ++ getClosureTypes (unbox bcoPtrs) ++ getBitmapClosureTypes bcoPayload
+    -- Other closures
     getClosureTypes (ConstrClosure {info, ..}) = [tipe info]
     getClosureTypes (FunClosure {info, ..}) = [tipe info]
     getClosureTypes (ThunkClosure {info, ..}) = [tipe info]
@@ -122,13 +127,16 @@ stackFrameToClosureTypes sf =
     getClosureTypes (UnsupportedClosure {info, ..}) = [tipe info]
     getClosureTypes _ = []
 
-    getBitmapClosureTypes :: [BitmapPayload] -> [ClosureType]
+    getBitmapClosureTypes :: [Box] -> [ClosureType]
     getBitmapClosureTypes bps =
       reverse $
         foldl
-          ( \acc p -> case p of
-              (Closure c) -> getClosureTypes c ++ acc
-              (Primitive _) -> acc
+          ( \acc p -> case unbox p of
+              UnknownTypeWordSizedPrimitive _ -> acc
+              c -> getClosureTypes c ++ acc
           )
           []
           bps
+
+unbox :: Box -> Closure
+unbox (Box c) = unsafeCoerce c

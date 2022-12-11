@@ -3,6 +3,7 @@ module Main where
 import Control.Concurrent.STM
 import Control.Exception
 import GHC.Conc
+import GHC.Exts.Heap.Closures
 import GHC.Exts.DecodeStack
 import GHC.Stack.CloneStack
 import TestUtils
@@ -23,16 +24,16 @@ main = do
     (== 1)
     (length $ filter isAtomicallyFrame decodedStack)
 
-getDecodedStack :: IO (StackSnapshot, [StackFrame])
+getDecodedStack :: IO (StackSnapshot, [Closure])
 getDecodedStack = do
   s <-cloneMyStack
-  fs <- decodeStack s
+  fs <- decodeStack' s
   pure (s, fs)
 
-isCatchStmFrame :: StackFrame -> Bool
+isCatchStmFrame :: Closure -> Bool
 isCatchStmFrame (CatchStmFrame _ _) = True
 isCatchStmFrame _ = False
 
-isAtomicallyFrame :: StackFrame -> Bool
+isAtomicallyFrame :: Closure -> Bool
 isAtomicallyFrame (AtomicallyFrame _ _) = True
 isAtomicallyFrame _ = False

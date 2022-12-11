@@ -540,6 +540,7 @@ data TsoFlags
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 
+-- TODO: Fix this to include stack frames
 -- | For generic code, this function returns all referenced closures.
 allClosures :: GenClosure b -> [b]
 allClosures (ConstrClosure {..}) = ptrArgs
