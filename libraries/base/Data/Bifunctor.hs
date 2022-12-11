@@ -120,8 +120,17 @@ class (forall a. Functor (p a)) => Bifunctor p where
     second = bimap id
 
 
-
--- | @since 4.8.0.0
+-- | Class laws for tuples hold only up to laziness. Both
+-- 'first' 'id' and 'second' 'id' are lazier than 'id' (and 'fmap' 'id'):
+--
+-- >>> first id (undefined :: (Int, Word)) `seq` ()
+-- ()
+-- >>> second id (undefined :: (Int, Word)) `seq` ()
+-- ()
+-- >>> id (undefined :: (Int, Word)) `seq` ()
+-- *** Exception: Prelude.undefined
+--
+-- @since 4.8.0.0
 instance Bifunctor (,) where
     bimap f g ~(a, b) = (f a, g b)
 
