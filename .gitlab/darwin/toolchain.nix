@@ -15,16 +15,16 @@ let
   ghcBindists = let version = ghc.version; in {
     aarch64-darwin = pkgs.fetchurl {
       url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-aarch64-apple-darwin.tar.xz";
-      sha256 = "sha256:0p2f35pihlnmkm7x73b5xm3dyhiczrywc19khr7i7vb2q1y4zw6i";
+      sha256 = "sha256:10pby1idpxhkjqsi56jivkymhnabsdr8m2x8gdqchnv5113hl72k";
     };
     x86_64-darwin = pkgs.fetchurl {
       url = "https://downloads.haskell.org/ghc/${version}/ghc-${version}-x86_64-apple-darwin.tar.xz";
-      sha256 = "sha256:0gzq0vfjbhr9n8z63capvdwrw7bisy15d5c1y1gynfix13bbnjlk";
+      sha256 = "sha256:012yzyangk26sdapnz4226prgb8jgpf6k5bd9qxsdykk5x7jc7ah";
     };
   };
 
   ghc = pkgs.stdenv.mkDerivation rec {
-    version = "9.2.2";
+    version = "9.4.3";
     name = "ghc";
     src = ghcBindists.${pkgs.stdenv.hostPlatform.system};
     configureFlags = [
@@ -37,6 +37,21 @@ let
       "CONF_GCC_LINKER_OPTS_STAGE2=--target=${targetTriple}"
     ];
     buildPhase = "true";
+
+    # This is a horrible hack because the configure script invokes /usr/bin/clang
+    # without a `--target` flag. Then depending on whether the `nix` binary itself is
+    # a native x86 or arm64 binary means that /usr/bin/clang thinks it needs to run in
+    # x86 or arm64 mode.
+
+    # The correct answer for the check in question is the first one we try, so by replacing
+    # the condition to true; we select the right C++ standard library still.
+    preConfigure = ''
+      sed "s/\"\$CC\" -o actest actest.o \''${1} 2>\/dev\/null/true/i" configure > configure.new
+      mv configure.new configure
+      chmod +x configure
+      cat configure
+
+    '';
 
     # N.B. Work around #20253.
     nativeBuildInputs = [ pkgs.gnused ];
