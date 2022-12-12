@@ -456,3 +456,4 @@ test('T22317', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check m -
 
 test('T22494', [grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T22491', normal, compile, ['-O2'])
+test('T21476', normal, compile, [''])
