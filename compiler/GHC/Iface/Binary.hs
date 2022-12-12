@@ -292,7 +292,7 @@ getSymbolTable bh name_cache = do
     -- create an array of Names for the symbols and add them to the NameCache
     updateNameCache' name_cache $ \cache0 -> do
         mut_arr <- newArray_ (0, sz-1) :: IO (IOArray Int Name)
-        cache <- foldGet (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
+        cache <- foldGet' (fromIntegral sz) bh cache0 $ \i (uid, mod_name, occ) cache -> do
           let mod = mkModule uid mod_name
           case lookupOrigNameCache cache mod occ of
             Just name -> do

@@ -44,7 +44,7 @@ module GHC.Utils.Binary
    castBin,
    withBinBuffer,
 
-   foldGet,
+   foldGet, foldGet',
 
    writeBinMem,
    readBinMem,
@@ -330,6 +330,23 @@ foldGet n bh init_b f = go 0 init_b
       | otherwise = do
           a <- get bh
           b' <- f i a b
+          go (i+1) b'
+
+foldGet'
+  :: Binary a
+  => Word -- n elements
+  -> BinHandle
+  -> b -- initial accumulator
+  -> (Word -> a -> b -> IO b)
+  -> IO b
+{-# INLINE foldGet' #-}
+foldGet' n bh init_b f = go 0 init_b
+  where
+    go i !b
+      | i == n    = return b
+      | otherwise = do
+          !a  <- get bh
+          b'  <- f i a b
           go (i+1) b'
 
 
