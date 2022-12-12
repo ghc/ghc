@@ -44,6 +44,7 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
   , someNatVal, someSymbolVal, someCharVal
   , N.sameNat, sameSymbol, sameChar
+  , N.decideNat, decideSymbol, decideChar
   , OrderingI(..)
   , N.cmpNat, cmpSymbol, cmpChar
     -- ** Singleton values
@@ -68,7 +69,8 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base ( Eq(..), Functor(..), Ord(..), Ordering(..), String
-                , (.), otherwise, withDict )
+                , (.), otherwise, withDict, Void, (++)
+                , errorWithoutStackTrace)
 import GHC.Types(Symbol, Char, TYPE)
 import GHC.TypeError(ErrorMessage(..), TypeError)
 import GHC.Num(Integer, fromInteger)
@@ -76,7 +78,8 @@ import GHC.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Read(Read(..))
 import GHC.Real(toInteger)
 import GHC.Prim(Proxy#)
-import Data.Maybe(Maybe(..))
+import Data.Either (Either (..))
+import Data.Maybe (Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Coercion (Coercion(..), TestCoercion(..))
 import Data.Type.Equality((:~:)(Refl), TestEquality(..))
@@ -224,6 +227,20 @@ sameSymbol :: forall a b proxy1 proxy2.
               proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameSymbol _ _ = testEquality (symbolSing @a) (symbolSing @b)
 
+-- | We either get evidence that this function was instantiated with the
+-- same type-level symbols, or that the type-level symbols are distinct.
+--
+-- @since 4.19.0.0
+decideSymbol :: forall a b proxy1 proxy2.
+              (KnownSymbol a, KnownSymbol b) =>
+              proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
+decideSymbol _ _ = decSymbol (symbolSing @a) (symbolSing @b)
+
+-- Not exported: See [Not exported decNat, decSymbol and decChar]
+decSymbol :: SSymbol a -> SSymbol b -> Either (a :~: b -> Void) (a :~: b)
+decSymbol (UnsafeSSymbol x) (UnsafeSSymbol y)
+  | x == y    = Right (unsafeCoerce Refl)
+  | otherwise = Left (\Refl -> errorWithoutStackTrace ("decideSymbol: Impossible equality proof " ++ show x ++ " :~: " ++ show y))
 
 -- | We either get evidence that this function was instantiated with the
 -- same type-level characters, or 'Nothing'.
@@ -233,6 +250,21 @@ sameChar :: forall a b proxy1 proxy2.
             (KnownChar a, KnownChar b) =>
             proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameChar _ _ = testEquality (charSing @a) (charSing @b)
+
+-- | We either get evidence that this function was instantiated with the
+-- same type-level characters, or that the type-level characters are distinct.
+--
+-- @since 4.19.0.0
+decideChar :: forall a b proxy1 proxy2.
+            (KnownChar a, KnownChar b) =>
+            proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
+decideChar _ _ = decChar (charSing @a) (charSing @b)
+
+-- Not exported: See [Not exported decNat, decSymbol and decChar]
+decChar :: SChar a -> SChar b -> Either (a :~: b -> Void) (a :~: b)
+decChar (UnsafeSChar x) (UnsafeSChar y)
+  | x == y    = Right (unsafeCoerce Refl)
+  | otherwise = Left (\Refl -> errorWithoutStackTrace ("decideChar: Impossible equality proof " ++ show x ++ " :~: " ++ show y))
 
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
@@ -352,9 +384,9 @@ instance Show (SSymbol s) where
 
 -- | @since 4.18.0.0
 instance TestEquality SSymbol where
-  testEquality (UnsafeSSymbol x) (UnsafeSSymbol y)
-    | x == y    = Just (unsafeCoerce Refl)
-    | otherwise = Nothing
+  testEquality a b = case decSymbol a b of
+    Right p -> Just p
+    Left _  -> Nothing
 
 -- | @since 4.18.0.0
 instance TestCoercion SSymbol where
@@ -445,9 +477,9 @@ instance Show (SChar c) where
 
 -- | @since 4.18.0.0
 instance TestEquality SChar where
-  testEquality (UnsafeSChar x) (UnsafeSChar y)
-    | x == y    = Just (unsafeCoerce Refl)
-    | otherwise = Nothing
+  testEquality a b = case decChar a b of
+    Right p -> Just p
+    Left _  -> Nothing
 
 -- | @since 4.18.0.0
 instance TestCoercion SChar where

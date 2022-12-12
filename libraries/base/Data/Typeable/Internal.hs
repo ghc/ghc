@@ -66,6 +66,7 @@ module Data.Typeable.Internal (
     typeRepFingerprint,
     rnfTypeRep,
     eqTypeRep,
+    decTypeRep,
     typeRepKind,
     splitApps,
 
@@ -88,6 +89,7 @@ module Data.Typeable.Internal (
 
 import GHC.Base
 import qualified GHC.Arr as A
+import Data.Either (Either (..))
 import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
@@ -611,14 +613,48 @@ typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
 -- @since 4.10
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
-eqTypeRep a b
-  | sameTypeRep a b = Just (unsafeCoerce HRefl)
-  | otherwise       = Nothing
--- We want GHC to inline eqTypeRep to get rid of the Maybe
--- in the usual case that it is scrutinized immediately. We
--- split eqTypeRep into a worker and wrapper because otherwise
--- it's much larger than anything we'd want to inline.
-{-# INLINABLE eqTypeRep #-}
+eqTypeRep a b = case inline decTypeRep a b of
+                  -- inline: see wrinkle (I1) in Note [Inlining eqTypeRep/decTypeRep]
+  Right p -> Just p
+  Left _  -> Nothing
+
+-- | Type equality decision
+--
+-- @since 4.19.0.0
+decTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
+             TypeRep a -> TypeRep b -> Either (a :~~: b -> Void) (a :~~: b)
+decTypeRep a b
+  | sameTypeRep a b = Right (unsafeCoerce HRefl)
+  | otherwise       = Left (\HRefl -> errorWithoutStackTrace ("decTypeRep: Impossible equality proof " ++ show a ++ " :~: " ++ show b))
+
+{-# INLINEABLE eqTypeRep #-}
+{-# INLINEABLE decTypeRep #-}
+
+{-
+Note [Inlining eqTypeRep/decTypeRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We want GHC to inline eqTypeRep and decTypeRep to get rid of the Maybe
+and Either in the usual case that it is scrutinized immediately. We
+split them into a worker (sameTypeRep) and wrappers because otherwise
+it's much larger than anything we'd want to inline.
+
+We need INLINEABLE on the eqTypeRep and decTypeRep as GHC
+seems to want to inline sameTypeRep here, making tham bigger.
+By exposing exact RHS, they stay small and other optimizations may
+fire first, so GHC can realise that inlining sameTypeRep is often
+(but not always) a bad idea.
+
+Wrinkle I1:
+
+`inline decTypeRep` in eqTypeRep implementation is to ensure that `decTypeRep`
+is inlined, even it's somewhat big of expression, but we know that big Left
+branch will be optimized away.
+
+See discussion in https://gitlab.haskell.org/ghc/ghc/-/merge_requests/9524
+and also https://gitlab.haskell.org/ghc/ghc/-/issues/22635
+
+-}
 
 sameTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
                TypeRep a -> TypeRep b -> Bool

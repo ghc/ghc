@@ -44,6 +44,7 @@ module Type.Reflection
     , I.typeRepTyCon
     , I.rnfTypeRep
     , I.eqTypeRep
+    , I.decTypeRep
     , I.typeRepKind
     , I.splitApps
 

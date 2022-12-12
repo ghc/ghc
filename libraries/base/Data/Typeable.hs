@@ -58,6 +58,8 @@ module Data.Typeable
     , cast
     , eqT
     , heqT
+    , decT
+    , hdecT
     , gcast                -- a generalisation of cast
 
       -- * Generalized casts for higher-order kinds
@@ -99,6 +101,7 @@ import qualified Data.Typeable.Internal as I
 import Data.Typeable.Internal (Typeable)
 import Data.Type.Equality
 
+import Data.Either
 import Data.Maybe
 import Data.Proxy
 import GHC.Fingerprint.Type
@@ -140,11 +143,28 @@ eqT
   | Just HRefl <- heqT @a @b = Just Refl
   | otherwise                = Nothing
 
+-- | Decide an equality of two types
+--
+-- @since 4.19.0.0
+decT :: forall a b. (Typeable a, Typeable b) => Either (a :~: b -> Void) (a :~: b)
+decT = case hdecT @a @b of
+  Right HRefl -> Right Refl
+  Left p      -> Left (\Refl -> p HRefl)
+
 -- | Extract a witness of heterogeneous equality of two types
 --
 -- @since 4.18.0.0
 heqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~~: b)
 heqT = ta `I.eqTypeRep` tb
+  where
+    ta = I.typeRep :: I.TypeRep a
+    tb = I.typeRep :: I.TypeRep b
+
+-- | Decide heterogeneous equality of two types.
+--
+-- @since 4.19.0.0
+hdecT :: forall a b. (Typeable a, Typeable b) => Either (a :~~: b -> Void) (a :~~: b)
+hdecT = ta `I.decTypeRep` tb
   where
     ta = I.typeRep :: I.TypeRep a
     tb = I.typeRep :: I.TypeRep b

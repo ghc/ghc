@@ -33,6 +33,7 @@ module GHC.TypeNats
   , SomeNat(..)
   , someNatVal
   , sameNat
+  , decideNat
     -- ** Singleton values
   , SNat
   , pattern SNat
@@ -48,12 +49,14 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise)
+import GHC.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
+               , Void, errorWithoutStackTrace, (++))
 import GHC.Types
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Read(Read(..))
 import GHC.Prim(Proxy#)
+import Data.Either(Either(..))
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Coercion (Coercion(..), TestCoercion(..))
@@ -239,6 +242,73 @@ sameNat :: forall a b proxy1 proxy2.
            proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameNat _ _ = testEquality (natSing @a) (natSing @b)
 
+-- | We either get evidence that this function was instantiated with the
+-- same type-level numbers, or that the type-level numbers are distinct.
+--
+-- @since 4.19.0.0
+decideNat :: forall a b proxy1 proxy2.
+           (KnownNat a, KnownNat b) =>
+           proxy1 a -> proxy2 b -> Either (a :~: b -> Void) (a :~: b)
+decideNat _ _ = decNat (natSing @a) (natSing @b)
+
+-- Not exported: See [Not exported decNat, decSymbol and decChar]
+decNat :: SNat a -> SNat b -> Either (a :~: b -> Void) (a :~: b)
+decNat (UnsafeSNat x) (UnsafeSNat y)
+  | x == y    = Right (unsafeCoerce Refl)
+  | otherwise = Left (\Refl -> errorWithoutStackTrace ("decideNat: Impossible equality proof " ++ show x ++ " :~: " ++ show y))
+
+{-
+Note [Not exported decNat, decSymbol and decChar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The decNat, decSymbol and decChar are not (yet) exported.
+
+There are two development paths:
+1. export them.
+2. Add `decideEquality :: f a -> f b -> Either (a :~: b -> Void) (a :~: b)`
+   to the `Data.Type.Equality.TestEquality` typeclass.
+
+The second option looks nicer given the current base API:
+there aren't `eqNat :: SNat a -> SNat b -> Maybe (a :~: b)` like functions,
+they are abstracted by `TestEquality` typeclass.
+
+Also TestEquality class has a law that testEquality result
+should be Just Refl iff the types applied to are equal:
+
+testEquality (x :: f a) (y :: f b) = Just Refl  <=> a = b
+
+As consequence we have that testEquality should be Nothing
+iff the types applied are inequal:
+
+testEquality (x :: f a) (y :: f b) = Nothing   <=> a /= b
+
+And the decideEquality would enforce that.
+
+However, adding a new method is a breaking change,
+as default implementation cannot be (safely) provided.
+Also there are unlawful instances of `TestEquality` out there,
+(e.g. https://hackage.haskell.org/package/parameterized-utils Index instance
+      https://hackage.haskell.org/package/witness various types)
+which makes adding unsafe default implementation a bad idea.
+
+Adding own typeclass:
+
+class TestEquality f => DecideEquality f where
+  decideEquality :: f a -> f b -> Either (a :~: b -> Void) (a :~: b)
+
+is bad design, as `TestEquality` already implies that it should be possible.
+In other words, every f with (lawful) `TestEquality` instance should have
+`DecideEquality` instance as well.
+
+We hold on doing either 1. or 2. yet, as doing 2. is "harder",
+but if it is done eventually, doing 1. is pointless.
+In other words the paths can be thought as mutually exclusive.
+
+Fortunately the dec* functions can be simulated using decide* variants
+if needed, so there is no hurry to commit to either development paths.
+
+-}
+
 -- | Like 'sameNat', but if the numbers aren't equal, this additionally
 -- provides proof of LT or GT.
 --
@@ -318,9 +388,9 @@ instance Show (SNat n) where
 
 -- | @since 4.18.0.0
 instance TestEquality SNat where
-  testEquality (UnsafeSNat x) (UnsafeSNat y)
-    | x == y    = Just (unsafeCoerce Refl)
-    | otherwise = Nothing
+  testEquality a b = case decNat a b of
+    Right x -> Just x
+    Left _  -> Nothing
 
 -- | @since 4.18.0.0
 instance TestCoercion SNat where

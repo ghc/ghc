@@ -48,6 +48,20 @@ GHC.TypeLits.cmpChar ::
 GHC.TypeLits.cmpSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   proxy1 a -> proxy2 b -> Data.Type.Ord.OrderingI a b
+GHC.TypeLits.decideChar ::
+  (GHC.TypeLits.KnownChar a, GHC.TypeLits.KnownChar b) =>
+  proxy1 a
+  -> proxy2 b
+  -> Either
+       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       (a Data.Type.Equality.:~: b)
+GHC.TypeLits.decideSymbol ::
+  (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
+  proxy1 a
+  -> proxy2 b
+  -> Either
+       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       (a Data.Type.Equality.:~: b)
 GHC.TypeLits.fromSChar :: GHC.TypeLits.SChar c -> Char
 GHC.TypeLits.fromSNat :: GHC.TypeNats.SNat n -> Integer
 GHC.TypeLits.fromSSymbol :: GHC.TypeLits.SSymbol s -> String
@@ -172,6 +186,13 @@ type family (GHC.TypeNats.^) a b
 GHC.TypeNats.cmpNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
   proxy1 a -> proxy2 b -> Data.Type.Ord.OrderingI a b
+GHC.TypeNats.decideNat ::
+  (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
+  proxy1 a
+  -> proxy2 b
+  -> Either
+       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       (a Data.Type.Equality.:~: b)
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
   proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
