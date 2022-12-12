@@ -535,6 +535,8 @@ toIfGuidance :: UnfoldingSource -> UnfoldingGuidance -> IfGuidance
 toIfGuidance src guidance
   | UnfWhen arity unsat_ok boring_ok <- guidance
   , isStableSource src = IfWhen arity unsat_ok boring_ok
+  | UnfIfGoodArgs args size res <- guidance
+  , isStableSource src = IfStableGuidance args size res
   | otherwise          = IfNoGuidance
 
 {-

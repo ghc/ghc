@@ -371,6 +371,10 @@ data IfaceUnfolding
 data IfGuidance
   = IfNoGuidance            -- Compute it from the IfaceExpr
   | IfWhen Arity Bool Bool  -- Just like UnfWhen in Core.UnfoldingGuidance
+  | IfStableGuidance  { iug_args :: [Int]
+                      , iug_size :: Int
+                      , iug_res :: Int
+                      }
 
 -- We only serialise the IdDetails of top-level Ids, and even then
 -- we only need a very limited selection.  Notably, none of the
@@ -1530,6 +1534,8 @@ instance Outputable IfaceUnfolding where
 instance Outputable IfGuidance where
   ppr IfNoGuidance   = empty
   ppr (IfWhen a u b) = angleBrackets (ppr a <> comma <> ppr u <> ppr b)
+  ppr (IfStableGuidance a s r) =
+    angleBrackets (ppr a <> comma <> ppr s <> comma <> ppr r)
 
 {-
 ************************************************************************
@@ -2323,14 +2329,23 @@ instance Binary IfGuidance where
         put_ bh a
         put_ bh b
         put_ bh c
+    put_ bh (IfStableGuidance a s r ) = do
+        putByte bh 2
+        put_ bh a
+        put_ bh s
+        put_ bh r
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfNoGuidance
-            _ -> do a <- get bh
+            1 -> do a <- get bh
                     b <- get bh
                     c <- get bh
                     return (IfWhen a b c)
+            _ -> do a <- get bh
+                    s <- get bh
+                    r <- get bh
+                    return (IfStableGuidance a s r)
 
 instance Binary IfaceAlt where
     put_ bh (IfaceAlt a b c) = do
@@ -2685,6 +2700,7 @@ instance NFData IfGuidance where
   rnf = \case
     IfNoGuidance -> ()
     IfWhen a b c -> a `seq` b `seq` c `seq` ()
+    IfStableGuidance a b c -> a `seq` b `seq` c `seq` ()
 
 instance NFData IfaceUnfolding where
   rnf = \case
