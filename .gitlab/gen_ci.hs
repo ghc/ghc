@@ -349,8 +349,8 @@ opsysVariables _ FreeBSD13 = mconcat
     -- [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
     "CONFIGURE_ARGS" =:  "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
-  , "GHC_VERSION" =: "9.2.2"
-  , "CABAL_INSTALL_VERSION" =: "3.6.2.0"
+  , "GHC_VERSION" =: "9.4.3"
+  , "CABAL_INSTALL_VERSION" =: "3.8.1.0"
   ]
 opsysVariables _ (Linux distro) = distroVariables distro
 opsysVariables AArch64 (Darwin {}) =
@@ -378,8 +378,8 @@ opsysVariables _ (Windows {}) =
   mconcat [ "MSYSTEM" =: "MINGW64"
           , "HADRIAN_ARGS" =: "--docs=no-sphinx"
           , "LANG" =: "en_US.UTF-8"
-          , "CABAL_INSTALL_VERSION" =: "3.2.0.0"
-          , "GHC_VERSION" =: "9.2.2" ]
+          , "CABAL_INSTALL_VERSION" =: "3.8.1.0"
+          , "GHC_VERSION" =: "9.4.3" ]
 opsysVariables _ _ = mempty
 
 

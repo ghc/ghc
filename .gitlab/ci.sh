@@ -213,10 +213,14 @@ function set_toolchain_paths() {
           x86_64-darwin|aarch64-darwin) ;;
           *) fail "unknown NIX_SYSTEM" ;;
         esac
-        nix build -f .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh
+        info "Building toolchain for $NIX_SYSTEM"
+        nix-build .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh
         cat toolchain.sh
       fi
-      source toolchain.sh ;;
+      source toolchain.sh
+      info "--info for GHC for $NIX_SYSTEM"
+      $GHC --info
+      ;;
     env)
       # These are generally set by the Docker image but
       # we provide these handy fallbacks in case the
@@ -320,7 +324,7 @@ function fetch_cabal() {
             MINGW64) cabal_arch="x86_64" ;;
             *) fail "unknown MSYSTEM $MSYSTEM" ;;
           esac
-          url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-unknown-mingw32.zip"
+          url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"
           info "Fetching cabal binary distribution from $url..."
           curl "$url" > "$TMP/cabal.zip"
           unzip "$TMP/cabal.zip"
