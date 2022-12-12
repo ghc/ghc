@@ -388,7 +388,14 @@ runJsPhase pipe_env hsc_env input_fn = do
   -- ensure the timestamp is refreshed, see Note [JS Backend .o file procedure]. If
   -- they are not the same then we embed the .js file into a .o file with the
   -- addition of a header
-  if (input_fn /= output_fn)
+  --
+  -- We need to canonicalize the paths, otherwise the comparison can return
+  -- wrong results (e.g. with Cabal using paths containing "build/./Foo/..."
+  -- that are compared to "build/Foo/...").
+  --
+  cin  <- canonicalizePath input_fn
+  cout <- canonicalizePath output_fn
+  if (not (equalFilePath cin cout))
     then embedJsFile logger dflags tmpfs unit_env input_fn output_fn
     else touchObjectFile logger dflags output_fn
 
