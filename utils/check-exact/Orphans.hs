@@ -89,4 +89,4 @@ instance Default EpAnnSumPat where
   def = EpAnnSumPat def  def  def
 
 instance Default AnnsModule where
-  def = AnnsModule [] mempty
+  def = AnnsModule [] mempty Nothing

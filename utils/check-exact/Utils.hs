@@ -172,6 +172,25 @@ isPointSrcSpan ss = spanLength ss == 0
 
 -- ---------------------------------------------------------------------
 
+origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
+origDelta pos pp = op
+  where
+    (r,c) = ss2posEnd pp
+
+    op = if r == 0
+           then (             ss2delta (r,c+1) pos)
+           else (tweakDelta $ ss2delta (r,c  ) pos)
+
+-- ---------------------------------------------------------------------
+
+-- | For comment-related deltas starting on a new line we have an
+-- off-by-one problem. Adjust
+tweakDelta :: DeltaPos  -> DeltaPos
+tweakDelta (SameLine d) = SameLine d
+tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
+
+-- ---------------------------------------------------------------------
+
 -- |Given a list of items and a list of keys, returns a list of items
 -- ordered by their position in the list of keys.
 orderByKey :: [(RealSrcSpan,a)] -> [RealSrcSpan] -> [(RealSrcSpan,a)]

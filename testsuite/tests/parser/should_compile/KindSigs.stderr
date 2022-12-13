@@ -17,16 +17,14 @@
       (Nothing)
       (Nothing)
       []
-      []))
+      [])
+     (Just
+      ((,)
+       { KindSigs.hs:36:1 }
+       { KindSigs.hs:35:8-11 })))
     (EpaCommentsBalanced
      []
-     [(L
-       (Anchor
-        { KindSigs.hs:36:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { KindSigs.hs:36:1 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)

@@ -17,7 +17,11 @@
       (Nothing)
       (Nothing)
       []
-      []))
+      [])
+     (Just
+      ((,)
+       { T20718b.hs:8:1 }
+       { T20718b.hs:7:1-21 })))
     (EpaCommentsBalanced
      [(L
        (Anchor
@@ -51,13 +55,7 @@
         (EpaLineComment
          "-- trailing comment 2")
         { T20718b.hs:6:1-21 }))]
-     [(L
-       (Anchor
-        { T20718b.hs:8:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { T20718b.hs:7:1-21 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)

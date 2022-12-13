@@ -916,18 +916,11 @@ instance Outputable Token where
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When using the Api Annotations to exact print a modified AST, managing
 the space before a comment is important.  The PsSpan in the comment
-token allows this to happen.
+token allows this to happen, and this location is tracked in prev_loc
+in PState.  This only tracks physical tokens, so is not updated for
+zero-width ones.
 
-We also need to track the space before the end of file. The normal
-mechanism of using the previous token does not work, as the ITeof is
-synthesised to come at the same location of the last token, and the
-normal previous token updating has by then updated the required
-location.
-
-We track this using a 2-back location, prev_loc2. This adds extra
-processing to every single token, which is a performance hit for
-something needed only at the end of the file. This needs
-improving. Perhaps a backward scan on eof?
+We also use this to track the space before the end-of-file marker.
 -}
 
 {- Note [Minus tokens]
@@ -1363,7 +1356,7 @@ lineCommentToken :: Action
 lineCommentToken span buf len buf2 = do
   b <- getBit RawTokenStreamBit
   if b then do
-         lt <- getLastLocComment
+         lt <- getLastLocIncludingComments
          strtoken (\s -> ITlineComment s lt) span buf len buf2
        else lexToken
 
@@ -1374,7 +1367,7 @@ lineCommentToken span buf len buf2 = do
 -}
 nested_comment :: Action
 nested_comment span buf len _buf2 = {-# SCC "nested_comment" #-} do
-  l <- getLastLocComment
+  l <- getLastLocIncludingComments
   let endComment input (L _ comment) = commentEnd lexToken input (Nothing, ITblockComment comment l) buf span
   input <- getInput
   -- Include decorator in comment
@@ -1478,7 +1471,7 @@ withLexedDocType :: (AlexInput -> ((HsDocStringDecorator -> HsDocString) -> (Hdk
                  -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
-  l <- getLastLocComment
+  l <- getLastLocIncludingComments
   case prevChar buf ' ' of
     -- The `Bool` argument to lexDocComment signals whether or not the next
     -- line of input might also belong to this doc comment.
@@ -2001,7 +1994,7 @@ lex_string_prag_comment :: (String -> PsSpan -> Token) -> Action
 lex_string_prag_comment mkTok span _buf _len _buf2
     = do input <- getInput
          start <- getParsedLoc
-         l <- getLastLocComment
+         l <- getLastLocIncludingComments
          tok <- go l [] input
          end <- getParsedLoc
          return (L (mkPsSpan start end) tok)
@@ -2494,9 +2487,7 @@ data PState = PState {
         tab_first  :: Strict.Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Word,             -- number of tab warnings in the file
         last_tk    :: Strict.Maybe (PsLocated Token), -- last non-comment token
-        prev_loc   :: PsSpan,      -- pos of previous token, including comments,
-        prev_loc2  :: PsSpan,      -- pos of two back token, including comments,
-                                   -- see Note [PsSpan in Comments]
+        prev_loc   :: PsSpan,      -- pos of previous non-virtual token, including comments,
         last_loc   :: PsSpan,      -- pos of current token
         last_len   :: !Int,        -- len of current token
         loc        :: PsLoc,       -- current loc (end of prev token + 1)
@@ -2624,24 +2615,21 @@ setLastToken loc len = P $ \s -> POk s {
   } ()
 
 setLastTk :: PsLocated Token -> P ()
-setLastTk tk@(L l _) = P $ \s -> POk s { last_tk = Strict.Just tk
-                                       , prev_loc = l
-                                       , prev_loc2 = prev_loc s} ()
+setLastTk tk@(L l _) = P $ \s ->
+  if isPointRealSpan (psRealSpan l)
+    then POk s { last_tk = Strict.Just tk } ()
+    else POk s { last_tk = Strict.Just tk
+               , prev_loc = l } ()
 
 setLastComment :: PsLocated Token -> P ()
-setLastComment (L l _) = P $ \s -> POk s { prev_loc = l
-                                         , prev_loc2 = prev_loc s} ()
+setLastComment (L l _) = P $ \s -> POk s { prev_loc = l } ()
 
 getLastTk :: P (Strict.Maybe (PsLocated Token))
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
 -- see Note [PsSpan in Comments]
-getLastLocComment :: P PsSpan
-getLastLocComment = P $ \s@(PState { prev_loc = prev_loc }) -> POk s prev_loc
-
--- see Note [PsSpan in Comments]
-getLastLocEof :: P PsSpan
-getLastLocEof = P $ \s@(PState { prev_loc2 = prev_loc2 }) -> POk s prev_loc2
+getLastLocIncludingComments :: P PsSpan
+getLastLocIncludingComments = P $ \s@(PState { prev_loc = prev_loc }) -> POk s prev_loc
 
 getLastLoc :: P PsSpan
 getLastLoc = P $ \s@(PState { last_loc = last_loc }) -> POk s last_loc
@@ -3024,7 +3012,6 @@ initParserState options buf loc =
       tab_count     = 0,
       last_tk       = Strict.Nothing,
       prev_loc      = mkPsSpan init_loc init_loc,
-      prev_loc2     = mkPsSpan init_loc init_loc,
       last_loc      = mkPsSpan init_loc init_loc,
       last_len      = 0,
       loc           = init_loc,
@@ -3498,8 +3485,8 @@ lexToken = do
   case alexScanUser exts inp sc of
     AlexEOF -> do
         let span = mkPsSpan loc1 loc1
-        lt <- getLastLocEof
-        setEofPos (psRealSpan span) (psRealSpan lt)
+        lc <- getLastLocIncludingComments
+        setEofPos (psRealSpan span) (psRealSpan lc)
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
