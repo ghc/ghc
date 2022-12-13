@@ -875,10 +875,10 @@ pruneCache hpt summ
            modl = miKey iface
            linkable'
                 | Just ms <- M.lookup modl ms_map
-                , mi_src_hash iface /= ms_hs_hash ms
-                = emptyHomeModInfoLinkable
-                | otherwise
+                , mi_src_hash iface == Just (ms_hs_hash ms)
                 = linkable
+                | otherwise
+                = emptyHomeModInfoLinkable
 
         -- Using UFM Module is safe for determinism because the map is just used for a transient lookup. The cache should be unique and a key clash is an error.
         ms_map = M.fromListWith

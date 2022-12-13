@@ -53,7 +53,7 @@ data ModGuts
         mg_exports   :: ![AvailInfo],    -- ^ What it exports
         mg_deps      :: !Dependencies,   -- ^ What it depends on, directly or
                                          -- otherwise
-        mg_usages    :: ![Usage],        -- ^ What was used?  Used for interfaces.
+        mg_usages    :: !(Maybe [Usage]), -- ^ What was used?  Used for interfaces.
 
         mg_used_th   :: !Bool,           -- ^ Did we run a TH splice?
         mg_rdr_env   :: !GlobalRdrEnv,   -- ^ Top-level lexical environment
