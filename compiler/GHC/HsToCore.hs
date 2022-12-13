@@ -22,14 +22,12 @@ import GHC.Driver.DynFlags
 import GHC.Driver.Config
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.HsToCore.Ticks
-import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
 import GHC.Driver.Backend
 import GHC.Driver.Plugins
 
 import GHC.Hs
 
-import GHC.HsToCore.Usage
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Errors.Types
 import GHC.HsToCore.Expr
@@ -42,7 +40,7 @@ import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Origin ( Position(..) )
-import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances, initIfaceLoad )
+import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
 import GHC.Tc.Module ( runTcInteractive )
 
 import GHC.Core.Type
@@ -100,6 +98,7 @@ import GHC.Unit.Module.Deps
 import Data.List (partition)
 import Data.IORef
 import Data.Traversable (for)
+import GHC.Iface.Make (mkRecompUsageInfo)
 
 {-
 ************************************************************************
@@ -127,12 +126,10 @@ deSugar hsc_env
                             tcg_fix_env      = fix_env,
                             tcg_inst_env     = inst_env,
                             tcg_fam_inst_env = fam_inst_env,
-                            tcg_merged       = merged,
                             tcg_warns        = warns,
                             tcg_anns         = anns,
                             tcg_binds        = binds,
                             tcg_imp_specs    = imp_specs,
-                            tcg_dependent_files = dependent_files,
                             tcg_ev_binds     = ev_binds,
                             tcg_th_foreign_files = th_foreign_files_var,
                             tcg_fords        = fords,
@@ -228,8 +225,7 @@ deSugar hsc_env
 
         ; endPassHscEnvIO hsc_env name_ppr_ctx CoreDesugarOpt ds_binds ds_rules_for_imps
 
-        ; let used_names = mkUsedNames tcg_env
-              pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
+        ; let pluginModules = map lpModule (loadedPlugins (hsc_plugins hsc_env))
               home_unit = hsc_home_unit hsc_env
         ; let deps = mkDependencies home_unit
                                     (tcg_mod tcg_env)
@@ -237,17 +233,10 @@ deSugar hsc_env
                                     (map mi_module pluginModules)
 
         ; used_th <- readIORef tc_splice_used
-        ; dep_files <- readIORef dependent_files
         ; safe_mode <- finalSafeMode dflags tcg_env
-        ; (needed_mods, needed_pkgs) <- readIORef (tcg_th_needed_deps tcg_env)
 
-        ; let uc = initUsageConfig hsc_env
-        ; let plugins = hsc_plugins hsc_env
-        ; let fc = hsc_FC hsc_env
-        ; let unit_env = hsc_unit_env hsc_env
-        ; usages <- initIfaceLoad hsc_env $
-                      mkUsageInfo uc plugins fc unit_env mod (imp_mods imports) used_names
-                        dep_files merged needed_mods needed_pkgs
+        ; usages <- mkRecompUsageInfo hsc_env tcg_env
+
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)
         -- Consequently, this should hold for any ModGuts that make

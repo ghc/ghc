@@ -2398,6 +2398,7 @@ of ``-W(no-)*``.
     triggered whenever this happens, and can be addressed by enabling the
     extension.
 
+<<<<<<< HEAD
 .. ghc-flag:: -Wloopy-superclass-solve
     :shortdesc: *(deprecated)* warn when creating potentially-loopy superclass constraint evidence
     :type: dynamic
@@ -2596,6 +2597,22 @@ of ``-W(no-)*``.
 
     To make the code forwards-compatible and silence the warning, users are
     advised to add parentheses manually.
+=======
+.. ghc-flag:: -Wreify-module-missing-info
+    :shortdesc: warn when `reifyModule`
+    :type: dynamic
+    :reverse: -Wno-reify-module-missing-info
+
+    :since: 9.6.1
+
+    The `reifyModule` function in the Template Haskell API can fail to find the necessary
+    information when an interface file is generated with `-fno-write-self-recomp-info`. This
+    is due to a shortcoming in `reifyModule` tracked by :ghc-ticket:`8489`.
+
+    This flag warns the user when they try to call `reifyModule` on a module where this
+    situation occurs so that they know the traversal has ended prematurely.
+
+>>>>>>> d73b6b36c4b (Add flag to control whether self-recompilation information is written to interface)
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

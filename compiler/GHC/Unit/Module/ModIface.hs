@@ -15,7 +15,6 @@ module GHC.Unit.Module.ModIface
       , mi_sig_of
       , mi_hsc_src
       , mi_deps
-      , mi_usages
       , mi_exports
       , mi_used_th
       , mi_fixities
@@ -36,8 +35,8 @@ module GHC.Unit.Module.ModIface
       , mi_docs
       , mi_final_exts
       , mi_ext_fields
-      , mi_src_hash
       , mi_hi_bytes
+      , mi_self_recomp_info
       )
    , pattern ModIface
    , restoreFromOldModIface
@@ -45,10 +44,9 @@ module GHC.Unit.Module.ModIface
    , set_mi_module
    , set_mi_sig_of
    , set_mi_hsc_src
-   , set_mi_src_hash
+   , set_mi_self_recomp
    , set_mi_hi_bytes
    , set_mi_deps
-   , set_mi_usages
    , set_mi_exports
    , set_mi_used_th
    , set_mi_fixities
@@ -69,10 +67,15 @@ module GHC.Unit.Module.ModIface
    , set_mi_docs
    , set_mi_final_exts
    , set_mi_ext_fields
+   , mi_usages
+   , mi_src_hash
    , completePartialModIface
    , IfaceBinHandle(..)
    , PartialModIface
    , ModIfaceBackend (..)
+   , ModIfaceSelfRecompBackend (..)
+   , ModIfaceSelfRecomp (..)
+   , isSelfRecompilationInterface
    , IfaceDeclExts
    , IfaceBackendExts
    , IfaceExport
@@ -85,6 +88,11 @@ module GHC.Unit.Module.ModIface
    , mi_semantic_module
    , mi_free_holes
    , mi_mnwib
+   , mi_flag_hash
+   , mi_iface_hash
+   , mi_opt_hash
+   , mi_hpc_hash
+   , mi_plugin_hash
    , renameFreeHoles
    , emptyPartialModIface
    , emptyFullModIface
@@ -125,6 +133,9 @@ import GHC.Utils.Binary
 
 import Control.DeepSeq
 import Control.Exception
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
 
 
 {- Note [Interface file stages]
@@ -151,19 +162,11 @@ type ModIface = ModIface_ 'ModIfaceFinal
 -- * Or computed just before writing the iface to disk. (Hashes)
 -- In order to fully instantiate it.
 data ModIfaceBackend = ModIfaceBackend
-  { mi_iface_hash :: !Fingerprint
-    -- ^ Hash of the whole interface
-  , mi_mod_hash :: !Fingerprint
+  { mi_mod_hash :: !Fingerprint
     -- ^ Hash of the ABI only
-  , mi_flag_hash :: !Fingerprint
-    -- ^ Hash of the important flags used when compiling the module, excluding
-    -- optimisation flags
-  , mi_opt_hash :: !Fingerprint
-    -- ^ Hash of optimisation flags
-  , mi_hpc_hash :: !Fingerprint
-    -- ^ Hash of hpc flags
-  , mi_plugin_hash :: !Fingerprint
-    -- ^ Hash of plugins
+  , mi_self_recomp_backend_info :: !ModIfaceSelfRecompBackend
+    -- ^ Information needed for checking self-recompilation.
+    -- See Note [Self recompilation information in interface files]
   , mi_orphan :: !WhetherHasOrphans
     -- ^ Whether this module has orphans
   , mi_finsts :: !WhetherHasFamInst
@@ -219,6 +222,83 @@ data IfaceBinHandle (phase :: ModIfacePhase) where
   -- (e.g., set to 'Nothing').
   FullIfaceBinHandle :: !(Strict.Maybe FullBinData) -> IfaceBinHandle 'ModIfaceFinal
 
+-- | The information for a module which is only used when deciding whether to recompile
+-- itself. In particular the external interface of a module is recorded by the ABI
+-- hash
+data ModIfaceSelfRecompBackend = NoSelfRecompBackend | ModIfaceSelfRecompBackend {
+    mi_sr_flag_hash :: !Fingerprint
+    -- ^ Hash of the important flags used when compiling the module, excluding
+    -- optimisation flags
+  , mi_sr_iface_hash :: !Fingerprint
+    -- ^ Hash of the whole interface
+  , mi_sr_opt_hash :: !Fingerprint
+    -- ^ Hash of optimisation flags
+  , mi_sr_hpc_hash :: !Fingerprint
+    -- ^ Hash of hpc flags
+  , mi_sr_plugin_hash :: !Fingerprint
+    -- ^ Hash of plugins
+}
+withSelfRecompBackend :: HasCallStack => (ModIfaceSelfRecompBackend-> t) -> ModIfaceBackend-> t
+
+withSelfRecompBackend f mi =
+  case mi_self_recomp_backend_info mi of
+    NoSelfRecompBackend -> panic "Trying to use self-recomp info"
+    x -> f x
+
+mi_flag_hash :: HasCallStack => ModIfaceBackend -> Fingerprint
+mi_flag_hash = withSelfRecompBackend mi_sr_flag_hash
+mi_iface_hash :: HasCallStack => ModIfaceBackend -> Fingerprint
+mi_iface_hash = withSelfRecompBackend mi_sr_iface_hash
+mi_opt_hash :: HasCallStack => ModIfaceBackend -> Fingerprint
+mi_opt_hash   = withSelfRecompBackend mi_sr_opt_hash
+mi_hpc_hash :: HasCallStack => ModIfaceBackend -> Fingerprint
+mi_hpc_hash   = withSelfRecompBackend mi_sr_hpc_hash
+mi_plugin_hash :: HasCallStack => ModIfaceBackend -> Fingerprint
+mi_plugin_hash = withSelfRecompBackend mi_sr_plugin_hash
+
+isSelfRecompilationInterface :: ModIface -> Bool
+isSelfRecompilationInterface iface =
+  case mi_self_recomp_info iface of
+    NoSelfRecomp -> False
+    ModIfaceSelfRecomp {} -> True
+
+{-
+Note [Self recompilation information in interface files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The flag -fwrite-self-recomp-info controls whether
+interface files contain the information necessary to answer the
+question:
+
+  Do I need to recompile myself or is this current interface file
+  suitable?
+
+Why? Most packages are only built once either by a distribution or cabal
+and then placed into an immutable store, after which we will never ask
+this question. Therefore we can derive two benefits from omitting this
+information.
+
+* Primary motivation: It vastly reduces the surface area for creating
+  non-deterministic interface files. See issue #10424 which motivated a
+  proper fix to that issue. Distributions have long contained versions
+  of GHC which just have broken self-recompilation checking (in order to
+  get deterministic interface files).
+
+* Secondary motivation: This reduces the size of interface files
+  slightly.. the `mi_usages` field can be quite big but probably this
+  isn't such a great benefit.
+
+* Third motivation: Conceptually clarity about which parts of an
+  interface file are used in order to **communicate** with subsequent
+  packages about the **interface** for a module. And which parts are
+  used to self-communicate during recompilation checking.
+
+The main tracking issue is #22188 but fixes issues such as #10424 in a
+proper way.
+
+-}
+
+
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
 -- and can be written out to an interface file. The 'ModDetails is after
@@ -245,16 +325,6 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ The dependencies of the module.  This is
                 -- consulted for directly-imported modules, but not
                 -- for anything else (hence lazy)
-
-        mi_usages_   :: [Usage],
-                -- ^ Usages; kept sorted so that it's easy to decide
-                -- whether to write a new iface file (changing usages
-                -- doesn't affect the hash of this module)
-                -- NOT STRICT!  we read this field lazily from the interface file
-                -- It is *only* consulted by the recompilation checker
-                --
-                -- The elements must be *deterministically* sorted to guarantee
-                -- deterministic interface files
 
         mi_exports_  :: ![IfaceExport],
                 -- ^ Exports
@@ -353,13 +423,15 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- chosen over `ByteString`s.
                 --
 
-        mi_src_hash_ :: !Fingerprint,
-                -- ^ Hash of the .hs source, used for recompilation checking.
-        mi_hi_bytes_ :: !(IfaceBinHandle phase)
+        mi_hi_bytes_ :: !(IfaceBinHandle phase),
                 -- ^ A serialised in-memory buffer of this 'ModIface'.
                 -- If this handle is given, we can avoid serialising the 'ModIface'
                 -- when writing this 'ModIface' to disk, and write this buffer to disk instead.
                 -- See Note [Sharing of ModIface].
+
+        mi_self_recomp_info_ :: !ModIfaceSelfRecomp
+                -- ^ Information needed for checking self-recompilation.
+                -- See Note [Self recompilation information in interface files]
      }
 
 -- Enough information to reconstruct the top level environment for a module
@@ -371,6 +443,37 @@ data IfaceTopEnv
 
 instance NFData IfaceTopEnv where
   rnf (IfaceTopEnv a b) = rnf a `seq` rnf b
+
+data ModIfaceSelfRecomp = NoSelfRecomp
+  | ModIfaceSelfRecomp { mi_sr_src_hash :: !Fingerprint
+                       -- ^ Hash of the .hs source, used for recompilation checking.
+                       , mi_sr_usages   :: [Usage]
+                       -- ^ Usages; kept sorted so that it's easy to decide
+                       -- whether to write a new iface file (changing usages
+                       -- doesn't affect the hash of this module)
+                       -- NOT STRICT!  we read this field lazily from the interface file
+                       -- It is *only* consulted by the recompilation checker
+                       }
+
+instance Outputable ModIfaceSelfRecomp where
+  ppr NoSelfRecomp = text "NoSelfRecomp"
+  ppr (ModIfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages}) = vcat [text "Self-Recomp"
+                                                                , nest 2 (vcat [text "src hash:" <+> ppr mi_sr_src_hash
+                                                                , text "usages:" <+> ppr (length mi_sr_usages)])]
+
+withSelfRecomp :: HasCallStack => (ModIfaceSelfRecomp-> t) -> ModIface_ phase -> t
+withSelfRecomp f mi =
+  case mi_self_recomp_info mi of
+    NoSelfRecomp -> panic "Trying to use self-recomp info"
+    x -> f x
+
+mi_usages :: HasCallStack => ModIface_ phase -> [Usage]
+mi_usages = withSelfRecomp mi_sr_usages
+mi_src_hash :: HasCallStack => ModIface_ phase -> Fingerprint
+mi_src_hash = withSelfRecomp mi_sr_src_hash
+
+
+
 
 {-
 Note [Strictness in ModIface]
@@ -446,15 +549,52 @@ renameFreeHoles fhs insts =
         -- It wasn't actually a hole
         | otherwise                           = emptyUniqDSet
 
+instance Binary ModIfaceSelfRecompBackend where
+  put_ bh NoSelfRecompBackend = put_ bh (0 :: Int)
+  put_ bh (ModIfaceSelfRecompBackend {mi_sr_flag_hash, mi_sr_iface_hash, mi_sr_plugin_hash, mi_sr_opt_hash, mi_sr_hpc_hash}) = do
+    put_ bh (1 :: Int)
+    put_ bh mi_sr_flag_hash
+    put_ bh mi_sr_iface_hash
+    put_ bh mi_sr_plugin_hash
+    put_ bh mi_sr_opt_hash
+    put_ bh mi_sr_hpc_hash
+
+  get bh = do
+    (tag :: Int) <- get bh
+    case tag of
+      0 -> return NoSelfRecompBackend
+      1 -> do
+        mi_sr_flag_hash <- get bh
+        mi_sr_iface_hash <- get bh
+        mi_sr_plugin_hash <- get bh
+        mi_sr_opt_hash <- get bh
+        mi_sr_hpc_hash <- get bh
+        return (ModIfaceSelfRecompBackend {mi_sr_flag_hash, mi_sr_iface_hash, mi_sr_plugin_hash, mi_sr_opt_hash, mi_sr_hpc_hash})
+      x -> pprPanic "get_ModIfaceSelfRecomp" (ppr x)
+
+instance Binary ModIfaceSelfRecomp where
+  put_ bh NoSelfRecomp = put_ bh (0 :: Int)
+  put_ bh (ModIfaceSelfRecomp{mi_sr_src_hash, mi_sr_usages}) = do
+    put_ bh (1 :: Int)
+    put_ bh mi_sr_src_hash
+    lazyPut bh mi_sr_usages
+
+  get bh = do
+    (tag :: Int) <- get bh
+    case tag of
+      0 -> return NoSelfRecomp
+      1 -> do
+        src_hash    <- get bh
+        usages      <- {-# SCC "bin_usages" #-} lazyGet bh
+        return $ ModIfaceSelfRecomp { mi_sr_src_hash = src_hash, mi_sr_usages = usages }
+      x -> pprPanic "get_ModIfaceSelfRecomp" (ppr x)
+
 -- See Note [Strictness in ModIface] about where we use lazyPut vs put
 instance Binary ModIface where
    put_ bh (PrivateModIface {
                  mi_module_    = mod,
                  mi_sig_of_    = sig_of,
                  mi_hsc_src_   = hsc_src,
-                 mi_src_hash_ = _src_hash, -- Don't `put_` this in the instance
-                                          -- because we are going to write it
-                                          -- out separately in the actual file
                  mi_hi_bytes_  = _hi_bytes, -- We don't serialise the 'mi_hi_bytes_', as it itself
                                             -- may contain an in-memory byte array buffer for this
                                             -- 'ModIface'. If we used 'put_' on this 'ModIface', then
@@ -462,7 +602,6 @@ instance Binary ModIface where
                                             -- the byte array.
                                             -- See Note [Private fields in ModIface]
                  mi_deps_      = deps,
-                 mi_usages_    = usages,
                  mi_exports_   = exports,
                  mi_used_th_   = used_th,
                  mi_fixities_  = fixities,
@@ -483,13 +622,10 @@ instance Binary ModIface where
                  mi_ext_fields_ = _ext_fields, -- Don't `put_` this in the instance so we
                                               -- can deal with it's pointer in the header
                                               -- when we write the actual file
+                 mi_self_recomp_info_ = self_recomp,
                  mi_final_exts_ = ModIfaceBackend {
-                   mi_iface_hash = iface_hash,
+                   mi_self_recomp_backend_info = self_recomp_backend,
                    mi_mod_hash = mod_hash,
-                   mi_flag_hash = flag_hash,
-                   mi_opt_hash = opt_hash,
-                   mi_hpc_hash = hpc_hash,
-                   mi_plugin_hash = plugin_hash,
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
@@ -498,16 +634,12 @@ instance Binary ModIface where
         put_ bh mod
         put_ bh sig_of
         put_ bh hsc_src
-        put_ bh iface_hash
+        put_ bh self_recomp
+        put_ bh self_recomp_backend
         put_ bh mod_hash
-        put_ bh flag_hash
-        put_ bh opt_hash
-        put_ bh hpc_hash
-        put_ bh plugin_hash
         put_ bh orphan
         put_ bh hasFamInsts
         lazyPut bh deps
-        lazyPut bh usages
         put_ bh exports
         put_ bh exp_hash
         put_ bh used_th
@@ -532,16 +664,12 @@ instance Binary ModIface where
         mod         <- get bh
         sig_of      <- get bh
         hsc_src     <- get bh
-        iface_hash  <- get bh
+        self_recomp_info <- get bh
+        self_recomp_backend_info <- get bh
         mod_hash    <- get bh
-        flag_hash   <- get bh
-        opt_hash    <- get bh
-        hpc_hash    <- get bh
-        plugin_hash <- get bh
         orphan      <- get bh
         hasFamInsts <- get bh
         deps        <- lazyGet bh
-        usages      <- {-# SCC "bin_usages" #-} lazyGet bh
         exports     <- {-# SCC "bin_exports" #-} get bh
         exp_hash    <- get bh
         used_th     <- get bh
@@ -565,15 +693,12 @@ instance Binary ModIface where
                  mi_module_      = mod,
                  mi_sig_of_      = sig_of,
                  mi_hsc_src_     = hsc_src,
-                 mi_src_hash_ = fingerprint0, -- placeholder because this is dealt
-                                             -- with specially when the file is read
                  mi_hi_bytes_    =
                                    -- We can't populate this field here, as we are
                                    -- missing the 'mi_ext_fields_' field, which is
                                    -- handled in 'getIfaceWithExtFields'.
                                    FullIfaceBinHandle Strict.Nothing,
                  mi_deps_        = deps,
-                 mi_usages_      = usages,
                  mi_exports_     = exports,
                  mi_used_th_     = used_th,
                  mi_anns_        = anns,
@@ -595,13 +720,10 @@ instance Binary ModIface where
                  mi_docs_        = docs,
                  mi_ext_fields_  = emptyExtensibleFields, -- placeholder because this is dealt
                                                          -- with specially when the file is read
+                 mi_self_recomp_info_ = self_recomp_info,
                  mi_final_exts_ = ModIfaceBackend {
-                   mi_iface_hash = iface_hash,
+                   mi_self_recomp_backend_info = self_recomp_backend_info,
                    mi_mod_hash = mod_hash,
-                   mi_flag_hash = flag_hash,
-                   mi_opt_hash = opt_hash,
-                   mi_hpc_hash = hpc_hash,
-                   mi_plugin_hash = plugin_hash,
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
@@ -622,10 +744,8 @@ emptyPartialModIface mod
       { mi_module_      = mod,
         mi_sig_of_      = Nothing,
         mi_hsc_src_     = HsSrcFile,
-        mi_src_hash_    = fingerprint0,
         mi_hi_bytes_    = PartialIfaceBinHandle,
         mi_deps_        = noDependencies,
-        mi_usages_      = [],
         mi_exports_     = [],
         mi_used_th_     = False,
         mi_fixities_    = [],
@@ -645,7 +765,8 @@ emptyPartialModIface mod
         mi_complete_matches_ = [],
         mi_docs_        = Nothing,
         mi_final_exts_  = (),
-        mi_ext_fields_  = emptyExtensibleFields
+        mi_ext_fields_  = emptyExtensibleFields,
+        mi_self_recomp_info_ = NoSelfRecomp
       }
 
 emptyFullModIface :: Module -> ModIface
@@ -654,12 +775,8 @@ emptyFullModIface mod =
       { mi_decls_ = []
       , mi_hi_bytes_ = FullIfaceBinHandle Strict.Nothing
       , mi_final_exts_ = ModIfaceBackend
-        { mi_iface_hash = fingerprint0,
-          mi_mod_hash = fingerprint0,
-          mi_flag_hash = fingerprint0,
-          mi_opt_hash = fingerprint0,
-          mi_hpc_hash = fingerprint0,
-          mi_plugin_hash = fingerprint0,
+        { mi_mod_hash = fingerprint0,
+          mi_self_recomp_backend_info = NoSelfRecompBackend, -- TODO
           mi_orphan = False,
           mi_finsts = False,
           mi_exp_hash = fingerprint0,
@@ -689,18 +806,17 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
          , NFData (IfaceDeclExts (phase :: ModIfacePhase))
          ) => NFData (ModIface_ phase) where
   rnf (PrivateModIface
-               { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_, mi_usages_
+               { mi_module_, mi_sig_of_, mi_hsc_src_, mi_hi_bytes_, mi_deps_
                , mi_exports_, mi_used_th_, mi_fixities_, mi_warns_, mi_anns_
                , mi_decls_, mi_defaults_, mi_extra_decls_, mi_foreign_, mi_top_env_, mi_insts_
                , mi_fam_insts_, mi_rules_, mi_hpc_, mi_trust_, mi_trust_pkg_
                , mi_complete_matches_, mi_docs_, mi_final_exts_
-               , mi_ext_fields_, mi_src_hash_ })
+               , mi_ext_fields_ })
     =     rnf mi_module_
     `seq` rnf mi_sig_of_
     `seq`     mi_hsc_src_
     `seq`     mi_hi_bytes_
     `seq`     mi_deps_
-    `seq`     mi_usages_
     `seq`     mi_exports_
     `seq` rnf mi_used_th_
     `seq`     mi_fixities_
@@ -721,16 +837,14 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_docs_
     `seq`     mi_final_exts_
     `seq`     mi_ext_fields_
-    `seq` rnf mi_src_hash_
     `seq` ()
 
 instance NFData (ModIfaceBackend) where
-  rnf (ModIfaceBackend{ mi_iface_hash, mi_mod_hash, mi_flag_hash, mi_opt_hash
-                      , mi_hpc_hash, mi_plugin_hash, mi_orphan, mi_finsts, mi_exp_hash
+  rnf (ModIfaceBackend{ mi_mod_hash
+                      ,  mi_orphan, mi_finsts, mi_exp_hash
                       , mi_orphan_hash, mi_decl_warn_fn, mi_export_warn_fn, mi_fix_fn
                       , mi_hash_fn})
-    =     rnf mi_iface_hash
-    `seq` rnf mi_mod_hash
+    =  rnf mi_mod_hash
     `seq` rnf mi_flag_hash
     `seq` rnf mi_opt_hash
     `seq` rnf mi_hpc_hash
@@ -743,6 +857,18 @@ instance NFData (ModIfaceBackend) where
     `seq` rnf mi_export_warn_fn
     `seq` rnf mi_fix_fn
     `seq` rnf mi_hash_fn
+
+instance NFData ModIfaceSelfRecompBackend where
+  -- Sufficient as all fields are strict (and simple)
+  rnf NoSelfRecompBackend = ()
+  -- Written like this so if you add another field you have to think about it
+  rnf !(ModIfaceSelfRecompBackend _ _ _ _ _) = ()
+instance NFData ModIfaceSelfRecomp where
+  -- Sufficient as all fields are strict (and simple)
+  rnf NoSelfRecomp = ()
+  -- MP: Note does not deeply force Usages but the old ModIface logic didn't either, so
+  -- I left it as a shallow force.
+  rnf (ModIfaceSelfRecomp src_hash usages) = src_hash `seq` usages `seq` ()
 
 
 forceModIface :: ModIface -> IO ()
@@ -806,7 +932,7 @@ completePartialModIface partial decls extra_decls final_exts = partial
 --
 -- The 'mi_src_hash' is computed outside of 'ModIface_' based on the 'ModSummary'.
 addSourceFingerprint :: Fingerprint -> ModIface_ phase -> ModIface_ phase
-addSourceFingerprint val iface = iface { mi_src_hash_ = val }
+addSourceFingerprint _val _iface = error "todo" --iface { mi_src_hash_ = val }
 
 -- | Copy fields that aren't serialised to disk to the new 'ModIface_'.
 -- This includes especially hashes that are usually stored in the interface
@@ -819,7 +945,7 @@ restoreFromOldModIface :: ModIface_ phase -> ModIface_ phase -> ModIface_ phase
 restoreFromOldModIface old new = new
   { mi_top_env_ = mi_top_env_ old
   , mi_hsc_src_ = mi_hsc_src_ old
-  , mi_src_hash_ = mi_src_hash_ old
+--  , mi_src_hash_ = error "todo" --mi_src_hash_ old
   }
 
 set_mi_module :: Module -> ModIface_ phase -> ModIface_ phase
@@ -831,8 +957,11 @@ set_mi_sig_of val iface = clear_mi_hi_bytes $ iface { mi_sig_of_ = val }
 set_mi_hsc_src :: HscSource -> ModIface_ phase -> ModIface_ phase
 set_mi_hsc_src val iface = clear_mi_hi_bytes $ iface { mi_hsc_src_ = val }
 
-set_mi_src_hash :: Fingerprint -> ModIface_ phase -> ModIface_ phase
-set_mi_src_hash val iface = clear_mi_hi_bytes $ iface { mi_src_hash_ = val }
+set_mi_self_recomp :: ModIfaceSelfRecomp -> ModIface_ phase -> ModIface_ phase
+set_mi_self_recomp val iface = clear_mi_hi_bytes $ iface { mi_self_recomp_info_ = val }
+
+--set_mi_src_hash :: Fingerprint -> ModIface_ phase -> ModIface_ phase
+--set_mi_src_hash val iface = clear_mi_hi_bytes $ iface { mi_src_hash_ = val }
 
 set_mi_hi_bytes :: IfaceBinHandle phase -> ModIface_ phase -> ModIface_ phase
 set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }
@@ -840,8 +969,8 @@ set_mi_hi_bytes val iface = iface { mi_hi_bytes_ = val }
 set_mi_deps :: Dependencies -> ModIface_ phase -> ModIface_ phase
 set_mi_deps val iface = clear_mi_hi_bytes $ iface { mi_deps_ = val }
 
-set_mi_usages :: [Usage] -> ModIface_ phase -> ModIface_ phase
-set_mi_usages val iface = clear_mi_hi_bytes $ iface { mi_usages_ = val }
+--set_mi_usages :: [Usage] -> ModIface_ phase -> ModIface_ phase
+--set_mi_usages val iface = clear_mi_hi_bytes $ iface { mi_usages_ = val }
 
 set_mi_exports :: [IfaceExport] -> ModIface_ phase -> ModIface_ phase
 set_mi_exports val iface = clear_mi_hi_bytes $ iface { mi_exports_ = val }
@@ -992,20 +1121,19 @@ However, with the pragma, the correct core is generated:
 {-# COMPLETE ModIface #-}
 
 pattern ModIface ::
-  Module -> Maybe Module -> HscSource -> Dependencies -> [Usage] ->
+  Module -> Maybe Module -> HscSource -> Dependencies ->
   [IfaceExport] -> Bool -> [(OccName, Fixity)] -> IfaceWarnings ->
   [IfaceAnnotation] -> [IfaceDeclExts phase] ->
   Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo] -> IfaceForeign ->
   [IfaceDefault] -> Maybe IfaceTopEnv -> [IfaceClsInst] -> [IfaceFamInst] -> [IfaceRule] ->
   AnyHpcUsage -> IfaceTrustInfo -> Bool -> [IfaceCompleteMatch] -> Maybe Docs ->
-  IfaceBackendExts phase -> ExtensibleFields -> Fingerprint -> IfaceBinHandle phase ->
+  IfaceBackendExts phase -> ExtensibleFields -> IfaceBinHandle phase -> ModIfaceSelfRecomp ->
   ModIface_ phase
 pattern ModIface
   { mi_module
   , mi_sig_of
   , mi_hsc_src
   , mi_deps
-  , mi_usages
   , mi_exports
   , mi_used_th
   , mi_fixities
@@ -1026,14 +1154,13 @@ pattern ModIface
   , mi_docs
   , mi_final_exts
   , mi_ext_fields
-  , mi_src_hash
   , mi_hi_bytes
+  , mi_self_recomp_info
   } <- PrivateModIface
     { mi_module_ = mi_module
     , mi_sig_of_ = mi_sig_of
     , mi_hsc_src_ = mi_hsc_src
     , mi_deps_ = mi_deps
-    , mi_usages_ = mi_usages
     , mi_exports_ = mi_exports
     , mi_used_th_ = mi_used_th
     , mi_fixities_ = mi_fixities
@@ -1054,6 +1181,6 @@ pattern ModIface
     , mi_docs_ = mi_docs
     , mi_final_exts_ = mi_final_exts
     , mi_ext_fields_ = mi_ext_fields
-    , mi_src_hash_ = mi_src_hash
     , mi_hi_bytes_ = mi_hi_bytes
+    , mi_self_recomp_info_ = mi_self_recomp_info
     }

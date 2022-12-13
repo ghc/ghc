@@ -1994,6 +1994,11 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedTypeSyntaxInTerms syntax -> mkSimpleDecorated $
       text "Unexpected" <+> pprTypeSyntaxName syntax
 
+    TcRnReifyModuleMissingInfo m -> mkSimpleDecorated $
+      vcat [ (ppr m) <+> text "can't be reified due to missing information in its interface file."
+           , text "Possible cause:" <+> ppr m <+> text "was compiled with -fno-write-self-recomp-info" ]
+
+
   diagnosticReason :: TcRnMessage -> DiagnosticReason
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2638,6 +2643,9 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnexpectedTypeSyntaxInTerms{}
       -> ErrorWithoutFlag
+    TcRnReifyModuleMissingInfo {} ->
+      WarningWithFlag Opt_WarnReifyModuleMissingInfo
+
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3320,6 +3328,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedTypeSyntaxInTerms syntax
       -> [suggestExtension (typeSyntaxExtension syntax)]
+    TcRnReifyModuleMissingInfo {} -> noHints
+
 
   diagnosticCode = constructorCode @GHC
 

@@ -2358,6 +2358,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnDataKindsTC -> warnSpec x
   Opt_WarnDefaultedExceptionContext -> warnSpec x
   Opt_WarnViewPatternSignatures -> warnSpec x
+  Opt_WarnReifyModuleMissingInfo -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups
@@ -2528,6 +2529,7 @@ fFlagsDeps = [
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
   flagSpec "write-if-simplified-core"         Opt_WriteIfSimplifiedCore,
+  flagSpec "write-self-recomp-info"           Opt_WriteSelfRecompInfo,
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,

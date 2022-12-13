@@ -50,7 +50,7 @@ import GHC.Types.Name.Cache
 import GHC.Types.SrcLoc
 import GHC.Platform
 import GHC.Settings.Constants
-import GHC.Utils.Fingerprint
+--import GHC.Utils.Fingerprint
 import GHC.Iface.Type (IfaceType(..), getIfaceType, putIfaceType, ifaceTypeSharedByte)
 
 import Control.Monad
@@ -115,7 +115,7 @@ readBinIfaceHeader
   -> CheckHiWay
   -> TraceBinIFace
   -> FilePath
-  -> IO (Fingerprint, ReadBinHandle)
+  -> IO ReadBinHandle
 readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     let platform = profilePlatform profile
 
@@ -157,8 +157,7 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
-    src_hash <- get bh
-    pure (src_hash, bh)
+    pure bh
 
 -- | Read an interface file.
 --
@@ -171,12 +170,12 @@ readBinIface
   -> FilePath
   -> IO ModIface
 readBinIface profile name_cache checkHiWay traceBinIface hi_path = do
-    (src_hash, bh) <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
+    bh <- readBinIfaceHeader profile name_cache checkHiWay traceBinIface hi_path
 
     mod_iface <- getIfaceWithExtFields name_cache bh
 
     return $ mod_iface
-      & addSourceFingerprint src_hash
+--      & addSourceFingerprint src_hash
 
 
 getIfaceWithExtFields :: NameCache -> ReadBinHandle -> IO ModIface
@@ -260,7 +259,6 @@ writeBinIface profile traceBinIface compressionLevel hi_path mod_iface = do
     put_ bh (show hiVersion)
     let tag = profileBuildTag profile
     put_  bh tag
-    put_  bh (mi_src_hash mod_iface)
 
     putIfaceWithExtFields traceBinIface compressionLevel bh mod_iface
 

@@ -4395,6 +4395,12 @@ data TcRnMessage where
     Test cases: T24159_type_syntax_rn_fail
   -}
   TcRnUnexpectedTypeSyntaxInTerms :: TypeSyntax -> TcRnMessage
+  {-| TcRnReifyModuleMissingInfo is a warning triggered by attempting to
+      call reifyModule on a module whose interface file lacks the necessary information
+      to satisfy the query. This normally occurs when the module is compiled with `-fno-write-self-recomp-info`.
+  -}
+  TcRnReifyModuleMissingInfo:: Module -> TcRnMessage
+
   deriving Generic
 
 ----

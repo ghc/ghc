@@ -692,6 +692,7 @@ data GeneralFlag
    | Opt_ExposeOverloadedUnfoldings
    | Opt_KeepAutoRules -- ^Keep auto-generated rules even if they seem to have become useless
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
+   | Opt_WriteSelfRecompInfo
    | Opt_WriteHie -- generate .hie files
 
    -- JavaScript opts
@@ -1076,6 +1077,7 @@ data WarningFlag =
    | Opt_WarnDataKindsTC                             -- Since 9.10
    | Opt_WarnDefaultedExceptionContext               -- Since 9.10
    | Opt_WarnViewPatternSignatures                   -- Since 9.12
+   | Opt_WarnReifyModuleMissingInfo                  -- Since 9.6
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -1192,6 +1194,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
   Opt_WarnViewPatternSignatures                   -> "view-pattern-signatures" :| []
+  Opt_WarnReifyModuleMissingInfo                  -> "reify-module-missing-info" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -1333,7 +1336,9 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnInconsistentFlags,
         Opt_WarnDataKindsTC,
         Opt_WarnTypeEqualityOutOfScope,
-        Opt_WarnViewPatternSignatures
+        Opt_WarnViewPatternSignatures,
+        Opt_WarnTypeEqualityRequiresOperators,
+        Opt_WarnReifyModuleMissingInfo
       ]
 
 -- | Things you get with -W

@@ -1,0 +1,11 @@
+
+annth.hs:12:4: warning: [GHC-89264] [-Wreify-module-missing-info (in -Wdefault)]
+    • GHC.Prim can't be reified due to missing information in its interface file.
+      Possible cause: GHC.Prim was compiled with -fno-write-self-recomp-info
+    • In the untyped splice:
+        $(do anns <- traverseModuleAnnotations
+             runIO $ print (anns :: [String])
+             anns <- reifyAnnotations (AnnLookupName 'testValue)
+             runIO $ print (anns :: [String])
+             anns <- reifyAnnotations (AnnLookupName 'testValueTH)
+             ....)
