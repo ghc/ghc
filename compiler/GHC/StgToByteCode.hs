@@ -14,6 +14,7 @@
 module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen) where
 
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Driver.Session
 import GHC.Driver.Env
@@ -75,6 +76,7 @@ import Data.Char
 
 import GHC.Unit.Module
 
+import Control.DeepSeq
 import Data.Array
 import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
@@ -384,11 +386,11 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
-getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
+getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Strict.Maybe CgVar]
 getVarOffSets platform depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
-        Nothing     -> Nothing
+        Nothing     -> Strict.Nothing
         Just offset ->
             -- michalt: I'm not entirely sure why we need the stack
             -- adjustment by 2 here. I initially thought that there's
@@ -399,7 +401,7 @@ getVarOffSets platform depth env = map getOffSet
             -- we trigger a breakpoint.
             let !var_depth_ws =
                     trunc16W $ bytesToWords platform (depth - offset) + 2
-            in Just (id, var_depth_ws)
+            in Strict.Just (CgVar (idName id) var_depth_ws (idType id))
 
 truncIntegral16 :: Integral a => a -> Word16
 truncIntegral16 w
@@ -2091,8 +2093,8 @@ getCCArray = BcM $ \st ->
 
 
 newBreakInfo :: BreakIndex -> CgBreakInfo -> BcM ()
-newBreakInfo ix info = BcM $ \st ->
-  return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ())
+newBreakInfo ix info = rnf info `seq` (BcM $ \st ->
+  return (st{breakInfo = IntMap.insert ix info (breakInfo st)}, ()))
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)

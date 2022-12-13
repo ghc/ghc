@@ -45,6 +45,7 @@ module GHC.Runtime.Eval (
         ) where
 
 import GHC.Prelude
+import qualified GHC.Data.Strict as Strict
 
 import GHC.Driver.Monad
 import GHC.Driver.Main
@@ -120,7 +121,8 @@ import Data.Dynamic
 import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.List (find,intercalate)
+import Data.List (find,intercalate, unzip4, zip4)
+import Data.Word
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
@@ -571,9 +573,9 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
            -- we can't bind these at the prompt
        mbPointers = nullUnboxed <$> mbVars
 
-       (ids, offsets, occs') = syncOccs mbPointers occs
+       (local_names,types,offsets, occs') = syncOccs mbPointers occs
 
-       free_tvs = tyCoVarsOfTypesWellScoped (result_ty:map idType ids)
+       free_tvs = tyCoVarsOfTypesWellScoped (result_ty:types)
 
    -- It might be that getIdValFromApStack fails, because the AP_STACK
    -- has been accidentally evaluated, or something else has gone wrong.
@@ -587,12 +589,12 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
    let tv_subst     = newTyVars us free_tvs
-       (filtered_ids, occs'') = unzip         -- again, sync the occ-names
-          [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
+       (filtered_names, filtered_types, occs'') = unzip3         -- again, sync the occ-names
+          [ (n, ty, occ) | (n, ty, Just _hv, occ) <- zip4 local_names types mb_hValues occs' ]
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
-                      map (substTy tv_subst . idType) filtered_ids
+                      map (substTy tv_subst) filtered_types
 
-   new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
+   new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_names
    result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
    let result_id = Id.mkVanillaGlobal result_name
@@ -615,10 +617,10 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
         -- state is single-threaded and otherwise we'd spam old bindings
         -- whenever we stop at a breakpoint.  The InteractveContext is properly
         -- saved/restored, but not the linker state.  See #1743, test break026.
-   mkNewId :: OccName -> Type -> Id -> IO Id
+   mkNewId :: OccName -> Type -> Name -> IO Id
    mkNewId occ ty old_id
      = do { name <- newInteractiveBinder hsc_env occ (getSrcSpan old_id)
-          ; return (Id.mkVanillaGlobalWithInfo name ty (idInfo old_id)) }
+          ; return (Id.mkVanillaGlobal name ty) }
 
    newTyVars :: UniqSupply -> [TcTyVar] -> Subst
      -- Similarly, clone the type variables mentioned in the types
@@ -629,23 +631,24 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      new_tv = mkRuntimeUnkTyVar (setNameUnique (tyVarName tv) uniq)
                                 (substTy subst (tyVarKind tv))
 
-   isPointer id | [rep] <- typePrimRep (idType id)
-                , isGcPtrRep rep                   = True
-                | otherwise                        = False
+   isPointer id = isPointerTy (idType id)
+   isPointerTy ty | [rep] <- typePrimRep ty
+                  , isGcPtrRep rep                   = True
+                  | otherwise                        = False
 
    -- Convert unboxed Id's to Nothings
-   nullUnboxed (Just (fv@(id, _)))
-     | isPointer id          = Just fv
-     | otherwise             = Nothing
-   nullUnboxed Nothing       = Nothing
+   nullUnboxed fv@(Strict.Just CgVar{..})
+     | isPointerTy cgv_type = fv
+     | otherwise            = Strict.Nothing
+   nullUnboxed Strict.Nothing       = Strict.Nothing
 
    -- See Note [Syncing breakpoint info]
-   syncOccs :: [Maybe (a,b)] -> [c] -> ([a], [b], [c])
-   syncOccs mbVs ocs = unzip3 $ catMaybes $ joinOccs mbVs ocs
+   syncOccs :: [Strict.Maybe CgVar] -> [c] -> ([Name], [Type],[Word16], [c])
+   syncOccs mbVs ocs = unzip4 $ Strict.catMaybes $ joinOccs mbVs ocs
      where
-       joinOccs :: [Maybe (a,b)] -> [c] -> [Maybe (a,b,c)]
+       joinOccs :: [Strict.Maybe CgVar] -> [c] -> [Strict.Maybe (Name,Type,Word16,c)]
        joinOccs = zipWithEqual "bindLocalsAtBreakpoint" joinOcc
-       joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
+       joinOcc mbV oc = (\CgVar{..} c -> (cgv_name,cgv_type,cgv_offset,c)) <$> mbV <*> pure oc
 
 rttiEnvironment :: HscEnv -> IO HscEnv
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do

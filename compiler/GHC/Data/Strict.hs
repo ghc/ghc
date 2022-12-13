@@ -9,6 +9,7 @@
 module GHC.Data.Strict (
     Maybe(Nothing, Just),
     fromMaybe,
+    catMaybes,
     Pair(And),
 
     -- Not used at the moment:
@@ -21,9 +22,19 @@ import GHC.Prelude hiding (Maybe(..), Either(..))
 import Control.Applicative
 import Data.Semigroup
 import Data.Data
+import Control.DeepSeq
+import GHC.Utils.Outputable (Outputable(..), text, (<+>))
 
 data Maybe a = Nothing | Just !a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Data)
+
+instance NFData a => NFData (Maybe a) where
+  rnf Nothing = ()
+  rnf (Just x) = rnf x
+
+instance Outputable a => Outputable (Maybe a) where
+    ppr Nothing  = text "Nothing"
+    ppr (Just x) = text "Just" <+> ppr x
 
 fromMaybe :: a -> Maybe a -> a
 fromMaybe d Nothing = d
@@ -36,6 +47,12 @@ apMaybe _ _ = Nothing
 altMaybe :: Maybe a -> Maybe a -> Maybe a
 altMaybe Nothing r = r
 altMaybe l _ = l
+
+catMaybes :: [Maybe a] -> [a]
+catMaybes = foldr go []
+  where
+    go Nothing xs = xs
+    go (Just x) xs = x : xs
 
 instance Semigroup a => Semigroup (Maybe a) where
   Nothing <> b       = b
@@ -55,6 +72,9 @@ instance Alternative Maybe where
 
 data Pair a b = !a `And` !b
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Data)
+
+instance (NFData a, NFData b) => NFData (Pair a b) where
+  rnf (And a b) = rnf a `seq` rnf b
 
 -- The definitions below are commented out because they are
 -- not used anywhere in the compiler, but are useful to showcase

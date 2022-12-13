@@ -15,6 +15,7 @@ module GHC.ByteCode.Types
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , CgBreakInfo(..)
+  , CgVar(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
   ) where
@@ -23,6 +24,8 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Data.SizedSeq
+import qualified GHC.Data.Strict as Strict
+import GHC.Iface.Type
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -163,19 +166,33 @@ data BCONPtr
 instance NFData BCONPtr where
   rnf x = x `seq` ()
 
+data CgVar
+  = CgVar {
+    cgv_name :: !Name,
+    cgv_offset :: !Word16,
+    cgv_type :: !Type
+  }
+
+instance Outputable CgVar where
+  ppr CgVar{..} = text "CgVar"
+              <+> parens (ppr cgv_name
+                      <+> ppr cgv_offset
+                      <+> ppr cgv_type)
+
+instance NFData CgVar where
+  rnf CgVar{..} = rnf cgv_name `seq` rnf cgv_offset `seq` seqType cgv_type
+
 -- | Information about a breakpoint that we know at code-generation time
 data CgBreakInfo
    = CgBreakInfo
-   { cgb_vars   :: [Maybe (Id,Word16)]
-   , cgb_resty  :: Type
+   { cgb_vars   :: ![Strict.Maybe CgVar]
+   , cgb_resty  :: !Type
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
--- Not a real NFData instance because we can't rnf Id or Type
-seqCgBreakInfo :: CgBreakInfo -> ()
-seqCgBreakInfo CgBreakInfo{..} =
-  rnf (map snd (catMaybes (cgb_vars))) `seq`
-  seqType cgb_resty
+instance NFData CgBreakInfo where
+  rnf CgBreakInfo{..} = rnf cgb_vars `seq` seqType cgb_resty
+
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)
@@ -223,7 +240,7 @@ seqModBreaks ModBreaks{..} =
   rnf modBreaks_vars `seq`
   rnf modBreaks_decls `seq`
   rnf modBreaks_ccs `seq`
-  rnf (fmap seqCgBreakInfo modBreaks_breakInfo)
+  rnf modBreaks_breakInfo
 
 -- | Construct an empty ModBreaks
 emptyModBreaks :: ModBreaks
