@@ -64,6 +64,9 @@ module GHC.Types.SrcLoc (
         isGoodSrcSpan, isOneLineSpan, isZeroWidthSpan,
         containsSpan, isNoSrcSpan,
 
+        -- ** Predicates on RealSrcSpan
+        isPointRealSpan,
+
         -- * StringBuffer locations
         BufPos(..),
         getBufPos,

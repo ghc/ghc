@@ -709,15 +709,6 @@ commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
 
 -- ---------------------------------------------------------------------
 
-
--- | For comment-related deltas starting on a new line we have an
--- off-by-one problem. Adjust
-tweakDelta :: DeltaPos  -> DeltaPos
-tweakDelta (SameLine d) = SameLine d
-tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
-
--- ---------------------------------------------------------------------
-
 balanceSameLineComments :: (Monad m)
   => LMatch GhcPs (LHsExpr GhcPs) -> TransformT m (LMatch GhcPs (LHsExpr GhcPs))
 balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do

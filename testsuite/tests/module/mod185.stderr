@@ -16,16 +16,14 @@
       (Nothing)
       (Nothing)
       []
-      []))
+      [])
+     (Just
+      ((,)
+       { mod185.hs:6:1 }
+       { mod185.hs:5:8-24 })))
     (EpaCommentsBalanced
      []
-     [(L
-       (Anchor
-        { mod185.hs:6:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { mod185.hs:6:1 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)

@@ -101,7 +101,8 @@ deriving instance Data (HsModule GhcPs)
 data AnnsModule
   = AnnsModule {
     am_main :: [AddEpAnn],
-    am_decls :: AnnList
+    am_decls :: AnnList,
+    am_eof :: Maybe (RealSrcSpan, RealSrcSpan) -- End of file and end of prior token
     } deriving (Data, Eq)
 
 instance Outputable (HsModule GhcPs) where

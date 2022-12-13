@@ -28,16 +28,14 @@
       ,(AddSemiAnn
         (EpaSpan { DumpSemis.hs:4:7 }))
       ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:8 }))]))
+        (EpaSpan { DumpSemis.hs:4:8 }))])
+     (Just
+      ((,)
+       { DumpSemis.hs:46:1 }
+       { DumpSemis.hs:45:1 })))
     (EpaCommentsBalanced
      []
-     [(L
-       (Anchor
-        { DumpSemis.hs:46:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { DumpSemis.hs:46:1 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)

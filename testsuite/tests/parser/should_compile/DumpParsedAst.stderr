@@ -17,16 +17,14 @@
       (Nothing)
       (Nothing)
       []
-      []))
+      [])
+     (Just
+      ((,)
+       { DumpParsedAst.hs:25:1 }
+       { DumpParsedAst.hs:24:17-23 })))
     (EpaCommentsBalanced
      []
-     [(L
-       (Anchor
-        { DumpParsedAst.hs:25:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { DumpParsedAst.hs:25:1 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)

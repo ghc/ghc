@@ -18,7 +18,11 @@
       (Nothing)
       (Nothing)
       []
-      []))
+      [])
+     (Just
+      ((,)
+       { DumpParsedAstComments.hs:17:1 }
+       { DumpParsedAstComments.hs:16:17-23 })))
     (EpaCommentsBalanced
      [(L
        (Anchor
@@ -44,13 +48,7 @@
         (EpaLineComment
          "-- Other comment")
         { DumpParsedAstComments.hs:5:30-34 }))]
-     [(L
-       (Anchor
-        { DumpParsedAstComments.hs:17:1 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaEofComment)
-        { DumpParsedAstComments.hs:17:1 }))]))
+     []))
    (VirtualBraces
     (1))
    (Nothing)
