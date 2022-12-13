@@ -118,6 +118,7 @@ GHC.HsToCore.Pmc.Solver.Types
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
+GHC.Iface.Recomp.Types
 GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Linker.Static.Utils

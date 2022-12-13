@@ -606,6 +606,7 @@ Library
         GHC.Iface.Recomp
         GHC.Iface.Recomp.Binary
         GHC.Iface.Recomp.Flags
+        GHC.Iface.Recomp.Types
         GHC.Iface.Rename
         GHC.Iface.Syntax
         GHC.Iface.Tidy

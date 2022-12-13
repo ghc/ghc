@@ -702,6 +702,24 @@ Options affecting code generation
     depend on the optimisation level. Any definitions which are already included in
     an interface file (via an unfolding for an exported identifier) are reused.
 
+.. ghc-flag:: -fwrite-if-self-recomp
+    :shortdesc: Write information for self-recompilation checking in an interface file
+    :type: dynamic
+    :category: codegen
+
+    :default: on
+
+    Include information in an interface file which can be used in future to determine
+    whether we need to recompile a module or can reuse the existing interface.
+
+    This is intended to be turned off in situations where you know you will never try
+    to recompile a module, such as when compiling a package for distribution.
+    The advantage is that by omitting unecessary information to do with dependencies
+    there is less chance of build paths leaking into the interface file and affecting
+    determinism.
+
+
+
 
 .. ghc-flag:: -fobject-code
     :shortdesc: Generate object code

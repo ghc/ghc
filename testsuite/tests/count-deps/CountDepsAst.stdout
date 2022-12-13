@@ -112,6 +112,7 @@ GHC.Hs.Utils
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields
 GHC.Iface.Recomp.Binary
+GHC.Iface.Recomp.Types
 GHC.Iface.Syntax
 GHC.Iface.Type
 GHC.Parser.Annotation
