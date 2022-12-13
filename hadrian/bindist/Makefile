@@ -65,7 +65,7 @@ install_bin: install_bin_libdir install_wrappers
 endif
 
 install: install_bin install_lib
-install: install_docs update_package_db
+install: install_man install_docs update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
 ifeq "$(TargetOS_CPP)" "mingw32"
@@ -185,17 +185,28 @@ install_lib: lib/settings
 install_docs:
 	@echo "Copying docs to $(DESTDIR)$(docdir)"
 	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
-	
+
 	if [ -d doc ]; then \
 		cd doc; $(FIND) . -type f -exec sh -c \
 			'$(INSTALL_DIR) "$(DESTDIR)$(docdir)/`dirname $$1`" && $(INSTALL_DATA) "$$1" "$(DESTDIR)$(docdir)/`dirname $$1`"' \
 			sh '{}' ';'; \
 	fi
-	
+
 	if [ -d docs-utils ]; then \
 		$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html/libraries/"; \
 		$(INSTALL_DATA) docs-utils/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"; \
 		$(INSTALL_SCRIPT) docs-utils/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"; \
+	fi
+
+MAN_SECTION := 1
+MAN_PAGES := doc/users_guide/build-man/ghc.1
+
+.PHONY: install_man
+install_man:
+	if [ -f $(MAN_PAGES) ]; then \
+		$(INSTALL_DIR) "$(DESTDIR)$(mandir)"; \
+		$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"; \
+		$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGES) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"; \
 	fi
 
 export SHELL
