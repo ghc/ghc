@@ -193,8 +193,12 @@ splitSectionsIf pkgPredicate = addArgs $ do
     pkg <- getPackage
     osx <- expr isOsxTarget
     not osx ? -- osx doesn't support split sections
-      pkgPredicate pkg ? -- Only apply to these packages
-        builder (Ghc CompileHs) ? arg "-split-sections"
+      pkgPredicate pkg ? mconcat -- Only apply to these packages
+        [ builder (Ghc CompileHs) ? arg "-split-sections"
+        , builder MergeObjects ? ifM (expr isWinTarget)
+            (pure ["-t", "driver/utils/merge_sections_pe.ld"])
+            (pure ["-t", "driver/utils/merge_sections.ld"])
+        ]
 
 -- | Like 'splitSectionsIf', but with a fixed predicate: use
 --   split sections for all packages but the GHC library.
