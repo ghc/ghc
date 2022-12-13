@@ -290,7 +290,7 @@ static bool set_initial_registers(Dwfl_Thread *thread, void *arg);
 #if defined(x86_64_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
-    Dwarf_Word regs[17];
+    Dwarf_Word regs[17] = {};
     __asm__ ("movq %%rax, 0x00(%0)\n\t"
              "movq %%rdx, 0x08(%0)\n\t"
              "movq %%rcx, 0x10(%0)\n\t"
@@ -318,7 +318,7 @@ static bool set_initial_registers(Dwfl_Thread *thread,
 #elif defined(i386_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
-    Dwarf_Word regs[9];
+    Dwarf_Word regs[9] = {};
     __asm__ ("movl %%eax, 0x00(%0)\n\t"
              "movl %%ecx, 0x04(%0)\n\t"
              "movl %%edx, 0x08(%0)\n\t"
@@ -339,7 +339,7 @@ static bool set_initial_registers(Dwfl_Thread *thread,
 #elif defined(s390x_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
-    Dwarf_Word regs[32];
+    Dwarf_Word regs[32] = {};
     __asm__ ("stmg %%r0,%%r15,0(%0)\n\t"
              "std  %%f0,  128(0,%0)\n\t"
              "std  %%f2,  136(0,%0)\n\t"
