@@ -15,6 +15,7 @@ module GHC.Iface.Recomp
    , CompileReason(..)
    , recompileRequired
    , addFingerprints
+   , mkSelfRecomp
    )
 where
 
@@ -171,6 +172,7 @@ data RecompReason
   = UnitDepRemoved UnitId
   | ModulePackageChanged FastString
   | SourceFileChanged
+  | NoSelfRecompInfo
   | ThisUnitIdChanged
   | ImpurePlugin
   | PluginsChanged
@@ -204,6 +206,7 @@ instance Outputable RecompReason where
     UnitDepRemoved uid       -> ppr uid <+> text "removed"
     ModulePackageChanged s   -> ftext s <+> text "package changed"
     SourceFileChanged        -> text "Source file changed"
+    NoSelfRecompInfo         -> text "Old interface lacks recompilation info"
     ThisUnitIdChanged        -> text "-this-unit-id changed"
     ImpurePlugin             -> text "Impure plugin forced recompilation"
     PluginsChanged           -> text "Plugins changed"
@@ -283,7 +286,7 @@ check_old_iface hsc_env mod_summary maybe_iface
         logger = hsc_logger hsc_env
         getIface =
             case maybe_iface of
-                Just _  -> do
+                Just {}  -> do
                     trace_if logger (text "We already have the old interface for" <+>
                       ppr (ms_mod mod_summary))
                     return maybe_iface
@@ -354,7 +357,9 @@ check_old_iface hsc_env mod_summary maybe_iface
                     -- should check versions because some packages
                     -- might have changed or gone away.
                     Just iface ->
-                      check_dyn_hi iface $ checkVersions hsc_env mod_summary iface
+                      case mi_self_recomp_info iface of
+                        Nothing -> return $ outOfDateItemBecause NoSelfRecompInfo Nothing
+                        Just sr_info -> check_dyn_hi iface $ checkVersions hsc_env mod_summary iface sr_info
 
 -- | Check if a module is still the same 'version'.
 --
@@ -370,8 +375,9 @@ check_old_iface hsc_env mod_summary maybe_iface
 checkVersions :: HscEnv
               -> ModSummary
               -> ModIface       -- Old interface
+              -> ModIfaceSelfRecomp
               -> IfG (MaybeValidated ModIface)
-checkVersions hsc_env mod_summary iface
+checkVersions hsc_env mod_summary iface self_recomp
   = do { liftIO $ trace_hi_diffs logger
                         (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
@@ -380,22 +386,21 @@ checkVersions hsc_env mod_summary iface
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
        ; hsc_env <- getTopEnv
-       ; if mi_src_hash iface /= ms_hs_hash mod_summary
+       ; if mi_sr_src_hash self_recomp /= ms_hs_hash mod_summary
             then return $ outOfDateItemBecause SourceFileChanged Nothing else do {
        ; if not (isHomeModule home_unit (mi_module iface))
             then return $ outOfDateItemBecause ThisUnitIdChanged Nothing else do {
-       ; recomp <- liftIO $ checkFlagHash hsc_env iface
-                             `recompThen` checkOptimHash hsc_env iface
-                             `recompThen` checkHpcHash hsc_env iface
-                             `recompThen` checkMergedSignatures hsc_env mod_summary iface
+       ; recomp <- liftIO $ checkFlagHash hsc_env (mi_module iface) self_recomp
+                             `recompThen` checkOptimHash hsc_env self_recomp
+                             `recompThen` checkHpcHash hsc_env self_recomp
+                             `recompThen` checkMergedSignatures hsc_env mod_summary self_recomp
                              `recompThen` checkHsig logger home_unit mod_summary iface
                              `recompThen` pure (checkHie dflags mod_summary)
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason Nothing ; _ -> do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
-       ; recomp <- checkPlugins (hsc_plugins hsc_env) iface
+       ; recomp <- checkPlugins (hsc_plugins hsc_env) self_recomp
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason Nothing ; _ -> do {
-
 
        -- Source code unchanged and no errors yet... carry on
        --
@@ -411,7 +416,7 @@ checkVersions hsc_env mod_summary iface
           ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
        }
        ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
-                             | u <- mi_usages iface]
+                             | u <- mi_sr_usages self_recomp]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
        ; return $ UpToDateItem iface
     }}}}}}}
@@ -423,11 +428,11 @@ checkVersions hsc_env mod_summary iface
 
 
 -- | Check if any plugins are requesting recompilation
-checkPlugins :: Plugins -> ModIface -> IfG RecompileRequired
-checkPlugins plugins iface = liftIO $ do
+checkPlugins :: Plugins -> ModIfaceSelfRecomp -> IfG RecompileRequired
+checkPlugins plugins self_recomp = liftIO $ do
   recomp <- recompPlugins plugins
   let new_fingerprint = fingerprintPluginRecompile recomp
-  let old_fingerprint = mi_plugin_hash (mi_final_exts iface)
+  let old_fingerprint = mi_sr_plugin_hash self_recomp
   return $ pluginRecompileToRecompileRequired old_fingerprint new_fingerprint recomp
 
 recompPlugins :: Plugins -> IO PluginRecompile
@@ -516,11 +521,11 @@ checkHie dflags mod_summary =
              _ -> UpToDate
 
 -- | Check the flags haven't changed
-checkFlagHash :: HscEnv -> ModIface -> IO RecompileRequired
-checkFlagHash hsc_env iface = do
+checkFlagHash :: HscEnv -> Module -> ModIfaceSelfRecomp -> IO RecompileRequired
+checkFlagHash hsc_env iface_mod self_recomp = do
     let logger   = hsc_logger hsc_env
-    let old_hash = mi_flag_hash (mi_final_exts iface)
-    new_hash <- fingerprintDynFlags hsc_env (mi_module iface) putNameLiterally
+    let old_hash = mi_sr_flag_hash self_recomp
+    new_hash <- fingerprintDynFlags hsc_env iface_mod putNameLiterally
     case old_hash == new_hash of
         True  -> up_to_date logger (text "Module flags unchanged")
         False -> out_of_date_hash logger FlagsChanged
@@ -528,10 +533,10 @@ checkFlagHash hsc_env iface = do
                      old_hash new_hash
 
 -- | Check the optimisation flags haven't changed
-checkOptimHash :: HscEnv -> ModIface -> IO RecompileRequired
+checkOptimHash :: HscEnv -> ModIfaceSelfRecomp -> IO RecompileRequired
 checkOptimHash hsc_env iface = do
     let logger   = hsc_logger hsc_env
-    let old_hash = mi_opt_hash (mi_final_exts iface)
+    let old_hash = mi_sr_opt_hash iface
     new_hash <- fingerprintOptFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -544,10 +549,10 @@ checkOptimHash hsc_env iface = do
                      old_hash new_hash
 
 -- | Check the HPC flags haven't changed
-checkHpcHash :: HscEnv -> ModIface -> IO RecompileRequired
-checkHpcHash hsc_env iface = do
+checkHpcHash :: HscEnv -> ModIfaceSelfRecomp -> IO RecompileRequired
+checkHpcHash hsc_env self_recomp = do
     let logger   = hsc_logger hsc_env
-    let old_hash = mi_hpc_hash (mi_final_exts iface)
+    let old_hash = mi_sr_hpc_hash self_recomp
     new_hash <- fingerprintHpcFlags (hsc_dflags hsc_env)
                                                putNameLiterally
     if | old_hash == new_hash
@@ -561,11 +566,11 @@ checkHpcHash hsc_env iface = do
 
 -- Check that the set of signatures we are merging in match.
 -- If the -unit-id flags change, this can change too.
-checkMergedSignatures :: HscEnv -> ModSummary -> ModIface -> IO RecompileRequired
-checkMergedSignatures hsc_env mod_summary iface = do
+checkMergedSignatures :: HscEnv -> ModSummary -> ModIfaceSelfRecomp -> IO RecompileRequired
+checkMergedSignatures hsc_env mod_summary self_recomp = do
     let logger     = hsc_logger hsc_env
     let unit_state = hsc_units hsc_env
-    let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
+    let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_sr_usages self_recomp ]
         new_merged = case lookupUniqMap (requirementContext unit_state)
                           (ms_mod_name mod_summary) of
                         Nothing -> []
@@ -939,6 +944,28 @@ we use is:
 
 -}
 
+-- | Compute the information needed for self-recompilation checking. This
+-- information can be computed before the backend phase.
+mkSelfRecomp :: HscEnv -> Module -> Fingerprint -> [Usage] -> IO ModIfaceSelfRecomp
+mkSelfRecomp hsc_env this_mod src_hash usages = do
+      let dflags = hsc_dflags hsc_env
+
+      flag_hash <- fingerprintDynFlags hsc_env this_mod putNameLiterally
+
+      opt_hash <- fingerprintOptFlags dflags putNameLiterally
+
+      hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
+
+      plugin_hash <- fingerprintPlugins (hsc_plugins hsc_env)
+
+      return (ModIfaceSelfRecomp
+                { mi_sr_flag_hash = flag_hash
+                , mi_sr_hpc_hash = hpc_hash
+                , mi_sr_opt_hash = opt_hash
+                , mi_sr_plugin_hash = plugin_hash
+                , mi_sr_src_hash = src_hash
+                , mi_sr_usages = usages })
+
 -- | Add fingerprints for top-level declarations to a 'ModIface'.
 --
 -- See Note [Fingerprinting IfaceDecls]
@@ -1213,18 +1240,6 @@ addFingerprints hsc_env iface0
        sorted_extra_decls :: Maybe [IfaceBindingX IfaceMaybeRhs IfaceTopBndrInfo]
        sorted_extra_decls = sortOn binding_key <$> mi_extra_decls iface0
 
-   -- the flag hash depends on:
-   --   - (some of) dflags
-   -- it returns two hashes, one that shouldn't change
-   -- the abi hash and one that should
-   flag_hash <- fingerprintDynFlags hsc_env this_mod putNameLiterally
-
-   opt_hash <- fingerprintOptFlags dflags putNameLiterally
-
-   hpc_hash <- fingerprintHpcFlags dflags putNameLiterally
-
-   plugin_hash <- fingerprintPlugins (hsc_plugins hsc_env)
-
    -- the ABI hash depends on:
    --   - decls
    --   - export list
@@ -1238,6 +1253,7 @@ addFingerprints hsc_env iface0
                        mi_warns iface0,
                        mi_foreign iface0)
 
+
    -- The interface hash depends on:
    --   - the ABI hash, plus
    --   - the source file hash,
@@ -1246,21 +1262,17 @@ addFingerprints hsc_env iface0
    --   - deps (home and external packages, dependent files)
    --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
-                      (mod_hash,
-                       mi_src_hash iface0,
-                       ann_fn (mkVarOccFS (fsLit "module")),  -- See mkIfaceAnnCache
-                       mi_usages iface0,
-                       sorted_deps,
-                       mi_hpc iface0)
+                        (mod_hash,
+                         mi_src_hash iface0,
+                         ann_fn (mkVarOccFS (fsLit "module")),  -- See mkIfaceAnnCache
+                         mi_usages iface0,
+                         sorted_deps,
+                         mi_hpc iface0)
 
    let
     final_iface_exts = ModIfaceBackend
-      { mi_iface_hash     = iface_hash
-      , mi_mod_hash       = mod_hash
-      , mi_flag_hash      = flag_hash
-      , mi_opt_hash       = opt_hash
-      , mi_hpc_hash       = hpc_hash
-      , mi_plugin_hash    = plugin_hash
+      { mi_mod_hash       = mod_hash
+      , mi_iface_hash     = iface_hash
       , mi_orphan         = not (   all ifRuleAuto orph_rules
                                       -- See Note [Orphans and auto-generated rules]
                                  && null orph_insts
@@ -1281,11 +1293,11 @@ addFingerprints hsc_env iface0
   where
     this_mod = mi_module iface0
     semantic_mod = mi_semantic_module iface0
-    dflags = hsc_dflags hsc_env
     (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
+
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the

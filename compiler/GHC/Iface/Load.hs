@@ -1259,21 +1259,25 @@ pprModIfaceSimple unit_state iface =
 -- The UnitState is used to pretty-print units
 pprModIface :: UnitState -> ModIface -> SDoc
 pprModIface unit_state iface
- = vcat [ text "interface"
+ = vcat $ [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
+                <+> (withSelfRecomp iface empty $ \_ -> text "[self-recomp]")
                 <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
                 <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
                 <+> (if mi_hpc iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
-        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash exts))
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
+        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash (mi_final_exts iface)))
         , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash exts))
+        , withSelfRecomp iface empty $ \(ModIfaceSelfRecomp src usages flag_hash opt_hash hpc_hash plugin_hash) -> vcat
+                [ nest 2 (text "src_hash:" <+> ppr src)
+                , nest 2 (text "flag hash:" <+> ppr flag_hash)
+                , nest 2 (text "opt_hash:" <+> ppr opt_hash)
+                , nest 2 (text "hpc_hash:" <+> ppr hpc_hash)
+                , nest 2 (text "plugin_hash:" <+> ppr plugin_hash)
+                , vcat (map pprUsage usages)
+                ]
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
-        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash exts))
-        , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
-        , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
-        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
-        , nest 2 (text "src_hash:" <+> ppr (mi_src_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
@@ -1282,7 +1286,6 @@ pprModIface unit_state iface
         , text "defaults:"
         , nest 2 (vcat (map ppr (mi_defaults iface)))
         , pprDeps unit_state (mi_deps iface)
-        , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
         , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
@@ -1302,6 +1305,7 @@ pprModIface unit_state iface
         ]
   where
     exts = mi_final_exts iface
+
     pp_hsc_src HsBootFile = text "[boot]"
     pp_hsc_src HsigFile   = text "[hsig]"
     pp_hsc_src HsSrcFile  = Outputable.empty
