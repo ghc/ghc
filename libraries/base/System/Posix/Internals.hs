@@ -682,8 +682,13 @@ foreign import capi unsafe "HsBase.h read"
 foreign import capi safe "HsBase.h read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
+#if defined(HAVE_UMASK)
 foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
+#else
+c_umask :: CMode -> IO CMode
+c_umask _ = ioError (ioeSetLocation unsupportedOperation "umask")
+#endif
 
 -- See Note: Windows types
 foreign import capi unsafe "HsBase.h write"
@@ -785,8 +790,14 @@ foreign import capi unsafe "HsBase.h tcsetattr"
 
 #endif
 
+#if defined(HAVE_GETPID)
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
+#else
+c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
+c_waitpid _ _ _ = ioError (ioeSetLocation unsupportedOperation "waitpid")
+#endif
+
 #endif
 
 #if !defined(js_HOST_ARCH)
