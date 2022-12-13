@@ -2516,6 +2516,8 @@ specHeader env (bndr : bndrs) (UnspecType : args)
 -- the nitty-gritty), as a LHS rule and unfolding details.
 specHeader env (bndr : bndrs) (SpecDict d : args)
   | not (isDeadBinder bndr)
+  , allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
+    -- See Note [Weird special case for SpecDict]
   = do { (env1, bndr') <- newDictBndr env bndr -- See Note [Zap occ info in rule binders]
        ; let (env2, dx_bind, spec_dict) = bindAuxiliaryDict env1 bndr bndr' d
        ; (_, env3, leftover_bndrs, rule_bs, rule_es, bs', dx, spec_args)
@@ -2531,6 +2533,8 @@ specHeader env (bndr : bndrs) (SpecDict d : args)
               , spec_dict : spec_args
               )
        }
+   where
+     in_scope = Core.getSubstInScope (se_subst env)
 
 -- Finally, we don't want to specialise on this argument 'i':
 --   - It's an UnSpecArg, or
@@ -2752,6 +2756,8 @@ monomorpic, and specialised in one go.
 
 Wrinkles.
 
+* See Note [Weird special case for SpecDict]
+
 * With -XOverlappingInstances you might worry about this:
     class C a where ...
     instance C (Maybe Int) where ...   -- $df1 :: C (Maybe Int)
@@ -2777,6 +2783,33 @@ Wrinkles.
   it's a hard test to make.)
 
   But see Note [Specialisation and overlapping instances].
+
+Note [Weird special case for SpecDict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are trying to specialise for this this call:
+   $wsplit @T (mkD @k @(a::k) :: C T)
+where
+   mkD :: forall k (a::k). C T
+is a top-level dictionary-former.  This actually happened in #22459,
+because of (MP1) of Note [Specialising polymorphic dictionaries].
+
+How can we speicalise $wsplit?  We might try
+
+   RULE "SPEC" forall (d :: C T). $wsplit @T d = $s$wsplit
+
+but then in the body of $s$wsplit what will we use for the dictionary
+evidence?  We can't use (mkD @k @(a::k)) because k and a aren't in scope.
+We could zap `k` to (Any @Type) and `a` to (Any @(Any @Type)), but that
+is a lot of hard work for a very strange case.
+
+So we simply refrain from specialising in this case; hence the guard
+   allVarSet (`elemInScopeSet` in_scope) (exprFreeVars d)
+in the SpecDict cased of specHeader.
+
+How did this strange polymorphic mkD arise in the first place?
+From GHC.Core.Opt.Utils.abstractFloats, which was abstracting
+over too many type variables. But that too is now fixed;
+see Note [Which type variables to abstract over] in that module.
 -}
 
 instance Outputable DictBind where

@@ -2063,34 +2063,51 @@ it is guarded by the doFloatFromRhs call in simplLazyBind.
 Note [Which type variables to abstract over]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Abstract only over the type variables free in the rhs wrt which the
-new binding is abstracted.  Note that
+new binding is abstracted.  Several points worth noting
 
-  * The naive approach of abstracting wrt the
-    tyvars free in the Id's /type/ fails. Consider:
-        /\ a b -> let t :: (a,b) = (e1, e2)
-                      x :: a     = fst t
-                  in ...
-    Here, b isn't free in x's type, but we must nevertheless
-    abstract wrt b as well, because t's type mentions b.
-    Since t is floated too, we'd end up with the bogus:
-         poly_t = /\ a b -> (e1, e2)
-         poly_x = /\ a   -> fst (poly_t a *b*)
+(AB1) The naive approach of abstracting wrt the
+      tyvars free in the Id's /type/ fails. Consider:
+          /\ a b -> let t :: (a,b) = (e1, e2)
+                        x :: a     = fst t
+                    in ...
+      Here, b isn't free in x's type, but we must nevertheless
+      abstract wrt b as well, because t's type mentions b.
+      Since t is floated too, we'd end up with the bogus:
+           poly_t = /\ a b -> (e1, e2)
+           poly_x = /\ a   -> fst (poly_t a *b*)
 
-  * We must do closeOverKinds.  Example (#10934):
+(AB2) We must do closeOverKinds.  Example (#10934):
        f = /\k (f:k->*) (a:k). let t = AccFailure @ (f a) in ...
-    Here we want to float 't', but we must remember to abstract over
-    'k' as well, even though it is not explicitly mentioned in the RHS,
-    otherwise we get
-       t = /\ (f:k->*) (a:k). AccFailure @ (f a)
-    which is obviously bogus.
+      Here we want to float 't', but we must remember to abstract over
+      'k' as well, even though it is not explicitly mentioned in the RHS,
+      otherwise we get
+         t = /\ (f:k->*) (a:k). AccFailure @ (f a)
+      which is obviously bogus.
 
-  * We get the variables to abstract over by filtering down the
-    the main_tvs for the original function, picking only ones
-    mentioned in the abstracted body. This means:
-    - they are automatically in dependency order, because main_tvs is
-    - there is no issue about non-determinism
-    - we don't gratuitously change order, which may help (in a tiny
-      way) with CSE and/or the compiler-debugging experience
+(AB3) We get the variables to abstract over by filtering down the
+      the main_tvs for the original function, picking only ones
+      mentioned in the abstracted body. This means:
+      - they are automatically in dependency order, because main_tvs is
+      - there is no issue about non-determinism
+      - we don't gratuitously change order, which may help (in a tiny
+        way) with CSE and/or the compiler-debugging experience
+
+(AB4) For a recursive group, it's a bit of a pain to work out the minimal
+      set of tyvars over which to abstract:
+           /\ a b c.  let x = ...a... in
+                      letrec { p = ...x...q...
+                               q = .....p...b... } in
+                      ...
+      Since 'x' is abstracted over 'a', the {p,q} group must be abstracted
+      over 'a' (because x is replaced by (poly_x a)) as well as 'b'.
+      Remember this bizarre case too:
+           x::a = x
+      Here, we must abstract 'x' over 'a'.
+
+      Why is it worth doing this?  Partly tidiness; and partly #22459
+      which showed that it's harder to do polymorphic specialisation well
+      if there are dictionaries abstracted over unnecessary type variables.
+      See Note [Weird special case for SpecDict] in GHC.Core.Opt.Specialise
 -}
 
 abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
@@ -2115,33 +2132,40 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         rhs' = GHC.Core.Subst.substExpr subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
-        tvs_here = filter (`elemVarSet` free_tvs) main_tvs
-        free_tvs = closeOverKinds $
-                   exprSomeFreeVars isTyVar rhs'
+        tvs_here = choose_tvs (exprSomeFreeVars isTyVar rhs')
 
     abstract subst (Rec prs)
-       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
-            ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
-                  poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
-                               | (poly_id, rhs) <- poly_ids `zip` rhss
-                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-            ; return (subst', Rec poly_pairs) }
+      = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
+           ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
+                 poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
+                              | (poly_id, rhs) <- poly_ids `zip` rhss
+                              , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
+           ; return (subst', Rec poly_pairs) }
+      where
+        (ids,rhss) = unzip prs
+
+
+        -- tvs_here: see Note [Which type variables to abstract over]
+        tvs_here = choose_tvs (mapUnionVarSet get_bind_fvs prs)
+
+        -- See wrinkle (AB4) in Note [Which type variables to abstract over]
+        get_bind_fvs (id,rhs) = tyCoVarsOfType (idType id) `unionVarSet` get_rec_rhs_tvs rhs
+        get_rec_rhs_tvs rhs   = nonDetStrictFoldVarSet get_tvs emptyVarSet (exprFreeVars rhs)
+
+        get_tvs :: Var -> VarSet -> VarSet
+        get_tvs var free_tvs
+           | isTyVar var      -- CoVars have been substituted away
+           = extendVarSet free_tvs var
+           | Just poly_app <- GHC.Core.Subst.lookupIdSubst_maybe subst var
+           = -- 'var' is like 'x' in (AB4)
+             exprSomeFreeVars isTyVar poly_app `unionVarSet` free_tvs
+           | otherwise
+           = free_tvs
+
+    choose_tvs free_tvs
+       = filter (`elemVarSet` all_free_tvs) main_tvs  -- (AB3)
        where
-         (ids,rhss) = unzip prs
-                -- For a recursive group, it's a bit of a pain to work out the minimal
-                -- set of tyvars over which to abstract:
-                --      /\ a b c.  let x = ...a... in
-                --                 letrec { p = ...x...q...
-                --                          q = .....p...b... } in
-                --                 ...
-                -- Since 'x' is abstracted over 'a', the {p,q} group must be abstracted
-                -- over 'a' (because x is replaced by (poly_x a)) as well as 'b'.
-                -- Since it's a pain, we just use the whole set, which is always safe
-                --
-                -- If you ever want to be more selective, remember this bizarre case too:
-                --      x::a = x
-                -- Here, we must abstract 'x' over 'a'.
-         tvs_here = scopedSort main_tvs
+         all_free_tvs = closeOverKinds free_tvs       -- (AB2)
 
     mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
     mk_poly1 tvs_here var

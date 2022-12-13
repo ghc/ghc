@@ -15,7 +15,7 @@ module GHC.Core.Subst (
         deShadowBinds, substRuleInfo, substRulesForImportedIds,
         substTyUnchecked, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
-        lookupIdSubst, substIdType, substIdOcc,
+        lookupIdSubst, lookupIdSubst_maybe, substIdType, substIdOcc,
         substTickish, substDVarSet, substIdInfo,
 
         -- ** Operations on substitutions
@@ -184,15 +184,23 @@ extendSubstList subst []              = subst
 extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
 
 -- | Find the substitution for an 'Id' in the 'Subst'
+-- The Id should not be a CoVar
 lookupIdSubst :: HasDebugCallStack => Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids _ _) v
-  | not (isLocalId v) = Var v
+  | assertPpr (isId v && not (isCoVar v)) (ppr v)
+    not (isLocalId v)                   = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the IdSubstEnv]
         -- If v isn't in the InScopeSet, we panic, because
         -- it's a bad bug and we really want to know
   | otherwise = pprPanic "lookupIdSubst" (ppr v $$ ppr in_scope)
+
+lookupIdSubst_maybe :: HasDebugCallStack => Subst -> Id -> Maybe CoreExpr
+-- Just look up in the substitution; do not check the in-scope set
+lookupIdSubst_maybe (Subst _ ids _ _) v
+  = assertPpr (isId v && not (isCoVar v)) (ppr v) $
+    lookupVarEnv ids v
 
 delBndr :: Subst -> Var -> Subst
 delBndr (Subst in_scope ids tvs cvs) v
