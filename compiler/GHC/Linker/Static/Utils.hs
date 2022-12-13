@@ -19,6 +19,7 @@ exeFileName (ArchOS arch os) staticLink output_fn
   | Just s <- output_fn = if
       | OSMinGW32      <- os   -> s <?.> "exe"
       | ArchJavaScript <- arch -> s <?.> "jsexe"
+      | ArchWasm32     <- arch -> s <?.> "wasm"
       | staticLink             -> s <?.> "a"
       | otherwise              -> s
   | otherwise = if
@@ -28,4 +29,3 @@ exeFileName (ArchOS arch os) staticLink output_fn
       | otherwise              -> "a.out"
  where s <?.> ext | null (takeExtension s) = s <.> ext
                   | otherwise              = s
-

@@ -788,9 +788,10 @@ guessOutputFile = modifySession $ \env ->
                   -- we must add the .exe extension unconditionally here, otherwise
                   -- when name has an extension of its own, the .exe extension will
                  -- not be added by GHC.Driver.Pipeline.exeFileName.  See #2248
-                 !name' <- if platformOS platform == OSMinGW32
-                           then fmap (<.> "exe") name
-                           else name
+                 !name' <- case platformArchOS platform of
+                             ArchOS _ OSMinGW32  -> fmap (<.> "exe") name
+                             ArchOS ArchWasm32 _ -> fmap (<.> "wasm") name
+                             _ -> name
                  mainModuleSrcPath' <- mainModuleSrcPath
                  -- #9930: don't clobber input files (unless they ask for it)
                  if name' == mainModuleSrcPath'
