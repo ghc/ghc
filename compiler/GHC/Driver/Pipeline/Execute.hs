@@ -127,7 +127,10 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
           })
         input_fn output_fn
   return output_fn
-runPhase (T_Js pipe_env hsc_env _mb_location js_src) = runJsPhase pipe_env hsc_env js_src
+runPhase (T_Js pipe_env hsc_env location js_src) =
+  runJsPhase pipe_env hsc_env location js_src
+runPhase (T_ForeignJs pipe_env hsc_env location js_src) =
+  runForeignJsPhase pipe_env hsc_env location js_src
 runPhase (T_Cmm pipe_env hsc_env input_fn) = do
   let dflags = hsc_dflags hsc_env
   let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
@@ -374,31 +377,27 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 -- to ensure these timestamps abide by the proper ordering.
 
 -- | Run the JS Backend postHsc phase.
-runJsPhase :: PipeEnv -> HscEnv -> FilePath -> IO FilePath
-runJsPhase pipe_env hsc_env input_fn = do
+runJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runJsPhase _pipe_env hsc_env _location input_fn = do
+  let dflags     = hsc_dflags   hsc_env
+  let logger     = hsc_logger   hsc_env
+
+  -- The object file is already generated. We only touch it to ensure the
+  -- timestamp is refreshed, see Note [JS Backend .o file procedure].
+  touchObjectFile logger dflags input_fn
+
+  return input_fn
+
+-- | Deal with foreign JS files (embed them into .o files)
+runForeignJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
+runForeignJsPhase pipe_env hsc_env _location input_fn = do
   let dflags     = hsc_dflags   hsc_env
   let logger     = hsc_logger   hsc_env
   let tmpfs      = hsc_tmpfs    hsc_env
   let unit_env   = hsc_unit_env hsc_env
 
   output_fn <- phaseOutputFilenameNew StopLn pipe_env hsc_env Nothing
-
-  -- if the input filename is the same as the output, then we've probably
-  -- generated the object ourselves. In this case, we touch the object file to
-  -- ensure the timestamp is refreshed, see Note [JS Backend .o file procedure]. If
-  -- they are not the same then we embed the .js file into a .o file with the
-  -- addition of a header
-  --
-  -- We need to canonicalize the paths, otherwise the comparison can return
-  -- wrong results (e.g. with Cabal using paths containing "build/./Foo/..."
-  -- that are compared to "build/Foo/...").
-  --
-  cin  <- canonicalizePath input_fn
-  cout <- canonicalizePath output_fn
-  if (not (equalFilePath cin cout))
-    then embedJsFile logger dflags tmpfs unit_env input_fn output_fn
-    else touchObjectFile logger dflags output_fn
-
+  embedJsFile logger dflags tmpfs unit_env input_fn output_fn
   return output_fn
 
 

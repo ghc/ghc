@@ -607,7 +607,7 @@ compileForeign hsc_env lang stub_c = do
               LangObjc   -> viaCPipeline Cobjc
               LangObjcxx -> viaCPipeline Cobjcxx
               LangAsm    -> \pe hsc_env ml fp -> asPipeline True pe hsc_env ml fp
-              LangJs     -> \pe hsc_env ml fp -> Just <$> jsPipeline pe hsc_env ml fp
+              LangJs     -> \pe hsc_env ml fp -> Just <$> foreignJsPipeline pe hsc_env ml fp
 #if __GLASGOW_HASKELL__ < 811
               RawObject  -> panic "compileForeign: should be unreachable"
 #endif
@@ -639,7 +639,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
       let src = ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
       writeFile empty_stub (showSDoc dflags (pprCode src))
       let pipe_env = (mkPipeEnv NoStop empty_stub Nothing Persistent) { src_basename = basename}
-          pipeline = Just <$> jsPipeline pipe_env hsc_env (Just location) empty_stub
+          pipeline = Just <$> foreignJsPipeline pipe_env hsc_env (Just location) empty_stub
       _ <- runPipeline (hsc_hooks hsc_env) pipeline
       pure ()
 
@@ -858,6 +858,10 @@ jsPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m Fil
 jsPipeline pipe_env hsc_env location input_fn = do
   use (T_Js pipe_env hsc_env location input_fn)
 
+foreignJsPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
+foreignJsPipeline pipe_env hsc_env location input_fn = do
+  use (T_ForeignJs pipe_env hsc_env location input_fn)
+
 hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
 hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
 hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
@@ -928,7 +932,7 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    fromPhase StopLn     = return (Just input_fn)
    fromPhase CmmCpp     = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
    fromPhase Cmm        = Just <$> cmmPipeline pipe_env hsc_env input_fn
-   fromPhase Js         = Just <$> jsPipeline pipe_env hsc_env Nothing input_fn
+   fromPhase Js         = Just <$> foreignJsPipeline pipe_env hsc_env Nothing input_fn
    fromPhase MergeForeign = panic "fromPhase: MergeForeign"
 
 {-
