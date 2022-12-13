@@ -227,6 +227,7 @@ GHC.Unit.Module.Graph
 GHC.Unit.Module.Imported
 GHC.Unit.Module.Location
 GHC.Unit.Module.ModIface
+GHC.Unit.Module.ModIface.SelfRecomp
 GHC.Unit.Module.ModNodeKey
 GHC.Unit.Module.ModSummary
 GHC.Unit.Module.Warnings

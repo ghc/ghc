@@ -955,6 +955,7 @@ Library
         GHC.Unit.Module.ModDetails
         GHC.Unit.Module.ModGuts
         GHC.Unit.Module.ModIface
+        GHC.Unit.Module.ModIface.SelfRecomp
         GHC.Unit.Module.WholeCoreBindings
         GHC.Unit.Module.ModSummary
         GHC.Unit.Module.Status
