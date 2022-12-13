@@ -2875,6 +2875,10 @@ modToTHMod :: Module -> TH.Module
 modToTHMod m = TH.Module (TH.PkgName $ unitString  $ moduleUnit m)
                          (TH.ModName $ moduleNameString $ moduleName m)
 
+-- | Note that reifyModule will not work if the module is compiled with `-fno-write-self-recomp-info`
+-- because the implementation works by consulting the `mi_usages` field which is intended to be only
+-- used for recompilation checking. See #8489 for a ticket which tracks improvement
+-- of this function.
 reifyModule :: TH.Module -> TcM TH.ModuleInfo
 reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
   this_mod <- getModule

@@ -730,6 +730,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInvalidInvisTyVarBndr"                     = 57916
   GhcDiagnosticCode "TcRnInvisBndrWithoutSig"                       = 92337
 
+
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
   GhcDiagnosticCode "IsNonLinear"                                   = 38291
