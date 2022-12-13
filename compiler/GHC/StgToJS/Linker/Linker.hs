@@ -806,45 +806,35 @@ embedJsFile logger dflags tmpfs unit_env input_fn output_fn = do
   -- the header lets the linker recognize processed JavaScript files
   -- But don't add JavaScript header to object files!
 
-  is_js_obj <- if True
-                then pure False
-                else isJsObjectFile input_fn
-                -- FIXME (Sylvain 2022-09): this call makes the
-                -- testsuite go into a loop, I don't know why yet!
-                -- Disabling it for now.
+  -- header appended to JS files stored as .o to recognize them.
+  let header = "//JavaScript\n"
+  jsFileNeedsCpp input_fn >>= \case
+    False -> copyWithHeader header input_fn output_fn
+    True  -> do
 
-  if is_js_obj
-    then copyWithHeader "" input_fn output_fn
-    else do
-      -- header appended to JS files stored as .o to recognize them.
-      let header = "//JavaScript\n"
-      jsFileNeedsCpp input_fn >>= \case
-        False -> copyWithHeader header input_fn output_fn
-        True  -> do
+      -- append common CPP definitions to the .js file.
+      -- They define macros that avoid directly wiring zencoded names
+      -- in RTS JS files
+      pp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+      payload <- B.readFile input_fn
+      B.writeFile pp_fn (commonCppDefs profiling <> payload)
 
-          -- append common CPP definitions to the .js file.
-          -- They define macros that avoid directly wiring zencoded names
-          -- in RTS JS files
-          pp_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
-          payload <- B.readFile input_fn
-          B.writeFile pp_fn (commonCppDefs profiling <> payload)
-
-          -- run CPP on the input JS file
-          js_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
-          let
-            cpp_opts = CppOpts
-              { cppUseCc       = True
-              , cppLinePragmas = False -- LINE pragmas aren't JS compatible
-              }
-          doCpp logger
-                  tmpfs
-                  dflags
-                  unit_env
-                  cpp_opts
-                  pp_fn
-                  js_fn
-          -- add header to recognize the object as a JS file
-          copyWithHeader header js_fn output_fn
+      -- run CPP on the input JS file
+      js_fn <- newTempName logger tmpfs (tmpDir dflags) TFL_CurrentModule "js"
+      let
+        cpp_opts = CppOpts
+          { cppUseCc       = True
+          , cppLinePragmas = False -- LINE pragmas aren't JS compatible
+          }
+      doCpp logger
+              tmpfs
+              dflags
+              unit_env
+              cpp_opts
+              pp_fn
+              js_fn
+      -- add header to recognize the object as a JS file
+      copyWithHeader header js_fn output_fn
 
 jsFileNeedsCpp :: FilePath -> IO Bool
 jsFileNeedsCpp fn = do
