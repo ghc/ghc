@@ -1175,7 +1175,7 @@ extractPatternSyn nm t tvs cons =
     | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noAnn NotPromoted (noLocA t))) tvs
                     where mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
                           mkAppTyArg f (HsValArg ty) = HsAppTy noExtField f ty
-                          mkAppTyArg f (HsTypeArg l ki) = HsAppKindTy l f ki
+                          mkAppTyArg f (HsTypeArg at ki) = HsAppKindTy noExtField f at ki
                           mkAppTyArg f (HsArgPar _) = HsParTy noAnn f
 
 extractRecSel :: Name -> Name -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
@@ -1197,7 +1197,7 @@ extractRecSel nm t tvs (L _ con : rest) =
     | otherwise = foldl' (\x y -> noLocA (mkAppTyArg x y)) (noLocA (HsTyVar noAnn NotPromoted (noLocA t))) tvs
                    where mkAppTyArg :: LHsType GhcRn -> LHsTypeArg GhcRn -> HsType GhcRn
                          mkAppTyArg f (HsValArg ty) = HsAppTy noExtField f ty
-                         mkAppTyArg f (HsTypeArg l ki) = HsAppKindTy l f ki
+                         mkAppTyArg f (HsTypeArg at ki) = HsAppKindTy noExtField f at ki
                          mkAppTyArg f (HsArgPar _) = HsParTy noAnn f
 
 -- | Keep export items with docs.

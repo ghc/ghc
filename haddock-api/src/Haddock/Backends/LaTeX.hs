@@ -1131,7 +1131,7 @@ ppr_mono_ty (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLTyp
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
   = hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 
-ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode
+ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode
   = hsep [ppr_mono_lty fun_ty unicode, atSign unicode <> ppr_mono_lty arg_ki unicode]
 
 ppr_mono_ty (HsOpTy _ prom ty1 op ty2) unicode

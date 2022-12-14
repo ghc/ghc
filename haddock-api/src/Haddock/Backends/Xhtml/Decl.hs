@@ -1282,7 +1282,7 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode qual _
   = hsep [ ppr_mono_lty fun_ty unicode qual HideEmptyContexts
          , ppr_mono_lty arg_ty unicode qual HideEmptyContexts ]
 
-ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode qual _
+ppr_mono_ty (HsAppKindTy _ fun_ty _ arg_ki) unicode qual _
   = hsep [ppr_mono_lty fun_ty unicode qual HideEmptyContexts
          , atSign unicode <> ppr_mono_lty arg_ki unicode qual HideEmptyContexts]
 
