@@ -79,11 +79,11 @@ initSettings top_dir = do
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   cc_prog <- getToolSetting "C compiler command"
   cxx_prog <- getToolSetting "C++ compiler command"
-  cc_args_str <- getSetting "C compiler flags"
-  cxx_args_str <- getSetting "C++ compiler flags"
+  cc_args_str <- getToolSetting "C compiler flags"
+  cxx_args_str <- getToolSetting "C++ compiler flags"
   gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
   cpp_prog <- getToolSetting "Haskell CPP command"
-  cpp_args_str <- getSetting "Haskell CPP flags"
+  cpp_args_str <- getToolSetting "Haskell CPP flags"
 
   platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
 
@@ -123,13 +123,13 @@ initSettings top_dir = do
 
 
   -- Other things being equal, as and ld are simply gcc
-  cc_link_args_str <- getSetting "C compiler link flags"
+  cc_link_args_str <- getToolSetting "C compiler link flags"
   let   as_prog  = cc_prog
         as_args  = map Option cc_args
         ld_prog  = cc_prog
         ld_args  = map Option (cc_args ++ words cc_link_args_str)
   ld_r_prog <- getToolSetting "Merge objects command"
-  ld_r_args <- getSetting "Merge objects flags"
+  ld_r_args <- getToolSetting "Merge objects flags"
   let ld_r
         | null ld_r_prog = Nothing
         | otherwise      = Just (ld_r_prog, map Option $ words ld_r_args)
