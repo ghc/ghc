@@ -2496,19 +2496,6 @@ typeCharTypeRepKey    = mkPreludeMiscIdUnique 509
 typeRepIdKey          = mkPreludeMiscIdUnique 510
 mkTrFunKey            = mkPreludeMiscIdUnique 511
 
--- Representations for primitive types
-trTYPEKey
-  , trTYPE'PtrRepLiftedKey
-  , trRuntimeRepKey
-  , tr'PtrRepLiftedKey
-  , trLiftedRepKey
-  :: Unique
-trTYPEKey              = mkPreludeMiscIdUnique 512
-trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 513
-trRuntimeRepKey        = mkPreludeMiscIdUnique 514
-tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 515
-trLiftedRepKey         = mkPreludeMiscIdUnique 516
-
 -- KindReps for common cases
 starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey, constraintKindRepKey :: Unique
 starKindRepKey               = mkPreludeMiscIdUnique 520
@@ -2520,9 +2507,6 @@ constraintKindRepKey         = mkPreludeMiscIdUnique 523
 toDynIdKey :: Unique
 toDynIdKey            = mkPreludeMiscIdUnique 530
 
-
-bitIntegerIdKey :: Unique
-bitIntegerIdKey       = mkPreludeMiscIdUnique 550
 
 heqSCSelIdKey, eqSCSelIdKey, coercibleSCSelIdKey :: Unique
 eqSCSelIdKey        = mkPreludeMiscIdUnique 551

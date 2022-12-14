@@ -159,9 +159,9 @@ ppr_binding ann (val_bdr, expr)
                   -- So refer to printing  j = e
       = pp_normal_bind
       where
-        (bndrs, body) = collectBinders expr
-        lhs_bndrs = take join_arity bndrs
-        rhs       = mkLams (drop join_arity bndrs) body
+        (bndrs, body)     = collectBinders expr
+        (lhs_bndrs, rest) = splitAt join_arity bndrs
+        rhs               = mkLams rest body
 
 pprParendExpr expr = ppr_expr parens expr
 pprCoreExpr   expr = ppr_expr noParens expr

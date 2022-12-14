@@ -372,8 +372,9 @@ According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undeter
 It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
 
 The detection of CUSKs is enabled by the :extension:`CUSKs` flag, which is
-switched on by default. This extension is scheduled for deprecation to be
-replaced with :extension:`StandaloneKindSignatures`.
+switched off by default in GHC2021 and on in Haskell98 and Haskell2010.
+This extension is scheduled for deprecation to be replaced
+with :extension:`StandaloneKindSignatures`.
 
 .. index::
    single: standalone kind signature

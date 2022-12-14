@@ -785,7 +785,7 @@ zonkExpr env (HsUntypedBracket hsb_tc body)
 
 zonkExpr env (HsTypedSplice s _) = runTopSplice s >>= zonkExpr env
 
-zonkExpr _ e@(HsUntypedSplice _ _) = pprPanic "zonkExpr: HsUntypedSplice" (ppr e)
+zonkExpr _ (HsUntypedSplice x _) = dataConCantHappen x
 
 zonkExpr _ (OpApp x _ _ _) = dataConCantHappen x
 
@@ -899,7 +899,11 @@ zonkExpr env (XExpr (ConLikeTc con tvs tys))
     -- The tvs come straight from the data-con, and so are strictly redundant
     -- See Wrinkles of Note [Typechecking data constructors] in GHC.Tc.Gen.Head
 
-zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
+zonkExpr _ (RecordUpd x _ _)  = dataConCantHappen x
+zonkExpr _ (HsGetField x _ _) = dataConCantHappen x
+zonkExpr _ (HsProjection x _) = dataConCantHappen x
+zonkExpr _ e@(XExpr (HsTick {})) = pprPanic "zonkExpr" (ppr e)
+zonkExpr _ e@(XExpr (HsBinTick {})) = pprPanic "zonkExpr" (ppr e)
 
 -------------------------------------------------------------------------
 {-

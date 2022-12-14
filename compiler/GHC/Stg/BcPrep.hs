@@ -128,7 +128,7 @@ bcPrep us bnds = evalState (mapM bcPrepTopLvl bnds) (BcPrepM_State us)
 isNNLJoinPoint :: Id -> Bool
 isNNLJoinPoint x = isJoinId x && mightBeUnliftedType (idType x)
 
--- Update an Id's type to take a Void# argument.
+-- Update an Id's type to take a (# #) argument.
 -- Precondition: the Id is a not-necessarily-lifted join point.
 -- See Note [Not-necessarily-lifted join points]
 protectNNLJoinPointId :: Id -> Id
@@ -200,7 +200,7 @@ Here is an example. Suppose we have
 Our plan is to behave is if the code was
 
   f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
-      let j :: (Void# -> a)
+      let j :: ((# #) -> a)
           j = \ _ -> error @r @a "bloop"
       in case x of
            A -> j void#

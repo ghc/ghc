@@ -647,7 +647,7 @@ dsCmd ids local_vars stack_ty res_ty (XCmd (HsWrap wrap cmd)) env_ids = do
     core_wrap <- dsHsWrapper wrap
     return (core_wrap core_cmd, env_ids')
 
-dsCmd _ _ _ _ c _ = pprPanic "dsCmd" (ppr c)
+dsCmd _ _ _ _ c@(HsCmdLam {}) _ = pprPanic "dsCmd" (ppr c)
 
 -- D; ys |-a c : stk --> t      (ys <= xs)
 -- ---------------------

@@ -131,4 +131,4 @@ instance  Show (ST s a)  where
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST (ST st_rep) = case runRW# st_rep of (# _, a #) -> a
--- See Note [Definition of runRW#] in GHC.Magic
+-- See Note [runRW magic] in GHC.CoreToStg.Prep

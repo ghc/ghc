@@ -479,8 +479,7 @@ axConsSymbolDef =
 
 axUnconsSymbolDef =
   mkUnAxiom "UnconsSymbolDef" typeUnconsSymbolTyCon isStrLitTy $
-    \str -> Just $
-      mkPromotedMaybeTy charSymbolPairKind (fmap reifyCharSymbolPairTy (unconsFS str))
+    \str -> Just $ computeUncons str
 
 axCharToNatDef =
   mkUnAxiom "CharToNatDef" typeCharToNatTyCon isCharLitTy $
@@ -784,14 +783,15 @@ matchFamConsSymbol [s,t]
   mbY = isStrLitTy t
 matchFamConsSymbol _ = Nothing
 
-reifyCharSymbolPairTy :: (Char, FastString) -> Type
-reifyCharSymbolPairTy (c, s) = charSymbolPair (mkCharLitTy c) (mkStrLitTy s)
+computeUncons :: FastString -> Type
+computeUncons str = mkPromotedMaybeTy charSymbolPairKind (fmap reifyCharSymbolPairTy (unconsFS str))
+  where reifyCharSymbolPairTy :: (Char, FastString) -> Type
+        reifyCharSymbolPairTy (c, s) = charSymbolPair (mkCharLitTy c) (mkStrLitTy s)
 
 matchFamUnconsSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamUnconsSymbol [s]
   | Just x <- mbX =
-    Just (axUnconsSymbolDef, [s]
-         , mkPromotedMaybeTy charSymbolPairKind (fmap reifyCharSymbolPairTy (unconsFS x)))
+    Just (axUnconsSymbolDef, [s], computeUncons x)
   where
   mbX = isStrLitTy s
 matchFamUnconsSymbol _ = Nothing

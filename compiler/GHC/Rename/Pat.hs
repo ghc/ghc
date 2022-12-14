@@ -773,7 +773,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     mb_con = case ctxt of
                 HsRecFieldCon con  -> Just con
                 HsRecFieldPat con  -> Just con
-                _ {- update -}     -> Nothing
+                HsRecFieldUpd      -> Nothing
 
     rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (LocatedA arg)
            -> RnM (LHsRecField GhcRn (LocatedA arg))

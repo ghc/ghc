@@ -580,7 +580,8 @@ declaration before checking all of the others, supporting polymorphic recursion.
 See https://gitlab.haskell.org/ghc/ghc/wikis/ghc-kinds/kind-inference#proposed-new-strategy
 and #9200 for lots of discussion of how we got here.
 
-The detection of CUSKs is enabled by the -XCUSKs extension, switched on by default.
+The detection of CUSKs is enabled by the -XCUSKs extension, switched off by default
+in GHC2021 and on in Haskell98/2010.
 Under -XNoCUSKs, all declarations are treated as if they have no CUSK.
 See https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst
 

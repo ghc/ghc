@@ -781,7 +781,7 @@ isBoxedRuntimeRep_maybe rep
 
 -- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
 --
--- `isLiftedRuntimeRep rr` returns:
+-- `runtimeRepLevity_maybe rr` returns:
 --
 --   * `Just Lifted` if `rr` is `LiftedRep :: RuntimeRep`
 --   * `Just Unlifted` if `rr` is definitely unlifted, e.g. `IntRep`
@@ -1028,7 +1028,7 @@ invariant: use it.
 Note [Decomposing fat arrow c=>t]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Can we unify (a b) with (Eq a => ty)?   If we do so, we end up with
-a partial application like ((=>) Eq a) which doesn't make sense in
+a partial application like ((=>) (Eq a)) which doesn't make sense in
 source Haskell.  In contrast, we *can* unify (a b) with (t1 -> t2).
 Here's an example (#9858) of how you might do it:
    i :: (Typeable a, Typeable b) => Proxy (a b) -> TypeRep
