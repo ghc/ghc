@@ -608,6 +608,10 @@ function test_hadrian() {
     install_bindist _build/bindist/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
+    # Despite "-o hello", ghc may output something like hello.exe or
+    # hello.wasm depending on the backend. For the time being let's
+    # just move it to hello before proceeding to running it.
+    mv hello.wasm hello || true
     ${CROSS_EMULATOR:-} ./hello > actual
     run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
