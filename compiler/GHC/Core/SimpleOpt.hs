@@ -263,7 +263,6 @@ simple_opt_expr env expr
 
     go lam@(Lam {})     = go_lam env [] lam
     go (Case e b ty as)
-       -- See Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
       , Just (_, [], con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
         -- We don't need to be concerned about floats when looking for coerce.
@@ -476,7 +475,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     occ        = idOccInfo in_bndr
     in_scope   = getSubstInScope subst
 
-    out_rhs | Just join_arity <- isJoinId_maybe in_bndr
+    out_rhs | JoinPoint join_arity <- idJoinPointHood in_bndr
             = simple_join_rhs join_arity
             | otherwise
             = simple_opt_clo in_scope clo

@@ -1941,8 +1941,8 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                   = calcSpecInfo fn arg_bndrs call_pat extra_bndrs
 
               spec_arity = count isId spec_lam_args
-              spec_join_arity | isJoinId fn = Just (length spec_call_args)
-                              | otherwise   = Nothing
+              spec_join_arity | isJoinId fn = JoinPoint (length spec_call_args)
+                              | otherwise   = NotJoinPoint
               spec_id    = asWorkerLikeId $
                            mkLocalId spec_name ManyTy
                                      (mkLamTypes spec_lam_args spec_body_ty)

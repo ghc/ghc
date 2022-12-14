@@ -220,9 +220,9 @@ mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
            -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- Make a specialisation rule, for Specialise or SpecConstr
 mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs
-  = case isJoinId_maybe fn of
-      Just join_arity -> etaExpandToJoinPointRule join_arity rule
-      Nothing         -> rule
+  = case idJoinPointHood fn of
+      JoinPoint join_arity -> etaExpandToJoinPointRule join_arity rule
+      NotJoinPoint         -> rule
   where
     rule = mkRule this_mod is_auto is_local
                   rule_name
@@ -443,23 +443,39 @@ emptyRuleEnv = RuleEnv { re_local_rules   = emptyNameEnv
 getRules :: RuleEnv -> Id -> [CoreRule]
 -- Given a RuleEnv and an Id, find the visible rules for that Id
 -- See Note [Where rules are found]
-getRules (RuleEnv { re_local_rules   = local_rules
-                  , re_home_rules    = home_rules
-                  , re_eps_rules     = eps_rules
+--
+-- This function is quite heavily used, so it's worth trying to make it efficient
+getRules (RuleEnv { re_local_rules   = local_rule_base
+                  , re_home_rules    = home_rule_base
+                  , re_eps_rules     = eps_rule_base
                   , re_visible_orphs = orphs }) fn
 
   | Just {} <- isDataConId_maybe fn   -- Short cut for data constructor workers
   = []                                -- and wrappers, which never have any rules
 
-  | otherwise
-  = idCoreRules fn          ++
-    get local_rules         ++
-    find_visible home_rules ++
-    find_visible eps_rules
+  | Just export_flag <- isLocalId_maybe fn
+  = -- LocalIds can't have rules in the local_rule_base (used for imported fns)
+    -- nor external packages; but there can (just) be rules in another module
+    -- in the home package, if it is exported
+    case export_flag of
+      NotExported -> idCoreRules fn
+      Exported -> case get home_rule_base of
+          []           -> idCoreRules fn
+          home_rules   -> drop_orphs home_rules ++ idCoreRules fn
 
+  | otherwise
+  = -- This case expression is a fast path, to avoid calling the
+    -- recursive (++) in the common case where there are no rules at all
+    case (get local_rule_base, get home_rule_base, get eps_rule_base) of
+      ([], [], [])                         -> idCoreRules fn
+      (local_rules, home_rules, eps_rules) -> local_rules           ++
+                                              drop_orphs home_rules ++
+                                              drop_orphs eps_rules  ++
+                                              idCoreRules fn
   where
     fn_name = idName fn
-    find_visible rb = filter (ruleIsVisible orphs) (get rb)
+    drop_orphs [] = []  -- Fast path; avoid invoking recursive filter
+    drop_orphs xs = filter (ruleIsVisible orphs) xs
     get rb = lookupNameEnv rb fn_name `orElse` []
 
 ruleIsVisible :: ModuleSet -> CoreRule -> Bool

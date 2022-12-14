@@ -23,6 +23,7 @@
 module GHC.Utils.Outputable (
         -- * Type classes
         Outputable(..), OutputableBndr(..), OutputableP(..),
+        BindingSite(..),  JoinPointHood(..), isJoinPoint,
 
         IsOutput(..), IsLine(..), IsDoc(..),
         HLine, HDoc,
@@ -86,8 +87,6 @@ module GHC.Utils.Outputable (
         pprModuleName,
 
         -- * Controlling the style in which output is printed
-        BindingSite(..),
-
         PprStyle(..), NamePprCtx(..),
         QueryQualifyName, QueryQualifyModule, QueryQualifyPackage, QueryPromotionTick,
         PromotedItem(..), IsEmptyOrSingleton(..), isListEmptyOrSingleton,
@@ -156,6 +155,7 @@ import qualified Data.List.NonEmpty as NEL
 import Data.Time ( UTCTime )
 import Data.Time.Format.ISO8601
 import Data.Void
+import Control.DeepSeq (NFData(rnf))
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -1220,16 +1220,6 @@ instance OutputableP env Void where
 ************************************************************************
 -}
 
--- | 'BindingSite' is used to tell the thing that prints binder what
--- language construct is binding the identifier.  This can be used
--- to decide how much info to print.
--- Also see Note [Binding-site specific printing] in "GHC.Core.Ppr"
-data BindingSite
-    = LambdaBind  -- ^ The x in   (\x. e)
-    | CaseBind    -- ^ The x in   case scrut of x { (y,z) -> ... }
-    | CasePatBind -- ^ The y,z in case scrut of x { (y,z) -> ... }
-    | LetBind     -- ^ The x in   (let x = rhs in e)
-    deriving Eq
 -- | When we print a binder, we often want to print its type too.
 -- The @OutputableBndr@ class encapsulates this idea.
 class Outputable a => OutputableBndr a where
@@ -1241,12 +1231,39 @@ class Outputable a => OutputableBndr a where
       -- prefix position of an application, thus   (f a b) or  ((+) x)
       -- or infix position,                 thus   (a `f` b) or  (x + y)
 
-   bndrIsJoin_maybe :: a -> Maybe Int
-   bndrIsJoin_maybe _ = Nothing
+   bndrIsJoin_maybe :: a -> JoinPointHood
+   bndrIsJoin_maybe _ = NotJoinPoint
       -- When pretty-printing we sometimes want to find
       -- whether the binder is a join point.  You might think
       -- we could have a function of type (a->Var), but Var
       -- isn't available yet, alas
+
+-- | 'BindingSite' is used to tell the thing that prints binder what
+-- language construct is binding the identifier.  This can be used
+-- to decide how much info to print.
+-- Also see Note [Binding-site specific printing] in "GHC.Core.Ppr"
+data BindingSite
+    = LambdaBind  -- ^ The x in   (\x. e)
+    | CaseBind    -- ^ The x in   case scrut of x { (y,z) -> ... }
+    | CasePatBind -- ^ The y,z in case scrut of x { (y,z) -> ... }
+    | LetBind     -- ^ The x in   (let x = rhs in e)
+    deriving Eq
+
+data JoinPointHood
+  = JoinPoint {-# UNPACK #-} !Int   -- The JoinArity (but an Int here because
+  | NotJoinPoint                    -- synonym JoinArity is defined in Types.Basic
+  deriving( Eq )
+
+isJoinPoint :: JoinPointHood -> Bool
+isJoinPoint (JoinPoint {}) = True
+isJoinPoint NotJoinPoint   = False
+
+instance Outputable JoinPointHood where
+  ppr NotJoinPoint      = text "NotJoinPoint"
+  ppr (JoinPoint arity) = text "JoinPoint" <> parens (ppr arity)
+
+instance NFData JoinPointHood where
+  rnf x = x `seq` ()
 
 {-
 ************************************************************************

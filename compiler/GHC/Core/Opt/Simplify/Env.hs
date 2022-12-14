@@ -373,7 +373,7 @@ type SimplIdSubst = IdEnv SimplSR -- IdId |--> OutExpr
 
 -- | A substitution result.
 data SimplSR
-  = DoneEx OutExpr (Maybe JoinArity)
+  = DoneEx OutExpr JoinPointHood
        -- If  x :-> DoneEx e ja   is in the SimplIdSubst
        -- then replace occurrences of x by e
        -- and  ja = Just a <=> x is a join-point of arity a
@@ -398,8 +398,8 @@ instance Outputable SimplSR where
   ppr (DoneEx e mj) = text "DoneEx" <> pp_mj <+> ppr e
     where
       pp_mj = case mj of
-                Nothing -> empty
-                Just n  -> parens (int n)
+                NotJoinPoint -> empty
+                JoinPoint n  -> parens (int n)
 
   ppr (ContEx _tv _cv _id e) = vcat [text "ContEx" <+> ppr e {-,
                                 ppr (filter_env tv), ppr (filter_env id) -}]

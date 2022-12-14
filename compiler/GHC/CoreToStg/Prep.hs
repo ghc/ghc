@@ -740,8 +740,8 @@ cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
 -- No eta-expansion: see Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
 cpeJoinPair env bndr rhs
   = assert (isJoinId bndr) $
-    do { let Just join_arity = isJoinId_maybe bndr
-             (bndrs, body)   = collectNBinders join_arity rhs
+    do { let JoinPoint join_arity = idJoinPointHood bndr
+             (bndrs, body)        = collectNBinders join_arity rhs
 
        ; (env', bndrs') <- cpCloneBndrs env bndrs
 
@@ -1541,7 +1541,7 @@ maybeSaturate fn expr n_args unsat_ticks
       ( not (isJoinId fn)) -- See Note [Do not eta-expand join points]
       ( ppr fn $$ text "expr:" <+> ppr expr $$ text "n_args:" <+> ppr n_args $$
           text "marks:" <+> ppr (idCbvMarks_maybe fn) $$
-          text "join_arity" <+> ppr (isJoinId_maybe fn) $$
+          text "join_arity" <+> ppr (idJoinPointHood fn) $$
           text "fn_arity" <+> ppr fn_arity
        ) $
     -- pprTrace "maybeSat"

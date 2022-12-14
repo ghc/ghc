@@ -78,7 +78,8 @@ module GHC.Types.Id (
         hasNoBinding,
 
         -- ** Join variables
-        JoinId, isJoinId, isJoinId_maybe, idJoinArity,
+        JoinId, JoinPointHood,
+        isJoinId, idJoinPointHood, idJoinArity,
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
@@ -560,13 +561,13 @@ isJoinId id
   | otherwise = False
 
 -- | Doesn't return strictness marks
-isJoinId_maybe :: Var -> Maybe JoinArity
-isJoinId_maybe id
+idJoinPointHood :: Var -> JoinPointHood
+idJoinPointHood id
  | isId id  = assertPpr (isId id) (ppr id) $
               case Var.idDetails id of
-                JoinId arity _marks -> Just arity
-                _            -> Nothing
- | otherwise = Nothing
+                JoinId arity _marks -> JoinPoint arity
+                _                   -> NotJoinPoint
+ | otherwise = NotJoinPoint
 
 idDataCon :: Id -> DataCon
 -- ^ Get from either the worker or the wrapper 'Id' to the 'DataCon'. Currently used only in the desugarer.
@@ -639,7 +640,9 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 -}
 
 idJoinArity :: JoinId -> JoinArity
-idJoinArity id = isJoinId_maybe id `orElse` pprPanic "idJoinArity" (ppr id)
+idJoinArity id = case idJoinPointHood id of
+                   JoinPoint ar -> ar
+                   NotJoinPoint -> pprPanic "idJoinArity" (ppr id)
 
 asJoinId :: Id -> JoinArity -> JoinId
 asJoinId id arity = warnPprTrace (not (isLocalId id))
@@ -671,9 +674,9 @@ zapJoinId jid | isJoinId jid = zapIdTailCallInfo (newIdDetails `seq` jid `setIdD
                   _                     -> panic "zapJoinId: newIdDetails can only be used if Id was a join Id."
 
 
-asJoinId_maybe :: Id -> Maybe JoinArity -> Id
-asJoinId_maybe id (Just arity) = asJoinId id arity
-asJoinId_maybe id Nothing      = zapJoinId id
+asJoinId_maybe :: Id -> JoinPointHood -> Id
+asJoinId_maybe id (JoinPoint arity) = asJoinId id arity
+asJoinId_maybe id NotJoinPoint      = zapJoinId id
 
 {-
 ************************************************************************

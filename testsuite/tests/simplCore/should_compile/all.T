@@ -492,3 +492,6 @@ test('T23491d', [extra_files(['T23491.hs']), grep_errmsg(r'Static argument')], m
 test('T23074', normal, compile, ['-O -ddump-rules'])
 test('T23272', [only_ways(['ghci']), extra_hc_opts('-fno-unoptimized-core-for-interpreter -O')], ghci_script, ['T23272.script'])
 test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -v0'])
+
+# The -ddump-simpl of T22404 should have no let-bindings
+test('T22404', [only_ways(['optasm']), check_errmsg(r'let') ], compile, ['-ddump-simpl -dsuppress-uniques'])

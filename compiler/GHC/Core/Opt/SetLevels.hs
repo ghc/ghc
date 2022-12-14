@@ -322,7 +322,7 @@ lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr
 --     there is no need call substAndLvlBndrs here
 lvl_top env is_rec bndr rhs
   = do { rhs' <- lvlRhs env is_rec (isDeadEndId bndr)
-                                   Nothing  -- Not a join point
+                                   NotJoinPoint
                                    (freeVars rhs)
        ; return (stayPut tOP_LEVEL bndr, rhs') }
 
@@ -666,9 +666,9 @@ lvlMFE env strict_ctxt ann_expr
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
-                              is_bot_lam join_arity_maybe ann_expr
+                              is_bot_lam NotJoinPoint ann_expr
                   -- Treat the expr just like a right-hand side
-       ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
+       ; var <- newLvlVar expr1 NotJoinPoint is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
        ; return (Let (NonRec (TB var2 (FloatMe dest_lvl)) expr1)
                      (mkVarApps (Var var2) abs_vars)) }
@@ -689,7 +689,7 @@ lvlMFE env strict_ctxt ann_expr
                          Case expr1 (stayPut l1r ubx_bndr) box_ty
                              [Alt DEFAULT [] (App boxing_expr (Var ubx_bndr))]
 
-       ; var <- newLvlVar float_rhs Nothing is_mk_static
+       ; var <- newLvlVar float_rhs NotJoinPoint is_mk_static
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
@@ -725,8 +725,6 @@ lvlMFE env strict_ctxt ann_expr
     float_n_lams     = count isId abs_vars
 
     (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
-
-    join_arity_maybe = Nothing
 
     is_mk_static = isJust (collectMakeStaticArgs expr)
         -- Yuk: See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
@@ -1177,8 +1175,8 @@ lvlBind env (AnnNonRec bndr rhs)
         -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
 
     n_extra    = count isId abs_vars
-    mb_join_arity = isJoinId_maybe bndr
-    is_join       = isJust mb_join_arity
+    mb_join_arity = idJoinPointHood bndr
+    is_join       = isJoinPoint mb_join_arity
 
 lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
@@ -1193,7 +1191,7 @@ lvlBind env (AnnRec pairs)
   =    -- No float
     do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
-             lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (isJoinId_maybe b) r
+             lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (idJoinPointHood b) r
        ; rhss' <- mapM lvl_rhs pairs
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
@@ -1256,8 +1254,8 @@ lvlBind env (AnnRec pairs)
                                         is_bot (get_join bndr)
                                         rhs
 
-    get_join bndr | need_zap  = Nothing
-                  | otherwise = isJoinId_maybe bndr
+    get_join bndr | need_zap  = NotJoinPoint
+                  | otherwise = idJoinPointHood bndr
     need_zap = dest_lvl `ltLvl` joinCeilingLevel env
 
         -- Finding the free vars of the binding group is annoying
@@ -1284,7 +1282,7 @@ profitableFloat env dest_lvl
 lvlRhs :: LevelEnv
        -> RecFlag
        -> Bool               -- Is this a bottoming function
-       -> Maybe JoinArity
+       -> JoinPointHood
        -> CoreExprWithFVs
        -> LvlM LevelledExpr
 lvlRhs env rec_flag is_bot mb_join_arity expr
@@ -1293,7 +1291,7 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
 
 lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
-            -> Maybe JoinArity
+            -> JoinPointHood
             -> CoreExprWithFVs
             -> LvlM (Expr LevelledBndr)
 -- Ignores the le_ctxt_lvl in env; treats dest_lvl as the baseline
@@ -1304,13 +1302,13 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                   else lvlExpr body_env      body
        ; return (mkLams bndrs' body') }
   where
-    (bndrs, body)     | Just join_arity <- mb_join_arity
+    (bndrs, body)     | JoinPoint join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
                       | otherwise
                       = collectAnnBndrs rhs
     (env1, bndrs1)    = substBndrsSL NonRecursive env bndrs
     all_bndrs         = abs_vars ++ bndrs1
-    (body_env, bndrs') | Just _ <- mb_join_arity
+    (body_env, bndrs') | JoinPoint {} <- mb_join_arity
                       = lvlJoinBndrs env1 dest_lvl rec all_bndrs
                       | otherwise
                       = case lvlLamBndrs env1 dest_lvl all_bndrs of
@@ -1741,14 +1739,14 @@ newPolyBndrs dest_lvl
     -- but we may need to adjust its arity
     dest_is_top = isTopLvl dest_lvl
     transfer_join_info bndr new_bndr
-      | Just join_arity <- isJoinId_maybe bndr
+      | JoinPoint join_arity <- idJoinPointHood bndr
       , not dest_is_top
       = new_bndr `asJoinId` join_arity + length abs_vars
       | otherwise
       = new_bndr
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
-          -> Maybe JoinArity     -- Its join arity, if it is a join point
+          -> JoinPointHood       -- Its join arity, if it is a join point
           -> Bool                -- True <=> the RHS looks like (makeStatic ...)
           -> LvlM Id
 newLvlVar lvld_rhs join_arity_maybe is_mk_static

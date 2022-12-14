@@ -1130,9 +1130,9 @@ splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
 thresholdArity :: Id -> CoreExpr -> Arity
 -- See Note [Demand signatures are computed for a threshold arity based on idArity]
 thresholdArity fn rhs
-  = case isJoinId_maybe fn of
-      Just join_arity -> count isId $ fst $ collectNBinders join_arity rhs
-      Nothing         -> idArity fn
+  = case idJoinPointHood fn of
+      JoinPoint join_arity -> count isId $ fst $ collectNBinders join_arity rhs
+      NotJoinPoint         -> idArity fn
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1948,6 +1948,7 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
               -- manifest arity for join points
   = -- pprTrace "finaliseArgBoxities" (
     --   vcat [text "function:" <+> ppr fn
+    --        , text "max" <+> ppr max_wkr_args
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
     --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
     (arg_dmds', set_lam_dmds arg_dmds' rhs)

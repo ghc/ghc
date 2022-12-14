@@ -1586,7 +1586,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
         ; let id = mkLocalIdWithInfo name ManyTy ty' id_info
-                     `asJoinId_maybe` tcJoinInfo ji
+                     `asJoinId_maybe` ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
         ; return (Let (NonRec id rhs') body') }
@@ -1601,7 +1601,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` tcJoinInfo ji) }
+          ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -1743,10 +1743,6 @@ tcIdInfo ignore_prags toplvl name ty info = do
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfo` unf) }
-
-tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
-tcJoinInfo (IfaceJoinPoint ar) = Just ar
-tcJoinInfo IfaceNotJoinPoint   = Nothing
 
 tcLFInfo :: IfaceLFInfo -> IfL LambdaFormInfo
 tcLFInfo lfi = case lfi of

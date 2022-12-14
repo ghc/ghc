@@ -425,7 +425,7 @@ simplAuxBind env bndr new_rhs
   = return ( emptyFloats env
            , case new_rhs of
                 Coercion co -> extendCvSubst env bndr co
-                _           -> extendIdSubst env bndr (DoneEx new_rhs Nothing) )
+                _           -> extendIdSubst env bndr (DoneEx new_rhs NotJoinPoint) )
 
   | otherwise
   = do  { -- ANF-ise the RHS
@@ -625,7 +625,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
           then do { tick (PostInlineUnconditionally bndr)
                   ; return ( floats
                            , extendIdSubst (setInScopeFromF env floats) old_bndr $
-                             DoneEx triv_rhs Nothing ) }
+                             DoneEx triv_rhs NotJoinPoint ) }
 
           else do { wrap_unf <- mkLetUnfolding uf_opts top_lvl VanillaSrc bndr triv_rhs
                   ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
@@ -961,7 +961,7 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
                  ; simplTrace "PostInlineUnconditionally" (ppr new_bndr <+> ppr unf_rhs) $
                    return ( emptyFloats env
                           , extendIdSubst env old_bndr $
-                            DoneEx unf_rhs (isJoinId_maybe new_bndr)) }
+                            DoneEx unf_rhs (idJoinPointHood new_bndr)) }
                 -- Use the substitution to make quite, quite sure that the
                 -- substitution will happen, since we are going to discard the binding
 
@@ -1303,7 +1303,7 @@ work. T5631 is a good example of this.
 simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
              -> SimplM OutExpr
 simplJoinRhs env bndr expr cont
-  | Just arity <- isJoinId_maybe bndr
+  | JoinPoint arity <- idJoinPointHood bndr
   =  do { let (join_bndrs, join_body) = collectNBinders arity expr
               mult = contHoleScaling cont
         ; (env', join_bndrs') <- simplLamBndrs env (map (scaleVarBy mult) join_bndrs)
@@ -1985,14 +1985,14 @@ wrapJoinCont env cont thing_inside
 
 --------------------
 trimJoinCont :: Id         -- Used only in error message
-             -> Maybe JoinArity
+             -> JoinPointHood
              -> SimplCont -> SimplCont
 -- Drop outer context from join point invocation (jump)
 -- See Note [Join points and case-of-case]
 
-trimJoinCont _ Nothing cont
+trimJoinCont _ NotJoinPoint cont
   = cont -- Not a jump
-trimJoinCont var (Just arity) cont
+trimJoinCont var (JoinPoint arity) cont
   = trim arity cont
   where
     trim 0 cont@(Stop {})
@@ -2139,7 +2139,7 @@ simplIdF env var cont
 
       DoneId var1 ->
         do { rule_base <- getSimplRules
-           ; let cont' = trimJoinCont var1 (isJoinId_maybe var1) cont
+           ; let cont' = trimJoinCont var1 (idJoinPointHood var1) cont
                  info  = mkArgInfo env rule_base var1 cont'
            ; rebuildCall env info cont' }
 
@@ -3260,7 +3260,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
-        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) NotJoinPoint
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
 
@@ -3549,7 +3549,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
     bind_case_bndr env
       | isDeadBinder bndr   = return (emptyFloats env, env)
       | exprIsTrivial scrut = return (emptyFloats env
-                                     , extendIdSubst env bndr (DoneEx scrut Nothing))
+                                     , extendIdSubst env bndr (DoneEx scrut NotJoinPoint))
                               -- See Note [Do not duplicate constructor applications]
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
                                          -- dc_ty_args are already OutTypes,
@@ -4463,11 +4463,11 @@ simplRules env mb_new_id rules bind_cxt
                  -- binder matches that of the rule, so that pushing the
                  -- continuation into the RHS makes sense
                  join_ok = case mb_new_id of
-                             Just id | Just join_arity <- isJoinId_maybe id
+                             Just id | JoinPoint join_arity <- idJoinPointHood id
                                      -> length args == join_arity
                              _ -> False
                  bad_join_msg = vcat [ ppr mb_new_id, ppr rule
-                                     , ppr (fmap isJoinId_maybe mb_new_id) ]
+                                     , ppr (fmap idJoinPointHood mb_new_id) ]
 
            ; args' <- mapM (simplExpr lhs_env) args
            ; rhs'  <- simplExprC rhs_env rhs rhs_cont

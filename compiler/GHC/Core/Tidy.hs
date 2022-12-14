@@ -132,7 +132,7 @@ computeCbvInfo :: HasCallStack
                -> Id
 -- computeCbvInfo fun_id rhs = fun_id
 computeCbvInfo fun_id rhs
-  | is_wkr_like || isJust mb_join_id
+  | is_wkr_like || isJoinPoint mb_join_id
   , valid_unlifted_worker val_args
   = -- pprTrace "computeCbvInfo"
     --   (text "fun" <+> ppr fun_id $$
@@ -147,14 +147,14 @@ computeCbvInfo fun_id rhs
 
   | otherwise = fun_id
   where
-    mb_join_id  = isJoinId_maybe fun_id
+    mb_join_id  = idJoinPointHood fun_id
     is_wkr_like = isWorkerLikeId fun_id
 
     val_args = filter isId lam_bndrs
     -- When computing CbvMarks, we limit the arity of join points to
     -- the JoinArity, because that's the arity we are going to use
     -- when calling it. There may be more lambdas than that on the RHS.
-    lam_bndrs | Just join_arity <- mb_join_id
+    lam_bndrs | JoinPoint join_arity <- mb_join_id
               = fst $ collectNBinders join_arity rhs
               | otherwise
               = fst $ collectBinders rhs

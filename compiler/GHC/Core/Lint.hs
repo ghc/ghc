@@ -604,10 +604,10 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
 
          -- Check that a join-point binder has a valid type
          -- NB: lintIdBinder has checked that it is not top-level bound
-       ; case isJoinId_maybe binder of
-            Nothing    -> return ()
-            Just arity ->  checkL (isValidJoinPointType arity binder_ty)
-                                  (mkInvalidJoinPointMsg binder binder_ty)
+       ; case idJoinPointHood binder of
+            NotJoinPoint    -> return ()
+            JoinPoint arity ->  checkL (isValidJoinPointType arity binder_ty)
+                                       (mkInvalidJoinPointMsg binder binder_ty)
 
        ; when (lf_check_inline_loop_breakers flags
                && isStableUnfolding (realIdUnfolding binder)
@@ -662,7 +662,7 @@ lintRhs :: Id -> CoreExpr -> LintM (LintedType, UsageEnv)
 -- NB: the Id can be Linted or not -- it's only used for
 --     its OccInfo and join-pointer-hood
 lintRhs bndr rhs
-    | Just arity <- isJoinId_maybe bndr
+    | JoinPoint arity <- idJoinPointHood bndr
     = lintJoinLams arity (Just bndr) rhs
     | AlwaysTailCalled arity <- tailCallInfo (idOccInfo bndr)
     = lintJoinLams arity Nothing rhs
@@ -1085,7 +1085,7 @@ lintJoinBndrType :: LintedType -- Type of the body
 -- E.g. join j x = rhs in body
 --      The type of 'rhs' must be the same as the type of 'body'
 lintJoinBndrType body_ty bndr
-  | Just arity <- isJoinId_maybe bndr
+  | JoinPoint arity <- idJoinPointHood bndr
   , let bndr_ty = idType bndr
   , (bndrs, res) <- splitPiTys bndr_ty
   = checkL (length bndrs >= arity
@@ -1101,15 +1101,14 @@ checkJoinOcc :: Id -> JoinArity -> LintM ()
 -- Check that if the occurrence is a JoinId, then so is the
 -- binding site, and it's a valid join Id
 checkJoinOcc var n_args
-  | Just join_arity_occ <- isJoinId_maybe var
+  | JoinPoint join_arity_occ <- idJoinPointHood var
   = do { mb_join_arity_bndr <- lookupJoinId var
        ; case mb_join_arity_bndr of {
-           Nothing -> -- Binder is not a join point
-                      do { join_set <- getValidJoins
-                         ; addErrL (text "join set " <+> ppr join_set $$
-                                    invalidJoinOcc var) } ;
+           NotJoinPoint -> do { join_set <- getValidJoins
+                              ; addErrL (text "join set " <+> ppr join_set $$
+                                invalidJoinOcc var) } ;
 
-           Just join_arity_bndr ->
+           JoinPoint join_arity_bndr ->
 
     do { checkL (join_arity_bndr == join_arity_occ) $
            -- Arity differs at binding site and occurrence
@@ -2109,8 +2108,8 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
     do { (lhs_ty, _) <- lintCoreArgs (fun_ty, zeroUE) args
-       ; (rhs_ty, _) <- case isJoinId_maybe fun of
-                     Just join_arity
+       ; (rhs_ty, _) <- case idJoinPointHood fun of
+                     JoinPoint join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
                                 mkBadJoinPointRuleMsg fun join_arity rule
                                -- See Note [Rules for join points]
@@ -3373,14 +3372,14 @@ lookupIdInScope id_occ
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
 
-lookupJoinId :: Id -> LintM (Maybe JoinArity)
+lookupJoinId :: Id -> LintM JoinPointHood
 -- Look up an Id which should be a join point, valid here
 -- If so, return its arity, if not return Nothing
 lookupJoinId id
   = do { join_set <- getValidJoins
        ; case lookupVarSet join_set id of
-            Just id' -> return (isJoinId_maybe id')
-            Nothing  -> return Nothing }
+            Just id' -> return (idJoinPointHood id')
+            Nothing  -> return NotJoinPoint }
 
 addAliasUE :: Id -> UsageEnv -> LintM a -> LintM a
 addAliasUE id ue thing_inside = LintM $ \ env errs ->

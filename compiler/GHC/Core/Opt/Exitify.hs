@@ -36,19 +36,23 @@ Now `t` is no longer in a recursive function, and good things happen!
 -}
 
 import GHC.Prelude
+import GHC.Builtin.Uniques
+import GHC.Core
+import GHC.Core.Utils
+import GHC.Core.FVs
+import GHC.Core.Type
+
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core
-import GHC.Core.Utils
-import GHC.Utils.Monad.State.Strict
-import GHC.Builtin.Uniques
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.FVs
-import GHC.Data.FastString
-import GHC.Core.Type
+import GHC.Types.Basic( JoinPointHood(..) )
+
+import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Misc( mapSnd )
+
+import GHC.Data.FastString
 
 import Data.Bifunctor
 import Control.Monad
@@ -160,7 +164,7 @@ exitifyRec in_scope pairs
     go captured (_, AnnLet ann_bind body)
         -- join point, RHS and body are in tail-call position
         | AnnNonRec j rhs <- ann_bind
-        , Just join_arity <- isJoinId_maybe j
+        , JoinPoint join_arity <- idJoinPointHood j
         = do let (params, join_body) = collectNAnnBndrs join_arity rhs
              join_body' <- go (captured ++ params) join_body
              let rhs' = mkLams params join_body'

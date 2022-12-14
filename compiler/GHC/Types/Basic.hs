@@ -29,6 +29,7 @@ module GHC.Types.Basic (
         ConTag, ConTagZ, fIRST_TAG,
 
         Arity, RepArity, JoinArity, FullArgCount,
+        JoinPointHood(..), isJoinPoint,
 
         Alignment, mkAlignment, alignmentOf, alignmentBytes,
 
@@ -1008,14 +1009,23 @@ of the type of the method signature.
 *                                                                      *
 ************************************************************************
 
-This data type is used exclusively by the simplifier, but it appears in a
+Note [OccInfo]
+~~~~~~~~~~~~~
+The OccInfo data type is used exclusively by the simplifier, but it appears in a
 SubstResult, which is currently defined in GHC.Types.Var.Env, which is pretty
 near the base of the module hierarchy.  So it seemed simpler to put the defn of
-OccInfo here, safely at the bottom
+OccInfo here, safely at the bottom.
+
+Note that `OneOcc` doesn't meant that it occurs /syntactially/ only once; it
+means that it is /used/ only once. It might occur syntactically many times.
+For example, in (case x of A -> y; B -> y; C -> True),
+* `y` is used only once
+* but it occurs syntactically twice
+
 -}
 
 -- | identifier Occurrence Information
-data OccInfo
+data OccInfo -- See Note [OccInfo]
   = ManyOccs        { occ_tail    :: !TailCallInfo }
                         -- ^ There are many occurrences, or unknown occurrences
 
@@ -1113,8 +1123,9 @@ instance Monoid InsideLam where
   mappend = (Semi.<>)
 
 -----------------
-data TailCallInfo = AlwaysTailCalled JoinArity -- See Note [TailCallInfo]
-                  | NoTailCallInfo
+data TailCallInfo
+  = AlwaysTailCalled {-# UNPACK #-} !JoinArity -- See Note [TailCallInfo]
+  | NoTailCallInfo
   deriving (Eq)
 
 tailCallInfo :: OccInfo -> TailCallInfo
@@ -1195,7 +1206,7 @@ The AlwaysTailCalled marker actually means slightly more than simply that the
 function is always tail-called. See Note [Invariants on join points].
 
 This info is quite fragile and should not be relied upon unless the occurrence
-analyser has *just* run. Use 'Id.isJoinId_maybe' for the permanent state of
+analyser has *just* run. Use 'Id.idJoinPointHood' for the permanent state of
 the join-point-hood of a binder; a join id itself will not be marked
 AlwaysTailCalled.
 

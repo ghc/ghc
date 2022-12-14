@@ -415,7 +415,7 @@ lintAppCbvMarks e@(StgApp fun args) = do
         (text "marks" <> ppr marks $$
         text "args" <> ppr args $$
         text "arity" <> ppr (idArity fun) $$
-        text "join_arity" <> ppr (isJoinId_maybe fun))
+        text "join_arity" <> ppr (idJoinPointHood fun))
 lintAppCbvMarks _ = panic "impossible - lintAppCbvMarks"
 
 {-

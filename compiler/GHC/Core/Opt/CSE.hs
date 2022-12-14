@@ -14,7 +14,7 @@ import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
-                        , isJoinId, isJoinId_maybe, idUnfolding )
+                        , isJoinId, idJoinPointHood, idUnfolding )
 import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
@@ -436,7 +436,7 @@ cse_bind toplevel env_rhs env_body (in_id, in_rhs) out_id
       -- See Note [Take care with literal strings]
   = (env_body', (out_id', in_rhs))
 
-  | Just arity <- isJoinId_maybe out_id
+  | JoinPoint arity <- idJoinPointHood out_id
       -- See Note [Look inside join-point binders]
   = let (params, in_body) = collectNBinders arity in_rhs
         (env', params') = addBinders env_rhs params

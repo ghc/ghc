@@ -86,7 +86,7 @@ mkDFunUnfolding bndrs con ops
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
                   , df_args = map occurAnalyseExpr ops }
-                  -- See Note [Occurrence analysis of unfoldings]
+                  -- See Note [OccInfo in unfoldings and rules] in GHC.Core
 
 mkDataConUnfolding :: CoreExpr -> Unfolding
 -- Used for non-newtype data constructors with non-trivial wrappers
@@ -338,7 +338,7 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
 mkCoreUnfolding src top_lvl expr precomputed_cache guidance
   = CoreUnfolding { uf_tmpl = cache `seq`
                               occurAnalyseExpr expr
-      -- occAnalyseExpr: see Note [Occurrence analysis of unfoldings]
+      -- occAnalyseExpr: see Note [OccInfo in unfoldings and rules] in GHC.Core
       -- See #20905 for what a discussion of this 'seq'.
       -- We are careful to make sure we only
       -- have one copy of an unfolding around at once.
@@ -459,7 +459,7 @@ With that in mind we want to maintain the invariant that each unfolding only ref
 a single CoreExpr. One place where we have to be careful is in mkCoreUnfolding.
 
 * The template of the unfolding is the result of performing occurrence analysis
-  (Note [Occurrence analysis of unfoldings])
+  (Note [OccInfo in unfoldings and rules] in GHC.Core)
 * Predicates are applied to the unanalysed expression
 
 Therefore if we are not thoughtful about forcing you can end up in a situation where the

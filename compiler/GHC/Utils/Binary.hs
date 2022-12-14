@@ -97,6 +97,7 @@ import GHC.Utils.Fingerprint
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import qualified GHC.Data.Strict as Strict
+import GHC.Utils.Outputable( JoinPointHood(..) )
 
 import Control.DeepSeq
 import Foreign hiding (shiftL, shiftR, void)
@@ -808,6 +809,17 @@ instance Binary DiffTime where
     put_ bh dt = put_ bh (toRational dt)
     get bh = do r <- get bh
                 return $ fromRational r
+
+instance Binary JoinPointHood where
+    put_ bh NotJoinPoint = putByte bh 0
+    put_ bh (JoinPoint ar) = do
+        putByte bh 1
+        put_ bh ar
+    get bh = do
+        h <- getByte bh
+        case h of
+            0 -> return NotJoinPoint
+            _ -> do { ar <- get bh; return (JoinPoint ar) }
 
 {-
 Finally - a reasonable portable Integer instance.

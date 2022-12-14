@@ -61,7 +61,7 @@ module GHC.Types.Var (
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
+        isLocalVar, isLocalId, isLocalId_maybe, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
@@ -94,6 +94,9 @@ module GHC.Types.Var (
         isTyVarBinder,
         tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs,
+
+        -- ** ExportFlag
+        ExportFlag(..),
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -1245,6 +1248,10 @@ isNonCoVarId _                             = False
 isLocalId :: Var -> Bool
 isLocalId (Id { idScope = LocalId _ }) = True
 isLocalId _                            = False
+
+isLocalId_maybe :: Var -> Maybe ExportFlag
+isLocalId_maybe (Id { idScope = LocalId ef }) = Just ef
+isLocalId_maybe _                             = Nothing
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free

@@ -12,7 +12,7 @@ module GHC.Iface.Syntax (
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
-        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceJoinInfo(..), IfaceBinding,
+        IfaceExpr(..), IfaceAlt(..), IfaceLetBndr(..), IfaceBinding,
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
@@ -651,16 +651,13 @@ data IfaceBindingX r b
 -- IfaceLetBndr is like IfaceIdBndr, but has IdInfo too
 -- It's used for *non-top-level* let/rec binders
 -- See Note [IdInfo on nested let-bindings]
-data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo IfaceJoinInfo
+data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo JoinPointHood
 
 data IfaceTopBndrInfo = IfLclTopBndr IfLclName IfaceType IfaceIdInfo IfaceIdDetails
                       | IfGblTopBndr IfaceTopBndr
 
 -- See Note [Interface File with Core: Sharing RHSs]
 data IfaceMaybeRhs = IfUseUnfoldingRhs | IfRhs IfaceExpr
-
-data IfaceJoinInfo = IfaceNotJoinPoint
-                   | IfaceJoinPoint JoinArity
 
 {-
 Note [Empty case alternatives]
@@ -1573,10 +1570,6 @@ instance Outputable IfaceInfoItem where
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
   ppr (HsTagSig tag_sig)    = text "TagSig:" <+> ppr tag_sig
-
-instance Outputable IfaceJoinInfo where
-  ppr IfaceNotJoinPoint   = empty
-  ppr (IfaceJoinPoint ar) = angleBrackets (text "join" <+> ppr ar)
 
 instance Outputable IfaceUnfolding where
   ppr (IfCoreUnfold src _ guide e)
@@ -2689,19 +2682,6 @@ instance Binary IfaceMaybeRhs where
       1 -> IfRhs <$> get bh
       _ -> pprPanic "IfaceMaybeRhs" (intWithCommas b)
 
-
-
-instance Binary IfaceJoinInfo where
-    put_ bh IfaceNotJoinPoint = putByte bh 0
-    put_ bh (IfaceJoinPoint ar) = do
-        putByte bh 1
-        put_ bh ar
-    get bh = do
-        h <- getByte bh
-        case h of
-            0 -> return IfaceNotJoinPoint
-            _ -> liftM IfaceJoinPoint $ get bh
-
 instance Binary IfaceTyConParent where
     put_ bh IfNoParent = putByte bh 0
     put_ bh (IfDataInstance ax pr ty) = do
@@ -2880,9 +2860,6 @@ instance NFData IfaceFamTyConFlav where
     IfaceClosedSynFamilyTyCon f1 -> rnf f1
     IfaceAbstractClosedSynFamilyTyCon -> ()
     IfaceBuiltInSynFamTyCon -> ()
-
-instance NFData IfaceJoinInfo where
-  rnf x = x `seq` ()
 
 instance NFData IfaceTickish where
   rnf = \case

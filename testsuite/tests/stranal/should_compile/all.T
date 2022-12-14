@@ -84,8 +84,11 @@ test('T20510', [ grep_errmsg(r'jump \$wgo') ], compile, ['-dsuppress-uniques -dd
 test('T20817', [ grep_errmsg(r'Str') ], compile, ['-dsuppress-uniques -ddump-stranal'])
 # T21150: Check that t{,1,2} haven't been inlined.
 test('T21150', [ grep_errmsg(r'( t\d? :: Int)') ], compile, ['-dsuppress-uniques -ddump-exitify'])
+
 # T21128: Check that y is not reboxed in $wtheresCrud
+#         If so, there should be no `let` for y
 test('T21128', [ grep_errmsg(r'let { y = I\#') ], multimod_compile, ['T21128', '-v0 -dsuppress-uniques -dsuppress-all -ddump-simpl'])
+
 test('T21265', normal, compile, [''])
 test('EtaExpansion', normal, compile, [''])
 test('T22039', normal, compile, [''])
