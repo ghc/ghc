@@ -478,22 +478,6 @@ repPrim t = rep where
     | t == int64PrimTyCon            = text $ show (build x :: Int64)
     | t == word64PrimTyCon           = text $ show (build x :: Word64)
     | t == addrPrimTyCon             = text $ show (nullPtr `plusPtr` build x)
-    | t == stablePtrPrimTyCon        = text "<stablePtr>"
-    | t == stableNamePrimTyCon       = text "<stableName>"
-    | t == statePrimTyCon            = text "<statethread>"
-    | t == proxyPrimTyCon            = text "<proxy>"
-    | t == realWorldTyCon            = text "<realworld>"
-    | t == threadIdPrimTyCon         = text "<ThreadId>"
-    | t == weakPrimTyCon             = text "<Weak>"
-    | t == arrayPrimTyCon            = text "<array>"
-    | t == smallArrayPrimTyCon       = text "<smallArray>"
-    | t == byteArrayPrimTyCon        = text "<bytearray>"
-    | t == mutableArrayPrimTyCon     = text "<mutableArray>"
-    | t == smallMutableArrayPrimTyCon = text "<smallMutableArray>"
-    | t == mutableByteArrayPrimTyCon = text "<mutableByteArray>"
-    | t == mutVarPrimTyCon           = text "<mutVar>"
-    | t == mVarPrimTyCon             = text "<mVar>"
-    | t == tVarPrimTyCon             = text "<tVar>"
     | otherwise                      = char '<' <> ppr t <> char '>'
     where build ww = unsafePerformIO $ withArray ww (peek . castPtr)
 --   This ^^^ relies on the representation of Haskell heap values being

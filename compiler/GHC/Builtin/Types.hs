@@ -903,7 +903,7 @@ mkConstraintTupleStr 1  = "Solo%"   -- See Note [One-tuples]
 mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
 
 commas :: Arity -> String
-commas ar = take (ar-1) (repeat ',')
+commas ar = replicate (ar-1) ','
 
 cTupleTyCon :: Arity -> TyCon
 cTupleTyCon i

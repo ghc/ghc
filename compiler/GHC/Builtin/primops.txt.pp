@@ -3743,7 +3743,7 @@ pseudoop "proxy#"
    representation. }
 
 pseudoop   "seq"
-   a -> b -> b
+   a -> p -> p
    { The value of @'seq' a b@ is bottom if @a@ is bottom, and
      otherwise equal to @b@. In other words, it evaluates the first
      argument @a@ to weak head normal form (WHNF). 'seq' is usually
@@ -3761,7 +3761,7 @@ pseudoop   "seq"
          -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 pseudoop   "unsafeCoerce#"
-   a -> b
+   o -> p
    { The function 'unsafeCoerce#' allows you to side-step the typechecker entirely. That
         is, it allows you to coerce any type into any other type. If you use this function,
         you had better get it right, otherwise segmentation faults await. It is generally

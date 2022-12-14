@@ -141,8 +141,7 @@ exprType (Lam binder expr)   = mkLamType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
         (fun, args) -> applyTypeToArgs (pprCoreExpr e) (exprType fun) args
-
-exprType other = pprPanic "exprType" (pprCoreExpr other)
+exprType (Type ty) = pprPanic "exprType" (ppr ty)
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side

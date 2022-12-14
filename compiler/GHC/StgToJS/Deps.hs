@@ -153,7 +153,7 @@ genDependencyData mod units = do
       lookupOtherFun od@(OtherSymb m idTxt) =
         case M.lookup od unitOtherExports of
           Just n  -> return (Right n)
-          Nothing | m == mod -> panic ("genDependencyData.lookupOtherFun: unknown local other id: " ++ unpackFS idTxt)
+          Nothing | m == mod -> pprPanic "genDependencyData.lookupOtherFun: unknown local other id:" (ftext idTxt)
           Nothing ->  Left <$> (maybe (lookupExternalFun Nothing od) return =<<
                         gets (M.lookup od . ddcOther))
 

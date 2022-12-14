@@ -271,7 +271,7 @@ argBits :: Platform -> [ArgRep] -> [Bool]
 argBits _        [] = []
 argBits platform (rep : args)
   | isFollowableArg rep  = False : argBits platform args
-  | otherwise = take (argRepSizeW platform rep) (repeat True) ++ argBits platform args
+  | otherwise = replicate (argRepSizeW platform rep) True ++ argBits platform args
 
 non_void :: [ArgRep] -> [ArgRep]
 non_void = filter nv
@@ -1818,8 +1818,7 @@ mkMultiBranch maybe_ncons raw_ways = do
 
          mkTree vals range_lo range_hi
             = let n = length vals `div` 2
-                  vals_lo = take n vals
-                  vals_hi = drop n vals
+                  (vals_lo, vals_hi) = splitAt n vals
                   v_mid = fst (head vals_hi)
               in do
               label_geq <- getLabelBc

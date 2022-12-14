@@ -177,14 +177,14 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
             text "h$foreignExport" <>
                         parens (
                           ftext c_nm <> comma <>
-                          strlit (unitIdString (moduleUnitId m)) <> comma <>
-                          strlit (moduleNameString (moduleName m)) <> comma <>
-                          strlit (unpackFS c_nm) <> comma <>
-                          strlit type_string
+                          strlit (unitIdFS (moduleUnitId m)) <> comma <>
+                          strlit (moduleNameFS (moduleName m)) <> comma <>
+                          strlit c_nm <> comma <>
+                          strlit (mkFastString type_string)
                         ) <> semi
           _ -> empty
 
-  strlit xs = docToSDoc (pprStringLit (mkFastString xs))
+  strlit xs = docToSDoc (pprStringLit xs)
 
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun
@@ -382,16 +382,16 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
 
 
 mkHObj :: Type -> SDoc
-mkHObj t = text "h$rts_mk" <> text (showFFIType t)
+mkHObj t = text "h$rts_mk" <> showFFIType t
 
 unpackHObj :: Type -> SDoc
-unpackHObj t = text "h$rts_get" <> text (showFFIType t)
+unpackHObj t = text "h$rts_get" <> showFFIType t
 
 showStgType :: Type -> SDoc
-showStgType t = text "Hs" <> text (showFFIType t)
+showStgType t = text "Hs" <> showFFIType t
 
-showFFIType :: Type -> String
-showFFIType t = getOccString (getName (typeTyCon t))
+showFFIType :: Type -> SDoc
+showFFIType t = ftext (occNameFS (getOccName (typeTyCon t)))
 
 typeTyCon :: Type -> TyCon
 typeTyCon ty
@@ -639,7 +639,7 @@ jsResultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey = do
 --    result_id <- newSysLocalDs boolTy
     ccall_uniq <- newUnique
-    let forceBool e = mkJsCall ccall_uniq "$r = !(!$1)" [e] boolTy
+    let forceBool e = mkJsCall ccall_uniq (fsLit "$r = !(!$1)") [e] boolTy
     return
      (Just intPrimTy, \e -> forceBool e)
 
@@ -674,10 +674,10 @@ jsResultWrapper result_ty
     maybe_tc_app = splitTyConApp_maybe result_ty
 
 -- low-level primitive JavaScript call:
-mkJsCall :: Unique -> String -> [CoreExpr] -> Type -> CoreExpr
+mkJsCall :: Unique -> FastString -> [CoreExpr] -> Type -> CoreExpr
 mkJsCall u tgt args t = mkFCall u ccall args t
   where
     ccall = CCall $ CCallSpec
-              (StaticTarget NoSourceText (mkFastString tgt) (Just primUnit) True)
+              (StaticTarget NoSourceText tgt (Just primUnit) True)
               JavaScriptCallConv
               PlayRisky

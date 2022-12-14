@@ -529,7 +529,7 @@ rnBind sig_fn (PatSynBind x bind)
   = do  { (bind', name, fvs) <- rnPatSynBind sig_fn bind
         ; return (PatSynBind x bind', name, fvs) }
 
-rnBind _ b = pprPanic "rnBind" (ppr b)
+rnBind _ b@(VarBind {}) = pprPanic "rnBind" (ppr b)
 
  -- See Note [Pattern bindings that bind no variables]
 isOkNoBindPattern :: LPat GhcRn -> Bool

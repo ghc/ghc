@@ -554,7 +554,7 @@ mkArgDescr platform args
 argBits :: Platform -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
 argBits _         []           = []
 argBits platform (P   : args) = False : argBits platform args
-argBits platform (arg : args) = take (argRepSizeW platform arg) (repeat True)
+argBits platform (arg : args) = replicate (argRepSizeW platform arg) True
                                  ++ argBits platform args
 
 ----------------------

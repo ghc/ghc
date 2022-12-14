@@ -962,7 +962,7 @@ typedSpliceCtxtDoc n splice
 spliceResultDoc :: LHsExpr GhcTc -> SDoc
 spliceResultDoc expr
   = sep [ text "In the result of the splice:"
-        , nest 2 (char '$' <> ppr expr)
+        , nest 2 (text "$$" <> ppr expr)
         , text "To see what the splice expanded to, use -ddump-splices"]
 
 stubNestedSplice :: HsExpr GhcTc

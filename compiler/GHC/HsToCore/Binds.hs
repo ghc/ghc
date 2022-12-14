@@ -307,7 +307,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; let mk_bind (ABE { abe_wrap = wrap
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
-                          -- See Note [AbsBinds wrappers] in "GHC.Hs.Binds"
+                          -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
                 = do { tup_id  <- newSysLocalDs ManyTy tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $

@@ -501,6 +501,8 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                          , plusFVs [fv_getField, fv_setField, fv_e, fv_us] )
              }
 
+rnExpr (HsRecSel x _) = dataConCantHappen x
+
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
@@ -587,9 +589,6 @@ rnExpr (HsProc x pat body)
     rnPat (ArrowMatchCtxt ProcExpr) pat $ \ pat' -> do
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
-
-rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
-        -- HsWrap
 
 {-
 ************************************************************************

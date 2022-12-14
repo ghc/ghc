@@ -45,8 +45,6 @@ coVarRole :: CoVar -> Role
 
 mkCoercionType :: Role -> Type -> Type -> Type
 
-data LiftingContext
-liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
 seqCo :: Coercion -> ()
 
 coercionKind :: Coercion -> Pair Type

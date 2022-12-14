@@ -584,8 +584,8 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
        = do { exp <- dsInnerMonadComp stmts bndrs return_op
             ; return (exp, mkBigCoreVarTupTy bndrs) }
 
-dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
-
+dsMcStmt stmt@(ApplicativeStmt {}) _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
+dsMcStmt stmt@(RecStmt {}) _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 
 matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 -- (matchTuple [a,b,c] body)
