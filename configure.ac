@@ -143,7 +143,7 @@ if test "$EnableDistroToolchain" = "YES"; then
 fi
 
 AC_ARG_ENABLE(asserts-all-ways,
-[AC_HELP_STRING([--enable-asserts-all-ways],
+[AS_HELP_STRING([--enable-asserts-all-ways],
                 [Usually ASSERTs are only compiled in the DEBUG way,
                  this will enable them in all ways.])],
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableAssertsAllWays])],
