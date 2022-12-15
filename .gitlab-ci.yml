@@ -679,19 +679,21 @@ test-bootstrap:
 # access to an unprivileged access token with the ability to query the ghc/ghc
 # project such that it can find the job ID of the fedora33 job for the current
 # pipeline.
+#
+# hackage-lint: Can be triggered on any MR, normal validate pipeline or nightly build.
+#               Runs head.hackage with -dlint and a slow-validate bindist
+#
+# hackage-label-lint: Trigged on MRs with "user-facing" label, runs the slow-validate
+#                     head.hackage build with -dlint.
+#
+# nightly-hackage-lint: Runs automatically on nightly pipelines with slow-validate + dlint config.
+#
+# nightly-hackage-perf: Runs automaticaly on nightly pipelines with release build and eventlogging enabled.
+#
+# release-hackage-lint: Runs automatically on release pipelines with -dlint on a release bindist.
 
 .hackage:
   stage: testing
-  needs:
-    - job: x86_64-linux-fedora33-release
-      optional: true
-      artifacts: false
-    - job: nightly-x86_64-linux-fedora33-release
-      optional: true
-      artifacts: false
-    - job: release-x86_64-linux-fedora33-release
-      optional: true
-      artifacts: false
   variables:
     UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
@@ -703,30 +705,56 @@ test-bootstrap:
     strategy: "depend"
 
 hackage-lint:
+  needs:
+    - job: x86_64-linux-deb10-numa-slow-validate
+      optional: true
+      artifacts: false
+    - job: nightly-x86_64-linux-deb10-numa-slow-validate
+      optional: true
+      artifacts: false
   extends: .hackage
   variables:
-    EXTRA_HC_OPTS: "-dcore-lint"
+    SLOW_VALIDATE: 1
+    EXTRA_HC_OPTS: "-dlint"
+  # No for release jobs because there isn't a slow-valdate bindist. There is an
+  # automatic pipeline for release bindists (see release-hackage-lint)
+  rules:
+    - if: '$RELEASE_JOB != "yes"'
   when: manual
 
 hackage-label-lint:
+  needs:
+    - job: x86_64-linux-deb10-numa-slow-validate
+      optional: true
+      artifacts: false
   extends: .hackage
   variables:
-    EXTRA_HC_OPTS: "-dcore-lint"
+    SLOW_VALIDATE: 1
+    EXTRA_HC_OPTS: "-dlint"
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/'
 
-# The head.hackage job is split into two jobs because enabling `-dcore-lint`
+# The head.hackage job is split into two jobs because enabling `-dlint`
 # affects the total allocation numbers for the simplifier portion significantly.
 nightly-hackage-lint:
+  needs:
+    - job: nightly-x86_64-linux-deb10-numa-slow-validate
+      optional: true
+      artifacts: false
   rules:
     - if: $NIGHTLY
       variables:
         NIGHTLY: "$NIGHTLY"
   extends: .hackage
   variables:
-    EXTRA_HC_OPTS: "-dcore-lint"
+    SLOW_VALIDATE: 1
+    EXTRA_HC_OPTS: "-dlint"
 
 nightly-hackage-perf:
+  needs:
+    - job: nightly-x86_64-linux-fedora33-release
+      optional: true
+      artifacts: false
   rules:
     - if: $NIGHTLY
       variables:
@@ -737,6 +765,18 @@ nightly-hackage-perf:
     EXTRA_HC_OPTS: "-ddump-timings"
     # Ask head.hackage to generate eventlogs
     EVENTLOGGING: 1
+
+release-hackage-lint:
+  needs:
+    - job: release-x86_64-linux-fedora33-release
+      optional: true
+      artifacts: false
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+  extends: .hackage
+  variables:
+    # No slow-validate bindist on release pipeline
+    EXTRA_HC_OPTS: "-dlint"
 
 ############################################################
 # Nofib testing
