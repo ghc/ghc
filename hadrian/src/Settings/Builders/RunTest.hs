@@ -68,8 +68,8 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   withInterpreter   :: Bool
  ,   unregisterised    :: Bool
  ,   tables_next_to_code :: Bool
- ,   withSMP           :: Bool
- ,   debugAssertions   :: Bool
+ ,   targetWithSMP       :: Bool  -- does the target support SMP
+ ,   debugAssertions     :: Bool
       -- ^ Whether the compiler has debug assertions enabled,
       -- corresponding to the -DDEBUG option.
  ,   profiled          :: Bool
@@ -100,7 +100,7 @@ inTreeCompilerArgs stg = do
     withInterpreter     <- ghcWithInterpreter
     unregisterised      <- flag GhcUnregisterised
     tables_next_to_code <- flag TablesNextToCode
-    withSMP             <- targetSupportsSMP
+    targetWithSMP       <- targetSupportsSMP
     debugAssertions     <- ($ succStage stg) . ghcDebugAssertions <$> flavour
     profiled            <- ghcProfiled        <$> flavour <*> pure stg
 
@@ -145,8 +145,8 @@ outOfTreeCompilerArgs = do
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
-    tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
-    withSMP             <- getBooleanSetting TestGhcWithSMP
+    tables_next_to_code <- getBooleanSetting TestGhcUnregisterised
+    targetWithSMP       <- targetSupportsSMP
     debugAssertions     <- getBooleanSetting TestGhcDebugged
 
     os          <- getTestSetting TestHostOS
@@ -202,7 +202,7 @@ runTestBuilderArgs = builder Testsuite ? do
     bignumBackend <- getBignumBackend
     bignumCheck   <- getBignumCheck
 
-    keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
+    keepFiles <- expr (testKeepFiles <$> userSetting defaultTestArgs)
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
     (acceptPlatform, acceptOS) <- expr . liftIO $
@@ -262,8 +262,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasDynamicRts)
             , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasThreadedRts)
             , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
-            , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
-
+            , arg "-e", arg $ asBool "target_with_smp=" targetWithSMP
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
             , arg "-e", arg $ "config.leading_underscore=" ++ show leadingUnderscore
 

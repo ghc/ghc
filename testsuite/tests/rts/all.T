@@ -287,7 +287,7 @@ test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
 
 test('T7815', [ multi_cpu_race,
                 extra_run_opts('50000 +RTS -N2 -RTS'),
-                req_smp,
+                req_target_smp, req_ghc_smp,
                 only_ways(['threaded1', 'threaded2']) ], compile_and_run, [''] )
 
 # ignore_stderr because it contains a unique:
@@ -306,10 +306,10 @@ test('T7919', [ when(fast(), skip)
 
 test('T8035', normal, compile_and_run, [''])
 
-test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8209', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
+test('T8242', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
@@ -330,7 +330,8 @@ test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
                , when(unregisterised(), skip)
-               , req_smp
+               , req_target_smp
+               , req_ghc_smp
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('T11108', normal, compile_and_run, [''])
@@ -403,7 +404,7 @@ test('T11788', [ when(ghc_dynamic(), skip)
                , req_interp
                ], makefile_test, ['T11788'])
 
-test('T10296a', [req_smp], makefile_test, ['T10296a'])
+test('T10296a', [req_ghc_smp], makefile_test, ['T10296a'])
 
 test('T10296b', [only_ways(['threaded2'])], compile_and_run, [''])
 
@@ -457,7 +458,8 @@ test('alloccounter1', js_broken(22261), compile_and_run,
 
 test('nursery-chunks1',
   [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
-  , req_smp
+  , req_ghc_smp
+  , req_target_smp
   , only_ways(['threaded1','threaded2'])
   ],
   compile_and_run,

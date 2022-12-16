@@ -1,7 +1,7 @@
 test('T13615',
      [when(fast(), skip),
       when(unregisterised(), skip),
-      req_smp, # needs -N support
+      req_target_smp, # needs -N support
       only_ways(threaded_ways),
       extra_files(['Parallel.hs', 'Memo.hs']),
       # Decrease stack chunk size and lots of capabilities to increase failure
