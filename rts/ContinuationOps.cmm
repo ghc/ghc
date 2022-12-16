@@ -166,11 +166,12 @@ INFO_TABLE_FUN(stg_CONTINUATION,0,0,CONTINUATION,"CONTINUATION","CONTINUATION",2
 // see Note [Continuations overview] in Continuation.c
 stg_CONTINUATION_apply // explicit stack
 {
+  W_ _unused;
   P_ cont, io;
   cont = R1;
   io = R2;
 
-  IF_DEBUG(sanity, ccall checkClosure(cont "ptr"));
+  IF_DEBUG(sanity, (_unused) = ccall checkClosure(cont "ptr"));
 
   W_ new_stack_words, apply_mask_frame, mask_frame_offset;
   new_stack_words = StgContinuation_stack_size(cont);
