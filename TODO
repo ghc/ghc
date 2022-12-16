@@ -1,0 +1,7 @@
+update documentation (once all new names are approved)
+improved error: flag name suggestions
+improved error: flag value suggestions
+improved error: 'no value' error
+question about casting StgWord64 to StgWord
+perhaps move additional arithmetic manipulations out of `parseArg`
+print out flag 'tail' in some error messages

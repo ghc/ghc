@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 1998-2009
  *
- * Datatypes that holds the command-line flag settings.
+ * Datatypes that hold the command-line flag settings.
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *

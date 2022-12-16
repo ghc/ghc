@@ -227,6 +227,7 @@ library
                         rts/EventLogWriter.h
                         rts/FileLock.h
                         rts/Flags.h
+                        rts/OptParse.h
                         rts/ForeignExports.h
                         rts/GetTime.h
                         rts/Globals.h
@@ -547,6 +548,7 @@ library
                  ReportMemoryMap.c
                  Messages.c
                  OldARMAtomic.c
+                 OptParse.c
                  PathUtils.c
                  Pool.c
                  Printer.c

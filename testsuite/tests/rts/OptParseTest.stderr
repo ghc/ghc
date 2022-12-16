@@ -1,0 +1,411 @@
+
+(TEST) input: -?
+0: (null) ? SAFE
+
+(TEST) input: --install-signal-handlers
+1: install-signal-handlers (null) UNSAFE
+
+(TEST) input: --install-signal-handlers=yes
+1: install-signal-handlers (null) UNSAFE
+
+(TEST) input: --install-signal-handlers=no
+1: install-signal-handlers (null) UNSAFE
+
+(FAIL_TEST) input: --install-signal-handlers=dunnow
+unknown RTS option: --install-signal-handlers=dunnow
+
+(FAIL_TEST) input: --install-signal-handlersgasg
+unknown RTS option: --install-signal-handlersgasg
+
+(TEST) input: --install-seh-handlers
+2: install-seh-handlers (null) UNSAFE
+
+(TEST) input: --install-seh-handlers=yes
+2: install-seh-handlers (null) UNSAFE
+
+(TEST) input: --install-seh-handlers=no
+2: install-seh-handlers (null) UNSAFE
+
+(FAIL_TEST) input: --install-seh-handlers=
+unknown RTS option: --install-seh-handlers=
+
+(FAIL_TEST) input: --install-seh-handlers=hmmm
+unknown RTS option: --install-seh-handlers=hmmm
+
+(FAIL_TEST) input: --install-seh-handlersgasdxxxasg
+unknown RTS option: --install-seh-handlersgasdxxxasg
+
+(TEST) input: --generate-stack-traces
+3: generate-stack-traces (null) UNSAFE
+
+(TEST) input: --generate-stack-traces=yes
+3: generate-stack-traces (null) UNSAFE
+
+(TEST) input: --generate-stack-traces=no
+3: generate-stack-traces (null) UNSAFE
+
+(FAIL_TEST) input: --generate-stack-traces=perhaps
+unknown RTS option: --generate-stack-traces=perhaps
+
+(FAIL_TEST) input: --generate-stack-tracesgasg
+unknown RTS option: --generate-stack-tracesgasg
+
+(TEST) input: --generate-crash-dumps
+4: generate-crash-dumps (null) UNSAFE
+
+(TEST) input: --generate-crash-dumps=yes
+4: generate-crash-dumps (null) UNSAFE
+
+(TEST) input: --generate-crash-dumps=no
+4: generate-crash-dumps (null) UNSAFE
+
+(FAIL_TEST) input: --generate-crash-dumps=maybe
+unknown RTS option: --generate-crash-dumps=maybe
+
+(FAIL_TEST) input: --generate-crash-dumpssss
+unknown RTS option: --generate-crash-dumpssss
+
+(TEST) input: --null-eventlog-writer
+5: null-eventlog-writer (null) UNSAFE
+
+(TEST) input: --null-eventlog-writer=yes
+5: null-eventlog-writer (null) UNSAFE
+
+(TEST) input: --null-eventlog-writer=no
+5: null-eventlog-writer (null) UNSAFE
+
+(FAIL_TEST) input: --null-eventlog-writer=
+unknown RTS option: --null-eventlog-writer=
+
+(FAIL_TEST) input: --null-eventlog-writerytrwe
+unknown RTS option: --null-eventlog-writerytrwe
+
+(TEST) input: --machine-readable
+6: machine-readable (null) UNSAFE
+
+(TEST) input: --machine-readable=yes
+6: machine-readable (null) UNSAFE
+
+(TEST) input: --machine-readable=no
+6: machine-readable (null) UNSAFE
+
+(FAIL_TEST) input: --machine-readable=treu
+unknown RTS option: --machine-readable=treu
+
+(FAIL_TEST) input: --machine-readableytrweasf
+unknown RTS option: --machine-readableytrweasf
+
+(TEST) input: --disable-delayed-os-memory-return
+7: disable-delayed-os-memory-return (null) UNSAFE
+
+(TEST) input: --disable-delayed-os-memory-return=yes
+7: disable-delayed-os-memory-return (null) UNSAFE
+
+(TEST) input: --disable-delayed-os-memory-return=no
+7: disable-delayed-os-memory-return (null) UNSAFE
+
+(FAIL_TEST) input: --disable-delayed-os-memory-return=flase
+unknown RTS option: --disable-delayed-os-memory-return=flase
+
+(FAIL_TEST) input: --disable-delayed-os-memory-returnysaftrweasf
+unknown RTS option: --disable-delayed-os-memory-returnysaftrweasf
+
+(TEST) input: --internal-counters
+8: internal-counters (null) SAFE
+
+(TEST) input: --internal-counters=yes
+8: internal-counters (null) SAFE
+
+(TEST) input: --internal-counters=no
+8: internal-counters (null) SAFE
+
+(FAIL_TEST) input: --internal-counters=tutr
+unknown RTS option: --internal-counters=tutr
+
+(FAIL_TEST) input: --internal-countersysaftrweasfasf
+unknown RTS option: --internal-countersysaftrweasfasf
+
+(TEST) input: --io-manager=native
+9: io-manager (null) UNSAFE
+
+(TEST) input: --io-manager=posix
+9: io-manager (null) UNSAFE
+
+(FAIL_TEST) input: --io-manager
+unknown RTS option: --io-manager
+
+(FAIL_TEST) input: --io-manager=
+unknown RTS option: --io-manager=
+
+(FAIL_TEST) input: --io-manager=unknown-manager
+invalid enum 'unknown-manager' for 'io-manager'
+
+(FAIL_TEST) input: --io-managerlgaks
+unknown RTS option: --io-managerlgaks
+
+(TEST) input: --info
+10: info (null) SAFE
+
+(TEST) input: --eventlog-flush-interval=606.909
+11: eventlog-flush-interval (null) SAFE
+expected: 606.909000 actual: 606.909000
+
+(TEST) input: --eventlog-flush-interval=0.125
+11: eventlog-flush-interval (null) SAFE
+expected: 0.125000 actual: 0.125000
+
+(FAIL_TEST) input: --eventlog-flush-interval
+unknown RTS option: --eventlog-flush-interval
+
+(FAIL_TEST) input: --eventlog-flush-interval=
+unknown RTS option: --eventlog-flush-interval=
+
+(FAIL_TEST) input: --eventlog-flush-interval=true
+bad value for eventlog-flush-interval=true
+
+(FAIL_TEST) input: --eventlog-flush-intervalysaftrweasfasf
+unknown RTS option: --eventlog-flush-intervalysaftrweasfasf
+
+(TEST) input: --copying-gc
+12: copying-gc (null) SAFE
+
+(TEST) input: --nonmoving-gc
+13: nonmoving-gc (null) SAFE
+
+(TEST) input: --large-object-allocation=8193K
+14: large-object-allocation AL UNSAFE
+expected: 2048 actual: 2048
+
+(TEST) input: --large-object-allocation=2M
+14: large-object-allocation AL UNSAFE
+expected: 512 actual: 512
+
+(TEST) input: -AL9G
+14: large-object-allocation AL UNSAFE
+expected: 2359296 actual: 2359296
+
+(TEST) input: -AL0.125G
+14: large-object-allocation AL UNSAFE
+expected: 32768 actual: 32768
+
+(TEST) input: -AL3333w
+14: large-object-allocation AL UNSAFE
+expected: 6 actual: 6
+
+(FAIL_TEST) input: -AL
+unknown RTS option: -AL
+
+(FAIL_TEST) input: --large-object-allocation
+unknown RTS option: --large-object-allocation
+
+(FAIL_TEST) input: --large-object-allocation=
+unknown RTS option: --large-object-allocation=
+
+(TEST) input: --minimum-allocation-area-size=8193K
+15: minimum-allocation-area-size A UNSAFE
+expected: 2048 actual: 2048
+
+(TEST) input: --minimum-allocation-area-size=2M
+15: minimum-allocation-area-size A UNSAFE
+expected: 512 actual: 512
+
+(TEST) input: -A9G
+15: minimum-allocation-area-size A UNSAFE
+expected: 2359296 actual: 2359296
+
+(TEST) input: -A0.125G
+15: minimum-allocation-area-size A UNSAFE
+expected: 32768 actual: 32768
+
+(TEST) input: -A3333w
+15: minimum-allocation-area-size A UNSAFE
+expected: 6 actual: 6
+
+(FAIL_TEST) input: -A
+unknown RTS option: -A
+
+(FAIL_TEST) input: --minimum-allocation-area-size
+unknown RTS option: --minimum-allocation-area-size
+
+(FAIL_TEST) input: --minimum-allocation-area-size=
+unknown RTS option: --minimum-allocation-area-size=
+
+(TEST) input: --io-manager-threads=1
+17: io-manager-threads (null) UNSAFE
+expected: 1 actual: 1
+
+(TEST) input: --io-manager-threads=1234567
+17: io-manager-threads (null) UNSAFE
+expected: 1234567 actual: 1234567
+
+(FAIL_TEST) input: --io-manager-threads
+unknown RTS option: --io-manager-threads
+
+(FAIL_TEST) input: --io-manager-threads=
+unknown RTS option: --io-manager-threads=
+
+(TEST) input: --numa
+18: numa (null) SAFE
+expected: 18446744073709551615 actual: 18446744073709551615
+
+(TEST) input: --numa=1
+18: numa (null) SAFE
+expected: 1 actual: 1
+
+(TEST) input: --numa=1234567
+18: numa (null) SAFE
+expected: 1234567 actual: 1234567
+
+(FAIL_TEST) input: --numa=
+unknown RTS option: --numa=
+
+(TEST) input: --debug-numa=1
+19: debug-numa (null) SAFE
+expected: 1 actual: 1
+
+(TEST) input: --debug-numa=8
+19: debug-numa (null) SAFE
+expected: 8 actual: 8
+
+(FAIL_TEST) input: --debug-numa=999
+debug-numa: Too many NUMA nodes (max 16)
+
+(FAIL_TEST) input: --debug-numa999
+unknown RTS option: --debug-numa999
+
+(FAIL_TEST) input: --debug-numa=
+unknown RTS option: --debug-numa=
+
+(FAIL_TEST) input: --debug-numa
+unknown RTS option: --debug-numa
+
+(FAIL_TEST) input: --debug-num
+unknown RTS option: --debug-num
+
+(TEST) input: --long-gc-sync=606.909
+20: long-gc-sync (null) SAFE
+expected: 606.909000 actual: 606.909000
+
+(TEST) input: --long-gc-sync=0.125
+20: long-gc-sync (null) SAFE
+expected: 0.125000 actual: 0.125000
+
+(FAIL_TEST) input: --long-gc-sync
+bad value for long-gc-sync
+
+(FAIL_TEST) input: --long-gc-sync=
+unknown RTS option: --long-gc-sync=
+
+(FAIL_TEST) input: --long-gc-sync=true
+bad value for long-gc-sync=true
+
+(FAIL_TEST) input: --long-gc-syncysaftrweasfasf
+unknown RTS option: --long-gc-syncysaftrweasfasf
+
+(TEST) input: --no-automatic-heap-samples
+21: no-automatic-heap-samples (null) UNSAFE
+
+(TEST) input: --no-automatic-heap-samples=yes
+21: no-automatic-heap-samples (null) UNSAFE
+
+(TEST) input: --no-automatic-heap-samples=no
+21: no-automatic-heap-samples (null) UNSAFE
+
+(FAIL_TEST) input: --no-automatic-heap-samples=
+unknown RTS option: --no-automatic-heap-samples=
+
+(FAIL_TEST) input: --no-automatic-heap-samples=foo
+unknown RTS option: --no-automatic-heap-samples=foo
+
+(FAIL_TEST) input: --no-automatic-heap-samplasfsg
+unknown RTS option: --no-automatic-heap-samplasfsg
+
+(TEST) input: --alloc-area-chunksize=16M
+22: alloc-area-chunksize n UNSAFE
+expected: 4096 actual: 4096
+
+(TEST) input: -n16m
+22: alloc-area-chunksize n UNSAFE
+expected: 4096 actual: 4096
+
+(TEST) input: --alloc-area-chunksize=1234567
+22: alloc-area-chunksize n UNSAFE
+expected: 301 actual: 301
+
+(TEST) input: -n1239999
+22: alloc-area-chunksize n UNSAFE
+expected: 302 actual: 302
+
+(TEST) input: --alloc-area-chunksize=0.225G
+22: alloc-area-chunksize n UNSAFE
+expected: 58982 actual: 58982
+
+(TEST) input: -n99999999k
+22: alloc-area-chunksize n UNSAFE
+expected: 24999999 actual: 24999999
+
+(TEST) input: --alloc-area-chunksize=7654W
+22: alloc-area-chunksize n UNSAFE
+expected: 14 actual: 14
+
+(TEST) input: -n4567w
+22: alloc-area-chunksize n UNSAFE
+expected: 8 actual: 8
+
+(FAIL_TEST) input: --alloc-area-chunksize
+unknown RTS option: --alloc-area-chunksize
+
+(FAIL_TEST) input: --alloc-area-chunksizr
+unknown RTS option: --alloc-area-chunksizr
+
+(FAIL_TEST) input: --alloc-area-chunksizr=23M
+unknown RTS option: --alloc-area-chunksizr=23M
+
+(FAIL_TEST) input: --alloc-area-chunksize=
+unknown RTS option: --alloc-area-chunksize=
+
+(FAIL_TEST) input: -n
+unknown RTS option: -n
+
+(FAIL_TEST) input: -n=
+unknown RTS option: -n=
+
+(FAIL_TEST) input: -n=0
+unknown RTS option: -n=0
+
+(TEST) input: -B
+16: gc-bell B UNSAFE
+
+(TEST) input: --gc-bell
+16: gc-bell B UNSAFE
+
+(FAIL_TEST) input: --gc-bell=
+unknown RTS option: --gc-bell=
+
+(FAIL_TEST) input: --gc-bell=123G
+flag gc-bell given an argument when none was expected: --gc-bell=123G
+
+(FAIL_TEST) input: -B123G
+flag B given an argument when none was expected: -B123G
+
+(TEST) input: --compact-gc
+23: compact-gc c UNSAFE
+expected: 0.000000 actual: 0.000000
+
+(TEST) input: -c
+23: compact-gc c UNSAFE
+expected: 0.000000 actual: 0.000000
+
+(TEST) input: --compact-gc=1125
+23: compact-gc c UNSAFE
+expected: 1125.000000 actual: 1125.000000
+
+(TEST) input: -c
+23: compact-gc c UNSAFE
+expected: 0.000000 actual: 0.000000
+
+(FAIL_TEST) input: --compact-gc=
+unknown RTS option: --compact-gc=
+
+(FAIL_TEST) input: --compact-gc=blah
+bad value for compact-gc=blah
