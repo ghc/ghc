@@ -48,10 +48,12 @@ module GHC.Types.Id.Info (
 
         -- ** Unfolding Info
         realUnfoldingInfo, unfoldingInfo, setUnfoldingInfo, hasInlineUnfolding,
+        inlinePragInfo, setInlinePragInfo, inlineableInfo, setHasInlineableInfo,
 
-        -- ** The InlinePragInfo type
-        InlinePragInfo,
-        inlinePragInfo, setInlinePragInfo,
+        -- ** The PragInfo type
+        setPragInfo, pragInfo, PragInfo, mkPragInfo,
+        pragInfoInline, pragHasInlineable,
+        setPragInfoInline,
 
         -- ** The OccInfo type
         OccInfo(..),
@@ -114,9 +116,11 @@ import GHC.StgToCmm.Types (LambdaFormInfo)
 infixl  1 `setRuleInfo`,
           `setArityInfo`,
           `setInlinePragInfo`,
+          `setHasInlineableInfo`,
           `setUnfoldingInfo`,
           `setOneShotInfo`,
           `setOccInfo`,
+          `setPragInfo`,
           `setCafInfo`,
           `setDmdSigInfo`,
           `setCprSigInfo`,
@@ -348,7 +352,7 @@ data IdInfo
         -- See Note [Specialisations and RULES in IdInfo]
         realUnfoldingInfo   :: Unfolding,
         -- ^ The 'Id's unfolding
-        inlinePragInfo  :: InlinePragma,
+        pragInfo  :: PragInfo,
         -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
@@ -429,6 +433,12 @@ bitfieldSetArityInfo info (BitField bits) =
 
 -- Getters
 
+inlinePragInfo :: IdInfo -> InlinePragma
+inlinePragInfo = pragInfoInline . pragInfo
+
+inlineableInfo :: IdInfo -> Bool
+inlineableInfo = pragHasInlineable . pragInfo
+
 -- | Info about a lambda-bound variable, if the 'Id' is one
 oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
@@ -455,10 +465,17 @@ tagSigInfo = tagSig
 
 setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
 setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
-setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
-setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
+
+setPragInfo :: IdInfo -> PragInfo -> IdInfo
+setPragInfo info pr = pr `seq` info { pragInfo = pr}
+
+setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
+setInlinePragInfo info pr = pr `seq` info { pragInfo = setPragInfoInline pr (pragInfo info) }
+
+setHasInlineableInfo :: IdInfo -> Bool -> IdInfo
+setHasInlineableInfo  info pr = pr `seq` info { pragInfo = setPragInfoUnf pr (pragInfo info) }
         -- Try to avoid space leaks by seq'ing
 
 -- | Essentially returns the 'realUnfoldingInfo' field, but does not expose the
@@ -522,7 +539,7 @@ vanillaIdInfo
   = IdInfo {
             ruleInfo       = emptyRuleInfo,
             realUnfoldingInfo  = noUnfolding,
-            inlinePragInfo = defaultInlinePragma,
+            pragInfo       = defaultPragInfo,
             occInfo        = noOccInfo,
             demandInfo     = topDmd,
             dmdSigInfo     = nopSig,
@@ -622,9 +639,37 @@ ppArityInfo n = hsep [text "Arity", int n]
 -- If there was an @INLINE@ pragma, then as a separate matter, the
 -- RHS will have been made to look small with a Core inline 'Note'
 --
--- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
+-- The default 'PragInfo' is 'AlwaysActive', so the info serves
 -- entirely as a way to inhibit inlining until we want it
-type InlinePragInfo = InlinePragma
+data PragInfo = PragInfo
+  { -- | INLINE etc info
+    pragInfoInline :: !InlinePragma
+  , -- | Should we keep the unfolding?
+    pragHasInlineable :: !Bool
+  } deriving Eq
+
+instance Outputable PragInfo where
+  ppr prag = text "PragInfo=" <> braces
+    (ppr (pragInfoInline prag) <> comma <>
+     text "HasInlineable:" <> ppr (pragHasInlineable prag))
+
+-- | mkPragInfo inl_prag has_inlineable
+mkPragInfo :: InlinePragma -> Bool -> PragInfo
+mkPragInfo = PragInfo
+
+setPragInfoInline :: InlinePragma -> PragInfo -> PragInfo
+setPragInfoInline inl prag_info = prag_info { pragInfoInline = inl }
+
+setPragInfoUnf :: Bool -> PragInfo -> PragInfo
+setPragInfoUnf keep prag_info = prag_info { pragHasInlineable = keep }
+
+defaultPragInfo :: PragInfo
+defaultPragInfo = PragInfo
+  { pragInfoInline = defaultInlinePragma
+  , pragHasInlineable = defaultHasInlineableInfo }
+
+defaultHasInlineableInfo :: Bool
+defaultHasInlineableInfo = False
 
 {-
 ************************************************************************

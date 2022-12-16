@@ -7,6 +7,7 @@ module GHC.Core.Unfold.Make
    , mkCoreUnfolding
    , mkFinalUnfolding
    , mkFinalUnfolding'
+   , mkVanillaUnfolding
    , mkSimpleUnfolding
    , mkWorkerUnfolding
    , mkInlineUnfoldingWithArity, mkInlineUnfoldingNoArity
@@ -77,6 +78,12 @@ mkCompulsoryUnfolding expr
 -- top-level flag to True.  It gets set more accurately by the simplifier
 -- Simplify.simplUnfolding.
 
+-- | Make a regular compiler generated unfolding
+mkVanillaUnfolding :: UnfoldingOpts -> Bool -> Bool -> CoreExpr -> Unfolding
+mkVanillaUnfolding !opts is_top is_bottoming rhs
+  = mkUnfolding opts VanillaSrc is_top is_bottoming rhs Nothing
+
+-- | Non top-lvl non-bottoming vanilla unfolding
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
   = mkUnfolding opts VanillaSrc False False rhs Nothing
@@ -98,12 +105,12 @@ mkDataConUnfolding expr
                     , ug_unsat_ok  = unSaturatedOk
                     , ug_boring_ok = False }
 
-mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
+mkWrapperUnfolding :: CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
-mkWrapperUnfolding opts expr arity
+mkWrapperUnfolding expr arity
   = mkCoreUnfolding StableSystemSrc True
-                    (simpleOptExpr opts expr) Nothing
+                    expr Nothing
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
                              , ug_boring_ok = boringCxtNotOk })
@@ -316,8 +323,8 @@ to arise for non-0-ary functions too, but let's wait and see.
 
 mkUnfolding :: UnfoldingOpts
             -> UnfoldingSource
-            -> Bool       -- Is top-level
-            -> Bool       -- Definitely a bottoming binding
+            -> Bool       -- ^ Is top-level
+            -> Bool       -- ^ Definitely a bottoming binding
                           -- (only relevant for top-level bindings)
             -> CoreExpr
             -> Maybe UnfoldingCache

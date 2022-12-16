@@ -955,7 +955,11 @@ instance Diagnostic TcRnMessage where
              2 (vcat (text "Ignoring all but the first"
                       : map pp_inl (fst_inl_prag : NE.toList inl_prags)))
          where
-           pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
+           pp_inl :: (LocatedA InlinePragma) -> SDoc
+           pp_inl loc_prag =
+              let prag = (unLoc loc_prag)
+                  loc = getLocA loc_prag
+              in (pprInlineDebug prag) <+> text "at" <+> (ppr loc)
     TcRnUnexpectedPragmas poly_id bad_sigs
       -> mkSimpleDecorated $
            hang (text "Discarding unexpected pragmas for" <+> ppr poly_id)

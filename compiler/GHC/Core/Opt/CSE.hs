@@ -233,7 +233,7 @@ an Id, even if it is a 'stable' unfolding.  That means that when an
 unfolding happens, it is always faithful to what the stable unfolding
 originally was.
 
-Note [CSE for stable unfoldings]
+Note [CSE for INLINEABLE unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    {-# Unf = Stable (\pq. build blah) #-}
@@ -264,8 +264,7 @@ Wrinkles
   decide that a function's definition is so small that it should
   always inline, or indeed for the wrapper function itself.  In this
   case we still want to do CSE (#13340). Hence the use of
-  isStableUserUnfolding/isStableSystemUnfolding rather than
-  isStableUnfolding.
+  idHasInlineable rather than isStableUnfolding.
 
 * Consider
      foo = <expr>
@@ -510,7 +509,7 @@ extendCSEnvWithBinding env in_id out_id rhs' cse_done
 noCSE :: InId -> Bool
 noCSE id
   | isJoinId id                = no_cse  -- See Note [CSE for join points?]
-  | isStableUserUnfolding  unf = no_cse  -- See Note [CSE for stable unfoldings]
+  | isStableUserUnfolding  unf = no_cse  -- See Note [CSE for INLINEABLE unfoldings]
   | user_activation_control    = no_cse  -- See Note [CSE for INLINE and NOINLINE]
   | otherwise = yes_cse
    where

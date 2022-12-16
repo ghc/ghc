@@ -2140,6 +2140,9 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
   = do  { logger <- getLogger
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
+              -- TODO: Here one would expect us to transfer NOINLINE as well.
+              -- But it seems we don't. See #22689
+              -- If we start doing so we will also need to transfer the keep unfolding flag.
               inline_prags | isAnyInlinePragma inline_prag
                            = [noLocA (InlineSig noAnn fn inline_prag)]
                            | otherwise

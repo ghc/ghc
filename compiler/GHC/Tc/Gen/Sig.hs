@@ -56,8 +56,9 @@ import GHC.Core.TyCo.Rep( mkNakedFunTy )
 
 import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
-import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
+import GHC.Types.Id  ( Id, idName, idType, setIdPragmaInfo
                      , mkLocalId, realIdUnfolding )
+import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -74,7 +75,6 @@ import GHC.Data.Maybe( orElse, whenIsJust )
 
 import Data.Maybe( mapMaybe )
 import qualified Data.List.NonEmpty as NE
-import Control.Monad( unless )
 
 
 {- -------------------------------------------------------------
@@ -622,19 +622,60 @@ lhsBindArity _ env = env        -- PatBind/VarBind
 
 
 -----------------
+
+-- Potentially combine INLINEABLE/NOINLINE pragma combinations
+computePragmaInfo :: PragInfo -> [InlinePragma] -> Maybe PragInfo
+computePragmaInfo info [] = Just info
+computePragmaInfo info (prag:prags)
+  = case old_spec of
+    Inline{} -> Nothing
+    Inlinable{}
+      -- INLINEABLE + NOINLINE
+      | NoInline{} <- new_spec
+      , isDefaultActivationPragma old_prag
+      -> computePragmaInfo (mkPragInfo prag True) prags
+      | otherwise -> Nothing
+    NoInline{}
+      -- NOINLINE + INLINEABLE
+      | isInlinableSpec new_spec
+      , isDefaultActivationPragma prag
+      -> Just info{ pragHasInlineable = True }
+      | otherwise
+      -> Nothing
+    Opaque{} -> Nothing
+    NoUserInlinePrag ->
+      computePragmaInfo
+          (mkPragInfo prag (isInlinablePragma prag))
+          prags
+  where
+    old_prag = pragInfoInline $ info
+    old_spec = inl_inline old_prag
+    new_spec = inl_inline prag
+
+
+
+-----------------
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
-  | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
-       ; unless (null inls) (warn_multiple_inlines inl inls)
-       ; return (poly_id `setInlinePragma` prag) }
+  | inl@(L _ inl_prag) : inls <- inl_prags
+  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr inl_prag)
+       ; let  init_info = (mkPragInfo inl_prag $ isInlinablePragma inl_prag)
+              m_prag_info = computePragmaInfo
+                            init_info
+                            (map unLoc inls)
+
+       ; prag_info <- case m_prag_info of
+            Just info -> return info
+            Nothing -> do warn_multiple_inlines inl inls
+                          return init_info
+
+       ; return (poly_id `setIdPragmaInfo` prag_info) }
   | otherwise
   = return poly_id
   where
     inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
-
     warn_multiple_inlines inl1@(L loc prag1) (inl2@(L _ prag2) : inls)
        | inlinePragmaActivation prag1 == inlinePragmaActivation prag2
        , noUserInlineSpec (inlinePragmaSpec prag1)

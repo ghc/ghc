@@ -319,7 +319,7 @@ data IfaceRule
         ifRuleHead   :: IfExtName,      -- Head of lhs
         ifRuleArgs   :: [IfaceExpr],    -- Args of LHS
         ifRuleRhs    :: IfaceExpr,
-        ifRuleAuto   :: Bool,
+        ifRuleAuto   :: RuleSource,
         ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
 
@@ -357,6 +357,7 @@ data IfaceInfoItem
   | HsInline        InlinePragma
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
+  | HsInlineable                     -- Inlineable pragma
   | HsNoCafRefs
   | HsLFInfo        IfaceLFInfo
   | HsTagSig        TagSig
@@ -1515,6 +1516,7 @@ instance Outputable IfaceInfoItem where
                               <> ppWhen lb (text "(loop-breaker)")
                               <> colon <+> ppr unf
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
+  ppr (HsInlineable)        = text "HasInlineable:True"
   ppr (HsArity arity)       = text "Arity:" <+> int arity
   ppr (HsDmdSig str)        = text "Strictness:" <+> ppr str
   ppr (HsCprSig cpr)        = text "CPR:" <+> ppr cpr
@@ -2285,6 +2287,7 @@ instance Binary IfaceInfoItem where
     put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
     put_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
+    put_ bh (HsInlineable)        = putByte bh 9
 
     get bh = do
         h <- getByte bh
@@ -2298,7 +2301,9 @@ instance Binary IfaceInfoItem where
             4 -> return HsNoCafRefs
             6 -> HsCprSig <$> get bh
             7 -> HsLFInfo <$> get bh
-            _ -> HsTagSig <$> get bh
+            8 -> HsTagSig <$> get bh
+            9 -> pure HsInlineable
+            _ -> error "Binary:IfaceInfoItem - Invalid byte"
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s c g e) = do
@@ -2707,6 +2712,7 @@ instance NFData IfaceInfoItem where
     HsCprSig cpr -> cpr `seq` ()
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
     HsTagSig sig -> sig `seq` ()
+    HsInlineable -> ()
 
 instance NFData IfGuidance where
   rnf = \case

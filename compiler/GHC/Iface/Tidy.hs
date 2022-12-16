@@ -1240,7 +1240,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
         `setDmdSigInfo`      final_sig
         `setCprSigInfo`      final_cpr
         `setOccInfo`         robust_occ_info
-        `setInlinePragInfo`  inlinePragInfo idinfo
+        `setPragInfo`        prag_info
         `setUnfoldingInfo`   unfold_info
                 -- NB: we throw away the Rules
                 -- They have already been extracted by findExternalRules
@@ -1278,6 +1278,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
           Nothing            -> False
           Just (arity, _, _) -> not (isDeadEndAppSig id_sig arity)
 
+    prag_info = mkPragInfo (inlinePragInfo idinfo) (inlineableInfo idinfo)
     --------- Unfolding ------------
     -- Force unfold_info (hence bangs), otherwise the old unfolding
     -- is retained during code generation. See #22071
@@ -1292,6 +1293,8 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
      -- NB: use `orig_rhs` not `tidy_rhs` in this call to mkFinalUnfolding
      -- else you get a black hole (#22122). Reason: mkFinalUnfolding
      -- looks at IdInfo, and that is knot-tied in tidyTopBind (the Rec case)
+
+
 
     --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because

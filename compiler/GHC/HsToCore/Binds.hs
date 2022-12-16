@@ -60,6 +60,7 @@ import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
 import GHC.Tc.Types.Evidence
 
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -339,9 +340,9 @@ dsAbsBinds dflags tyvars dicts exports
                            -- The type checker put the inline pragma
                            -- on the *global* Id, so we need to transfer it
     inline_env
-      = mkVarEnv [ (lcl_id, setInlinePragma lcl_id prag)
+      = mkVarEnv [ (lcl_id, setIdPragmaInfo lcl_id prag)
                  | ABE { abe_mono = lcl_id, abe_poly = gbl_id } <- exports
-                 , let prag = idInlinePragma gbl_id ]
+                 , let prag = idPragmaInfo gbl_id ]
 
     global_env :: IdEnv Id -- Maps local Id to its global exported Id
     global_env =
@@ -393,14 +394,20 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | otherwise
   = case inlinePragmaSpec inline_prag of
           NoUserInlinePrag -> (gbl_id, rhs)
-          NoInline  {}     -> (gbl_id, rhs)
+          NoInline  {}
+            | keep_unf  -> (gbl_id `setIdUnfolding` inlinable_unf False, rhs)
+            | otherwise -> (gbl_id, rhs)
           Opaque    {}     -> (gbl_id, rhs)
-          Inlinable {}     -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inlinable {}     -> (gbl_id `setIdUnfolding` inlinable_unf True, rhs)
           Inline    {}     -> inline_pair
   where
     simpl_opts    = initSimpleOpts dflags
-    inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding simpl_opts StableUserSrc rhs
+    prag_info     = idPragmaInfo gbl_id
+    keep_unf      = pragHasInlineable prag_info
+    inline_prag   = pragInfoInline prag_info
+    inlinable_unf may_inline
+        | may_inline = mkInlinableUnfolding simpl_opts StableUserSrc rhs
+        | otherwise = mkInlinableUnfolding simpl_opts StableUserNoInlineSrc rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
@@ -715,10 +722,10 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              simpl_opts = initSimpleOpts dflags
              spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
              spec_id    = mkLocalId spec_name ManyTy spec_ty -- Specialised binding is toplevel, hence Many.
-                            `setInlinePragma` inl_prag
+                            `setIdPragmaInfo` spec_prag_info
                             `setIdUnfolding`  spec_unf
 
-             rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
+             rule = mkSpecRule dflags this_mod RuleSrcUser rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
                                (mkVarApps (Var spec_id) spec_bndrs)
              spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
@@ -742,7 +749,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise = pprPanic "dsImpSpecs" (ppr poly_id)
                             -- The type checker has checked that it *has* an unfolding
 
-    id_inl = idInlinePragma poly_id
+    id_pragInfo = idPragmaInfo poly_id
+    id_inl = pragInfoInline id_pragInfo
 
     -- See Note [Activation pragmas for SPECIALISE]
     inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
@@ -753,6 +761,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
      -- Get the INLINE pragma from SPECIALISE declaration, or,
      -- failing that, from the original Id
 
+    spec_prag_info = id_pragInfo { pragInfoInline = inl_prag }
     spec_prag_act = inlinePragmaActivation spec_inl
 
     -- See Note [Activation pragmas for SPECIALISE]
