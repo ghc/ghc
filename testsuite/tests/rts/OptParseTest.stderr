@@ -479,3 +479,744 @@ unknown RTS option: -Fd=
 
 (FAIL_TEST) input: -Fdblah
 unknown RTS option: -Fdblah
+
+(TEST) input: --debug-scheduler
+27: debug-scheduler Ds SAFE
+
+(TEST) input: -Ds
+27: debug-scheduler Ds SAFE
+
+(FAIL_TEST) input: -debug-scheduler=
+unknown RTS option: -debug-scheduler=
+
+(FAIL_TEST) input: --debug-scheduler=123G
+flag debug-scheduler given an argument when none was expected: --debug-scheduler=123G
+
+(FAIL_TEST) input: --debug-scheduler=false
+flag debug-scheduler given an argument when none was expected: --debug-scheduler=false
+
+(FAIL_TEST) input: --debug-scheduler=true
+flag debug-scheduler given an argument when none was expected: --debug-scheduler=true
+
+(FAIL_TEST) input: -Ds=
+unknown RTS option: -Ds=
+
+(FAIL_TEST) input: -Ds3621
+flag Ds given an argument when none was expected: -Ds3621
+
+(FAIL_TEST) input: -Ds=3622
+unknown RTS option: -Ds=3622
+
+(FAIL_TEST) input: -Ds=true
+unknown RTS option: -Ds=true
+
+(FAIL_TEST) input: -Ds=
+unknown RTS option: -Ds=
+
+(FAIL_TEST) input: -Ds3622
+flag Ds given an argument when none was expected: -Ds3622
+
+(FAIL_TEST) input: -Ds=3600
+unknown RTS option: -Ds=3600
+
+(TEST) input: --debug-interpreter
+28: debug-interpreter Di SAFE
+
+(TEST) input: -Di
+28: debug-interpreter Di SAFE
+
+(FAIL_TEST) input: -debug-interpreter=
+unknown RTS option: -debug-interpreter=
+
+(FAIL_TEST) input: --debug-interpreter=123G
+flag debug-interpreter given an argument when none was expected: --debug-interpreter=123G
+
+(FAIL_TEST) input: --debug-interpreter=false
+flag debug-interpreter given an argument when none was expected: --debug-interpreter=false
+
+(FAIL_TEST) input: --debug-interpreter=true
+flag debug-interpreter given an argument when none was expected: --debug-interpreter=true
+
+(FAIL_TEST) input: -Di=
+unknown RTS option: -Di=
+
+(FAIL_TEST) input: -Di3621
+flag Di given an argument when none was expected: -Di3621
+
+(FAIL_TEST) input: -Di=3622
+unknown RTS option: -Di=3622
+
+(FAIL_TEST) input: -Di=true
+unknown RTS option: -Di=true
+
+(FAIL_TEST) input: -Di=
+unknown RTS option: -Di=
+
+(FAIL_TEST) input: -Di3622
+flag Di given an argument when none was expected: -Di3622
+
+(FAIL_TEST) input: -Di=3600
+unknown RTS option: -Di=3600
+
+(TEST) input: --debug-weak
+29: debug-weak Dw SAFE
+
+(TEST) input: -Dw
+29: debug-weak Dw SAFE
+
+(FAIL_TEST) input: -debug-weak=
+unknown RTS option: -debug-weak=
+
+(FAIL_TEST) input: --debug-weak=123G
+flag debug-weak given an argument when none was expected: --debug-weak=123G
+
+(FAIL_TEST) input: --debug-weak=false
+flag debug-weak given an argument when none was expected: --debug-weak=false
+
+(FAIL_TEST) input: --debug-weak=true
+flag debug-weak given an argument when none was expected: --debug-weak=true
+
+(FAIL_TEST) input: -Dw=
+unknown RTS option: -Dw=
+
+(FAIL_TEST) input: -Dw3621
+flag Dw given an argument when none was expected: -Dw3621
+
+(FAIL_TEST) input: -Dw=3622
+unknown RTS option: -Dw=3622
+
+(FAIL_TEST) input: -Dw=true
+unknown RTS option: -Dw=true
+
+(FAIL_TEST) input: -Dw=
+unknown RTS option: -Dw=
+
+(FAIL_TEST) input: -Dw3622
+flag Dw given an argument when none was expected: -Dw3622
+
+(FAIL_TEST) input: -Dw=3600
+unknown RTS option: -Dw=3600
+
+(TEST) input: --debug-gccafs
+30: debug-gccafs DG SAFE
+
+(TEST) input: -DG
+30: debug-gccafs DG SAFE
+
+(FAIL_TEST) input: -debug-gccafs=
+unknown RTS option: -debug-gccafs=
+
+(FAIL_TEST) input: --debug-gccafs=123G
+flag debug-gccafs given an argument when none was expected: --debug-gccafs=123G
+
+(FAIL_TEST) input: --debug-gccafs=false
+flag debug-gccafs given an argument when none was expected: --debug-gccafs=false
+
+(FAIL_TEST) input: --debug-gccafs=true
+flag debug-gccafs given an argument when none was expected: --debug-gccafs=true
+
+(FAIL_TEST) input: -DG=
+unknown RTS option: -DG=
+
+(FAIL_TEST) input: -DG3621
+flag DG given an argument when none was expected: -DG3621
+
+(FAIL_TEST) input: -DG=3622
+unknown RTS option: -DG=3622
+
+(FAIL_TEST) input: -DG=true
+unknown RTS option: -DG=true
+
+(FAIL_TEST) input: -DG=
+unknown RTS option: -DG=
+
+(FAIL_TEST) input: -DG3622
+flag DG given an argument when none was expected: -DG3622
+
+(FAIL_TEST) input: -DG=3600
+unknown RTS option: -DG=3600
+
+(TEST) input: --debug-gc
+31: debug-gc Dg SAFE
+
+(TEST) input: -Dg
+31: debug-gc Dg SAFE
+
+(FAIL_TEST) input: -debug-gc=
+unknown RTS option: -debug-gc=
+
+(FAIL_TEST) input: --debug-gc=123G
+flag debug-gc given an argument when none was expected: --debug-gc=123G
+
+(FAIL_TEST) input: --debug-gc=false
+flag debug-gc given an argument when none was expected: --debug-gc=false
+
+(FAIL_TEST) input: --debug-gc=true
+flag debug-gc given an argument when none was expected: --debug-gc=true
+
+(FAIL_TEST) input: -Dg=
+unknown RTS option: -Dg=
+
+(FAIL_TEST) input: -Dg3621
+flag Dg given an argument when none was expected: -Dg3621
+
+(FAIL_TEST) input: -Dg=3622
+unknown RTS option: -Dg=3622
+
+(FAIL_TEST) input: -Dg=true
+unknown RTS option: -Dg=true
+
+(FAIL_TEST) input: -Dg=
+unknown RTS option: -Dg=
+
+(FAIL_TEST) input: -Dg3622
+flag Dg given an argument when none was expected: -Dg3622
+
+(FAIL_TEST) input: -Dg=3600
+unknown RTS option: -Dg=3600
+
+(TEST) input: --debug-nonmoving-gc
+32: debug-nonmoving-gc Dn SAFE
+
+(TEST) input: -Dn
+32: debug-nonmoving-gc Dn SAFE
+
+(FAIL_TEST) input: -debug-nonmoving-gc=
+unknown RTS option: -debug-nonmoving-gc=
+
+(FAIL_TEST) input: --debug-nonmoving-gc=123G
+flag debug-nonmoving-gc given an argument when none was expected: --debug-nonmoving-gc=123G
+
+(FAIL_TEST) input: --debug-nonmoving-gc=false
+flag debug-nonmoving-gc given an argument when none was expected: --debug-nonmoving-gc=false
+
+(FAIL_TEST) input: --debug-nonmoving-gc=true
+flag debug-nonmoving-gc given an argument when none was expected: --debug-nonmoving-gc=true
+
+(FAIL_TEST) input: -Dn=
+unknown RTS option: -Dn=
+
+(FAIL_TEST) input: -Dn3621
+flag Dn given an argument when none was expected: -Dn3621
+
+(FAIL_TEST) input: -Dn=3622
+unknown RTS option: -Dn=3622
+
+(FAIL_TEST) input: -Dn=true
+unknown RTS option: -Dn=true
+
+(FAIL_TEST) input: -Dn=
+unknown RTS option: -Dn=
+
+(FAIL_TEST) input: -Dn3622
+flag Dn given an argument when none was expected: -Dn3622
+
+(FAIL_TEST) input: -Dn=3600
+unknown RTS option: -Dn=3600
+
+(TEST) input: --debug-block-alloc
+33: debug-block-alloc Db SAFE
+
+(TEST) input: -Db
+33: debug-block-alloc Db SAFE
+
+(FAIL_TEST) input: -debug-block-alloc=
+unknown RTS option: -debug-block-alloc=
+
+(FAIL_TEST) input: --debug-block-alloc=123G
+flag debug-block-alloc given an argument when none was expected: --debug-block-alloc=123G
+
+(FAIL_TEST) input: --debug-block-alloc=false
+flag debug-block-alloc given an argument when none was expected: --debug-block-alloc=false
+
+(FAIL_TEST) input: --debug-block-alloc=true
+flag debug-block-alloc given an argument when none was expected: --debug-block-alloc=true
+
+(FAIL_TEST) input: -Db=
+unknown RTS option: -Db=
+
+(FAIL_TEST) input: -Db3621
+flag Db given an argument when none was expected: -Db3621
+
+(FAIL_TEST) input: -Db=3622
+unknown RTS option: -Db=3622
+
+(FAIL_TEST) input: -Db=true
+unknown RTS option: -Db=true
+
+(FAIL_TEST) input: -Db=
+unknown RTS option: -Db=
+
+(FAIL_TEST) input: -Db3622
+flag Db given an argument when none was expected: -Db3622
+
+(FAIL_TEST) input: -Db=3600
+unknown RTS option: -Db=3600
+
+(TEST) input: --debug-sanity
+34: debug-sanity DS SAFE
+
+(TEST) input: -DS
+34: debug-sanity DS SAFE
+
+(FAIL_TEST) input: -debug-sanity=
+unknown RTS option: -debug-sanity=
+
+(FAIL_TEST) input: --debug-sanity=123G
+flag debug-sanity given an argument when none was expected: --debug-sanity=123G
+
+(FAIL_TEST) input: --debug-sanity=false
+flag debug-sanity given an argument when none was expected: --debug-sanity=false
+
+(FAIL_TEST) input: --debug-sanity=true
+flag debug-sanity given an argument when none was expected: --debug-sanity=true
+
+(FAIL_TEST) input: -DS=
+unknown RTS option: -DS=
+
+(FAIL_TEST) input: -DS3621
+flag DS given an argument when none was expected: -DS3621
+
+(FAIL_TEST) input: -DS=3622
+unknown RTS option: -DS=3622
+
+(FAIL_TEST) input: -DS=true
+unknown RTS option: -DS=true
+
+(FAIL_TEST) input: -DS=
+unknown RTS option: -DS=
+
+(FAIL_TEST) input: -DS3622
+flag DS given an argument when none was expected: -DS3622
+
+(FAIL_TEST) input: -DS=3600
+unknown RTS option: -DS=3600
+
+(TEST) input: --debug-zero-on-gc
+35: debug-zero-on-gc DZ SAFE
+
+(TEST) input: -DZ
+35: debug-zero-on-gc DZ SAFE
+
+(FAIL_TEST) input: -debug-zero-on-gc=
+unknown RTS option: -debug-zero-on-gc=
+
+(FAIL_TEST) input: --debug-zero-on-gc=123G
+flag debug-zero-on-gc given an argument when none was expected: --debug-zero-on-gc=123G
+
+(FAIL_TEST) input: --debug-zero-on-gc=false
+flag debug-zero-on-gc given an argument when none was expected: --debug-zero-on-gc=false
+
+(FAIL_TEST) input: --debug-zero-on-gc=true
+flag debug-zero-on-gc given an argument when none was expected: --debug-zero-on-gc=true
+
+(FAIL_TEST) input: -DZ=
+unknown RTS option: -DZ=
+
+(FAIL_TEST) input: -DZ3621
+flag DZ given an argument when none was expected: -DZ3621
+
+(FAIL_TEST) input: -DZ=3622
+unknown RTS option: -DZ=3622
+
+(FAIL_TEST) input: -DZ=true
+unknown RTS option: -DZ=true
+
+(FAIL_TEST) input: -DZ=
+unknown RTS option: -DZ=
+
+(FAIL_TEST) input: -DZ3622
+flag DZ given an argument when none was expected: -DZ3622
+
+(FAIL_TEST) input: -DZ=3600
+unknown RTS option: -DZ=3600
+
+(TEST) input: --debug-stable
+36: debug-stable Dt SAFE
+
+(TEST) input: -Dt
+36: debug-stable Dt SAFE
+
+(FAIL_TEST) input: -debug-stable=
+unknown RTS option: -debug-stable=
+
+(FAIL_TEST) input: --debug-stable=123G
+flag debug-stable given an argument when none was expected: --debug-stable=123G
+
+(FAIL_TEST) input: --debug-stable=false
+flag debug-stable given an argument when none was expected: --debug-stable=false
+
+(FAIL_TEST) input: --debug-stable=true
+flag debug-stable given an argument when none was expected: --debug-stable=true
+
+(FAIL_TEST) input: -Dt=
+unknown RTS option: -Dt=
+
+(FAIL_TEST) input: -Dt3621
+flag Dt given an argument when none was expected: -Dt3621
+
+(FAIL_TEST) input: -Dt=3622
+unknown RTS option: -Dt=3622
+
+(FAIL_TEST) input: -Dt=true
+unknown RTS option: -Dt=true
+
+(FAIL_TEST) input: -Dt=
+unknown RTS option: -Dt=
+
+(FAIL_TEST) input: -Dt3622
+flag Dt given an argument when none was expected: -Dt3622
+
+(FAIL_TEST) input: -Dt=3600
+unknown RTS option: -Dt=3600
+
+(TEST) input: --debug-prof
+37: debug-prof Dp SAFE
+
+(TEST) input: -Dp
+37: debug-prof Dp SAFE
+
+(FAIL_TEST) input: -debug-prof=
+unknown RTS option: -debug-prof=
+
+(FAIL_TEST) input: --debug-prof=123G
+flag debug-prof given an argument when none was expected: --debug-prof=123G
+
+(FAIL_TEST) input: --debug-prof=false
+flag debug-prof given an argument when none was expected: --debug-prof=false
+
+(FAIL_TEST) input: --debug-prof=true
+flag debug-prof given an argument when none was expected: --debug-prof=true
+
+(FAIL_TEST) input: -Dp=
+unknown RTS option: -Dp=
+
+(FAIL_TEST) input: -Dp3621
+flag Dp given an argument when none was expected: -Dp3621
+
+(FAIL_TEST) input: -Dp=3622
+unknown RTS option: -Dp=3622
+
+(FAIL_TEST) input: -Dp=true
+unknown RTS option: -Dp=true
+
+(FAIL_TEST) input: -Dp=
+unknown RTS option: -Dp=
+
+(FAIL_TEST) input: -Dp3622
+flag Dp given an argument when none was expected: -Dp3622
+
+(FAIL_TEST) input: -Dp=3600
+unknown RTS option: -Dp=3600
+
+(TEST) input: --debug-linker
+38: debug-linker Dl SAFE
+
+(TEST) input: -Dl
+38: debug-linker Dl SAFE
+
+(FAIL_TEST) input: -debug-linker=
+unknown RTS option: -debug-linker=
+
+(FAIL_TEST) input: --debug-linker=123G
+flag debug-linker given an argument when none was expected: --debug-linker=123G
+
+(FAIL_TEST) input: --debug-linker=false
+flag debug-linker given an argument when none was expected: --debug-linker=false
+
+(FAIL_TEST) input: --debug-linker=true
+flag debug-linker given an argument when none was expected: --debug-linker=true
+
+(FAIL_TEST) input: -Dl=
+unknown RTS option: -Dl=
+
+(FAIL_TEST) input: -Dl3621
+flag Dl given an argument when none was expected: -Dl3621
+
+(FAIL_TEST) input: -Dl=3622
+unknown RTS option: -Dl=3622
+
+(FAIL_TEST) input: -Dl=true
+unknown RTS option: -Dl=true
+
+(FAIL_TEST) input: -Dl=
+unknown RTS option: -Dl=
+
+(FAIL_TEST) input: -Dl3622
+flag Dl given an argument when none was expected: -Dl3622
+
+(FAIL_TEST) input: -Dl=3600
+unknown RTS option: -Dl=3600
+
+(TEST) input: --debug-linker-verbose
+39: debug-linker-verbose DL SAFE
+
+(TEST) input: -DL
+39: debug-linker-verbose DL SAFE
+
+(FAIL_TEST) input: -debug-linker-verbose=
+unknown RTS option: -debug-linker-verbose=
+
+(FAIL_TEST) input: --debug-linker-verbose=123G
+flag debug-linker-verbose given an argument when none was expected: --debug-linker-verbose=123G
+
+(FAIL_TEST) input: --debug-linker-verbose=false
+flag debug-linker-verbose given an argument when none was expected: --debug-linker-verbose=false
+
+(FAIL_TEST) input: --debug-linker-verbose=true
+flag debug-linker-verbose given an argument when none was expected: --debug-linker-verbose=true
+
+(FAIL_TEST) input: -DL=
+unknown RTS option: -DL=
+
+(FAIL_TEST) input: -DL3621
+flag DL given an argument when none was expected: -DL3621
+
+(FAIL_TEST) input: -DL=3622
+unknown RTS option: -DL=3622
+
+(FAIL_TEST) input: -DL=true
+unknown RTS option: -DL=true
+
+(FAIL_TEST) input: -DL=
+unknown RTS option: -DL=
+
+(FAIL_TEST) input: -DL3622
+flag DL given an argument when none was expected: -DL3622
+
+(FAIL_TEST) input: -DL=3600
+unknown RTS option: -DL=3600
+
+(TEST) input: --debug-apply
+40: debug-apply Da SAFE
+
+(TEST) input: -Da
+40: debug-apply Da SAFE
+
+(FAIL_TEST) input: -debug-apply=
+unknown RTS option: -debug-apply=
+
+(FAIL_TEST) input: --debug-apply=123G
+flag debug-apply given an argument when none was expected: --debug-apply=123G
+
+(FAIL_TEST) input: --debug-apply=false
+flag debug-apply given an argument when none was expected: --debug-apply=false
+
+(FAIL_TEST) input: --debug-apply=true
+flag debug-apply given an argument when none was expected: --debug-apply=true
+
+(FAIL_TEST) input: -Da=
+unknown RTS option: -Da=
+
+(FAIL_TEST) input: -Da3621
+flag Da given an argument when none was expected: -Da3621
+
+(FAIL_TEST) input: -Da=3622
+unknown RTS option: -Da=3622
+
+(FAIL_TEST) input: -Da=true
+unknown RTS option: -Da=true
+
+(FAIL_TEST) input: -Da=
+unknown RTS option: -Da=
+
+(FAIL_TEST) input: -Da3622
+flag Da given an argument when none was expected: -Da3622
+
+(FAIL_TEST) input: -Da=3600
+unknown RTS option: -Da=3600
+
+(TEST) input: --debug-stm
+41: debug-stm Dm SAFE
+
+(TEST) input: -Dm
+41: debug-stm Dm SAFE
+
+(FAIL_TEST) input: -debug-stm=
+unknown RTS option: -debug-stm=
+
+(FAIL_TEST) input: --debug-stm=123G
+flag debug-stm given an argument when none was expected: --debug-stm=123G
+
+(FAIL_TEST) input: --debug-stm=false
+flag debug-stm given an argument when none was expected: --debug-stm=false
+
+(FAIL_TEST) input: --debug-stm=true
+flag debug-stm given an argument when none was expected: --debug-stm=true
+
+(FAIL_TEST) input: -Dm=
+unknown RTS option: -Dm=
+
+(FAIL_TEST) input: -Dm3621
+flag Dm given an argument when none was expected: -Dm3621
+
+(FAIL_TEST) input: -Dm=3622
+unknown RTS option: -Dm=3622
+
+(FAIL_TEST) input: -Dm=true
+unknown RTS option: -Dm=true
+
+(FAIL_TEST) input: -Dm=
+unknown RTS option: -Dm=
+
+(FAIL_TEST) input: -Dm3622
+flag Dm given an argument when none was expected: -Dm3622
+
+(FAIL_TEST) input: -Dm=3600
+unknown RTS option: -Dm=3600
+
+(TEST) input: --debug-squeeze
+42: debug-squeeze Dz SAFE
+
+(TEST) input: -Dz
+42: debug-squeeze Dz SAFE
+
+(FAIL_TEST) input: -debug-squeeze=
+unknown RTS option: -debug-squeeze=
+
+(FAIL_TEST) input: --debug-squeeze=123G
+flag debug-squeeze given an argument when none was expected: --debug-squeeze=123G
+
+(FAIL_TEST) input: --debug-squeeze=false
+flag debug-squeeze given an argument when none was expected: --debug-squeeze=false
+
+(FAIL_TEST) input: --debug-squeeze=true
+flag debug-squeeze given an argument when none was expected: --debug-squeeze=true
+
+(FAIL_TEST) input: -Dz=
+unknown RTS option: -Dz=
+
+(FAIL_TEST) input: -Dz3621
+flag Dz given an argument when none was expected: -Dz3621
+
+(FAIL_TEST) input: -Dz=3622
+unknown RTS option: -Dz=3622
+
+(FAIL_TEST) input: -Dz=true
+unknown RTS option: -Dz=true
+
+(FAIL_TEST) input: -Dz=
+unknown RTS option: -Dz=
+
+(FAIL_TEST) input: -Dz3622
+flag Dz given an argument when none was expected: -Dz3622
+
+(FAIL_TEST) input: -Dz=3600
+unknown RTS option: -Dz=3600
+
+(TEST) input: --debug-hpc
+43: debug-hpc Dc SAFE
+
+(TEST) input: -Dc
+43: debug-hpc Dc SAFE
+
+(FAIL_TEST) input: -debug-hpc=
+unknown RTS option: -debug-hpc=
+
+(FAIL_TEST) input: --debug-hpc=123G
+flag debug-hpc given an argument when none was expected: --debug-hpc=123G
+
+(FAIL_TEST) input: --debug-hpc=false
+flag debug-hpc given an argument when none was expected: --debug-hpc=false
+
+(FAIL_TEST) input: --debug-hpc=true
+flag debug-hpc given an argument when none was expected: --debug-hpc=true
+
+(FAIL_TEST) input: -Dc=
+unknown RTS option: -Dc=
+
+(FAIL_TEST) input: -Dc3621
+flag Dc given an argument when none was expected: -Dc3621
+
+(FAIL_TEST) input: -Dc=3622
+unknown RTS option: -Dc=3622
+
+(FAIL_TEST) input: -Dc=true
+unknown RTS option: -Dc=true
+
+(FAIL_TEST) input: -Dc=
+unknown RTS option: -Dc=
+
+(FAIL_TEST) input: -Dc3622
+flag Dc given an argument when none was expected: -Dc3622
+
+(FAIL_TEST) input: -Dc=3600
+unknown RTS option: -Dc=3600
+
+(TEST) input: --debug-sparks
+44: debug-sparks Dr SAFE
+
+(TEST) input: -Dr
+44: debug-sparks Dr SAFE
+
+(FAIL_TEST) input: -debug-sparks=
+unknown RTS option: -debug-sparks=
+
+(FAIL_TEST) input: --debug-sparks=123G
+flag debug-sparks given an argument when none was expected: --debug-sparks=123G
+
+(FAIL_TEST) input: --debug-sparks=false
+flag debug-sparks given an argument when none was expected: --debug-sparks=false
+
+(FAIL_TEST) input: --debug-sparks=true
+flag debug-sparks given an argument when none was expected: --debug-sparks=true
+
+(FAIL_TEST) input: -Dr=
+unknown RTS option: -Dr=
+
+(FAIL_TEST) input: -Dr3621
+flag Dr given an argument when none was expected: -Dr3621
+
+(FAIL_TEST) input: -Dr=3622
+unknown RTS option: -Dr=3622
+
+(FAIL_TEST) input: -Dr=true
+unknown RTS option: -Dr=true
+
+(FAIL_TEST) input: -Dr=
+unknown RTS option: -Dr=
+
+(FAIL_TEST) input: -Dr3622
+flag Dr given an argument when none was expected: -Dr3622
+
+(FAIL_TEST) input: -Dr=3600
+unknown RTS option: -Dr=3600
+
+(TEST) input: --debug-compact
+45: debug-compact DC SAFE
+
+(TEST) input: -DC
+45: debug-compact DC SAFE
+
+(FAIL_TEST) input: -debug-compact=
+unknown RTS option: -debug-compact=
+
+(FAIL_TEST) input: --debug-compact=123G
+flag debug-compact given an argument when none was expected: --debug-compact=123G
+
+(FAIL_TEST) input: --debug-compact=false
+flag debug-compact given an argument when none was expected: --debug-compact=false
+
+(FAIL_TEST) input: --debug-compact=true
+flag debug-compact given an argument when none was expected: --debug-compact=true
+
+(FAIL_TEST) input: -DC=
+unknown RTS option: -DC=
+
+(FAIL_TEST) input: -DC3621
+flag DC given an argument when none was expected: -DC3621
+
+(FAIL_TEST) input: -DC=3622
+unknown RTS option: -DC=3622
+
+(FAIL_TEST) input: -DC=true
+unknown RTS option: -DC=true
+
+(FAIL_TEST) input: -DC=
+unknown RTS option: -DC=
+
+(FAIL_TEST) input: -DC3622
+flag DC given an argument when none was expected: -DC3622
+
+(FAIL_TEST) input: -DC=3600
+unknown RTS option: -DC=3600

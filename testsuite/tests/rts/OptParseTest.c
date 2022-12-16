@@ -55,6 +55,42 @@ static void _FAIL_TEST(char* flagToTest) {
     ERROR = false;
 }
 
+static void _VOID_FLAG_TEST(const RtsFlagKey i)
+{
+     RtsFlagName name = rtsFlags[i];
+     char buffer[100];
+     snprintf(buffer, sizeof(buffer), "--%s", name.longName);
+    _TEST( buffer, i
+        , name.longName, name.shortName
+        , name.valueType, SAFE, NO_VAL(i));
+    snprintf(buffer, sizeof(buffer), "-%s", name.shortName);
+    _TEST( buffer, i
+        , name.longName, name.shortName
+        , name.valueType, SAFE, NO_VAL(i));
+    snprintf(buffer, sizeof(buffer), "-%s=", name.longName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "--%s=123G", name.longName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "--%s=false", name.longName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "--%s=true", name.longName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s=", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s3621", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s=3622", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s=true", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s=", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s3622", name.shortName);
+    _FAIL_TEST(buffer);
+    snprintf(buffer, sizeof(buffer), "-%s=3600", name.shortName);
+    _FAIL_TEST(buffer);
+}
+
 int main (int argc, char *argv[])
 {
 
@@ -385,6 +421,26 @@ int main (int argc, char *argv[])
     _FAIL_TEST("-Fd");
     _FAIL_TEST("-Fd=");
     _FAIL_TEST("-Fdblah");
+
+    _VOID_FLAG_TEST(DEBUG_SCHEDULER);
+    _VOID_FLAG_TEST(DEBUG_INTERPRETER);
+    _VOID_FLAG_TEST(DEBUG_WEAK);
+    _VOID_FLAG_TEST(DEBUG_GCCAFS);
+    _VOID_FLAG_TEST(DEBUG_GC);
+    _VOID_FLAG_TEST(DEBUG_NONMOVING_GC);
+    _VOID_FLAG_TEST(DEBUG_BLOCK_ALLOC);
+    _VOID_FLAG_TEST(DEBUG_SANITY);
+    _VOID_FLAG_TEST(DEBUG_ZERO_IN_GC);
+    _VOID_FLAG_TEST(DEBUG_STABLE);
+    _VOID_FLAG_TEST(DEBUG_PROF);
+    _VOID_FLAG_TEST(DEBUG_LINKER);
+    _VOID_FLAG_TEST(DEBUG_LINKER_VERBOSE);
+    _VOID_FLAG_TEST(DEBUG_APPLY);
+    _VOID_FLAG_TEST(DEBUG_STM);
+    _VOID_FLAG_TEST(DEBUG_SQUEEZE);
+    _VOID_FLAG_TEST(DEBUG_HPC);
+    _VOID_FLAG_TEST(DEBUG_SPARKS);
+    _VOID_FLAG_TEST(DEBUG_COMPACT);
 
     printf("\n=== OptParseTest END ===\n");
     return 0;

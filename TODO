@@ -5,3 +5,10 @@ improved error: 'no value' error
 question about casting StgWord64 to StgWord
 perhaps move additional arithmetic manipulations out of `parseArg`
 print out flag 'tail' in some error messages
+can we reuse STGWORD64 for DOUBLE? Just need to cast where we update RtsFlags state
+also consider using all VOID ones as BOOLs
+implement DEBUG_BUILD_ONLY
+generalize void flag tests: VOID_FLAG_TEST
+TODO: generate usage_text contents from rtsFlags
+repurpose other tests into more compact, type-tests
+implement the "program requires to be built with 'x' flag" hook

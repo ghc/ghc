@@ -288,4 +288,118 @@
 26: return-decay-factor Fd UNSAFE
 	value: 188.000000
 
+(TEST) input: --debug-scheduler
+27: debug-scheduler Ds SAFE
+
+(TEST) input: -Ds
+27: debug-scheduler Ds SAFE
+
+(TEST) input: --debug-interpreter
+28: debug-interpreter Di SAFE
+
+(TEST) input: -Di
+28: debug-interpreter Di SAFE
+
+(TEST) input: --debug-weak
+29: debug-weak Dw SAFE
+
+(TEST) input: -Dw
+29: debug-weak Dw SAFE
+
+(TEST) input: --debug-gccafs
+30: debug-gccafs DG SAFE
+
+(TEST) input: -DG
+30: debug-gccafs DG SAFE
+
+(TEST) input: --debug-gc
+31: debug-gc Dg SAFE
+
+(TEST) input: -Dg
+31: debug-gc Dg SAFE
+
+(TEST) input: --debug-nonmoving-gc
+32: debug-nonmoving-gc Dn SAFE
+
+(TEST) input: -Dn
+32: debug-nonmoving-gc Dn SAFE
+
+(TEST) input: --debug-block-alloc
+33: debug-block-alloc Db SAFE
+
+(TEST) input: -Db
+33: debug-block-alloc Db SAFE
+
+(TEST) input: --debug-sanity
+34: debug-sanity DS SAFE
+
+(TEST) input: -DS
+34: debug-sanity DS SAFE
+
+(TEST) input: --debug-zero-on-gc
+35: debug-zero-on-gc DZ SAFE
+
+(TEST) input: -DZ
+35: debug-zero-on-gc DZ SAFE
+
+(TEST) input: --debug-stable
+36: debug-stable Dt SAFE
+
+(TEST) input: -Dt
+36: debug-stable Dt SAFE
+
+(TEST) input: --debug-prof
+37: debug-prof Dp SAFE
+
+(TEST) input: -Dp
+37: debug-prof Dp SAFE
+
+(TEST) input: --debug-linker
+38: debug-linker Dl SAFE
+
+(TEST) input: -Dl
+38: debug-linker Dl SAFE
+
+(TEST) input: --debug-linker-verbose
+39: debug-linker-verbose DL SAFE
+
+(TEST) input: -DL
+39: debug-linker-verbose DL SAFE
+
+(TEST) input: --debug-apply
+40: debug-apply Da SAFE
+
+(TEST) input: -Da
+40: debug-apply Da SAFE
+
+(TEST) input: --debug-stm
+41: debug-stm Dm SAFE
+
+(TEST) input: -Dm
+41: debug-stm Dm SAFE
+
+(TEST) input: --debug-squeeze
+42: debug-squeeze Dz SAFE
+
+(TEST) input: -Dz
+42: debug-squeeze Dz SAFE
+
+(TEST) input: --debug-hpc
+43: debug-hpc Dc SAFE
+
+(TEST) input: -Dc
+43: debug-hpc Dc SAFE
+
+(TEST) input: --debug-sparks
+44: debug-sparks Dr SAFE
+
+(TEST) input: -Dr
+44: debug-sparks Dr SAFE
+
+(TEST) input: --debug-compact
+45: debug-compact DC SAFE
+
+(TEST) input: -DC
+45: debug-compact DC SAFE
+
 === OptParseTest END ===
