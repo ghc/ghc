@@ -60,6 +60,8 @@
   * Add `Data.Typeable.heqT`, a kind-heterogeneous version of `Data.Typeable.eqT`.
   * Add `Data.List.!?` per
     [CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110).
+  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
+    types significantly.
 
 ## 4.17.0.0 *August 2022*
 

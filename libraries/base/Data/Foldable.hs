@@ -1363,7 +1363,9 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
       Just x -> case cmp x y of
         GT -> x
         _ -> y
-{-# INLINEABLE maximumBy #-}
+-- #22609 showed that maximumBy is too large to reliably inline,
+-- See Note [maximumBy/minimumBy INLINE pragma]
+{-# INLINE[2] maximumBy #-}
 
 -- | The least element of a non-empty structure with respect to the
 -- given comparison function.
@@ -1378,6 +1380,7 @@ maximumBy cmp = fromMaybe (errorWithoutStackTrace "maximumBy: empty structure")
 -- WARNING: This function is partial for possibly-empty structures like lists.
 
 -- See Note [maximumBy/minimumBy space usage]
+-- See Note [maximumBy/minimumBy INLINE pragma]
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
 minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
   . foldl' min' Nothing
@@ -1387,7 +1390,9 @@ minimumBy cmp = fromMaybe (errorWithoutStackTrace "minimumBy: empty structure")
       Just x -> case cmp x y of
         GT -> y
         _ -> x
-{-# INLINEABLE minimumBy #-}
+-- See Note [maximumBy/minimumBy INLINE pragma]
+{-# INLINE[2] minimumBy #-}
+
 
 -- | 'notElem' is the negation of 'elem'.
 --
@@ -1525,6 +1530,31 @@ minimumBy to foldl1 solves the issue, assuming GHC's strictness analysis can the
 make these functions only use O(1) stack space.  As of base 4.16, we have
 switched to employing foldl' over foldl1, not relying on GHC's optimiser.  See
 https://gitlab.haskell.org/ghc/ghc/-/issues/17867 for more context.
+
+Note [maximumBy/minimumBy INLINE pragma]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently maximumBy/minimumBy wrap the accumulator into Maybe to deal with the
+empty case. Commonly one would just pass in a bottom default value alas this is
+not easily done here if we want to remain strict in the accumulator.
+See #17867 for why we want to be strict in the accumulator here.
+
+For optimal code we want the Maybe to optimize away and the accumulator to be
+unpacked if possible. For this to happen we need:
+* SpecConstr to eliminate the Maybe
+* W/W to unpack the accumulator
+This only happens if we compile the RHS with -O2 at a specific type.
+There are two ways to achieve this: Using a SPECIALIZE pragma inside base for a
+blessed set of types since we know base will be compiled using -O2.
+Or using INLINE and counting at call sites to be compiled with -O2.
+
+
+We've chosen to use INLINE as this guarantees optimal code at -O2 no matter what
+element type is used. However this comes at the cost of less optimal code when
+the call site is using -O as SpecConstr won't fire, preventing W/W from firing
+as well. See #22609 and the discussion in !9565.
+Sadly we can't use both SPECIALIZE and INLINE. This would result in the RHS being
+inlined before the specialization rule fires. Giving the same result as if we had
+only used INLINE.
 -}
 
 {-
