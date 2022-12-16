@@ -24,6 +24,7 @@ import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
+-- import GHC.Core.Ppr
 import GHC.Core.Make      ( mkLitRubbish )
 import GHC.Core.Unify     ( tcMatchTy )
 import GHC.Core.Rules
@@ -715,7 +716,7 @@ specialisation (see canSpecImport):
 
 (2) Without -fspecialise-aggressively, specialise only imported things
     that have a /user-supplied/ INLINE or INLINABLE pragma (hence
-    isAnyInlinePragma rather than isStableSource).
+    isAnyInlinePragma || idHasInlineable rather than isStableSource).
 
     In particular, we don't want to specialise workers created by
     worker/wrapper (for functions with no pragma) because they won't
@@ -791,7 +792,8 @@ spec_import :: SpecEnv               -- Passed in so that all top-level Ids are 
                      , [CoreBind] )  -- Specialised bindings
 spec_import env callers dict_binds cis@(CIS fn _)
   | isIn "specImport" fn callers
-  = return (env, [], [])  -- No warning.  This actually happens all the time
+  = -- pprTrace "spec_import.1" (ppr (fn,callers)) $
+    return (env, [], [])  -- No warning.  This actually happens all the time
                           -- when specialising a recursive function, because
                           -- the RHS of the specialised function contains a recursive
                           -- call to the original function
@@ -799,7 +801,9 @@ spec_import env callers dict_binds cis@(CIS fn _)
   | null good_calls
   = return (env, [], [])
 
-  | Just rhs <- canSpecImport dflags fn
+  | r <- canSpecImport dflags fn
+  -- , pprTrace "canSpecImport.2" (ppr (fn, r)) True
+  , Just rhs <- r
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
@@ -850,8 +854,9 @@ canSpecImport dflags fn
               -- have dict args; there is no benefit.
 
   | CoreUnfolding { uf_tmpl = rhs } <- unf
+  -- , pprTrace "canSpecImport" (ppr (fn, idHasInlineable fn, unf)) True
     -- CoreUnfolding: see Note [Specialising imported functions] point (1).
-  , isAnyInlinePragma (idInlinePragma fn)
+  , isAnyInlinePragma (idInlinePragma fn) || idHasInlineable fn
     -- See Note [Specialising imported functions] point (2).
   = Just rhs
 
@@ -880,7 +885,9 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
   | wopt Opt_WarnAllMissedSpecs dflags    = doWarn $ WarningWithFlag Opt_WarnAllMissedSpecs
   | otherwise                             = return ()
   where
-    allCallersInlined = all (isAnyInlinePragma . idInlinePragma) callers
+    allCallersInlined = all (\caller -> isAnyInlinePragma (idInlinePragma caller) ||
+                                        idHasInlineable caller)
+                            callers
     diag_opts = initDiagOpts dflags
     doWarn reason =
       msg (mkMCDiagnostic diag_opts reason Nothing)
@@ -1155,6 +1162,13 @@ specVar env@(SE { se_subst = Core.Subst in_scope ids _ _ }) v
 specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
+-- specExpr env e
+--   | pprTrace "specExpr" (
+--       ppr e
+--       -- ppr env
+--       )
+--     False
+--   = undefined
 specExpr env (Var v)       = specVar env v
 specExpr env (Type ty)     = return (Type     (substTy env ty), emptyUDs)
 specExpr env (Coercion co) = return (Coercion (substCo env co), emptyUDs)
@@ -1597,18 +1611,16 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
   |  notNull calls_for_me               -- And there are some calls to specialise
-  && not (isNeverActive (idInlineActivation fn))
-        -- Don't specialise NOINLINE things
-        -- See Note [Auto-specialisation and RULES]
-        --
-        -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
-        -- Since OPAQUE things are always never-active (see
-        -- GHC.Parser.PostProcess.mkOpaquePragma) this guard never fires for
-        -- OPAQUE things.
-
---   && not (certainlyWillInline (idUnfolding fn))      -- And it's not small
---      See Note [Inline specialisations] for why we do not
---      switch off specialisation for inline functions
+  ,  not (isNeverActive inl_act)
+  || idHasInlineable fn -- Explicit INLINEABLE pragma
+  || gopt Opt_SpecialiseAggressively dflags -- -fspecialise-aggressively
+  , not (isOpaquePragma inl_prag)
+  -- Don't specialise NOINLINE things by default.
+  -- See Note [Auto-specialisation and RULES]
+  --
+  -- Don't specialise OPAQUE things, see Note [OPAQUE pragma].
+  -- We specialise even INLINE functions. See Note [Inline specialisations] for
+  -- why we do notswitch off specialisation for inline functions.
 
   = -- pprTrace "specCalls: some" (ppr fn $$ ppr calls_for_me $$ ppr existing_rules) $
     foldlM spec_call ([], [], emptyUDs) calls_for_me
@@ -1670,19 +1682,19 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env_with_dict_bndrs
                                                                rhs_bndrs all_call_args
 
---           ; pprTrace "spec_call" (vcat [ text "fun:       "  <+> ppr fn
---                                        , text "call info: "  <+> ppr _ci
---                                        , text "useful:    "  <+> ppr useful
---                                        , text "rule_bndrs:"  <+> ppr rule_bndrs
---                                        , text "lhs_args:  "  <+> ppr rule_lhs_args
---                                        , text "spec_bndrs1:" <+> ppr spec_bndrs1
---                                        , text "leftover_bndrs:" <+> pprIds leftover_bndrs
---                                        , text "spec_args: "  <+> ppr spec_args
---                                        , text "dx_binds:  "  <+> ppr dx_binds
---                                        , text "rhs_body"     <+> ppr rhs_body
---                                        , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
---                                        , ppr dx_binds ]) $
---             return ()
+          -- ; pprTrace "spec_call" (vcat [ text "fun:       "  <+> ppr fn
+          --                              , text "call info: "  <+> ppr _ci
+          --                              , text "useful:    "  <+> ppr useful
+          --                              , text "rule_bndrs:"  <+> ppr rule_bndrs
+          --                              , text "lhs_args:  "  <+> ppr rule_lhs_args
+          --                              , text "spec_bndrs1:" <+> ppr spec_bndrs1
+          --                              , text "leftover_bndrs:" <+> pprIds leftover_bndrs
+          --                              , text "spec_args: "  <+> ppr spec_args
+          --                              , text "dx_binds:  "  <+> ppr dx_binds
+          --                              , text "rhs_body"     <+> ppr rhs_body
+          --                              , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
+          --                              , ppr dx_binds ]) $
+          --   return ()
 
            ; if not useful  -- No useful specialisation
                 || already_covered rhs_env2 rules_acc rule_lhs_args
@@ -1729,7 +1741,11 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                        | otherwise = -- Specialising local fn
                                      text "SPEC"
 
-                spec_rule = mkSpecRule dflags this_mod True inl_act
+                spec_act
+                  | isNeverActive (idInlineActivation fn) = activeAfter FinalPhase
+                  | otherwise = inl_act
+
+                spec_rule = mkSpecRule dflags this_mod RuleSrcAuto spec_act
                                     herald fn rule_bndrs rule_lhs_args
                                     (mkVarApps (Var spec_fn) spec_bndrs)
 
@@ -2276,7 +2292,8 @@ should jolly well do anyway, even aside from specialisation, to ensure
 that g doesn't inline too early.
 
 This in turn means that the RULE would never fire for a NOINLINE
-thing so not much point in generating a specialisation at all.
+thing. So in the presence of a NOINLINE pragma we set the rules activation
+to FinalPhase instead.
 
 Note [Specialisation shape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

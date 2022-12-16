@@ -761,6 +761,7 @@ addExternal opts id
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isDeadEndSig (dmdSigInfo idinfo)
+    inlineable     = inlineableInfo idinfo
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -773,6 +774,8 @@ addExternal opts id
 
        || isStableSource src     -- Always expose things whose
                                  -- source is an inline rule
+
+       || inlineable
 
        || not dont_inline
        where
@@ -1240,7 +1243,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
         `setDmdSigInfo`      final_sig
         `setCprSigInfo`      final_cpr
         `setOccInfo`         robust_occ_info
-        `setInlinePragInfo`  inlinePragInfo idinfo
+        `setPragInfo`        pragInfo idinfo
         `setUnfoldingInfo`   unfold_info
                 -- NB: we throw away the Rules
                 -- They have already been extracted by findExternalRules

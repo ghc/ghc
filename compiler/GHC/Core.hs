@@ -1134,7 +1134,8 @@ data CoreRule
                                         -- See Note [OccInfo in unfoldings and rules]
 
         -- Locality
-        ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
+        ru_auto :: RuleSource,
+                           -- ^ @True@  <=> this rule is auto-generated
                            --               (notably by Specialise or SpecConstr)
                            --   @False@ <=> generated at the user's behest
                            -- See Note [Trimming auto-rules] in "GHC.Iface.Tidy"
@@ -1187,7 +1188,10 @@ isBuiltinRule _                = False
 
 isAutoRule :: CoreRule -> Bool
 isAutoRule (BuiltinRule {}) = False
-isAutoRule (Rule { ru_auto = is_auto }) = is_auto
+isAutoRule (Rule { ru_auto = is_auto }) =
+  case is_auto of
+    RuleSrcAuto -> True
+    RuleSrcUser -> False
 
 -- | The number of arguments the 'ru_fn' must be applied
 -- to before the rule can match on it
@@ -1273,7 +1277,7 @@ data Unfolding
   | CoreUnfolding {             -- An unfolding for an Id with no pragma,
                                 -- or perhaps a NOINLINE pragma
                                 -- (For NOINLINE, the phase, if any, is in the
-                                -- InlinePragInfo for this Id.)
+                                -- PragInfo for this Id.)
         uf_tmpl       :: CoreExpr,        -- Template; occurrence info is correct
         uf_src        :: UnfoldingSource, -- Where the unfolding came from
         uf_is_top     :: Bool,          -- True <=> top level binding
@@ -1340,7 +1344,7 @@ data UnfoldingGuidance
     }                     -- a context (case (thing args) of ...),
                           -- (where there are the right number of arguments.)
 
-  | UnfNever        -- The RHS is big, so don't inline it
+  | UnfNever        -- The RHS is big or marked NOINLINE so don't inline it
   deriving (Eq)
 
 {- Note [UnfoldingCache]

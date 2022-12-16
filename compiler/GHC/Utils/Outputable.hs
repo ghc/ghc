@@ -756,8 +756,11 @@ lambda     = unicodeSyntax (char 'λ') (char '\\')
 
 semi, comma, colon, equals, space, underscore, dot, vbar :: IsLine doc => doc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace :: IsLine doc => doc
+-- | ;
 semi       = char ';'
+-- | ,
 comma      = char ','
+-- | :
 colon      = char ':'
 equals     = char '='
 space      = char ' '

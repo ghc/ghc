@@ -14,7 +14,7 @@ import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
-                        , isJoinId, isJoinId_maybe, idUnfolding )
+                        , isJoinId, isJoinId_maybe, idUnfolding, idHasInlineable )
 import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )
@@ -225,7 +225,7 @@ is small).  The conclusion here is this:
   really was <rhs>.
 
 An exception to the rule is when the INLINE pragma is not from the user, e.g. from
-WorkWrap (see Note [Wrapper activation]). We can tell because noUserInlineSpec
+WorkWrap (see Note [Wrapper activation]). We can tell because isNoUserInlineSpec
 is then true.
 
 Note that we do not (currently) do CSE on the unfolding stored inside
@@ -233,7 +233,7 @@ an Id, even if it is a 'stable' unfolding.  That means that when an
 unfolding happens, it is always faithful to what the stable unfolding
 originally was.
 
-Note [CSE for stable unfoldings]
+Note [CSE for INLINEABLE unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    {-# Unf = Stable (\pq. build blah) #-}
@@ -264,8 +264,7 @@ Wrinkles
   decide that a function's definition is so small that it should
   always inline, or indeed for the wrapper function itself.  In this
   case we still want to do CSE (#13340). Hence the use of
-  isStableUserUnfolding/isStableSystemUnfolding rather than
-  isStableUnfolding.
+  idHasInlineable rather than isStableUnfolding.
 
 * Consider
      foo = <expr>
@@ -510,13 +509,12 @@ extendCSEnvWithBinding env in_id out_id rhs' cse_done
 noCSE :: InId -> Bool
 noCSE id
   | isJoinId id                = no_cse  -- See Note [CSE for join points?]
-  | isStableUserUnfolding  unf = no_cse  -- See Note [CSE for stable unfoldings]
+  | idHasInlineable id         = no_cse  -- See Note [CSE for INLINEABLE unfoldings]
   | user_activation_control    = no_cse  -- See Note [CSE for INLINE and NOINLINE]
   | otherwise = yes_cse
    where
-     unf = idUnfolding id
      user_activation_control = not (isAlwaysActive (idInlineActivation id))
-                            && not (noUserInlineSpec (inlinePragmaSpec (idInlinePragma id)))
+                            && not (isNoUserInlineSpec (inlinePragmaSpec (idInlinePragma id)))
      yes_cse = False
      no_cse  = True
 

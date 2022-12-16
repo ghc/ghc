@@ -355,6 +355,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
                     `setDmdSigInfo`     zapDmdEnvSig (dmdSigInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
+                    `setHasInlineableInfo`    inlineableInfo old_info
                     `setUnfoldingInfo`  new_unf
 
         old_unf = realUnfoldingInfo old_info

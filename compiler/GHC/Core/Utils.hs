@@ -2230,7 +2230,7 @@ diffIdInfo env bndr1 bndr2
   | arityInfo info1 == arityInfo info2
     && cafInfo info1 == cafInfo info2
     && oneShotInfo info1 == oneShotInfo info2
-    && inlinePragInfo info1 == inlinePragInfo info2
+    && pragInfo info1 == pragInfo info2
     && occInfo info1 == occInfo info2
     && demandInfo info1 == demandInfo info2
     && callArityInfo info1 == callArityInfo info2

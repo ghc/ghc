@@ -19,6 +19,7 @@ import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.Type
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.SimpleOpt
+import GHC.Core.Rules
 
 import GHC.Types.Var
 import GHC.Types.Id
@@ -836,6 +837,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- (see Note [Don't w/w join points for CPR])
 
     work_id  = asWorkerLikeId $
+               modifyIdInfo (flip setHasInlineableInfo fn_has_inlineable) $
                mkWorkerId work_uniq fn_id (exprType work_rhs)
                 `setIdOccInfo` occInfo fn_info
                         -- Copy over occurrence info from parent
@@ -883,6 +885,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_unfolding    = realUnfoldingInfo fn_info
+    fn_has_inlineable = inlineableInfo fn_info
     fn_rules        = ruleInfoRules (ruleInfo fn_info)
 
 mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
@@ -901,16 +904,12 @@ mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
   where
     -- See Note [Wrapper activation]
-    wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_inline_phase rules
+    wrapper_phase = earliest_inline_phase `afterRules` rules
     earliest_inline_phase = beginPhase fn_act `laterPhase` nextPhase InitialPhase
           -- laterPhase (nextPhase InitialPhase) is a temporary hack
           -- to inline no earlier than phase 2.  I got regressions in
           -- 'mate', due to changes in full laziness due to Note [Case
           -- MFEs], when I did earlier inlining.
-
-    get_rule_phase :: CoreRule -> CompilerPhase
-    -- The phase /after/ the rule is first active
-    get_rule_phase rule = nextPhase (beginPhase (ruleActivation rule))
 
 {-
 Note [Demand on the worker]

@@ -53,6 +53,7 @@ import GHC.Utils.Logger
 import GHC.Utils.Constants (debugIsOn)
 
 import GHC.Types.Annotations
+import GHC.Types.Basic (RuleSource(..))
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
@@ -1256,7 +1257,7 @@ addFingerprints hsc_env iface0
       , mi_opt_hash    = opt_hash
       , mi_hpc_hash    = hpc_hash
       , mi_plugin_hash = plugin_hash
-      , mi_orphan      = not (   all ifRuleAuto orph_rules
+      , mi_orphan      = not (   all (is_if_auto_rule . ifRuleAuto) orph_rules
                                    -- See Note [Orphans and auto-generated rules]
                               && null orph_insts
                               && null orph_fis)
@@ -1279,6 +1280,9 @@ addFingerprints hsc_env iface0
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
     (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     ann_fn = mkIfaceAnnCache (mi_anns iface0)
+    is_if_auto_rule src = case src of
+      RuleSrcAuto -> True
+      RuleSrcUser -> False
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the

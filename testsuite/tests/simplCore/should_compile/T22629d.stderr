@@ -1,0 +1,56 @@
+[1 of 2] Compiling T22629d_Lib      ( T22629d_Lib.hs, T22629d_Lib.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 51, types: 67, coercions: 0, joins: 0/1}
+
+lvl = IS 42#
+
+Rec {
+getNumbers
+  = \ @a $dNum ->
+      case $wgetNumbers $dNum of { (# ww, ww1 #) -> :| ww ww1 }
+
+$wgetNumbers
+  = \ @a $dNum ->
+      (# fromInteger $dNum lvl,
+         let {
+           ds = case $wgetNumbers $dNum of { (# ww, ww1 #) -> :| ww ww1 } } in
+         : (case ds of { :| a1 as -> a1 })
+           (case ds of { :| a1 as -> as }) #)
+end Rec }
+
+$trModule4 = "main"#
+
+$trModule3 = TrNameS $trModule4
+
+$trModule2 = "T22629d_Lib"#
+
+$trModule1 = TrNameS $trModule2
+
+$trModule = Module $trModule3 $trModule1
+
+
+
+[2 of 2] Compiling T22629d          ( T22629d.hs, T22629d.o )
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 19, types: 7, coercions: 0, joins: 0/0}
+
+$trModule2 = "T22629d"#
+
+$trModule1 = TrNameS $trModule2
+
+$trModule4 = "main"#
+
+$trModule3 = TrNameS $trModule4
+
+$trModule = Module $trModule3 $trModule1
+
+lvl = I# 42#
+
+foo = lvl
+
+
+

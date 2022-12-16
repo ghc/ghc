@@ -1105,7 +1105,7 @@ rep_specialise nm ty ispec loc
        ; ty1 <- repHsSigType ty
        ; phases <- repPhases $ inl_act ispec
        ; let inline = inl_inline ispec
-       ; pragma <- if noUserInlineSpec inline
+       ; pragma <- if isNoUserInlineSpec inline
                    then -- SPECIALISE
                      repPragSpec nm1 ty1 phases
                    else -- SPECIALISE INLINE

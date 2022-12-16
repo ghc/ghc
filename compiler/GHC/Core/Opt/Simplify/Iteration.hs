@@ -644,7 +644,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
     work_info = vanillaIdInfo `setDmdSigInfo`     dmdSigInfo info
                               `setCprSigInfo`     cprSigInfo info
                               `setDemandInfo`     demandInfo info
-                              `setInlinePragInfo` inlinePragInfo info
+                              `setPragInfo`       pragInfo info
                               `setArityInfo`      work_arity
            -- We do /not/ want to transfer OccInfo, Rules
            -- Note [Preserve strictness in cast w/w]
@@ -4210,7 +4210,7 @@ simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
 mkLetUnfolding !uf_opts top_lvl src id new_rhs
-  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs Nothing)
+  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming may_inline new_rhs Nothing)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -4223,6 +4223,7 @@ mkLetUnfolding !uf_opts top_lvl src id new_rhs
     !is_top_lvl   = isTopLevel top_lvl
     -- See Note [Force bottoming field]
     !is_bottoming = isDeadEndId id
+    !may_inline = not . isNoInlinePragma . idInlinePragma $ id
 
 -------------------
 simplStableUnfolding :: SimplEnv -> BindContext

@@ -30,7 +30,10 @@ module GHC.Core.Rules (
         rulesOfBinds, getRules, pprRulesForUser,
 
         -- * Making rules
-        mkRule, mkSpecRule, roughTopNames
+        mkRule, mkSpecRule, roughTopNames,
+
+        -- * Dealing with when rules fire
+        afterRules
 
     ) where
 
@@ -182,7 +185,19 @@ to apply the specialised function to, are handled by the fact that the
 Rule contains a template for the result of the specialisation.
 -}
 
-mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
+-- Sometimes we want to push some activation back such that it fires after a
+-- given set of activations. But at least FinalPhase
+afterRules :: CompilerPhase -> [CoreRule] -> CompilerPhase
+afterRules earliest_phase rules
+  = wrapper_phase
+  where
+    wrapper_phase = foldr (laterPhase . get_rule_phase) earliest_phase rules
+
+    get_rule_phase :: CoreRule -> CompilerPhase
+    -- The phase /after/ the rule is first active
+    get_rule_phase rule = nextPhase (beginPhase (ruleActivation rule))
+
+mkRule :: Module -> RuleSource -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
 -- compiled. See also 'GHC.Core.CoreRule'
@@ -208,7 +223,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
     orph = chooseOrphanAnchor local_lhs_names
 
 --------------
-mkSpecRule :: DynFlags -> Module -> Bool -> Activation -> SDoc
+mkSpecRule :: DynFlags -> Module -> RuleSource -> Activation -> SDoc
            -> Id -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- Make a specialisation rule, for Specialise or SpecConstr
 mkSpecRule dflags this_mod is_auto inl_act herald fn bndrs args rhs

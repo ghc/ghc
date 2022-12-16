@@ -1960,7 +1960,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                               dropTail (length extra_bndrs) spec_call_args
               inline_act = idInlineActivation fn
               this_mod   = sc_module $ sc_opts env
-              rule       = mkRule this_mod True {- Auto -} True {- Local -}
+              rule       = mkRule this_mod RuleSrcAuto {- Auto -} True {- Local -}
                                   rule_name inline_act
                                   fn_name qvars' pats' rule_rhs
                            -- See Note [Transfer activation]

@@ -396,7 +396,11 @@ behaviour:
 
 -  Unlike ``INLINE``, it is OK to use an ``INLINABLE`` pragma on a
    recursive function. The principal reason do to so to allow later use
-   of ``SPECIALISE``
+   of ``SPECIALISE``. Further ``INLINABLE`` can also be combined with
+   ``NOINLINE`` which allows both specialisation as well as manual inlining
+   through the magic ``inline`` function.
+   When ``INLINABLE`` is combined with ``NOINLINE`` no phase control is allowed
+   on the ``INLINABLE`` pragma.
 
 The alternative spelling ``INLINEABLE`` is also accepted by GHC.
 

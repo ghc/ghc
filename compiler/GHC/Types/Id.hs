@@ -82,7 +82,7 @@ module GHC.Types.Id (
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
-        idInlinePragma, setInlinePragma, modifyInlinePragma,
+        idPragmaInfo, idInlinePragma, idHasInlineable, setInlinePragma, setPragmaInfo, modifyInlinePragma,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
@@ -174,6 +174,7 @@ infixl  1 `setIdUnfolding`,
 
           `setIdSpecialisation`,
           `setInlinePragma`,
+          `setPragmaInfo`,
           `setInlineActivation`,
           `idCafInfo`,
 
@@ -893,8 +894,17 @@ OK not to if optimisation is switched off.
 idInlinePragma :: Id -> InlinePragma
 idInlinePragma id = inlinePragInfo (idInfo id)
 
+idHasInlineable :: Id -> Bool
+idHasInlineable id = inlineableInfo (idInfo id)
+
+idPragmaInfo :: Id -> PragInfo
+idPragmaInfo id = pragInfo (idInfo id)
+
 setInlinePragma :: Id -> InlinePragma -> Id
 setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
+
+setPragmaInfo :: Id -> PragInfo -> Id
+setPragmaInfo id pragInfo = modifyIdInfo (`setPragInfo` pragInfo) id
 
 modifyInlinePragma :: Id -> (InlinePragma -> InlinePragma) -> Id
 modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id
@@ -1037,6 +1047,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_info        = idInfo old_id
     old_arity       = arityInfo old_info
     old_inline_prag = inlinePragInfo old_info
+    old_unf_info    = inlineableInfo old_info
     old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
     new_occ_info    = zapOccTailCallInfo old_occ_info
@@ -1060,6 +1071,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
       | otherwise = Just NotMarkedCbv
     transfer new_info = new_info `setArityInfo`      new_arity
                                  `setInlinePragInfo` old_inline_prag
+                                 `setHasInlineableInfo` old_unf_info
                                  `setOccInfo`        new_occ_info
                                  `setDmdSigInfo`     new_strictness
                                  `setCprSigInfo`     new_cpr
