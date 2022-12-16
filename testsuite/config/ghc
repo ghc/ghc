@@ -43,10 +43,12 @@ if ghc_with_native_codegen:
 if config.have_interp:
     config.run_ways.append('ghci')
 
+# we read the 'Support SMP' setting from the ghcconfig file. This dictates
+# whether the target supports smp
 if ghc_with_threaded_rts:
     config.run_ways.append('threaded1')
-    if ghc_with_smp:
-        config.have_smp = True
+    if target_with_smp:
+        config.target_has_smp = True
         config.run_ways.append('threaded2')
         if config.speed == 0:
             config.run_ways.append('nonmoving_thr')
@@ -210,31 +212,52 @@ def get_compiler_info():
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = config.libdir.replace('\\', '/')
 
-    def test_compile(flags) -> bool:
+    def test_compile(flags):
         """
-        Check whether GHC can compile in the given way.
-        This is used as a proxy to determine, e.g., whether
-        profiled libraries were built.
+        Check whether GHC can compile in the given way. This is used as a
+        proxy to determine, e.g., whether profiled libraries were built, or
+        whether the host RTS supports smp.
         """
         import tempfile
         import textwrap
+
+        res = False
+
         with tempfile.TemporaryDirectory() as d:
             src = Path(d) / 'test.hs'
             src.write_text(textwrap.dedent('''
                 module Main where
                 main = putStrLn "Hello World!"
             '''))
-            p = subprocess.run(
+            try:
+                p = subprocess.run(
                     '{} -v0 {} -o test '.format(config.compiler, src) + ' '.join(flags),
                     shell=True,
                     cwd=d,
-                    stderr=None if config.verbose >= 3 else subprocess.DEVNULL)
-            res = p.returncode
-            return res == 0
+                    stderr=None if config.verbose >= 3 else subprocess.DEVNULL
+                    )
 
-    config.have_vanilla = test_compile([])
-    config.have_dynamic = test_compile(['-dynamic'])
-    config.have_profiling = test_compile(['-prof'])
+            except Exception as err:
+                print("Exception thrown in testsuite/config/ghc.get_compiler_info: %s", err)
+
+            else:
+                res = p.returncode == 0
+
+        return res
+
+    def compiler_supports_way(flags):
+        return test_compile(flags)
+
+    # Test the Host RTS to determine if it supports SMP. For cross compilers the
+    # Host /= Target, so we cannot determine from the ghcconfig file if the host
+    # itself supports smp. To support smp the host must be linked with an RTS
+    # built with 'defined(THREADED_RTS) && !defined(NO_SMP)'. Thus we directly
+    # query the RTS the host is linked with.
+    config.ghc_has_smp    = test_compile(["+RTS", "-N"])
+
+    config.have_vanilla   = compiler_supports_way([])
+    config.have_dynamic   = compiler_supports_way(['-dynamic'])
+    config.have_profiling = compiler_supports_way(['-prof'])
 
     if config.have_profiling:
         config.compile_ways.append('profasm')

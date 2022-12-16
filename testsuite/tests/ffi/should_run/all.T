@@ -235,7 +235,7 @@ test('T17471', [omit_ways(['ghci']), req_c], compile_and_run,
      ['T17471_c.c -optc-D -optcFOO'])
 
 test('IncallAffinity',
-     [req_smp, only_ways(['threaded1', 'threaded2']),
+     [req_target_smp, req_ghc_smp, only_ways(['threaded1', 'threaded2']),
       # Unregisterised build doesn't support
       when(unregisterised(), skip),
       req_c],

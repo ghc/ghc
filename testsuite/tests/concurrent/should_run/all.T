@@ -240,7 +240,9 @@ test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
        extra_run_opts('8 12 2000'),
        when(have_thread_sanitizer(), expect_broken(18808)),
-       req_smp ],
+       req_target_smp,
+       req_ghc_smp
+     ],
      compile_and_run, [''])
 
 test('T21651',
@@ -248,7 +250,9 @@ test('T21651',
        when(opsys('mingw32'),skip), # uses POSIX pipes
        when(opsys('darwin'),extra_run_opts('8 12 2000 100')),
        unless(opsys('darwin'),extra_run_opts('8 12 2000 200')), # darwin runners complain of too many open files
-       req_smp ],
+       req_target_smp,
+       req_ghc_smp
+     ],
      compile_and_run, [''])
 
 test('hs_try_putmvar001',

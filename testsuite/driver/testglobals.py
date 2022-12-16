@@ -147,8 +147,11 @@ class TestConfig:
         # Is the compiler dynamically linked?
         self.ghc_dynamic = False
 
-        # Do we have SMP support?
-        self.have_smp = False
+        # Does the host RTS have SMP support?
+        self.ghc_has_smp = True
+
+        # Does the target have SMP support?
+        self.target_has_smp = True
 
         # Is gdb available?
         self.have_gdb = False

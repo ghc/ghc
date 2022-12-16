@@ -296,8 +296,20 @@ def req_th( name, opts ):
     if ghc_dynamic():
         return _omit_ways(name, opts, ['profasm', 'profthreaded'])
 
-def req_smp( name, opts ):
-    if not config.have_smp:
+def req_ghc_smp( name, opts ):
+    """
+    Mark a test as requiring GHC to be linked with an RTS that supports smp.
+    """
+    if not config.ghc_has_smp:
+        opts.skip = True
+
+def req_target_smp( name, opts ):
+    """
+    Mark a test as requiring smp when run on the target. If the target does
+    not support smp, then mark the test as an expected fail. Use this when the
+    test needs to run with smp support.
+    """
+    if not config.target_has_smp:
         opts.expect = 'fail'
 
 def ignore_stdout(name, opts):
