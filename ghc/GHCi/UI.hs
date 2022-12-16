@@ -122,7 +122,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( elemIndices, find, intercalate, intersperse,
+import Data.List ( elemIndices, find, intercalate, intersperse, minimumBy,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
@@ -1374,12 +1374,13 @@ afterRunStmt step_here run_result = do
             show_types <- isOptionSet ShowType
             when show_types $ printTypeOfNames names
      GHC.ExecBreak names mb_info
-         | isNothing  mb_info ||
-           step_here (GHC.resumeSpan $ head resumes) -> do
+         | first_resume : _ <- resumes
+         , isNothing  mb_info ||
+           step_here (GHC.resumeSpan first_resume) -> do
                mb_id_loc <- toBreakIdAndLocation mb_info
                let bCmd = maybe "" ( \(_,l) -> onBreakCmd l ) mb_id_loc
                if (null bCmd)
-                 then printStoppedAtBreakInfo (head resumes) names
+                 then printStoppedAtBreakInfo first_resume names
                  else enqueueCommands [bCmd]
                -- run the command set with ":set stop <cmd>"
                st <- getGHCiState
@@ -2607,15 +2608,14 @@ guessCurrentModule :: GHC.GhcMonad m => String -> m Module
 -- Guess which module the user wants to browse.  Pick
 -- modules that are interpreted first.  The most
 -- recently-added module occurs last, it seems.
-guessCurrentModule cmd
-  = do imports <- GHC.getContext
-       when (null imports) $ throwGhcException $
-          CmdLineError (':' : cmd ++ ": no current module")
-       case (head imports) of
-          IIModule m -> GHC.findQualifiedModule NoPkgQual m
-          IIDecl d   -> do
-            pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
-            GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
+guessCurrentModule cmd = do
+  imports <- GHC.getContext
+  case imports of
+    [] -> throwGhcException $ CmdLineError (':' : cmd ++ ": no current module")
+    IIModule m : _ -> GHC.findQualifiedModule NoPkgQual m
+    IIDecl d : _ -> do
+      pkgqual <- GHC.renameRawPkgQualM (unLoc $ ideclName d) (ideclPkgQual d)
+      GHC.findQualifiedModule pkgqual (unLoc (ideclName d))
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -3507,18 +3507,15 @@ completeCmd argLine0 = case parseLine argLine0 of
             liftIO $ print r
     _ -> throwGhcException (CmdLineError "Syntax: :complete repl [<range>] <quoted-string-to-complete>")
   where
-    parseLine argLine
-        | null argLine = Nothing
-        | null rest1   = Nothing
-        | otherwise    = (,,) dom <$> resRange <*> s
-      where
-        (dom, rest1) = breakSpace argLine
-        (rng, rest2) = breakSpace rest1
-        resRange | head rest1 == '"' = parseRange ""
-                 | otherwise         = parseRange rng
-        s | head rest1 == '"' = readMaybe rest1 :: Maybe String
-          | otherwise         = readMaybe rest2
-        breakSpace = fmap (dropWhile isSpace) . break isSpace
+    parseLine [] = Nothing
+    parseLine argLine = case breakSpace argLine of
+      (_, []) -> Nothing
+      (dom, rest1@('"' : _)) -> (dom,,) <$> parseRange "" <*> (readMaybe rest1 :: Maybe String)
+      (dom, rest1) -> (dom,,) <$> parseRange rng <*> readMaybe rest2
+        where
+          (rng, rest2) = breakSpace rest1
+
+    breakSpace = fmap (dropWhile isSpace) . break isSpace
 
     takeRange (lb,ub) = maybe id (drop . pred) lb . maybe id take ub
 
@@ -3666,7 +3663,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     addNestedDecls (ident, mod) = do
         (_, decls) <- getModBreak mod
         let (mod_str, topLvl, _) = splitIdent ident
-            ident_decls = filter ((topLvl ==) . head) $ elems decls
+            ident_decls = [ elm | elm@(el : _) <- elems decls, el == topLvl ]
             bids = nub $ declPath <$> ident_decls
         pure $ map (combineModIdent mod_str) bids
 
@@ -3843,7 +3840,7 @@ enclosingTickSpan md (RealSrcSpan src _) = do
   massert (inRange (bounds ticks) line)
   let enclosing_spans = [ pan | (_,pan) <- ticks ! line
                                , realSrcSpanEnd pan >= realSrcSpanEnd src]
-  return . head . sortBy leftmostLargestRealSrcSpan $ enclosing_spans
+  return . minimumBy leftmostLargestRealSrcSpan $ enclosing_spans
  where
 
 leftmostLargestRealSrcSpan :: RealSrcSpan -> RealSrcSpan -> Ordering
@@ -4110,7 +4107,7 @@ breakById inp = do
     lookupModuleInscope :: GhciMonad m => String -> m (Maybe Module)
     lookupModuleInscope mod_top_lvl = do
         names <- GHC.parseName mod_top_lvl
-        pure $ Just $ head $ GHC.nameModule <$> names
+        pure $ listToMaybe $ GHC.nameModule <$> names
           -- if GHC.parseName succeeds `names` is not empty!
           -- if it fails, the last line will not be evaluated.
 
