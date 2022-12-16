@@ -409,3 +409,73 @@ unknown RTS option: --compact-gc=
 
 (FAIL_TEST) input: --compact-gc=blah
 bad value for compact-gc=blah
+
+(TEST) input: --use-mark-region
+24: use-mark-region w UNSAFE
+
+(TEST) input: -w
+24: use-mark-region w UNSAFE
+
+(FAIL_TEST) input: --use-mark-region=
+unknown RTS option: --use-mark-region=
+
+(FAIL_TEST) input: --use-mark-region=123G
+flag use-mark-region given an argument when none was expected: --use-mark-region=123G
+
+(FAIL_TEST) input: --use-mark-region=false
+flag use-mark-region given an argument when none was expected: --use-mark-region=false
+
+(FAIL_TEST) input: -w3622
+flag w given an argument when none was expected: -w3622
+
+(TEST) input: --old-gen-factor=11288
+25: old-gen-factor F UNSAFE
+expected: 11288.000000 actual: 11288.000000
+
+(TEST) input: -F188
+25: old-gen-factor F UNSAFE
+expected: 188.000000 actual: 188.000000
+
+(FAIL_TEST) input: --old-gen-factor
+unknown RTS option: --old-gen-factor
+
+(FAIL_TEST) input: --old-gen-factor=
+unknown RTS option: --old-gen-factor=
+
+(FAIL_TEST) input: --old-gen-factor=blah
+bad value for old-gen-factor=blah
+
+(FAIL_TEST) input: -F
+unknown RTS option: -F
+
+(FAIL_TEST) input: -F=
+unknown RTS option: -F=
+
+(FAIL_TEST) input: -Fblah
+unknown RTS option: -Fblah
+
+(TEST) input: --return-decay-factor=11288
+26: return-decay-factor Fd UNSAFE
+expected: 11288.000000 actual: 11288.000000
+
+(TEST) input: -Fd188
+26: return-decay-factor Fd UNSAFE
+expected: 188.000000 actual: 188.000000
+
+(FAIL_TEST) input: --return-decay-factor
+unknown RTS option: --return-decay-factor
+
+(FAIL_TEST) input: --return-decay-factor=
+unknown RTS option: --return-decay-factor=
+
+(FAIL_TEST) input: --return-decay-factor=blah
+bad value for return-decay-factor=blah
+
+(FAIL_TEST) input: -Fd
+unknown RTS option: -Fd
+
+(FAIL_TEST) input: -Fd=
+unknown RTS option: -Fd=
+
+(FAIL_TEST) input: -Fdblah
+unknown RTS option: -Fdblah

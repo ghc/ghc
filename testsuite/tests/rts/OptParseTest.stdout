@@ -266,4 +266,26 @@
 23: compact-gc c UNSAFE
 	value: 0.000000
 
+(TEST) input: --use-mark-region
+24: use-mark-region w UNSAFE
+
+(TEST) input: -w
+24: use-mark-region w UNSAFE
+
+(TEST) input: --old-gen-factor=11288
+25: old-gen-factor F UNSAFE
+	value: 11288.000000
+
+(TEST) input: -F188
+25: old-gen-factor F UNSAFE
+	value: 188.000000
+
+(TEST) input: --return-decay-factor=11288
+26: return-decay-factor Fd UNSAFE
+	value: 11288.000000
+
+(TEST) input: -Fd188
+26: return-decay-factor Fd UNSAFE
+	value: 188.000000
+
 === OptParseTest END ===

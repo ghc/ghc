@@ -349,6 +349,43 @@ int main (int argc, char *argv[])
     _FAIL_TEST("--compact-gc=");
     _FAIL_TEST("--compact-gc=blah");
 
+    _TEST( "--use-mark-region", USE_MARK_REGION
+        , "use-mark-region", "w"
+        , VOID, UNSAFE, NO_VAL(USE_MARK_REGION));
+    _TEST( "-w", USE_MARK_REGION
+        , "use-mark-region", "w"
+        , VOID, UNSAFE, NO_VAL(USE_MARK_REGION));
+    _FAIL_TEST("--use-mark-region=");
+    _FAIL_TEST("--use-mark-region=123G");
+    _FAIL_TEST("--use-mark-region=false");
+    _FAIL_TEST("-w3622");
+
+    _TEST( "--old-gen-factor=11288", OLD_GEN_FACTOR
+        , "old-gen-factor", "F"
+        , DOUBLE, UNSAFE, DOUBLE_VAL(OLD_GEN_FACTOR, 11288.0));
+    _TEST( "-F188", OLD_GEN_FACTOR
+         , "old-gen-factor", "F"
+        , DOUBLE, UNSAFE, DOUBLE_VAL(OLD_GEN_FACTOR, 188.0));
+    _FAIL_TEST("--old-gen-factor");
+    _FAIL_TEST("--old-gen-factor=");
+    _FAIL_TEST("--old-gen-factor=blah");
+    _FAIL_TEST("-F");
+    _FAIL_TEST("-F=");
+    _FAIL_TEST("-Fblah");
+
+    _TEST( "--return-decay-factor=11288", RETURN_DECAY_FACTOR
+        , "return-decay-factor", "Fd"
+        , DOUBLE, UNSAFE, DOUBLE_VAL(RETURN_DECAY_FACTOR, 11288.0));
+    _TEST( "-Fd188", RETURN_DECAY_FACTOR
+        , "return-decay-factor", "Fd"
+        , DOUBLE, UNSAFE, DOUBLE_VAL(RETURN_DECAY_FACTOR, 188.0));
+    _FAIL_TEST("--return-decay-factor");
+    _FAIL_TEST("--return-decay-factor=");
+    _FAIL_TEST("--return-decay-factor=blah");
+    _FAIL_TEST("-Fd");
+    _FAIL_TEST("-Fd=");
+    _FAIL_TEST("-Fdblah");
+
     printf("\n=== OptParseTest END ===\n");
     return 0;
 }

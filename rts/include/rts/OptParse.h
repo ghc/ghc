@@ -48,6 +48,9 @@ typedef enum _RtsFlagKey {
     NO_AUTO_HEAP_SAMPLES,
     NURSERY_CHUNK_SIZE,
     COMPACT_GC,
+    USE_MARK_REGION,
+    OLD_GEN_FACTOR,
+    RETURN_DECAY_FACTOR,
 
     UNKNOWN_RTS_OPTION,
 } RtsFlagKey;

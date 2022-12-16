@@ -67,6 +67,9 @@ rtsFlags[] = {
     [NURSERY_CHUNK_SIZE]      = {UNSAFE, STGWORD64, "alloc-area-chunksize",            "n",   true},
     [GC_BELL]                 = {UNSAFE, VOID,      "gc-bell",                         "B",  false},
     [COMPACT_GC]              = {UNSAFE, DOUBLE,    "compact-gc",                      "c",  false},
+    [USE_MARK_REGION]         = {UNSAFE, VOID,      "use-mark-region",                 "w",  false},
+    [OLD_GEN_FACTOR]          = {UNSAFE, DOUBLE,    "old-gen-factor",                  "F",   true},
+    [RETURN_DECAY_FACTOR]     = {UNSAFE, DOUBLE,    "return-decay-factor",             "Fd",  true},
     // The 'NULL' of flags. Long name just for debugging
     [UNKNOWN_RTS_OPTION]      = {SAFE,   VOID,      "UNKNOWN_RTS_OPTION",              NULL, false},
 };
@@ -183,6 +186,7 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
         case VOID: {
             switch (i) {
                 case GC_BELL:
+                case USE_MARK_REGION:
                     if (hasValue) UNEXPECTED_ARGUMENT(error, name, arg0);
             }
             return NO_VAL(i);
@@ -219,25 +223,33 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
         }
         case DOUBLE: {
             double res;
+            // account for '=' that is used with long-form names
+            // some long-from names can have no value though so account for that as well
+            if (isLongName && arg[offset] == '=') offset++;
             switch (i) {
                 case EVENTLOG_FLUSH_INTERVAL: {
-                    res = parseDouble(arg+offset+1, error);
+                    res = parseDouble(arg+offset, error);
                     break;
                 }
                 case LONG_GC_SYNC: {
-                    res = parseDouble(arg+offset+1, error);
+                    res = parseDouble(arg+offset, error);
                     break;
                 }
                 case COMPACT_GC: {
                     // special treatment when used as a switch
                     if (!hasValue) return NO_VAL(i);
-                    res = parseDouble(arg+offset+1, error);
+                    res = parseDouble(arg+offset, error);
                     break;
                 }
-                default: {
-                    *error = true;
-                    errorBelch("invalid double '%s' for '%s'", &arg[offset + 1], rtsFlags[i].longName);
+                case OLD_GEN_FACTOR: {
+                    res = parseDouble(arg+offset, error);
+                    break;
                 }
+                case RETURN_DECAY_FACTOR: {
+                    res = parseDouble(arg+offset, error);
+                    break;
+                }
+                default: {}
             }
             if (*error) {
                 BAD_VALUE(error, arg);
