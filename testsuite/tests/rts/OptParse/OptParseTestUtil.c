@@ -2,7 +2,14 @@
 #include "Rts.h"
 #include "OptParseTestUtil.h"
 
+char CMP_BUF[100];
 extern bool ERROR;
+
+#define FAIL_TEST(...) \
+    do { \
+        snprintf(CMP_BUF, sizeof(CMP_BUF), __VA_ARGS__); \
+        _FAIL_TEST(CMP_BUF); \
+    } while (false)
 
 void _TEST( char* flagToTest
           , int expectedFlagKey
@@ -64,28 +71,17 @@ void _VOID_FLAG_TEST(const RtsFlagKey i)
     snprintf(buffer, sizeof(buffer), "-%s", name.shortName);
     _TEST( buffer, i, name.longName, name.shortName
         , name.valueType, name.optionSafe, NO_VAL(i));
-    snprintf(buffer, sizeof(buffer), "-%s=", name.longName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "--%s=123G", name.longName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "--%s=false", name.longName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "--%s=true", name.longName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s=", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s3621", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s=3622", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s=true", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s=", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s3622", name.shortName);
-    _FAIL_TEST(buffer);
-    snprintf(buffer, sizeof(buffer), "-%s=3600", name.shortName);
-    _FAIL_TEST(buffer);
+    FAIL_TEST("-%s=",       name.longName);
+    FAIL_TEST("--%s=123G",  name.longName);
+    FAIL_TEST("--%s=false", name.longName);
+    FAIL_TEST("--%s=true",  name.longName);
+    FAIL_TEST("-%s=",       name.shortName);
+    FAIL_TEST("-%s3621",    name.shortName);
+    FAIL_TEST("-%s=3622",   name.shortName);
+    FAIL_TEST("-%s=true",   name.shortName);
+    FAIL_TEST("-%s=",       name.shortName);
+    FAIL_TEST("-%s3622",    name.shortName);
+    FAIL_TEST("-%s=3600",   name.shortName);
 }
 
 void _BOOL_FLAG_TEST(const RtsFlagKey i)
@@ -105,19 +101,12 @@ void _BOOL_FLAG_TEST(const RtsFlagKey i)
         _TEST( buffer, i
             , name.longName, name.shortName
             , BOOL, name.optionSafe, BOOL_VAL(i, false));
-        snprintf(buffer, sizeof(buffer), "--%s=", name.longName);
-        _FAIL_TEST(buffer);
-        snprintf(buffer, sizeof(buffer), "--%s=foo", name.longName);
-        _FAIL_TEST(buffer);
-        snprintf(buffer, sizeof(buffer), "--%s=1", name.longName);
-        _FAIL_TEST(buffer);
-        snprintf(buffer, sizeof(buffer), "--%sjhgl", name.longName);
-        _FAIL_TEST(buffer);
+        FAIL_TEST("--%s=",    name.longName);
+        FAIL_TEST("--%s=foo", name.longName);
+        FAIL_TEST("--%s=1",   name.longName);
+        FAIL_TEST("--%sjhgl", name.longName);
     }
     if (name.shortName != NULL) {
-        snprintf(buffer, sizeof(buffer), "-%s", name.shortName);
-        _TEST( buffer, i
-            , name.longName, name.shortName
-            , BOOL, name.optionSafe, BOOL_VAL(i, true));
+        FAIL_TEST("-%s", name.shortName);
     }
 }
