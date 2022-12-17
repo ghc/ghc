@@ -64,12 +64,12 @@ void _FAIL_TEST(char* flagToTest)
 void _VOID_FLAG_TEST(const RtsFlagKey i)
 {
     RtsFlagName name = rtsFlags[i];
-    char buffer[100];
-    snprintf(buffer, sizeof(buffer), "--%s", name.longName);
-    _TEST( buffer, i, name.longName, name.shortName
+    char CMP_BUF[100];
+    snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s", name.longName);
+    _TEST( CMP_BUF, i, name.longName, name.shortName
         , name.valueType, name.optionSafe, NO_VAL(i));
-    snprintf(buffer, sizeof(buffer), "-%s", name.shortName);
-    _TEST( buffer, i, name.longName, name.shortName
+    snprintf(CMP_BUF, sizeof(CMP_BUF), "-%s", name.shortName);
+    _TEST( CMP_BUF, i, name.longName, name.shortName
         , name.valueType, name.optionSafe, NO_VAL(i));
     FAIL_TEST("-%s=",       name.longName);
     FAIL_TEST("--%s=123G",  name.longName);
@@ -87,18 +87,18 @@ void _VOID_FLAG_TEST(const RtsFlagKey i)
 void _BOOL_FLAG_TEST(const RtsFlagKey i)
 {
     RtsFlagName name = rtsFlags[i];
-    char buffer[100];
+    char CMP_BUF[100];
     if (name.longName != NULL) {
-        snprintf(buffer, sizeof(buffer), "--%s", name.longName);
-        _TEST( buffer, i
+        snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s", name.longName);
+        _TEST( CMP_BUF, i
             , name.longName, name.shortName
             , BOOL, name.optionSafe, BOOL_VAL(i, true));
-        snprintf(buffer, sizeof(buffer), "--%s=yes", name.longName);
-        _TEST( buffer, i
+        snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s=yes", name.longName);
+        _TEST( CMP_BUF, i
             , name.longName, name.shortName
             , BOOL, name.optionSafe, BOOL_VAL(i, true));
-        snprintf(buffer, sizeof(buffer), "--%s=no", name.longName);
-        _TEST( buffer, i
+        snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s=no", name.longName);
+        _TEST( CMP_BUF, i
             , name.longName, name.shortName
             , BOOL, name.optionSafe, BOOL_VAL(i, false));
         FAIL_TEST("--%s=",    name.longName);
@@ -109,4 +109,8 @@ void _BOOL_FLAG_TEST(const RtsFlagKey i)
     if (name.shortName != NULL) {
         FAIL_TEST("-%s", name.shortName);
     }
+}
+void _DOUBLE_FLAG_TEST(const RtsFlagKey i)
+{
+
 }

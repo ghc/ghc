@@ -12,3 +12,4 @@ void _TEST( char* flagToTest
 void _FAIL_TEST(char* flagToTest);
 void _VOID_FLAG_TEST(const RtsFlagKey i);
 void _BOOL_FLAG_TEST(const RtsFlagKey i);
+void _DOUBLE_FLAG_TEST(const RtsFlagKey i);
