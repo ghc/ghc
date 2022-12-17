@@ -564,5 +564,3 @@ test('decodeMyStack_emptyListForMissingFlag',
   , ignore_stderr
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
-
-test('OptParseTest', [ c_src, only_ways(['normal','threaded1', 'threaded2']) ], compile_and_run, [''])
