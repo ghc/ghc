@@ -11,11 +11,17 @@
 (TEST) input: --install-signal-handlers=no
 1: install-signal-handlers (null) UNSAFE
 
-(FAIL_TEST) input: --install-signal-handlers=dunnow
-unknown RTS option: --install-signal-handlers=dunnow
+(FAIL_TEST) input: --install-signal-handlers=
+unknown RTS option: --install-signal-handlers=
 
-(FAIL_TEST) input: --install-signal-handlersgasg
-unknown RTS option: --install-signal-handlersgasg
+(FAIL_TEST) input: --install-signal-handlers=foo
+unknown RTS option: --install-signal-handlers=foo
+
+(FAIL_TEST) input: --install-signal-handlers=1
+unknown RTS option: --install-signal-handlers=1
+
+(FAIL_TEST) input: --install-signal-handlersjhgl
+unknown RTS option: --install-signal-handlersjhgl
 
 (TEST) input: --install-seh-handlers
 2: install-seh-handlers (null) UNSAFE
@@ -29,11 +35,14 @@ unknown RTS option: --install-signal-handlersgasg
 (FAIL_TEST) input: --install-seh-handlers=
 unknown RTS option: --install-seh-handlers=
 
-(FAIL_TEST) input: --install-seh-handlers=hmmm
-unknown RTS option: --install-seh-handlers=hmmm
+(FAIL_TEST) input: --install-seh-handlers=foo
+unknown RTS option: --install-seh-handlers=foo
 
-(FAIL_TEST) input: --install-seh-handlersgasdxxxasg
-unknown RTS option: --install-seh-handlersgasdxxxasg
+(FAIL_TEST) input: --install-seh-handlers=1
+unknown RTS option: --install-seh-handlers=1
+
+(FAIL_TEST) input: --install-seh-handlersjhgl
+unknown RTS option: --install-seh-handlersjhgl
 
 (TEST) input: --generate-stack-traces
 3: generate-stack-traces (null) UNSAFE
@@ -44,11 +53,17 @@ unknown RTS option: --install-seh-handlersgasdxxxasg
 (TEST) input: --generate-stack-traces=no
 3: generate-stack-traces (null) UNSAFE
 
-(FAIL_TEST) input: --generate-stack-traces=perhaps
-unknown RTS option: --generate-stack-traces=perhaps
+(FAIL_TEST) input: --generate-stack-traces=
+unknown RTS option: --generate-stack-traces=
 
-(FAIL_TEST) input: --generate-stack-tracesgasg
-unknown RTS option: --generate-stack-tracesgasg
+(FAIL_TEST) input: --generate-stack-traces=foo
+unknown RTS option: --generate-stack-traces=foo
+
+(FAIL_TEST) input: --generate-stack-traces=1
+unknown RTS option: --generate-stack-traces=1
+
+(FAIL_TEST) input: --generate-stack-tracesjhgl
+unknown RTS option: --generate-stack-tracesjhgl
 
 (TEST) input: --generate-crash-dumps
 4: generate-crash-dumps (null) UNSAFE
@@ -59,11 +74,17 @@ unknown RTS option: --generate-stack-tracesgasg
 (TEST) input: --generate-crash-dumps=no
 4: generate-crash-dumps (null) UNSAFE
 
-(FAIL_TEST) input: --generate-crash-dumps=maybe
-unknown RTS option: --generate-crash-dumps=maybe
+(FAIL_TEST) input: --generate-crash-dumps=
+unknown RTS option: --generate-crash-dumps=
 
-(FAIL_TEST) input: --generate-crash-dumpssss
-unknown RTS option: --generate-crash-dumpssss
+(FAIL_TEST) input: --generate-crash-dumps=foo
+unknown RTS option: --generate-crash-dumps=foo
+
+(FAIL_TEST) input: --generate-crash-dumps=1
+unknown RTS option: --generate-crash-dumps=1
+
+(FAIL_TEST) input: --generate-crash-dumpsjhgl
+unknown RTS option: --generate-crash-dumpsjhgl
 
 (TEST) input: --null-eventlog-writer
 5: null-eventlog-writer (null) UNSAFE
@@ -77,8 +98,14 @@ unknown RTS option: --generate-crash-dumpssss
 (FAIL_TEST) input: --null-eventlog-writer=
 unknown RTS option: --null-eventlog-writer=
 
-(FAIL_TEST) input: --null-eventlog-writerytrwe
-unknown RTS option: --null-eventlog-writerytrwe
+(FAIL_TEST) input: --null-eventlog-writer=foo
+unknown RTS option: --null-eventlog-writer=foo
+
+(FAIL_TEST) input: --null-eventlog-writer=1
+unknown RTS option: --null-eventlog-writer=1
+
+(FAIL_TEST) input: --null-eventlog-writerjhgl
+unknown RTS option: --null-eventlog-writerjhgl
 
 (TEST) input: --machine-readable
 6: machine-readable (null) UNSAFE
@@ -89,11 +116,17 @@ unknown RTS option: --null-eventlog-writerytrwe
 (TEST) input: --machine-readable=no
 6: machine-readable (null) UNSAFE
 
-(FAIL_TEST) input: --machine-readable=treu
-unknown RTS option: --machine-readable=treu
+(FAIL_TEST) input: --machine-readable=
+unknown RTS option: --machine-readable=
 
-(FAIL_TEST) input: --machine-readableytrweasf
-unknown RTS option: --machine-readableytrweasf
+(FAIL_TEST) input: --machine-readable=foo
+unknown RTS option: --machine-readable=foo
+
+(FAIL_TEST) input: --machine-readable=1
+unknown RTS option: --machine-readable=1
+
+(FAIL_TEST) input: --machine-readablejhgl
+unknown RTS option: --machine-readablejhgl
 
 (TEST) input: --disable-delayed-os-memory-return
 7: disable-delayed-os-memory-return (null) UNSAFE
@@ -104,11 +137,17 @@ unknown RTS option: --machine-readableytrweasf
 (TEST) input: --disable-delayed-os-memory-return=no
 7: disable-delayed-os-memory-return (null) UNSAFE
 
-(FAIL_TEST) input: --disable-delayed-os-memory-return=flase
-unknown RTS option: --disable-delayed-os-memory-return=flase
+(FAIL_TEST) input: --disable-delayed-os-memory-return=
+unknown RTS option: --disable-delayed-os-memory-return=
 
-(FAIL_TEST) input: --disable-delayed-os-memory-returnysaftrweasf
-unknown RTS option: --disable-delayed-os-memory-returnysaftrweasf
+(FAIL_TEST) input: --disable-delayed-os-memory-return=foo
+unknown RTS option: --disable-delayed-os-memory-return=foo
+
+(FAIL_TEST) input: --disable-delayed-os-memory-return=1
+unknown RTS option: --disable-delayed-os-memory-return=1
+
+(FAIL_TEST) input: --disable-delayed-os-memory-returnjhgl
+unknown RTS option: --disable-delayed-os-memory-returnjhgl
 
 (TEST) input: --internal-counters
 8: internal-counters (null) SAFE
@@ -119,11 +158,17 @@ unknown RTS option: --disable-delayed-os-memory-returnysaftrweasf
 (TEST) input: --internal-counters=no
 8: internal-counters (null) SAFE
 
-(FAIL_TEST) input: --internal-counters=tutr
-unknown RTS option: --internal-counters=tutr
+(FAIL_TEST) input: --internal-counters=
+unknown RTS option: --internal-counters=
 
-(FAIL_TEST) input: --internal-countersysaftrweasfasf
-unknown RTS option: --internal-countersysaftrweasfasf
+(FAIL_TEST) input: --internal-counters=foo
+unknown RTS option: --internal-counters=foo
+
+(FAIL_TEST) input: --internal-counters=1
+unknown RTS option: --internal-counters=1
+
+(FAIL_TEST) input: --internal-countersjhgl
+unknown RTS option: --internal-countersjhgl
 
 (TEST) input: --io-manager=native
 9: io-manager (null) UNSAFE
@@ -317,8 +362,11 @@ unknown RTS option: --no-automatic-heap-samples=
 (FAIL_TEST) input: --no-automatic-heap-samples=foo
 unknown RTS option: --no-automatic-heap-samples=foo
 
-(FAIL_TEST) input: --no-automatic-heap-samplasfsg
-unknown RTS option: --no-automatic-heap-samplasfsg
+(FAIL_TEST) input: --no-automatic-heap-samples=1
+unknown RTS option: --no-automatic-heap-samples=1
+
+(FAIL_TEST) input: --no-automatic-heap-samplesjhgl
+unknown RTS option: --no-automatic-heap-samplesjhgl
 
 (TEST) input: --alloc-area-chunksize=16M
 22: alloc-area-chunksize n UNSAFE
