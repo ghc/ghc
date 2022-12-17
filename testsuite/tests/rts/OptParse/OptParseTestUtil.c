@@ -64,7 +64,6 @@ void _FAIL_TEST(char* flagToTest)
 void _VOID_FLAG_TEST(const RtsFlagKey i)
 {
     RtsFlagName name = rtsFlags[i];
-    char CMP_BUF[100];
     snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s", name.longName);
     _TEST( CMP_BUF, i, name.longName, name.shortName
         , name.valueType, name.optionSafe, NO_VAL(i));
@@ -87,7 +86,6 @@ void _VOID_FLAG_TEST(const RtsFlagKey i)
 void _BOOL_FLAG_TEST(const RtsFlagKey i)
 {
     RtsFlagName name = rtsFlags[i];
-    char CMP_BUF[100];
     if (name.longName != NULL) {
         snprintf(CMP_BUF, sizeof(CMP_BUF), "--%s", name.longName);
         _TEST( CMP_BUF, i
