@@ -1,7 +1,7 @@
 === OptParseTest START ===
 
 (TEST) input: -?
-0: (null) ? SAFE
+0: help ? SAFE
 
 (TEST) input: --install-signal-handlers
 1: install-signal-handlers (null) UNSAFE
@@ -110,13 +110,17 @@
 (TEST) input: --info
 10: info (null) SAFE
 
-(TEST) input: --eventlog-flush-interval=606.909
+(TEST) input: --eventlog-flush-interval=1125
 11: eventlog-flush-interval (null) SAFE
-	value: 606.909000
+	value: 1125.000000
 
-(TEST) input: --eventlog-flush-interval=0.125
+(TEST) input: --eventlog-flush-interval=909.909
 11: eventlog-flush-interval (null) SAFE
-	value: 0.125000
+	value: 909.909000
+
+(TEST) input: --eventlog-flush-interval=0.00567
+11: eventlog-flush-interval (null) SAFE
+	value: 0.005670
 
 (TEST) input: --copying-gc
 12: copying-gc (null) SAFE
@@ -124,81 +128,181 @@
 (TEST) input: --nonmoving-gc
 13: nonmoving-gc (null) SAFE
 
+(TEST) input: --large-object-allocation=8193
+14: large-object-allocation AL UNSAFE
+	value: 8193
+
 (TEST) input: --large-object-allocation=8193K
 14: large-object-allocation AL UNSAFE
-	value: 2048
+	value: 8389632
 
 (TEST) input: --large-object-allocation=2M
 14: large-object-allocation AL UNSAFE
-	value: 512
+	value: 2097152
 
-(TEST) input: -AL9G
+(TEST) input: --large-object-allocation=9G
 14: large-object-allocation AL UNSAFE
-	value: 2359296
+	value: 9663676416
 
-(TEST) input: -AL0.125G
+(TEST) input: --large-object-allocation=2G
 14: large-object-allocation AL UNSAFE
-	value: 32768
+	value: 2147483648
+
+(TEST) input: --large-object-allocation=3333w
+14: large-object-allocation AL UNSAFE
+	value: 26664
+
+(TEST) input: -AL8193
+14: large-object-allocation AL UNSAFE
+	value: 8193
+
+(TEST) input: -AL8193k
+14: large-object-allocation AL UNSAFE
+	value: 8389632
+
+(TEST) input: -AL2m
+14: large-object-allocation AL UNSAFE
+	value: 2097152
+
+(TEST) input: -AL9g
+14: large-object-allocation AL UNSAFE
+	value: 9663676416
+
+(TEST) input: -AL1G
+14: large-object-allocation AL UNSAFE
+	value: 1073741824
 
 (TEST) input: -AL3333w
 14: large-object-allocation AL UNSAFE
-	value: 6
+	value: 26664
+
+(TEST) input: --minimum-allocation-area-size=8193
+15: minimum-allocation-area-size A UNSAFE
+	value: 8193
 
 (TEST) input: --minimum-allocation-area-size=8193K
 15: minimum-allocation-area-size A UNSAFE
-	value: 2048
+	value: 8389632
 
 (TEST) input: --minimum-allocation-area-size=2M
 15: minimum-allocation-area-size A UNSAFE
-	value: 512
+	value: 2097152
 
-(TEST) input: -A9G
+(TEST) input: --minimum-allocation-area-size=9G
 15: minimum-allocation-area-size A UNSAFE
-	value: 2359296
+	value: 9663676416
 
-(TEST) input: -A0.125G
+(TEST) input: --minimum-allocation-area-size=2G
 15: minimum-allocation-area-size A UNSAFE
-	value: 32768
+	value: 2147483648
+
+(TEST) input: --minimum-allocation-area-size=3333w
+15: minimum-allocation-area-size A UNSAFE
+	value: 26664
+
+(TEST) input: -A8193
+15: minimum-allocation-area-size A UNSAFE
+	value: 8193
+
+(TEST) input: -A8193k
+15: minimum-allocation-area-size A UNSAFE
+	value: 8389632
+
+(TEST) input: -A2m
+15: minimum-allocation-area-size A UNSAFE
+	value: 2097152
+
+(TEST) input: -A9g
+15: minimum-allocation-area-size A UNSAFE
+	value: 9663676416
+
+(TEST) input: -A1G
+15: minimum-allocation-area-size A UNSAFE
+	value: 1073741824
 
 (TEST) input: -A3333w
 15: minimum-allocation-area-size A UNSAFE
-	value: 6
+	value: 26664
 
-(TEST) input: --io-manager-threads=1
+(TEST) input: --io-manager-threads=8193
 17: io-manager-threads (null) UNSAFE
-	value: 1
+	value: 8193
 
-(TEST) input: --io-manager-threads=1234567
+(TEST) input: --io-manager-threads=8193K
 17: io-manager-threads (null) UNSAFE
-	value: 1234567
+	value: 8389632
+
+(TEST) input: --io-manager-threads=2M
+17: io-manager-threads (null) UNSAFE
+	value: 2097152
+
+(TEST) input: --io-manager-threads=9G
+17: io-manager-threads (null) UNSAFE
+	value: 9663676416
+
+(TEST) input: --io-manager-threads=2G
+17: io-manager-threads (null) UNSAFE
+	value: 2147483648
+
+(TEST) input: --io-manager-threads=3333w
+17: io-manager-threads (null) UNSAFE
+	value: 26664
+
+(TEST) input: --numa=8193
+18: numa (null) SAFE
+	value: 8193
+
+(TEST) input: --numa=8193K
+18: numa (null) SAFE
+	value: 8389632
+
+(TEST) input: --numa=2M
+18: numa (null) SAFE
+	value: 2097152
+
+(TEST) input: --numa=9G
+18: numa (null) SAFE
+	value: 9663676416
+
+(TEST) input: --numa=2G
+18: numa (null) SAFE
+	value: 2147483648
+
+(TEST) input: --numa=3333w
+18: numa (null) SAFE
+	value: 26664
 
 (TEST) input: --numa
 18: numa (null) SAFE
 	value: 18446744073709551615
 
-(TEST) input: --numa=1
-18: numa (null) SAFE
-	value: 1
+(TEST) input: --debug-numa=0
+19: debug-numa (null) SAFE
+	value: 0
 
-(TEST) input: --numa=1234567
-18: numa (null) SAFE
-	value: 1234567
+(TEST) input: --debug-numa=16
+19: debug-numa (null) SAFE
+	value: 16
 
 (TEST) input: --debug-numa=1
 19: debug-numa (null) SAFE
 	value: 1
 
-(TEST) input: --debug-numa=8
+(TEST) input: --debug-numa=11
 19: debug-numa (null) SAFE
-	value: 8
+	value: 11
 
-(TEST) input: --long-gc-sync=606.909
+(TEST) input: --long-gc-sync=1125
 20: long-gc-sync (null) SAFE
-	value: 606.909000
+	value: 1125.000000
 
-(TEST) input: --long-gc-sync=0.125
+(TEST) input: --long-gc-sync=909.909
 20: long-gc-sync (null) SAFE
-	value: 0.125000
+	value: 909.909000
+
+(TEST) input: --long-gc-sync=0.00567
+20: long-gc-sync (null) SAFE
+	value: 0.005670
 
 (TEST) input: --no-automatic-heap-samples
 21: no-automatic-heap-samples (null) UNSAFE
@@ -212,49 +316,61 @@
 21: no-automatic-heap-samples (null) UNSAFE
 	value: false
 
-(TEST) input: --alloc-area-chunksize=16M
+(TEST) input: --alloc-area-chunksize=8193
 22: alloc-area-chunksize n UNSAFE
-	value: 4096
+	value: 8193
 
-(TEST) input: -n16m
+(TEST) input: --alloc-area-chunksize=8193K
 22: alloc-area-chunksize n UNSAFE
-	value: 4096
+	value: 8389632
 
-(TEST) input: --alloc-area-chunksize=1234567
+(TEST) input: --alloc-area-chunksize=2M
 22: alloc-area-chunksize n UNSAFE
-	value: 301
+	value: 2097152
 
-(TEST) input: -n1239999
+(TEST) input: --alloc-area-chunksize=9G
 22: alloc-area-chunksize n UNSAFE
-	value: 302
+	value: 9663676416
 
-(TEST) input: --alloc-area-chunksize=0.225G
+(TEST) input: --alloc-area-chunksize=2G
 22: alloc-area-chunksize n UNSAFE
-	value: 58982
+	value: 2147483648
 
-(TEST) input: -n99999999k
+(TEST) input: --alloc-area-chunksize=3333w
 22: alloc-area-chunksize n UNSAFE
-	value: 24999999
+	value: 26664
 
-(TEST) input: --alloc-area-chunksize=7654W
+(TEST) input: -n8193
 22: alloc-area-chunksize n UNSAFE
-	value: 14
+	value: 8193
 
-(TEST) input: -n4567w
+(TEST) input: -n8193k
 22: alloc-area-chunksize n UNSAFE
-	value: 8
+	value: 8389632
 
-(TEST) input: -B
-16: gc-bell B UNSAFE
+(TEST) input: -n2m
+22: alloc-area-chunksize n UNSAFE
+	value: 2097152
+
+(TEST) input: -n9g
+22: alloc-area-chunksize n UNSAFE
+	value: 9663676416
+
+(TEST) input: -n1G
+22: alloc-area-chunksize n UNSAFE
+	value: 1073741824
+
+(TEST) input: -n3333w
+22: alloc-area-chunksize n UNSAFE
+	value: 26664
 
 (TEST) input: --gc-bell
 16: gc-bell B UNSAFE
 
-(TEST) input: --compact-gc
-23: compact-gc c UNSAFE
-	value: 0.000000
+(TEST) input: -B
+16: gc-bell B UNSAFE
 
-(TEST) input: -c
+(TEST) input: --compact-gc
 23: compact-gc c UNSAFE
 	value: 0.000000
 
@@ -262,9 +378,25 @@
 23: compact-gc c UNSAFE
 	value: 1125.000000
 
+(TEST) input: --compact-gc=909.909
+23: compact-gc c UNSAFE
+	value: 909.909000
+
+(TEST) input: --compact-gc=0.00567
+23: compact-gc c UNSAFE
+	value: 0.005670
+
 (TEST) input: -c
 23: compact-gc c UNSAFE
 	value: 0.000000
+
+(TEST) input: -c0.125
+23: compact-gc c UNSAFE
+	value: 0.125000
+
+(TEST) input: -c707.76
+23: compact-gc c UNSAFE
+	value: 707.760000
 
 (TEST) input: --use-mark-region
 24: use-mark-region w UNSAFE
@@ -272,21 +404,65 @@
 (TEST) input: -w
 24: use-mark-region w UNSAFE
 
-(TEST) input: --old-gen-factor=11288
+(TEST) input: --old-gen-factor=1125
 25: old-gen-factor F UNSAFE
-	value: 11288.000000
+	value: 1125.000000
 
-(TEST) input: -F188
+(TEST) input: --old-gen-factor=909.909
 25: old-gen-factor F UNSAFE
-	value: 188.000000
+	value: 909.909000
 
-(TEST) input: --return-decay-factor=11288
-26: return-decay-factor Fd UNSAFE
-	value: 11288.000000
+(TEST) input: --old-gen-factor=0.00567
+25: old-gen-factor F UNSAFE
+	value: 0.005670
 
-(TEST) input: -Fd188
+(TEST) input: -F0.125
+25: old-gen-factor F UNSAFE
+	value: 0.125000
+
+(TEST) input: -F707.76
+25: old-gen-factor F UNSAFE
+	value: 707.760000
+
+(TEST) input: --return-decay-factor=1125
 26: return-decay-factor Fd UNSAFE
-	value: 188.000000
+	value: 1125.000000
+
+(TEST) input: --return-decay-factor=909.909
+26: return-decay-factor Fd UNSAFE
+	value: 909.909000
+
+(TEST) input: --return-decay-factor=0.00567
+26: return-decay-factor Fd UNSAFE
+	value: 0.005670
+
+(TEST) input: -Fd0.125
+26: return-decay-factor Fd UNSAFE
+	value: 0.125000
+
+(TEST) input: -Fd707.76
+26: return-decay-factor Fd UNSAFE
+	value: 707.760000
+
+(TEST) input: --return-decay-factor=1125
+26: return-decay-factor Fd UNSAFE
+	value: 1125.000000
+
+(TEST) input: --return-decay-factor=909.909
+26: return-decay-factor Fd UNSAFE
+	value: 909.909000
+
+(TEST) input: --return-decay-factor=0.00567
+26: return-decay-factor Fd UNSAFE
+	value: 0.005670
+
+(TEST) input: -Fd0.125
+26: return-decay-factor Fd UNSAFE
+	value: 0.125000
+
+(TEST) input: -Fd707.76
+26: return-decay-factor Fd UNSAFE
+	value: 707.760000
 
 (TEST) input: --debug-scheduler
 27: debug-scheduler Ds SAFE
@@ -401,5 +577,53 @@
 
 (TEST) input: -DC
 45: debug-compact DC SAFE
+
+(TEST) input: --max-stack-size=8193
+46: max-stack-size K UNSAFE
+	value: 8193
+
+(TEST) input: --max-stack-size=8193K
+46: max-stack-size K UNSAFE
+	value: 8389632
+
+(TEST) input: --max-stack-size=2M
+46: max-stack-size K UNSAFE
+	value: 2097152
+
+(TEST) input: --max-stack-size=9G
+46: max-stack-size K UNSAFE
+	value: 9663676416
+
+(TEST) input: --max-stack-size=2G
+46: max-stack-size K UNSAFE
+	value: 2147483648
+
+(TEST) input: --max-stack-size=3333w
+46: max-stack-size K UNSAFE
+	value: 26664
+
+(TEST) input: -K8193
+46: max-stack-size K UNSAFE
+	value: 8193
+
+(TEST) input: -K8193k
+46: max-stack-size K UNSAFE
+	value: 8389632
+
+(TEST) input: -K2m
+46: max-stack-size K UNSAFE
+	value: 2097152
+
+(TEST) input: -K9g
+46: max-stack-size K UNSAFE
+	value: 9663676416
+
+(TEST) input: -K1G
+46: max-stack-size K UNSAFE
+	value: 1073741824
+
+(TEST) input: -K3333w
+46: max-stack-size K UNSAFE
+	value: 26664
 
 === OptParseTest END ===

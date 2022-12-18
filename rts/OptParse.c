@@ -35,9 +35,16 @@
         return NO_VAL(UNKNOWN_RTS_OPTION); \
     } while (false)
 
+#define OUT_OF_RANGE(error, name, min, max) \
+    do { \
+        *error = true; \
+        errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word " - %" FMT_Word ")", name, (W_)min, (W_)max); \
+        return NO_VAL(UNKNOWN_RTS_OPTION); \
+    } while (false)
+
 RtsFlagName
 rtsFlags[] = {
-    [HELP]                    = {SAFE,   VOID,      NULL,                              "?"  , false},
+    [HELP]                    = {SAFE,   VOID,      "help",                             "?" , false},
     [INSTALL_SIGNAL_HANDLERS] = {UNSAFE, BOOL,      "install-signal-handlers",          NULL, false},
     [INSTALL_SEH_HANDLERS]    = {UNSAFE, BOOL,      "install-seh-handlers",             NULL, false},
     [GENERATE_STACK_TRACES]   = {UNSAFE, BOOL,      "generate-stack-traces",            NULL, false},
@@ -51,8 +58,8 @@ rtsFlags[] = {
     [EVENTLOG_FLUSH_INTERVAL] = {SAFE,   DOUBLE,    "eventlog-flush-interval",          NULL,  true},
     [COPYING_GC]              = {SAFE,   VOID,      "copying-gc",                       NULL, false},
     [NONMOVING_GC]            = {SAFE,   VOID,      "nonmoving-gc",                     NULL, false},
-    [LARGE_OBJ_ALLOC_AREA]    = {UNSAFE, STGWORD64, "large-object-allocation",         "AL",  true},
-    [MIN_ALLOC_AREA]          = {UNSAFE, STGWORD64, "minimum-allocation-area-size",    "A",   true},
+    [LARGE_OBJ_ALLOC_AREA]    = {UNSAFE, STGWORD64, "large-object-allocation",          "AL",  true},
+    [MIN_ALLOC_AREA]          = {UNSAFE, STGWORD64, "minimum-allocation-area-size",     "A",   true},
 // #if defined(THREADED_RTS)
 // #if defined(mingw32_HOST_OS)
     [IO_MANAGER_THREADS]      = {UNSAFE, STGWORD64,  "io-manager-threads",              NULL,  true},
@@ -62,7 +69,7 @@ rtsFlags[] = {
 // #if defined(DEBUG) && defined(THREADED_RTS)
     [DEBUG_NUMA]              = {SAFE,   STGWORD64,  "debug-numa",                      NULL,  true},
 // #endif
-    [LONG_GC_SYNC]            = {SAFE,   DOUBLE,     "long-gc-sync",                    NULL, false},
+    [LONG_GC_SYNC]            = {SAFE,   DOUBLE,     "long-gc-sync",                    NULL,  true},
     [NO_AUTO_HEAP_SAMPLES]    = {UNSAFE, BOOL,       "no-automatic-heap-samples",       NULL, false},
     [NURSERY_CHUNK_SIZE]      = {UNSAFE, STGWORD64,  "alloc-area-chunksize",            "n",   true},
     [GC_BELL]                 = {UNSAFE, VOID,       "gc-bell",                         "B",  false},
@@ -91,6 +98,7 @@ rtsFlags[] = {
     [DEBUG_SPARKS]            = {SAFE,   VOID,       "debug-sparks",                    "Dr", false},
     [DEBUG_COMPACT]           = {SAFE,   VOID,       "debug-compact",                   "DC", false},
 // #endif
+    [MAX_STACK_SIZE]          = {UNSAFE, STGWORD64,  "max-stack-size",                  "K",   true},
     // The 'NULL' of flags. Long name just for debugging
     [UNKNOWN_RTS_OPTION]      = {SAFE,   VOID,       "UNKNOWN_RTS_OPTION",              NULL, false},
 };
@@ -99,7 +107,7 @@ static RtsFlagValue
 parse_flag_value(RtsFlagKey i, bool isLongName, char *arg, bool *error);
 
 static double
-parseDouble(const char *arg, bool *error)
+parseDouble(char *arg, bool *error)
 {
     char *endptr;
     double out;
@@ -123,12 +131,44 @@ parseDouble(const char *arg, bool *error)
     return out;
 }
 
+static
+bool valid_size(char c)
+{
+    char sizes[8] = "wWgGmMkK";
+    for (int i = 0; i < 8; i++) {
+        if (sizes[i] == c) return true;
+    }
+    return false;
+}
+
+// checks if str can be pased using decodeSize
+static
+bool is_valid_size(char *str) {
+    if (str == NULL || str[0] == '\0') {
+        return false;
+    }
+    // Check for a negative sign
+    int i = 0;
+    if (str[0] == '-') {
+        i = 1;
+    }
+    // Check for digits
+    for (; str[i] != '\0'; i++) {
+        if (i == strlen(str)-1
+            && valid_size(str[i])) { return true;
+        }
+        if (!isdigit(str[i])) {
+            return false;
+        }
+    }
+    return true;
+}
 
 static StgWord64
-decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max);
+decodeSize(char *flag, uint32_t offset, StgWord64 min, StgWord64 max, bool* error);
 
 static int
-find_first_numeric_char(const char *s) {
+find_first_numeric_char(char *s) {
     int len = strlen(s);
     for (int i = 0; i < len; i++) {
         if (isdigit(s[i])) {
@@ -139,7 +179,7 @@ find_first_numeric_char(const char *s) {
 }
 
 static char*
-name_from_arg(bool longName, const char* str) {
+name_from_arg(bool longName, char* str) {
     ASSERT(str != NULL);
     int i;
     int str_len = strlen(str);
@@ -190,15 +230,17 @@ parseArg(char *arg, bool *error)
 static RtsFlagValue
 parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
 {
+    // trim off hyphens
+    char* arg  = isLongName ? &arg0[2] : &arg0[1];
     RtsFlagName flag = rtsFlags[i];
     char* name = isLongName ? flag.longName : flag.shortName;
-    char *arg = isLongName ? &arg0[2] : &arg0[1];
     // offset at which value can be found. Does not account for potential `=`
-    int offset = isLongName ? strlen(flag.longName) : strlen(flag.shortName);
+    int offset = strlen(name);
     bool isSwitch = !rtsFlags[i].valueRequired && arg[offset] == '\0';
     bool hasValue = (isLongName && arg[offset] == '=' && arg[offset+1] != '\0')
                  || (!isLongName && arg[offset] != '\0');
 
+    // debugBelch("in: %s name %s isSwitch %i hasValue %i 'arg[offset] == '\0'?: %i\n", arg0, name, isSwitch, hasValue, arg[offset] == '\0');
     // missing value - return immediately
     if (!isSwitch && !hasValue) UNKNOWN_RTS_OPTION(error, arg0);
     if (isSwitch && hasValue) UNKNOWN_RTS_OPTION(error, arg0);
@@ -206,6 +248,9 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
     switch (flag.valueType) {
         case VOID: {
             switch (i) {
+            case INFO:
+            case COPYING_GC:
+            case NONMOVING_GC:
             case GC_BELL:
             case USE_MARK_REGION:
 // #if defined(DEBUG)
@@ -303,31 +348,45 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
             // account for '=' that is used with long-form names
             // some long-from names can have no value though so account for that as well
             if (isLongName && arg[offset] == '=') offset++;
+            if (hasValue && !is_valid_size(&arg[offset])) {
+                BAD_VALUE(error, arg);
+            }
+            StgWord64 min;
+            StgWord64 max;
             switch (i) {
                 case LARGE_OBJ_ALLOC_AREA: {
-                    value = decodeSize(arg, offset, 2*BLOCK_SIZE,
-                                    HS_INT_MAX) / BLOCK_SIZE;
+                    // minimum two blocks in the nursery, so that we have one
+                    // to grab for allocate().
+                    min = 2*BLOCK_SIZE;
+                    max = HS_INT_MAX;
+                    value = decodeSize(arg, offset, min, max, error);
                     break;
                 }
                 case MIN_ALLOC_AREA: {
                     // minimum two blocks in the nursery, so that we have one
                     // to grab for allocate().
-                    value = decodeSize(arg, offset, 2*BLOCK_SIZE,
-                                    HS_INT_MAX) / BLOCK_SIZE;
+                    min = 2*BLOCK_SIZE;
+                    max = HS_INT_MAX;
+                    value = decodeSize(arg, offset, min, max, error);
                     break;
                 }
 // #if defined(THREADED_RTS)
 // #if defined(mingw32_HOST_OS)
                 case IO_MANAGER_THREADS: {
-                    value = (StgWord64)strtol(arg + offset, (char **) NULL, 10);
+                    // this has to be uint32_t
+                    min = 0;
+                    max = HS_INT_MAX;
+                    value = decodeSize(arg, offset, min, max, error);
                     break;
                 }
 // #endif
                 case NUMA: {
+                    min = 0;
+                    max = HS_INT_MAX;
                     if (isSwitch) {
                         value = (StgWord64)~0;
                     } else if (hasValue) {
-                        value = (StgWord64)strtol(arg + offset, (char **) NULL, 10);
+                        value = decodeSize(arg, offset, min, max, error);
                     } else {
                         *error = true;
                         errorBelch("invalid RTS option: %s", arg0);
@@ -337,8 +396,10 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
 // #endif
 // #if defined(DEBUG) && defined(THREADED_RTS)
                 case DEBUG_NUMA: {
-                    if (isdigit(arg[offset]) && hasValue) {
-                        value = (StgWord64)strtol(arg + offset, (char **) NULL, 10);
+                    min = 0;
+                    max = MAX_NUMA_NODES;
+                    if (hasValue) {
+                        value = decodeSize(arg, offset, min, max, error);
                     } else {
                         UNKNOWN_RTS_OPTION(error, arg0);
                     }
@@ -351,10 +412,21 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
                 }
 // #endif
                 case NURSERY_CHUNK_SIZE: {
-                    value = decodeSize(arg, offset, 2*BLOCK_SIZE, HS_INT_MAX)
-                                / BLOCK_SIZE;
+                    min = 2*BLOCK_SIZE;
+                    max = HS_INT_MAX;
+                    value = decodeSize(arg, offset, min, max, error);
                     break;
                 }
+
+                case MAX_STACK_SIZE: {
+                    min = 0;
+                    max = HS_INT_MAX;
+                    value = decodeSize(arg, offset, min, max, error);
+                    break;
+                }
+            }
+            if (*error) {
+                OUT_OF_RANGE(error, arg, min, max);
             }
             return STGWORD64_VAL(i, value);
         }
@@ -368,7 +440,7 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
  * decodeSize: parse a string containing a size, like 300K or 1.2M
 -------------------------------------------------------------------------- */
 static StgWord64
-decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
+decodeSize(char *flag, uint32_t offset, StgWord64 min, StgWord64 max, bool *error)
 {
     char c;
     const char *s;
@@ -402,8 +474,9 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     if (m < 0 || val < min || val > max) {
         // printf doesn't like 64-bit format specs on Windows
         // apparently, so fall back to unsigned long.
-        errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word " - %" FMT_Word ")", flag, (W_)min, (W_)max);
-        stg_exit(EXIT_FAILURE);
+        *error = true;
+        // errorBelch("error in RTS option %s: size outside allowed range (%" FMT_Word " - %" FMT_Word ")", flag, (W_)min, (W_)max);
+        // stg_exit(EXIT_FAILURE);
     }
 
     // debugBelch("------- decodeSize val: %" FMT_Word64 "\n", val);
