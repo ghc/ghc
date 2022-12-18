@@ -481,7 +481,6 @@ abi-test-nightly:
       - out
   rules:
     - if: $NIGHTLY
-    - if: '$RELEASE_JOB == "yes"'
 
 ############################################################
 # Packaging
