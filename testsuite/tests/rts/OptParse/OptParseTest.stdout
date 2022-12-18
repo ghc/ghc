@@ -578,52 +578,196 @@
 (TEST) input: -DC
 45: debug-compact DC SAFE
 
-(TEST) input: --max-stack-size=8193
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=8193
+46: stack-max-size K UNSAFE
 	value: 8193
 
-(TEST) input: --max-stack-size=8193K
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=8193K
+46: stack-max-size K UNSAFE
 	value: 8389632
 
-(TEST) input: --max-stack-size=2M
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=2M
+46: stack-max-size K UNSAFE
 	value: 2097152
 
-(TEST) input: --max-stack-size=9G
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=9G
+46: stack-max-size K UNSAFE
 	value: 9663676416
 
-(TEST) input: --max-stack-size=2G
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=2G
+46: stack-max-size K UNSAFE
 	value: 2147483648
 
-(TEST) input: --max-stack-size=3333w
-46: max-stack-size K UNSAFE
+(TEST) input: --stack-max-size=3333w
+46: stack-max-size K UNSAFE
 	value: 26664
 
 (TEST) input: -K8193
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
 	value: 8193
 
 (TEST) input: -K8193k
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
 	value: 8389632
 
 (TEST) input: -K2m
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
 	value: 2097152
 
 (TEST) input: -K9g
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
 	value: 9663676416
 
 (TEST) input: -K1G
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
 	value: 1073741824
 
 (TEST) input: -K3333w
-46: max-stack-size K UNSAFE
+46: stack-max-size K UNSAFE
+	value: 26664
+
+(TEST) input: --stack-chunk-size=8193
+47: stack-chunk-size kc UNSAFE
+	value: 8193
+
+(TEST) input: --stack-chunk-size=8193K
+47: stack-chunk-size kc UNSAFE
+	value: 8389632
+
+(TEST) input: --stack-chunk-size=2M
+47: stack-chunk-size kc UNSAFE
+	value: 2097152
+
+(TEST) input: --stack-chunk-size=9G
+47: stack-chunk-size kc UNSAFE
+	value: 9663676416
+
+(TEST) input: --stack-chunk-size=2G
+47: stack-chunk-size kc UNSAFE
+	value: 2147483648
+
+(TEST) input: --stack-chunk-size=3333w
+47: stack-chunk-size kc UNSAFE
+	value: 26664
+
+(TEST) input: -kc8193
+47: stack-chunk-size kc UNSAFE
+	value: 8193
+
+(TEST) input: -kc8193k
+47: stack-chunk-size kc UNSAFE
+	value: 8389632
+
+(TEST) input: -kc2m
+47: stack-chunk-size kc UNSAFE
+	value: 2097152
+
+(TEST) input: -kc9g
+47: stack-chunk-size kc UNSAFE
+	value: 9663676416
+
+(TEST) input: -kc1G
+47: stack-chunk-size kc UNSAFE
+	value: 1073741824
+
+(TEST) input: -kc3333w
+47: stack-chunk-size kc UNSAFE
+	value: 26664
+
+(TEST) input: --stack-chunk-buffer-size=8193
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 8193
+
+(TEST) input: --stack-chunk-buffer-size=8193K
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 8389632
+
+(TEST) input: --stack-chunk-buffer-size=2M
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 2097152
+
+(TEST) input: --stack-chunk-buffer-size=9G
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 9663676416
+
+(TEST) input: --stack-chunk-buffer-size=2G
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 2147483648
+
+(TEST) input: --stack-chunk-buffer-size=3333w
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 26664
+
+(TEST) input: -kb8193
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 8193
+
+(TEST) input: -kb8193k
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 8389632
+
+(TEST) input: -kb2m
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 2097152
+
+(TEST) input: -kb9g
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 9663676416
+
+(TEST) input: -kb1G
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 1073741824
+
+(TEST) input: -kb3333w
+48: stack-chunk-buffer-size kb UNSAFE
+	value: 26664
+
+(TEST) input: --stack-initial-size=8193
+49: stack-initial-size ki UNSAFE
+	value: 8193
+
+(TEST) input: --stack-initial-size=8193K
+49: stack-initial-size ki UNSAFE
+	value: 8389632
+
+(TEST) input: --stack-initial-size=2M
+49: stack-initial-size ki UNSAFE
+	value: 2097152
+
+(TEST) input: --stack-initial-size=9G
+49: stack-initial-size ki UNSAFE
+	value: 9663676416
+
+(TEST) input: --stack-initial-size=2G
+49: stack-initial-size ki UNSAFE
+	value: 2147483648
+
+(TEST) input: --stack-initial-size=3333w
+49: stack-initial-size ki UNSAFE
+	value: 26664
+
+(TEST) input: -ki8193
+49: stack-initial-size ki UNSAFE
+	value: 8193
+
+(TEST) input: -ki8193k
+49: stack-initial-size ki UNSAFE
+	value: 8389632
+
+(TEST) input: -ki2m
+49: stack-initial-size ki UNSAFE
+	value: 2097152
+
+(TEST) input: -ki9g
+49: stack-initial-size ki UNSAFE
+	value: 9663676416
+
+(TEST) input: -ki1G
+49: stack-initial-size ki UNSAFE
+	value: 1073741824
+
+(TEST) input: -ki3333w
+49: stack-initial-size ki UNSAFE
 	value: 26664
 
 === OptParseTest END ===

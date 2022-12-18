@@ -98,7 +98,10 @@ rtsFlags[] = {
     [DEBUG_SPARKS]            = {SAFE,   VOID,       "debug-sparks",                    "Dr", false},
     [DEBUG_COMPACT]           = {SAFE,   VOID,       "debug-compact",                   "DC", false},
 // #endif
-    [MAX_STACK_SIZE]          = {UNSAFE, STGWORD64,  "max-stack-size",                  "K",   true},
+    [MAX_STACK_SIZE]          = {UNSAFE, STGWORD64,  "stack-max-size",                  "K",   true},
+    [STACK_CHUNK_SIZE]        = {UNSAFE, STGWORD64,  "stack-chunk-size",                "kc",  true},
+    [STACK_CHUNK_BUFFER_SIZE] = {UNSAFE, STGWORD64,  "stack-chunk-buffer-size",         "kb",  true},
+    [STACK_INITIAL_SIZE]      = {UNSAFE, STGWORD64,  "stack-initial-size",              "ki",  true},
     // The 'NULL' of flags. Long name just for debugging
     [UNKNOWN_RTS_OPTION]      = {SAFE,   VOID,       "UNKNOWN_RTS_OPTION",              NULL, false},
 };
@@ -418,9 +421,12 @@ parse_flag_value(RtsFlagKey i, bool isLongName, char *arg0, bool *error)
                     break;
                 }
 
-                case MAX_STACK_SIZE: {
-                    min = 0;
-                    max = HS_INT_MAX;
+                case MAX_STACK_SIZE:
+                case STACK_CHUNK_SIZE:
+                case STACK_CHUNK_BUFFER_SIZE:
+                case STACK_INITIAL_SIZE: {
+                    min = sizeof(W_);
+                    max = HS_WORD_MAX;
                     value = decodeSize(arg, offset, min, max, error);
                     break;
                 }

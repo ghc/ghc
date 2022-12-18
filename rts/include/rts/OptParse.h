@@ -73,6 +73,9 @@ typedef enum _RtsFlagKey {
     DEBUG_COMPACT,
 // #endif
     MAX_STACK_SIZE,
+    STACK_CHUNK_SIZE,
+    STACK_CHUNK_BUFFER_SIZE,
+    STACK_INITIAL_SIZE,
 
     UNKNOWN_RTS_OPTION,
 } RtsFlagKey;
