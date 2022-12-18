@@ -266,6 +266,7 @@ import GHC.SysTools.BaseDir (findTopDir)
 
 import Data.Data hiding (Fixity, TyCon)
 import Data.List        ( nub, isPrefixOf, partition )
+import qualified Data.List.NonEmpty as NE
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -445,11 +446,15 @@ ioMsgMaybe' ioA = do
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
 
-hscTcRnLookupRdrName :: HscEnv -> LocatedN RdrName -> IO [Name]
+hscTcRnLookupRdrName :: HscEnv -> LocatedN RdrName -> IO (NonEmpty Name)
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe $ hoistTcRnMessage $ tcRnLookupRdrName hsc_env rdr_name }
+       -- tcRnLookupRdrName can return empty list only together with TcRnUnknownMessage.
+       -- Once errors has been dealt with in hoistTcRnMessage, we can enforce
+       -- this invariant in types by converting to NonEmpty.
+       ; ioMsgMaybe $ fmap (fmap (>>= NE.nonEmpty)) $ hoistTcRnMessage $
+          tcRnLookupRdrName hsc_env rdr_name }
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do

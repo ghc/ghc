@@ -1057,10 +1057,7 @@ installInteractivePrint :: GhciMonad m => Maybe String -> Bool -> m ()
 installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
-                names <- GHC.parseName ipFun
-                let name = case names of
-                             name':_ -> name'
-                             [] -> panic "installInteractivePrint"
+                name NE.:| _ <- GHC.parseName ipFun
                 modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
@@ -1599,7 +1596,7 @@ infoThing allInfo str = do
     names     <- GHC.parseName str
     mb_stuffs <- mapM (GHC.getInfo allInfo) names
     let filtered = filterOutChildren (\(t,_f,_ci,_fi,_sd) -> t)
-                                     (catMaybes mb_stuffs)
+                                     (catMaybes (NE.toList mb_stuffs))
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
   -- Filter out names whose parent is also there. Good
@@ -1920,7 +1917,7 @@ docCmd s  = do
 
   docs <- traverse (buildDocComponents s) names
 
-  let sdocs = pprDocs docs
+  let sdocs = pprDocs (NE.toList docs)
       sdocs' = vcat (intersperse (text "") sdocs)
   sdoc <- showSDocForUser' sdocs'
   liftIO (putStrLn sdoc)
@@ -3657,7 +3654,7 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     createInscope :: GhciMonad m => String -> m [(String, Module)]
     createInscope str_rdr = do
         names <- GHC.parseName str_rdr
-        pure $ zip (repeat str_rdr) $ GHC.nameModule <$> names
+        pure $ map (str_rdr, ) $ NE.toList $ GHC.nameModule <$> names
 
     -- For every top-level identifier in scope, add the bids of the nested
     -- declarations. See Note [Field modBreaks_decls] in GHC.ByteCode.Types
@@ -4109,9 +4106,7 @@ breakById inp = do
     lookupModuleInscope :: GhciMonad m => String -> m (Maybe Module)
     lookupModuleInscope mod_top_lvl = do
         names <- GHC.parseName mod_top_lvl
-        pure $ listToMaybe $ GHC.nameModule <$> names
-          -- if GHC.parseName succeeds `names` is not empty!
-          -- if it fails, the last line will not be evaluated.
+        pure $ Just $ NE.head $ GHC.nameModule <$> names
 
     -- Lookup the Module of a module name in the module graph
     lookupModuleInGraph :: GhciMonad m => String -> m (Maybe Module)
@@ -4644,20 +4639,17 @@ wantNameFromInterpretedModule :: GHC.GhcMonad m
                               -> m ()
 wantNameFromInterpretedModule noCanDo str and_then =
   handleSourceError GHC.printException $ do
-   names <- GHC.parseName str
-   case names of
-      []    -> return ()
-      (n:_) -> do
-            let modl = assert (isExternalName n) $ GHC.nameModule n
-            if not (GHC.isExternalName n)
-               then noCanDo n $ ppr n <>
-                                text " is not defined in an interpreted module"
-               else do
-            is_interpreted <- GHC.moduleIsInterpreted modl
-            if not is_interpreted
-               then noCanDo n $ text "module " <> ppr modl <>
-                                text " is not interpreted"
-               else and_then n
+    n NE.:| _ <- GHC.parseName str
+    let modl = assert (isExternalName n) $ GHC.nameModule n
+    if not (GHC.isExternalName n)
+       then noCanDo n $ ppr n <>
+                        text " is not defined in an interpreted module"
+       else do
+    is_interpreted <- GHC.moduleIsInterpreted modl
+    if not is_interpreted
+       then noCanDo n $ text "module " <> ppr modl <>
+                        text " is not interpreted"
+       else and_then n
 
 clearCaches :: GhciMonad m => m ()
 clearCaches = discardActiveBreakPoints

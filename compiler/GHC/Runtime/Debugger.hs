@@ -49,6 +49,7 @@ import GHC.Types.TyThing
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.List ( (\\), partition )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.IORef
 
@@ -57,7 +58,7 @@ import Data.IORef
 -------------------------------------
 pprintClosureCommand :: GhcMonad m => Bool -> Bool -> String -> m ()
 pprintClosureCommand bindThings force str = do
-  tythings <- (catMaybes . concat) `liftM`
+  tythings <- (catMaybes . concatMap NE.toList) `liftM`
                  mapM (\w -> GHC.parseName w >>=
                                 mapM GHC.lookupName)
                       (words str)

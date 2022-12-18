@@ -121,6 +121,7 @@ import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
+import Data.List.NonEmpty (NonEmpty)
 import Control.Monad
 import Control.Monad.Catch as MC
 import Data.Array
@@ -903,7 +904,7 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
 
 -- | Parses a string as an identifier, and returns the list of 'Name's that
 -- the identifier can refer to in the current interactive context.
-parseName :: GhcMonad m => String -> m [Name]
+parseName :: GhcMonad m => String -> m (NonEmpty Name)
 parseName str = withSession $ \hsc_env -> liftIO $
    do { lrdr_name <- hscParseIdentifier hsc_env str
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
