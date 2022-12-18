@@ -1,8 +1,8 @@
 module AddDecl where
 
-nn = n2
-
 -- Adding a declaration to an existing file
+
+nn = n2
 
 -- | Do foo
 foo a b = a + b

@@ -556,7 +556,7 @@ data EpAnnComments = EpaComments
                     | EpaCommentsBalanced
                         { priorComments :: ![LEpaComment]
                         , followingComments :: ![LEpaComment] }
-        deriving (Data, Eq)
+        deriving (Data, Eq, Show)
 
 type LEpaComment = GenLocated EpaLocation EpaComment
 

@@ -283,7 +283,7 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
     EpaSpan _ _ -> return ()
   p <- getPosP
   debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
-  -- debugM $ "enterAnn:(cs) =" ++ showGhc (cs)
+  debugM $ "enterAnn:(cs) =" ++ showGhc (cs)
   -- let curAnchor = anchor anchor' -- As a base for the current AST element
   priorAnchor <- getAnchorU
   let curAnchor = case anchor' of -- As a base for the current AST element
@@ -298,6 +298,7 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   printComments curAnchor
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
+  debugM $ "enterAnn:(acceptSpan, curAnchor):" ++ showGhc (acceptSpan, ss2pos curAnchor)
   case anchor' of
     EpaDelta dp _ -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
@@ -449,6 +450,7 @@ flushComments trailing = do
   debugM $ "flushing comments starting"
   mapM_ printOneComment (sortComments cs)
   debugM $ "flushing comments done"
+  putUnallocatedComments []
 
 -- ---------------------------------------------------------------------
 
@@ -1442,6 +1444,11 @@ instance ExactPrint (HsModule GhcPs) where
           an1 <- setLayoutTopLevelP $ markEpAnnL an0 lam_main AnnWhere
 
           return (an1, Just m', mdeprec', mexports')
+
+
+    -- Get rid of the balance of the header comments
+    -- cs <- getUnallocatedComments
+    flushComments []
 
     let ann_decls = EpAnn (entry an) (am_decls $ anns an0) emptyComments
     (ann_decls', (decls', imports')) <- markAnnList' False ann_decls $ do

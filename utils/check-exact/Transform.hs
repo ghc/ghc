@@ -909,11 +909,11 @@ insertAt :: (HasDecls ast)
 insertAt f t decl = do
   oldDecls <- hsDecls t
   oldDeclsb <- balanceCommentsList oldDecls
-          `debug` ( "oldDecls:" ++ showAst oldDecls)
+          -- `debug` ( "oldDecls:" ++ showAst oldDecls)
   let oldDecls' = map commentsOrigDeltasDecl oldDeclsb
-          `debug` ("oldDeclsb:" ++ showAst oldDeclsb)
+          -- `debug` ("oldDeclsb:" ++ showAst oldDeclsb)
   r <- replaceDecls t (f decl oldDecls')
-          `debug` ("oldDecls':" ++ showAst oldDecls')
+          -- `debug` ("oldDecls':" ++ showAst oldDecls')
   return r
 
 -- |Insert a declaration at the beginning or end of the subdecls of the given

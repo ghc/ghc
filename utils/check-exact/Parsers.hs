@@ -264,7 +264,8 @@ parseModuleEpAnnsWithCppInternal cppOptions dflags file = do
       GHC.PFailed pst
         -> Left (GHC.GhcPsMessage <$> GHC.getPsErrorMessages pst)
       GHC.POk _ pmod
-        -> Right $ (injectedComments, dflags', fixModuleTrailingComments pmod)
+        -- -> Right $ (injectedComments, dflags', fixModuleTrailingComments pmod)
+        -> Right $ (injectedComments, dflags', pmod)
 
 -- | Internal function. Exposed if you want to muck with DynFlags
 -- before parsing. Or after parsing.
