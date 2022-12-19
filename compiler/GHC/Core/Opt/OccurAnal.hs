@@ -1812,7 +1812,8 @@ occAnalLam :: OccEnv -> CoreExpr -> (WithUsageDetails CoreExpr)
 
 occAnalLam env (Lam bndr expr)
   | isTyVar bndr
-  = let (WithUsageDetails usage expr') = occAnalLam env expr
+  = let env1 = addOneInScope env bndr
+        WithUsageDetails usage expr' = occAnalLam env1 expr
     in WithUsageDetails usage (Lam bndr expr')
        -- Important: Keep the 'env' unchanged so that with a RHS like
        --   \(@ x) -> K @x (f @x)
@@ -2458,9 +2459,10 @@ data OccEnv
            -- then please replace x by (y |> sym mco)
            -- Invariant of course: idType x = exprType (y |> sym mco)
            , occ_bs_env  :: !(VarEnv (OutId, MCoercion))
-           , occ_bs_rng  :: !VarSet   -- Vars free in the range of occ_bs_env
                    -- Domain is Global and Local Ids
                    -- Range is just Local Ids
+           , occ_bs_rng  :: !VarSet
+                   -- Vars (TyVars and Ids) free in the range of occ_bs_env
     }
 
 
@@ -2537,14 +2539,15 @@ isRhsEnv (OccEnv { occ_encl = cxt }) = case cxt of
                                           _      -> False
 
 addOneInScope :: OccEnv -> CoreBndr -> OccEnv
+-- Needed for all Vars not just Ids
+-- See Note [The binder-swap substitution] (BS3)
 addOneInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndr
   | bndr `elemVarSet` rng_vars = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
   | otherwise                  = env { occ_bs_env = swap_env `delVarEnv` bndr }
 
 addInScope :: OccEnv -> [Var] -> OccEnv
--- See Note [The binder-swap substitution]
--- It's only neccessary to call this on in-scope Ids,
--- but harmless to include TyVars too
+-- Needed for all Vars not just Ids
+-- See Note [The binder-swap substitution] (BS3)
 addInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndrs
   | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
   | otherwise                         = env { occ_bs_env = swap_env `delVarEnvList` bndrs }
@@ -2703,25 +2706,29 @@ Some tricky corners:
 
 (BS3) We need care when shadowing.  Suppose [x :-> b] is in occ_bs_env,
       and we encounter:
-         - \x. blah
-           Here we want to delete the x-binding from occ_bs_env
+         (i) \x. blah
+             Here we want to delete the x-binding from occ_bs_env
 
-         - \b. blah
-           This is harder: we really want to delete all bindings that
-           have 'b' free in the range.  That is a bit tiresome to implement,
-           so we compromise.  We keep occ_bs_rng, which is the set of
-           free vars of rng(occc_bs_env).  If a binder shadows any of these
-           variables, we discard all of occ_bs_env.  Safe, if a bit
-           brutal.  NB, however: the simplifer de-shadows the code, so the
-           next time around this won't happen.
+         (ii) \b. blah
+              This is harder: we really want to delete all bindings that
+              have 'b' free in the range.  That is a bit tiresome to implement,
+              so we compromise.  We keep occ_bs_rng, which is the set of
+              free vars of rng(occc_bs_env).  If a binder shadows any of these
+              variables, we discard all of occ_bs_env.  Safe, if a bit
+              brutal.  NB, however: the simplifer de-shadows the code, so the
+              next time around this won't happen.
 
       These checks are implemented in addInScope.
+      (i) is needed only for Ids, but (ii) is needed for tyvars too (#22623)
+      because if occ_bs_env has [x :-> ...a...] where `a` is a tyvar, we
+      must not replace `x` by `...a...` under /\a. ...x..., or similarly
+      under a case pattern match that binds `a`.
 
-      The occurrence analyser itself does /not/ do cloning. It could, in
-      principle, but it'd make it a bit more complicated and there is no
-      great benefit. The simplifer uses cloning to get a no-shadowing
-      situation, the care-when-shadowing behaviour above isn't needed for
-      long.
+      An alternative would be for the occurrence analyser to do cloning as
+      it goes.  In principle it could do so, but it'd make it a bit more
+      complicated and there is no great benefit. The simplifer uses
+      cloning to get a no-shadowing situation, the care-when-shadowing
+      behaviour above isn't needed for long.
 
 (BS4) The domain of occ_bs_env can include GlobaIds.  Eg
          case M.foo of b { alts }
