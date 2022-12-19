@@ -132,7 +132,11 @@ data SimplifyOpts = SimplifyOpts
   { so_dump_core_sizes :: !Bool
   , so_iterations      :: !Int
   , so_mode            :: !SimplMode
+
   , so_pass_result_cfg :: !(Maybe LintPassResultConfig)
+                          -- Nothing => Do not Lint
+                          -- Just cfg => Lint like this
+
   , so_hpt_rules       :: !RuleBase
   , so_top_env_cfg     :: !TopEnvConfig
   }
