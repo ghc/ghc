@@ -770,4 +770,100 @@
 49: stack-initial-size ki UNSAFE
 	value: 26664
 
+(TEST) input: --heap-limit-grace=8193
+50: heap-limit-grace Mgrace UNSAFE
+	value: 8193
+
+(TEST) input: --heap-limit-grace=8193K
+50: heap-limit-grace Mgrace UNSAFE
+	value: 8389632
+
+(TEST) input: --heap-limit-grace=2M
+50: heap-limit-grace Mgrace UNSAFE
+	value: 2097152
+
+(TEST) input: --heap-limit-grace=9G
+50: heap-limit-grace Mgrace UNSAFE
+	value: 9663676416
+
+(TEST) input: --heap-limit-grace=2G
+50: heap-limit-grace Mgrace UNSAFE
+	value: 2147483648
+
+(TEST) input: --heap-limit-grace=3333w
+50: heap-limit-grace Mgrace UNSAFE
+	value: 26664
+
+(TEST) input: -Mgrace8193
+50: heap-limit-grace Mgrace UNSAFE
+	value: 8193
+
+(TEST) input: -Mgrace8193k
+50: heap-limit-grace Mgrace UNSAFE
+	value: 8389632
+
+(TEST) input: -Mgrace2m
+50: heap-limit-grace Mgrace UNSAFE
+	value: 2097152
+
+(TEST) input: -Mgrace9g
+50: heap-limit-grace Mgrace UNSAFE
+	value: 9663676416
+
+(TEST) input: -Mgrace1G
+50: heap-limit-grace Mgrace UNSAFE
+	value: 1073741824
+
+(TEST) input: -Mgrace3333w
+50: heap-limit-grace Mgrace UNSAFE
+	value: 26664
+
+(TEST) input: --heap-limit-size=8193
+51: heap-limit-size M UNSAFE
+	value: 8193
+
+(TEST) input: --heap-limit-size=8193K
+51: heap-limit-size M UNSAFE
+	value: 8389632
+
+(TEST) input: --heap-limit-size=2M
+51: heap-limit-size M UNSAFE
+	value: 2097152
+
+(TEST) input: --heap-limit-size=9G
+51: heap-limit-size M UNSAFE
+	value: 9663676416
+
+(TEST) input: --heap-limit-size=2G
+51: heap-limit-size M UNSAFE
+	value: 2147483648
+
+(TEST) input: --heap-limit-size=3333w
+51: heap-limit-size M UNSAFE
+	value: 26664
+
+(TEST) input: -M8193
+51: heap-limit-size M UNSAFE
+	value: 8193
+
+(TEST) input: -M8193k
+51: heap-limit-size M UNSAFE
+	value: 8389632
+
+(TEST) input: -M2m
+51: heap-limit-size M UNSAFE
+	value: 2097152
+
+(TEST) input: -M9g
+51: heap-limit-size M UNSAFE
+	value: 9663676416
+
+(TEST) input: -M1G
+51: heap-limit-size M UNSAFE
+	value: 1073741824
+
+(TEST) input: -M3333w
+51: heap-limit-size M UNSAFE
+	value: 26664
+
 === OptParseTest END ===

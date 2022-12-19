@@ -76,6 +76,8 @@ typedef enum _RtsFlagKey {
     STACK_CHUNK_SIZE,
     STACK_CHUNK_BUFFER_SIZE,
     STACK_INITIAL_SIZE,
+    HEAP_LIMIT_GRACE,
+    HEAP_LIMIT_SIZE,
 
     UNKNOWN_RTS_OPTION,
 } RtsFlagKey;

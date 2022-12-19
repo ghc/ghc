@@ -1988,3 +1988,159 @@ unknown RTS option: -ki=true
 
 (FAIL_TEST) input: -kijhgl
 unknown RTS option: -kijhgl
+
+(TEST) input: --heap-limit-grace=8193
+50: heap-limit-grace Mgrace UNSAFE
+expected: 8193 actual: 8193
+
+(TEST) input: --heap-limit-grace=8193K
+50: heap-limit-grace Mgrace UNSAFE
+expected: 8389632 actual: 8389632
+
+(TEST) input: --heap-limit-grace=2M
+50: heap-limit-grace Mgrace UNSAFE
+expected: 2097152 actual: 2097152
+
+(TEST) input: --heap-limit-grace=9G
+50: heap-limit-grace Mgrace UNSAFE
+expected: 9663676416 actual: 9663676416
+
+(TEST) input: --heap-limit-grace=2G
+50: heap-limit-grace Mgrace UNSAFE
+expected: 2147483648 actual: 2147483648
+
+(TEST) input: --heap-limit-grace=3333w
+50: heap-limit-grace Mgrace UNSAFE
+expected: 26664 actual: 26664
+
+(FAIL_TEST) input: --heap-limit-grace=
+unknown RTS option: --heap-limit-grace=
+
+(FAIL_TEST) input: --heap-limit-grace=fbar
+bad value for heap-limit-grace=fbar
+
+(FAIL_TEST) input: --heap-limit-grace=false
+bad value for heap-limit-grace=false
+
+(FAIL_TEST) input: --heap-limit-grace=true
+bad value for heap-limit-grace=true
+
+(FAIL_TEST) input: --heap-limit-gracexxzag
+unknown RTS option: --heap-limit-gracexxzag
+
+(TEST) input: -Mgrace8193
+50: heap-limit-grace Mgrace UNSAFE
+expected: 8193 actual: 8193
+
+(TEST) input: -Mgrace8193k
+50: heap-limit-grace Mgrace UNSAFE
+expected: 8389632 actual: 8389632
+
+(TEST) input: -Mgrace2m
+50: heap-limit-grace Mgrace UNSAFE
+expected: 2097152 actual: 2097152
+
+(TEST) input: -Mgrace9g
+50: heap-limit-grace Mgrace UNSAFE
+expected: 9663676416 actual: 9663676416
+
+(TEST) input: -Mgrace1G
+50: heap-limit-grace Mgrace UNSAFE
+expected: 1073741824 actual: 1073741824
+
+(TEST) input: -Mgrace3333w
+50: heap-limit-grace Mgrace UNSAFE
+expected: 26664 actual: 26664
+
+(FAIL_TEST) input: -Mgrace=
+unknown RTS option: -Mgrace=
+
+(FAIL_TEST) input: -Mgrace=baz
+unknown RTS option: -Mgrace=baz
+
+(FAIL_TEST) input: -Mgrace=false
+unknown RTS option: -Mgrace=false
+
+(FAIL_TEST) input: -Mgrace=true
+unknown RTS option: -Mgrace=true
+
+(FAIL_TEST) input: -Mgracejhgl
+unknown RTS option: -Mgracejhgl
+
+(TEST) input: --heap-limit-size=8193
+51: heap-limit-size M UNSAFE
+expected: 8193 actual: 8193
+
+(TEST) input: --heap-limit-size=8193K
+51: heap-limit-size M UNSAFE
+expected: 8389632 actual: 8389632
+
+(TEST) input: --heap-limit-size=2M
+51: heap-limit-size M UNSAFE
+expected: 2097152 actual: 2097152
+
+(TEST) input: --heap-limit-size=9G
+51: heap-limit-size M UNSAFE
+expected: 9663676416 actual: 9663676416
+
+(TEST) input: --heap-limit-size=2G
+51: heap-limit-size M UNSAFE
+expected: 2147483648 actual: 2147483648
+
+(TEST) input: --heap-limit-size=3333w
+51: heap-limit-size M UNSAFE
+expected: 26664 actual: 26664
+
+(FAIL_TEST) input: --heap-limit-size=
+unknown RTS option: --heap-limit-size=
+
+(FAIL_TEST) input: --heap-limit-size=fbar
+bad value for heap-limit-size=fbar
+
+(FAIL_TEST) input: --heap-limit-size=false
+bad value for heap-limit-size=false
+
+(FAIL_TEST) input: --heap-limit-size=true
+bad value for heap-limit-size=true
+
+(FAIL_TEST) input: --heap-limit-sizexxzag
+unknown RTS option: --heap-limit-sizexxzag
+
+(TEST) input: -M8193
+51: heap-limit-size M UNSAFE
+expected: 8193 actual: 8193
+
+(TEST) input: -M8193k
+51: heap-limit-size M UNSAFE
+expected: 8389632 actual: 8389632
+
+(TEST) input: -M2m
+51: heap-limit-size M UNSAFE
+expected: 2097152 actual: 2097152
+
+(TEST) input: -M9g
+51: heap-limit-size M UNSAFE
+expected: 9663676416 actual: 9663676416
+
+(TEST) input: -M1G
+51: heap-limit-size M UNSAFE
+expected: 1073741824 actual: 1073741824
+
+(TEST) input: -M3333w
+51: heap-limit-size M UNSAFE
+expected: 26664 actual: 26664
+
+(FAIL_TEST) input: -M=
+unknown RTS option: -M=
+
+(FAIL_TEST) input: -M=baz
+unknown RTS option: -M=baz
+
+(FAIL_TEST) input: -M=false
+unknown RTS option: -M=false
+
+(FAIL_TEST) input: -M=true
+unknown RTS option: -M=true
+
+(FAIL_TEST) input: -Mjhgl
+unknown RTS option: -Mjhgl

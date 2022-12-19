@@ -79,6 +79,9 @@ int main (int argc, char *argv[])
      STGWORD64_FLAG_TEST(STACK_CHUNK_BUFFER_SIZE);
      STGWORD64_FLAG_TEST(STACK_INITIAL_SIZE);
 
+     STGWORD64_FLAG_TEST(HEAP_LIMIT_GRACE);
+     STGWORD64_FLAG_TEST(HEAP_LIMIT_SIZE);
+
      printf("\n=== OptParseTest END ===\n");
      return 0;
 }
