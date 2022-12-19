@@ -65,7 +65,7 @@ import GHC.Core.Map.Expr
 import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
 import GHC.Core.Utils     (exprType)
-import GHC.Core.Make      (mkListExpr, mkCharExpr, mkRuntimeErrorApp, rUNTIME_ERROR_ID)
+import GHC.Core.Make      (mkListExpr, mkCharExpr, mkImpossibleExpr)
 
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
@@ -972,7 +972,7 @@ makeDictsCoherent :: CoreExpr -> CoreExpr
 makeDictsCoherent var@(Var v)
   | let ty = idType v
   , typeDeterminesValue ty
-  = mkRuntimeErrorApp rUNTIME_ERROR_ID ty "dictionary"
+  = mkImpossibleExpr ty "Solver.makeDictsCoherent"
   | otherwise
   = var
 makeDictsCoherent lit@(Lit {})

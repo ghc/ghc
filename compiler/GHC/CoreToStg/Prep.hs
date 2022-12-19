@@ -868,8 +868,7 @@ cpeRhsE env (Case scrut bndr ty alts)
                , not (altsAreExhaustive alts)
                = addDefault alts (Just err)
                | otherwise = alts
-               where err = mkRuntimeErrorApp rUNTIME_ERROR_ID ty
-                                             "Bottoming expression returned"
+               where err = mkImpossibleExpr ty "cpeRhsE: missing case alternative"
        ; alts'' <- mapM (sat_alt env') alts'
 
        ; return (floats, Case scrut' bndr2 ty alts'') }

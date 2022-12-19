@@ -3528,7 +3528,7 @@ missingAlt env case_bndr _ cont
     -- See Note [Avoiding space leaks in OutType]
     let cont_ty = contResultType cont
     in seqType cont_ty `seq`
-       return (emptyFloats env, mkImpossibleExpr cont_ty)
+       return (emptyFloats env, mkImpossibleExpr cont_ty "Simplify.Iteration.missingAlt")
 
 {-
 ************************************************************************
