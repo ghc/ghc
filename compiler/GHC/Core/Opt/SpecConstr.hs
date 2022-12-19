@@ -1500,7 +1500,7 @@ scExpr' env (Case scrut b ty alts)
   where
     sc_con_app con args scrut'  -- Known constructor; simplify
      = do { let Alt _ bs rhs = findAlt con alts
-                                  `orElse` Alt DEFAULT [] (mkImpossibleExpr ty)
+                                  `orElse` Alt DEFAULT [] (mkImpossibleExpr ty "SpecConstr")
                 alt_env'     = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
           ; scExpr alt_env' rhs }
 

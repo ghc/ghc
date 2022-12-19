@@ -44,7 +44,7 @@ module GHC.Core.Make (
 
         -- * Error Ids
         mkRuntimeErrorApp, mkImpossibleExpr, mkAbsentErrorApp, errorIds,
-        rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
+        rEC_CON_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID,
         tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
@@ -58,6 +58,7 @@ import GHC.Types.Var  ( EvVar, setTyVarUnique, visArgConstraintLike )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
+import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Types.Demand
 import GHC.Types.Name      hiding ( varName )
 import GHC.Types.Literal
@@ -847,7 +848,9 @@ mkJustExpr ty val = mkConApp justDataCon [Type ty, val]
 -}
 
 mkRuntimeErrorApp
-        :: Id           -- Should be of type (forall a. Addr# -> a)
+        :: Id           -- Should be of type
+                        --   forall (r::RuntimeRep) (a::TYPE r). Addr# -> a
+                        --      or (a :: CONSTRAINT r)
                         --      where Addr# points to a UTF8 encoded string
         -> Type         -- The type to instantiate 'a'
         -> String       -- The string to print
@@ -858,10 +861,6 @@ mkRuntimeErrorApp err_id res_ty err_msg
                         , Type res_ty, err_string ]
   where
     err_string = Lit (mkLitString err_msg)
-
-mkImpossibleExpr :: Type -> CoreExpr
-mkImpossibleExpr res_ty
-  = mkRuntimeErrorApp rUNTIME_ERROR_ID res_ty "Impossible case alternative"
 
 {-
 ************************************************************************
@@ -884,25 +883,23 @@ crash).
 
 errorIds :: [Id]
 errorIds
-  = [ rUNTIME_ERROR_ID,
-      nON_EXHAUSTIVE_GUARDS_ERROR_ID,
+  = [ nON_EXHAUSTIVE_GUARDS_ERROR_ID,
       nO_METHOD_BINDING_ERROR_ID,
       pAT_ERROR_ID,
       rEC_CON_ERROR_ID,
       rEC_SEL_ERROR_ID,
-      aBSENT_ERROR_ID, aBSENT_CONSTRAINT_ERROR_ID,
+      iMPOSSIBLE_ERROR_ID, iMPOSSIBLE_CONSTRAINT_ERROR_ID,
+      aBSENT_ERROR_ID,  aBSENT_CONSTRAINT_ERROR_ID,
       aBSENT_SUM_FIELD_ERROR_ID,
       tYPE_ERROR_ID   -- Used with Opt_DeferTypeErrors, see #10284
       ]
 
-recSelErrorName, runtimeErrorName :: Name
-recConErrorName, patErrorName :: Name
+recSelErrorName, recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 absentSumFieldErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
-runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
 typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
@@ -915,16 +912,15 @@ nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
 err_nm :: String -> Unique -> Id -> Name
 err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
-rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
+rEC_SEL_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
-rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
-rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
-rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
-pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
-nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
-nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
-tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
+rEC_SEL_ERROR_ID                = mkRuntimeErrorId TypeLike recSelErrorName
+rEC_CON_ERROR_ID                = mkRuntimeErrorId TypeLike recConErrorName
+pAT_ERROR_ID                    = mkRuntimeErrorId TypeLike patErrorName
+nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId TypeLike noMethodBindingErrorName
+nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId TypeLike nonExhaustiveGuardsErrorName
+tYPE_ERROR_ID                   = mkRuntimeErrorId TypeLike typeErrorName
 
 -- Note [aBSENT_SUM_FIELD_ERROR_ID]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1038,30 +1034,6 @@ mkExceptionId name
       (divergingIdInfo [] `setCafInfo` NoCafRefs)
          -- See Note [Wired-in exceptions are not CAFfy]
 
-mkRuntimeErrorId :: Name -> Id
--- Error function
---   with type:  forall (r:RuntimeRep) (a:TYPE r). Addr# -> a
---   with arity: 1
--- which diverges after being given one argument
--- The Addr# is expected to be the address of
---   a UTF8-encoded error string
-mkRuntimeErrorId name
- = mkVanillaGlobalWithInfo name runtimeErrorTy (divergingIdInfo [evalDmd])
-     -- Do *not* mark them as NoCafRefs, because they can indeed have
-     -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
-     -- which has some CAFs
-     -- In due course we may arrange that these error-y things are
-     -- regarded by the GC as permanently live, in which case we
-     -- can give them NoCaf info.  As it is, any function that calls
-     -- any pc_bottoming_Id will itself have CafRefs, which bloats
-     -- SRTs.
-
-runtimeErrorTy :: Type
--- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
---   See Note [Error and friends have an "open-tyvar" forall]
-runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
-                                 (mkVisFunTyMany addrPrimTy openAlphaTy)
-
 -- | An 'IdInfo' for an Id, such as 'aBSENT_ERROR_ID', that
 -- throws an (imprecise) exception after being supplied one value arg for every
 -- argument 'Demand' in the list. The demands end up in the demand signature.
@@ -1087,6 +1059,56 @@ divergingIdInfo arg_dmds
 Notice the runtime-representation polymorphism. This ensures that
 "error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
+
+
+************************************************************************
+*                                                                      *
+                     iMPOSSIBLE_ERROR_ID
+*                                                                      *
+************************************************************************
+-}
+
+iMPOSSIBLE_ERROR_ID, iMPOSSIBLE_CONSTRAINT_ERROR_ID :: Id
+iMPOSSIBLE_ERROR_ID            = mkRuntimeErrorId TypeLike       impossibleErrorName
+iMPOSSIBLE_CONSTRAINT_ERROR_ID = mkRuntimeErrorId ConstraintLike impossibleConstraintErrorName
+
+impossibleErrorName, impossibleConstraintErrorName :: Name
+impossibleErrorName           = err_nm "impossibleError"
+                                impossibleErrorIdKey iMPOSSIBLE_ERROR_ID
+impossibleConstraintErrorName = err_nm "impossibleConstraintError"
+                                impossibleConstraintErrorIdKey iMPOSSIBLE_CONSTRAINT_ERROR_ID
+
+mkImpossibleExpr :: Type -> String -> CoreExpr
+mkImpossibleExpr res_ty str
+  = mkRuntimeErrorApp err_id res_ty str
+  where    -- See Note [Type vs Constraint for error ids]
+    err_id | isConstraintLikeKind (typeKind res_ty) = iMPOSSIBLE_CONSTRAINT_ERROR_ID
+           | otherwise                              = iMPOSSIBLE_ERROR_ID
+
+{- Note [Type vs Constraint for error ids]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need both
+  iMPOSSIBLE_ERROR_ID            :: forall (r::RuntimeRep) (a::TYPE r).       Addr# -> a
+  iMPOSSIBLE_CONSTRAINT_ERROR_ID :: forall (r::RuntimeRep) (a::CONSTRAINT r). Addr# -> a
+
+because we don't have polymorphism over TYPE vs CONSTRAINT.  You
+might wonder if iMPOSSIBLE_CONSTRAINT_ERROR_ID is ever needed in
+practice, but it is: see #22634.  So:
+
+* In Control.Exception.Base we have
+      impossibleError           :: forall (a::Type). Addr# -> a
+      impossibleConstraintError :: forall (a::Type). Addr# -> a
+  This generates the code for `impossibleError`, but because they are wired in
+  the interface file definitions are never looked at (indeed, they don't
+  even get serialised).
+
+* In this module GHC.Core.Make we define /wired-in/ Ids for
+      iMPOSSIBLE_ERROR_ID
+      iMPOSSIBLE_CONSTRAINT_ERROR_ID
+   with the desired above types (i.e. runtime-rep polymorphic, and returning a
+   constraint for the latter.
+
+Much the same plan works for aBSENT_ERROR_ID and aBSENT_CONSTRAINT_ERROR_ID
 
 
 ************************************************************************
@@ -1176,6 +1198,7 @@ be relying on anything from it.
 --   absentConstraintError :: forall (a :: Constraint). Addr# -> a
 -- We don't have polymorphism over TypeOrConstraint!
 -- mkAbsentErrorApp chooses which one to use, based on the kind
+-- See Note [Type vs Constraint for error ids]
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print
@@ -1193,29 +1216,69 @@ absentErrorName
    = mkWiredInIdName gHC_PRIM_PANIC (fsLit "absentError")
       absentErrorIdKey aBSENT_ERROR_ID
 
-absentConstraintErrorName
+absentConstraintErrorName   -- See Note [Type vs Constraint for error ids]
    = mkWiredInIdName gHC_PRIM_PANIC (fsLit "absentConstraintError")
       absentConstraintErrorIdKey aBSENT_CONSTRAINT_ERROR_ID
 
 aBSENT_ERROR_ID, aBSENT_CONSTRAINT_ERROR_ID :: Id
 
 aBSENT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
- = mkVanillaGlobalWithInfo absentErrorName absent_ty id_info
+ = mk_runtime_error_id absentErrorName absent_ty
  where
    -- absentError :: forall (a :: Type). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaTyVar] $
                mkVisFunTyMany addrPrimTy (mkTyVarTy alphaTyVar)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent fillers] in GHC.Core.Opt.WorkWrap.Utils
-   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
 
 aBSENT_CONSTRAINT_ERROR_ID -- See Note [aBSENT_ERROR_ID]
- = mkVanillaGlobalWithInfo absentConstraintErrorName absent_ty id_info
+ = mk_runtime_error_id absentConstraintErrorName absent_ty
+   -- See Note [Type vs Constraint for error ids]
  where
    -- absentConstraintError :: forall (a :: Constraint). Addr# -> a
    absent_ty = mkSpecForAllTys [alphaConstraintTyVar] $
                mkFunTy visArgConstraintLike ManyTy
                        addrPrimTy (mkTyVarTy alphaConstraintTyVar)
-   id_info = divergingIdInfo [evalDmd] -- NB: CAFFY!
 
+
+{-
+************************************************************************
+*                                                                      *
+                     mkRuntimeErrorId
+*                                                                      *
+************************************************************************
+-}
+
+mkRuntimeErrorId :: TypeOrConstraint -> Name -> Id
+-- Error function
+--   with type:  forall (r:RuntimeRep) (a:TYPE r). Addr# -> a
+--   with arity: 1
+-- which diverges after being given one argument
+-- The Addr# is expected to be the address of
+--   a UTF8-encoded error string
+mkRuntimeErrorId torc name = mk_runtime_error_id name (mkRuntimeErrorTy torc)
+
+
+mk_runtime_error_id :: Name -> Type -> Id
+mk_runtime_error_id name ty
+ = mkVanillaGlobalWithInfo name ty (divergingIdInfo [evalDmd])
+     -- Do *not* mark them as NoCafRefs, because they can indeed have
+     -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
+     -- which has some CAFs
+     -- In due course we may arrange that these error-y things are
+     -- regarded by the GC as permanently live, in which case we
+     -- can give them NoCaf info.  As it is, any function that calls
+     -- any pc_bottoming_Id will itself have CafRefs, which bloats
+     -- SRTs.
+
+mkRuntimeErrorTy :: TypeOrConstraint -> Type
+-- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
+--   See Note [Error and friends have an "open-tyvar" forall]
+mkRuntimeErrorTy torc = mkSpecForAllTys [runtimeRep1TyVar, tyvar] $
+                        mkFunctionType ManyTy addrPrimTy (mkTyVarTy tyvar)
+  where
+    (tyvar:_) = mkTemplateTyVars [kind]
+    kind = case torc of
+              TypeLike       -> mkTYPEapp       runtimeRep1Ty
+              ConstraintLike -> mkCONSTRAINTapp runtimeRep1Ty
 

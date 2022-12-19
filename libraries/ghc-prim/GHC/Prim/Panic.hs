@@ -111,9 +111,9 @@ absentConstraintError :: forall (a :: Type). Addr# -> a
 -- We want to give this the type
 --    forall (a :: Constraint). Addr# -> a
 -- but Haskell source code doesn't allow functions that return Constraint
--- Fortunately, absentConstraintError is a wired-in Id with the above
--- desired type. So the only purpose of this definition is to give a
--- function to call. And for that purpose, absentError will do fine.
--- It's fine to lie about about the type; it is not looked at
--- because absentConstraintError is wired-in.
+-- So in this module we lie about the type.  This is fine because
+-- absentConstraintError is a wired-in Id with the desired Constraint-kinded
+-- type; the type in the interface file is never looked at.
+-- The only purpose of this definition is to give a function to call,
+-- and for that purpose, delegating to absentError is fine.
 absentConstraintError errmsg = absentError errmsg

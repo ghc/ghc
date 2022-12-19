@@ -3271,9 +3271,8 @@ mkCONSTRAINTapp_maybe :: RuntimeRepType -> Maybe Type
 -- ^ Just like mkTYPEapp_maybe
 {-# NOINLINE mkCONSTRAINTapp_maybe #-}
 mkCONSTRAINTapp_maybe (TyConApp tc args)
-  | key == liftedRepTyConKey = assert (null args) $ Just constraintKind   -- CONSTRAINT LiftedRep
-  where
-    key = tyConUnique tc
+  | tc `hasKey` liftedRepTyConKey = assert (null args) $
+                                    Just constraintKind   -- CONSTRAINT LiftedRep
 mkCONSTRAINTapp_maybe _ = Nothing
 
 ------------------
