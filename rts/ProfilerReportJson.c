@@ -52,11 +52,10 @@ static void escapeString(char const* str, char **buf)
 static void
 logCostCentres(FILE *prof_file)
 {
-    char* lbl;
-    char* src_loc;
     bool needs_comma = false;
     fprintf(prof_file, "[\n");
     for (CostCentre *cc = CC_LIST; cc != NULL; cc = cc->link) {
+        char *lbl, *src_loc;
         escapeString(cc->label, &lbl);
         escapeString(cc->srcloc, &src_loc);
         fprintf(prof_file,
@@ -70,10 +69,10 @@ logCostCentres(FILE *prof_file)
                 cc->ccID, lbl, cc->module, src_loc,
                 cc->is_caf ? "true" : "false");
         needs_comma = true;
+        stgFree(lbl);
+        stgFree(src_loc);
     }
     fprintf(prof_file, "]\n");
-    stgFree(lbl);
-    stgFree(src_loc);
 }
 
 static void
