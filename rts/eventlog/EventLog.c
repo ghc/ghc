@@ -759,8 +759,10 @@ void postCapsetVecEvent (EventTypeNum tag,
         // 1 + strlen to account for the trailing \0, used as separator
         int increment = 1 + strlen(argv[i]);
         if (size + increment > EVENT_PAYLOAD_SIZE_MAX) {
-            errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, record only "
-                       "%d out of %d args", i, argc);
+            errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, record only %"
+                       FMT_Word " out of %" FMT_Word " args",
+                       (StgWord) i,
+                       (StgWord) argc);
             argc = i;
             break;
         } else {
