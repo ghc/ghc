@@ -39,9 +39,7 @@ static void trace_PAP_payload (MarkQueue *queue,
                                StgClosure *fun,
                                StgClosure **payload,
                                StgWord size);
-#if defined(DEBUG)
-static bool is_nonmoving_weak(StgWeak *weak);
-#endif
+static bool is_nonmoving_weak(StgWeak *weak) USED_IF_DEBUG;
 
 // How many Array# entries to add to the mark queue at once?
 #define MARK_ARRAY_CHUNK_LENGTH 128
@@ -1975,7 +1973,6 @@ void nonmovingMarkWeakPtrList (struct MarkQueue_ *queue)
 
 // Determine whether a weak pointer object is on one of the nonmoving
 // collector's weak pointer lists. Used for sanity checking.
-#if defined(DEBUG)
 static bool is_nonmoving_weak(StgWeak *weak)
 {
     for (StgWeak *w = nonmoving_old_weak_ptr_list; w != NULL; w = w->link) {
@@ -1986,7 +1983,6 @@ static bool is_nonmoving_weak(StgWeak *weak)
     }
     return false;
 }
-#endif
 
 // Non-moving heap variant of `tidyWeakList`
 bool nonmovingTidyWeaks (struct MarkQueue_ *queue)

@@ -123,16 +123,25 @@ addArgs args' fl = fl { extraArgs = extraArgs fl <> args' }
 -- from warnings.
 werror :: Flavour -> Flavour
 werror =
-  addArgs
-    ( builder Ghc
+  addArgs $ mconcat
+    [ builder Ghc
         ? notStage0
         ? mconcat
-          [ arg "-Werror",
-            flag CrossCompiling
+          [ arg "-Werror"
+          , flag CrossCompiling
               ? package unix
               ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]
           ]
-    )
+    , builder Ghc
+        ? package rts
+        ? mconcat
+          [ arg "-optc-Werror"
+            -- clang complains about #pragma GCC pragmas
+          , arg "-optc-Wno-error=unknown-pragmas"
+          ]
+      -- N.B. We currently don't build the boot libraries' C sources with -Werror
+      -- as this tends to be a portability nightmare.
+    ]
 
 -- | Build C and Haskell objects with debugging information.
 enableDebugInfo :: Flavour -> Flavour
