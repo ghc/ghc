@@ -1810,7 +1810,7 @@ tagToEnumRule = do
 
     -- See Note [tagToEnum#]
     _ -> warnPprTrace True "tagToEnum# on non-enumeration type" (ppr ty) $
-         return $ mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type"
+         return $ mkImpossibleExpr ty "tagToEnum# on non-enumeration type"
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr

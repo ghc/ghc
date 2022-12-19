@@ -2282,7 +2282,8 @@ wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendI
     buildIdKey, foldrIdKey, recSelErrorIdKey,
     seqIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
-    runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
+    impossibleErrorIdKey, impossibleConstraintErrorIdKey,
+    patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendUtf8IdKey, unpackCStringFoldrUtf8IdKey,
     unpackCStringIdKey, unpackCStringAppendIdKey, unpackCStringFoldrIdKey,
@@ -2290,37 +2291,38 @@ wildCardKey, absentErrorIdKey, absentConstraintErrorIdKey, augmentIdKey, appendI
     absentSumFieldErrorIdKey, cstringLengthIdKey
     :: Unique
 
-wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
-absentErrorIdKey              = mkPreludeMiscIdUnique  1
-augmentIdKey                  = mkPreludeMiscIdUnique  2
-appendIdKey                   = mkPreludeMiscIdUnique  3
-buildIdKey                    = mkPreludeMiscIdUnique  4
-absentConstraintErrorIdKey    = mkPreludeMiscIdUnique  5
-foldrIdKey                    = mkPreludeMiscIdUnique  6
-recSelErrorIdKey              = mkPreludeMiscIdUnique  7
-seqIdKey                      = mkPreludeMiscIdUnique  8
-absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique  9
-eqStringIdKey                 = mkPreludeMiscIdUnique 10
-noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
-nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
-runtimeErrorIdKey             = mkPreludeMiscIdUnique 13
-patErrorIdKey                 = mkPreludeMiscIdUnique 14
-realWorldPrimIdKey            = mkPreludeMiscIdUnique 15
-recConErrorIdKey              = mkPreludeMiscIdUnique 16
+wildCardKey                    = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
+absentErrorIdKey               = mkPreludeMiscIdUnique  1
+absentConstraintErrorIdKey     = mkPreludeMiscIdUnique  2
+augmentIdKey                   = mkPreludeMiscIdUnique  3
+appendIdKey                    = mkPreludeMiscIdUnique  4
+buildIdKey                     = mkPreludeMiscIdUnique  5
+foldrIdKey                     = mkPreludeMiscIdUnique  6
+recSelErrorIdKey               = mkPreludeMiscIdUnique  7
+seqIdKey                       = mkPreludeMiscIdUnique  8
+absentSumFieldErrorIdKey       = mkPreludeMiscIdUnique  9
+eqStringIdKey                  = mkPreludeMiscIdUnique 10
+noMethodBindingErrorIdKey      = mkPreludeMiscIdUnique 11
+nonExhaustiveGuardsErrorIdKey  = mkPreludeMiscIdUnique 12
+impossibleErrorIdKey           = mkPreludeMiscIdUnique 13
+impossibleConstraintErrorIdKey = mkPreludeMiscIdUnique 14
+patErrorIdKey                  = mkPreludeMiscIdUnique 15
+realWorldPrimIdKey             = mkPreludeMiscIdUnique 16
+recConErrorIdKey               = mkPreludeMiscIdUnique 17
 
-unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 17
-unpackCStringAppendUtf8IdKey  = mkPreludeMiscIdUnique 18
-unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 19
+unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 18
+unpackCStringAppendUtf8IdKey  = mkPreludeMiscIdUnique 19
+unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 20
 
-unpackCStringIdKey            = mkPreludeMiscIdUnique 20
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 21
-unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 22
+unpackCStringIdKey            = mkPreludeMiscIdUnique 21
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 22
+unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 23
 
-voidPrimIdKey                 = mkPreludeMiscIdUnique 23
-typeErrorIdKey                = mkPreludeMiscIdUnique 24
-divIntIdKey                   = mkPreludeMiscIdUnique 25
-modIntIdKey                   = mkPreludeMiscIdUnique 26
-cstringLengthIdKey            = mkPreludeMiscIdUnique 27
+voidPrimIdKey                 = mkPreludeMiscIdUnique 24
+typeErrorIdKey                = mkPreludeMiscIdUnique 25
+divIntIdKey                   = mkPreludeMiscIdUnique 26
+modIntIdKey                   = mkPreludeMiscIdUnique 27
+cstringLengthIdKey            = mkPreludeMiscIdUnique 28
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,

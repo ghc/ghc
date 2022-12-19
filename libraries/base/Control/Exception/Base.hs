@@ -94,7 +94,8 @@ module Control.Exception.Base (
         finally,
 
         -- * Calls for GHC runtime
-        recSelError, recConError, runtimeError,
+        recSelError, recConError,
+        impossibleError, impossibleConstraintError,
         nonExhaustiveGuardsError, patError, noMethodBindingError,
         typeError,
         nonTermination, nestedAtomically, noMatchingContinuationPrompt,
@@ -409,20 +410,24 @@ instance Exception NoMatchingContinuationPrompt
 -----
 
 -- See Note [Compiler error functions] in ghc-prim:GHC.Prim.Panic
-recSelError, recConError, runtimeError,
-  nonExhaustiveGuardsError, patError, noMethodBindingError,
-  typeError
+recSelError, recConError, typeError,
+  nonExhaustiveGuardsError, patError, noMethodBindingError
         :: Addr# -> a   -- All take a UTF8-encoded C string
 
 recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
-runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
-
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
 noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
 patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
 typeError                s = throw (TypeError        (unpackCStringUtf8# s))
+
+
+impossibleError, impossibleConstraintError :: Addr# -> a
+-- These two are used for impossible case alternatives, and lack location info
+impossibleError             s = errorWithoutStackTrace (unpackCStringUtf8# s)
+impossibleConstraintError   s = errorWithoutStackTrace (unpackCStringUtf8# s)
+
 
 -- GHC's RTS calls this
 nonTermination :: SomeException
