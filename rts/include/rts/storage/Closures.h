@@ -211,8 +211,7 @@ typedef struct {
 // An array of heap objects, ie Array# v and MutableArray# v
 //
 // Closure types: MUT_ARR_PTRS_CLEAN, MUT_ARR_PTRS_DIRTY,
-// MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN, MUT_VAR_CLEAN,
-// MUT_VAR_DIRTY
+// MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN
 typedef struct _StgMutArrPtrs {
     StgHeader   header;
     StgWord     ptrs;
