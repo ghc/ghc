@@ -273,21 +273,29 @@ addToEqualCtList ct old_eqs
   | debugIsOn
   = case ct of
       CEqCan { cc_lhs = TyVarLHS tv } ->
-        let shares_lhs (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
-            shares_lhs _other                                = False
-        in
-        assert (all shares_lhs old_eqs) $
-        assert (null ([ (ct1, ct2) | ct1 <- ct : old_eqs
-                                   , ct2 <- ct : old_eqs
-                                   , let { fr1 = ctFlavourRole ct1
-                                         ; fr2 = ctFlavourRole ct2 }
-                                   , fr1 `eqCanRewriteFR` fr2 ])) $
+        assert (all (shares_lhs tv) old_eqs) $
+        assertPpr (null bad_prs)
+                  (vcat [ text "bad_prs" <+> ppr bad_prs
+                        , text "ct:old_eqs" <+> ppr (ct : old_eqs) ]) $
         (ct : old_eqs)
 
       _ -> pprPanic "addToEqualCtList not CEqCan" (ppr ct)
 
   | otherwise
   = ct : old_eqs
+  where
+    shares_lhs tv (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
+    shares_lhs _ _ = False
+    bad_prs = filter is_bad_pair (distinctPairs (ct : old_eqs))
+    is_bad_pair (ct1,ct2) = ctFlavourRole ct1 `eqCanRewriteFR` ctFlavourRole ct2
+
+distinctPairs :: [a] -> [(a,a)]
+-- distinctPairs [x1,...xn] is the list of all pairs [ ...(xi, xj)...]
+--                             where i /= j
+-- NB: does not return pairs (xi,xi), which would be stupid in the
+--     context of addToEqualCtList (#22645)
+distinctPairs []     = []
+distinctPairs (x:xs) = concatMap (\y -> [(x,y),(y,x)]) xs ++ distinctPairs xs
 
 -- returns Nothing when the new list is empty, to keep the environments smaller
 filterEqualCtList :: (Ct -> Bool) -> EqualCtList -> Maybe EqualCtList
