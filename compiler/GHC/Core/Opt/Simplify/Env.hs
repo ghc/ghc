@@ -1060,30 +1060,29 @@ subst_id_bndr :: SimplEnv
               -> SimplM (SimplEnv, OutBndr)
 subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
               old_id adjust_type
-  =  do
-      -- See Note [Bangs in the Simplifier]
-      new_unique <- getUniqueM
-      let
-        !id1  = setVarUnique old_id new_unique
-        -- CHANGE1: Use fresh unique setVarUnique rather than uniqAway
---        !id1  = uniqAway in_scope old_id
-        !id2  = substIdType env id1
-        !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
-                                          -- and fragile OccInfo
-        !new_id = adjust_type id3
+  = do { -- See Note [Bangs in the Simplifier]
 
-            -- Extend the substitution if the unique has changed,
-            -- or there's some useful occurrence information
-            -- See the notes with substTyVarBndr for the delSubstEnv
-        !new_subst | new_id /= old_id
-                  = extendVarEnv id_subst old_id (DoneId new_id)
-                  | otherwise
-                  = delVarEnv id_subst old_id
+         -- CHANGE1: Use fresh unique setVarUnique rather than uniqAway
+--         new_unique <- getUniqueM; let !id1 = setVarUnique old_id new_unique
+           let !id1  = uniqAway in_scope old_id
 
-        !new_in_scope = in_scope `extendInScopeSet` new_id
-      assertPpr (not (isCoVar old_id)) (ppr old_id) $
-        return (env { seInScope = new_in_scope,
-                      seIdSubst = new_subst }, new_id)
+         ; let !id2  = substIdType env id1
+               !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+                                                  -- and fragile OccInfo
+               !new_id = adjust_type id3
+
+                -- Extend the substitution if the unique has changed,
+                -- or there's some useful occurrence information
+                -- See the notes with substTyVarBndr for the delSubstEnv
+               !new_subst | new_id /= old_id
+                          = extendVarEnv id_subst old_id (DoneId new_id)
+                          | otherwise
+                          = delVarEnv id_subst old_id
+
+               !new_in_scope = in_scope `extendInScopeSet` new_id
+         ; assertPpr (not (isCoVar old_id)) (ppr old_id) $
+           return (env { seInScope = new_in_scope
+                       , seIdSubst = new_subst }, new_id) }
         -- It's important that both seInScope and seIdSubst are updated with
         -- the new_id, /after/ applying adjust_type. That's why adjust_type
         -- is done here.  If we did adjust_type in simplJoinBndr (the only

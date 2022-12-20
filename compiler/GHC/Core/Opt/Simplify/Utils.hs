@@ -1981,10 +1981,10 @@ uniqifyFloats_strict :: UnfoldingOpts -> TopLevelFlag -> SimplFloats
               -> OutExpr -> SimplM (SimplFloats, OutExpr)
 -- CHANGE 2: Uncomment to
 --uniqifyFloats _ _ floats1 body = return (floats1, body)
-uniqifyFloats_strict uf_opts TopLevel floats1 body = do
-
-    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-        ; return (foldl' extendFloats (empty_floats (getSubstInScope subst)) float_binds, GHC.Core.Subst.substExpr subst body) }
+uniqifyFloats_strict uf_opts TopLevel floats1 body
+  = do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
+        ; return ( foldl' extendFloats (empty_floats (getSubstInScope subst)) float_binds
+                 , GHC.Core.Subst.substExprSC subst body) }
   where
     empty_floats in_scope = SimplFloats emptyLetFloats (sfJoinFloats floats1) in_scope
     body_floats = letFloatBinds (sfLetFloats floats1)
@@ -2236,39 +2236,47 @@ new binding is abstracted.  Note that
       way) with CSE and/or the compiler-debugging experience
 -}
 
-abstractFloats :: UnfoldingOpts -> TopLevelFlag -> [OutTyVar] -> SimplFloats
-              -> OutExpr -> SimplM ([OutBind], OutExpr)
-abstractFloats uf_opts top_lvl main_tvs floats body
-  = assert (notNull body_floats) $
-    assert (isNilOL (sfJoinFloats floats)) $
-    do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
+abstractFloats :: SimplEnv -> TopLevelFlag
+              -> [OutTyVar]   -- Abstract over these
+              -> SimplFloats  -- sfJoinFloats is empty
+              -> OutExpr      -- Body
+              -> SimplM (SimplFloats, OutExpr)
+abstractFloats env top_lvl main_tvs body_floats body
+  | assert (isNilOL (sfJoinFloats body_floats)) $
+    isEmptyFloats body_floats || (null main_tvs && not (isTopLevel top_lvl))
+  = return (body_floats, body)
+  | otherwise
+  = do  { (poly_floats, subst) <- foldlM abstract (empty_floats, empty_subst) $
+                                  letFloatBinds (sfLetFloats body_floats)
+        ; return (poly_floats, GHC.Core.Subst.substExpr subst body) }
   where
-    is_top_lvl  = isTopLevel top_lvl
-    body_floats = letFloatBinds (sfLetFloats floats)
-    empty_subst = GHC.Core.Subst.mkEmptySubst (sfInScope floats)
+    uf_opts      = seUnfoldingOpts env
+    is_top_lvl   = isTopLevel top_lvl
+    empty_subst  = GHC.Core.Subst.mkEmptySubst (sfInScope body_floats)
+    empty_floats = emptyFloats env
 
-    abstract :: GHC.Core.Subst.Subst -> OutBind -> SimplM (GHC.Core.Subst.Subst, OutBind)
-    abstract subst (NonRec id rhs)
+    abstract :: (SimplFloats, GHC.Core.Subst.Subst) -> OutBind -> SimplM (SimplFloats, GHC.Core.Subst.Subst)
+    abstract (poly_floats, subst) (NonRec id rhs)
       = do { (poly_id1, poly_app) <- mk_poly1 tvs_here id
            ; let (poly_id2, poly_rhs) = mk_poly2 poly_id1 tvs_here rhs'
-                 !subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
-           ; return (subst', NonRec poly_id2 poly_rhs) }
+                 !subst'       = GHC.Core.Subst.extendIdSubst subst id poly_app
+                 !poly_floats' = extendFloats poly_floats (NonRec poly_id2 poly_rhs)
+           ; return (poly_floats', subst') }
       where
         rhs' = GHC.Core.Subst.substExpr subst rhs
-
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = filter (`elemVarSet` free_tvs) main_tvs
         free_tvs = closeOverKinds $
                    exprSomeFreeVars isTyVar rhs'
 
-    abstract subst (Rec prs)
+    abstract (poly_floats, subst) (Rec prs)
        = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly1 tvs_here) ids
             ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
                   poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                                | (poly_id, rhs) <- poly_ids `zip` rhss
                                , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
-            ; return (subst', Rec poly_pairs) }
+                  !poly_floats' = extendFloats poly_floats (Rec poly_pairs)
+            ; return (poly_floats', subst') }
        where
          (ids,rhss) = unzip prs
                 -- For a recursive group, it's a bit of a pain to work out the minimal
