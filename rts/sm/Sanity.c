@@ -1249,7 +1249,9 @@ memInventory (bool show)
 #endif
 
   // count the blocks allocated by the arena allocator
-  arena_blocks = arenaBlocks();
+  // arena_blocks = arenaBlocks();
+  // disable the counting since we are using malloc() for arena
+  arena_blocks = 0;
 
   // count the blocks containing executable memory
   exec_blocks = countAllocdBlocks(exec_block);

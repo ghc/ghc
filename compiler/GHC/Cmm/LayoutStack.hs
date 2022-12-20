@@ -254,7 +254,7 @@ cmmLayoutStack cfg procpoints entry_args
 
     blocks_with_reloads <-
         insertReloadsAsNeeded platform procpoints final_stackmaps entry new_blocks
-    new_blocks' <- mapM (lowerSafeForeignCall profile) blocks_with_reloads
+    new_blocks' <- concat <$> mapM (lowerSafeForeignCall profile) blocks_with_reloads
     return (ofBlockList entry new_blocks', final_stackmaps)
 
 -- -----------------------------------------------------------------------------
@@ -1134,9 +1134,9 @@ expecting them (see Note [safe foreign call convention]). Note also
 that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 
-lowerSafeForeignCall :: Profile -> CmmBlock -> UniqSM CmmBlock
+lowerSafeForeignCall :: Profile -> CmmBlock -> UniqSM [CmmBlock]
 lowerSafeForeignCall profile block
-  | (entry@(CmmEntry _ tscp), middle, CmmForeignCall { .. }) <- blockSplit block
+  | (CmmEntry lbl tscp, middle, CmmForeignCall { .. }) <- blockSplit block
   = do
     let platform = profilePlatform profile
     -- Both 'id' and 'new_base' are KindNonPtr because they're
@@ -1144,8 +1144,8 @@ lowerSafeForeignCall profile block
     id <- newTemp (bWord platform)
     new_base <- newTemp (cmmRegType platform baseReg)
     let (caller_save, caller_load) = callerSaveVolatileRegs platform
-    save_state_code <- saveThreadState profile
-    load_state_code <- loadThreadState profile
+    save_state_code <- saveThreadState profile tscp
+    load_state_code <- loadThreadState profile tscp
     let suspend = save_state_code  <*>
                   caller_save <*>
                   mkMiddle (callSuspendThread platform id intrbl)
@@ -1175,19 +1175,16 @@ lowerSafeForeignCall profile block
                        , cml_ret_args  = ret_args
                        , cml_ret_off   = ret_off }
 
-    graph' <- lgraphOfAGraph ( suspend <*>
-                               midCall <*>
-                               resume  <*>
-                               copyout <*>
-                               mkLast jump, tscp)
-
-    case toBlockList graph' of
-      [one] -> let (_, middle', last) = blockSplit one
-               in return (blockJoin entry (middle `blockAppend` middle') last)
-      _ -> panic "lowerSafeForeignCall0"
+    let graph' = labelAGraph lbl (blockToAGraphOO middle <*>
+                                  suspend <*>
+                                  midCall <*>
+                                  resume  <*>
+                                  copyout <*>
+                                  mkLast jump, tscp)
+    return $ toBlockList graph'
 
   -- Block doesn't end in a safe foreign call:
-  | otherwise = return block
+  | otherwise = return [block]
 
 
 callSuspendThread :: Platform -> LocalReg -> Bool -> CmmNode O O

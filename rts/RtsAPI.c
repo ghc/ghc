@@ -828,11 +828,10 @@ void rts_listThreads(ListThreadsCb cb, void *user)
     // The rts is paused and can only be resumed by the current thread. Hence it
     // is safe to read global thread data.
 
-    for (uint32_t g=0; g < RtsFlags.GcFlags.generations; g++) {
-        StgTSO *tso = generations[g].threads;
-        while (tso != END_TSO_QUEUE) {
-            cb(user, tso);
-            tso = tso->global_link;
+    // check all the currently alive TSO
+    for (StgTSO *t = global_TSOs; t->tso_link_next != END_TSO_QUEUE; t = t->tso_link_next) {
+        if (t != END_TSO_QUEUE) {
+            cb(user, t);
         }
     }
 }

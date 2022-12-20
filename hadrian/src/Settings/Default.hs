@@ -180,10 +180,12 @@ defaultRtsWays = Set.fromList <$>
   , notStage0 ? pure
       [ profiling, debugProfiling
       , debug
+      , threadedMmtk, threadedDebugMmtk
       ]
   , notStage0 ? targetSupportsThreadedRts ? pure [threaded, threadedProfiling, threadedDebugProfiling, threadedDebug]
   , notStage0 ? platformSupportsSharedLibs ? pure
       [ dynamic, debugDynamic
+      , threadedMmtkDynamic, threadedDebugMmtkDynamic
       ]
   , notStage0 ? platformSupportsSharedLibs ? targetSupportsThreadedRts ? pure [ threadedDynamic, threadedDebugDynamic ]
   ]
@@ -291,5 +293,11 @@ defaultBuilderArgs = mconcat
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
-defaultPackageArgs = mconcat [ packageArgs
-                             , builder Ghc ? ghcWarningsArgs ]
+defaultPackageArgs = mconcat
+    [ packageArgs
+    , do ways <- getWay -- FIXME
+         (MMTK `wayUnit` ways) ? builder (Ghc LinkHs) ? mconcat
+             [ arg "-Lrts/mmtk/mmtk/target/debug"
+             , arg "-lmmtk_ghc"
+             ]
+    , builder Ghc ? ghcWarningsArgs ]

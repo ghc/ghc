@@ -18,6 +18,7 @@ data WayUnit = Threaded
              | Profiling
              | Logging
              | Dynamic
+             | MMTK
              deriving (Bounded, Enum, Eq, Ord)
 
 -- TODO: get rid of non-derived Show instances
@@ -28,6 +29,7 @@ instance Show WayUnit where
         Profiling -> "p"
         Logging   -> "l"
         Dynamic   -> "dyn"
+        MMTK      -> "mmtk"
 
 -- TODO: get rid of non-derived Read instance
 instance Read WayUnit where
@@ -37,6 +39,7 @@ instance Read WayUnit where
         "p"     -> [(Profiling,"")]
         "l"     -> [(Logging,"")]
         "dyn"   -> [(Dynamic,"")]
+        "mmtk"  -> [(MMTK,"")]
         _       -> []
 
 -- | Collection of 'WayUnit's that stands for the different ways source code

@@ -33,7 +33,11 @@ userFlavours = [userFlavour] -- Add more build flavours if need be.
 -- | This is an example user-defined build flavour. Feel free to modify it and
 -- use by passing @--flavour=user@ from the command line.
 userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user" } -- Modify other settings here.
+userFlavour = defaultFlavour { name = "user"
+                             , args = x <> args defaultFlavour
+                             }
+  where
+    x = stage1 ? builder (Ghc LinkHs) ? arg "rts/libmmtk_ghc.a"
 
 -- | Add user-defined packages. Note, this only lets Hadrian know about the
 -- existence of a new package; to actually build it you need to create a new

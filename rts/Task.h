@@ -15,6 +15,8 @@
 
 #include "BeginPrivate.h"
 
+#include "mmtk.h"
+
 /*
    Note [Definition of a Task]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,6 +166,9 @@ typedef struct Task_ {
     struct Task_ *all_next;
     struct Task_ *all_prev;
 
+    // MMTk mutator (per OS thread)
+    void *mmutator;
+    void *rts_mutator;
 } Task;
 
 INLINE_HEADER bool

@@ -110,3 +110,6 @@
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+[submodule "rts/mmtk/mmtk-core"]
+	path = rts/mmtk/mmtk-core
+	url = git@github.com:mmtk/mmtk-core.git

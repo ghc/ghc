@@ -54,6 +54,15 @@
 
 #include "ffi.h"
 
+#include "mmtk.h"
+
+// global variable; used in code gen compiler/GHC/StgToCmm.Foreign
+#if defined(MMTK_GHC)
+uint32_t is_MMTk = true;
+#else
+uint32_t is_MMTk = false;
+#endif
+
 /*
  * All these globals require sm_mutex to access in THREADED_RTS mode.
  */
@@ -316,8 +325,12 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
     // allocate a block for each mut list
     for (n = from; n < to; n++) {
         for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
+#if defined(MMTK_GHC)
+            getCapability(n)->mut_lists[g] = NULL;
+#else
             getCapability(n)->mut_lists[g] =
                 allocBlockOnNode(capNoToNumaNode(n));
+#endif
         }
     }
 
@@ -766,12 +779,18 @@ allocNursery (uint32_t node, bdescr *tail, W_ blocks)
 STATIC_INLINE void
 assignNurseryToCapability (Capability *cap, uint32_t n)
 {
+#if defined(MMTK_GHC)
+    cap->r.rNursery = NULL;
+    cap->r.rCurrentNursery = NULL;
+    cap->r.rCurrentAlloc   = NULL;
+#else
     ASSERT(n < n_nurseries);
     cap->r.rNursery = &nurseries[n];
     cap->r.rCurrentNursery = nurseries[n].blocks;
     newNurseryBlock(nurseries[n].blocks);
     cap->r.rCurrentAlloc   = NULL;
     ASSERT(cap->r.rCurrentNursery->node == cap->node);
+#endif
 }
 
 /*
@@ -803,8 +822,10 @@ allocNurseries (uint32_t from, uint32_t to)
     }
 
     for (i = from; i < to; i++) {
+#if !defined(MMTK_GHC)
         nurseries[i].blocks = allocNursery(capNoToNumaNode(i), NULL, n_blocks);
         nurseries[i].n_blocks = n_blocks;
+#endif
     }
 }
 
@@ -1082,13 +1103,21 @@ allocate (Capability *cap, W_ n)
 
 /*
  * Allocate some n words of heap memory; returning NULL
- * on heap overflow
+ * on heap overflow'
  */
 StgPtr
 allocateMightFail (Capability *cap, W_ n)
 {
-    bdescr *bd;
     StgPtr p;
+    
+#if defined(MMTK_GHC)
+    StgWord bytes = n*sizeof(W_);
+    p = mmtk_alloc(cap->running_task->rts_mutator, bytes, sizeof(W_), 0, 0);
+    mmtk_post_alloc(cap->running_task->rts_mutator, p, bytes, 0);
+    return p;
+#endif
+
+    bdescr *bd;
 
     if (RTS_UNLIKELY(n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))) {
         // The largest number of words such that
@@ -1237,6 +1266,8 @@ allocateMightFail (Capability *cap, W_ n)
 StgPtr
 allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ align_off /*bytes*/)
 {
+    // Pinned: make sure GC doesn't move
+
     StgPtr p;
     bdescr *bd;
 
@@ -1256,10 +1287,14 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
         // number of extra words we could possibly need to satisfy the alignment
         // constraint.
         p = allocateMightFail(cap, n + alignment_w - 1);
+
         if (p == NULL) {
             return NULL;
         } else {
+
+#if !defined(MMTK_GHC)
             Bdescr(p)->flags |= BF_PINNED;
+#endif
             W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
             MEMSET_SLOP_W(p, 0, off_w);
             p += off_w;
@@ -1267,6 +1302,13 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
             return p;
         }
     }
+
+#if defined(MMTK_GHC)
+    StgWord bytes = n*sizeof(W_);
+    p = mmtk_alloc(cap->running_task->rts_mutator, bytes, alignment, align_off, 0);
+    mmtk_post_alloc(cap->running_task->rts_mutator, p, bytes, 0);
+    return p;
+#endif
 
     bd = cap->pinned_object_block;
 
@@ -1363,6 +1405,7 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
     p += off_w;
     bd->free += n;
 
+    // here we are not zeoring the slop after closure?
     accountAllocation(cap, n);
 
     return p;
@@ -1496,6 +1539,9 @@ dirty_STACK (Capability *cap, StgStack *stack)
         updateRemembSetPushStack(cap, stack);
     }
 
+    // if stack is not dirty, set the flag, put to mut set
+    // any heap obj has been mutated since last GC, that lives in an older gen of the nursery
+    // 
     if (RELAXED_LOAD(&stack->dirty) == 0) {
         RELAXED_STORE(&stack->dirty, 1);
         recordClosureMutated(cap,(StgClosure*)stack);

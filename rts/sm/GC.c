@@ -54,6 +54,10 @@
 #include "RtsFlags.h"
 #include "NonMoving.h"
 #include "Ticky.h"
+#include "Threads.h"
+#if defined(MMTK_GHC)
+#include "mmtk/ghc/mmtk_upcalls.h"
+#endif
 
 #include <string.h> // for memset()
 #include <unistd.h>
@@ -239,6 +243,39 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
+#if defined(MMTK_GHC)
+struct MmtkGcWorker {
+    int dummy;
+};
+
+static void mmtk_controller_thread(void* controller)
+{
+    void *tls = stgMallocBytes(sizeof(struct MmtkGcWorker), "mmtk_controller_thread");
+    mmtk_start_control_collector(tls, controller);
+}
+
+void upcall_spawn_gc_controller(void *controller)
+{
+    OSThreadId *tid;
+    if (createOSThread(&tid, "MMTK controller", mmtk_controller_thread, controller) != 0) {
+        barf("Failed to spawn GC controller thread");
+    }
+}
+
+static void mmtk_worker_thread(void* worker)
+{
+    void *tls = stgMallocBytes(sizeof(struct MmtkGcWorker), "mmtk_worker_thread");
+    mmtk_start_worker(tls, worker);
+}
+
+void upcall_spawn_gc_worker(void *worker)
+{
+    OSThreadId *tid;
+    if (createOSThread(&tid, "MMTK worker", mmtk_worker_thread, worker) != 0) {
+        barf("Failed to spawn GC worker thread");
+    }
+}
+#endif
 
 /* -----------------------------------------------------------------------------
    Statistics from mut_list scavenging
@@ -536,6 +573,9 @@ GarbageCollect (uint32_t collect_gen,
   } else {
       markCapability(mark_root, gct, cap, true/*don't mark sparks*/);
   }
+
+  // add global TSO list as a GC root
+  evacuate((StgClosure **)&global_TSOs);
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
@@ -1151,15 +1191,19 @@ new_gc_thread (uint32_t n, gc_thread *t)
         // but can't, because it uses gct which isn't set up at this point.
         // Hence, allocate a block for todo_bd manually:
         {
+#if defined(MMTK_GHC)
+            bdescr *bd = NULL;
+#else
             bdescr *bd = allocBlockOnNode(capNoToNumaNode(n));
                 // no lock, locks aren't initialised yet
             initBdescr(bd, ws->gen, ws->gen->to);
             bd->flags = BF_EVACUATED;
             bd->u.scan = bd->free = bd->start;
 
-            ws->todo_bd = bd;
             ws->todo_free = bd->free;
             ws->todo_lim = bd->start + BLOCK_SIZE_W;
+#endif
+            ws->todo_bd = bd;
         }
 
         ws->todo_q = newWSDeque(128);

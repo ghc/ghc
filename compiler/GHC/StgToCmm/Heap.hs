@@ -106,6 +106,7 @@ allocDynClosureCmm mb_id info_tbl lf_info use_cc _blame_cc amodes_w_offsets = do
 
 
 -- | Low-level heap object allocation.
+-- Combine GHCSM heap allocation; and a call to MMTk allocation
 allocHeapClosure
   :: SMRep                            -- ^ representation of the object
   -> CmmExpr                          -- ^ info pointer
@@ -124,9 +125,9 @@ allocHeapClosure rep info_ptr use_cc payload = do
             -- Remember, virtHp points to last allocated word,
             -- ie 1 *before* the info-ptr word of new object.
 
-  base <- getHpRelOffset info_offset
+  base <- getHpRelOffset info_offset -- actual allocation
   emitComment $ mkFastString "allocHeapClosure"
-  emitSetDynHdr base info_ptr use_cc
+  emitSetDynHdr base info_ptr use_cc -- info pointer header and profiling header
 
   -- Fill in the fields
   hpStore base payload
@@ -136,7 +137,6 @@ allocHeapClosure rep info_ptr use_cc payload = do
   setVirtHp (virt_hp + heapClosureSizeW profile rep)
 
   return base
-
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs

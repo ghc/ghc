@@ -387,6 +387,9 @@ wanteds os = concat
           ,structField C    "StgRegTable" "rRet"
           ,structField C    "StgRegTable" "rNursery"
 
+          ,structField Both "BumpAllocator" "cursor"
+          ,structField Both "BumpAllocator" "limit"
+
           ,defIntOffset Both "stgEagerBlackholeInfo"
                              "FUN_OFFSET(stgEagerBlackholeInfo)"
           ,defIntOffset Both "stgGCEnter1" "FUN_OFFSET(stgGCEnter1)"
@@ -402,6 +405,9 @@ wanteds os = concat
           ,structField C    "Capability" "total_allocated"
           ,structField C    "Capability" "weak_ptr_list_hd"
           ,structField C    "Capability" "weak_ptr_list_tl"
+          ,structField Both "Capability" "running_task"
+
+          ,structField Both "Task" "mmutator"
 
           ,structField Both "bdescr" "start"
           ,structField Both "bdescr" "free"
@@ -456,6 +462,8 @@ wanteds os = concat
 
           ,closureField  C    "StgTSO"      "_link"
           ,closureField  C    "StgTSO"      "global_link"
+          ,closureField  C    "StgTSO"      "tso_link_prev"
+          ,closureField  C    "StgTSO"      "tso_link_next"
           ,closureField  C    "StgTSO"      "what_next"
           ,closureField  C    "StgTSO"      "why_blocked"
           ,closureField  C    "StgTSO"      "block_info"
@@ -766,6 +774,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "#include \"Rts.h\"",
                      "#include \"StableName.h\"",
                      "#include \"Capability.h\"",
+                     "#include \"include/mmtk.h\"",
                      "",
                      "#include <inttypes.h>",
                      "#include <stddef.h>",

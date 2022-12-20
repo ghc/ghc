@@ -376,6 +376,8 @@
 #include "rts/storage/Block.h"  /* For Bdescr() */
 
 
+// BaseReg is pointing to a StgRegTable inside my capability
+// OFFSET_Capability_r is the auto-generated offset
 #define MyCapability()  (BaseReg - OFFSET_Capability_r)
 
 /* -------------------------------------------------------------------------
@@ -444,9 +446,14 @@
    HP_CHK_P(bytes);                             \
    TICK_ALLOC_HEAP_NOCTR(bytes);
 
+#if defined(MMTK_GHC)
+#define CHECK_GC()                                                      \
+  (generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
+#else
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
    generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
+#endif
 
 // allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses

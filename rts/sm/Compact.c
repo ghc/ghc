@@ -462,6 +462,9 @@ thread_TSO (StgTSO *tso)
 {
     thread_(&tso->_link);
     thread_(&tso->global_link);
+    thread_(&tso->tso_link_next);
+    // probably don't need
+    thread_(&tso->tso_link_prev);
 
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead

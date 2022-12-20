@@ -194,9 +194,9 @@ continuation, resulting in just one proc point instead of two. Yay!
 -}
 
 
-emitCCall :: [(CmmFormal,ForeignHint)]
-          -> CmmExpr
-          -> [(CmmActual,ForeignHint)]
+emitCCall :: [(CmmFormal,ForeignHint)] -- result: pointer to the object CmmFormal-result
+          -> CmmExpr -- actual funtion
+          -> [(CmmActual,ForeignHint)] -- cmmActual: expression
           -> FCode ()
 emitCCall hinted_results fn hinted_args
   = void $ emitForeignCall PlayRisky results target args
@@ -288,15 +288,16 @@ maybe_assign_temp e = do
 emitSaveThreadState :: FCode ()
 emitSaveThreadState = do
   profile <- getProfile
-  code <- saveThreadState profile
+  tscp <- getTickScope
+  code <- saveThreadState profile tscp
   emit code
 
 -- | Produce code to save the current thread state to @CurrentTSO@
-saveThreadState :: MonadUnique m => Profile -> m CmmAGraph
-saveThreadState profile = do
+saveThreadState :: MonadUnique m => Profile -> CmmTickScope -> m CmmAGraph
+saveThreadState profile tscp = do
   let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
-  close_nursery <- closeNursery profile tso
+  close_nursery <- closeNursery profile tscp tso
   pure $ catAGraphs
    [ -- tso = CurrentTSO;
      mkAssign (CmmLocal tso) currentTSOExpr
@@ -405,7 +406,8 @@ emitCloseNursery = do
   profile <- getProfile
   let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
-  code <- closeNursery profile tso
+  tscp <- getTickScope
+  code <- closeNursery profile tscp tso
   emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
 
 {- |
@@ -429,45 +431,68 @@ Closing the nursery corresponds to the following code:
   cn->free = Hp + WDS(1);
 @
 -}
-closeNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
-closeNursery profile tso = do
-  let tsoreg   = CmmLocal tso
-      platform = profilePlatform profile
-  cnreg      <- CmmLocal <$> newTemp (bWord platform)
-  pure $ catAGraphs [
-    mkAssign cnreg currentNurseryExpr,
+closeNursery :: MonadUnique m => Profile -> CmmTickScope -> LocalReg -> m CmmAGraph
+closeNursery profile tscp tso = do
+    ghcsm <- ghcsm_path
+    mmtk <- mmtk_path
+    mkCmmIfThenElseUniq tscp is_MMTk mmtk ghcsm (Just False)
+  where
+    tsoreg   = CmmLocal tso
+    platform = profilePlatform profile
+    isMMTk  = cmmLoadBWord platform (CmmLit $ CmmLabel mkIsMMTk_infoLabel)
+    zero = zeroExpr platform
+    is_MMTk = cmmNeWord platform isMMTk zero
 
-    -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform hpExpr 1),
+    ghcsm_path = do
+      cnreg      <- CmmLocal <$> newTemp (bWord platform)
+      pure $ catAGraphs [
+        mkAssign cnreg currentNurseryExpr,
 
-    let alloc =
-           CmmMachOp (mo_wordSub platform)
-              [ cmmOffsetW platform hpExpr 1
-              , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
-              ]
+        -- CurrentNursery->free = Hp + WORD_SIZE;
+        mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform hpExpr 1),
 
-        alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
-    in
+        let alloc =
+              CmmMachOp (mo_wordSub platform)
+                  [ cmmOffsetW platform hpExpr 1
+                  , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
+                  ]
 
-    -- tso->alloc_limit += alloc
-    mkStore alloc_limit (CmmMachOp (MO_Sub W64)
-                               [ CmmLoad alloc_limit b64 NaturallyAligned
-                               , CmmMachOp (mo_WordTo64 platform) [alloc] ])
-   ]
+            alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
+        in
+
+        -- tso->alloc_limit += alloc
+        mkStore alloc_limit (CmmMachOp (MO_Sub W64)
+                                  [ CmmLoad alloc_limit b64 NaturallyAligned
+                                  , CmmMachOp (mo_WordTo64 platform) [alloc] ])
+        ]
+    
+    mmtk_path = do
+      bump_alloc_reg <- CmmLocal <$> newTemp (bWord platform)
+      pure $ catAGraphs [
+        mkAssign bump_alloc_reg (mmtkBumpAllocator platform),
+
+        -- P_[BumpAlloc->cursor] = Hp + WORD_SIZE
+        let cursor_ptr = bumpAllocator_cursor platform bump_alloc_reg
+        in mkStore cursor_ptr (cmmOffsetW platform (CmmReg hpReg) 1)
+
+        -- TODO: update alloc
+        ]
+
 
 emitLoadThreadState :: FCode ()
 emitLoadThreadState = do
   profile <- getProfile
-  code <- loadThreadState profile
+  tscp <- getTickScope 
+  code <- loadThreadState profile tscp
   emit code
 
 -- | Produce code to load the current thread state from @CurrentTSO@
-loadThreadState :: MonadUnique m => Profile -> m CmmAGraph
-loadThreadState profile = do
+loadThreadState :: MonadUnique m => Profile -> CmmTickScope -> m CmmAGraph
+loadThreadState profile tscp = do
   let platform = profilePlatform profile
   tso <- newTemp (gcWord platform)
   stack <- newTemp (gcWord platform)
-  open_nursery <- openNursery profile tso
+  open_nursery <- openNursery profile tscp tso
   pure $ catAGraphs [
     -- tso = CurrentTSO;
     mkAssign (CmmLocal tso) currentTSOExpr,
@@ -478,11 +503,11 @@ loadThreadState profile = do
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
     mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
                                 (pc_RESERVED_STACK_WORDS (platformConstants platform))),
+    open_nursery,
     -- HpAlloc = 0;
     --   HpAlloc is assumed to be set to non-zero only by a failed
     --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
     mkAssign hpAllocReg (zeroExpr platform),
-    open_nursery,
     -- and load the current cost centre stack from the TSO when profiling:
     if profileIsProfiling profile
        then let ccs_ptr = cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS profile)
@@ -496,7 +521,8 @@ emitOpenNursery = do
   profile <- getProfile
   let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
-  code <- openNursery profile tso
+  tscp <- getTickScope
+  code <- openNursery profile tscp tso
   emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
 
 {- |
@@ -527,57 +553,106 @@ Opening the nursery corresponds to the following code:
    HpLim = bdstart + CurrentNursery->blocks*BLOCK_SIZE_W - 1;
 @
 -}
-openNursery :: MonadUnique m => Profile -> LocalReg -> m CmmAGraph
-openNursery profile tso = do
-  let tsoreg   = CmmLocal tso
-      platform = profilePlatform profile
-  cnreg      <- CmmLocal <$> newTemp (bWord platform)
-  bdfreereg  <- CmmLocal <$> newTemp (bWord platform)
-  bdstartreg <- CmmLocal <$> newTemp (bWord platform)
+openNursery :: MonadUnique m => Profile -> CmmTickScope -> LocalReg -> m CmmAGraph
+openNursery profile tscp tso = do
+    ghcsm <- ghcsm_path
+    mmtk <- mmtk_path
+    mkCmmIfThenElseUniq tscp is_MMTk mmtk ghcsm (Just False)
+  where
+    tsoreg   = CmmLocal tso
+    platform = profilePlatform profile
+    isMMTk  = cmmLoadBWord platform (CmmLit $ CmmLabel mkIsMMTk_infoLabel)
+    zero = zeroExpr platform
+    is_MMTk = cmmNeWord platform isMMTk zero
 
-  -- These assignments are carefully ordered to reduce register
-  -- pressure and generate not completely awful code on x86.  To see
-  -- what code we generate, look at the assembly for
-  -- stg_returnToStackTop in rts/StgStartup.cmm.
-  pure $ catAGraphs [
-     mkAssign cnreg currentNurseryExpr,
-     mkAssign bdfreereg  (cmmLoadBWord platform (nursery_bdescr_free platform cnreg)),
+    ghcsm_path = do
+      cnreg      <- CmmLocal <$> newTemp (bWord platform)
+      bdfreereg  <- CmmLocal <$> newTemp (bWord platform)
+      bdstartreg <- CmmLocal <$> newTemp (bWord platform)
 
-     -- Hp = CurrentNursery->free - 1;
-     mkAssign hpReg (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
+      -- These assignments are carefully ordered to reduce register
+      -- pressure and generate not completely awful code on x86.  To see
+      -- what code we generate, look at the assembly for
+      -- stg_returnToStackTop in rts/StgStartup.cmm.
+      pure $ catAGraphs [
+          mkAssign cnreg currentNurseryExpr,
+          mkAssign bdfreereg  (cmmLoadBWord platform (nursery_bdescr_free platform cnreg)),
 
-     mkAssign bdstartreg (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)),
+          -- Hp = CurrentNursery->free - WORD_SIZE;
+          mkAssign hpReg (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
 
-     -- HpLim = CurrentNursery->start +
-     --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
-     mkAssign hpLimReg
-         (cmmOffsetExpr platform
-             (CmmReg bdstartreg)
-             (cmmOffset platform
-               (CmmMachOp (mo_wordMul platform)
-                 [ CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
-                     [CmmLoad (nursery_bdescr_blocks platform cnreg) b32 NaturallyAligned]
-                 , mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform))
-                 ])
-               (-1)
-             )
-         ),
+          mkAssign bdstartreg (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)),
 
-     -- alloc = bd->free - bd->start
-     let alloc =
-           CmmMachOp (mo_wordSub platform) [CmmReg bdfreereg, CmmReg bdstartreg]
+          -- HpLim = CurrentNursery->start +
+          --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
+          mkAssign hpLimReg
+              (cmmOffsetExpr platform
+                  (CmmReg bdstartreg)
+                  (cmmOffset platform
+                    (CmmMachOp (mo_wordMul platform)
+                      [ CmmMachOp (MO_SS_Conv W32 (wordWidth platform))
+                          [CmmLoad (nursery_bdescr_blocks platform cnreg) b32 NaturallyAligned]
+                      , mkIntExpr platform (pc_BLOCK_SIZE (platformConstants platform))
+                      ])
+                    (-1)
+                  )
+              ),
 
-         alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
-     in
+          -- alloc = bd->free - bd->start
+          let alloc =
+                CmmMachOp (mo_wordSub platform) [CmmReg bdfreereg, CmmReg bdstartreg]
 
-     -- tso->alloc_limit += alloc
-     mkStore alloc_limit (CmmMachOp (MO_Add W64)
-                               [ CmmLoad alloc_limit b64 NaturallyAligned
-                               , CmmMachOp (mo_WordTo64 platform) [alloc] ])
+              alloc_limit = cmmOffset platform (CmmReg tsoreg) (tso_alloc_limit profile)
+          in
 
-   ]
+          -- tso->alloc_limit += alloc
+          mkStore alloc_limit (CmmMachOp (MO_Add W64)
+                                    [ CmmLoad alloc_limit b64 NaturallyAligned
+                                    , CmmMachOp (mo_WordTo64 platform) [alloc] ])
+        ]
+
+    -- Note [MMTK off-by-one]
+    -- ~~~~~~~~~~~~~~~~~~~~~~
+    -- The STG machine's Hp register always points to the first byte of the
+    -- *last allocated* word. By contrast, MMTK's BumpAllocator::cursor field
+    -- points to the first byte of the first unallocated word. We must take
+    -- care to account for this offset when opening/closing the nursery.
+    --
+    -- In the case of the limit semantics, STG's HpLim register points to the
+    -- last byte *inside* of the nursery, which is the same as MMTk's
+    -- semantics.
+    mmtk_path = do
+      bump_alloc_reg <- CmmLocal <$> newTemp (bWord platform)
+      cursor_reg  <- CmmLocal <$> newTemp (bWord platform)
+      limit_reg <- CmmLocal <$> newTemp (bWord platform)
+      pure $ catAGraphs [
+          mkAssign bump_alloc_reg (mmtkBumpAllocator platform),
+          mkAssign cursor_reg (cmmLoadBWord platform (bumpAllocator_cursor platform bump_alloc_reg)),
+          mkAssign limit_reg (cmmLoadBWord platform (bumpAllocator_limit platform bump_alloc_reg)),
+
+          -- Hp = BumpAlloc->cursor - WORD_SIZE
+          mkAssign hpReg $ cmmOffsetW platform (CmmReg cursor_reg) (-1),
+
+          -- HpLim = BumpAlloc->limit
+          mkAssign hpLimReg (cmmOffsetW platform (CmmReg limit_reg) (-1))
+
+          -- TODO: alloc = bd->free - bd->start
+        ]
+
+mmtkBumpAllocator :: Platform -> CmmExpr
+mmtkBumpAllocator platform =
+    bump_alloc_addr
+  where
+    pc = platformConstants platform
+    capability_addr = cmmOffset platform baseExpr (negate $ pc_OFFSET_Capability_r pc)                             -- :: Ptr Capability
+    task_addr = cmmLoadBWord platform (cmmOffset platform capability_addr (pc_OFFSET_Capability_running_task pc))  -- :: Ptr Task
+    mutator_addr = cmmLoadBWord platform (cmmOffset platform task_addr (pc_OFFSET_Task_mmutator pc))               -- :: Ptr MMTK_Mutator
+    -- TODO: Account for potential offset; we currently assume that `mutator.allocators.bump_allocator[0]` is
+    -- at offset 0 of `mutator`
+    bump_alloc_addr = mutator_addr                                                                                 -- :: Ptr BumpAllocator
 
 nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks
+  , bumpAllocator_cursor, bumpAllocator_limit
   :: Platform -> CmmReg -> CmmExpr
 nursery_bdescr_free   platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_free (platformConstants platform))
@@ -585,6 +660,10 @@ nursery_bdescr_start  platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_start (platformConstants platform))
 nursery_bdescr_blocks platform cn =
   cmmOffset platform (CmmReg cn) (pc_OFFSET_bdescr_blocks (platformConstants platform))
+bumpAllocator_cursor platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_BumpAllocator_cursor (platformConstants platform))
+bumpAllocator_limit platform cn =
+  cmmOffset platform (CmmReg cn) (pc_OFFSET_BumpAllocator_limit (platformConstants platform))
 
 tso_stackobj, tso_CCCS, tso_alloc_limit, stack_STACK, stack_SP :: Profile -> ByteOff
 tso_stackobj    profile = closureField profile (pc_OFFSET_StgTSO_stackobj    (profileConstants profile))

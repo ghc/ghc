@@ -60,6 +60,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.PkgQual
 
 import GHC.Utils.Error
+import GHC.Utils.ExceptionWithPlatform
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
@@ -272,7 +273,7 @@ main' postLoadMode units dflags0 args flagWarnings = do
   ---------------- Do the business -----------
   handleSourceError (\e -> do
        GHC.printException e
-       liftIO $ exitWith (ExitFailure 1)) $ do
+       liftIO $ exitWith (ExitFailure 1)) $ rethrowWithPlatform (targetPlatform dflags6) $ do
     case postLoadMode of
        ShowInterface f        -> liftIO $ showIface logger
                                                     (hsc_dflags hsc_env)

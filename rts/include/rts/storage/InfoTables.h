@@ -186,6 +186,8 @@ typedef StgHalfWord StgSRTField;
 /*
  * The "standard" part of an info table.  Every info table has this bit.
  */
+// we can assume the macro here is set (TABLES_NEXT_TO_CODE)
+// construct similar rust file (abi.rs)
 typedef struct StgInfoTable_ {
 
 #if !defined(TABLES_NEXT_TO_CODE)
@@ -203,9 +205,9 @@ typedef struct StgInfoTable_ {
        /* In a CONSTR:
             - the zero-based constructor tag
           In a FUN/THUNK
-            - if USE_INLINE_SRT_FIELD
-              - offset to the SRT (or zero if no SRT)
-            - otherwise
+            - if USE_INLINE_SRT_FIELD (halfint)
+              - offset to the SRT (or zero if no SRT) 
+            - otherwise (full word)
               - non-zero if there is an SRT, offset is in srt_offset
        */
 

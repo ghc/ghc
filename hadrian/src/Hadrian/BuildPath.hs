@@ -108,7 +108,8 @@ parseWayUnit = Parsec.choice
                      , Parsec.string "yn"   *> pure Dynamic ])
     , Parsec.char 'p'     *> pure Profiling
     , Parsec.char 'l'     *> pure Logging
-    ] Parsec.<?> "way unit (thr, debug, dyn, p, l)"
+    , Parsec.string "mmtk" *> pure MMTK
+    ] Parsec.<?> "way unit (thr, debug, dyn, p, l, mmtk)"
 
 -- | Parse a @"pkgname-pkgversion"@ string into the package name and the
 -- integers that make up the package version.

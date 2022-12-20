@@ -27,6 +27,7 @@
 #include "IOManager.h" // for CapIOManager
 
 #include "BeginPrivate.h"
+#include "mmtk.h"
 
 /* N.B. This must be consistent with CapabilityPublic in RtsAPI.h */
 struct Capability_ {
@@ -90,6 +91,7 @@ struct Capability_ {
     // The update remembered set for the non-moving collector
     UpdRemSet upd_rem_set;
 
+    // MMTK-TODO: move pinned object blocks inside storage manager
     // block for allocating pinned objects into
     bdescr *pinned_object_block;
     // full pinned object blocks allocated since the last GC
@@ -276,7 +278,8 @@ typedef enum {
     SYNC_GC_SEQ,
     SYNC_GC_PAR,
     SYNC_FLUSH_UPD_REM_SET,
-    SYNC_FLUSH_EVENT_LOG
+    SYNC_FLUSH_EVENT_LOG,
+    SYNC_GC_MMTK
 } SyncType;
 
 //
@@ -327,6 +330,8 @@ EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 // On return: *pCap is NULL if the capability was released.  The
 // current task should then re-acquire it using waitForCapability().
 //
+
+bool yieldCapabilityForMMTK (Task *task, bool gcAllowed);
 bool yieldCapability (Capability** pCap, Task *task, bool gcAllowed);
 
 // Wakes up a worker thread on just one Capability, used when we
@@ -425,6 +430,11 @@ INLINE_HEADER bool emptyInbox(Capability *cap);
 EXTERN_INLINE void
 recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
 {
+#if defined(MMTK_GHC)
+    // TODO: call MMTK write barrier
+    return;
+#endif
+
     bdescr *bd;
 
     // We must own this Capability in order to modify its mutable list.
@@ -446,6 +456,10 @@ recordMutableCap (const StgClosure *p, Capability *cap, uint32_t gen)
 EXTERN_INLINE void
 recordClosureMutated (Capability *cap, StgClosure *p)
 {
+#if defined(MMTK_GHC)
+    // TODO: call MMTK write barrier
+    return;
+#endif
     bdescr *bd;
     bd = Bdescr((StgPtr)p);
     if (bd->gen_no != 0) recordMutableCap(p,cap,bd->gen_no);

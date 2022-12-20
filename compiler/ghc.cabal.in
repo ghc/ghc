@@ -841,6 +841,7 @@ Library
         GHC.Utils.Constants
         GHC.Utils.Error
         GHC.Utils.Exception
+        GHC.Utils.ExceptionWithPlatform
         GHC.Utils.Fingerprint
         GHC.Utils.FV
         GHC.Utils.GlobalVars

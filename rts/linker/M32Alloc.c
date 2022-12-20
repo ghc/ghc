@@ -286,13 +286,13 @@ m32_release_page(struct m32_page_t *page)
 
   const size_t pgsz = getPageSize();
   ssize_t sz = page->filled_page.size;
-  IF_DEBUG(sanity, memset(page, 0xaa, sz));
 
   // Break the page, which may be a large multi-page allocation, into
   // individual pages for the page pool
   while (sz > 0) {
     if (m32_free_page_pool_size < M32_MAX_FREE_PAGE_POOL_SIZE) {
       mprotectForLinker(page, pgsz, MEM_READ_WRITE);
+      IF_DEBUG(sanity, memset(page, 0xaa, pgsz));
       SET_PAGE_TYPE(page, FREE_PAGE);
       page->free_page.next = m32_free_page_pool;
       m32_free_page_pool = page;

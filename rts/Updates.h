@@ -45,8 +45,24 @@
  * before we introduce the indirection.
  * See Note [Heap memory barriers] in SMP.h.
  */
+#if defined(MMTK_GHC)
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
+                                                                \
+    prim_write_barrier;                                         \
+    OVERWRITING_CLOSURE(p1);                                    \
+    %relaxed StgInd_indirectee(p1) = p2;                        \
+    prim_write_barrier;                                         \
+    SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
+    LDV_RECORD_CREATE(p1);                                      \
+    and_then;
+
+#else
+
+#define updateWithIndirection(p1, p2, and_then) \
+    W_ bd;                                                      \
+                                                                \
+    prim_write_barrier;                                         \
     bd = Bdescr(p1);                                            \
     if (bdescr_gen_no(bd) != 0 :: bits16) {                     \
       IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
@@ -63,27 +79,30 @@
     SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
+#endif
 
 #else /* !CMINUSMINUS */
 
-INLINE_HEADER void updateWithIndirection (Capability *cap,
+INLINE_HEADER void updateWithIndirection (Capability *cap STG_UNUSED,
                                           StgClosure *p1,
                                           StgClosure *p2)
 {
     ASSERT( (P_)p1 != (P_)p2 );
-    /* not necessarily true: ASSERT( !closure_IND(p1) ); */
-    /* occurs in RaiseAsync.c:raiseAsync() */
-    /* See Note [Heap memory barriers] in SMP.h */
-    bdescr *bd = Bdescr((StgPtr)p1);
-    if (bd->gen_no != 0) {
-      IF_NONMOVING_WRITE_BARRIER_ENABLED {
-          updateRemembSetPushThunk(cap, (StgThunk*)p1);
-      }
-        recordMutableCap(p1, cap, bd->gen_no);
-        TICK_UPD_OLD_IND();
-    } else {
-        TICK_UPD_NEW_IND();
-    }
+#if !defined(MMTK_GHC)
+        /* not necessarily true: ASSERT( !closure_IND(p1) ); */
+        /* occurs in RaiseAsync.c:raiseAsync() */
+        /* See Note [Heap memory barriers] in SMP.h */
+        bdescr *bd = Bdescr((StgPtr)p1);
+        if (bd->gen_no != 0) {
+          IF_NONMOVING_WRITE_BARRIER_ENABLED {
+              updateRemembSetPushThunk(cap, (StgThunk*)p1);
+          }
+            recordClosureMutated(cap, p1);
+            TICK_UPD_OLD_IND();
+        } else {
+            TICK_UPD_NEW_IND();
+        }
+#endif
     OVERWRITING_CLOSURE(p1);
     RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
     SET_INFO_RELEASE(p1, &stg_BLACKHOLE_info);

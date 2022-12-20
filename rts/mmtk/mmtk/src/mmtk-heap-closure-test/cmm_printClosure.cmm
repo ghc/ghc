@@ -1,0 +1,6 @@
+#include "Cmm.h"
+
+cmm_printClosure(P_ p) {
+    ccall c_printClosure(p);
+    return ();
+}

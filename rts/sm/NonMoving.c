@@ -1153,6 +1153,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // for how we deal with this.
     resurrectThreads(*resurrected_threads);
 #endif
+    dump_heap_to("heap.dot");
 
 #if defined(DEBUG)
     // Zap CAFs that we will sweep

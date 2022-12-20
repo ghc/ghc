@@ -32,6 +32,7 @@ module GHC.StgToCmm.Monad (
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
         mkCmmIfThenElse', mkCmmIfThen', mkCmmIfGoto',
+        mkCmmIfThenElseUniq,
 
         mkCall, mkCmmCall,
 
@@ -814,6 +815,11 @@ mkCmmIfThenElse' :: CmmExpr -> CmmAGraph -> CmmAGraph
                  -> Maybe Bool -> FCode CmmAGraph
 mkCmmIfThenElse' e tbranch fbranch likely = do
   tscp  <- getTickScope
+  mkCmmIfThenElseUniq tscp e tbranch fbranch likely
+
+mkCmmIfThenElseUniq :: MonadUnique m => CmmTickScope -> CmmExpr -> CmmAGraph -> CmmAGraph 
+                    -> Maybe Bool -> m CmmAGraph
+mkCmmIfThenElseUniq tscp e tbranch fbranch likely = do
   endif <- newBlockId
   tid   <- newBlockId
   fid   <- newBlockId

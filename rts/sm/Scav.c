@@ -155,6 +155,12 @@ scavengeTSO (StgTSO *tso)
     }
 #endif
 
+    // evac in global_TSOs list too
+    // no evac for global_link
+    // should have handled in markweak - do not mark thread if thread is not reachable
+    evacuate((StgClosure **)&tso->tso_link_next);
+    evacuate((StgClosure **)&tso->tso_link_prev);
+
     tso->dirty = gct->failed_to_evac;
 
     gct->eager_promotion = saved_eager;
@@ -232,6 +238,7 @@ StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
     p = (StgPtr)&a->payload[0];
     for (m = 0; (int)m < (int)mutArrPtrsCards(a->ptrs) - 1; m++)
     {
+        // MUT_ARR_PTRS_CARD_BITS = size of the card, each card has 2^7 elements
         q = p + (1 << MUT_ARR_PTRS_CARD_BITS);
         for (; p < q; p++) {
             evacuate((StgClosure**)p);
@@ -245,7 +252,8 @@ StgPtr scavenge_mut_arr_ptrs (StgMutArrPtrs *a)
         }
     }
 
-    q = (StgPtr)&a->payload[a->ptrs];
+    // looking at the last card, since it might not be full
+    q = (StgPtr)&a->payload[a->ptrs]; // piont to (n+1)th element in the array
     if (p < q) {
         for (; p < q; p++) {
             evacuate((StgClosure**)p);
@@ -1975,6 +1983,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         p = scavenge_small_bitmap(p, size, bitmap);
 
     follow_srt:
+    // srt is generated (e.g. thunks)
         if (major_gc && info->i.srt) {
             StgClosure *srt = (StgClosure*)GET_SRT(info);
             evacuate(&srt);

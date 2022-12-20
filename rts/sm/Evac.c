@@ -493,6 +493,21 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
     StgWord link = RELAXED_LOAD((StgWord*) link_field);
 
     // See Note [STATIC_LINK fields] for how the link field bits work
+    // (link & STATIC_BITS) : mark bit of this object (visited state)
+    // prev_static_flag: "current" static flag value of the previous GC
+
+    // Let's see how this works in practice.
+    // Assume prev_static_flag == 1, cur_static_flag == 2:
+    //
+    // * If we have not visited an object, the object's flag field will be 1; 
+    //   therefore static_flag(obj) | prev_static_flag == 1 /= 3. Therefore
+    //   we conclude that the object has not yet been visited. We therefore visit the object
+    //   and set static_flag(obj) to cur_static_flag (2).
+    // * If we have visited object, the object's flag will be two,  therefore (static_flag(obj) | prev_static_flag) == 3
+    //   and we conclude that we have already visited the object.
+    //
+    // Then next GC we set prev_static_flag == 2, cur_static_flag == 1, flipping the sense of the flag.
+
     if (((link & STATIC_BITS) | prev_static_flag) != 3) {
         StgWord new_list_head = (StgWord)q | static_flag;
 #if !defined(THREADED_RTS)

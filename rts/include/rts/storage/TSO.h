@@ -106,6 +106,11 @@ typedef struct StgTSO_ {
     struct StgTSO_*         global_link;    // Links threads on the
                                             // generation->threads lists
 
+    // use a global double linked list to trace TSO
+    // to avoid the exposure of gen structure
+    struct StgTSO_*         tso_link_prev;
+    struct StgTSO_*         tso_link_next;
+
     /*
      * The thread's stack
      */

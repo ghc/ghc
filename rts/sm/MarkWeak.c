@@ -219,6 +219,16 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
             // it to END_TSO_QUEUE. The copying GC doesn't currently care, but
             // the compacting GC does, see #17785.
             t->global_link = END_TSO_QUEUE;
+
+            // also delete from the global tso list
+            if (t->tso_link_prev != END_TSO_QUEUE){
+                t->tso_link_prev->tso_link_next = t->tso_link_next;
+            }
+            if (t->tso_link_next != END_TSO_QUEUE){
+                t->tso_link_next->tso_link_prev = t->tso_link_prev;
+            }
+            t->tso_link_prev = END_TSO_QUEUE;
+            t->tso_link_next = END_TSO_QUEUE;
             continue;
         default:
             tmp = t;

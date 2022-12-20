@@ -1145,6 +1145,10 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
         pushOnRunQueue(cap,t);
     }
 
+#if defined(MMTK_GHC)
+    return true;
+#endif
+
     // did the task ask for a large block?
     if (cap->r.rHpAlloc > BLOCK_SIZE) {
         // if so, get one and push it on the front of the nursery.
@@ -1435,6 +1439,12 @@ void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
 }
 #endif
 
+#if defined(MMTK_GHC)
+void stopAllCapabilitiesForMMTK (Task *task) {
+    stopAllCapabilitiesWith (NULL, task, SYNC_GC_MMTK);
+}
+#endif
+
 /* -----------------------------------------------------------------------------
  * requestSync()
  *
@@ -1585,6 +1595,36 @@ static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
               bool force_major, bool is_overflow_gc, bool deadlock_detect)
 {
+    ASSERT((*pcap)->running_task == task);
+
+#if defined(MMTK_GHC)
+    // exit GC if in MMTK Mode
+    // TODO: distinguish scheduling and GC after delete_threads_and_gc
+    if (RELAXED_LOAD(&sched_state) == SCHED_INTERRUPTING) {
+        sched_state = SCHED_SHUTTING_DOWN;
+        deleteAllThreads();
+    } else {
+        Capability *cap = *pcap;
+        StgWord hp_alloc = cap->r.rHpAlloc;
+        // N.B. MMTK doesn't like it if we ask for a size-0 allocation.
+        if (hp_alloc != 0) {
+            StgPtr p = mmtk_alloc_slow(task->mmutator, hp_alloc, sizeof(W_), 0, 0);
+
+            // N.B. mmtk_alloc_slow may yield our capability by calling block_for_gc;
+            // ensure that pcap is updated appropriately.
+            *pcap = task->cap;
+
+            // mmtk_alloc_slow has allocated hp_alloc bytes for us but we want
+            // the mutator to be the one to advance the cursor; roll it back.
+            mmtk_get_nursery_allocator(task->mmutator)->cursor = p;
+        }
+        else {
+            // TODO: handle force GC during shutdown (or more cases)
+        }
+        return;
+    }
+#endif
+
     Capability *cap = *pcap;
     bool heap_census;
     uint32_t collect_gen;
@@ -2027,7 +2067,6 @@ forkProcess(HsStablePtr *entry
 {
 #if defined(FORKPROCESS_PRIMOP_SUPPORTED)
     pid_t pid;
-    StgTSO* t,*next;
     Capability *cap;
     uint32_t g;
     Task *task = NULL;
@@ -2127,9 +2166,8 @@ forkProcess(HsStablePtr *entry
         // all Tasks, because they correspond to OS threads that are
         // now gone.
 
-        for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-          for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
-                next = t->global_link;
+        StgTSO* t, *next;
+        for (t = global_TSOs; t->tso_link_next != END_TSO_QUEUE; t = next) {
                 // don't allow threads to catch the ThreadKilled
                 // exception, but we do want to raiseAsync() because these
                 // threads may be evaluating thunks that we need later.
@@ -2141,7 +2179,7 @@ forkProcess(HsStablePtr *entry
                 // won't get a chance to exit in the usual way (see
                 // also scheduleHandleThreadFinished).
                 t->bound = NULL;
-          }
+                next = t->tso_link_next;
         }
 
         discardTasksExcept(task);
@@ -2233,6 +2271,12 @@ forkProcess(HsStablePtr *entry
 void
 setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 {
+#if defined(MMTK_GHC)
+    if (new_n_capabilities != 1) {
+        barf("noGC try to change number of capabilities; \
+                    Should change gen _mut_lists too.");
+    }
+#endif
 #if !defined(THREADED_RTS)
     if (new_n_capabilities != 1) {
         errorBelch("setNumCapabilities: not supported in the non-threaded RTS");
@@ -2368,17 +2412,13 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 static void
 deleteAllThreads ()
 {
+    StgTSO* t, *next;
     // NOTE: only safe to call if we own all capabilities.
 
-    StgTSO* t, *next;
-    uint32_t g;
-
     debugTrace(DEBUG_sched,"deleting all threads");
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
-                next = t->global_link;
-                deleteThread(t);
-        }
+    for(t = global_TSOs; t->tso_link_next != END_TSO_QUEUE; t = next) {
+        next = t->tso_link_next;
+        deleteThread(t);
     }
 
     // The run queue now contains a bunch of ThreadKilled threads.  We
@@ -2824,9 +2864,13 @@ performGC_(bool force_major)
 
     // TODO: do we need to traceTask*() here?
 
+#if defined(MMTK_GHC)
+    mmtk_handle_user_collection_request(cap);
+#else
     waitForCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major,false,false);
     releaseCapability(cap);
+#endif
     exitMyTask();
 }
 

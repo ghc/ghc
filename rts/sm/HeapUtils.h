@@ -21,7 +21,7 @@ walk_large_bitmap(walk_closures_cb *cb,
     // comments around StgPAP.
     ASSERT(large_bitmap->size >= size);
 
-    uint32_t b = 0;
+    uint32_t b = 0; // current word index
 
     for (uint32_t i = 0; i < size; b++) {
         StgWord bitmap = large_bitmap->bitmap[b];

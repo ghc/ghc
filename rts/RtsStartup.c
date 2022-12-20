@@ -42,6 +42,10 @@
 #include "sm/CNF.h"
 #include "TopHandler.h"
 
+#if defined(MMTK_GHC)
+# include "mmtk.h"
+#endif
+
 #if defined(PROFILING)
 # include "ProfHeap.h"
 # include "RetainerProfile.h"
@@ -357,6 +361,16 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
      */
     initTimer();
 
+    /* initialize the storage manager */
+    /* NOTE: Need to init MMTk before init collection for each task*/
+#if defined(MMTK_GHC)
+    size_t mmtk_heap_size = RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE;
+    if (mmtk_heap_size == 0) {
+        mmtk_heap_size = 1024*1024*1024;
+    }
+    mmtk_init(mmtk_heap_size);
+#endif
+
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -367,7 +381,6 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     traceInitEvent(traceOSProcessInfo);
     flushTrace();
 
-    /* initialize the storage manager */
     initStorage();
 
     /* initialise the stable pointer table */
@@ -421,6 +434,11 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Record initialization times */
     stat_endInit();
+
+#if defined(MMTK_GHC)
+    mmtk_initialize_collection(capabilities[0]->running_task);
+#endif
+
 }
 
 // Compatibility interface

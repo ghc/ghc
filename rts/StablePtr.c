@@ -100,7 +100,8 @@
 
 spEntry *stable_ptr_table = NULL;
 static spEntry *stable_ptr_free = NULL;
-static unsigned int SPT_size = 0;
+// static unsigned int SPT_size = 0;
+unsigned int SPT_size = 0;
 #define INIT_SPT_SIZE 64
 
 /* Each time the stable pointer table is enlarged, we temporarily retain the old
@@ -312,7 +313,7 @@ getStablePtr(StgPtr p)
         spEntry *__end_ptr = &stable_ptr_table[SPT_size];               \
         for (p = stable_ptr_table; p < __end_ptr; p++) {                \
             /* Internal pointers are free slots. NULL is last in free */ \
-            /* list. */                                                 \
+            /* list. (when addr null don't trace) */                     \
             if (p->addr &&                                              \
                 (p->addr < (P_)stable_ptr_table || p->addr >= (P_)__end_ptr)) \
             {                                                           \

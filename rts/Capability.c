@@ -31,6 +31,13 @@
 #include "sm/BlockAlloc.h" // for countBlocks()
 #include "IOManager.h"
 
+#if defined(MMTK_GHC)
+#if !defined(THREADED_RTS)
+#error MMTK is only supported in the threaded RTS
+#endif
+#include "mmtk/ghc/mmtk_upcalls.h"
+#endif
+
 #include <string.h>
 
 // one global capability, this is the Capability for non-threaded
@@ -333,6 +340,7 @@ initCapability (Capability *cap, uint32_t i)
 #endif
 }
 
+
 /* ---------------------------------------------------------------------------
  * Function:  initCapabilities()
  *
@@ -493,7 +501,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
     ASSERT_LOCK_HELD(&cap->lock);
     ASSERT(task->cap == cap);
     debugTrace(DEBUG_sched, "passing capability %d to %s %#" FMT_HexWord64,
-               cap->no, task->incall->tso ? "bound task" : "worker",
+               cap->no, (task->incall && task->incall->tso) ? "bound task" : "worker",
                serialisableTaskId(task));
     ACQUIRE_LOCK(&task->lock);
     if (task->wakeup == false) {
@@ -936,6 +944,16 @@ void waitForCapability (Capability **pCap, Task *task)
 
 #if defined(THREADED_RTS)
 
+bool /* Did we GC? */
+yieldCapabilityForMMTK
+    ( Task *task            // [in] This thread's task.
+    , bool gcAllowed
+    )
+{
+    Capability *cap = task->cap;
+    return yieldCapability(&cap, task, gcAllowed);
+}
+
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
 bool /* Did we GC? */
@@ -976,6 +994,8 @@ yieldCapability
 
             case SYNC_FLUSH_EVENT_LOG:
                 /* N.B. the actual flushing is performed by flushEventLog */
+                break;
+            case SYNC_GC_MMTK:
                 break;
 
             default:

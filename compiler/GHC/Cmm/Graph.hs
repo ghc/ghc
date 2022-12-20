@@ -5,6 +5,8 @@ module GHC.Cmm.Graph
   , (<*>), catAGraphs
   , mkLabel, mkMiddle, mkLast, outOfLine
   , lgraphOfAGraph, labelAGraph
+  , blockToAGraphOO
+  , blockToAGraph
 
   , stackStubExpr
   , mkNop, mkAssign, mkStore
@@ -177,6 +179,20 @@ lgraphOfAGraph g = do
 -- | use the given BlockId as the label of the entry point
 labelAGraph    :: BlockId -> CmmAGraphScoped -> CmmGraph
 labelAGraph lbl ag = flattenCmmAGraph lbl ag
+
+blockToAGraphOO :: Block CmmNode O O -> CmmAGraph
+blockToAGraphOO blk =
+    catAGraphs (map mkMiddle $ blockToList blk)
+
+blockToAGraph :: Block CmmNode C C -> CmmAGraph
+blockToAGraph blk =
+    agraph
+  where
+    (CmmEntry blkid tscp, middle, x) = blockSplit blk
+    agraph =
+      mkLabel blkid tscp <*>
+      blockToAGraphOO middle <*>
+      mkLast x
 
 ---------- No-ops
 mkNop        :: CmmAGraph

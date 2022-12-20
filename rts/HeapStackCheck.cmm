@@ -108,14 +108,30 @@ import CLOSURE stg_ret_p_info;
 stg_gc_noregs
 {
     W_ ret;
-
     DEBUG_ONLY(foreign "C" heapCheckFail());
+    // allocation amount exceeded
     if (Hp > HpLim) {
         Hp = Hp - HpAlloc/*in bytes*/;
-        if (HpLim == 0) {
+        // otherwise, allocate another chunk of available heap
+#if defined(MMTK_GHC)
+        if (HpAlloc != 0) {
+            CLOSE_NURSERY();
+            ret = HeapOverflow;
+            goto sched;
+        }
+        // need to check again to make sure that 
+        if (Capability_context_switch(MyCapability()) != 0 :: CInt ||
+            Capability_interrupt(MyCapability())      != 0 :: CInt ||
+                (StgTSO_alloc_limit(CurrentTSO) `lt` (0::I64) &&
+                 (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_ALLOC_LIMIT) != 0)) {
                 ret = ThreadYielding;
                 goto sched;
+        } else {
+            jump %ENTRY_CODE(Sp(0)) [];
         }
+#endif
+        // GCHSM case:        
+        // if there is another chunk of allocated nursery
         if (HpAlloc <= BLOCK_SIZE
             && bdescr_link(CurrentNursery) != NULL) {
             HpAlloc = 0;

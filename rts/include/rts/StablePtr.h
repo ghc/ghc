@@ -27,6 +27,7 @@ typedef struct {
 } spEntry;
 
 extern DLL_IMPORT_RTS spEntry *stable_ptr_table;
+extern unsigned int SPT_size;
 
 ATTR_ALWAYS_INLINE EXTERN_INLINE
 StgPtr deRefStablePtr(StgStablePtr sp)

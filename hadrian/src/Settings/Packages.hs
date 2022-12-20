@@ -301,6 +301,7 @@ rtsPackageArgs = package rts ? do
                                                     , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+          , MMTK      `wayUnit` way          ? arg "-DMMTK_GHC"
           , notM targetSupportsSMP           ? pure [ "-DNOSMP"
                                                     , "-optc-DNOSMP" ]
           ]

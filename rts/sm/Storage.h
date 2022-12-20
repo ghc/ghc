@@ -15,7 +15,6 @@
 /* -----------------------------------------------------------------------------
    Initialisation / De-initialisation
    -------------------------------------------------------------------------- */
-
 void initStorage(void);
 void initGeneration(generation *gen, int g);
 void exitStorage(void);

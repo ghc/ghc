@@ -67,6 +67,7 @@ module GHC.Cmm.CLabel (
         mkOutOfBoundsAccessLabel,
         mkArrWords_infoLabel,
         mkSRTInfoLabel,
+        mkIsMMTk_infoLabel,
 
         mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
@@ -649,6 +650,7 @@ mkDirty_MUT_VAR_Label,
     mkCAFBlackHoleInfoTableLabel,
     mkSMAP_FROZEN_CLEAN_infoLabel, mkSMAP_FROZEN_DIRTY_infoLabel,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel,
+    mkIsMMTk_infoLabel,
     mkOutOfBoundsAccessLabel, mkMUT_VAR_CLEAN_infoLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
@@ -669,6 +671,7 @@ mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (NeedExternDecl False) (fsL
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_badAlignment")      CmmEntry
 mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") Nothing ForeignLabelInExternalPackage IsFunction
 mkMUT_VAR_CLEAN_infoLabel       = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_VAR_CLEAN")     CmmInfo
+mkIsMMTk_infoLabel              = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "is_MMTk") CmmData
 
 mkSRTInfoLabel :: Int -> CLabel
 mkSRTInfoLabel n = CmmLabel rtsUnitId (NeedExternDecl False) lbl CmmInfo

@@ -2,10 +2,10 @@ module Way (
     WayUnit (..), Way, wayUnit, addWayUnit, removeWayUnit, wayFromUnits, allWays,
 
     vanilla, profiling, dynamic, profilingDynamic, threaded, debug,
-    threadedDebug, threadedProfiling, threadedDynamic,
+    threadedDebug, threadedProfiling, threadedDynamic, threadedMmtk, 
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
     debugProfiling, debugDynamic,
-
+    threadedMmtkDynamic, threadedDebugMmtkDynamic, threadedDebugMmtk,
     wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf
     ) where
 
@@ -39,7 +39,8 @@ debug = wayFromUnits [Debug]
 -- | Various combinations of RTS only ways.
 threadedDebug, threadedProfiling, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
-    debugProfiling, debugDynamic :: Way
+    debugProfiling, debugDynamic, 
+    threadedMmtk, threadedMmtkDynamic, threadedDebugMmtk :: Way
 threadedDebug            = wayFromUnits [Threaded, Debug]
 threadedProfiling        = wayFromUnits [Threaded, Profiling]
 threadedDynamic          = wayFromUnits [Threaded, Dynamic]
@@ -48,12 +49,17 @@ threadedDebugDynamic     = wayFromUnits [Threaded, Debug, Dynamic]
 threadedProfilingDynamic = wayFromUnits [Threaded, Profiling, Dynamic]
 debugProfiling           = wayFromUnits [Debug, Profiling]
 debugDynamic             = wayFromUnits [Debug, Dynamic]
+threadedMmtk             = wayFromUnits [Threaded, MMTK]
+threadedMmtkDynamic      = wayFromUnits [Threaded, MMTK, Dynamic]
+threadedDebugMmtkDynamic = wayFromUnits [Threaded, Debug, MMTK, Dynamic]
+threadedDebugMmtk        = wayFromUnits [Threaded, Debug, MMTK]
 
 -- | All ways supported by the build system.
 allWays :: [Way]
 allWays =
     [ vanilla, profiling, dynamic, profilingDynamic, threaded, debug
     , threadedDebug, threadedProfiling, threadedDynamic
+    , threadedMmtk, threadedDebugMmtk, threadedMmtkDynamic, threadedDebugMmtkDynamic
     , threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic
     , debugProfiling, debugDynamic ]
 

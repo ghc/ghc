@@ -12,6 +12,15 @@
 
 #define END_BLOCKED_EXCEPTIONS_QUEUE ((MessageThrowTo*)END_TSO_QUEUE)
 
+
+/* ---------------------------------
+ * A global double linked list of TSO object. 
+ * Used in RTS for tracing through all current threads,
+ * without exposing generation to non-sm part of RTS */
+extern StgTSO* global_TSOs;
+/* ------------------------------------------------- */
+
+
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
 StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, bool allow_migrate);
 

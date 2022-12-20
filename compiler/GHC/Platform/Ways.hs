@@ -48,6 +48,7 @@ module GHC.Platform.Ways
    , hostIsThreaded
    , hostIsDebugged
    , hostIsTracing
+   , hostIsMMTK
    )
 where
 
@@ -69,6 +70,7 @@ data Way
   | WayDebug         -- ^ Debugging, enable trace messages and extra checks
   | WayProf          -- ^ Profiling, enable cost-centre stacks and profiling reports
   | WayDyn           -- ^ Dynamic linking
+  | WayMMTK          -- ^ (RTS) enable MMTK storage manage, disable GHCSM and its GC
   deriving (Eq, Ord, Show, Read)
 
 type Ways = Set Way
@@ -117,6 +119,8 @@ wayTag WayThreaded    = "thr"
 wayTag WayDebug       = "debug"
 wayTag WayDyn         = "dyn"
 wayTag WayProf        = "p"
+-- wayTag WayTracing     = "l" -- "l" for "logging"
+wayTag WayMMTK        = "mmtk"
 
 -- | Return true for ways that only impact the RTS, not the generated code
 wayRTSOnly :: Way -> Bool
@@ -125,6 +129,8 @@ wayRTSOnly WayDyn         = False
 wayRTSOnly WayProf        = False
 wayRTSOnly WayThreaded    = True
 wayRTSOnly WayDebug       = True
+-- wayRTSOnly WayTracing     = True
+wayRTSOnly WayMMTK        = True -- might effect
 
 -- | Filter ways that have an impact on compilation
 fullWays :: Ways -> Ways
@@ -140,6 +146,8 @@ wayDesc WayThreaded    = "Threaded"
 wayDesc WayDebug       = "Debug"
 wayDesc WayDyn         = "Dynamic"
 wayDesc WayProf        = "Profiling"
+-- wayDesc WayTracing     = "Tracing"
+wayDesc WayMMTK        = "MMTK"
 
 -- | Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -155,6 +163,8 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
 wayGeneralFlags _ WayProf     = []
+-- wayGeneralFlags _ WayTracing  = []
+wayGeneralFlags _ WayMMTK     = []
 
 -- | Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -165,6 +175,8 @@ wayUnsetGeneralFlags _ WayDyn      = [Opt_SplitSections]
    -- There's no point splitting when we're going to be dynamically linking.
    -- Plus it breaks compilation on OSX x86.
 wayUnsetGeneralFlags _ WayProf     = []
+-- wayUnsetGeneralFlags _ WayTracing  = []
+wayUnsetGeneralFlags _ WayMMTK     = []
 
 -- | Pass these options to the C compiler when enabling this way
 wayOptc :: Platform -> Way -> [String]
@@ -176,6 +188,8 @@ wayOptc platform WayThreaded = case platformOS platform of
 wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
+-- wayOptc _ WayTracing    = ["-DTRACING"]
+wayOptc _ WayMMTK       = ["-DMMTK_GHC"]
 
 -- | Pass these options to linker when enabling this way
 wayOptl :: Platform -> Way -> [String]
@@ -191,6 +205,8 @@ wayOptl platform WayThreaded =
 wayOptl _ WayDebug      = []
 wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
+-- wayOptl _ WayTracing    = []
+wayOptl _ WayMMTK       = []
 
 -- | Pass these options to the preprocessor when enabling this way
 wayOptP :: Platform -> Way -> [String]
@@ -199,6 +215,8 @@ wayOptP _ WayThreaded = []
 wayOptP _ WayDebug    = []
 wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
+-- wayOptP _ WayTracing  = ["-DTRACING"]
+wayOptP _ WayMMTK     = ["-DMMTK_GHC"]
 
 
 -- | Consult the RTS to find whether it has been built with profiling enabled.
@@ -217,6 +235,21 @@ hostIsDynamic = rtsIsDynamic_ /= 0
 foreign import ccall unsafe "rts_isDynamic" rtsIsDynamic_ :: Int
 
 -- we need this until the bootstrap GHC is always recent enough
+#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
+
+-- | Consult the RTS to find whether it is in MMTK mode.
+hostIsMMTK :: Bool
+hostIsMMTK = rts_isMMTK_ /= 0
+
+foreign import ccall unsafe "rts_isMMTK" rts_isMMTK_ :: Int
+
+#else
+
+hostIsMMTK :: Bool
+hostIsMMTK = False
+
+#endif
+
 #if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
 
 -- | Consult the RTS to find whether it is threaded.
@@ -236,7 +269,6 @@ hostIsTracing :: Bool
 hostIsTracing = rtsIsTracing_ /= 0
 
 foreign import ccall unsafe "rts_isTracing" rtsIsTracing_ :: Int
-
 
 #else
 
@@ -259,6 +291,8 @@ hostWays = Set.unions
    , if hostIsProfiled then Set.singleton WayProf     else Set.empty
    , if hostIsThreaded then Set.singleton WayThreaded else Set.empty
    , if hostIsDebugged then Set.singleton WayDebug    else Set.empty
+   -- , if hostIsTracing  then Set.singleton WayTracing  else Set.empty
+   , if hostIsMMTK     then Set.singleton WayMMTK     else Set.empty
    ]
 
 -- | Host "full" ways (i.e. ways that have an impact on the compilation,

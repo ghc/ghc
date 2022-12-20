@@ -248,3 +248,7 @@ ghc.nix/
 # clangd
 .clangd
 dist-newstyle/
+
+
+# fibonacci test
+fibo

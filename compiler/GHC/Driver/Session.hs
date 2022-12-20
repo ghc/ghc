@@ -2080,7 +2080,7 @@ dynamic_flags_deps = [
          return d)
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWayDynP WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWayDynP WayThreaded))
-
+  , make_ord_flag defGhcFlag "mmtk"           (NoArg (addWayDynP WayMMTK))
   , make_ord_flag defGhcFlag "ticky"
       (NoArg (setGeneralFlag Opt_Ticky >> addWayDynP WayDebug))
 

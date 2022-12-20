@@ -127,8 +127,10 @@ library
       -- using Cabal.
       if flag(threaded)
         extra-library-flavours: _thr
+        extra-library-flavours: _thr_mmtk, _thr_debug_mmtk
         if flag(dynamic)
           extra-dynamic-library-flavours: _thr
+          extra-dynamic-library-flavours: _thr_mmtk, _thr_debug_mmtk
 
       if flag(profiling)
         extra-library-flavours: _p
@@ -642,6 +644,11 @@ library
                  fs.c
                  -- I wish we had wildcards..., this would be:
                  -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
+
+      c-sources: MmtkGhc.c
+
+      extra-libraries: stdc++
+      c-sources: sm/CheckGc.cpp
 
       if os(windows)
          c-sources: win32/AsyncMIO.c

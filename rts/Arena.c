@@ -24,9 +24,14 @@
 #include "RtsUtils.h"
 #include "Arena.h"
 
+typedef struct ArenaBlock {
+    struct ArenaBlock *link;
+    StgPtr start;
+}ArenaBlock;
+
 // Each arena struct is allocated using malloc().
 struct _Arena {
-    bdescr *current;
+    ArenaBlock *current;
     StgWord *free;              // ptr to next free byte in current block
     StgWord *lim;               // limit (== last free byte + 1)
 };
@@ -42,7 +47,7 @@ newArena( void )
     Arena *arena;
 
     arena = stgMallocBytes(sizeof(Arena), "newArena");
-    arena->current = allocBlock_lock();
+    arena->current = stgMallocBytes(sizeof(ArenaBlock), "newArena");
     arena->current->link = NULL;
     arena->free = arena->current->start;
     arena->lim  = arena->current->start + BLOCK_SIZE_W;
@@ -80,20 +85,22 @@ arenaAlloc( Arena *arena, size_t size )
         return p;
     } else {
         // allocate a fresh block...
-        req_blocks =  (W_)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
-        bd = allocGroup_lock(req_blocks);
-        arena_blocks += bd->blocks;
 
-        bd->gen_no  = 0;
-        bd->gen     = NULL;
-        bd->dest_no = 0;
-        bd->flags   = 0;
-        bd->free    = bd->start;
-        bd->link    = arena->current;
-        arena->current = bd;
-        arena->free = bd->free + size_w;
-        arena->lim = bd->free + bd->blocks * BLOCK_SIZE_W;
-        return bd->start;
+        uint32_t req_blocks;
+        ArenaBlock *new_;
+
+        req_blocks =  (W_)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
+        new_ = stgMallocBytes(sizeof(ArenaBlock), "newArena");
+        new_->start = malloc(BLOCK_SIZE * req_blocks);
+        new_->link = arena->current;
+
+        arena_blocks += req_blocks;
+        arena->current = new_;
+        arena->free = new_->start + size_w;
+        arena->lim = new_->start + req_blocks * BLOCK_SIZE_W;
+
+        return new_->start;
+
     }
 }
 
@@ -101,13 +108,12 @@ arenaAlloc( Arena *arena, size_t size )
 void
 arenaFree( Arena *arena )
 {
-    bdescr *bd, *next;
+    ArenaBlock *bd, *next;
 
     for (bd = arena->current; bd != NULL; bd = next) {
         next = bd->link;
-        arena_blocks -= bd->blocks;
-        ASSERT(arena_blocks >= 0);
-        freeGroup_lock(bd);
+        free(bd->start);
+        stgFree(bd);
     }
     stgFree(arena);
 }
@@ -130,8 +136,8 @@ void checkPtrInArena( StgPtr p, Arena *arena )
     // Rest of the blocks should be full (except there may be a little bit of
     // slop at the end). Again, free pointers are not updated so we can't use
     // those.
-    for (bdescr *bd = arena->current->link; bd; bd = bd->link) {
-        if (p >= bd->start && p < bd->start + (bd->blocks*BLOCK_SIZE_W)) {
+    for (ArenaBlock *bd = arena->current->link; bd; bd = bd->link) {
+        if (p >= bd->start && p < bd->start + BLOCK_SIZE_W) {
             return;
         }
     }

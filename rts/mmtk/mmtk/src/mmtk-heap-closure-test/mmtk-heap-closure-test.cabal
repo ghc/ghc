@@ -1,0 +1,27 @@
+cabal-version:      3.0
+name:               mmtk-heap-closure-test
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             Junming Zhao
+maintainer:         junming.zhao@anu.edu.au
+
+library
+    c-sources:        c_printClosure.c
+    cmm-sources:      cmm_printClosure.cmm
+    default-language: Haskell2010
+
+executable mmtk-heap-closure-test
+    main-is:          Main.hs
+    build-depends:    base, mmtk-heap-closure-test, random-heap, QuickCheck
+    default-language: Haskell2010

@@ -427,6 +427,9 @@ EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
    -------------------------------------------------------------------------- */
 
 // The number of card bytes needed
+// (1 << MUT_ARR_PTRS_CARD_BITS): number of elements
+// elems : total number of elements in the array
+// return round(N / 2^c)
 EXTERN_INLINE W_ mutArrPtrsCards (W_ elems);
 EXTERN_INLINE W_ mutArrPtrsCards (W_ elems)
 {
@@ -442,6 +445,7 @@ EXTERN_INLINE W_ mutArrPtrsCardTableSize (W_ elems)
 }
 
 // The address of the card for a particular card number
+// at the end of the array, each byte is the flag/state of the nth card
 EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n);
 EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
 {

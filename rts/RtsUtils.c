@@ -396,6 +396,17 @@ int rts_isTracing(void)
 #endif
 }
 
+// Provides a way for Haskell programs to tell whether they're
+// linked with the MMTK mode or not.
+int rts_isMMTK(void)
+{
+#if defined(MMTK_GHC)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 // Used for detecting a non-empty FPU stack on x86 (see #4914)
 void checkFPUStack(void)
 {
