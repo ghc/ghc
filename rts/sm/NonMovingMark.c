@@ -1915,16 +1915,26 @@ static bool nonmovingIsNowAlive (StgClosure *p)
 
     bdescr *bd = Bdescr((P_)p);
 
-    // All non-static objects in the non-moving heap should be marked as
-    // BF_NONMOVING
-    ASSERT(bd->flags & BF_NONMOVING);
+    const uint16_t flags = bd->flags;
+    if (flags & BF_LARGE) {
+        if (flags & BF_PINNED && !(flags & BF_NONMOVING)) {
+            // In this case we have a pinned object living in a non-full
+            // accumulator block which was not promoted to the nonmoving
+            // generation. Assume that the object is alive.
+            // See #22014.
+            return true;
+        }
 
-    if (bd->flags & BF_LARGE) {
+        ASSERT(bd->flags & BF_NONMOVING);
         return (bd->flags & BF_NONMOVING_SWEEPING) == 0
                    // the large object wasn't in the snapshot and therefore wasn't marked
             || (bd->flags & BF_MARKED) != 0;
                    // The object was marked
     } else {
+        // All non-static objects in the non-moving heap should be marked as
+        // BF_NONMOVING.
+        ASSERT(bd->flags & BF_NONMOVING);
+
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         StgClosure *snapshot_loc =
           (StgClosure *) nonmovingSegmentGetBlock(seg, nonmovingSegmentInfo(seg)->next_free_snap);
