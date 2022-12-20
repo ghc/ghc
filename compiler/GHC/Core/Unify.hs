@@ -1114,20 +1114,11 @@ unify_ty env ty1 ty2 _kco
             ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
               don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
 
-  | Just (tc1, _) <- mb_tc_app1
-  , not (isGenerativeTyCon tc1 Nominal)
-    -- E.g.   unify_ty (F ty1) b  =  MaybeApart
-    --        because the (F ty1) behaves like a variable
-    --        NB: if unifying, we have already dealt
-    --            with the 'ty2 = variable' case
-  = maybeApart MARTypeFamily
+  | isTyFamApp mb_tc_app1     -- A (not-over-saturated) type-family application
+  = maybeApart MARTypeFamily  -- behaves like a type variable; might match
 
-  | Just (tc2, _) <- mb_tc_app2
-  , not (isGenerativeTyCon tc2 Nominal)
-  , um_unif env
-    -- E.g.   unify_ty [a] (F ty2) =  MaybeApart, when unifying (only)
-    --        because the (F ty2) behaves like a variable
-    --        NB: we have already dealt with the 'ty1 = variable' case
+  | isTyFamApp mb_tc_app2     -- A (not-over-saturated) type-family application
+  , um_unif env               -- behaves like a type variable; might unify
   = maybeApart MARTypeFamily
 
   where
@@ -1215,6 +1206,17 @@ unify_tys env orig_xs orig_ys
     go _ _ = surelyApart
       -- Possibly different saturations of a polykinded tycon
       -- See Note [Polykinded tycon applications]
+
+isTyFamApp :: Maybe (TyCon, [Type]) -> Bool
+-- True if we have a saturated or under-saturated type family application
+-- If it is /over/ saturated then we return False.  E.g.
+--     unify_ty (F a b) (c d)    where F has arity 1
+-- we definitely want to decompose that type application! (#22647)
+isTyFamApp (Just (tc, tys))
+  =  not (isGenerativeTyCon tc Nominal)       -- Type family-ish
+  && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
+isTyFamApp Nothing
+  = False
 
 ---------------------------------
 uVar :: UMEnv
