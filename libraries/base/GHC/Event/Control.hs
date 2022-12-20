@@ -50,7 +50,7 @@ import System.Posix.Types (Fd)
 import Foreign.C.Error (throwErrnoIfMinus1, eBADF)
 import Foreign.C.Types (CULLong(..))
 #else
-import Foreign.C.Error (eAGAIN, eWOULDBLOCK)
+import Foreign.C.Error (eAGAIN, eWOULDBLOCK, eBADF)
 #endif
 
 data ControlMessage = CMsgWakeup
@@ -211,8 +211,15 @@ sendWakeup c = do
     _ | n /= -1   -> return ()
       | otherwise -> do
                    errno <- getErrno
-                   when (errno /= eAGAIN && errno /= eWOULDBLOCK) $
-                     throwErrno "sendWakeup"
+                   isDead <- readIORef (controlIsDead c)
+                   case () of
+                     _   -- Someone else has beat us to waking it up
+                       | errno == eAGAIN          -> return ()
+                       | errno == eWOULDBLOCK     -> return ()
+                         -- we are shutting down
+                       | errno == eBADF && isDead -> return ()
+                         -- something bad happened
+                       | otherwise                -> throwErrno "sendWakeup"
 #endif
 
 sendDie :: Control -> IO ()
