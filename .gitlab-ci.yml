@@ -697,10 +697,10 @@ test-bootstrap:
     UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
     UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
     RELEASE_JOB: "$RELEASE_JOB"
-  trigger:
-    project: "ghc/head.hackage"
-    branch: "master"
-    strategy: "depend"
+  # N.B. Sadly we can't use gitlab-ci's trigger: field due to
+  # https://gitlab.haskell.org/ghc/head.hackage/-/issues/68
+  script:
+      - "curl -X POST --fail -F token=$HEAD_HACKAGE_TRIGGER_TOKEN -F ref=master https://gitlab.haskell.org/api/v4/projects/78/trigger/pipeline"
 
 hackage-lint:
   extends: .hackage
