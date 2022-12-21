@@ -39,7 +39,7 @@ static AdjustorWritable allocate_adjustor(AdjustorExecutable *exec_ret, ffi_cif 
 {
     AdjustorWritable writ;
 
-    ffi_status r = ffi_alloc_prep_closure(&writ, cif, wptr, hptr, exec_ret);
+    ffi_status r = ffi_alloc_prep_closure((ffi_closure **) &writ, cif, wptr, hptr, exec_ret);
     if (r != FFI_OK)
         barf("ffi_alloc_prep_closure failed: %d", r);
 
