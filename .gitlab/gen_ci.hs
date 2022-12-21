@@ -807,6 +807,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , allowFailureGroup (addValidateRule FreeBSDLabel (standardBuilds Amd64 FreeBSD13))
      , standardBuilds AArch64 Darwin
      , standardBuilds AArch64 (Linux Debian10)
+     , disableValidate (standardBuildsWithConfig AArch64 (Linux Debian10) llvm)
      , standardBuilds I386 (Linux Debian9)
      , standardBuildsWithConfig Amd64 (Linux Alpine) static
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
