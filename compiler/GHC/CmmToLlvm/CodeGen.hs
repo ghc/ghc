@@ -2041,7 +2041,7 @@ genLit _ CmmHighStackMark
 --
 
 convertMemoryOrdering :: MemoryOrdering -> LlvmSyncOrdering
-convertMemoryOrdering MemOrderRelaxed = SyncUnord
+convertMemoryOrdering MemOrderRelaxed = SyncMonotonic
 convertMemoryOrdering MemOrderAcquire = SyncAcquire
 convertMemoryOrdering MemOrderRelease = SyncRelease
 convertMemoryOrdering MemOrderSeqCst  = SyncSeqCst
