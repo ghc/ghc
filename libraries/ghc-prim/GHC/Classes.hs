@@ -410,19 +410,7 @@ instance Ord Char where
     (C# c1) <= (C# c2) = isTrue# (c1 `leChar#` c2)
     (C# c1) <  (C# c2) = isTrue# (c1 `ltChar#` c2)
 
--- | Note that due to the presence of @NaN@, `Float`'s 'Ord' instance does not
--- satisfy reflexivity.
---
--- >>> 0/0 <= (0/0 :: Float)
--- False
---
--- Also note that, due to the same, `Ord`'s operator interactions are not
--- respected by `Float`'s instance:
---
--- >>> (0/0 :: Float) > 1
--- False
--- >>> compare (0/0 :: Float) 1
--- GT
+-- | See @instance@ 'Ord' 'Double' for discussion of deviations from IEEE 754 standard.
 instance Ord Float where
     (F# x) `compare` (F# y)
         = if      isTrue# (x `ltFloat#` y) then LT
@@ -434,19 +422,38 @@ instance Ord Float where
     (F# x) >= (F# y) = isTrue# (x `geFloat#` y)
     (F# x) >  (F# y) = isTrue# (x `gtFloat#` y)
 
--- | Note that due to the presence of @NaN@, `Double`'s 'Ord' instance does not
--- satisfy reflexivity.
+-- | IEEE 754 'Double'-precision type includes not only numbers, but also
+-- positive and negative infinities and a special element called @NaN@
+-- (which can be quiet or signal).
 --
--- >>> 0/0 <= (0/0 :: Double)
--- False
+-- IEEE 754-2008, section 5.11 requires that if at least one of arguments of
+-- '<=', '<', '>', '>=' is @NaN@ then the result of the comparison is 'False',
+-- and @instance@ 'Ord' 'Double' complies with this requirement. This violates
+-- the reflexivity: both @NaN@ '<=' @NaN@ and @NaN@ '>=' @NaN@ are 'False'.
 --
--- Also note that, due to the same, `Ord`'s operator interactions are not
--- respected by `Double`'s instance:
+-- IEEE 754-2008, section 5.10 defines @totalOrder@ predicate. Unfortunately,
+-- 'compare' on 'Double's violates the IEEE standard and does not define a total order.
+-- More specifically, both 'compare' @NaN@ @x@ and 'compare' @x@ @NaN@ always return 'GT'.
 --
--- >>> (0/0 :: Double) > 1
--- False
--- >>> compare (0/0 :: Double) 1
--- GT
+-- Thus, users must be extremely cautious when using @instance@ 'Ord' 'Double'.
+-- For instance, one should avoid ordered containers with keys represented by 'Double',
+-- because data loss and corruption may happen. An IEEE-compliant 'compare' is available
+-- in @fp-ieee@ package as @TotallyOrdered@ newtype.
+--
+-- Moving further, the behaviour of 'min' and 'max' with regards to @NaN@ is
+-- also non-compliant. IEEE 754-2008, section 5.3.1 defines that quiet @NaN@
+-- should be treated as a missing data by @minNum@ and @maxNum@ functions,
+-- for example, @minNum(NaN, 1) = minNum(1, NaN) = 1@. Some languages such as Java
+-- deviate from the standard implementing @minNum(NaN, 1) = minNum(1, NaN) = NaN@.
+-- However, 'min' / 'max' in @base@ are even worse: 'min' @NaN@ 1 is 1, but 'min' 1 @NaN@
+-- is @NaN@.
+--
+-- IEEE 754-2008 compliant 'min' / 'max' can be found in @ieee754@ package under
+-- @minNum@ / @maxNum@ names. Implementations compliant with
+-- @minimumNumber@ / @maximumNumber@ from a newer
+-- [IEEE 754-2019](https://grouper.ieee.org/groups/msc/ANSI_IEEE-Std-754-2019/background/),
+-- section 9.6 are available from @fp-ieee@ package.
+--
 instance Ord Double where
     (D# x) `compare` (D# y)
         = if      isTrue# (x <##  y) then LT
