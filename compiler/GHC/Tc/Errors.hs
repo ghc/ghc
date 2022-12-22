@@ -1347,7 +1347,7 @@ mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc 
        ; let (imp_errs, hints)
                 = unknownNameSuggestions WL_Anything
                     dflags hpt curr_mod rdr_env
-                    (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)
+                    (tcl_rdr lcl_env) imp_info occ
              err    = SolverReportWithCtxt ctxt (ReportHoleError hole $ OutOfScopeHole imp_errs)
              report = SolverReport err [] hints
 

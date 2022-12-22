@@ -99,6 +99,7 @@ import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Data.Foldable ( toList )
+import GHC.Types.Name.Reader (RdrName(..))
 
 data MetaWrappers = MetaWrappers {
       -- Applies its argument to a type argument `m` and dictionary `Quote m`
@@ -1647,9 +1648,8 @@ repE (HsUntypedSplice (HsUntypedSpliceNested n) _)  = rep_splice n
 repE e@(HsUntypedSplice (HsUntypedSpliceTop _ _) _) = pprPanic "repE: top level splice" (ppr e)
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
 repE (HsUnboundVar _ uv)   = do
-                               occ   <- occNameLit uv
-                               sname <- repNameS occ
-                               repUnboundVar sname
+                               name <- repRdrName uv
+                               repUnboundVar name
 repE (HsGetField _ e (L _ (DotFieldOcc _ (L _ (FieldLabelString f))))) = do
   e1 <- repLE e
   repGetField e1 f
@@ -2191,31 +2191,40 @@ lookupOccDsM n
                 Just (DsSplice _) -> pprPanic "repE:lookupOcc" (ppr n)
     }
 
-globalVar :: Name -> DsM (Core TH.Name)
+
 -- Not bound by the meta-env
 -- Could be top-level; or could be local
 --      f x = $(g [| x |])
 -- Here the x will be local
-globalVar name
-  | isExternalName name
-  = do  { MkC mod <- coreStringLit name_mod
-        ; MkC pkg <- coreStringLit name_pkg
-        ; MkC occ <- nameLit name
-        ; rep2_nwDsM mk_varg [pkg,mod,occ] }
-  | otherwise
-  = do  { MkC occ <- nameLit name
+globalVar :: Name -> DsM (Core TH.Name)
+globalVar n =
+  case nameModule_maybe n of
+    Just m -> globalVarExternal m (getOccName n)
+    Nothing -> globalVarLocal (getUnique n) (getOccName n)
+
+globalVarLocal :: Unique -> OccName -> DsM (Core TH.Name)
+globalVarLocal unique name
+  = do  { MkC occ <- occNameLit name
         ; platform <- targetPlatform <$> getDynFlags
-        ; let uni = mkIntegerExpr platform (toInteger $ getKey (getUnique name))
+        ; let uni = mkIntegerExpr platform (toInteger $ getKey unique)
         ; rep2_nwDsM mkNameLName [occ,uni] }
+
+globalVarExternal :: Module -> OccName -> DsM (Core TH.Name)
+globalVarExternal mod name_occ
+  = do  {
+
+        ; MkC mod <- coreStringLit name_mod
+        ; MkC pkg <- coreStringLit name_pkg
+        ; MkC occ <- occNameLit name_occ
+        ; rep2_nwDsM mk_varg [pkg,mod,occ] }
   where
-      mod = assert (isExternalName name) nameModule name
-      name_mod = moduleNameFS (moduleName mod)
-      name_pkg = unitFS (moduleUnit mod)
-      name_occ = nameOccName name
-      mk_varg | isDataOcc name_occ = mkNameG_dName
-              | isVarOcc  name_occ = mkNameG_vName
-              | isTcOcc   name_occ = mkNameG_tcName
-              | otherwise          = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name)
+    name_mod = moduleNameFS (moduleName mod)
+    name_pkg = unitFS (moduleUnit mod)
+    mk_varg | isDataOcc name_occ = mkNameG_dName
+            | isVarOcc  name_occ = mkNameG_vName
+            | isTcOcc   name_occ = mkNameG_tcName
+            | otherwise          = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name_occ)
+
 
 lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
            -> MetaM Type  -- The type
@@ -2243,15 +2252,12 @@ wrapGenSyms binds body@(MkC b)
     go _ [] = return body
     go var_ty ((name,id) : binds)
       = do { MkC body'  <- go var_ty binds
-           ; lit_str    <- lift $ nameLit name
+           ; lit_str    <- occNameLit (occName name)
            ; gensym_app <- repGensym lit_str
            ; repBindM var_ty elt_ty
                       gensym_app (MkC (Lam id body')) }
 
-nameLit :: Name -> DsM (Core String)
-nameLit n = coreStringLit (occNameFS (nameOccName n))
-
-occNameLit :: OccName -> MetaM (Core String)
+occNameLit :: MonadThings m => OccName -> m (Core String)
 occNameLit name = coreStringLit (occNameFS name)
 
 
@@ -2945,8 +2951,24 @@ mk_lit (HsIntegral i)     = mk_integer  (il_value i)
 mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString _ s)   = mk_string   s
 
+repRdrName :: RdrName -> MetaM (Core TH.Name)
+repRdrName rdr_name = do
+  case rdr_name of
+    Unqual occ ->
+      repNameS =<< occNameLit occ
+    Qual mn occ -> do
+      let name_mod = moduleNameFS mn
+      mod <- coreStringLit name_mod
+      occ <- occNameLit occ
+      repNameQ mod occ
+    Orig m n -> lift $ globalVarExternal m n
+    Exact n -> lift $ globalVar n
+
 repNameS :: Core String -> MetaM (Core TH.Name)
 repNameS (MkC name) = rep2_nw mkNameSName [name]
+
+repNameQ :: Core String -> Core String -> MetaM (Core TH.Name)
+repNameQ (MkC mn) (MkC name) = rep2_nw mkNameQName [mn, name]
 
 --------------- Miscellaneous -------------------
 

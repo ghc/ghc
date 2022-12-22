@@ -1370,8 +1370,7 @@ badRuleLhsErr name lhs bad_e
     err =
       case bad_e of
         HsUnboundVar _ uv ->
-          let rdr = mkRdrUnqual uv
-          in  pprScopeError rdr $ notInScopeErr WL_Global (mkRdrUnqual uv)
+          pprScopeError uv $ notInScopeErr WL_Global uv
         _ -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************

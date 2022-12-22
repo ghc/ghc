@@ -124,6 +124,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Types.Name.Reader
 
 import Data.Coerce
 import Data.Monoid ( Endo(..) )
@@ -307,7 +308,7 @@ instance Outputable DelayedError where
 -- signatures). See Note [Holes].
 data Hole
   = Hole { hole_sort :: HoleSort -- ^ What flavour of hole is this?
-         , hole_occ  :: OccName  -- ^ The name of this hole
+         , hole_occ  :: RdrName  -- ^ The name of this hole
          , hole_ty   :: TcType   -- ^ Type to be printed to the user
                                  -- For expression holes: type of expr
                                  -- For type holes: the missing type
@@ -1233,7 +1234,7 @@ insolubleCt ct
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]
 isOutOfScopeHole :: Hole -> Bool
-isOutOfScopeHole (Hole { hole_occ = occ }) = not (startsWithUnderscore occ)
+isOutOfScopeHole (Hole { hole_occ = occ }) = not (startsWithUnderscore (occName occ))
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i, wc_errors = e})

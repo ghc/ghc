@@ -32,7 +32,7 @@ templateHaskellNames :: [Name]
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
-    mkNameSName,
+    mkNameSName, mkNameQName,
     mkModNameName,
     liftStringName,
     unTypeName, unTypeCodeName,
@@ -216,7 +216,7 @@ modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
-    unsafeCodeCoerceName, liftTypedName, mkModNameName :: Name
+    unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -228,6 +228,7 @@ mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
+mkNameQName    = thFun (fsLit "mkNameQ")    mkNameQIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
@@ -742,7 +743,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
-    unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey :: Unique
+    unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey, mkNameQIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -759,6 +760,7 @@ unTypeCodeIdKey      = mkPreludeMiscIdUnique 212
 liftTypedIdKey        = mkPreludeMiscIdUnique 214
 mkModNameIdKey        = mkPreludeMiscIdUnique 215
 unsafeCodeCoerceIdKey = mkPreludeMiscIdUnique 216
+mkNameQIdKey         = mkPreludeMiscIdUnique 217
 
 
 -- data Lit = ...

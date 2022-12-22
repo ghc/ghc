@@ -1425,7 +1425,7 @@ data NegationHandling = ReassociateNegation | KeepNegationIntact
 -- | Name of an operator in an operator application or section
 data OpName = NormalOp Name             -- ^ A normal identifier
             | NegateOp                  -- ^ Prefix negation
-            | UnboundOp OccName         -- ^ An unbound identifier
+            | UnboundOp RdrName         -- ^ An unbound identifier
             | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
 
 instance Outputable OpName where
@@ -1607,7 +1607,7 @@ checkSectionPrec direction section op arg
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName
-lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName u)
+lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (occName u))
 lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
 
 

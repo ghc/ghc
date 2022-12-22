@@ -3360,14 +3360,14 @@ pprSameOccInfo (SameOcc same_pkg n1 n2) =
 **********************************************************************-}
 
 pprHoleError :: SolverReportErrCtxt -> Hole -> HoleError -> SDoc
-pprHoleError _ (Hole { hole_ty, hole_occ = occ }) (OutOfScopeHole imp_errs)
+pprHoleError _ (Hole { hole_ty, hole_occ = rdr }) (OutOfScopeHole imp_errs)
   = out_of_scope_msg $$ vcat (map ppr imp_errs)
   where
-    herald | isDataOcc occ = text "Data constructor not in scope:"
+    herald | isDataOcc (rdrNameOcc rdr) = text "Data constructor not in scope:"
            | otherwise     = text "Variable not in scope:"
     out_of_scope_msg -- Print v :: ty only if the type has structure
-      | boring_type = hang herald 2 (ppr occ)
-      | otherwise   = hang herald 2 (pp_occ_with_type occ hole_ty)
+      | boring_type = hang herald 2 (ppr rdr)
+      | otherwise   = hang herald 2 (pp_rdr_with_type rdr hole_ty)
     boring_type = isTyVarTy hole_ty
 pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_skol_info) =
   vcat [ hole_msg
@@ -3379,7 +3379,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
     hole_msg = case sort of
       ExprHole {} ->
         hang (text "Found hole:")
-          2 (pp_occ_with_type hole_occ hole_ty)
+          2 (pp_rdr_with_type hole_occ hole_ty)
       TypeHole ->
         hang (text "Found type wildcard" <+> quotes (ppr hole_occ))
           2 (text "standing for" <+> quotes pp_hole_type_with_kind)
@@ -3404,7 +3404,7 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
                       -- Coercion variables can be free in the
                       -- hole, via kind casts
     expr_hole_hint                       -- Give hint for, say,   f x = _x
-         | lengthFS (occNameFS hole_occ) > 1  -- Don't give this hint for plain "_"
+         | lengthFS (occNameFS (rdrNameOcc hole_occ)) > 1  -- Don't give this hint for plain "_"
          = text "Or perhaps" <+> quotes (ppr hole_occ)
            <+> text "is mis-spelled, or not in scope"
          | otherwise
@@ -3425,8 +3425,8 @@ pprHoleError ctxt (Hole { hole_ty, hole_occ}) (HoleError sort other_tvs hole_sko
        = ppWhenOption sdocPrintExplicitCoercions $
            quotes (ppr tv) <+> text "is a coercion variable"
 
-pp_occ_with_type :: OccName -> Type -> SDoc
-pp_occ_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
+pp_rdr_with_type :: RdrName -> Type -> SDoc
+pp_rdr_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
 
 {- *********************************************************************
 *                                                                      *

@@ -22,7 +22,7 @@ hard_hole_fits.hs:15:32: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (HsUnboundVar xuv uv) = _
     • Relevant bindings include
-        uv :: GHC.Types.Name.Occurrence.OccName
+        uv :: GHC.Types.Name.Reader.RdrName
           (bound at hard_hole_fits.hs:15:26)
         xuv :: Language.Haskell.Syntax.Extension.XUnboundVar GhcPs
           (bound at hard_hole_fits.hs:15:22)

@@ -248,8 +248,9 @@ finishHsVar (L l name)
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v = do
   deferOutofScopeVariables <- goptM Opt_DeferOutOfScopeVariables
+  -- See Note [Reporting unbound names] for difference between qualified and unqualified names.
   unless (isUnqual v || deferOutofScopeVariables) (reportUnboundName v >> return ())
-  return (HsUnboundVar noExtField (rdrNameOcc v), emptyFVs)
+  return (HsUnboundVar noExtField v, emptyFVs)
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
@@ -751,6 +752,28 @@ bindNonRec will automatically do the right thing, giving us:
     case expr of y -> (\x -> op y x)
 
 See #18151.
+
+Note [Reporting unbound names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Faced with an out-of-scope `RdrName` there are two courses of action
+A. Report an error immediately (and return a HsUnboundVar). This will halt GHC after the renamer is complete
+B. Return a HsUnboundVar without reporting an error.  That will allow the typechecker to run, which in turn
+   can give a better error message, notably giving the type of the variable via the "typed holes" mechanism.
+
+When `-fdefer-out-of-scope-variables` is on we follow plan B.
+
+When it is not, we follow plan B for unqualified names, and plan A for qualified names.
+
+If a name is qualified, and out of scope, then by default an error will be raised
+because the user was already more precise. They specified a specific qualification
+and either
+  * The qualification didn't exist, so that precision was wrong.
+  * Or the qualification existed and the thing we were looking for wasn't where
+    the qualification said it would be.
+
+However we can still defer this error completely, and we do defer it if
+`-fdefer-out-of-scope-variables` is enabled.
+
 -}
 
 {-
