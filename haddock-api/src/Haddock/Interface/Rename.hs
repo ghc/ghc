@@ -273,10 +273,10 @@ renameType t = case t of
     b' <- renameLType b
     return (HsAppTy noAnn a' b')
 
-  HsAppKindTy _ a b -> do
+  HsAppKindTy _ a at b -> do
     a' <- renameLType a
     b' <- renameLKind b
-    return (HsAppKindTy noAnn a' b')
+    return (HsAppKindTy noAnn a' at b')
 
   HsFunTy _ w a b -> do
     a' <- renameLType a
