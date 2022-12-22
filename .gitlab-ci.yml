@@ -700,7 +700,7 @@ test-bootstrap:
     RELEASE_JOB: "$RELEASE_JOB"
   trigger:
     project: "ghc/head.hackage"
-    branch: "master"
+    branch: "upstream-testing"
     strategy: "depend"
 
 hackage-lint:
