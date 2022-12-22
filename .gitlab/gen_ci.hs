@@ -96,7 +96,7 @@ data Opsys
   | Windows deriving (Eq)
 
 data LinuxDistro
-  = Debian11 | Debian10 | Debian9 | Fedora33 | Ubuntu2004 | Centos7 | Alpine deriving (Eq)
+  = Debian11 | Debian10 | Debian9 | Fedora27 | Fedora33 | Ubuntu2004 | Centos7 | Alpine deriving (Eq)
 
 data Arch = Amd64 | AArch64 | ARMv7 | I386
 
@@ -221,6 +221,7 @@ distroName :: LinuxDistro -> String
 distroName Debian11  = "deb11"
 distroName Debian10   = "deb10"
 distroName Debian9   = "deb9"
+distroName Fedora27  = "fedora27"
 distroName Fedora33  = "fedora33"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
@@ -366,6 +367,12 @@ distroVariables Alpine = mconcat
   ]
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
+  ]
+distroVariables Fedora27 = mconcat
+  -- There is no reasonably new version of LLVM available on Fedora 27.
+  [ "LLC" =: "/bin/false"
+  , "OPT" =: "/bin/false"
+  , "HADRIAN_ARGS" =: "--docs=no-sphinx"
   ]
 distroVariables Fedora33 = mconcat
   -- LLC/OPT do not work for some reason in our fedora images
@@ -770,6 +777,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
      , (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
+     , (standardBuildsWithConfig Amd64 (Linux Fedora27) releaseConfig)
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
