@@ -30,7 +30,6 @@ import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Binds
 
 -- others:
-import GHC.Types.Name (OccName)
 import GHC.Types.Fixity (LexicalFixity(Infix), Fixity)
 import GHC.Types.SourceText (StringLiteral)
 
@@ -44,6 +43,7 @@ import Data.Either
 import Data.Eq
 import Data.Maybe
 import Data.List.NonEmpty ( NonEmpty )
+import GHC.Types.Name.Reader
 
 {- Note [RecordDotSyntax field updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -255,7 +255,7 @@ data HsExpr p
                        -- See Note [Located RdrNames]
 
   | HsUnboundVar (XUnboundVar p)
-                 OccName     -- ^ Unbound variable; also used for "holes"
+                 RdrName     -- ^ Unbound variable; also used for "holes"
                              --   (_ or _x).
                              -- Turned from HsVar to HsUnboundVar by the
                              --   renamer, when it finds an out-of-scope

@@ -1916,7 +1916,7 @@ emitAnonTypeHole :: IsExtraConstraint
 emitAnonTypeHole extra_constraints tv
   = do { ct_loc <- getCtLocM (TypeHoleOrigin occ) Nothing
        ; let hole = Hole { hole_sort = sort
-                         , hole_occ  = occ
+                         , hole_occ  = mkRdrUnqual occ
                          , hole_ty   = mkTyVarTy tv
                          , hole_loc  = ct_loc }
        ; emitHole hole }
@@ -1930,7 +1930,7 @@ emitNamedTypeHole (name, tv)
   = do { ct_loc <- setSrcSpan (nameSrcSpan name) $
                    getCtLocM (TypeHoleOrigin occ) Nothing
        ; let hole = Hole { hole_sort = TypeHole
-                         , hole_occ  = occ
+                         , hole_occ  = nameRdrName name
                          , hole_ty   = mkTyVarTy tv
                          , hole_loc  = ct_loc }
        ; emitHole hole }

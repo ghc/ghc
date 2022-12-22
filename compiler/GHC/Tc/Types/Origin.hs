@@ -580,7 +580,7 @@ data CtOrigin
       PredType CtOrigin RealSrcSpan    -- This constraint arising from ...
       PredType CtOrigin RealSrcSpan    -- and this constraint arising from ...
 
-  | ExprHoleOrigin (Maybe OccName)   -- from an expression hole
+  | ExprHoleOrigin (Maybe RdrName)   -- from an expression hole
   | TypeHoleOrigin OccName   -- from a type hole (partial type signature)
   | PatCheckOrigin      -- normalisation of a type during pattern-match checking
   | ListOrigin          -- An overloaded list

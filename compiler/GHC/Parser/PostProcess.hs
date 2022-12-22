@@ -1815,7 +1815,7 @@ instance DisambECP (HsExpr GhcPs) where
   rejectPragmaPV _                        = return ()
 
 hsHoleExpr :: EpAnn EpAnnUnboundVar -> HsExpr GhcPs
-hsHoleExpr anns = HsUnboundVar anns (mkVarOccFS (fsLit "_"))
+hsHoleExpr anns = HsUnboundVar anns (mkRdrUnqual (mkVarOccFS (fsLit "_")))
 
 type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs))) = SrcAnn NoEpAnns
 type instance Anno [LocatedA (Match GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnL

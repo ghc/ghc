@@ -34,7 +34,7 @@ fromModule _ = []
 
 toHoleFitCommand :: TypedHole -> String -> Maybe String
 toHoleFitCommand (TypedHole {th_hole = Just (Hole { hole_occ = h })}) str
-    = stripPrefix ("_" <> str) $ occNameString h
+    = stripPrefix ("_" <> str) $ occNameString (occName h)
 toHoleFitCommand _ _ = Nothing
 
 

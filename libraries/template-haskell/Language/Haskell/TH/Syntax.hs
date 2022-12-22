@@ -1807,6 +1807,10 @@ mkNameU s u = Name (mkOccName s) (NameU u)
 mkNameL :: String -> Uniq -> Name
 mkNameL s u = Name (mkOccName s) (NameL u)
 
+-- | Only used internally
+mkNameQ :: String -> String -> Name
+mkNameQ mn occ = Name (mkOccName occ) (NameQ (mkModName mn))
+
 -- | Used for 'x etc, but not available to the programmer
 mkNameG :: NameSpace -> String -> String -> String -> Name
 mkNameG ns pkg modu occ

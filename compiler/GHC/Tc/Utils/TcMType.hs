@@ -153,6 +153,7 @@ import GHC.Utils.Constants (debugIsOn)
 import Control.Monad
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
+import GHC.Types.Name.Reader
 
 {-
 ************************************************************************
@@ -300,7 +301,7 @@ emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]
 emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 
 -- | Emit a new wanted expression hole
-emitNewExprHole :: OccName         -- of the hole
+emitNewExprHole :: RdrName         -- of the hole
                 -> Type -> TcM HoleExprRef
 emitNewExprHole occ ty
   = do { u <- newUnique
