@@ -397,3 +397,4 @@ test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddu
 
 test('T22491', normal, compile, ['-O2'])
 test('T22623', normal, multimod_compile, ['T22623', '-O -v0'])
+test('T22662', normal, compile, [''])
