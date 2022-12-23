@@ -51,6 +51,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAllowQuotRem2             = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowIntMul2Instr         = (ncg && x86ish) || llvm
+  , stgToCmmAllowCMovInstr             = (ncg && x86_64)
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
   , stgToCmmAvx           = isAvxEnabled                   dflags
@@ -68,6 +69,9 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                           LlvmPrimitives    -> (False, True)
           x86ish  = case platformArch platform of
                       ArchX86    -> True
+                      ArchX86_64 -> True
+                      _          -> False
+          x86_64 = case platformArch platform of
                       ArchX86_64 -> True
                       _          -> False
           ppc     = case platformArch platform of

@@ -3412,6 +3412,14 @@ primop CompactSize "compactSize#" GenPrimOp
    out_of_line      = True
 
 ------------------------------------------------------------------------
+section "Cmove"
+------------------------------------------------------------------------
+
+primop CMovOp "cmov#" GenPrimOp
+   Int# -> o -> o -> (# o #)
+   { Returns the last argument if the first argument is zero, the first argument otherwise. }
+
+------------------------------------------------------------------------
 section "Unsafe pointer equality"
 --  (#1 Bad Guy: Alastair Reid :)
 ------------------------------------------------------------------------

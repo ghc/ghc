@@ -341,6 +341,12 @@ emitPrimOp cfg primop =
 
   EqStablePtrOp -> \args -> opTranslate args (mo_wordEq platform)
 
+  CMovOp -> \[cond, x, y] ->
+        opIntoRegs $ \[res] -> if allowCmov
+          then emitAssign (CmmLocal res) (cmmCMov platform cond x y)
+          -- Fall back to using a branch
+          else emitGenericCMov [res] [cond, x, y]
+
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
 
@@ -1735,6 +1741,7 @@ emitPrimOp cfg primop =
   allowQuotRem2 = stgToCmmAllowQuotRem2             cfg
   allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
   allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
+  allowCmov     = stgToCmmAllowCMovInstr            cfg
 
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other
@@ -2024,6 +2031,15 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
              ]
 genericIntMul2Op _ _ = panic "genericIntMul2Op"
 
+-- | Emulate cmov by using a branch, urkh
+emitGenericCMov :: GenericOp
+emitGenericCMov [res] [cond, arg_x, arg_y]
+ = do true_lbl <- newBlockId
+      emitAssign (CmmLocal res) arg_x
+      emit =<< mkCmmIfGoto cond true_lbl
+      emitAssign (CmmLocal res) arg_y
+      emitLabel true_lbl
+emitGenericCMov _ _ = panic "genericIntMul2Op"
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.
 

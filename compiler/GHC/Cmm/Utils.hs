@@ -38,7 +38,7 @@ module GHC.Cmm.Utils(
         cmmNeWord, cmmEqWord,
         cmmOrWord, cmmAndWord,
         cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord,
-        cmmToWord,
+        cmmToWord, cmmCMov,
 
         cmmMkAssign,
 
@@ -389,6 +389,12 @@ cmmToWord platform e
   where
     w = cmmExprWidth platform e
     word = wordWidth platform
+
+-- Might not be supported on all platforms
+cmmCMov :: Platform -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+cmmCMov platform cond x y =
+  CmmMachOp (MO_Cmov (cmmExprWidth platform x))
+    [cmmNeWord platform (cmmToWord platform cond) (zeroExpr platform),x,y]
 
 cmmMkAssign :: Platform -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
 cmmMkAssign platform expr uq =

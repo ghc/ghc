@@ -379,7 +379,11 @@ type InstrBlock
 -- | Condition codes passed up the tree.
 --
 data CondCode
-        = CondCode Bool Cond InstrBlock
+        = CondCode
+        { _cond_is_float :: Bool
+        , _cond_cond :: Cond
+        , _cond_instr :: InstrBlock
+        }
 
 
 -- | Register's passed up the tree.  If the stix code forces the register
@@ -1147,6 +1151,26 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
                     | otherwise = edx
 
            return (Fixed format result code)
+
+getRegister' _bid _is32Bit (CmmMachOp mop [x, y, z]) = -- triadic MachOps
+    case mop of
+        MO_Cmov width -> do
+            let format = (intFormat width)
+
+            CondCode is_float cond code_cond <- getCondCode x
+            massert (not is_float)
+
+            (y_reg, code_y) <- getSomeReg y
+
+            get_code_z <- getAnyReg z
+            let cmov_code dst_reg =
+                  code_y `appOL` (get_code_z dst_reg) `appOL` code_cond `appOL`
+                        toOL [CMOV cond format (OpReg y_reg) dst_reg]
+            return $ Any format cmov_code
+        _other -> pprPanic "getRegister(x86) - trinary CmmMachOp (1)" (pprMachOp mop)
+  where
+
+
 
 
 getRegister' _ _ (CmmLoad mem pk _)

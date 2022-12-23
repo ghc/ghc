@@ -108,6 +108,9 @@ data MachOp
   | MO_U_Shr Width      -- unsigned shift right
   | MO_S_Shr Width      -- signed shift right
 
+  -- | Conditional move. First argument tells us which arg to select.
+  | MO_Cmov Width
+
   -- Conversions.  Some of these will be NOPs.
   -- Floating-point conversions use the signed variant.
   | MO_SF_Conv Width Width      -- Signed int -> Float
@@ -412,6 +415,7 @@ machOpResultType platform mop tys =
     MO_Shl   r          -> cmmBits r
     MO_U_Shr r          -> cmmBits r
     MO_S_Shr r          -> cmmBits r
+    MO_Cmov r           -> cmmBits r
 
     MO_SS_Conv _ to     -> cmmBits to
     MO_UU_Conv _ to     -> cmmBits to
@@ -503,6 +507,7 @@ machOpArgReps platform op =
     MO_Shl   r          -> [r, wordWidth platform]
     MO_U_Shr r          -> [r, wordWidth platform]
     MO_S_Shr r          -> [r, wordWidth platform]
+    MO_Cmov r           -> [wordWidth platform, r, r]
 
     MO_SS_Conv from _   -> [from]
     MO_UU_Conv from _   -> [from]
