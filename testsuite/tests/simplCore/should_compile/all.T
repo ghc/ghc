@@ -366,3 +366,4 @@ test('T20200', normal, compile, [''])
 # which (before the fix) lost crucial dependencies
 test('T20820',  normal, compile, ['-O0'])
 test('T22491', normal, compile, ['-O2'])
+test('T22662', normal, compile, [''])
