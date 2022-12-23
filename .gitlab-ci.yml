@@ -911,7 +911,8 @@ pages:
 .x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release:
   stage: full-build
   rules:
-    - when: always
+    # See #22664 to see what needs to be done to bring this up to the validate pipeline standards.
+    - if: $NIGHTLY
   tags:
     - x86_64-linux
   image: registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV
@@ -953,7 +954,7 @@ pages:
     - cat ci-timings
 
   artifacts:
-    expire_in: 1 year
+    expire_in: 8 weeks
     paths:
       - ghc-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release.tar.xz
     when: always
