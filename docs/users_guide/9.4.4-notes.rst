@@ -20,6 +20,7 @@ Issues fixed in this release include:
 * Fix the :ghc-flag:`-fdefer-diagnostics`. (:ghc-ticket:`22391`)
 * Fixes to several subtle compiler panics. (:ghc-ticket:`22491`, :ghc-ticket:`22416`, :ghc-ticket:`22549`, :ghc-ticket:`22475`, :ghc-ticket:`22039`)
 * Add correct write barries to IORef operations. (:ghc-ticket:`22468`)
+* The toolchain provided with Windows binary distributions now searches for its own headers and libraries before those of the host system's msys2 installation (:ghc-ticket:`22561`)
 
 
 Included libraries
