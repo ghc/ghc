@@ -40,6 +40,7 @@ import Data.IORef
 import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import GHC.Linker.Types
 import GHC.Unit.Finder
@@ -82,7 +83,8 @@ mkUsageInfo uc plugins fc unit_env this_mod dir_imp_mods used_names dependent_fi
         hug = ue_home_unit_graph unit_env
     -- Dependencies on object files due to TH and plugins
     object_usages <- liftIO $ mkObjectUsage (eps_PIT eps) plugins fc hug needed_links needed_pkgs
-    mod_usages <- mk_mod_usage_info uc hu this_mod
+    let all_home_ids = ue_all_home_unit_ids unit_env
+    mod_usages <- mk_mod_usage_info uc hu all_home_ids this_mod
                                        dir_imp_mods used_names
     let usages = mod_usages ++ [ UsageFile { usg_file_path = f
                                            , usg_file_hash = hash
@@ -184,7 +186,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
           case miface of
             Nothing -> pprPanic "mkObjectUsage" (ppr m)
             Just iface ->
-              return $ UsageHomeModuleInterface (moduleName m) (mi_iface_hash (mi_final_exts iface))
+              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash (mi_final_exts iface))
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os
@@ -194,11 +196,12 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
 
 mk_mod_usage_info :: UsageConfig
               -> HomeUnit
+              -> Set.Set UnitId
               -> Module
               -> ImportedMods
               -> NameSet
               -> IfG [Usage]
-mk_mod_usage_info uc home_unit this_mod direct_imports used_names
+mk_mod_usage_info uc home_unit home_unit_ids this_mod direct_imports used_names
   = mapMaybeM mkUsageM usage_mods
   where
     safe_implicit_imps_req = uc_safe_implicit_imps_req uc
@@ -252,7 +255,7 @@ mk_mod_usage_info uc home_unit this_mod direct_imports used_names
     --     (need to recompile if its export list changes: export_fprint)
     mkUsage :: Module -> ModIface -> Maybe Usage
     mkUsage mod iface
-      | not (isHomeModule home_unit mod)
+      | toUnitId (moduleUnit mod) `Set.notMember` home_unit_ids
       = Just $ UsagePackageModule{ usg_mod      = mod,
                                    usg_mod_hash = mod_hash,
                                    usg_safe     = imp_safe }
@@ -270,6 +273,7 @@ mk_mod_usage_info uc home_unit this_mod direct_imports used_names
       | otherwise
       = Just UsageHomeModule {
                       usg_mod_name = moduleName mod,
+                      usg_unit_id  = toUnitId (moduleUnit mod),
                       usg_mod_hash = mod_hash,
                       usg_exports  = export_hash,
                       usg_entities = Map.toList ent_hashs,
