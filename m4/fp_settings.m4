@@ -10,12 +10,12 @@ AC_DEFUN([FP_SETTINGS],
         # See Note [tooldir: How GHC finds mingw on Windows]
         mingw_bin_prefix='$$tooldir/mingw/bin/'
         SettingsCCompilerCommand="${mingw_bin_prefix}clang.exe"
-        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 -I$$tooldir/mingw/include"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 -I\$\$tooldir/mingw/include"
         SettingsCxxCompilerCommand="${mingw_bin_prefix}clang++.exe"
-        SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2 -I$$tooldir/mingw/include"
-        SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2 -L$$tooldir/mingw/lib -L$$tooldir/mingw/x86_64-w64-mingw32/lib"
+        SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2 -I\$\$tooldir/mingw/include"
+        SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2 -L\$\$tooldir/mingw/lib -L\$\$tooldir/mingw/x86_64-w64-mingw32/lib"
         SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
-        SettingsHaskellCPPFlags="$HaskellCPPArgs -I$$tooldir/mingw/include"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs -I\$\$tooldir/mingw/include"
         SettingsLdCommand="${mingw_bin_prefix}ld.lld.exe"
         SettingsLdFlags=""
         # LLD does not support object merging (#21068)
