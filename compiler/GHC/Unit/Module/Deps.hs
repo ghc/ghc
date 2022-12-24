@@ -256,6 +256,8 @@ data Usage
   | UsageHomeModule {
         usg_mod_name :: ModuleName,
             -- ^ Name of the module
+        usg_unit_id :: UnitId,
+        -- ^ UnitId of the HomeUnit the module is from
         usg_mod_hash :: Fingerprint,
             -- ^ Cached module ABI fingerprint (corresponds to mi_mod_hash).
             -- This may be out dated after recompilation was avoided, but is
@@ -292,6 +294,8 @@ data Usage
   | UsageHomeModuleInterface {
         usg_mod_name :: ModuleName
         -- ^ Name of the module
+        , usg_unit_id :: UnitId
+        -- ^ UnitId of the HomeUnit the module is from
         , usg_iface_hash :: Fingerprint
         -- ^ The *interface* hash of the module, not the ABI hash.
         -- This changes when anything about the interface (and hence the
@@ -331,6 +335,7 @@ instance Binary Usage where
     put_ bh usg@UsageHomeModule{} = do
         putByte bh 1
         put_ bh (usg_mod_name usg)
+        put_ bh (usg_unit_id  usg)
         put_ bh (usg_mod_hash usg)
         put_ bh (usg_exports  usg)
         put_ bh (usg_entities usg)
@@ -350,6 +355,7 @@ instance Binary Usage where
     put_ bh usg@UsageHomeModuleInterface{} = do
         putByte bh 4
         put_ bh (usg_mod_name usg)
+        put_ bh (usg_unit_id  usg)
         put_ bh (usg_iface_hash usg)
 
     get bh = do
@@ -362,11 +368,12 @@ instance Binary Usage where
             return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
           1 -> do
             nm    <- get bh
+            uid    <- get bh
             mod   <- get bh
             exps  <- get bh
             ents  <- get bh
             safe  <- get bh
-            return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
+            return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod, usg_unit_id = uid,
                      usg_exports = exps, usg_entities = ents, usg_safe = safe }
           2 -> do
             fp   <- get bh
@@ -379,8 +386,9 @@ instance Binary Usage where
             return UsageMergedRequirement { usg_mod = mod, usg_mod_hash = hash }
           4 -> do
             mod <- get bh
+            uid <- get bh
             hash <- get bh
-            return UsageHomeModuleInterface { usg_mod_name = mod, usg_iface_hash = hash }
+            return UsageHomeModuleInterface { usg_mod_name = mod, usg_unit_id = uid, usg_iface_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
 

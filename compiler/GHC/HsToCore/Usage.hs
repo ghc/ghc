@@ -35,6 +35,7 @@ import GHC.Data.Maybe
 import Data.List (sortBy)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import GHC.Linker.Types
 import GHC.Unit.Finder
@@ -173,7 +174,7 @@ mkObjectUsage pit hsc_env th_links_needed th_pkgs_needed = do
           case miface of
             Nothing -> pprPanic "mkObjectUsage" (ppr m)
             Just iface ->
-              return $ UsageHomeModuleInterface (moduleName m) (mi_iface_hash (mi_final_exts iface))
+              return $ UsageHomeModuleInterface (moduleName m) (toUnitId $ moduleUnit m) (mi_iface_hash (mi_final_exts iface))
 
     librarySpecToUsage :: LibrarySpec -> IO [Usage]
     librarySpecToUsage (Objects os) = traverse (fing Nothing) os
@@ -190,7 +191,7 @@ mk_mod_usage_info :: PackageIfaceTable
 mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   = mapMaybe mkUsage usage_mods
   where
-    hpt = hsc_HUG hsc_env
+    hug = hsc_HUG hsc_env
     dflags = hsc_dflags hsc_env
     home_unit = hsc_home_unit hsc_env
 
@@ -238,7 +239,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | not (isHomeModule home_unit mod)
+      | toUnitId (moduleUnit mod) `Set.notMember` hsc_all_home_unit_ids hsc_env
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }
@@ -256,12 +257,13 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
       | otherwise
       = Just UsageHomeModule {
                       usg_mod_name = moduleName mod,
+                      usg_unit_id  = toUnitId (moduleUnit mod),
                       usg_mod_hash = mod_hash,
                       usg_exports  = export_hash,
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        maybe_iface  = lookupIfaceByModule hpt pit mod
+        maybe_iface  = lookupIfaceByModule hug pit mod
                 -- In one-shot mode, the interfaces for home-package
                 -- modules accumulate in the PIT not HPT.  Sigh.
 

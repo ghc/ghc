@@ -399,7 +399,7 @@ checkVersions hsc_env mod_summary iface
        when (isOneShot (ghcMode (hsc_dflags hsc_env))) $ do {
           ; updateEps_ $ \eps  -> eps { eps_is_boot = mkModDeps $ dep_boot_mods (mi_deps iface) }
        }
-       ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) (homeUnitAsUnit home_unit) u
+       ; recomp <- checkList [checkModUsage (hsc_FC hsc_env) u
                              | u <- mi_usages iface]
        ; case recomp of (NeedsRecompile reason) -> return $ OutOfDateItem reason (Just iface) ; _ -> do {
        ; return $ UpToDateItem iface
@@ -679,7 +679,7 @@ tryGetModIface doc_msg mod
   = do  -- Load the imported interface if possible
     logger <- getLogger
     let doc_str = sep [text doc_msg, ppr mod]
-    liftIO $ trace_hi_diffs logger (text "Checking interface for module" <+> ppr mod)
+    liftIO $ trace_hi_diffs logger (text "Checking interface for module" <+> ppr mod <+> ppr (moduleUnit mod))
 
     mb_iface <- loadInterface doc_str mod ImportBySystem
         -- Load the interface, but don't complain on failure;
@@ -698,8 +698,8 @@ tryGetModIface doc_msg mod
 -- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-checkModUsage :: FinderCache -> Unit -> Usage -> IfG RecompileRequired
-checkModUsage _ _this_pkg UsagePackageModule{
+checkModUsage :: FinderCache -> Usage -> IfG RecompileRequired
+checkModUsage _ UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash } = do
   logger <- getLogger
@@ -711,25 +711,28 @@ checkModUsage _ _this_pkg UsagePackageModule{
         -- recompile.  This is safe but may entail more recompilation when
         -- a dependent package has changed.
 
-checkModUsage _ _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash } = do
+checkModUsage _ UsageMergedRequirement{ usg_mod = mod, usg_mod_hash = old_mod_hash } = do
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChangedRaw (moduleName mod)
     checkModuleFingerprint logger reason old_mod_hash (mi_mod_hash (mi_final_exts iface))
-checkModUsage _ this_pkg UsageHomeModuleInterface{ usg_mod_name = mod_name, usg_iface_hash = old_mod_hash } = do
-  let mod = mkModule this_pkg mod_name
+checkModUsage _  UsageHomeModuleInterface{ usg_mod_name = mod_name
+                                                 , usg_unit_id = uid
+                                                 , usg_iface_hash = old_mod_hash } = do
+  let mod = mkModule (RealUnit (Definite uid)) mod_name
   logger <- getLogger
   needInterface mod $ \iface -> do
     let reason = ModuleChangedIface mod_name
     checkIfaceFingerprint logger reason old_mod_hash (mi_iface_hash (mi_final_exts iface))
 
-checkModUsage _ this_pkg UsageHomeModule{
+checkModUsage _ UsageHomeModule{
                                 usg_mod_name = mod_name,
+                                usg_unit_id  = uid,
                                 usg_mod_hash = old_mod_hash,
                                 usg_exports = maybe_old_export_hash,
                                 usg_entities = old_decl_hash }
   = do
-    let mod = mkModule this_pkg mod_name
+    let mod = mkModule (RealUnit (Definite uid)) mod_name
     logger <- getLogger
     needInterface mod $ \iface -> do
      let
@@ -754,9 +757,9 @@ checkModUsage _ this_pkg UsageHomeModule{
            , up_to_date logger (text "  Great!  The bits I use are up to date")
            ]
 
-checkModUsage fc _this_pkg UsageFile{ usg_file_path = file,
-                                   usg_file_hash = old_hash,
-                                   usg_file_label = mlabel } =
+checkModUsage fc UsageFile{ usg_file_path = file,
+                            usg_file_hash = old_hash,
+                            usg_file_label = mlabel } =
   liftIO $
     handleIO handler $ do
       new_hash <- lookupFileCache fc file
