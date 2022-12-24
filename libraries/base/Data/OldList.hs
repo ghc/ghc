@@ -1266,15 +1266,42 @@ permutations :: [a] -> [[a]]
 -- Related discussions:
 -- * https://mail.haskell.org/pipermail/haskell-cafe/2021-December/134920.html
 -- * https://mail.haskell.org/pipermail/libraries/2007-December/008788.html
+--
+-- Verification of the equivalences of the auxiliary functions with Liquid Haskell:
+-- https://github.com/ucsd-progsys/liquidhaskell/blob/b86fb5b/tests/ple/pos/Permutations.hs
 permutations xs0 = xs0 : perms xs0 []
   where
+    -- | @perms ts is@ is equivalent to
+    --
+    -- > concat
+    -- >   [ interleave {(ts!!n)} {(drop (n+1)} ts) xs []
+    -- >   | n <- [0..length ts - 1]
+    -- >   , xs <- permutations (reverse (take n ts) ++ is)
+    -- >   ]
+    --
+    -- @{(ts!!n)}@ and @{(drop (n+1)}@ denote the values of variables @t@ and @ts@ which
+    -- appear free in the definition of @interleave@ and @interleave'@.
     perms :: forall a. [a] -> [a] -> [[a]]
     perms []     _  = []
     perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
       where
+        -- @interleave {t} {ts} xs r@ is equivalent to
+        --
+        -- > [ insertAt n t xs ++ ts | n <- [0..length xs - 1] ] ++ r
+        --
+        -- where
+        --
+        -- > insertAt n y xs = take n xs ++ y : drop n xs
+        --
         interleave :: [a] -> [[a]] -> [[a]]
         interleave xs r = let (_,zs) = interleave' id xs r in zs
 
+        -- @interleave' f ys r@ is equivalent to
+        --
+        -- > ( ys ++ ts
+        -- > , [ f (insertAt n t ys ++ ts) | n <- [0..length ys - 1] ] ++ r
+        -- > )
+        --
         interleave' :: ([a] -> b) -> [a] -> [b] -> ([a], [b])
         interleave' _ []     r = (ts, r)
         interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
