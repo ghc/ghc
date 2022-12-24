@@ -1164,7 +1164,7 @@ pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}
   = pprUsageImport usage usg_mod
 pprUsage usage@UsageHomeModule{}
-  = pprUsageImport usage usg_mod_name $$
+  = pprUsageImport usage (\u -> mkModule (usg_unit_id u) (usg_mod_name u)) $$
     nest 2 (
         maybe Outputable.empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
@@ -1176,7 +1176,9 @@ pprUsage usage@UsageFile{}
 pprUsage usage@UsageMergedRequirement{}
   = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]
 pprUsage usage@UsageHomeModuleInterface{}
-  = hsep [text "implementation", ppr (usg_mod_name usage), ppr (usg_iface_hash usage)]
+  = hsep [text "implementation", ppr (usg_mod_name usage)
+                               , ppr (usg_unit_id usage)
+                               , ppr (usg_iface_hash usage)]
 
 pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
 pprUsageImport usage usg_mod'

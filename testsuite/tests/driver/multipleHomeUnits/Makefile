@@ -30,4 +30,9 @@ multipleHomeUnits004_recomp: clean
 multipleHomeUnitsModuleVisibility: clean
 	! '$(TEST_HC)' $(TEST_HC_OPTS) -fhide-source-paths -unit @unitMV -unit @unitMV-import
 
+multipleHomeUnits_recomp: clean
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fhide-source-paths -unit @unitRecomp -unit @unitDep
+	# Doesn't cause recomp when TH is not involved
+	echo "recomp=()" >> Dep.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -fhide-source-paths -unit @unitRecomp -unit @unitDep
 
