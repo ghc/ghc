@@ -12,11 +12,11 @@ import           Prelude
 #undef BLOCKS_PER_MBLOCK
 #include "DerivedConstants.h"
 
-offsetStgCatchSTMFrameCode :: Int
-offsetStgCatchSTMFrameCode = (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
-
 offsetStgCatchFrameHandler :: Int
 offsetStgCatchFrameHandler = (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
+
+offsetStgCatchSTMFrameCode :: Int
+offsetStgCatchSTMFrameCode = (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
 
 offsetStgCatchSTMFrameHandler :: Int
 offsetStgCatchSTMFrameHandler = (#const OFFSET_StgCatchSTMFrame_handler) + (#size StgHeader)

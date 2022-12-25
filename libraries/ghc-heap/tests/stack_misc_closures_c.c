@@ -18,6 +18,7 @@ extern void printStack(StgStack *stack);
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
+// TODO: Try to remove UNTAG_CLOSURE. This should happen in the decoding logic.
 void create_any_update_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
   SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
@@ -31,6 +32,15 @@ void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
   catchF->exceptions_blocked = 1;
   catchF->handler = payload;
+}
+
+void create_any_catch_stm_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgCatchSTMFrame *catchF = (StgCatchSTMFrame *)stack->sp;
+  SET_HDR(catchF, &stg_catch_stm_frame_info, CCS_SYSTEM);
+  StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  StgClosure *payload2 = UNTAG_CLOSURE(rts_mkWord(cap, w + 1));
+  catchF->code = payload1;
+  catchF->handler = payload2;
 }
 
 StgStack *setup(StgWord closureSizeWords, StgWord w,
@@ -63,4 +73,8 @@ StgStack *any_update_frame(StgWord w) {
 
 StgStack *any_catch_frame(StgWord w) {
   return setup(sizeofW(StgCatchFrame), w, &create_any_catch_frame);
+}
+
+StgStack *any_catch_stm_frame(StgWord w) {
+  return setup(sizeofW(StgCatchSTMFrame), w, &create_any_catch_stm_frame);
 }
