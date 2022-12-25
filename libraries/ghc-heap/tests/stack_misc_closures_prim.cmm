@@ -1,7 +1,13 @@
 #include "Cmm.h"
 
-any_update_framezh(){
+any_update_framezh(W_ w){
     P_ stack;
-    (stack) = ccall any_update_frame();
+    (stack) = ccall any_update_frame(w);
+    return (stack);
+}
+
+any_catch_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_catch_frame(w);
     return (stack);
 }

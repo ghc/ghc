@@ -5,6 +5,7 @@
 #include "rts/Types.h"
 #include "rts/storage/ClosureMacros.h"
 #include "rts/storage/Closures.h"
+#include "rts/storage/TSO.h"
 #include "stg/Types.h"
 #include <stdlib.h>
 
@@ -17,14 +18,30 @@ extern void printStack(StgStack *stack);
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
-StgStack *any_update_frame() {
+void create_any_update_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
+  SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
+  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  updF->updatee = payload;
+}
+
+void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgCatchFrame *catchF = (StgCatchFrame *)stack->sp;
+  SET_HDR(catchF, &stg_catch_frame_info, CCS_SYSTEM);
+  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  catchF->exceptions_blocked = 1;
+  catchF->handler = payload;
+}
+
+StgStack *setup(StgWord closureSizeWords, StgWord w,
+                void (*f)(Capability *, StgStack *, StgWord)) {
   Capability *cap = rts_lock();
-  StgWord closureSizeWords =
-      sizeofW(StgStack) + sizeofW(StgUpdateFrame) + MIN_STACK_WORDS;
-  StgStack *stack = (StgStack *)allocate(cap, closureSizeWords);
-  StgWord closureSizeBytes = WDS(closureSizeWords);
+  StgWord totalSizeWords =
+      sizeofW(StgStack) + closureSizeWords + MIN_STACK_WORDS;
+  StgStack *stack = (StgStack *)allocate(cap, totalSizeWords);
+  StgWord totalSizeBytes = WDS(totalSizeWords);
   SET_HDR(stack, &stg_upd_frame_info, CCS_SYSTEM);
-  stack->stack_size = closureSizeBytes;
+  stack->stack_size = totalSizeBytes;
   stack->dirty = 0;
   stack->marking = 0;
 
@@ -32,13 +49,18 @@ StgStack *any_update_frame() {
   stack->sp = spBottom;
   stack->sp -= sizeofW(StgStopFrame);
   SET_HDR((StgClosure *)stack->sp, &stg_stop_thread_info, CCS_SYSTEM);
+  stack->sp -= closureSizeWords;
 
-  stack->sp -= sizeofW(StgUpdateFrame);
-  StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
-  SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
-  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, 42));
-  updF->updatee = payload;
+  f(cap, stack, w);
+
   rts_unlock(cap);
-  printStack(stack);
   return stack;
+}
+
+StgStack *any_update_frame(StgWord w) {
+  return setup(sizeofW(StgUpdateFrame), w, &create_any_update_frame);
+}
+
+StgStack *any_catch_frame(StgWord w) {
+  return setup(sizeofW(StgCatchFrame), w, &create_any_catch_frame);
 }
