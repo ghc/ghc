@@ -1,0 +1,7 @@
+#include "Cmm.h"
+
+any_update_framezh(){
+    P_ stack;
+    (stack) = ccall any_update_frame();
+    return (stack);
+}
