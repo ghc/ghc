@@ -140,3 +140,4 @@ stackFrameToClosureTypes = getClosureTypes
 
 unbox :: Box -> Closure
 unbox (Box c) = unsafeCoerce c
+unbox (DecodedClosureBox c) = c

@@ -94,3 +94,19 @@ test('stack_stm_frames',
       ],
      multi_compile_and_run,
      ['stack_stm_frames', [('stack_lib.c','')], '-debug -optc-g -g'])
+
+# TODO: Remove debug flags
+test('stack_misc_closures',
+     [
+        extra_files(['stack_misc_closures_c.c', 'stack_misc_closures_prim.cmm','stack_lib.c', 'TestUtils.hs']),
+        ignore_stdout,
+        ignore_stderr
+      ],
+     multi_compile_and_run,
+     ['stack_misc_closures',
+        [ ('stack_misc_closures_c.c', '')
+         ,('stack_misc_closures_prim.cmm', '')
+         ,('stack_lib.c', '')
+         ]
+      , '-debug -optc-g -g'
+      ])

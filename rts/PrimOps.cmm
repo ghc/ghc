@@ -2510,7 +2510,7 @@ stg_unpackClosurezh ( P_ closure )
 {
     W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
     MAYBE_GC_P(stg_unpackClosurezh, closure);
-    info  = %GET_STD_INFO(UNTAG(closure));
+    (info)  = ccall getInfo(UNTAG(closure));
     prim_read_barrier;
 
     ptrs  = TO_W_(%INFO_PTRS(info));
@@ -2518,7 +2518,6 @@ stg_unpackClosurezh ( P_ closure )
 
     W_ clos;
     clos = UNTAG(closure);
-
     W_ len;
     // The array returned, dat_arr, is the raw data for the entire closure.
     // The length is variable based upon the closure type, ptrs, and non-ptrs

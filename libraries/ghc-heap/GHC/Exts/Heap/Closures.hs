@@ -20,7 +20,6 @@ module GHC.Exts.Heap.Closures (
     , RetFunType(..)
     , allClosures
     , closureSize
-    , RetFunType(..)
 
     -- * Boxes
     , Box(..)
@@ -68,7 +67,13 @@ foreign import prim "reallyUnsafePtrEqualityUpToTag"
 -- unevaluated thunks can safely be moved around inside the Box, and when
 -- required, e.g. in 'getBoxedClosureData', the function knows how far it has
 -- to evaluate the argument.
+#if MIN_VERSION_base(4,17,0)
+data Box = Box Any | DecodedClosureBox Closure
+
+
+#else
 data Box = Box Any
+#endif
 
 instance Show Box where
 -- From libraries/base/GHC/Ptr.lhs
@@ -80,6 +85,21 @@ instance Show Box where
        tag  = ptr .&. fromIntegral tAG_MASK -- ((1 `shiftL` TAG_BITS) -1)
        addr = ptr - tag
        pad_out ls = '0':'x':ls
+#if MIN_VERSION_base(4,17,0)
+   showsPrec _ (DecodedClosureBox a) rs = "(DecodedClosureBox " ++ show a ++ ")" ++ rs
+#endif
+
+-- | Boxes can be compared, but this is not pure, as different heap objects can,
+-- after garbage collection, become the same object.
+areBoxesEqual :: Box -> Box -> IO Bool
+areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
+    0# -> pure False
+    _  -> pure True
+#if MIN_VERSION_base(4,17,0)
+-- TODO: Implement
+areBoxesEqual (DecodedClosureBox a) (DecodedClosureBox b) = error "Not implemented, yet!"
+areBoxesEqual _ _ = pure $ False
+#endif
 
 -- |This takes an arbitrary value and puts it into a box.
 -- Note that calls like
@@ -92,14 +112,6 @@ instance Show Box where
 -- > case list of x:_ -> asBox x
 asBox :: a -> Box
 asBox x = Box (unsafeCoerce# x)
-
--- | Boxes can be compared, but this is not pure, as different heap objects can,
--- after garbage collection, become the same object.
-areBoxesEqual :: Box -> Box -> IO Bool
-areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
-    0# -> pure False
-    _  -> pure True
-
 
 ------------------------------------------------------------------------
 -- Closures
@@ -540,7 +552,6 @@ data TsoFlags
   | TsoFlagsUnknownValue Word32 -- ^ Please report this as a bug
   deriving (Eq, Show, Generic, Ord)
 
--- TODO: Fix this to include stack frames
 -- | For generic code, this function returns all referenced closures.
 allClosures :: GenClosure b -> [b]
 allClosures (ConstrClosure {..}) = ptrArgs
@@ -562,6 +573,18 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
+#if MIN_VERSION_base(4,17,0)
+allClosures (SimpleStack {..}) = stackClosures
+allClosures (UpdateFrame {..}) = [updatee]
+allClosures (CatchFrame {..}) = [handler]
+allClosures (CatchStmFrame {..}) = [catchFrameCode, handler]
+allClosures (CatchRetryFrame {..}) = [first_code, alt_code]
+allClosures (AtomicallyFrame {..}) = [atomicallyFrameCode, result]
+allClosures (RetSmall {..}) = payload
+allClosures (RetBig {..}) = payload
+allClosures (RetFun {..}) = retFunFun : retFunPayload
+allClosures (RetBCO {..}) = bcoInstrs : bcoLiterals : bcoPtrs : bcoPayload
+#endif
 allClosures _ = []
 
 -- | Get the size of the top-level closure in words.
@@ -570,3 +593,8 @@ allClosures _ = []
 -- @since 8.10.1
 closureSize :: Box -> Int
 closureSize (Box x) = I# (closureSize# x)
+#if MIN_VERSION_base(4,17,0)
+-- TODO: Add comment to explain. This is a bit weird because it returns the size
+-- of the representation, not the closure itself.
+closureSize (DecodedClosureBox dc) = closureSize $ asBox dc
+#endif

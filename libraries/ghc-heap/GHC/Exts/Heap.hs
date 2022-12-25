@@ -174,3 +174,6 @@ getClosureDataFromHeapObject x = do
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
+#if MIN_VERSION_base(4,17,0)
+getBoxedClosureData (DecodedClosureBox a) = pure a
+#endif

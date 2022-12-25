@@ -12,6 +12,7 @@
 
 #include "Capability.h"
 #include "Printer.h"
+#include "rts/storage/InfoTables.h"
 
 StgWord heap_view_closureSize(StgClosure *closure) {
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
@@ -282,4 +283,8 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     stgFree(ptrs);
 
     return arr;
+}
+
+const StgInfoTable* getInfo(StgClosure* c) {
+  return get_itbl(c);
 }

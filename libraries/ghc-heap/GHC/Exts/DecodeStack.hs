@@ -115,15 +115,14 @@ getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intT
 toClosure :: (StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO Box
 toClosure f# (StackFrameIter (# s#, i# #)) =
   case f# s# i# of
-      (# infoTableAddr, heapRep, pointersArray #) -> do
+      (# infoTableAddr, heapRep, pointersArray #) ->
           let infoTablePtr = Ptr infoTableAddr
               ptrList = [case indexArray# pointersArray i of
                               (# ptr #) -> CL.Box ptr
                           | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
                           ]
-
-          c <- (getClosureDataFromHeapRep heapRep infoTablePtr ptrList)
-          pure $ asBox c
+          in
+            DecodedClosureBox <$> (getClosureDataFromHeapRep heapRep infoTablePtr ptrList)
 
 -- TODO: Make function more readable: No IO in let bindings
 decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> Word# -> IO [Box]
@@ -189,8 +188,9 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " 
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
         !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
-       in
-        CL.UpdateFrame t <$> getClosure sfi offsetStgUpdateFrameUpdatee
+        c = getClosure sfi offsetStgUpdateFrameUpdatee
+      in
+        (CL.UpdateFrame t ) <$> c
      CATCH_FRAME -> do
         -- TODO: Replace with getWord# expression
         let exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
