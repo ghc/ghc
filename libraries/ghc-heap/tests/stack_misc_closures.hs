@@ -27,6 +27,8 @@ foreign import prim "any_catch_framezh" any_catch_frame# :: Word# -> (# StackSna
 
 foreign import prim "any_catch_stm_framezh" any_catch_stm_frame# :: Word# -> (# StackSnapshot# #)
 
+foreign import prim "any_catch_retry_framezh" any_catch_retry_frame# :: Word# -> (# StackSnapshot# #)
+
 main :: HasCallStack => IO ()
 main = do
   test any_update_frame# 42## $
@@ -46,6 +48,13 @@ main = do
       CatchStmFrame {..} -> do
         assertConstrClosure 44 =<< getBoxedClosureData catchFrameCode
         assertConstrClosure 45 =<< getBoxedClosureData handler
+      e -> error $ "Wrong closure type: " ++ show e
+  test any_catch_retry_frame# 46## $
+    \case
+      CatchRetryFrame {..} -> do
+        assertEqual running_alt_code 1
+        assertConstrClosure 46 =<< getBoxedClosureData first_code
+        assertConstrClosure 47 =<< getBoxedClosureData alt_code
       e -> error $ "Wrong closure type: " ++ show e
 
 test :: HasCallStack => (Word# -> (# StackSnapshot# #)) -> Word# -> (Closure -> IO ()) -> IO ()

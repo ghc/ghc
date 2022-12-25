@@ -3,6 +3,7 @@
 #include "rts/Messages.h"
 #include "rts/Types.h"
 #include "rts/storage/ClosureMacros.h"
+#include "rts/storage/ClosureTypes.h"
 #include "rts/storage/Closures.h"
 #include "stg/Types.h"
 #include <stdlib.h>
@@ -121,6 +122,12 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
     case CATCH_FRAME: {
       StgCatchFrame *f = (StgCatchFrame *)sp;
       result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->handler))->type);
+      continue;
+    }
+    case CATCH_RETRY_FRAME: {
+      StgCatchRetryFrame *f = (StgCatchRetryFrame *)sp;
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->first_code))->type);
+      result = add(result, get_itbl(UNTAG_CONST_CLOSURE(f->alt_code))->type);
       continue;
     }
     case STOP_FRAME: {

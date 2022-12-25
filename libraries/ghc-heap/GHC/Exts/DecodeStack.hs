@@ -207,7 +207,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " 
      CATCH_RETRY_FRAME -> do
         let running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
         first_code' <- getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
-        alt_code' <- getClosure sfi offsetStgCatchRetryFrameRunningAltCode
+        alt_code' <- getClosure sfi offsetStgCatchRetryFrameAltCode
         pure $ CL.CatchRetryFrame running_alt_code' first_code' alt_code'
      CATCH_STM_FRAME -> CL.CatchStmFrame
           <$> getClosure sfi offsetStgCatchSTMFrameCode
