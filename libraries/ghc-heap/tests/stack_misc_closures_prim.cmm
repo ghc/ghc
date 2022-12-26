@@ -29,3 +29,9 @@ any_atomically_framezh(W_ w){
     (stack) = ccall any_atomically_frame(w);
     return (stack);
 }
+
+any_ret_small_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_ret_small_frame(w);
+    return (stack);
+}

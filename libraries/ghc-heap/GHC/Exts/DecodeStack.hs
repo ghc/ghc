@@ -103,7 +103,7 @@ toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap bSize = BitmapEntry {
   } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> IO Box
-toBitmapPayload e | isPrimitive e = pure $ asBox . CL.UnknownTypeWordSizedPrimitive . toWord . closureFrame $ e
+toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . toWord . closureFrame $ e
       where
         toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
 toBitmapPayload e = toClosure unpackClosureFromStackFrame# (closureFrame e)

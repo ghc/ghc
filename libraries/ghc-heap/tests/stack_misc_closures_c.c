@@ -63,6 +63,14 @@ void create_any_atomically_frame(Capability *cap, StgStack *stack, StgWord w) {
   aF->result = payload2;
 }
 
+void create_any_ret_small_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &stg_ret_n_info, CCS_SYSTEM);
+  // The cast is a lie (w is interpreted as plain Word, not as pointer), but the
+  // memory layout fits.
+  c->payload[0] = (StgClosure*) w;
+}
+
 StgStack *setup(StgWord closureSizeWords, StgWord w,
                 void (*f)(Capability *, StgStack *, StgWord)) {
   Capability *cap = rts_lock();
@@ -105,4 +113,8 @@ StgStack *any_catch_retry_frame(StgWord w) {
 
 StgStack *any_atomically_frame(StgWord w) {
   return setup(sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
+}
+
+StgStack *any_ret_small_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w, &create_any_ret_small_frame);
 }

@@ -20,6 +20,7 @@ import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack (StackSnapshot (..))
 import TestUtils
 import Unsafe.Coerce (unsafeCoerce)
+import GHC.Exts.Heap (GenClosure(wordVal))
 
 foreign import prim "any_update_framezh" any_update_frame# :: Word# -> (# StackSnapshot# #)
 
@@ -30,6 +31,8 @@ foreign import prim "any_catch_stm_framezh" any_catch_stm_frame# :: Word# -> (# 
 foreign import prim "any_catch_retry_framezh" any_catch_retry_frame# :: Word# -> (# StackSnapshot# #)
 
 foreign import prim "any_atomically_framezh" any_atomically_frame# :: Word# -> (# StackSnapshot# #)
+
+foreign import prim "any_ret_small_framezh" any_ret_small_frame# :: Word# -> (# StackSnapshot# #)
 
 main :: HasCallStack => IO ()
 main = do
@@ -64,6 +67,15 @@ main = do
         assertConstrClosure 48 =<< getBoxedClosureData atomicallyFrameCode
         assertConstrClosure 49 =<< getBoxedClosureData result
       e -> error $ "Wrong closure type: " ++ show e
+  -- TODO: Test for UnderflowFrame once it points to a Box payload
+  test any_ret_small_frame# 48## $
+    \case
+      RetSmall {..} -> do
+        assertEqual knownRetSmallType RetN
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) 1
+        assertUnknownTypeWordSizedPrimitive 48 (head pCs)
+      e -> error $ "Wrong closure type: " ++ show e
 
 test :: HasCallStack => (Word# -> (# StackSnapshot# #)) -> Word# -> (Closure -> IO ()) -> IO ()
 test setup w assertion = do
@@ -87,6 +99,12 @@ assertConstrClosure w c = case c of
     assertEqual (tipe info) CONSTR_0_1
     assertEqual dataArgs [w]
     assertEqual (null ptrArgs) True
+  e -> error $ "Wrong closure type: " ++ show e
+
+assertUnknownTypeWordSizedPrimitive :: HasCallStack => Word -> Closure -> IO ()
+assertUnknownTypeWordSizedPrimitive w c = case c of
+  UnknownTypeWordSizedPrimitive {..} -> do
+    assertEqual wordVal w
   e -> error $ "Wrong closure type: " ++ show e
 
 unboxSingletonTuple :: (# StackSnapshot# #) -> StackSnapshot#
