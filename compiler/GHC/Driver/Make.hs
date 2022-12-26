@@ -343,7 +343,7 @@ warnMissingHomeModules dflags targets mod_graph =
           TargetFile target_file _
             | Just mod_file <- ml_hs_file (ms_location mod)
             ->
-             target_file == mod_file ||
+             augmentByWorkingDirectory dflags target_file == mod_file ||
 
              --  Don't warn on B.hs-boot if B.hs is specified (#16551)
              addBootSuffix target_file == mod_file ||
