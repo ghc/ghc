@@ -478,21 +478,33 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
       next_phase = hscPostBackendPhase src_flavour (backend dflags)
   case result of
       HscUpdate iface ->
-          do
-             case src_flavour of
-               HsigFile -> do
-                 -- We need to create a REAL but empty .o file
-                 -- because we are going to attempt to put it in a library
-                 let input_fn = expectJust "runPhase" (ml_hs_file location)
-                     basename = dropExtension input_fn
-                 compileEmptyStub dflags hsc_env basename location mod_name
+          if | NoBackend <- backend dflags  ->
+                panic "HscUpdate not relevant for NoBackend"
+             | Interpreter <- backend dflags -> do
+                -- In Interpreter way, there is just no linkable for hs-boot files
+                -- and we don't want to write an empty `o-boot` file when we're not
+                -- supposed to be writing any .o files (#22669)
+                return ([], iface, Nothing, o_file)
+             | otherwise -> do
+                 case src_flavour of
+                   HsigFile -> do
+                     -- We need to create a REAL but empty .o file
+                     -- because we are going to attempt to put it in a library
+                     let input_fn = expectJust "runPhase" (ml_hs_file location)
+                         basename = dropExtension input_fn
+                     compileEmptyStub dflags hsc_env basename location mod_name
 
-               -- In the case of hs-boot files, generate a dummy .o-boot
-               -- stamp file for the benefit of Make
-               HsBootFile -> touchObjectFile logger dflags o_file
-               HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
+                   -- In the case of hs-boot files, generate a dummy .o-boot
+                   -- stamp file for the benefit of Make
+                   HsBootFile -> touchObjectFile logger dflags o_file
+                   HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
 
-             return ([], iface, Nothing, o_file)
+                     -- MP: I wonder if there are any lurking bugs here because we
+                     -- return Linkable == emptyHomeModInfoLinkable, despite the fact that there is a
+                     -- linkable (.o-boot) which we check for in `Iface/Recomp.hs` and
+                     -- then will carry around the linkable if we're doing
+                     -- recompilation.
+                 return ([], iface, Nothing, o_file)
       HscRecomp { hscs_guts = cgguts,
                   hscs_mod_location = mod_location,
                   hscs_partial_iface = partial_iface,
