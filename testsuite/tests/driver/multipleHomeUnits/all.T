@@ -7,6 +7,8 @@ test('multipleHomeUnits_cpp', [extra_files([ 'cpp-includes/', 'unitCPPIncludes']
 test('multipleHomeUnits_cfile', [extra_files([ 'c-file/', 'unitCFile'])], multiunit_compile, [['unitCFile'], '-fhide-source-paths'])
 test('multipleHomeUnits_callstack', [extra_files([ 'callstack/', 'unitCallstack'])], makefile_test, [])
 
+test('multipleHomeUnits_warnings', [extra_files([ 'unitWarnings', 'A.hs'])], multiunit_compile_fail, [['unitWarnings'], '-fhide-source-paths'])
+
 test('multipleHomeUnits_cpp2', [extra_files([ 'cpp-includes/', 'cpp-import/', 'unitCPPImport', 'unitCPPIncludes'])], multiunit_compile, [['unitCPPImport', 'unitCPPIncludes'], '-fhide-source-paths'])
 
 test('multiGHCi', [extra_files(['a/', 'b/', 'unitA', 'unitB', 'multiGHCi.script'])

@@ -76,28 +76,29 @@ instance Diagnostic DriverMessage where
       -> diagnosticMessage m
     DriverPsHeaderMessage m
       -> diagnosticMessage m
-    DriverMissingHomeModules missing buildingCabalPackage
+    DriverMissingHomeModules uid missing buildingCabalPackage
       -> let msg | buildingCabalPackage == YesBuildingCabalPackage
                  = hang
-                     (text "These modules are needed for compilation but not listed in your .cabal file's other-modules: ")
+                     (text "These modules are needed for compilation but not listed in your .cabal file's other-modules for" <+> quotes (ppr uid) <+> text ":")
                      4
                      (sep (map ppr missing))
                  | otherwise
                  =
                    hang
-                     (text "Modules are not listed in command line but needed for compilation: ")
+                     (text "Modules are not listed in options for"
+                        <+> quotes (ppr uid) <+> text "but needed for compilation:")
                      4
                      (sep (map ppr missing))
          in mkSimpleDecorated msg
-    DriverUnknownHiddenModules missing
+    DriverUnknownHiddenModules uid missing
       -> let msg = hang
-                     (text "Modules are listened as hidden but not part of the unit: ")
+                     (text "Modules are listed as hidden in options for" <+> quotes (ppr uid) <+> text "but not part of the unit:")
                      4
                      (sep (map ppr missing))
          in mkSimpleDecorated msg
-    DriverUnknownReexportedModules missing
+    DriverUnknownReexportedModules uid missing
       -> let msg = hang
-                     (text "Modules are listened as reexported but can't be found in any dependency: ")
+                     (text "Modules are listed as reexported in options for" <+> quotes (ppr uid) <+> text "but can't be found in any dependency:")
                      4
                      (sep (map ppr missing))
          in mkSimpleDecorated msg

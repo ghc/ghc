@@ -1,0 +1,8 @@
+
+<no location info>: error:
+    Modules are listed as hidden in options for ‘unit-warnings’ but not part of the unit:
+        C
+
+<no location info>: error:
+    Modules are listed as reexported in options for ‘unit-warnings’ but can't be found in any dependency:
+        B

@@ -126,17 +126,17 @@ data DriverMessage where
       Test case: warnings/should_compile/MissingMod
 
   -}
-  DriverMissingHomeModules :: [ModuleName] -> !BuildingCabalPackage -> DriverMessage
+  DriverMissingHomeModules :: UnitId -> [ModuleName] -> !BuildingCabalPackage -> DriverMessage
 
   {-| DriverUnknown is a warning that arises when a user tries to
       reexport a module which isn't part of that unit.
   -}
-  DriverUnknownReexportedModules :: [ModuleName] -> DriverMessage
+  DriverUnknownReexportedModules :: UnitId -> [ModuleName] -> DriverMessage
 
   {-| DriverUnknownHiddenModules is a warning that arises when a user tries to
       hide a module which isn't part of that unit.
   -}
-  DriverUnknownHiddenModules :: [ModuleName] -> DriverMessage
+  DriverUnknownHiddenModules :: UnitId -> [ModuleName] -> DriverMessage
 
   {-| DriverUnusedPackages occurs when when package is requested on command line,
       but was never needed during compilation. Activated by -Wunused-packages.
