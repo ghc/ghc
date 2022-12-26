@@ -43,6 +43,7 @@ void create_any_catch_stm_frame(Capability *cap, StgStack *stack, StgWord w) {
   catchF->handler = payload2;
 }
 
+// TODO: Use `w` for running_alt_code, too.
 void create_any_catch_retry_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgCatchRetryFrame *catchRF = (StgCatchRetryFrame *)stack->sp;
   SET_HDR(catchRF, &stg_catch_retry_frame_info, CCS_SYSTEM);
@@ -51,6 +52,15 @@ void create_any_catch_retry_frame(Capability *cap, StgStack *stack, StgWord w) {
   catchRF->running_alt_code = 1;
   catchRF->first_code = payload1;
   catchRF->alt_code = payload2;
+}
+
+void create_any_atomically_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgAtomicallyFrame *aF = (StgAtomicallyFrame *)stack->sp;
+  SET_HDR(aF, &stg_atomically_frame_info, CCS_SYSTEM);
+  StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  StgClosure *payload2 = UNTAG_CLOSURE(rts_mkWord(cap, w + 1));
+  aF->code = payload1;
+  aF->result = payload2;
 }
 
 StgStack *setup(StgWord closureSizeWords, StgWord w,
@@ -91,4 +101,8 @@ StgStack *any_catch_stm_frame(StgWord w) {
 
 StgStack *any_catch_retry_frame(StgWord w) {
   return setup(sizeofW(StgCatchRetryFrame), w, &create_any_catch_retry_frame);
+}
+
+StgStack *any_atomically_frame(StgWord w) {
+  return setup(sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
 }

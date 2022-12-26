@@ -23,3 +23,9 @@ any_catch_retry_framezh(W_ w){
     (stack) = ccall any_catch_retry_frame(w);
     return (stack);
 }
+
+any_atomically_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_atomically_frame(w);
+    return (stack);
+}
