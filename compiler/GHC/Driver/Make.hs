@@ -445,6 +445,9 @@ addHmiToCache c (HomeModInfo i _ l) = iface_addToCache c (CachedIface i l)
 data CachedIface = CachedIface { cached_modiface :: !ModIface
                                , cached_linkable :: !(Maybe Linkable) }
 
+instance Outputable CachedIface where
+  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey mi), ppr (isJust ln)]
+
 noIfaceCache :: Maybe ModIfaceCache
 noIfaceCache = Nothing
 
@@ -815,15 +818,19 @@ pruneCache hpt summ
                            , cached_linkable = linkable
                            }) = HomeModInfo iface emptyModDetails linkable'
           where
-           modl = moduleName (mi_module iface)
+           modl = miKey iface
            linkable'
-                | Just ms <- lookupUFM ms_map modl
+                | Just ms <- M.lookup modl ms_map
                 , mi_src_hash iface /= ms_hs_hash ms
                 = Nothing
                 | otherwise
                 = linkable
 
-        ms_map = listToUFM [(ms_mod_name ms, ms) | ms <- summ]
+        -- Using UFM Module is safe for determinism because the map is just used for a transient lookup. The cache should be unique and a key clash is an error.
+        ms_map = M.fromListWith
+                  (\ms1 ms2 -> assertPpr False (text "prune_cache" $$ (ppr ms1 <+> ppr ms2))
+                               ms2)
+                  [(msKey ms, ms) | ms <- summ]
 
 -- ---------------------------------------------------------------------------
 --
