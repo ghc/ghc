@@ -36,6 +36,10 @@ foreign import prim "any_ret_small_prim_framezh" any_ret_small_prim_frame# :: Wo
 
 foreign import prim "any_ret_small_closure_framezh" any_ret_small_closure_frame# :: Word# -> (# StackSnapshot# #)
 
+foreign import prim "any_ret_big_prims_framezh" any_ret_big_prims_frame# :: Word# -> (# StackSnapshot# #)
+
+foreign import prim "any_ret_big_closures_framezh" any_ret_big_closures_frame# :: Word# -> (# StackSnapshot# #)
+
 main :: HasCallStack => IO ()
 main = do
   test any_update_frame# 42## $
@@ -86,7 +90,13 @@ main = do
         assertEqual (length pCs) 1
         assertConstrClosure 51 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
-
+  test any_ret_big_prims_frame# 52## $
+    \case
+      RetBig {..} -> do
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) 1
+        assertUnknownTypeWordSizedPrimitive 52 (head pCs)
+      e -> error $ "Wrong closure type: " ++ show e
 
 test :: HasCallStack => (Word# -> (# StackSnapshot# #)) -> Word# -> (Closure -> IO ()) -> IO ()
 test setup w assertion = do

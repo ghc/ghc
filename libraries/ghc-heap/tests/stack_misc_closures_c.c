@@ -5,9 +5,9 @@
 #include "rts/Types.h"
 #include "rts/storage/ClosureMacros.h"
 #include "rts/storage/Closures.h"
+#include "rts/storage/InfoTables.h"
 #include "rts/storage/TSO.h"
 #include "stg/Types.h"
-#include <stdlib.h>
 
 extern void printStack(StgStack *stack);
 
@@ -63,19 +63,49 @@ void create_any_atomically_frame(Capability *cap, StgStack *stack, StgWord w) {
   aF->result = payload2;
 }
 
-void create_any_ret_small_prim_frame(Capability *cap, StgStack *stack, StgWord w) {
+void create_any_ret_small_prim_frame(Capability *cap, StgStack *stack,
+                                     StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &stg_ret_n_info, CCS_SYSTEM);
   // The cast is a lie (w is interpreted as plain Word, not as pointer), but the
   // memory layout fits.
-  c->payload[0] = (StgClosure*) w;
+  c->payload[0] = (StgClosure *)w;
 }
 
-void create_any_ret_small_closure_frame(Capability *cap, StgStack *stack, StgWord w) {
+void create_any_ret_small_closure_frame(Capability *cap, StgStack *stack,
+                                        StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &stg_ret_p_info, CCS_SYSTEM);
   StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
   c->payload[0] = payload;
+}
+
+void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
+                                    StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  StgWord bitmapCount = 1;
+  StgWord memSizeInfo = sizeofW(StgRetInfoTable);
+  StgWord memSizeBitmap = sizeofW(StgLargeBitmap) + bitmapCount * sizeofW(StgWord);
+  StgRetInfoTable *info = allocate(cap, memSizeInfo);
+  memset(info, 0, WDS(memSizeInfo));
+  StgLargeBitmap *largeBitmap = allocate(cap, memSizeBitmap);
+  memset(largeBitmap, 0, WDS(memSizeBitmap));
+  info->i.type = RET_BIG;
+#if !defined(TABLES_NEXT_TO_CODE)
+  info->i.layout.large_bitmap = largeBitmap; /* pointer to large bitmap structure */
+  SET_HDR(c, info, CCS_SYSTEM);
+#else
+  info->i.layout.large_bitmap_offset = ((StgWord) largeBitmap) - ((StgWord) (info + 1));
+  SET_HDR(c, (StgInfoTable*) info + 1 , CCS_SYSTEM);
+#endif
+  largeBitmap->size = 1;
+  largeBitmap->bitmap[0] = 1;
+  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  c->payload[0] = (StgClosure *)w;
+
+  debugBelch("Yooo itbl : %us\n", get_itbl(c)->type);
+  debugBelch("Yooo bitmap size : %ul\n", GET_LARGE_BITMAP(get_itbl(c))->size);
+  printStack(stack);
 }
 
 StgStack *setup(StgWord closureSizeWords, StgWord w,
@@ -123,9 +153,22 @@ StgStack *any_atomically_frame(StgWord w) {
 }
 
 StgStack *any_ret_small_prim_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w, &create_any_ret_small_prim_frame);
+  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w,
+               &create_any_ret_small_prim_frame);
 }
 
 StgStack *any_ret_small_closure_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w, &create_any_ret_small_closure_frame);
+  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
+               &create_any_ret_small_closure_frame);
+}
+
+StgStack *any_ret_big_closures_frame(StgWord w) {
+  return NULL; // TODO: Implement
+  //  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
+  //               &create_any_ret_closures_closure_frame);
+}
+
+StgStack *any_ret_big_prims_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w,
+               &create_any_ret_big_prims_frame);
 }
