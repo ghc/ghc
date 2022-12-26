@@ -105,7 +105,6 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
-import GHC.Types.Unique.FM
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -446,7 +445,7 @@ data CachedIface = CachedIface { cached_modiface :: !ModIface
                                , cached_linkable :: !(Maybe Linkable) }
 
 instance Outputable CachedIface where
-  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey mi), ppr (isJust ln)]
+  ppr (CachedIface mi ln) = hsep [text "CachedIface", ppr (miKey mi), ppr ln]
 
 noIfaceCache :: Maybe ModIfaceCache
 noIfaceCache = Nothing

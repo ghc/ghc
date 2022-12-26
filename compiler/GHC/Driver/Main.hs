@@ -778,6 +778,12 @@ hscRecompStatus
             msg $ UpToDate
             return $ HscUpToDate checked_iface Nothing
           -- Do need linkable
+          backend
+            | not (backendProducesObject backend)
+            , IsBoot <- isBootSummary mod_summary
+            -> do
+            msg $ UpToDate
+            return $ HscUpToDate checked_iface Nothing
           _ -> do
             -- Check to see whether the expected build products already exist.
             -- If they don't exists then we trigger recompilation.
