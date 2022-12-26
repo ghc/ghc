@@ -757,4 +757,10 @@ T22044:
 	# Test the file exists and is preprocessed
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T22044.hs
 
+.PHONY: T22669
+T22669:
+	echo ":q" | "$(TEST_HC)" $(TEST_HC_OPTS) -v0 --interactive T22669
+	! test -f T22669.o-boot
+
+
 

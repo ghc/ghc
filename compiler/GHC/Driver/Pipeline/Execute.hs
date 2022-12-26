@@ -477,8 +477,13 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
       o_file = if dynamicNow dflags then ml_dyn_obj_file location else ml_obj_file location -- The real object file
       next_phase = hscPostBackendPhase src_flavour (backend dflags)
   case result of
-      HscUpdate iface ->
-          do
+      HscUpdate iface -> case backend dflags of
+          NoBackend -> panic "HscUpdate not relevant for NoBackend"
+          -- In Interpreter way, there is just no linkable for hs-boot files
+          -- and we don't want to write an empty `o-boot` file when we're not
+          -- supposed to be writing any .o files (#22669)
+          Interpreter -> return ([], iface, Nothing, o_file)
+          _ -> do
              case src_flavour of
                HsigFile -> do
                  -- We need to create a REAL but empty .o file
@@ -492,6 +497,11 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
                HsBootFile -> touchObjectFile logger dflags o_file
                HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
 
+             -- MP: I wonder if there are any lurking bugs here because we
+             -- return Linkable == Nothing, despite the fact that there is a
+             -- linkable (.o-boot) which we check for in `Iface/Recomp.hs` and
+             -- then will carry around `Just {}` for the linkable if we're doing
+             -- recompilation.
              return ([], iface, Nothing, o_file)
       HscRecomp { hscs_guts = cgguts,
                   hscs_mod_location = mod_location,
