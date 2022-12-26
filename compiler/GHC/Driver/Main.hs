@@ -775,12 +775,17 @@ hscRecompStatus
         case backend lcl_dflags of
           -- No need for a linkable, we're good to go
           NoBackend -> do
-            msg $ UpToDate
+            msg UpToDate
+            return $ HscUpToDate checked_iface Nothing
+          -- Interpreter doesn't need linkable for hs-boot files (unlike normal backends which
+          -- generate empty o-boot files so we have to make sure they exist).
+          Interpreter | IsBoot <- isBootSummary mod_summary -> do
+            msg UpToDate
             return $ HscUpToDate checked_iface Nothing
           -- Do need linkable
           _ -> do
             -- Check to see whether the expected build products already exist.
-            -- If they don't exists then we trigger recompilation.
+            -- If they don't exist then we trigger recompilation.
             recomp_linkable_result <- case () of
                -- Interpreter can use either already loaded bytecode or loaded object code
                _ | Interpreter <- backend lcl_dflags -> do
