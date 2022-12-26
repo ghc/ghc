@@ -30,8 +30,14 @@ any_atomically_framezh(W_ w){
     return (stack);
 }
 
-any_ret_small_framezh(W_ w){
+any_ret_small_prim_framezh(W_ w){
     P_ stack;
-    (stack) = ccall any_ret_small_frame(w);
+    (stack) = ccall any_ret_small_prim_frame(w);
+    return (stack);
+}
+
+any_ret_small_closure_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_ret_small_closure_frame(w);
     return (stack);
 }

@@ -32,7 +32,9 @@ foreign import prim "any_catch_retry_framezh" any_catch_retry_frame# :: Word# ->
 
 foreign import prim "any_atomically_framezh" any_atomically_frame# :: Word# -> (# StackSnapshot# #)
 
-foreign import prim "any_ret_small_framezh" any_ret_small_frame# :: Word# -> (# StackSnapshot# #)
+foreign import prim "any_ret_small_prim_framezh" any_ret_small_prim_frame# :: Word# -> (# StackSnapshot# #)
+
+foreign import prim "any_ret_small_closure_framezh" any_ret_small_closure_frame# :: Word# -> (# StackSnapshot# #)
 
 main :: HasCallStack => IO ()
 main = do
@@ -68,14 +70,23 @@ main = do
         assertConstrClosure 49 =<< getBoxedClosureData result
       e -> error $ "Wrong closure type: " ++ show e
   -- TODO: Test for UnderflowFrame once it points to a Box payload
-  test any_ret_small_frame# 48## $
+  test any_ret_small_prim_frame# 50## $
     \case
       RetSmall {..} -> do
         assertEqual knownRetSmallType RetN
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 1
-        assertUnknownTypeWordSizedPrimitive 48 (head pCs)
+        assertUnknownTypeWordSizedPrimitive 50 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_small_closure_frame# 51## $
+    \case
+      RetSmall {..} -> do
+        assertEqual knownRetSmallType RetP
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) 1
+        assertConstrClosure 51 (head pCs)
+      e -> error $ "Wrong closure type: " ++ show e
+
 
 test :: HasCallStack => (Word# -> (# StackSnapshot# #)) -> Word# -> (Closure -> IO ()) -> IO ()
 test setup w assertion = do

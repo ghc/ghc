@@ -63,12 +63,19 @@ void create_any_atomically_frame(Capability *cap, StgStack *stack, StgWord w) {
   aF->result = payload2;
 }
 
-void create_any_ret_small_frame(Capability *cap, StgStack *stack, StgWord w) {
+void create_any_ret_small_prim_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &stg_ret_n_info, CCS_SYSTEM);
   // The cast is a lie (w is interpreted as plain Word, not as pointer), but the
   // memory layout fits.
   c->payload[0] = (StgClosure*) w;
+}
+
+void create_any_ret_small_closure_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &stg_ret_p_info, CCS_SYSTEM);
+  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  c->payload[0] = payload;
 }
 
 StgStack *setup(StgWord closureSizeWords, StgWord w,
@@ -115,6 +122,10 @@ StgStack *any_atomically_frame(StgWord w) {
   return setup(sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
 }
 
-StgStack *any_ret_small_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w, &create_any_ret_small_frame);
+StgStack *any_ret_small_prim_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w, &create_any_ret_small_prim_frame);
+}
+
+StgStack *any_ret_small_closure_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w, &create_any_ret_small_closure_frame);
 }
