@@ -361,7 +361,7 @@ warnMissingHomeModules dflags targets mod_graph =
                 (mgModSummaries mod_graph))
 
     warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan
-                         $ DriverMissingHomeModules missing (checkBuildingCabalPackage dflags)
+                         $ DriverMissingHomeModules (homeUnitId_ dflags) missing (checkBuildingCabalPackage dflags)
 
 -- Check that any modules we want to reexport or hide are actually in the package.
 warnUnknownModules :: HscEnv -> DynFlags -> ModuleGraph -> IO DriverMessages
@@ -389,14 +389,14 @@ warnUnknownModules hsc_env dflags mod_graph = do
         _ -> return True
 
 
-    warn flag mod = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan
-                         $ flag mod
+    warn diagnostic = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan
+                         $ diagnostic
 
     final_msgs hidden_warns reexported_warns
           =
         unionManyMessages $
-          [warn DriverUnknownHiddenModules (Set.toList hidden_warns) | not (Set.null hidden_warns)]
-          ++ [warn DriverUnknownReexportedModules reexported_warns | not (null reexported_warns)]
+          [warn (DriverUnknownHiddenModules (homeUnitId_ dflags) (Set.toList hidden_warns)) | not (Set.null hidden_warns)]
+          ++ [warn (DriverUnknownReexportedModules (homeUnitId_ dflags) reexported_warns) | not (null reexported_warns)]
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
