@@ -73,6 +73,7 @@ module GHC.Driver.Backend
    , backendPipelineOutput
    , backendCanReuseLoadedCode
    , backendGeneratesCode
+   , backendGeneratesCodeForHsBoot
    , backendSupportsInterfaceWriting
    , backendRespectsSpecialise
    , backendWantsGlobalBindings
@@ -515,6 +516,14 @@ backendGeneratesCode (Named ViaC)        = True
 backendGeneratesCode (Named JavaScript)  = True
 backendGeneratesCode (Named Interpreter) = True
 backendGeneratesCode (Named NoBackend)   = False
+
+backendGeneratesCodeForHsBoot :: Backend -> Bool
+backendGeneratesCodeForHsBoot (Named NCG)         = True
+backendGeneratesCodeForHsBoot (Named LLVM)        = True
+backendGeneratesCodeForHsBoot (Named ViaC)        = True
+backendGeneratesCodeForHsBoot (Named JavaScript)  = True
+backendGeneratesCodeForHsBoot (Named Interpreter) = False
+backendGeneratesCodeForHsBoot (Named NoBackend)   = False
 
 -- | When set, this flag turns on interface writing for
 -- Backpack.  It should probably be the same as
