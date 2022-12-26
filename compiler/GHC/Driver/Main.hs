@@ -5,6 +5,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
@@ -854,66 +855,69 @@ hscRecompStatus
         return $ HscRecompNeeded $ fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
       UpToDateItem checked_iface -> do
         let lcl_dflags = ms_hspp_opts mod_summary
-        if not (backendGeneratesCode (backend lcl_dflags)) then
-            -- No need for a linkable, we're good to go
-          do msg $ UpToDate
-             return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
-        else
-          -- Do need linkable
-          do
-            -- 1. Just check whether we have bytecode/object linkables and then
-            -- we will decide if we need them or not.
-            bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
-            obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
-            trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
+        if | not (backendGeneratesCode (backend lcl_dflags)) -> do
+               -- No need for a linkable, we're good to go
+               msg UpToDate
+               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+           | not (backendGeneratesCodeForHsBoot (backend lcl_dflags))
+           , IsBoot <- isBootSummary mod_summary -> do
+               msg UpToDate
+               return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+           | otherwise -> do
+               -- Do need linkable
+               -- 1. Just check whether we have bytecode/object linkables and then
+               -- we will decide if we need them or not.
+               bc_linkable <- checkByteCode checked_iface mod_summary (homeMod_bytecode old_linkable)
+               obj_linkable <- liftIO $ checkObjects lcl_dflags (homeMod_object old_linkable) mod_summary
+               trace_if (hsc_logger hsc_env) (vcat [text "BCO linkable", nest 2 (ppr bc_linkable), text "Object Linkable", ppr obj_linkable])
 
-            let just_bc = justBytecode <$> bc_linkable
-                just_o  = justObjects  <$> obj_linkable
-                _maybe_both_os = case (bc_linkable, obj_linkable) of
-                            (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
-                            -- If missing object code, just say we need to recompile because of object code.
-                            (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
-                            -- If just missing byte code, just use the object code
-                            -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
-                            -- end up using bytecode on recompilation
-                            (_, UpToDateItem {} ) -> just_o
+               let just_bc = justBytecode <$> bc_linkable
+                   just_o  = justObjects  <$> obj_linkable
+                   _maybe_both_os = case (bc_linkable, obj_linkable) of
+                               (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
+                               -- If missing object code, just say we need to recompile because of object code.
+                               (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
+                               -- If just missing byte code, just use the object code
+                               -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
+                               -- end up using bytecode on recompilation
+                               (_, UpToDateItem {} ) -> just_o
 
-                definitely_both_os = case (bc_linkable, obj_linkable) of
-                            (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
-                            -- If missing object code, just say we need to recompile because of object code.
-                            (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
-                            -- If just missing byte code, just use the object code
-                            -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
-                            -- end up using bytecode on recompilation
-                            (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
+                   definitely_both_os = case (bc_linkable, obj_linkable) of
+                               (UpToDateItem bc, UpToDateItem o) -> UpToDateItem (bytecodeAndObjects bc o)
+                               -- If missing object code, just say we need to recompile because of object code.
+                               (_, OutOfDateItem reason _) -> OutOfDateItem reason Nothing
+                               -- If just missing byte code, just use the object code
+                               -- so you should use -fprefer-byte-code with -fwrite-if-simplified-core or you'll
+                               -- end up using bytecode on recompilation
+                               (OutOfDateItem reason _,  _ ) -> OutOfDateItem reason Nothing
 
---            pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
-            -- 2. Decide which of the products we will need
-            let recomp_linkable_result = case () of
-                  _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
-                        case bc_linkable of
-                          -- If bytecode is available for Interactive then don't load object code
-                          UpToDateItem _ -> just_bc
-                          _ -> case obj_linkable of
-                                  -- If o is availabe, then just use that
-                                  UpToDateItem _ -> just_o
-                                  _ -> outOfDateItemBecause MissingBytecode Nothing
-                     -- Need object files for making object files
-                     | backendWritesFiles (backend lcl_dflags) ->
-                        if gopt Opt_ByteCodeAndObjectCode lcl_dflags
-                          -- We say we are going to write both, so recompile unless we have both
-                          then definitely_both_os
-                          -- Only load the object file unless we are saying we need to produce both.
-                          -- Unless we do this then you can end up using byte-code for a module you specify -fobject-code for.
-                          else just_o
-                     | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
-            case recomp_linkable_result of
-              UpToDateItem linkable -> do
-                msg $ UpToDate
-                return $ HscUpToDate checked_iface $ linkable
-              OutOfDateItem reason _ -> do
-                msg $ NeedsRecompile reason
-                return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+--               pprTraceM "recomp" (ppr just_bc <+> ppr just_o)
+               -- 2. Decide which of the products we will need
+               let recomp_linkable_result = case () of
+                     _ | backendCanReuseLoadedCode (backend lcl_dflags) ->
+                           case bc_linkable of
+                             -- If bytecode is available for Interactive then don't load object code
+                             UpToDateItem _ -> just_bc
+                             _ -> case obj_linkable of
+                                     -- If o is availabe, then just use that
+                                     UpToDateItem _ -> just_o
+                                     _ -> outOfDateItemBecause MissingBytecode Nothing
+                        -- Need object files for making object files
+                        | backendWritesFiles (backend lcl_dflags) ->
+                           if gopt Opt_ByteCodeAndObjectCode lcl_dflags
+                             -- We say we are going to write both, so recompile unless we have both
+                             then definitely_both_os
+                             -- Only load the object file unless we are saying we need to produce both.
+                             -- Unless we do this then you can end up using byte-code for a module you specify -fobject-code for.
+                             else just_o
+                        | otherwise -> pprPanic "hscRecompStatus" (text $ show $ backend lcl_dflags)
+               case recomp_linkable_result of
+                 UpToDateItem linkable -> do
+                   msg $ UpToDate
+                   return $ HscUpToDate checked_iface $ linkable
+                 OutOfDateItem reason _ -> do
+                   msg $ NeedsRecompile reason
+                   return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
 
 -- | Check that the .o files produced by compilation are already up-to-date
 -- or not.
