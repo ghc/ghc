@@ -81,19 +81,28 @@ void create_any_ret_small_closure_frame(Capability *cap, StgStack *stack,
 
 #define MAX_SMALL_BITMAP_BITS (BITS_IN(W_) - BITMAP_BITS_SHIFT)
 
-StgWord maxSmallBitmapBits(){
-  return MAX_SMALL_BITMAP_BITS;
-}
+StgWord maxSmallBitmapBits() { return MAX_SMALL_BITMAP_BITS; }
 
 RTS_RET(test_small_ret_full_p);
 void create_any_ret_small_closures_frame(Capability *cap, StgStack *stack,
-                                        StgWord w) {
+                                         StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &test_small_ret_full_p_info, CCS_SYSTEM);
-  for(int i = 0; i < MAX_SMALL_BITMAP_BITS; i++) {
+  for (int i = 0; i < MAX_SMALL_BITMAP_BITS; i++) {
     StgClosure *payload1 = rts_mkWord(cap, w);
     w++;
     c->payload[i] = payload1;
+  }
+}
+
+RTS_RET(test_small_ret_full_n);
+void create_any_ret_small_prims_frame(Capability *cap, StgStack *stack,
+                                      StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_small_ret_full_n_info, CCS_SYSTEM);
+  for (int i = 0; i < MAX_SMALL_BITMAP_BITS; i++) {
+    c->payload[i] = (StgClosure *)w;
+    w++;
   }
 }
 
@@ -102,18 +111,21 @@ void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
   StgClosure *c = (StgClosure *)stack->sp;
   StgWord bitmapCount = 1;
   StgWord memSizeInfo = sizeofW(StgRetInfoTable);
-  StgWord memSizeBitmap = sizeofW(StgLargeBitmap) + bitmapCount * sizeofW(StgWord);
+  StgWord memSizeBitmap =
+      sizeofW(StgLargeBitmap) + bitmapCount * sizeofW(StgWord);
   StgRetInfoTable *info = allocate(cap, memSizeInfo);
   memset(info, 0, WDS(memSizeInfo));
   StgLargeBitmap *largeBitmap = allocate(cap, memSizeBitmap);
   memset(largeBitmap, 0, WDS(memSizeBitmap));
   info->i.type = RET_BIG;
 #if !defined(TABLES_NEXT_TO_CODE)
-  info->i.layout.large_bitmap = largeBitmap; /* pointer to large bitmap structure */
+  info->i.layout.large_bitmap =
+      largeBitmap; /* pointer to large bitmap structure */
   SET_HDR(c, info, CCS_SYSTEM);
 #else
-  info->i.layout.large_bitmap_offset = ((StgWord) largeBitmap) - ((StgWord) (info + 1));
-  SET_HDR(c, (StgInfoTable*) info + 1 , CCS_SYSTEM);
+  info->i.layout.large_bitmap_offset =
+      ((StgWord)largeBitmap) - ((StgWord)(info + 1));
+  SET_HDR(c, (StgInfoTable *)info + 1, CCS_SYSTEM);
 #endif
   largeBitmap->size = 1;
   largeBitmap->bitmap[0] = 1;
@@ -180,8 +192,15 @@ StgStack *any_ret_small_closure_frame(StgWord w) {
 }
 
 StgStack *any_ret_small_closures_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr), w,
-               &create_any_ret_small_closures_frame);
+  return setup(sizeofW(StgClosure) +
+                   MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr),
+               w, &create_any_ret_small_closures_frame);
+}
+
+StgStack *any_ret_small_prims_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) +
+                   MAX_SMALL_BITMAP_BITS * sizeofW(StgWord),
+               w, &create_any_ret_small_prims_frame);
 }
 
 StgStack *any_ret_big_closures_frame(StgWord w) {

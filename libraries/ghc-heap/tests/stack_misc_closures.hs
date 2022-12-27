@@ -34,6 +34,8 @@ foreign import prim "any_atomically_framezh" any_atomically_frame# :: Word# -> (
 
 foreign import prim "any_ret_small_prim_framezh" any_ret_small_prim_frame# :: Word# -> (# StackSnapshot# #)
 
+foreign import prim "any_ret_small_prims_framezh" any_ret_small_prims_frame# :: Word# -> (# StackSnapshot# #)
+
 foreign import prim "any_ret_small_closure_framezh" any_ret_small_closure_frame# :: Word# -> (# StackSnapshot# #)
 
 foreign import prim "any_ret_small_closures_framezh" any_ret_small_closures_frame# :: Word# -> (# StackSnapshot# #)
@@ -105,6 +107,17 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_small_prims_frame# 1## $
+    \case
+      RetSmall {..} -> do
+        assertEqual knownRetSmallType None
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
+        assertUnknownTypeWordSizedPrimitive 1 (head pCs)
+        assertUnknownTypeWordSizedPrimitive 58 (last pCs)
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertEqual wds [1..58]
+      e -> error $ "Wrong closure type: " ++ show e
   test any_ret_big_prims_frame# 52## $
     \case
       RetBig {..} -> do
@@ -140,6 +153,11 @@ assertConstrClosure w c = case c of
 getWordFromConstr01 :: HasCallStack => Closure -> Word
 getWordFromConstr01 c = case c of
   ConstrClosure {..} -> head dataArgs
+  e -> error $ "Wrong closure type: " ++ show e
+
+getWordFromUnknownTypeWordSizedPrimitive :: HasCallStack => Closure -> Word
+getWordFromUnknownTypeWordSizedPrimitive c = case c of
+  UnknownTypeWordSizedPrimitive {..} -> wordVal
   e -> error $ "Wrong closure type: " ++ show e
 
 assertUnknownTypeWordSizedPrimitive :: HasCallStack => Word -> Closure -> IO ()
