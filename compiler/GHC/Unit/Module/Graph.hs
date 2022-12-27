@@ -99,7 +99,7 @@ moduleGraphNodeUnitId mgn =
 instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode _ iuid -> ppr iuid
-    ModuleNode nks ms -> ppr (ms_mnwib ms) <+> ppr nks
+    ModuleNode nks ms -> ppr (msKey ms) <+> ppr nks
     LinkNode uid _     -> text "LN:" <+> ppr uid
 
 instance Eq ModuleGraphNode where
