@@ -60,6 +60,9 @@ test('MHU_OptionsGHC', normal, compile_fail, [''])
 
 test('multipleHomeUnits_loop', [extra_files([ 'a/', 'unitA', 'loop', 'unitLoop'])], multiunit_compile, [['unitA', 'unitLoop'], '-fhide-source-paths'])
 
+# This test checks that we look for things in our home unit before looking in dependencies
+test('multipleHomeUnits_import_order', [extra_files([ 'unitOrder1', 'unitOrder2', 'order-matters1', 'order-matters2'])], multiunit_compile, [['unitOrder1', 'unitOrder2'], '-fhide-source-paths'])
+
 test('multipleHomeUnits_recomp', [copy_files,extra_files([ 'Recomp.hs', 'unitRecomp', 'unitDep', 'Dep.hs'])], makefile_test, [])
 
 test('multipleHomeUnits_recomp_th', [filter_stdout_lines(r'.*Compiling.*'), copy_files, extra_files(['thRecomp.script', 'unitRecompTH', 'unitDep', 'RecompTH.hs', 'Dep.hs', '../../ghci/shell.hs'])  , extra_run_opts('-v1 -unit @unitRecompTH -unit @unitDep')], ghci_script, ['thRecomp.script'])
