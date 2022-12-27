@@ -180,7 +180,10 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
       | otherwise =
         findHomePackageModule fc opts uid mod_name
 
-    any_home_import = foldr orIfNotFound home_import (map home_pkg_import other_fopts)
+    -- Do not be smart and change this to `foldr orIfNotFound home_import hs` as
+    -- that is not the same!! home_import is first because we need to look within ourselves
+    -- first before looking at the packages in order.
+    any_home_import = foldr1 orIfNotFound (home_import: map home_pkg_import other_fopts)
 
     pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
 
