@@ -1496,11 +1496,13 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         logger = hsc_logger hsc_env
         roots  = hsc_targets hsc_env
 
-        -- A cache from file paths to the already summarised modules.
+        -- A cache from file paths to the already summarised modules. The same file
+        -- can be used in multiple units so the map is also keyed by which unit the
+        -- file was used in.
         -- Reuse these if we can because the most expensive part of downsweep is
         -- reading the headers.
-        old_summary_map :: M.Map FilePath ModSummary
-        old_summary_map = M.fromList [(msHsFilePath ms, ms) | ms <- old_summaries]
+        old_summary_map :: M.Map (UnitId, FilePath) ModSummary
+        old_summary_map = M.fromList [((ms_unitid ms, msHsFilePath ms), ms) | ms <- old_summaries]
 
         getRootSummary :: Target -> IO (Either (UnitId, DriverMessages) ModSummary)
         getRootSummary Target { targetId = TargetFile file mb_phase
@@ -1815,7 +1817,7 @@ mkRootMap summaries = Map.fromListWith (flip (++))
 summariseFile
         :: HscEnv
         -> HomeUnit
-        -> M.Map FilePath ModSummary    -- old summaries
+        -> M.Map (UnitId, FilePath) ModSummary    -- old summaries
         -> FilePath                     -- source file name
         -> Maybe Phase                  -- start phase
         -> Maybe (StringBuffer,UTCTime)
@@ -1823,9 +1825,8 @@ summariseFile
 
 summariseFile hsc_env' home_unit old_summaries src_fn mb_phase maybe_buf
         -- we can use a cached summary if one is available and the
-        -- source file hasn't changed,  But we have to look up the summary
-        -- by source file, rather than module name as we do in summarise.
-   | Just old_summary <- M.lookup src_fn old_summaries
+        -- source file hasn't changed,
+   | Just old_summary <- M.lookup (homeUnitId home_unit, src_fn) old_summaries
    = do
         let location = ms_location $ old_summary
 
@@ -1934,7 +1935,7 @@ data SummariseResult =
 summariseModule
           :: HscEnv
           -> HomeUnit
-          -> M.Map FilePath ModSummary
+          -> M.Map (UnitId, FilePath) ModSummary
           -- ^ Map of old summaries
           -> IsBootInterface    -- True <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
@@ -1995,7 +1996,7 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
               Right ms -> FoundHome ms
 
     new_summary_cache_check loc mod src_fn h
-      | Just old_summary <- Map.lookup src_fn old_summary_map =
+      | Just old_summary <- Map.lookup ((toUnitId (moduleUnit mod), src_fn)) old_summary_map =
 
          -- check the hash on the source file, and
          -- return the cached summary if it hasn't changed.  If the
