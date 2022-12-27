@@ -42,6 +42,12 @@ any_ret_small_closure_framezh(W_ w){
     return (stack);
 }
 
+any_ret_small_closures_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_ret_small_closures_frame(w);
+    return (stack);
+}
+
 any_ret_big_prims_framezh(W_ w){
     P_ stack;
     (stack) = ccall any_ret_big_prims_frame(w);
@@ -52,4 +58,25 @@ any_ret_big_closures_framezh(W_ w){
     P_ stack;
     (stack) = ccall any_ret_big_closures_frame(w);
     return (stack);
+}
+
+#if SIZEOF_VOID_P == 4
+INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
+P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,
+P_ ptr11, P_ ptr12, P_ ptr13, P_ ptr14, P_ ptr15, P_ ptr16, P_ ptr17, P_ ptr18, P_ ptr19, P_ ptr20,
+P_ ptr21, P_ ptr22, P_ ptr23, P_ ptr24, P_ ptr25, P_ ptr26, P_ ptr27
+)
+#elif SIZEOF_VOID_P == 8
+INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
+P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,
+P_ ptr11, P_ ptr12, P_ ptr13, P_ ptr14, P_ ptr15, P_ ptr16, P_ ptr17, P_ ptr18, P_ ptr19, P_ ptr20,
+P_ ptr21, P_ ptr22, P_ ptr23, P_ ptr24, P_ ptr25, P_ ptr26, P_ ptr27, P_ ptr28, P_ ptr29, P_ ptr30,
+P_ ptr31, P_ ptr32, P_ ptr33, P_ ptr34, P_ ptr35, P_ ptr36, P_ ptr37, P_ ptr38, P_ ptr39, P_ ptr40,
+P_ ptr41, P_ ptr42, P_ ptr43, P_ ptr44, P_ ptr45, P_ ptr46, P_ ptr47, P_ ptr48, P_ ptr49, P_ ptr50,
+P_ ptr51, P_ ptr52, P_ ptr53, P_ ptr54, P_ ptr55, P_ ptr56, P_ ptr57, P_ ptr58
+)
+#endif
+    return (/* no return values */)
+{
+    return ();
 }

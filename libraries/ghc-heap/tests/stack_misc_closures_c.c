@@ -18,18 +18,17 @@ extern void printStack(StgStack *stack);
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
-// TODO: Try to remove UNTAG_CLOSURE. This should happen in the decoding logic.
 void create_any_update_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
   SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
-  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  StgClosure *payload = rts_mkWord(cap, w);
   updF->updatee = payload;
 }
 
 void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgCatchFrame *catchF = (StgCatchFrame *)stack->sp;
   SET_HDR(catchF, &stg_catch_frame_info, CCS_SYSTEM);
-  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  StgClosure *payload = rts_mkWord(cap, w);
   catchF->exceptions_blocked = 1;
   catchF->handler = payload;
 }
@@ -37,8 +36,8 @@ void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
 void create_any_catch_stm_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgCatchSTMFrame *catchF = (StgCatchSTMFrame *)stack->sp;
   SET_HDR(catchF, &stg_catch_stm_frame_info, CCS_SYSTEM);
-  StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
-  StgClosure *payload2 = UNTAG_CLOSURE(rts_mkWord(cap, w + 1));
+  StgClosure *payload1 = rts_mkWord(cap, w);
+  StgClosure *payload2 = rts_mkWord(cap, w + 1);
   catchF->code = payload1;
   catchF->handler = payload2;
 }
@@ -47,8 +46,8 @@ void create_any_catch_stm_frame(Capability *cap, StgStack *stack, StgWord w) {
 void create_any_catch_retry_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgCatchRetryFrame *catchRF = (StgCatchRetryFrame *)stack->sp;
   SET_HDR(catchRF, &stg_catch_retry_frame_info, CCS_SYSTEM);
-  StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
-  StgClosure *payload2 = UNTAG_CLOSURE(rts_mkWord(cap, w + 1));
+  StgClosure *payload1 = rts_mkWord(cap, w);
+  StgClosure *payload2 = rts_mkWord(cap, w + 1);
   catchRF->running_alt_code = 1;
   catchRF->first_code = payload1;
   catchRF->alt_code = payload2;
@@ -57,8 +56,8 @@ void create_any_catch_retry_frame(Capability *cap, StgStack *stack, StgWord w) {
 void create_any_atomically_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgAtomicallyFrame *aF = (StgAtomicallyFrame *)stack->sp;
   SET_HDR(aF, &stg_atomically_frame_info, CCS_SYSTEM);
-  StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
-  StgClosure *payload2 = UNTAG_CLOSURE(rts_mkWord(cap, w + 1));
+  StgClosure *payload1 = rts_mkWord(cap, w);
+  StgClosure *payload2 = rts_mkWord(cap, w + 1);
   aF->code = payload1;
   aF->result = payload2;
 }
@@ -76,8 +75,26 @@ void create_any_ret_small_closure_frame(Capability *cap, StgStack *stack,
                                         StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &stg_ret_p_info, CCS_SYSTEM);
-  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
+  StgClosure *payload = rts_mkWord(cap, w);
   c->payload[0] = payload;
+}
+
+#define MAX_SMALL_BITMAP_BITS (BITS_IN(W_) - BITMAP_BITS_SHIFT)
+
+StgWord maxSmallBitmapBits(){
+  return MAX_SMALL_BITMAP_BITS;
+}
+
+RTS_RET(test_small_ret_full_p);
+void create_any_ret_small_closures_frame(Capability *cap, StgStack *stack,
+                                        StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_small_ret_full_p_info, CCS_SYSTEM);
+  for(int i = 0; i < MAX_SMALL_BITMAP_BITS; i++) {
+    StgClosure *payload1 = rts_mkWord(cap, w);
+    w++;
+    c->payload[i] = payload1;
+  }
 }
 
 void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
@@ -160,6 +177,11 @@ StgStack *any_ret_small_prim_frame(StgWord w) {
 StgStack *any_ret_small_closure_frame(StgWord w) {
   return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
                &create_any_ret_small_closure_frame);
+}
+
+StgStack *any_ret_small_closures_frame(StgWord w) {
+  return setup(sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr), w,
+               &create_any_ret_small_closures_frame);
 }
 
 StgStack *any_ret_big_closures_frame(StgWord w) {
