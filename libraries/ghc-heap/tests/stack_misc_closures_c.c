@@ -1,6 +1,7 @@
 #include "MachDeps.h"
 #include "Rts.h"
 #include "RtsAPI.h"
+#include "alloca.h"
 #include "rts/Messages.h"
 #include "rts/Types.h"
 #include "rts/storage/ClosureMacros.h"
@@ -18,11 +19,18 @@ extern void printStack(StgStack *stack);
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
+// Update frames are interpreted by the garbage collector. We play it some
+// tricks here with a fake blackhole.
+RTS_RET(test_fake_blackhole);
 void create_any_update_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
   SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
+  // StgInd and a BLACKHOLE have the same structure
+  StgInd* blackhole = allocate(cap, sizeofW(StgInd));
+  SET_HDR(blackhole, &test_fake_blackhole_info, CCS_SYSTEM);
   StgClosure *payload = rts_mkWord(cap, w);
-  updF->updatee = payload;
+  blackhole->indirectee = payload;
+  updF->updatee = (StgClosure*) blackhole;
 }
 
 void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
@@ -89,7 +97,7 @@ void create_any_ret_small_closures_frame(Capability *cap, StgStack *stack,
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &test_small_ret_full_p_info, CCS_SYSTEM);
   for (int i = 0; i < MAX_SMALL_BITMAP_BITS; i++) {
-    StgClosure *payload1 = rts_mkWord(cap, w);
+    StgClosure *payload1 = UNTAG_CLOSURE(rts_mkWord(cap, w));
     w++;
     c->payload[i] = payload1;
   }
@@ -104,6 +112,16 @@ void create_any_ret_small_prims_frame(Capability *cap, StgStack *stack,
     c->payload[i] = (StgClosure *)w;
     w++;
   }
+}
+
+RTS_RET(test_big_ret_n);
+void create_any_ret_big_prim_frame(Capability *cap, StgStack *stack,
+                                      StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_big_ret_n_info, CCS_SYSTEM);
+  c->payload[0] = (StgClosure *)w;
+  debugBelch("Yolo size %lu\n", GET_LARGE_BITMAP(get_itbl(c))->size);
+  debugBelch("Yolo bitmap %lu\n", GET_LARGE_BITMAP(get_itbl(c))->bitmap[0]);
 }
 
 void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
@@ -137,14 +155,14 @@ void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
   printStack(stack);
 }
 
-StgStack *setup(StgWord closureSizeWords, StgWord w,
+void checkSTACK (StgStack *stack);
+StgStack *setup(Capability *cap, StgWord closureSizeWords, StgWord w,
                 void (*f)(Capability *, StgStack *, StgWord)) {
-  Capability *cap = rts_lock();
   StgWord totalSizeWords =
       sizeofW(StgStack) + closureSizeWords + MIN_STACK_WORDS;
   StgStack *stack = (StgStack *)allocate(cap, totalSizeWords);
   StgWord totalSizeBytes = WDS(totalSizeWords);
-  SET_HDR(stack, &stg_upd_frame_info, CCS_SYSTEM);
+  SET_HDR(stack, &stg_STACK_info, CCS_SYSTEM);
   stack->stack_size = totalSizeBytes;
   stack->dirty = 0;
   stack->marking = 0;
@@ -157,59 +175,66 @@ StgStack *setup(StgWord closureSizeWords, StgWord w,
 
   f(cap, stack, w);
 
-  rts_unlock(cap);
+  checkSTACK(stack);
   return stack;
 }
 
-StgStack *any_update_frame(StgWord w) {
-  return setup(sizeofW(StgUpdateFrame), w, &create_any_update_frame);
+StgStack *any_update_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgUpdateFrame), w, &create_any_update_frame);
 }
 
-StgStack *any_catch_frame(StgWord w) {
-  return setup(sizeofW(StgCatchFrame), w, &create_any_catch_frame);
+StgStack *any_catch_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgCatchFrame), w, &create_any_catch_frame);
 }
 
-StgStack *any_catch_stm_frame(StgWord w) {
-  return setup(sizeofW(StgCatchSTMFrame), w, &create_any_catch_stm_frame);
+StgStack *any_catch_stm_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgCatchSTMFrame), w, &create_any_catch_stm_frame);
 }
 
-StgStack *any_catch_retry_frame(StgWord w) {
-  return setup(sizeofW(StgCatchRetryFrame), w, &create_any_catch_retry_frame);
+StgStack *any_catch_retry_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgCatchRetryFrame), w, &create_any_catch_retry_frame);
 }
 
-StgStack *any_atomically_frame(StgWord w) {
-  return setup(sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
+StgStack *any_atomically_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
 }
 
-StgStack *any_ret_small_prim_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w,
+StgStack *any_ret_small_prim_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + sizeofW(StgWord), w,
                &create_any_ret_small_prim_frame);
 }
 
-StgStack *any_ret_small_closure_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
+StgStack *any_ret_small_closure_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
                &create_any_ret_small_closure_frame);
 }
 
-StgStack *any_ret_small_closures_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) +
+StgStack *any_ret_small_closures_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) +
                    MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr),
                w, &create_any_ret_small_closures_frame);
 }
 
-StgStack *any_ret_small_prims_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) +
+StgStack *any_ret_small_prims_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) +
                    MAX_SMALL_BITMAP_BITS * sizeofW(StgWord),
                w, &create_any_ret_small_prims_frame);
 }
 
-StgStack *any_ret_big_closures_frame(StgWord w) {
+StgStack *any_ret_big_closures_frame(Capability *cap, StgWord w) {
   return NULL; // TODO: Implement
   //  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
   //               &create_any_ret_closures_closure_frame);
 }
 
-StgStack *any_ret_big_prims_frame(StgWord w) {
-  return setup(sizeofW(StgClosure) + sizeofW(StgWord), w,
+StgStack *any_ret_big_prim_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + 59 * sizeofW(StgWord), w,
+               &create_any_ret_big_prim_frame);
+}
+
+StgStack *any_ret_big_prims_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + sizeofW(StgWord), w,
                &create_any_ret_big_prims_frame);
 }
+
+void belchStack(StgStack *stack) { printStack(stack); }
