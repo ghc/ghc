@@ -66,6 +66,13 @@ any_ret_big_closures_min_framezh(W_ w){
     return (stack);
 }
 
+any_ret_big_closures_two_words_framezh(W_ w){
+    P_ stack;
+    (stack) = ccall any_ret_big_closures_two_words_frame(MyCapability() "ptr", w);
+    return (stack);
+}
+
+
 INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
 #if SIZEOF_VOID_P == 4
 P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,
@@ -146,7 +153,32 @@ P_ p51, P_ p52, P_ p53, P_ p54, P_ p55, P_ p56, P_ p57, P_ p58, P_ p59
     return ();
 }
 
+// Size of this large bitmap closure is: max size of bits in word + 1
+// This results in a two word StgLargeBitmap.
+INFO_TABLE_RET ( test_big_ret_two_words_p, RET_BIG, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28, P_ p29, P_ p30,
+P_ p31, P_ p32, P_ p33
+#elif SIZEOF_VOID_P == 8
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28, P_ p29, P_ p30,
+P_ p31, P_ p32, P_ p33, P_ p34, P_ p35, P_ p36, P_ p37, P_ p38, P_ p39, P_ p40,
+P_ p41, P_ p42, P_ p43, P_ p44, P_ p45, P_ p46, P_ p47, P_ p48, P_ p49, P_ p50,
+P_ p51, P_ p52, P_ p53, P_ p54, P_ p55, P_ p56, P_ p57, P_ p58, P_ p59, P_ p60,
+P_ p61, P_ p62, P_ p63, P_ p64, P_ p65
+#endif
+)
+    return (/* no return values */)
+{
+    return ();
+}
 
+
+
+// A BLACKHOLE without any code. Just a placeholder to keep the GC happy.
 INFO_TABLE(test_fake_blackhole,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     (P_ node)
 {

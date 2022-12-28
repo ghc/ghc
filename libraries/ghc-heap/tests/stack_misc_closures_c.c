@@ -140,6 +140,20 @@ void create_any_ret_big_closures_min_frame(Capability *cap, StgStack *stack,
   }
 }
 
+#define TWO_WORDS_LARGE_BITMAP_BITS (BITS_IN(W_) + 1)
+
+RTS_RET(test_big_ret_two_words_p);
+void create_any_ret_big_closures_two_words_frame(Capability *cap, StgStack *stack,
+                                           StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_big_ret_two_words_p_info, CCS_SYSTEM);
+
+  for (int i = 0; i < TWO_WORDS_LARGE_BITMAP_BITS; i++) {
+    c->payload[i] = UNTAG_CLOSURE(rts_mkWord(cap, w));
+    w++;
+  }
+}
+
 void checkSTACK(StgStack *stack);
 StgStack *setup(Capability *cap, StgWord closureSizeWords, StgWord w,
                 void (*f)(Capability *, StgStack *, StgWord)) {
@@ -211,6 +225,11 @@ StgStack *any_ret_small_prims_frame(Capability *cap, StgWord w) {
 StgStack *any_ret_big_closures_min_frame(Capability *cap, StgWord w) {
   return setup(cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgClosure), w,
                &create_any_ret_big_closures_min_frame);
+}
+
+StgStack *any_ret_big_closures_two_words_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + TWO_WORDS_LARGE_BITMAP_BITS * sizeofW(StgClosure), w,
+               &create_any_ret_big_closures_two_words_frame);
 }
 
 StgStack *any_ret_big_prims_min_frame(Capability *cap, StgWord w) {
