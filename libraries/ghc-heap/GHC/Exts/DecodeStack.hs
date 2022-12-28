@@ -271,7 +271,9 @@ decodeStack s = do
 #if defined(DEBUG)
   belchStack s
 #endif
-  SimpleStack . (map asBox) <$> decodeStack' s
+  stack <- decodeStack' s
+  let boxed = map DecodedClosureBox stack
+  pure $ SimpleStack boxed
 
 decodeStack' :: StackSnapshot -> IO [CL.Closure]
 decodeStack' s = unpackStackFrameIter (stackHead s) >>= \frame -> (frame :) <$> go (advanceStackFrameIter (stackHead s))

@@ -20,7 +20,7 @@ import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack (StackSnapshot (..))
 import TestUtils
 import Unsafe.Coerce (unsafeCoerce)
-import GHC.Exts.Heap (GenClosure(wordVal))
+import GHC.Exts.Heap (GenClosure(wordVal), HasHeapRep (getClosureData))
 import System.Mem
 --TODO: Remove later
 import Debug.Trace
@@ -176,23 +176,36 @@ type SetupFunction = Word# -> State# RealWorld -> (# State# RealWorld, StackSnap
 
 test :: HasCallStack => SetupFunction -> Word# -> (Closure -> IO ()) -> IO ()
 test setup w assertion = do
-  sn <- getStackSnapshot setup w
-  -- Run garbage collection now, to prevent later surprises: It's hard to debug
-  -- when the GC suddenly does it's work and there were bad closures or pointers.
-  -- Better fail early, here.
-  performGC
-  stack <- decodeStack' sn
-  assertStackInvariants sn stack
-  assertEqual (length stack) 2
-  assertThat
-    "Last frame is stop frame"
-    ( \case
-        StopFrame -> True
-        _ -> False
-    )
-    (last stack)
-
-  assertion $ head stack
+    sn <- getStackSnapshot setup w
+    -- Run garbage collection now, to prevent later surprises: It's hard to debug
+    -- when the GC suddenly does it's work and there were bad closures or pointers.
+    -- Better fail early, here.
+    performGC
+    stack <- decodeStack' sn
+    assert sn stack
+    -- The result of HasHeapRep should be similar (wrapped in the closure for
+    -- StgStack itself.)
+    let (StackSnapshot sn#) = sn
+    stack' <- getClosureData sn#
+    case stack' of
+      SimpleStack {..} -> do
+        !cs <- mapM getBoxedClosureData stackClosures
+        assert sn cs
+      _ -> error $ "Unexpected closure type : " ++ show stack'
+  where
+    assert :: StackSnapshot -> [Closure] -> IO ()
+    assert sn stack = do
+      traceM $ "HERE: " ++ show stack
+      assertStackInvariants sn stack
+      assertEqual (length stack) 2
+      assertThat
+        "Last frame is stop frame"
+        ( \case
+            StopFrame -> True
+            _ -> False
+        )
+        (last stack)
+      assertion $ head stack
 
 -- | Get a `StackSnapshot` from test setup
 --

@@ -134,7 +134,7 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
 #if MIN_VERSION_base(4,17,0)
-instance HasHeapRep StackSnapshot# where
+instance {-# OVERLAPPING #-} HasHeapRep StackSnapshot# where
     getClosureData s# = decodeStack (StackSnapshot s#)
 #endif
 
