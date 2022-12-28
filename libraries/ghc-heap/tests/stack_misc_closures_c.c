@@ -143,8 +143,8 @@ void create_any_ret_big_closures_min_frame(Capability *cap, StgStack *stack,
 #define TWO_WORDS_LARGE_BITMAP_BITS (BITS_IN(W_) + 1)
 
 RTS_RET(test_big_ret_two_words_p);
-void create_any_ret_big_closures_two_words_frame(Capability *cap, StgStack *stack,
-                                           StgWord w) {
+void create_any_ret_big_closures_two_words_frame(Capability *cap,
+                                                 StgStack *stack, StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &test_big_ret_two_words_p_info, CCS_SYSTEM);
 
@@ -155,7 +155,7 @@ void create_any_ret_big_closures_two_words_frame(Capability *cap, StgStack *stac
 }
 
 void checkSTACK(StgStack *stack);
-StgStack *setup(Capability *cap, StgWord closureSizeWords, StgWord w,
+StgStack *setup(Capability *cap, StgWord closureSizeWords,
                 void (*f)(Capability *, StgStack *, StgWord)) {
   StgWord totalSizeWords =
       sizeofW(StgStack) + closureSizeWords + MIN_STACK_WORDS;
@@ -172,68 +172,73 @@ StgStack *setup(Capability *cap, StgWord closureSizeWords, StgWord w,
   SET_HDR((StgClosure *)stack->sp, &stg_stop_thread_info, CCS_SYSTEM);
   stack->sp -= closureSizeWords;
 
-  f(cap, stack, w);
+  // Pointers can easíly be confused with each other. Provide a start value for
+  // values (1) in closures and increment it after every usage. The goal is to
+  // have distinct values in the closure to ensure nothing gets mixed up.
+  f(cap, stack, 1);
 
   checkSTACK(stack);
   return stack;
 }
 
-StgStack *any_update_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgUpdateFrame), w, &create_any_update_frame);
+StgStack *any_update_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgUpdateFrame), &create_any_update_frame);
 }
 
-StgStack *any_catch_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgCatchFrame), w, &create_any_catch_frame);
+StgStack *any_catch_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgCatchFrame), &create_any_catch_frame);
 }
 
-StgStack *any_catch_stm_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgCatchSTMFrame), w, &create_any_catch_stm_frame);
+StgStack *any_catch_stm_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgCatchSTMFrame), &create_any_catch_stm_frame);
 }
 
-StgStack *any_catch_retry_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgCatchRetryFrame), w,
-               &create_any_catch_retry_frame);
+StgStack *any_catch_retry_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgCatchRetryFrame), &create_any_catch_retry_frame);
 }
 
-StgStack *any_atomically_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgAtomicallyFrame), w,
-               &create_any_atomically_frame);
+StgStack *any_atomically_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgAtomicallyFrame), &create_any_atomically_frame);
 }
 
-StgStack *any_ret_small_prim_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + sizeofW(StgWord), w,
+StgStack *any_ret_small_prim_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgClosure) + sizeofW(StgWord),
                &create_any_ret_small_prim_frame);
 }
 
-StgStack *any_ret_small_closure_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
+StgStack *any_ret_small_closure_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgClosure) + sizeofW(StgClosurePtr),
                &create_any_ret_small_closure_frame);
 }
 
-StgStack *any_ret_small_closures_frame(Capability *cap, StgWord w) {
+StgStack *any_ret_small_closures_frame(Capability *cap) {
   return setup(
       cap, sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr),
-      w, &create_any_ret_small_closures_frame);
+      &create_any_ret_small_closures_frame);
 }
 
-StgStack *any_ret_small_prims_frame(Capability *cap, StgWord w) {
+StgStack *any_ret_small_prims_frame(Capability *cap) {
   return setup(cap,
                sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgWord),
-               w, &create_any_ret_small_prims_frame);
+               &create_any_ret_small_prims_frame);
 }
 
-StgStack *any_ret_big_closures_min_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgClosure), w,
-               &create_any_ret_big_closures_min_frame);
+StgStack *any_ret_big_closures_min_frame(Capability *cap) {
+  return setup(
+      cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgClosure),
+      &create_any_ret_big_closures_min_frame);
 }
 
-StgStack *any_ret_big_closures_two_words_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + TWO_WORDS_LARGE_BITMAP_BITS * sizeofW(StgClosure), w,
+StgStack *any_ret_big_closures_two_words_frame(Capability *cap) {
+  return setup(cap,
+               sizeofW(StgClosure) +
+                   TWO_WORDS_LARGE_BITMAP_BITS * sizeofW(StgClosure),
                &create_any_ret_big_closures_two_words_frame);
 }
 
-StgStack *any_ret_big_prims_min_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgWord), w,
+StgStack *any_ret_big_prims_min_frame(Capability *cap) {
+  return setup(cap,
+               sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgWord),
                &create_any_ret_big_prims_min_frame);
 }
 

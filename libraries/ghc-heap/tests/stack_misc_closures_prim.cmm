@@ -1,74 +1,74 @@
 #include "Cmm.h"
 
-any_update_framezh(W_ w){
+any_update_framezh(){
     P_ stack;
-    ("ptr" stack) = ccall any_update_frame(MyCapability() "ptr", w);
+    ("ptr" stack) = ccall any_update_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_catch_framezh(W_ w){
+any_catch_framezh(){
     P_ stack;
-    (stack) = ccall any_catch_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_catch_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_catch_stm_framezh(W_ w){
+any_catch_stm_framezh(){
     P_ stack;
-    (stack) = ccall any_catch_stm_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_catch_stm_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_catch_retry_framezh(W_ w){
+any_catch_retry_framezh(){
     P_ stack;
-    (stack) = ccall any_catch_retry_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_catch_retry_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_atomically_framezh(W_ w){
+any_atomically_framezh(){
     P_ stack;
-    (stack) = ccall any_atomically_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_atomically_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_small_prim_framezh(W_ w){
+any_ret_small_prim_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_small_prim_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_small_prim_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_small_prims_framezh(W_ w){
+any_ret_small_prims_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_small_prims_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_small_prims_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_small_closure_framezh(W_ w){
+any_ret_small_closure_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_small_closure_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_small_closure_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_small_closures_framezh(W_ w){
+any_ret_small_closures_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_small_closures_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_small_closures_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_big_prims_min_framezh(W_ w){
+any_ret_big_prims_min_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_big_prims_min_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_big_prims_min_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_big_closures_min_framezh(W_ w){
+any_ret_big_closures_min_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_big_closures_min_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_big_closures_min_frame(MyCapability() "ptr");
     return (stack);
 }
 
-any_ret_big_closures_two_words_framezh(W_ w){
+any_ret_big_closures_two_words_framezh(){
     P_ stack;
-    (stack) = ccall any_ret_big_closures_two_words_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_big_closures_two_words_frame(MyCapability() "ptr");
     return (stack);
 }
 
@@ -175,8 +175,6 @@ P_ p61, P_ p62, P_ p63, P_ p64, P_ p65
 {
     return ();
 }
-
-
 
 // A BLACKHOLE without any code. Just a placeholder to keep the GC happy.
 INFO_TABLE(test_fake_blackhole,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")

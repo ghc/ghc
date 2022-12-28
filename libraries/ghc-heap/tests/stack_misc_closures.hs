@@ -83,55 +83,55 @@ N.B. the test data stack are only meant be de decoded. They are not executable
 -}
 main :: HasCallStack => IO ()
 main = do
-  test any_update_frame# 42## $
+  test any_update_frame# $
     \case
       UpdateFrame {..} -> do
         assertEqual knownUpdateFrameType NormalUpdateFrame
-        assertEqual 42 =<< (getWordFromBlackhole =<< getBoxedClosureData updatee)
+        assertEqual 1 =<< (getWordFromBlackhole =<< getBoxedClosureData updatee)
       e -> error $ "Wrong closure type: " ++ show e
-  test any_catch_frame# 43## $
+  test any_catch_frame# $
     \case
       CatchFrame {..} -> do
         assertEqual exceptions_blocked 1
-        assertConstrClosure 43 =<< getBoxedClosureData handler
+        assertConstrClosure 1 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
-  test any_catch_stm_frame# 44## $
+  test any_catch_stm_frame# $
     \case
       CatchStmFrame {..} -> do
-        assertConstrClosure 44 =<< getBoxedClosureData catchFrameCode
-        assertConstrClosure 45 =<< getBoxedClosureData handler
+        assertConstrClosure 1 =<< getBoxedClosureData catchFrameCode
+        assertConstrClosure 2 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
-  test any_catch_retry_frame# 46## $
+  test any_catch_retry_frame# $
     \case
       CatchRetryFrame {..} -> do
         assertEqual running_alt_code 1
-        assertConstrClosure 46 =<< getBoxedClosureData first_code
-        assertConstrClosure 47 =<< getBoxedClosureData alt_code
+        assertConstrClosure 1 =<< getBoxedClosureData first_code
+        assertConstrClosure 2 =<< getBoxedClosureData alt_code
       e -> error $ "Wrong closure type: " ++ show e
-  test any_atomically_frame# 48## $
+  test any_atomically_frame# $
     \case
       AtomicallyFrame {..} -> do
-        assertConstrClosure 48 =<< getBoxedClosureData atomicallyFrameCode
-        assertConstrClosure 49 =<< getBoxedClosureData result
+        assertConstrClosure 1 =<< getBoxedClosureData atomicallyFrameCode
+        assertConstrClosure 2 =<< getBoxedClosureData result
       e -> error $ "Wrong closure type: " ++ show e
   -- TODO: Test for UnderflowFrame once it points to a Box payload
-  test any_ret_small_prim_frame# 50## $
+  test any_ret_small_prim_frame# $
     \case
       RetSmall {..} -> do
         assertEqual knownRetSmallType RetN
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 1
-        assertUnknownTypeWordSizedPrimitive 50 (head pCs)
+        assertUnknownTypeWordSizedPrimitive 1 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_small_closure_frame# 51## $
+  test any_ret_small_closure_frame# $
     \case
       RetSmall {..} -> do
         assertEqual knownRetSmallType RetP
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 1
-        assertConstrClosure 51 (head pCs)
+        assertConstrClosure 1 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_small_closures_frame# 1## $
+  test any_ret_small_closures_frame# $
     \case
       RetSmall {..} -> do
         assertEqual knownRetSmallType None
@@ -140,7 +140,7 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_small_prims_frame# 1## $
+  test any_ret_small_prims_frame# $
     \case
       RetSmall {..} -> do
         assertEqual knownRetSmallType None
@@ -149,7 +149,7 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_big_prims_min_frame# 1## $
+  test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload
@@ -157,7 +157,7 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1..59]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_big_prims_min_frame# 1## $
+  test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload
@@ -165,7 +165,7 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1..59]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_big_closures_min_frame# 1## $
+  test any_ret_big_closures_min_frame# $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload
@@ -173,7 +173,7 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1..59]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_big_closures_two_words_frame# 1## $
+  test any_ret_big_closures_two_words_frame# $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload
@@ -182,11 +182,11 @@ main = do
         assertEqual wds [1..65]
       e -> error $ "Wrong closure type: " ++ show e
 
-type SetupFunction = Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
+type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
-test :: HasCallStack => SetupFunction -> Word# -> (Closure -> IO ()) -> IO ()
-test setup w assertion = do
-    sn <- getStackSnapshot setup w
+test :: HasCallStack => SetupFunction -> (Closure -> IO ()) -> IO ()
+test setup assertion = do
+    sn <- getStackSnapshot setup
     -- Run garbage collection now, to prevent later surprises: It's hard to debug
     -- when the GC suddenly does it's work and there were bad closures or pointers.
     -- Better fail early, here.
@@ -220,9 +220,9 @@ test setup w assertion = do
 --
 -- This function mostly resembles `cloneStack`. Though, it doesn't clone, but
 -- just pulls a @StgStack@ from RTS to Haskell land.
-getStackSnapshot :: SetupFunction -> Word# -> IO StackSnapshot
-getStackSnapshot action# w# = IO $ \s ->
-   case action# w# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
+getStackSnapshot :: SetupFunction -> IO StackSnapshot
+getStackSnapshot action# = IO $ \s ->
+   case action# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
 
 assertConstrClosure :: HasCallStack => Word -> Closure -> IO ()
 assertConstrClosure w c = case c of
