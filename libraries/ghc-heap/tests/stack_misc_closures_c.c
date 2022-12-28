@@ -26,11 +26,11 @@ void create_any_update_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgUpdateFrame *updF = (StgUpdateFrame *)stack->sp;
   SET_HDR(updF, &stg_upd_frame_info, CCS_SYSTEM);
   // StgInd and a BLACKHOLE have the same structure
-  StgInd* blackhole = allocate(cap, sizeofW(StgInd));
+  StgInd *blackhole = allocate(cap, sizeofW(StgInd));
   SET_HDR(blackhole, &test_fake_blackhole_info, CCS_SYSTEM);
   StgClosure *payload = rts_mkWord(cap, w);
   blackhole->indirectee = payload;
-  updF->updatee = (StgClosure*) blackhole;
+  updF->updatee = (StgClosure *)blackhole;
 }
 
 void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
@@ -114,19 +114,33 @@ void create_any_ret_small_prims_frame(Capability *cap, StgStack *stack,
   }
 }
 
+#define MIN_LARGE_BITMAP_BITS (MAX_SMALL_BITMAP_BITS + 1)
+
 RTS_RET(test_big_ret_min_n);
 void create_any_ret_big_prims_min_frame(Capability *cap, StgStack *stack,
-                                      StgWord w) {
+                                        StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &test_big_ret_min_n_info, CCS_SYSTEM);
 
-  for(int i = 0; i < MAX_SMALL_BITMAP_BITS + 1; i++){
+  for (int i = 0; i < MIN_LARGE_BITMAP_BITS; i++) {
     c->payload[i] = (StgClosure *)w;
     w++;
   }
 }
 
-void checkSTACK (StgStack *stack);
+RTS_RET(test_big_ret_min_p);
+void create_any_ret_big_closures_min_frame(Capability *cap, StgStack *stack,
+                                           StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_big_ret_min_p_info, CCS_SYSTEM);
+
+  for (int i = 0; i < MIN_LARGE_BITMAP_BITS; i++) {
+    c->payload[i] = UNTAG_CLOSURE(rts_mkWord(cap, w));
+    w++;
+  }
+}
+
+void checkSTACK(StgStack *stack);
 StgStack *setup(Capability *cap, StgWord closureSizeWords, StgWord w,
                 void (*f)(Capability *, StgStack *, StgWord)) {
   StgWord totalSizeWords =
@@ -163,11 +177,13 @@ StgStack *any_catch_stm_frame(Capability *cap, StgWord w) {
 }
 
 StgStack *any_catch_retry_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgCatchRetryFrame), w, &create_any_catch_retry_frame);
+  return setup(cap, sizeofW(StgCatchRetryFrame), w,
+               &create_any_catch_retry_frame);
 }
 
 StgStack *any_atomically_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgAtomicallyFrame), w, &create_any_atomically_frame);
+  return setup(cap, sizeofW(StgAtomicallyFrame), w,
+               &create_any_atomically_frame);
 }
 
 StgStack *any_ret_small_prim_frame(Capability *cap, StgWord w) {
@@ -181,25 +197,24 @@ StgStack *any_ret_small_closure_frame(Capability *cap, StgWord w) {
 }
 
 StgStack *any_ret_small_closures_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) +
-                   MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr),
-               w, &create_any_ret_small_closures_frame);
+  return setup(
+      cap, sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgClosurePtr),
+      w, &create_any_ret_small_closures_frame);
 }
 
 StgStack *any_ret_small_prims_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) +
-                   MAX_SMALL_BITMAP_BITS * sizeofW(StgWord),
+  return setup(cap,
+               sizeofW(StgClosure) + MAX_SMALL_BITMAP_BITS * sizeofW(StgWord),
                w, &create_any_ret_small_prims_frame);
 }
 
-StgStack *any_ret_big_closures_frame(Capability *cap, StgWord w) {
-  return NULL; // TODO: Implement
-  //  return setup(sizeofW(StgClosure) + sizeofW(StgClosurePtr), w,
-  //               &create_any_ret_closures_closure_frame);
+StgStack *any_ret_big_closures_min_frame(Capability *cap, StgWord w) {
+  return setup(cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgClosure), w,
+               &create_any_ret_big_closures_min_frame);
 }
 
 StgStack *any_ret_big_prims_min_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + 59 * sizeofW(StgWord), w,
+  return setup(cap, sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgWord), w,
                &create_any_ret_big_prims_min_frame);
 }
 

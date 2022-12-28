@@ -45,12 +45,39 @@ foreign import prim "any_ret_small_closures_framezh" any_ret_small_closures_fram
 
 foreign import prim "any_ret_big_prims_min_framezh" any_ret_big_prims_min_frame# :: SetupFunction
 
-foreign import prim "any_ret_big_closures_framezh" any_ret_big_closures_frame# :: SetupFunction
+foreign import prim "any_ret_big_closures_min_framezh" any_ret_big_closures_min_frame# :: SetupFunction
 
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
 
+{-
+__Test stategy:__
+
+- Create @StgStack@s in C that contain two closures (as they are on stack they
+may also be called "frames"). A stop frame and the frame which's decoding should
+be tested.
+
+- Cmm primops are used to get `StackSnapshot#` values. (This detour ensures that
+the closures are referenced by `StackSnapshot#` and not garbage collected right
+away.)
+
+- These can then be decoded and checked.
+
+This strategy may look pretty complex for a test. But, it can provide very
+specific corner cases that would be hard to (reliably!) produce in Haskell.
+
+N.B. `StackSnapshots` are managed by the garbage collector. This isn't much of
+an issue regarding the test data, as it's already very terse. However, it's
+important to know that the GC may rewrite parts of the stack and that the stack
+must be sound (otherwise, the GC may fail badly.)
+
+The decission to make `StackSnapshots`s (and their closures) being managed by the
+GC isn't accidential. It's closer to the reality of decoding stacks.
+
+N.B. the test data stack are only meant be de decoded. They are not executable
+(the result would likely be a crash or non-sense.)
+-}
 main :: HasCallStack => IO ()
 main = do
   traceM "test any_update_frame#"
@@ -137,12 +164,31 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1..59]
       e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_big_prims_min_frame# 1## $
+    \case
+      RetBig {..} -> do
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) 59
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertEqual wds [1..59]
+      e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_big_closures_min_frame# 1## $
+    \case
+      RetBig {..} -> do
+        pCs <- mapM getBoxedClosureData payload
+        assertEqual (length pCs) 59
+        let wds = map getWordFromConstr01 pCs
+        assertEqual wds [1..59]
+      e -> error $ "Wrong closure type: " ++ show e
 
 type SetupFunction = Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
 test :: HasCallStack => SetupFunction -> Word# -> (Closure -> IO ()) -> IO ()
 test setup w assertion = do
   sn <- getStackSnapshot setup w
+  -- Run garbage collection now, to prevent later surprises: It's hard to debug
+  -- when the GC suddenly does it's work and there were bad closures or pointers.
+  -- Better fail early, here.
   performGC
   stack <- decodeStack' sn
   assertStackInvariants sn stack
@@ -157,6 +203,10 @@ test setup w assertion = do
 
   assertion $ head stack
 
+-- | Get a `StackSnapshot` from test setup
+--
+-- This function mostly resembles `cloneStack`. Though, it doesn't clone, but
+-- just pulls a @StgStack@ from RTS to Haskell land.
 getStackSnapshot :: SetupFunction -> Word# -> IO StackSnapshot
 getStackSnapshot action# w# = IO $ \s ->
    case action# w# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
