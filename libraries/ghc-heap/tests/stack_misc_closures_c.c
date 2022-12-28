@@ -114,45 +114,16 @@ void create_any_ret_small_prims_frame(Capability *cap, StgStack *stack,
   }
 }
 
-RTS_RET(test_big_ret_n);
-void create_any_ret_big_prim_frame(Capability *cap, StgStack *stack,
+RTS_RET(test_big_ret_min_n);
+void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
                                       StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
-  SET_HDR(c, &test_big_ret_n_info, CCS_SYSTEM);
-  c->payload[0] = (StgClosure *)w;
-  debugBelch("Yolo size %lu\n", GET_LARGE_BITMAP(get_itbl(c))->size);
-  debugBelch("Yolo bitmap %lu\n", GET_LARGE_BITMAP(get_itbl(c))->bitmap[0]);
-}
+  SET_HDR(c, &test_big_ret_min_n_info, CCS_SYSTEM);
 
-void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
-                                    StgWord w) {
-  StgClosure *c = (StgClosure *)stack->sp;
-  StgWord bitmapCount = 1;
-  StgWord memSizeInfo = sizeofW(StgRetInfoTable);
-  StgWord memSizeBitmap =
-      sizeofW(StgLargeBitmap) + bitmapCount * sizeofW(StgWord);
-  StgRetInfoTable *info = allocate(cap, memSizeInfo);
-  memset(info, 0, WDS(memSizeInfo));
-  StgLargeBitmap *largeBitmap = allocate(cap, memSizeBitmap);
-  memset(largeBitmap, 0, WDS(memSizeBitmap));
-  info->i.type = RET_BIG;
-#if !defined(TABLES_NEXT_TO_CODE)
-  info->i.layout.large_bitmap =
-      largeBitmap; /* pointer to large bitmap structure */
-  SET_HDR(c, info, CCS_SYSTEM);
-#else
-  info->i.layout.large_bitmap_offset =
-      ((StgWord)largeBitmap) - ((StgWord)(info + 1));
-  SET_HDR(c, (StgInfoTable *)info + 1, CCS_SYSTEM);
-#endif
-  largeBitmap->size = 1;
-  largeBitmap->bitmap[0] = 1;
-  StgClosure *payload = UNTAG_CLOSURE(rts_mkWord(cap, w));
-  c->payload[0] = (StgClosure *)w;
-
-  debugBelch("Yooo itbl : %us\n", get_itbl(c)->type);
-  debugBelch("Yooo bitmap size : %ul\n", GET_LARGE_BITMAP(get_itbl(c))->size);
-  printStack(stack);
+  for(int i = 0; i < MAX_SMALL_BITMAP_BITS + 1; i++){
+    c->payload[i] = (StgClosure *)w;
+    w++;
+  }
 }
 
 void checkSTACK (StgStack *stack);
@@ -227,13 +198,8 @@ StgStack *any_ret_big_closures_frame(Capability *cap, StgWord w) {
   //               &create_any_ret_closures_closure_frame);
 }
 
-StgStack *any_ret_big_prim_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + 59 * sizeofW(StgWord), w,
-               &create_any_ret_big_prim_frame);
-}
-
 StgStack *any_ret_big_prims_frame(Capability *cap, StgWord w) {
-  return setup(cap, sizeofW(StgClosure) + sizeofW(StgWord), w,
+  return setup(cap, sizeofW(StgClosure) + 59 * sizeofW(StgWord), w,
                &create_any_ret_big_prims_frame);
 }
 

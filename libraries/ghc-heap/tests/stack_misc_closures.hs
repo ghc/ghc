@@ -45,8 +45,6 @@ foreign import prim "any_ret_small_closures_framezh" any_ret_small_closures_fram
 
 foreign import prim "any_ret_big_prims_framezh" any_ret_big_prims_frame# :: SetupFunction
 
-foreign import prim "any_ret_big_prim_framezh" any_ret_big_prim_frame# :: SetupFunction
-
 foreign import prim "any_ret_big_closures_framezh" any_ret_big_closures_frame# :: SetupFunction
 
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
@@ -135,12 +133,13 @@ main = do
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "test any_ret_big_prim_frame#"
-  test any_ret_big_prim_frame# 52## $
+  test any_ret_big_prims_frame# 1## $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
-        assertUnknownTypeWordSizedPrimitive 52 (head pCs)
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertEqual wds [1..59]
       e -> error $ "Wrong closure type: " ++ show e
 
 type SetupFunction = Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)

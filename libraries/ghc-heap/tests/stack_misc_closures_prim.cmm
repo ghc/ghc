@@ -60,12 +60,6 @@ any_ret_big_prims_framezh(W_ w){
     return (stack);
 }
 
-any_ret_big_prim_framezh(W_ w){
-    P_ stack;
-    (stack) = ccall any_ret_big_prim_frame(MyCapability() "ptr", w);
-    return (stack);
-}
-
 any_ret_big_closures_framezh(W_ w){
     P_ stack;
     (stack) = ccall any_ret_big_closures_frame(MyCapability() "ptr", w);
@@ -112,13 +106,20 @@ W_ n51, W_ n52, W_ n53, W_ n54, W_ n55, W_ n56, W_ n57, W_ n58
     return ();
 }
 
-INFO_TABLE_RET ( test_big_ret_n, RET_BIG, W_ info_ptr,
+// Size of this large bitmap closure is: max size of small bitmap + 1
+INFO_TABLE_RET ( test_big_ret_min_n, RET_BIG, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
+W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
+W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27, W_ n28
+#elif SIZEOF_VOID_P == 8
 W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
 W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
 W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27, W_ n28, W_ n29, W_ n30,
 W_ n31, W_ n32, W_ n33, W_ n34, W_ n35, W_ n36, W_ n37, W_ n38, W_ n39, W_ n40,
 W_ n41, W_ n42, W_ n43, W_ n44, W_ n45, W_ n46, W_ n47, W_ n48, W_ n49, W_ n50,
 W_ n51, W_ n52, W_ n53, W_ n54, W_ n55, W_ n56, W_ n57, W_ n58, W_ n59
+#endif
 )
     return (/* no return values */)
 {
