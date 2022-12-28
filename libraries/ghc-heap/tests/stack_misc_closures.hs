@@ -43,7 +43,7 @@ foreign import prim "any_ret_small_closure_framezh" any_ret_small_closure_frame#
 
 foreign import prim "any_ret_small_closures_framezh" any_ret_small_closures_frame# :: SetupFunction
 
-foreign import prim "any_ret_big_prims_framezh" any_ret_big_prims_frame# :: SetupFunction
+foreign import prim "any_ret_big_prims_min_framezh" any_ret_big_prims_min_frame# :: SetupFunction
 
 foreign import prim "any_ret_big_closures_framezh" any_ret_big_closures_frame# :: SetupFunction
 
@@ -115,8 +115,6 @@ main = do
         assertEqual knownRetSmallType None
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
-        assertConstrClosure 1 (head pCs)
-        assertConstrClosure 58 (last pCs)
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
@@ -127,13 +125,11 @@ main = do
         assertEqual knownRetSmallType None
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
-        assertUnknownTypeWordSizedPrimitive 1 (head pCs)
-        assertUnknownTypeWordSizedPrimitive 58 (last pCs)
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1..58]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "test any_ret_big_prim_frame#"
-  test any_ret_big_prims_frame# 1## $
+  test any_ret_big_prims_min_frame# 1## $
     \case
       RetBig {..} -> do
         pCs <- mapM getBoxedClosureData payload

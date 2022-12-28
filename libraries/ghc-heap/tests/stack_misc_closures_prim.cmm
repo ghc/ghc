@@ -54,9 +54,9 @@ any_ret_small_closures_framezh(W_ w){
     return (stack);
 }
 
-any_ret_big_prims_framezh(W_ w){
+any_ret_big_prims_min_framezh(W_ w){
     P_ stack;
-    (stack) = ccall any_ret_big_prims_frame(MyCapability() "ptr", w);
+    (stack) = ccall any_ret_big_prims_min_frame(MyCapability() "ptr", w);
     return (stack);
 }
 

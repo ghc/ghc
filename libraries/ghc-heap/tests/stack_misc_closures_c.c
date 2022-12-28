@@ -115,7 +115,7 @@ void create_any_ret_small_prims_frame(Capability *cap, StgStack *stack,
 }
 
 RTS_RET(test_big_ret_min_n);
-void create_any_ret_big_prims_frame(Capability *cap, StgStack *stack,
+void create_any_ret_big_prims_min_frame(Capability *cap, StgStack *stack,
                                       StgWord w) {
   StgClosure *c = (StgClosure *)stack->sp;
   SET_HDR(c, &test_big_ret_min_n_info, CCS_SYSTEM);
@@ -198,9 +198,9 @@ StgStack *any_ret_big_closures_frame(Capability *cap, StgWord w) {
   //               &create_any_ret_closures_closure_frame);
 }
 
-StgStack *any_ret_big_prims_frame(Capability *cap, StgWord w) {
+StgStack *any_ret_big_prims_min_frame(Capability *cap, StgWord w) {
   return setup(cap, sizeofW(StgClosure) + 59 * sizeofW(StgWord), w,
-               &create_any_ret_big_prims_frame);
+               &create_any_ret_big_prims_min_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }
