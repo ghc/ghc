@@ -24,7 +24,14 @@
        { Test20239.hs:7:34-63 })))
     (EpaCommentsBalanced
      []
-     []))
+     [(L
+       (Anchor
+        { Test20239.hs:7:34-63 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaLineComment
+         "-- ^ Run any arbitrary IO code")
+        { Test20239.hs:6:86 }))]))
    (VirtualBraces
     (1))
    (Nothing)
@@ -50,15 +57,7 @@
                     (EpaComment
                      (EpaLineComment
                       "-- | Leading Haddock Comment")
-                     { Test20239.hs:1:18-22 }))
-                  ,(L
-                    (Anchor
-                     { Test20239.hs:7:34-63 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- ^ Run any arbitrary IO code")
-                     { Test20239.hs:6:86 }))])) { Test20239.hs:(4,1)-(6,86) })
+                     { Test20239.hs:1:18-22 }))])) { Test20239.hs:(4,1)-(6,86) })
     (InstD
      (NoExtField)
      (DataFamInstD
