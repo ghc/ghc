@@ -1,0 +1,668 @@
+
+(L
+ { 1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (EpaSpan { 1:1 })
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { 2:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { 2:28-32 }))]
+     (AnnList
+      (Nothing)
+      (Just
+       (AddEpAnn AnnOpenC (EpaSpan { 4:1 })))
+      (Just
+       (AddEpAnn AnnCloseC (EpaSpan { 17:1 })))
+      []
+      [])
+     (Just
+      ((,)
+       { 18:1 }
+       { 17:1 })))
+    (EpaComments
+     [(L
+       (EpaSpan { 1:1-30 })
+       (EpaComment
+        (EpaBlockComment
+         "{-# LANGUAGE TypeOperators #-}")
+        { 1:1 }))]))
+   (ExplicitBraces
+    (L
+     (TokenLoc
+      (EpaSpan { 4:1 }))
+     (HsTok))
+    (L
+     (TokenLoc
+      (EpaSpan { 17:1 }))
+     (HsTok)))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { 2:8-20 })
+    {ModuleName: AnnotationLet}))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { 2:22-26 })
+                 (AnnList
+                  (Nothing)
+                  (Just
+                   (AddEpAnn AnnOpenP (EpaSpan { 2:22 })))
+                  (Just
+                   (AddEpAnn AnnCloseP (EpaSpan { 2:26 })))
+                  []
+                  [])
+                 (EpaComments
+                  [])) { 2:22-26 })
+    [(L
+      (SrcSpanAnn (EpAnnNotUsed) { 2:23-25 })
+      (IEVar
+       (NoExtField)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { 2:23-25 })
+        (IEName
+         (NoExtField)
+         (L
+          (SrcSpanAnn (EpAnnNotUsed) { 2:23-25 })
+          (Unqual
+           {OccName: foo}))))))]))
+  [(L
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { 5:1-32 })
+                 (AnnListItem
+                  [(AddSemiAnn
+                    (EpaSpan { 6:1 }))])
+                 (EpaComments
+                  [])) { 5:1-32 })
+    (ImportDecl
+     (XImportDeclPass
+      (EpAnn
+       (EpaSpan { 5:1-6 })
+       (EpAnnImportDecl
+        (EpaSpan { 5:1-6 })
+        (Nothing)
+        (Nothing)
+        (Just
+         (EpaSpan { 5:8-16 }))
+        (Nothing)
+        (Just
+         (EpaSpan { 5:28-29 })))
+       (EpaComments
+        []))
+      (NoSourceText)
+      (False))
+     (L
+      (SrcSpanAnn (EpAnnNotUsed) { 5:18-26 })
+      {ModuleName: Data.List})
+     (NoRawPkgQual)
+     (NotBoot)
+     (False)
+     (QualifiedPre)
+     (Just
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { 5:31-32 })
+       {ModuleName: DL}))
+     (Nothing)))]
+  [(L
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { (7,1)-(11,12) })
+                 (AnnListItem
+                  [(AddSemiAnn
+                    (EpaSpan { 12:1 }))])
+                 (EpaComments
+                  [])) { (7,1)-(11,12) })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { 7:1-3 })
+       (Unqual
+        {OccName: foo}))
+      (MG
+       (FromSource)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { (7,1)-(11,12) })
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { (7,1)-(11,12) })
+          (Match
+           (EpAnn
+            (EpaSpan { (7,1)-(11,12) })
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { 7:1-3 })
+             (Unqual
+              {OccName: foo}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { (7,5)-(11,12) })
+              (GRHS
+               (EpAnn
+                (EpaSpan { (7,5)-(11,12) })
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { 7:5 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { (7,7)-(11,12) })
+                (HsLet
+                 (EpAnn
+                  (EpaSpan { (7,7)-(11,12) })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (L
+                  (TokenLoc
+                   (EpaSpan { 7:7-9 }))
+                  (HsTok))
+                 (HsValBinds
+                  (EpAnn
+                   (EpaSpan { (8,9)-(10,13) })
+                   (AnnList
+                    (Just
+                     (EpaSpan { (8,9)-(10,13) }))
+                    (Nothing)
+                    (Nothing)
+                    []
+                    [])
+                   (EpaComments
+                    []))
+                  (ValBinds
+                   (NoAnnSortKey)
+                   {Bag(LocatedA (HsBind GhcPs)):
+                    [(L
+                      (SrcSpanAnn (EpAnn
+                                   (EpaSpan { (8,9)-(9,15) })
+                                   (AnnListItem
+                                    [])
+                                   (EpaComments
+                                    [])) { (8,9)-(9,15) })
+                      (FunBind
+                       (NoExtField)
+                       (L
+                        (SrcSpanAnn (EpAnnNotUsed) { 8:9 })
+                        (Unqual
+                         {OccName: a}))
+                       (MG
+                        (FromSource)
+                        (L
+                         (SrcSpanAnn (EpAnnNotUsed) { (8,9)-(9,15) })
+                         [(L
+                           (SrcSpanAnn (EpAnn
+                                        (EpaSpan { 8:9-15 })
+                                        (AnnListItem
+                                         [])
+                                        (EpaComments
+                                         [])) { 8:9-15 })
+                           (Match
+                            (EpAnn
+                             (EpaSpan { 8:9-15 })
+                             []
+                             (EpaComments
+                              []))
+                            (FunRhs
+                             (L
+                              (SrcSpanAnn (EpAnnNotUsed) { 8:9 })
+                              (Unqual
+                               {OccName: a}))
+                             (Prefix)
+                             (NoSrcStrict))
+                            [(L
+                              (SrcSpanAnn (EpAnnNotUsed) { 8:11 })
+                              (NPat
+                               (EpAnnNotUsed)
+                               (L
+                                (SrcSpanAnn
+                                 (EpAnnNotUsed)
+                                 { 8:11 })
+                                (OverLit
+                                 (NoExtField)
+                                 (HsIntegral
+                                  (IL
+                                   (SourceText 0)
+                                   (False)
+                                   (0)))))
+                               (Nothing)
+                               (NoExtField)))]
+                            (GRHSs
+                             (EpaComments
+                              [])
+                             [(L
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { 8:13-15 })
+                               (GRHS
+                                (EpAnn
+                                 (EpaSpan { 8:13-15 })
+                                 (GrhsAnn
+                                  (Nothing)
+                                  (AddEpAnn AnnEqual (EpaSpan { 8:13 })))
+                                 (EpaComments
+                                  []))
+                                []
+                                (L
+                                 (SrcSpanAnn (EpAnnNotUsed) { 8:15 })
+                                 (HsOverLit
+                                  (EpAnn
+                                   (EpaSpan { 8:15 })
+                                   (NoEpAnns)
+                                   (EpaComments
+                                    []))
+                                  (OverLit
+                                   (NoExtField)
+                                   (HsIntegral
+                                    (IL
+                                     (SourceText 1)
+                                     (False)
+                                     (1))))))))]
+                             (EmptyLocalBinds
+                              (NoExtField)))))
+                         ,(L
+                           (SrcSpanAnn (EpAnn
+                                        (EpaSpan { 9:9-15 })
+                                        (AnnListItem
+                                         [])
+                                        (EpaComments
+                                         [])) { 9:9-15 })
+                           (Match
+                            (EpAnn
+                             (EpaSpan { 9:9-15 })
+                             []
+                             (EpaComments
+                              []))
+                            (FunRhs
+                             (L
+                              (SrcSpanAnn (EpAnnNotUsed) { 9:9 })
+                              (Unqual
+                               {OccName: a}))
+                             (Prefix)
+                             (NoSrcStrict))
+                            [(L
+                              (SrcSpanAnn (EpAnnNotUsed) { 9:11 })
+                              (WildPat
+                               (NoExtField)))]
+                            (GRHSs
+                             (EpaComments
+                              [])
+                             [(L
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { 9:13-15 })
+                               (GRHS
+                                (EpAnn
+                                 (EpaSpan { 9:13-15 })
+                                 (GrhsAnn
+                                  (Nothing)
+                                  (AddEpAnn AnnEqual (EpaSpan { 9:13 })))
+                                 (EpaComments
+                                  []))
+                                []
+                                (L
+                                 (SrcSpanAnn (EpAnnNotUsed) { 9:15 })
+                                 (HsOverLit
+                                  (EpAnn
+                                   (EpaSpan { 9:15 })
+                                   (NoEpAnns)
+                                   (EpaComments
+                                    []))
+                                  (OverLit
+                                   (NoExtField)
+                                   (HsIntegral
+                                    (IL
+                                     (SourceText 2)
+                                     (False)
+                                     (2))))))))]
+                             (EmptyLocalBinds
+                              (NoExtField)))))]))))
+                    ,(L
+                      (SrcSpanAnn (EpAnn
+                                   (EpaSpan { 10:9-13 })
+                                   (AnnListItem
+                                    [])
+                                   (EpaComments
+                                    [])) { 10:9-13 })
+                      (FunBind
+                       (NoExtField)
+                       (L
+                        (SrcSpanAnn (EpAnnNotUsed) { 10:9 })
+                        (Unqual
+                         {OccName: b}))
+                       (MG
+                        (FromSource)
+                        (L
+                         (SrcSpanAnn (EpAnnNotUsed) { 10:9-13 })
+                         [(L
+                           (SrcSpanAnn (EpAnnNotUsed) { 10:9-13 })
+                           (Match
+                            (EpAnn
+                             (EpaSpan { 10:9-13 })
+                             []
+                             (EpaComments
+                              []))
+                            (FunRhs
+                             (L
+                              (SrcSpanAnn (EpAnnNotUsed) { 10:9 })
+                              (Unqual
+                               {OccName: b}))
+                             (Prefix)
+                             (NoSrcStrict))
+                            []
+                            (GRHSs
+                             (EpaComments
+                              [])
+                             [(L
+                               (SrcSpanAnn
+                                (EpAnnNotUsed)
+                                { 10:11-13 })
+                               (GRHS
+                                (EpAnn
+                                 (EpaSpan { 10:11-13 })
+                                 (GrhsAnn
+                                  (Nothing)
+                                  (AddEpAnn AnnEqual (EpaSpan { 10:11 })))
+                                 (EpaComments
+                                  []))
+                                []
+                                (L
+                                 (SrcSpanAnn (EpAnnNotUsed) { 10:13 })
+                                 (HsOverLit
+                                  (EpAnn
+                                   (EpaSpan { 10:13 })
+                                   (NoEpAnns)
+                                   (EpaComments
+                                    []))
+                                  (OverLit
+                                   (NoExtField)
+                                   (HsIntegral
+                                    (IL
+                                     (SourceText 2)
+                                     (False)
+                                     (2))))))))]
+                             (EmptyLocalBinds
+                              (NoExtField)))))]))))]}
+                   []))
+                 (L
+                  (TokenLoc
+                   (EpaSpan { 11:7-8 }))
+                  (HsTok))
+                 (L
+                  (SrcSpanAnn (EpAnnNotUsed) { 11:10-12 })
+                  (HsApp
+                   (EpAnn
+                    (EpaSpan { 11:10-12 })
+                    (NoEpAnns)
+                    (EpaComments
+                     []))
+                   (L
+                    (SrcSpanAnn (EpAnnNotUsed) { 11:10 })
+                    (HsVar
+                     (NoExtField)
+                     (L
+                      (SrcSpanAnn (EpAnnNotUsed) { 11:10 })
+                      (Unqual
+                       {OccName: a}))))
+                   (L
+                    (SrcSpanAnn (EpAnnNotUsed) { 11:12 })
+                    (HsVar
+                     (NoExtField)
+                     (L
+                      (SrcSpanAnn (EpAnnNotUsed) { 11:12 })
+                      (Unqual
+                       {OccName: b}))))))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))
+  ,(L
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { 13:1-10 })
+                 (AnnListItem
+                  [(AddSemiAnn
+                    (EpaSpan { 14:1 }))])
+                 (EpaComments
+                  [])) { 13:1-10 })
+    (SigD
+     (NoExtField)
+     (FixSig
+      (EpAnn
+       (EpaSpan { 13:1-6 })
+       [(AddEpAnn AnnInfix (EpaSpan { 13:1-6 }))
+       ,(AddEpAnn AnnVal (EpaSpan { 13:8 }))]
+       (EpaComments
+        []))
+      (FixitySig
+       (NoExtField)
+       [(L
+         (SrcSpanAnn (EpAnnNotUsed) { 13:10 })
+         (Unqual
+          {OccName: +}))]
+       {Fixity: infixr 8}))))
+  ,(L
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { 15:1-40 })
+                 (AnnListItem
+                  [(AddSemiAnn
+                    (EpaSpan { 16:1 }))])
+                 (EpaComments
+                  [])) { 15:1-40 })
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (EpAnn
+       (EpaSpan { 15:1-40 })
+       [(AddEpAnn AnnData (EpaSpan { 15:1-4 }))
+       ,(AddEpAnn AnnEqual (EpaSpan { 15:18 }))
+       ,(AddEpAnn AnnOpenP (EpaSpan { 15:6 }))
+       ,(AddEpAnn AnnOpenP (EpaSpan { 15:7 }))
+       ,(AddEpAnn AnnCloseP (EpaSpan { 15:13 }))
+       ,(AddEpAnn AnnCloseP (EpaSpan { 15:14 }))]
+       (EpaComments
+        []))
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { 15:10 })
+       (Unqual
+        {OccName: +}))
+      (HsQTvs
+       (NoExtField)
+       [(L
+         (SrcSpanAnn (EpAnnNotUsed) { 15:8 })
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { 15:8 })
+           []
+           (EpaComments
+            []))
+          (())
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { 15:8 })
+           (Unqual
+            {OccName: f}))))
+       ,(L
+         (SrcSpanAnn (EpAnnNotUsed) { 15:12 })
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { 15:12 })
+           []
+           (EpaComments
+            []))
+          (())
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { 15:12 })
+           (Unqual
+            {OccName: g}))))
+       ,(L
+         (SrcSpanAnn (EpAnnNotUsed) { 15:16 })
+         (UserTyVar
+          (EpAnn
+           (EpaSpan { 15:16 })
+           []
+           (EpaComments
+            []))
+          (())
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { 15:16 })
+           (Unqual
+            {OccName: a}))))])
+      (Infix)
+      (HsDataDefn
+       (NoExtField)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       (DataTypeCons
+        (False)
+        [(L
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { 15:20-28 })
+                       (AnnListItem
+                        [(AddVbarAnn
+                          (EpaSpan { 15:30 }))])
+                       (EpaComments
+                        [])) { 15:20-28 })
+          (ConDeclH98
+           (EpAnn
+            (EpaSpan { 15:20-28 })
+            []
+            (EpaComments
+             []))
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { 15:20-22 })
+            (Unqual
+             {OccName: InL}))
+           (False)
+           []
+           (Nothing)
+           (PrefixCon
+            []
+            [(HsScaled
+              (HsLinearArrow
+               (HsPct1
+                (L
+                 (NoTokenLoc)
+                 (HsTok))
+                (L
+                 (NoTokenLoc)
+                 (HsNormalTok))))
+              (L
+               (SrcSpanAnn (EpAnnNotUsed) { 15:24-28 })
+               (HsParTy
+                (EpAnn
+                 (EpaSpan { 15:24 })
+                 (AnnParen
+                  (AnnParens)
+                  (EpaSpan { 15:24 })
+                  (EpaSpan { 15:28 }))
+                 (EpaComments
+                  []))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { 15:25-27 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { 15:25 })
+                   (HsTyVar
+                    (EpAnn
+                     (EpaSpan { 15:25 })
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { 15:25 })
+                     (Unqual
+                      {OccName: f}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { 15:27 })
+                   (HsTyVar
+                    (EpAnn
+                     (EpaSpan { 15:27 })
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { 15:27 })
+                     (Unqual
+                      {OccName: a})))))))))])
+           (Nothing)))
+        ,(L
+          (SrcSpanAnn (EpAnnNotUsed) { 15:32-40 })
+          (ConDeclH98
+           (EpAnn
+            (EpaSpan { 15:32-40 })
+            []
+            (EpaComments
+             []))
+           (L
+            (SrcSpanAnn (EpAnnNotUsed) { 15:32-34 })
+            (Unqual
+             {OccName: InR}))
+           (False)
+           []
+           (Nothing)
+           (PrefixCon
+            []
+            [(HsScaled
+              (HsLinearArrow
+               (HsPct1
+                (L
+                 (NoTokenLoc)
+                 (HsTok))
+                (L
+                 (NoTokenLoc)
+                 (HsNormalTok))))
+              (L
+               (SrcSpanAnn (EpAnnNotUsed) { 15:36-40 })
+               (HsParTy
+                (EpAnn
+                 (EpaSpan { 15:36 })
+                 (AnnParen
+                  (AnnParens)
+                  (EpaSpan { 15:36 })
+                  (EpaSpan { 15:40 }))
+                 (EpaComments
+                  []))
+                (L
+                 (SrcSpanAnn (EpAnnNotUsed) { 15:37-39 })
+                 (HsAppTy
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { 15:37 })
+                   (HsTyVar
+                    (EpAnn
+                     (EpaSpan { 15:37 })
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { 15:37 })
+                     (Unqual
+                      {OccName: g}))))
+                  (L
+                   (SrcSpanAnn (EpAnnNotUsed) { 15:39 })
+                   (HsTyVar
+                    (EpAnn
+                     (EpaSpan { 15:39 })
+                     []
+                     (EpaComments
+                      []))
+                    (NotPromoted)
+                    (L
+                     (SrcSpanAnn (EpAnnNotUsed) { 15:39 })
+                     (Unqual
+                      {OccName: a})))))))))])
+           (Nothing)))])
+       []))))]))
