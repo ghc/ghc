@@ -82,15 +82,7 @@
                     (EpaComment
                      (EpaLineComment
                       "-- comment 2 for foo")
-                     { DumpParsedAstComments.hs:9:1-20 }))
-                  ,(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:15:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- | Haddock comment")
-                     { DumpParsedAstComments.hs:13:3
+                     { DumpParsedAstComments.hs:9:1-20
                         }))])) { DumpParsedAstComments.hs:(11,1)-(13,3) })
     (ValD
      (NoExtField)
@@ -219,7 +211,15 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { DumpParsedAstComments.hs:16:1-23 })
+                  [(L
+                    (Anchor
+                     { DumpParsedAstComments.hs:15:1-20 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- | Haddock comment")
+                     { DumpParsedAstComments.hs:13:3
+                        }))])) { DumpParsedAstComments.hs:16:1-23 })
     (ValD
      (NoExtField)
      (FunBind

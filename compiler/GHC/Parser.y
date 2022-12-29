@@ -1076,8 +1076,10 @@ qcname  :: { LocatedN RdrName }  -- Variable or type constructor
 
 -- One or more semicolons
 semis1  :: { Located [TrailingAnn] }
-semis1  : semis1 ';'  { sLL $1 $> $ if isZeroWidthSpan (gl $2) then (unLoc $1) else (AddSemiAnn (glAA $2) : (unLoc $1)) }
-        | ';'         { sL1 $1 $ msemi $1 }
+semis1  : semis1 ';'  { if isZeroWidthSpan (gl $2) then (sL1 $1 $ unLoc $1) else (sLL $1 $> $ AddSemiAnn (glAA $2) : (unLoc $1)) }
+        | ';'         { case msemi $1 of
+                          [] -> noLoc []
+                          ms -> sL1 $1 $ ms }
 
 -- Zero or more semicolons
 semis   :: { [TrailingAnn] }
