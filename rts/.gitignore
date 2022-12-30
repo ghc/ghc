@@ -18,6 +18,7 @@
 /config.status
 /configure
 
+/external-symbols.list
 /ghcautoconf.h.autoconf.in
 /ghcautoconf.h.autoconf
 /include/ghcautoconf.h

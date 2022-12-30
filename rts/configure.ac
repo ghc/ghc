@@ -55,3 +55,44 @@ cat $srcdir/../mk/config.h ghcautoconf.h.autoconf | sed \
    >> include/ghcautoconf.h
 echo "#endif /* __GHCAUTOCONF_H__ */" >> include/ghcautoconf.h
 ]
+
+dnl ######################################################################
+dnl Generate external symbol flags (-Wl,-u...)
+dnl ######################################################################
+
+dnl See Note [Undefined symbols in the RTS]
+
+[
+symbolExtraDefs=''
+if [[ "$CABAL_FLAG_find_ptr" = 1 ]]; then
+    symbolExtraDefs+=' -DFIND_PTR'
+fi
+
+cat $srcdir/external-symbols.list.in \
+    | "$CC" $symbolExtraDefs -E -P -traditional -Iinclude - -o - \
+    | sed -e '/^ *$/d' \
+    > external-symbols.list \
+    || exit 1
+
+if [[ "$CABAL_FLAG_leading_underscore" = 1 ]]; then
+    sedExpr='s/^(.*)$/  "-Wl,-u,_\1"/'
+else
+    sedExpr='s/^(.*)$/  "-Wl,-u,\1"/'
+fi
+sed -E -e "${sedExpr}" external-symbols.list > external-symbols.flags
+unset sedExpr
+rm -f external-symbols.list
+]
+
+dnl ######################################################################
+dnl Generate build-info
+dnl ######################################################################
+
+[
+cat $srcdir/rts.buildinfo.in \
+    | "$CC" -E -P -traditional - -o - \
+    | sed -e '/^ *$/d' \
+    > rts.buildinfo \
+    || exit 1
+rm -f external-symbols.flags
+]
