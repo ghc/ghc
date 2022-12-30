@@ -4280,8 +4280,8 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf opt_rhs
                   -- based on the size of the optimized core. After all this is what the unfolding
                   -- will optimize to eventually!
                   _other -> do
-                    let rhs_guide = calcUnfoldingGuidance uf_opts (is_top_lvl && is_bottoming) opt_rhs
-                    return (mkCoreUnfolding src is_top_lvl unf_expr' rhs_guide)
+                    -- Otherwise keep as is.
+                    return (mkCoreUnfolding src is_top_lvl unf_expr' guide)
 
                     -- return $ CoreUnfolding { uf_tmpl = unf_expr', uf_src = src, uf_guidance = rhs_guide }
               }
