@@ -40,13 +40,14 @@ offsetStgCatchRetryFrameAltCode :: Int
 offsetStgCatchRetryFrameAltCode = (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
 
 offsetStgRetFunFrameSize :: Int
-offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size) + (#size StgHeader)
+-- StgRetFun has no header, but only a pointer to the info table at the beginning.
+offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size)
 
 offsetStgRetFunFrameFun :: Int
-offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun) + (#size StgHeader)
+offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun)
 
 offsetStgRetFunFramePayload :: Int
-offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload) + (#size StgHeader)
+offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload)
 
 offsetStgRetBCOFrameInstrs :: Int
 offsetStgRetBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)

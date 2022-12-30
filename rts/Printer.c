@@ -739,7 +739,8 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                                  GET_FUN_LARGE_BITMAP(fun_info)->size);
                 break;
             default:
-                printSmallBitmap(spBottom, sp+2,
+                // sp + 3 because the payload's offset is 24
+                printSmallBitmap(spBottom, sp+3,
                                  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
                                  BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
                 break;

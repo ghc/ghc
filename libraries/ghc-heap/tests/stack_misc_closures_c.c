@@ -154,6 +154,24 @@ void create_any_ret_big_closures_two_words_frame(Capability *cap,
   }
 }
 
+RTS_RET(test_ret_fun);
+RTS_RET(test_fun_0_1);
+void create_any_ret_fun_arg_n_prim_frame(Capability *cap, StgStack *stack,
+                                         StgWord w) {
+  StgRetFun *c = (StgRetFun *)stack->sp;
+  c->info = &test_ret_fun_info;
+  StgClosure *f = (StgClosure *)allocate(cap, sizeofW(StgClosure) * sizeofW(StgWord));
+  SET_HDR(f, &test_fun_0_1_info, ccs)
+  c->fun = f;
+  const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
+  c->size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+  // The cast is a lie (w is interpreted as plain Word, not as pointer), but the
+  // memory layout fits.
+  c->payload[0] = (StgClosure *)w;
+  f->payload[0] = (StgClosure *)w;
+  printStack(stack);
+}
+
 void checkSTACK(StgStack *stack);
 StgStack *setup(Capability *cap, StgWord closureSizeWords,
                 void (*f)(Capability *, StgStack *, StgWord)) {
@@ -240,6 +258,11 @@ StgStack *any_ret_big_prims_min_frame(Capability *cap) {
   return setup(cap,
                sizeofW(StgClosure) + MIN_LARGE_BITMAP_BITS * sizeofW(StgWord),
                &create_any_ret_big_prims_min_frame);
+}
+
+StgStack *any_ret_fun_arg_n_prim_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgRetFun) + sizeofW(StgWord),
+               &create_any_ret_fun_arg_n_prim_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }

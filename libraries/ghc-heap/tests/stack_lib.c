@@ -172,24 +172,30 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
       const StgFunInfoTable *fun_info =
           get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
 
+      result = add(result, fun_info->i.type);
+
+      ClosureTypeList *bitmapList;
       switch (fun_info->f.fun_type) {
       case ARG_GEN:
-        foldSmallBitmapToList(spBottom, sp + 2,
-                              BITMAP_BITS(fun_info->f.b.bitmap),
-                              BITMAP_SIZE(fun_info->f.b.bitmap));
+        bitmapList = foldSmallBitmapToList(spBottom, sp + 2,
+                                           BITMAP_BITS(fun_info->f.b.bitmap),
+                                           BITMAP_SIZE(fun_info->f.b.bitmap));
         break;
       case ARG_GEN_BIG: {
-        foldSmallBitmapToList(spBottom, sp + 2, GET_FUN_LARGE_BITMAP(fun_info),
-                              GET_FUN_LARGE_BITMAP(fun_info)->size);
+        bitmapList = foldLargeBitmapToList(
+            spBottom, sp + 2, GET_FUN_LARGE_BITMAP(fun_info),
+            GET_FUN_LARGE_BITMAP(fun_info)->size);
         break;
       }
       default: {
-        foldSmallBitmapToList(spBottom, sp + 2,
-                         BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
-                         BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
+        bitmapList = foldSmallBitmapToList(
+            spBottom, sp + 2,
+            BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
+            BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
         break;
       }
       }
+      result = concat(result, bitmapList);
     }
     default: {
       errorBelch("Unexpected closure type!");

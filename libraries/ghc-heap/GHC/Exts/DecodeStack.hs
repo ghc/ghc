@@ -183,7 +183,8 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " 
           if t == CL.ARG_GEN_BIG then
             decodeLargeBitmap getRetFunLargeBitmap# sfi 2##
           else
-            decodeSmallBitmap getRetFunSmallBitmap# sfi 2##
+            -- TODO: The offsets should be based on DerivedConstants.h
+            decodeSmallBitmap getRetFunSmallBitmap# sfi 3##
         pure $ CL.RetFun t size' fun' payload'
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
