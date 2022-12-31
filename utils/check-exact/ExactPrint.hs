@@ -1448,13 +1448,14 @@ instance ExactPrint (HsModule GhcPs) where
           return (an1, Just m', mdeprec', mexports')
 
 
-    -- Get rid of the balance of the header comments
-    -- cs <- getUnallocatedComments
-    -- flushComments []
 
     let ann_decls = EpAnn (entry an) (am_decls $ anns an0) emptyComments
     (ann_decls', (decls', imports')) <- markAnnList' False ann_decls $ do
       imports' <- markTopLevelList imports
+
+      -- Get rid of the balance of the header comments
+      flushComments []
+
       decls' <- markTopLevelList decls
       -- Need to add trailing comments that may come before the final `}`
       addCommentsA $ getFollowingComments (comments an)

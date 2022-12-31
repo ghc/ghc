@@ -666,8 +666,10 @@ balanceComments' la1 la2 = do
     simpleBreak n (r,_) = r > n
     L (SrcSpanAnn an1 loc1) f = la1
     L (SrcSpanAnn an2 loc2) s = la2
-    anc1 = addCommentOrigDeltas $ epAnnComments an1
-    anc2 = addCommentOrigDeltas $ epAnnComments an2
+    -- anc1 = addCommentOrigDeltas $ epAnnComments an1
+    -- anc2 = addCommentOrigDeltas $ epAnnComments an2
+    anc1 = epAnnComments an1
+    anc2 = epAnnComments an2
 
     cs1s = splitCommentsEnd (anchorFromLocatedA la1) anc1
       `debug` ("balanceComments': (anc1, anc2):" ++ showAst (anc1, anc2))
@@ -941,7 +943,7 @@ insertAt f t decl = do
   -- let oldDecls'' = captureLineSpacing oldDeclsb
           -- `debug` ("oldDecls':" ++ showAst oldDecls')
   r <- replaceDecls t (f decl oldDecls)
-          -- `debug` ("oldDecls'':" ++ showAst oldDecls'')
+          `debug` ("oldDeclsb:" ++ showAst oldDeclsb)
   return r
 
 -- |Insert a declaration at the beginning or end of the subdecls of the given
