@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T15323.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T15323.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T15323.hs:3:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:3:15-19 }))]
@@ -37,9 +35,7 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T15323.hs:(5,1)-(6,54) }
-                  (UnchangedAnchor))
+                 (EpaSpan { T15323.hs:(5,1)-(6,54) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -48,9 +44,7 @@
      (NoExtField)
      (DataDecl
       (EpAnn
-       (Anchor
-        { T15323.hs:(5,1)-(6,54) }
-        (UnchangedAnchor))
+       (EpaSpan { T15323.hs:(5,1)-(6,54) })
        [(AddEpAnn AnnData (EpaSpan { T15323.hs:5:1-4 }))
        ,(AddEpAnn AnnWhere (EpaSpan { T15323.hs:5:21-25 }))]
        (EpaComments
@@ -65,9 +59,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:5:19 })
          (UserTyVar
           (EpAnn
-           (Anchor
-            { T15323.hs:5:19 }
-            (UnchangedAnchor))
+           (EpaSpan { T15323.hs:5:19 })
            []
            (EpaComments
             []))
@@ -88,9 +80,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:5-54 })
           (ConDeclGADT
            (EpAnn
-            (Anchor
-             { T15323.hs:6:5-54 }
-             (UnchangedAnchor))
+            (EpaSpan { T15323.hs:6:5-54 })
             []
             (EpaComments
              []))
@@ -108,9 +98,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:20-54 })
             (HsOuterExplicit
              (EpAnn
-              (Anchor
-               { T15323.hs:6:20-25 }
-               (UnchangedAnchor))
+              (EpaSpan { T15323.hs:6:20-25 })
               ((,)
                (AddEpAnn AnnForall (EpaSpan { T15323.hs:6:20-25 }))
                (AddEpAnn AnnDot (EpaSpan { T15323.hs:6:29 })))
@@ -120,9 +108,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:27 })
                (UserTyVar
                 (EpAnn
-                 (Anchor
-                  { T15323.hs:6:27 }
-                  (UnchangedAnchor))
+                 (EpaSpan { T15323.hs:6:27 })
                  []
                  (EpaComments
                   []))
@@ -134,9 +120,7 @@
            (Just
             (L
              (SrcSpanAnn (EpAnn
-                          (Anchor
-                           { T15323.hs:6:31-36 }
-                           (UnchangedAnchor))
+                          (EpaSpan { T15323.hs:6:31-36 })
                           (AnnContext
                            (Just
                             ((,)
@@ -150,9 +134,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:31-36 })
                (HsParTy
                 (EpAnn
-                 (Anchor
-                  { T15323.hs:6:31 }
-                  (UnchangedAnchor))
+                 (EpaSpan { T15323.hs:6:31 })
                  (AnnParen
                   (AnnParens)
                   (EpaSpan { T15323.hs:6:31 })
@@ -167,9 +149,7 @@
                    (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:32-33 })
                    (HsTyVar
                     (EpAnn
-                     (Anchor
-                      { T15323.hs:6:32-33 }
-                      (UnchangedAnchor))
+                     (EpaSpan { T15323.hs:6:32-33 })
                      []
                      (EpaComments
                       []))
@@ -182,9 +162,7 @@
                    (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:35 })
                    (HsTyVar
                     (EpAnn
-                     (Anchor
-                      { T15323.hs:6:35 }
-                      (UnchangedAnchor))
+                     (EpaSpan { T15323.hs:6:35 })
                      []
                      (EpaComments
                       []))
@@ -203,9 +181,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:41-52 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { T15323.hs:6:41-52 }
-                 (UnchangedAnchor))
+                (EpaSpan { T15323.hs:6:41-52 })
                 []
                 (EpaComments
                  []))
@@ -218,9 +194,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { T15323.hs:6:54 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { T15323.hs:6:54 }
-                 (UnchangedAnchor))
+                (EpaSpan { T15323.hs:6:54 })
                 []
                 (EpaComments
                  []))
@@ -231,5 +205,3 @@
                  {OccName: v}))))))
            (Nothing)))])
        []))))]))
-
-

@@ -483,7 +483,7 @@ hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 showAst :: (Data a) => a -> String
 showAst ast
   = showSDocUnsafe
-    $ showAstData NoBlankSrcSpan NoBlankEpAnnotations ast
+    $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 -- ---------------------------------------------------------------------
 -- Putting these here for the time being, to avoid import loops

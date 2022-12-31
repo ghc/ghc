@@ -14,9 +14,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { T14189.hs:6:1-42 }
-                     (UnchangedAnchor))
+                    (EpaSpan { T14189.hs:6:1-42 })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -42,9 +40,7 @@
           (False)
           [(L
             (SrcSpanAnn (EpAnn
-                         (Anchor
-                          { T14189.hs:6:15-20 }
-                          (UnchangedAnchor))
+                         (EpaSpan { T14189.hs:6:15-20 })
                          (AnnListItem
                           [(AddVbarAnn
                             (EpaSpan { T14189.hs:6:22 }))])
@@ -80,9 +76,7 @@
              (Nothing)))
           ,(L
             (SrcSpanAnn (EpAnn
-                         (Anchor
-                          { T14189.hs:6:24-25 }
-                          (UnchangedAnchor))
+                         (EpaSpan { T14189.hs:6:24-25 })
                          (AnnListItem
                           [(AddVbarAnn
                             (EpaSpan { T14189.hs:6:27 }))])
@@ -113,14 +107,10 @@
              (RecCon
               (L
                (SrcSpanAnn (EpAnn
-                            (Anchor
-                             { T14189.hs:6:31 }
-                             (UnchangedAnchor))
+                            (EpaSpan { T14189.hs:6:31 })
                             (AnnList
                              (Just
-                              (Anchor
-                               { T14189.hs:6:33-40 }
-                               (UnchangedAnchor)))
+                              (EpaSpan { T14189.hs:6:33-40 }))
                              (Just
                               (AddEpAnn AnnOpenC (EpaSpan { T14189.hs:6:31 })))
                              (Just
@@ -223,5 +213,3 @@
           (FieldSelectors)
           {Name: T14189.f}))])])])
   (Nothing)))
-
-

@@ -375,7 +375,9 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
 
   let mflush = when (flush == FlushComments) $ do
         debugM $ "flushing comments in enterAnn:" ++ showAst cs
-        flushComments (getFollowingComments cs)
+        -- Already added via HsModule ExactPrint instance
+        -- flushComments (getFollowingComments cs)
+        flushComments []
 
   advance edp
   a' <- exact a
@@ -1448,12 +1450,14 @@ instance ExactPrint (HsModule GhcPs) where
 
     -- Get rid of the balance of the header comments
     -- cs <- getUnallocatedComments
-    flushComments []
+    -- flushComments []
 
     let ann_decls = EpAnn (entry an) (am_decls $ anns an0) emptyComments
     (ann_decls', (decls', imports')) <- markAnnList' False ann_decls $ do
       imports' <- markTopLevelList imports
       decls' <- markTopLevelList decls
+      -- Need to add trailing comments that may come before the final `}`
+      addCommentsA $ getFollowingComments (comments an)
       return (decls', imports')
     let am_decls' = case ann_decls' of
           EpAnnNotUsed -> (am_decls $ anns an0)

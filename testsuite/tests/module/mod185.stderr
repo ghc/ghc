@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { mod185.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { mod185.hs:1:1 })
     (AnnsModule
      []
      (AnnList
@@ -35,9 +33,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (Anchor
-        { mod185.hs:3:1-6 }
-        (UnchangedAnchor))
+       (EpaSpan { mod185.hs:3:1-6 })
        (EpAnnImportDecl
         (EpaSpan { mod185.hs:3:1-6 })
         (Nothing)
@@ -61,9 +57,7 @@
      (Nothing)))]
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { mod185.hs:5:1-24 }
-                  (UnchangedAnchor))
+                 (EpaSpan { mod185.hs:5:1-24 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -84,9 +78,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { mod185.hs:5:1-24 })
           (Match
            (EpAnn
-            (Anchor
-             { mod185.hs:5:1-24 }
-             (UnchangedAnchor))
+            (EpaSpan { mod185.hs:5:1-24 })
             []
             (EpaComments
              []))
@@ -107,9 +99,7 @@
                { mod185.hs:5:6-24 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { mod185.hs:5:6-24 }
-                 (UnchangedAnchor))
+                (EpaSpan { mod185.hs:5:6-24 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { mod185.hs:5:6 })))

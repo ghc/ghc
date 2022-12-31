@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { KindSigs.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { KindSigs.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
@@ -39,9 +37,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (Anchor
-        { KindSigs.hs:8:1-6 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:8:1-6 })
        (EpAnnImportDecl
         (EpaSpan { KindSigs.hs:8:1-6 })
         (Nothing)
@@ -64,9 +60,7 @@
      (Nothing)))]
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:(11,1)-(12,21) }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:(11,1)-(12,21) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -77,9 +71,7 @@
       (NoExtField)
       (FamilyDecl
        (EpAnn
-        (Anchor
-         { KindSigs.hs:(11,1)-(12,21) }
-         (UnchangedAnchor))
+        (EpaSpan { KindSigs.hs:(11,1)-(12,21) })
         [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:11:1-4 }))
         ,(AddEpAnn AnnFamily (EpaSpan { KindSigs.hs:11:6-11 }))
         ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:11:19-23 }))]
@@ -91,9 +83,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:12:3-21 })
            (FamEqn
             (EpAnn
-             (Anchor
-              { KindSigs.hs:12:3-21 }
-              (UnchangedAnchor))
+             (EpaSpan { KindSigs.hs:12:3-21 })
              [(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:12:9 }))]
              (EpaComments
               []))
@@ -108,9 +98,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:12:7 })
                (HsTyVar
                 (EpAnn
-                 (Anchor
-                  { KindSigs.hs:12:7 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:12:7 })
                  []
                  (EpaComments
                   []))
@@ -124,9 +112,7 @@
              (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:12:11-21 })
              (HsKindSig
               (EpAnn
-               (Anchor
-                { KindSigs.hs:12:11-13 }
-                (UnchangedAnchor))
+               (EpaSpan { KindSigs.hs:12:11-13 })
                [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:12:15-16 }))]
                (EpaComments
                 []))
@@ -134,9 +120,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:12:11-13 })
                (HsTyVar
                 (EpAnn
-                 (Anchor
-                  { KindSigs.hs:12:11-13 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:12:11-13 })
                  []
                  (EpaComments
                   []))
@@ -149,9 +133,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:12:18-21 })
                (HsTyVar
                 (EpAnn
-                 (Anchor
-                  { KindSigs.hs:12:18-21 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:12:18-21 })
                  []
                  (EpaComments
                   []))
@@ -171,9 +153,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:11:17 })
           (UserTyVar
            (EpAnn
-            (Anchor
-             { KindSigs.hs:11:17 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:11:17 })
             []
             (EpaComments
              []))
@@ -192,9 +172,7 @@
        (Nothing)))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:15:1-51 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:15:1-51 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -203,9 +181,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:15:1-51 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:15:1-51 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:15:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:15:12 }))]
        (EpaComments
@@ -220,9 +196,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:10 })
          (UserTyVar
           (EpAnn
-           (Anchor
-            { KindSigs.hs:15:10 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:15:10 })
            []
            (EpaComments
             []))
@@ -236,9 +210,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:14-51 })
        (HsTupleTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:15:14 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:15:14 })
          (AnnParen
           (AnnParens)
           (EpaSpan { KindSigs.hs:15:14 })
@@ -248,9 +220,7 @@
         (HsBoxedOrConstraintTuple)
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:15:16-26 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:15:16-26 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:15:27 }))])
@@ -258,9 +228,7 @@
                         [])) { KindSigs.hs:15:16-26 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:15:16-18 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:15:16-18 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:15:20-21 }))]
             (EpaComments
              []))
@@ -268,9 +236,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:16-18 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:15:16-18 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:15:16-18 })
               []
               (EpaComments
                []))
@@ -283,9 +249,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:23-26 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:15:23-26 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:15:23-26 })
               []
               (EpaComments
                []))
@@ -296,9 +260,7 @@
                {OccName: Type}))))))
         ,(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:15:29-32 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:15:29-32 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:15:33 }))])
@@ -306,9 +268,7 @@
                         [])) { KindSigs.hs:15:29-32 })
           (HsTyVar
            (EpAnn
-            (Anchor
-             { KindSigs.hs:15:29-32 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:15:29-32 })
             []
             (EpaComments
              []))
@@ -321,9 +281,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:35-49 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:15:35-41 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:15:35-41 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:15:43-44 }))]
             (EpaComments
              []))
@@ -335,9 +293,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:35-39 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:15:35-39 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:15:35-39 })
                 []
                 (EpaComments
                  []))
@@ -350,9 +306,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:41 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:15:41 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:15:41 })
                 []
                 (EpaComments
                  []))
@@ -365,9 +319,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:15:46-49 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:15:46-49 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:15:46-49 })
               []
               (EpaComments
                []))
@@ -378,9 +330,7 @@
                {OccName: Type}))))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:16:1-54 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:16:1-54 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -389,9 +339,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:16:1-54 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:16:1-54 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:16:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:16:13 }))]
        (EpaComments
@@ -406,9 +354,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:11 })
          (UserTyVar
           (EpAnn
-           (Anchor
-            { KindSigs.hs:16:11 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:16:11 })
            []
            (EpaComments
             []))
@@ -422,9 +368,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:15-54 })
        (HsTupleTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:16:15-16 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:16:15-16 })
          (AnnParen
           (AnnParensHash)
           (EpaSpan { KindSigs.hs:16:15-16 })
@@ -434,9 +378,7 @@
         (HsUnboxedTuple)
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:16:18-28 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:16:18-28 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:16:29 }))])
@@ -444,9 +386,7 @@
                         [])) { KindSigs.hs:16:18-28 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:16:18-20 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:16:18-20 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:16:22-23 }))]
             (EpaComments
              []))
@@ -454,9 +394,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:18-20 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:16:18-20 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:16:18-20 })
               []
               (EpaComments
                []))
@@ -469,9 +407,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:25-28 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:16:25-28 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:16:25-28 })
               []
               (EpaComments
                []))
@@ -482,9 +418,7 @@
                {OccName: Type}))))))
         ,(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:16:31-34 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:16:31-34 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:16:35 }))])
@@ -492,9 +426,7 @@
                         [])) { KindSigs.hs:16:31-34 })
           (HsTyVar
            (EpAnn
-            (Anchor
-             { KindSigs.hs:16:31-34 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:16:31-34 })
             []
             (EpaComments
              []))
@@ -507,9 +439,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:37-51 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:16:37-43 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:16:37-43 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:16:45-46 }))]
             (EpaComments
              []))
@@ -521,9 +451,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:37-41 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:16:37-41 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:16:37-41 })
                 []
                 (EpaComments
                  []))
@@ -536,9 +464,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:43 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:16:43 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:16:43 })
                 []
                 (EpaComments
                  []))
@@ -551,9 +477,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:16:48-51 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:16:48-51 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:16:48-51 })
               []
               (EpaComments
                []))
@@ -564,9 +488,7 @@
                {OccName: Type}))))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:19:1-26 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:19:1-26 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -575,9 +497,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:19:1-26 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:19:1-26 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:19:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:19:10 }))]
        (EpaComments
@@ -594,9 +514,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:19:12-26 })
        (HsListTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:19:12 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:19:12 })
          (AnnParen
           (AnnParensSquare)
           (EpaSpan { KindSigs.hs:19:12 })
@@ -607,9 +525,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:19:14-24 })
          (HsKindSig
           (EpAnn
-           (Anchor
-            { KindSigs.hs:19:14-16 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:19:14-16 })
            [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:19:18-19 }))]
            (EpaComments
             []))
@@ -617,9 +533,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:19:14-16 })
            (HsTyVar
             (EpAnn
-             (Anchor
-              { KindSigs.hs:19:14-16 }
-              (UnchangedAnchor))
+             (EpaSpan { KindSigs.hs:19:14-16 })
              []
              (EpaComments
               []))
@@ -632,9 +546,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:19:21-24 })
            (HsTyVar
             (EpAnn
-             (Anchor
-              { KindSigs.hs:19:21-24 }
-              (UnchangedAnchor))
+             (EpaSpan { KindSigs.hs:19:21-24 })
              []
              (EpaComments
               []))
@@ -645,9 +557,7 @@
               {OccName: Type})))))))))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:22:1-44 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:22:1-44 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -656,9 +566,7 @@
      (NoExtField)
      (TypeSig
       (EpAnn
-       (Anchor
-        { KindSigs.hs:22:1-3 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:22:1-3 })
        (AnnSig
         (AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:5-6 }))
         [])
@@ -680,9 +588,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:8-44 })
           (HsFunTy
            (EpAnn
-            (Anchor
-             { KindSigs.hs:22:8-20 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:22:8-20 })
             (NoEpAnns)
             (EpaComments
              []))
@@ -695,9 +601,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:8-20 })
             (HsParTy
              (EpAnn
-              (Anchor
-               { KindSigs.hs:22:8 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:22:8 })
               (AnnParen
                (AnnParens)
                (EpaSpan { KindSigs.hs:22:8 })
@@ -708,9 +612,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:9-19 })
               (HsKindSig
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:22:9-11 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:22:9-11 })
                 [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:13-14 }))]
                 (EpaComments
                  []))
@@ -718,9 +620,7 @@
                 (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:9-11 })
                 (HsTyVar
                  (EpAnn
-                  (Anchor
-                   { KindSigs.hs:22:9-11 }
-                   (UnchangedAnchor))
+                  (EpaSpan { KindSigs.hs:22:9-11 })
                   []
                   (EpaComments
                    []))
@@ -733,9 +633,7 @@
                 (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:16-19 })
                 (HsTyVar
                  (EpAnn
-                  (Anchor
-                   { KindSigs.hs:22:16-19 }
-                   (UnchangedAnchor))
+                  (EpaSpan { KindSigs.hs:22:16-19 })
                   []
                   (EpaComments
                    []))
@@ -748,9 +646,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:25-44 })
             (HsFunTy
              (EpAnn
-              (Anchor
-               { KindSigs.hs:22:25-28 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:22:25-28 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -763,9 +659,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:25-28 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:22:25-28 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:22:25-28 })
                 []
                 (EpaComments
                  []))
@@ -778,9 +672,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:33-44 })
               (HsParTy
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:22:33 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:22:33 })
                 (AnnParen
                  (AnnParens)
                  (EpaSpan { KindSigs.hs:22:33 })
@@ -791,9 +683,7 @@
                 (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:34-43 })
                 (HsKindSig
                  (EpAnn
-                  (Anchor
-                   { KindSigs.hs:22:34-35 }
-                   (UnchangedAnchor))
+                  (EpaSpan { KindSigs.hs:22:34-35 })
                   [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:22:37-38 }))]
                   (EpaComments
                    []))
@@ -801,9 +691,7 @@
                   (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:34-35 })
                   (HsTupleTy
                    (EpAnn
-                    (Anchor
-                     { KindSigs.hs:22:34 }
-                     (UnchangedAnchor))
+                    (EpaSpan { KindSigs.hs:22:34 })
                     (AnnParen
                      (AnnParens)
                      (EpaSpan { KindSigs.hs:22:34 })
@@ -816,9 +704,7 @@
                   (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:22:40-43 })
                   (HsTyVar
                    (EpAnn
-                    (Anchor
-                     { KindSigs.hs:22:40-43 }
-                     (UnchangedAnchor))
+                    (EpaSpan { KindSigs.hs:22:40-43 })
                     []
                     (EpaComments
                      []))
@@ -829,9 +715,7 @@
                      {OccName: Type}))))))))))))))))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:23:1-12 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:23:1-12 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -850,18 +734,14 @@
         (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:23:1-12 })
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:23:1-12 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:23:1-12 })
                        (AnnListItem
                         [])
                        (EpaComments
                         [])) { KindSigs.hs:23:1-12 })
           (Match
            (EpAnn
-            (Anchor
-             { KindSigs.hs:23:1-12 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:23:1-12 })
             []
             (EpaComments
              []))
@@ -889,9 +769,7 @@
                { KindSigs.hs:23:9-12 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:23:9-12 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:23:9-12 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:23:9 })))
@@ -904,9 +782,7 @@
                  (NoExtField)
                  (L
                   (SrcSpanAnn (EpAnn
-                               (Anchor
-                                { KindSigs.hs:23:11-12 }
-                                (UnchangedAnchor))
+                               (EpaSpan { KindSigs.hs:23:11-12 })
                                (NameAnnOnly
                                 (NameParens)
                                 (EpaSpan { KindSigs.hs:23:11 })
@@ -920,9 +796,7 @@
              (NoExtField)))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:26:1-29 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:26:1-29 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -931,9 +805,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:26:1-29 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:26:1-29 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:26:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:26:11 }))]
        (EpaComments
@@ -950,9 +822,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:26:13-29 })
        (HsExplicitListTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:26:13 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:26:13 })
          [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:26:13 }))
          ,(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:26:14 }))
          ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:26:29 }))]
@@ -963,9 +833,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:26:16-27 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:26:16-19 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:26:16-19 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:26:21-22 }))]
             (EpaComments
              []))
@@ -973,9 +841,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:26:16-19 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:26:16-19 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:26:16-19 })
               []
               (EpaComments
                []))
@@ -988,9 +854,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:26:24-27 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:26:24-27 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:26:24-27 })
               []
               (EpaComments
                []))
@@ -1001,9 +865,7 @@
                {OccName: Bool}))))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:27:1-45 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:27:1-45 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -1012,9 +874,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:27:1-45 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:27:1-45 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:27:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:27:12 }))]
        (EpaComments
@@ -1031,9 +891,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:14-45 })
        (HsExplicitListTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:27:14 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:27:14 })
          [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:27:14 }))
          ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:27:45 }))]
          (EpaComments
@@ -1041,9 +899,7 @@
         (NotPromoted)
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:27:16-27 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:27:16-27 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:27:28 }))])
@@ -1051,9 +907,7 @@
                         [])) { KindSigs.hs:27:16-27 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:27:16-19 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:27:16-19 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:27:21-22 }))]
             (EpaComments
              []))
@@ -1061,9 +915,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:16-19 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:27:16-19 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:27:16-19 })
               []
               (EpaComments
                []))
@@ -1076,9 +928,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:24-27 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:27:24-27 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:27:24-27 })
               []
               (EpaComments
                []))
@@ -1091,9 +941,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:30-42 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:27:30-34 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:27:30-34 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:27:36-37 }))]
             (EpaComments
              []))
@@ -1101,9 +949,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:30-34 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:27:30-34 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:27:30-34 })
               []
               (EpaComments
                []))
@@ -1116,9 +962,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:27:39-42 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { KindSigs.hs:27:39-42 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:27:39-42 })
               []
               (EpaComments
                []))
@@ -1129,9 +973,7 @@
                {OccName: Bool}))))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:28:1-44 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:28:1-44 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -1140,9 +982,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:28:1-44 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:28:1-44 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:28:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:28:14 }))]
        (EpaComments
@@ -1157,9 +997,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:12 })
          (UserTyVar
           (EpAnn
-           (Anchor
-            { KindSigs.hs:28:12 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:28:12 })
            []
            (EpaComments
             []))
@@ -1173,9 +1011,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:16-44 })
        (HsExplicitTupleTy
         (EpAnn
-         (Anchor
-          { KindSigs.hs:28:16 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:28:16 })
          [(AddEpAnn AnnSimpleQuote (EpaSpan { KindSigs.hs:28:16 }))
          ,(AddEpAnn AnnOpenP (EpaSpan { KindSigs.hs:28:17 }))
          ,(AddEpAnn AnnCloseP (EpaSpan { KindSigs.hs:28:44 }))]
@@ -1183,9 +1019,7 @@
           []))
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { KindSigs.hs:28:19-39 }
-                        (UnchangedAnchor))
+                       (EpaSpan { KindSigs.hs:28:19-39 })
                        (AnnListItem
                         [(AddCommaAnn
                           (EpaSpan { KindSigs.hs:28:40 }))])
@@ -1193,9 +1027,7 @@
                         [])) { KindSigs.hs:28:19-39 })
           (HsKindSig
            (EpAnn
-            (Anchor
-             { KindSigs.hs:28:19-29 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:28:19-29 })
             [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:28:31-32 }))]
             (EpaComments
              []))
@@ -1203,9 +1035,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:19-29 })
             (HsExplicitListTy
              (EpAnn
-              (Anchor
-               { KindSigs.hs:28:19 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:28:19 })
               [(AddEpAnn AnnOpenS (EpaSpan { KindSigs.hs:28:19 }))
               ,(AddEpAnn AnnCloseS (EpaSpan { KindSigs.hs:28:29 }))]
               (EpaComments
@@ -1213,9 +1043,7 @@
              (NotPromoted)
              [(L
                (SrcSpanAnn (EpAnn
-                            (Anchor
-                             { KindSigs.hs:28:20-22 }
-                             (UnchangedAnchor))
+                            (EpaSpan { KindSigs.hs:28:20-22 })
                             (AnnListItem
                              [(AddCommaAnn
                                (EpaSpan { KindSigs.hs:28:23 }))])
@@ -1223,9 +1051,7 @@
                              [])) { KindSigs.hs:28:20-22 })
                (HsTyVar
                 (EpAnn
-                 (Anchor
-                  { KindSigs.hs:28:20-22 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:28:20-22 })
                  []
                  (EpaComments
                   []))
@@ -1238,9 +1064,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:25-28 })
                (HsTyVar
                 (EpAnn
-                 (Anchor
-                  { KindSigs.hs:28:25-28 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:28:25-28 })
                  []
                  (EpaComments
                   []))
@@ -1253,9 +1077,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:34-39 })
             (HsListTy
              (EpAnn
-              (Anchor
-               { KindSigs.hs:28:34 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:28:34 })
               (AnnParen
                (AnnParensSquare)
                (EpaSpan { KindSigs.hs:28:34 })
@@ -1266,9 +1088,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:35-38 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:28:35-38 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:28:35-38 })
                 []
                 (EpaComments
                  []))
@@ -1281,9 +1101,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:28:42 })
           (HsTyVar
            (EpAnn
-            (Anchor
-             { KindSigs.hs:28:42 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:28:42 })
             []
             (EpaComments
              []))
@@ -1294,9 +1112,7 @@
              {OccName: b}))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:31:1-31 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:31:1-31 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -1305,9 +1121,7 @@
      (NoExtField)
      (SynDecl
       (EpAnn
-       (Anchor
-        { KindSigs.hs:31:1-31 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:31:1-31 })
        [(AddEpAnn AnnType (EpaSpan { KindSigs.hs:31:1-4 }))
        ,(AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:31:19 }))]
        (EpaComments
@@ -1324,9 +1138,7 @@
        (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:31:21-31 })
        (HsKindSig
         (EpAnn
-         (Anchor
-          { KindSigs.hs:31:21-23 }
-          (UnchangedAnchor))
+         (EpaSpan { KindSigs.hs:31:21-23 })
          [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:31:25-26 }))]
          (EpaComments
           []))
@@ -1334,9 +1146,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:31:21-23 })
          (HsTyVar
           (EpAnn
-           (Anchor
-            { KindSigs.hs:31:21-23 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:31:21-23 })
            []
            (EpaComments
             []))
@@ -1349,9 +1159,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:31:28-31 })
          (HsTyVar
           (EpAnn
-           (Anchor
-            { KindSigs.hs:31:28-31 }
-            (UnchangedAnchor))
+           (EpaSpan { KindSigs.hs:31:28-31 })
            []
            (EpaComments
             []))
@@ -1362,9 +1170,7 @@
             {OccName: Type})))))))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:34:1-22 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:34:1-22 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -1373,9 +1179,7 @@
      (NoExtField)
      (TypeSig
       (EpAnn
-       (Anchor
-        { KindSigs.hs:34:1-4 }
-        (UnchangedAnchor))
+       (EpaSpan { KindSigs.hs:34:1-4 })
        (AnnSig
         (AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:34:6-7 }))
         [])
@@ -1397,9 +1201,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:34:9-22 })
           (HsParTy
            (EpAnn
-            (Anchor
-             { KindSigs.hs:34:9 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:34:9 })
             (AnnParen
              (AnnParens)
              (EpaSpan { KindSigs.hs:34:9 })
@@ -1410,9 +1212,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:34:10-21 })
             (HsKindSig
              (EpAnn
-              (Anchor
-               { KindSigs.hs:34:10-13 }
-               (UnchangedAnchor))
+              (EpaSpan { KindSigs.hs:34:10-13 })
               [(AddEpAnn AnnDcolon (EpaSpan { KindSigs.hs:34:15-16 }))]
               (EpaComments
                []))
@@ -1420,9 +1220,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:34:10-13 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:34:10-13 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:34:10-13 })
                 []
                 (EpaComments
                  []))
@@ -1435,9 +1233,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:34:18-21 })
               (HsTyVar
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:34:18-21 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:34:18-21 })
                 []
                 (EpaComments
                  []))
@@ -1448,9 +1244,7 @@
                  {OccName: Type}))))))))))))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { KindSigs.hs:35:1-11 }
-                  (UnchangedAnchor))
+                 (EpaSpan { KindSigs.hs:35:1-11 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -1471,9 +1265,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { KindSigs.hs:35:1-11 })
           (Match
            (EpAnn
-            (Anchor
-             { KindSigs.hs:35:1-11 }
-             (UnchangedAnchor))
+            (EpaSpan { KindSigs.hs:35:1-11 })
             []
             (EpaComments
              []))
@@ -1494,9 +1286,7 @@
                { KindSigs.hs:35:6-11 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { KindSigs.hs:35:6-11 }
-                 (UnchangedAnchor))
+                (EpaSpan { KindSigs.hs:35:6-11 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { KindSigs.hs:35:6 })))

@@ -12,9 +12,7 @@
        {Bag(LocatedA (HsBind Name)):
         [(L
           (SrcSpanAnn (EpAnn
-                       (Anchor
-                        { DumpRenamedAst.hs:34:1-23 }
-                        (UnchangedAnchor))
+                       (EpaSpan { DumpRenamedAst.hs:34:1-23 })
                        (AnnListItem
                         [])
                        (EpaComments
@@ -54,9 +52,7 @@
                      (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:34:8-23 })
                      (HsApp
                       (EpAnn
-                       (Anchor
-                        { DumpRenamedAst.hs:34:8-23 }
-                        (UnchangedAnchor))
+                       (EpaSpan { DumpRenamedAst.hs:34:8-23 })
                        (NoEpAnns)
                        (EpaComments
                         []))
@@ -71,9 +67,7 @@
                        (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:34:17-23 })
                        (HsLit
                         (EpAnn
-                         (Anchor
-                          { DumpRenamedAst.hs:34:17-23 }
-                          (UnchangedAnchor))
+                         (EpaSpan { DumpRenamedAst.hs:34:17-23 })
                          (NoEpAnns)
                          (EpaComments
                           []))
@@ -88,9 +82,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:10:1-30 }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:10:1-30 })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -116,9 +108,7 @@
           (False)
           [(L
             (SrcSpanAnn (EpAnn
-                         (Anchor
-                          { DumpRenamedAst.hs:10:14-17 }
-                          (UnchangedAnchor))
+                         (EpaSpan { DumpRenamedAst.hs:10:14-17 })
                          (AnnListItem
                           [(AddVbarAnn
                             (EpaSpan { DumpRenamedAst.hs:10:19 }))])
@@ -174,9 +164,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:(12,1)-(14,24) }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:(12,1)-(14,24) })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -298,9 +286,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:12:20-30 })
             (KindedTyVar
              (EpAnn
-              (Anchor
-               { DumpRenamedAst.hs:12:20-30 }
-               (UnchangedAnchor))
+              (EpaSpan { DumpRenamedAst.hs:12:20-30 })
               [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:12:24-25 }))
               ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:12:20 }))
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:12:30 }))]
@@ -314,9 +300,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:12:27-29 })
               (HsListTy
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:12:27 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:12:27 })
                 (AnnParen
                  (AnnParensSquare)
                  (EpaSpan { DumpRenamedAst.hs:12:27 })
@@ -354,9 +338,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:16:1-33 }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:16:1-33 })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -384,9 +366,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:20-33 })
             (HsFunTy
              (EpAnn
-              (Anchor
-               { DumpRenamedAst.hs:16:20 }
-               (UnchangedAnchor))
+              (EpaSpan { DumpRenamedAst.hs:16:20 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -407,9 +387,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:16:25-33 })
               (HsFunTy
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:16:25 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:16:25 })
                 (NoEpAnns)
                 (EpaComments
                  []))
@@ -439,9 +417,7 @@
      []
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:(19,1)-(20,45) }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:(19,1)-(20,45) })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -466,9 +442,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:23-36 })
                (HsKindSig
                 (EpAnn
-                 (Anchor
-                  { DumpRenamedAst.hs:19:23 }
-                  (UnchangedAnchor))
+                 (EpaSpan { DumpRenamedAst.hs:19:23 })
                  [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:19:25-26 }))]
                  (EpaComments
                   []))
@@ -484,9 +458,7 @@
                  (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:28-36 })
                  (HsFunTy
                   (EpAnn
-                   (Anchor
-                    { DumpRenamedAst.hs:19:28 }
-                    (UnchangedAnchor))
+                   (EpaSpan { DumpRenamedAst.hs:19:28 })
                    (NoEpAnns)
                    (EpaComments
                     []))
@@ -521,9 +493,7 @@
              (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:42-60 })
              (HsFunTy
               (EpAnn
-               (Anchor
-                { DumpRenamedAst.hs:19:42-52 }
-                (UnchangedAnchor))
+               (EpaSpan { DumpRenamedAst.hs:19:42-52 })
                (NoEpAnns)
                (EpaComments
                 []))
@@ -540,9 +510,7 @@
                  (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:43-51 })
                  (HsFunTy
                   (EpAnn
-                   (Anchor
-                    { DumpRenamedAst.hs:19:43 }
-                    (UnchangedAnchor))
+                   (EpaSpan { DumpRenamedAst.hs:19:43 })
                    (NoEpAnns)
                    (EpaComments
                     []))
@@ -604,9 +572,7 @@
                    (HsNormalTok)))
                  (L
                   (SrcSpanAnn (EpAnn
-                               (Anchor
-                                { DumpRenamedAst.hs:20:10-34 }
-                                (UnchangedAnchor))
+                               (EpaSpan { DumpRenamedAst.hs:20:10-34 })
                                (AnnListItem
                                 [])
                                (EpaComments
@@ -623,9 +589,7 @@
                         (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:20:18-19 })
                         (UserTyVar
                          (EpAnn
-                          (Anchor
-                           { DumpRenamedAst.hs:20:18-19 }
-                           (UnchangedAnchor))
+                          (EpaSpan { DumpRenamedAst.hs:20:18-19 })
                           []
                           (EpaComments
                            []))
@@ -637,9 +601,7 @@
                       (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:20:22-33 })
                       (HsFunTy
                        (EpAnn
-                        (Anchor
-                         { DumpRenamedAst.hs:20:22-25 }
-                         (UnchangedAnchor))
+                        (EpaSpan { DumpRenamedAst.hs:20:22-25 })
                         (NoEpAnns)
                         (EpaComments
                          []))
@@ -726,9 +688,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:22:1-29 }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:22:1-29 })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -748,9 +708,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:8 })
            (UserTyVar
             (EpAnn
-             (Anchor
-              { DumpRenamedAst.hs:22:8 }
-              (UnchangedAnchor))
+             (EpaSpan { DumpRenamedAst.hs:22:8 })
              []
              (EpaComments
               []))
@@ -762,9 +720,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:10-17 })
            (KindedTyVar
             (EpAnn
-             (Anchor
-              { DumpRenamedAst.hs:22:10-17 }
-              (UnchangedAnchor))
+             (EpaSpan { DumpRenamedAst.hs:22:10-17 })
              [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:22:13-14 }))
              ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:22:10 }))
              ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:22:17 }))]
@@ -844,9 +800,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:(24,1)-(25,30) }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:(24,1)-(25,30) })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -957,9 +911,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:16-23 })
             (KindedTyVar
              (EpAnn
-              (Anchor
-               { DumpRenamedAst.hs:24:16-23 }
-               (UnchangedAnchor))
+              (EpaSpan { DumpRenamedAst.hs:24:16-23 })
               [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:24:19-20 }))
               ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:24:16 }))
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:23 }))]
@@ -981,9 +933,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:25-40 })
             (KindedTyVar
              (EpAnn
-              (Anchor
-               { DumpRenamedAst.hs:24:25-40 }
-               (UnchangedAnchor))
+              (EpaSpan { DumpRenamedAst.hs:24:25-40 })
               [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:24:28-29 }))
               ,(AddEpAnn AnnOpenP (EpaSpan { DumpRenamedAst.hs:24:25 }))
               ,(AddEpAnn AnnCloseP (EpaSpan { DumpRenamedAst.hs:24:40 }))]
@@ -997,9 +947,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:24:31-39 })
               (HsFunTy
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:24:31 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:24:31 })
                 (NoEpAnns)
                 (EpaComments
                  []))
@@ -1047,9 +995,7 @@
      (NoExtField)
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:(27,1)-(28,12) }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:(27,1)-(28,12) })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -1069,9 +1015,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:27:9 })
            (UserTyVar
             (EpAnn
-             (Anchor
-              { DumpRenamedAst.hs:27:9 }
-              (UnchangedAnchor))
+             (EpaSpan { DumpRenamedAst.hs:27:9 })
              []
              (EpaComments
               []))
@@ -1099,9 +1043,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:28:10 })
               (UserTyVar
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:28:10 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:28:10 })
                 []
                 (EpaComments
                  []))
@@ -1113,9 +1055,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:28:12 })
               (UserTyVar
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:28:12 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:28:12 })
                 []
                 (EpaComments
                  []))
@@ -1137,9 +1077,7 @@
      []
      [(L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { DumpRenamedAst.hs:(30,1)-(31,27) }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpRenamedAst.hs:(30,1)-(31,27) })
                     (AnnListItem
                      [])
                     (EpaComments
@@ -1170,9 +1108,7 @@
               (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:30:12-14 })
               (HsListTy
                (EpAnn
-                (Anchor
-                 { DumpRenamedAst.hs:30:12 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpRenamedAst.hs:30:12 })
                 (AnnParen
                  (AnnParensSquare)
                  (EpaSpan { DumpRenamedAst.hs:30:12 })
@@ -1194,9 +1130,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:31:3-27 })
            (TyFamInstDecl
             (EpAnn
-             (Anchor
-              { DumpRenamedAst.hs:31:3-27 }
-              (UnchangedAnchor))
+             (EpaSpan { DumpRenamedAst.hs:31:3-27 })
              [(AddEpAnn AnnType (EpaSpan { DumpRenamedAst.hs:31:3-6 }))]
              (EpaComments
               []))
@@ -1212,9 +1146,7 @@
                 (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:31:10-12 })
                 (HsListTy
                  (EpAnn
-                  (Anchor
-                   { DumpRenamedAst.hs:31:10 }
-                   (UnchangedAnchor))
+                  (EpaSpan { DumpRenamedAst.hs:31:10 })
                   (AnnParen
                    (AnnParensSquare)
                    (EpaSpan { DumpRenamedAst.hs:31:10 })
@@ -1302,9 +1234,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (Anchor
-        { DumpRenamedAst.hs:6:1-6 }
-        (UnchangedAnchor))
+       (EpaSpan { DumpRenamedAst.hs:6:1-6 })
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:6:1-6 })
         (Nothing)
@@ -1330,9 +1260,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (Anchor
-        { DumpRenamedAst.hs:8:1-6 }
-        (UnchangedAnchor))
+       (EpaSpan { DumpRenamedAst.hs:8:1-6 })
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:8:1-6 })
         (Nothing)
@@ -1357,9 +1285,7 @@
        (Exactly)
        (L
         (SrcSpanAnn (EpAnn
-                     (Anchor
-                      { DumpRenamedAst.hs:8:18-23 }
-                      (UnchangedAnchor))
+                     (EpaSpan { DumpRenamedAst.hs:8:18-23 })
                      (AnnList
                       (Nothing)
                       (Just
@@ -1383,5 +1309,3 @@
               {Name: GHC.Types.Type})))))])))))]
   (Nothing)
   (Nothing)))
-
-

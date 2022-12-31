@@ -68,13 +68,7 @@
                     (EpaComment
                      (EpaLineComment
                       "-- comment 2 for foo")
-                     { DumpParsedAstComments.hs:9:1-20 }))
-                  ,(L
-                    (EpaSpan { DumpParsedAstComments.hs:15:1-20 })
-                    (EpaComment
-                     (EpaLineComment
-                      "-- | Haddock comment")
-                     { DumpParsedAstComments.hs:13:3
+                     { DumpParsedAstComments.hs:9:1-20
                         }))])) { DumpParsedAstComments.hs:(11,1)-(13,3) })
     (ValD
      (NoExtField)
@@ -186,9 +180,7 @@
                   [])
                  (EpaComments
                   [(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:15:1-20 }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpParsedAstComments.hs:15:1-20 })
                     (EpaComment
                      (EpaLineComment
                       "-- | Haddock comment")
