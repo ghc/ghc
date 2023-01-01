@@ -486,7 +486,10 @@ pprIdBndrInfo info
       (info `seq` doc) -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
-    keep_unf = inlineableInfo info
+    has_inlineable = inlineableInfo info &&
+                     isNoInlinePragma prag_info -- The flag is redundant
+                                                -- unless we have NOINLINE.
+
     occ_info  = occInfo info
     dmd_info  = demandInfo info
     lbv_info  = oneShotInfo info
@@ -498,8 +501,7 @@ pprIdBndrInfo info
 
     doc = showAttributes
           [ (has_prag, text "InlPrag=" <> pprInlineDebug prag_info)
-          -- Todo: This is only interesting for NoInline pragmas
-          , (keep_unf, text "Inlineable")
+          , (has_inlineable, text "Inlineable")
           , (has_occ,  text "Occ=" <> ppr occ_info)
           , (has_dmd,  text "Dmd=" <> ppr dmd_info)
           , (has_lbv , text "OS=" <> ppr lbv_info)
@@ -509,7 +511,7 @@ instance Outputable IdInfo where
   ppr info = showAttributes
     [ (has_prag,         text "InlPrag=" <> pprInlineDebug prag_info)
     -- Todo: This is only interesting for NoInline pragmas
-    , (keep_unf,         text "Inlineable")
+    , (has_inlineable,   text "Inlineable")
     , (has_occ,          text "Occ=" <> ppr occ_info)
     , (has_dmd,          text "Dmd=" <> ppr dmd_info)
     , (has_lbv ,         text "OS=" <> ppr lbv_info)
@@ -551,7 +553,9 @@ instance Outputable IdInfo where
       rules = ruleInfoRules (ruleInfo info)
       has_rules = not (null rules)
 
-      keep_unf = inlineableInfo info
+      has_inlineable = inlineableInfo info &&
+                       isNoInlinePragma prag_info -- The flag is redundant
+                                                  -- unless we have NOINLINE.
 
 
 {-

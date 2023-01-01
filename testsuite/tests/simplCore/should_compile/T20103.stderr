@@ -31,8 +31,9 @@ lvl4 = GHC.CString.unpackCString# lvl3
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 T20103.$trModule2 = "T20103"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
@@ -43,8 +44,9 @@ lvl5 = GHC.CString.unpackCString# T20103.$trModule2
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 T20103.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
@@ -167,8 +169,8 @@ foo [InlPrag=[2]] :: HasCallStack => Int -> Int
  Arity=2,
  Str=<SL><1!P(1L)>,
  Cpr=1,
- Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ ($dIP [Occ=Once1] :: HasCallStack)
                  (eta [Occ=Once1!] :: Int) ->
@@ -186,22 +188,25 @@ foo
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule3 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule3 = GHC.Types.TrNameS T20103.$trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule1 = GHC.Types.TrNameS T20103.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T20103.$trModule :: GHC.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 T20103.$trModule
   = GHC.Types.Module T20103.$trModule3 T20103.$trModule1
 

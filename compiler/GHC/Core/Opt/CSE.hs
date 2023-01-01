@@ -14,7 +14,7 @@ import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
-                        , isJoinId, isJoinId_maybe, idUnfolding, idHasInlineable )
+                        , isJoinId, isJoinId_maybe, idHasInlineable )
 import GHC.Core.Utils   ( mkAltExpr
                         , exprIsTickedString
                         , stripTicksE, stripTicksT, mkTicks )

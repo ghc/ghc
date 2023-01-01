@@ -837,7 +837,6 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- (see Note [Don't w/w join points for CPR])
 
     work_id  = asWorkerLikeId $
-               modifyIdInfo (flip setHasInlineableInfo fn_has_inlineable) $
                mkWorkerId work_uniq fn_id (exprType work_rhs)
                 `setIdOccInfo` occInfo fn_info
                         -- Copy over occurrence info from parent
@@ -846,6 +845,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                         -- seems right-er to do so
 
                 `setInlinePragma` work_prag
+                `setHasInlineable` fn_has_inlineable
 
                 `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
                         -- See Note [Worker/wrapper for INLINABLE functions]
@@ -874,11 +874,14 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     wrap_rhs  = wrap_fn work_id
     wrap_prag = mkStrWrapperInlinePrag fn_inl_prag fn_rules
-    wrap_unf  = mkWrapperUnfolding simpl_opts wrap_rhs arity
+    wrap_unf  = mkWrapperUnfolding (simpleOptExpr simpl_opts wrap_rhs) arity
 
     wrap_id   = fn_id `setIdUnfolding`  wrap_unf
                       `setInlinePragma` wrap_prag
                       `setIdOccInfo`    noOccInfo
+                      -- We must keep hasInlineable to ensure wrappers can specialise
+                      -- if they are NOINLINE[final]
+                      `setHasInlineable`fn_has_inlineable
                         -- Zap any loop-breaker-ness, to avoid bleating from Lint
                         -- about a loop breaker with an INLINE rule
 

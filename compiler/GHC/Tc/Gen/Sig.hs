@@ -56,7 +56,7 @@ import GHC.Core.TyCo.Rep( mkNakedFunTy )
 
 import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
-import GHC.Types.Id  ( Id, idName, idType, setPragmaInfo
+import GHC.Types.Id  ( Id, idName, idType, setIdPragmaInfo
                      , mkLocalId, realIdUnfolding )
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -669,7 +669,7 @@ addInlinePrags poly_id prags_for_me
             Nothing -> do warn_multiple_inlines inl inls
                           return init_info
 
-       ; return (poly_id `setPragmaInfo` prag_info) }
+       ; return (poly_id `setIdPragmaInfo` prag_info) }
   | otherwise
   = return poly_id
   where

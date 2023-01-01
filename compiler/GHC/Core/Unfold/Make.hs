@@ -44,21 +44,20 @@ import {-# SOURCE #-} GHC.Core.SimpleOpt
 
 
 
-mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> Bool -> CoreExpr -> Unfolding
+mkFinalUnfolding :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Unfolding
 -- "Final" in the sense that this is a GlobalId that will not be further
 -- simplified; so the unfolding should be occurrence-analysed
-mkFinalUnfolding opts src strict_sig may_inline expr = mkFinalUnfolding' opts src strict_sig may_inline expr Nothing
+mkFinalUnfolding opts src strict_sig expr = mkFinalUnfolding' opts src strict_sig expr Nothing
 
 -- See Note [Tying the 'CoreUnfolding' knot] for why interfaces need
 -- to pass a precomputed 'UnfoldingCache'
-mkFinalUnfolding' :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> Bool -> CoreExpr -> Maybe UnfoldingCache -> Unfolding
+mkFinalUnfolding' :: UnfoldingOpts -> UnfoldingSource -> DmdSig -> CoreExpr -> Maybe UnfoldingCache -> Unfolding
 -- "Final" in the sense that this is a GlobalId that will not be further
 -- simplified; so the unfolding should be occurrence-analysed
-mkFinalUnfolding' opts src strict_sig may_inline  expr
+mkFinalUnfolding' opts src strict_sig expr
   = mkUnfolding opts src
                 True {- Top level -}
                 (isDeadEndSig strict_sig)
-                may_inline
                 expr
 
 -- | Same as 'mkCompulsoryUnfolding' but simplifies the unfolding first
@@ -82,12 +81,12 @@ mkCompulsoryUnfolding expr
 -- | Make a regular compiler generated unfolding
 mkVanillaUnfolding :: UnfoldingOpts -> Bool -> Bool -> CoreExpr -> Unfolding
 mkVanillaUnfolding !opts is_top is_bottoming rhs
-  = mkUnfolding opts VanillaSrc is_top is_bottoming True rhs Nothing
+  = mkUnfolding opts VanillaSrc is_top is_bottoming rhs Nothing
 
 -- | Non top-lvl non-bottoming vanilla unfolding
 mkSimpleUnfolding :: UnfoldingOpts -> CoreExpr -> Unfolding
 mkSimpleUnfolding !opts rhs
-  = mkUnfolding opts VanillaSrc False False True rhs Nothing
+  = mkUnfolding opts VanillaSrc False False rhs Nothing
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -106,12 +105,12 @@ mkDataConUnfolding expr
                     , ug_unsat_ok  = unSaturatedOk
                     , ug_boring_ok = False }
 
-mkWrapperUnfolding :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
+mkWrapperUnfolding :: CoreExpr -> Arity -> Unfolding
 -- Make the unfolding for the wrapper in a worker/wrapper split
 -- after demand/CPR analysis
-mkWrapperUnfolding opts expr arity
+mkWrapperUnfolding expr arity
   = mkCoreUnfolding StableSystemSrc True
-                    (simpleOptExpr opts expr) Nothing
+                    expr Nothing
                     (UnfWhen { ug_arity     = arity
                              , ug_unsat_ok  = unSaturatedOk
                              , ug_boring_ok = boringCxtNotOk })
@@ -162,9 +161,9 @@ mkInlineUnfoldingWithArity opts src arity expr
     boring_ok | arity == 0 = True
               | otherwise  = inlineBoringOk expr'
 
-mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> Bool -> CoreExpr -> Unfolding
-mkInlinableUnfolding opts src may_inline expr
-  = mkUnfolding (so_uf_opts opts) src False False may_inline expr' Nothing
+mkInlinableUnfolding :: SimpleOpts -> UnfoldingSource -> CoreExpr -> Unfolding
+mkInlinableUnfolding opts src expr
+  = mkUnfolding (so_uf_opts opts) src False False expr' Nothing
   where
     expr' = simpleOptExpr opts expr
 
@@ -327,19 +326,16 @@ mkUnfolding :: UnfoldingOpts
             -> Bool       -- ^ Is top-level
             -> Bool       -- ^ Definitely a bottoming binding
                           -- (only relevant for top-level bindings)
-            -> Bool       -- ^ Allow inlining, False <=> UnfNever guidance
             -> CoreExpr
             -> Maybe UnfoldingCache
             -> Unfolding
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
-mkUnfolding opts src top_lvl is_bottoming may_inline expr cache
+mkUnfolding opts src top_lvl is_bottoming expr cache
   = mkCoreUnfolding src top_lvl expr cache guidance
   where
     is_top_bottoming = top_lvl && is_bottoming
-    guidance
-      | may_inline = calcUnfoldingGuidance opts is_top_bottoming expr
-      | otherwise = UnfNever
+    guidance = calcUnfoldingGuidance opts is_top_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 

@@ -82,7 +82,8 @@ module GHC.Types.Id (
         asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
-        idPragmaInfo, idInlinePragma, idHasInlineable, setInlinePragma, setPragmaInfo, modifyInlinePragma,
+        idPragmaInfo, idInlinePragma, idHasInlineable, setInlinePragma,
+        setIdPragmaInfo, modifyInlinePragma, setHasInlineable,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
@@ -174,7 +175,8 @@ infixl  1 `setIdUnfolding`,
 
           `setIdSpecialisation`,
           `setInlinePragma`,
-          `setPragmaInfo`,
+          `setHasInlineable`,
+          `setIdPragmaInfo`,
           `setInlineActivation`,
           `idCafInfo`,
 
@@ -903,8 +905,11 @@ idPragmaInfo id = pragInfo (idInfo id)
 setInlinePragma :: Id -> InlinePragma -> Id
 setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
-setPragmaInfo :: Id -> PragInfo -> Id
-setPragmaInfo id pragInfo = modifyIdInfo (`setPragInfo` pragInfo) id
+setHasInlineable :: Id -> Bool -> Id
+setHasInlineable id inlineable = modifyIdInfo (`setHasInlineableInfo` inlineable) id
+
+setIdPragmaInfo :: Id -> PragInfo -> Id
+setIdPragmaInfo id pragInfo = modifyIdInfo (`setPragInfo` pragInfo) id
 
 modifyInlinePragma :: Id -> (InlinePragma -> InlinePragma) -> Id
 modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (inlinePragInfo info))) id

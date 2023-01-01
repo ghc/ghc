@@ -4,10 +4,8 @@ import Data.List.NonEmpty as NE
 
 import T22629d_Lib
 
--- getNumbers should get a specialization here.
--- As a result this while binding will optimize to just 42
--- so that's what the test checks for.
-
+-- getNumbers should get a specialization and W/Wed here.
+-- So we check specialise output for $s$wgetNumbers
 {-# NOINLINE foo #-}
 foo = NE.head getNumbers :: Int
 

@@ -99,7 +99,7 @@ module GHC.Types.Basic (
         pprInline, pprInlineDebug,
 
         UnfoldingSource(..), isStableSource, isStableUserSource,
-        isStableSystemSource, isCompulsorySource,
+        isStableSystemSource, isCompulsorySource, isNoInlineSource,
 
         SuccessFlag(..), succeeded, failed, successIf,
 
@@ -1829,7 +1829,8 @@ data UnfoldingSource
                        -- Replace uf_tmpl each time around
 
   -- See Note [Stable unfoldings] in GHC.Core
-  | StableUserSrc   -- From a user-specified INLINE or INLINABLE pragma
+  | StableUserSrc   -- From a regular user-specified INLINE or INLINABLE pragma
+  | StableUserNoInlineSrc  -- Like above, but should never be inlined automatically
   | StableSystemSrc -- From a wrapper, or system-generated unfolding
 
   | CompulsorySrc   -- Something that *has* no binding, so you *must* inline it
@@ -1837,9 +1838,11 @@ data UnfoldingSource
                     -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
                     -- Inline absolutely always, however boring the context.
 
+-- | NB: This might still be a NOINLINE unfolding
 isStableUserSource :: UnfoldingSource -> Bool
-isStableUserSource StableUserSrc = True
-isStableUserSource _             = False
+isStableUserSource StableUserSrc      = True
+isStableUserSource StableUserNoInlineSrc = True
+isStableUserSource _                  = False
 
 isStableSystemSource :: UnfoldingSource -> Bool
 isStableSystemSource StableSystemSrc = True
@@ -1850,29 +1853,37 @@ isCompulsorySource CompulsorySrc = True
 isCompulsorySource _             = False
 
 isStableSource :: UnfoldingSource -> Bool
-isStableSource CompulsorySrc   = True
-isStableSource StableSystemSrc = True
-isStableSource StableUserSrc   = True
-isStableSource VanillaSrc      = False
+isStableSource CompulsorySrc      = True
+isStableSource StableSystemSrc    = True
+isStableSource StableUserSrc      = True
+isStableSource StableUserNoInlineSrc = True
+isStableSource VanillaSrc         = False
+
+isNoInlineSource :: UnfoldingSource -> Bool
+isNoInlineSource StableUserNoInlineSrc = True
+isNoInlineSource _                  = False
 
 instance Binary UnfoldingSource where
-    put_ bh CompulsorySrc   = putByte bh 0
-    put_ bh StableUserSrc   = putByte bh 1
-    put_ bh StableSystemSrc = putByte bh 2
-    put_ bh VanillaSrc      = putByte bh 3
+    put_ bh CompulsorySrc       = putByte bh 0
+    put_ bh StableUserSrc       = putByte bh 1
+    put_ bh StableUserNoInlineSrc  = putByte bh 2
+    put_ bh StableSystemSrc     = putByte bh 3
+    put_ bh VanillaSrc          = putByte bh 4
     get bh = do
         h <- getByte bh
         case h of
             0 -> return CompulsorySrc
             1 -> return StableUserSrc
-            2 -> return StableSystemSrc
+            2 -> return StableUserNoInlineSrc
+            3 -> return StableSystemSrc
             _ -> return VanillaSrc
 
 instance Outputable UnfoldingSource where
-  ppr CompulsorySrc     = text "Compulsory"
-  ppr StableUserSrc     = text "StableUser"
-  ppr StableSystemSrc   = text "StableSystem"
-  ppr VanillaSrc        = text "<vanilla>"
+  ppr CompulsorySrc       = text "Compulsory"
+  ppr StableUserSrc       = text "StableUser"
+  ppr StableUserNoInlineSrc  = text "StableUserNoInl"
+  ppr StableSystemSrc     = text "StableSystem"
+  ppr VanillaSrc          = text "<vanilla>"
 
 {-
 ************************************************************************

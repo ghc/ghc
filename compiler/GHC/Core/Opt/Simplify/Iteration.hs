@@ -35,7 +35,7 @@ import GHC.Core.DataCon
    , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Stats ( Tick(..) )
-import GHC.Core.Ppr     ( pprCoreExpr )
+import GHC.Core.Ppr
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
@@ -629,8 +629,8 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                              DoneEx triv_rhs Nothing ) }
 
           else do { wrap_unf <- mkLetUnfolding uf_opts top_lvl VanillaSrc bndr triv_rhs
-                  ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
-                                `setIdUnfolding`  wrap_unf
+                  ; let bndr' = bndr  `setIdPragmaInfo` mkCastWrapperPragInfo (idPragmaInfo bndr)
+                                      `setIdUnfolding`  wrap_unf
                         floats' = floats `extendFloats` NonRec bndr' triv_rhs
                   ; return ( floats', setInScopeFromF env floats' ) } }
   where
@@ -666,20 +666,24 @@ tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
                                    , text "rhs:" <+> ppr rhs ])
         ; return (mkFloatBind env (NonRec bndr rhs)) }
 
-mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
+mkCastWrapperPragInfo :: PragInfo -> PragInfo
 -- See Note [Cast worker/wrapper]
-mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
-  = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                 , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
-                 , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
-                 , inl_act    = wrap_act     -- See Note [Wrapper activation]
-                 , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
-                                -- RuleMatchInfo is (and must be) unaffected
+mkCastWrapperPragInfo prag_info
+  = mkPragInfo
+        InlinePragma { inl_src    = SourceText "{-# INLINE"
+                    , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
+                    , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
+                    , inl_act    = wrap_act     -- See Note [Wrapper activation]
+                    , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
+                                    -- RuleMatchInfo is (and must be) unaffected
+        (pragHasInlineable prag_info)
   where
     -- See Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
     -- But simpler, because we don't need to disable during InitialPhase
     wrap_act | isNeverActive fn_act = activateDuringFinal
              | otherwise            = fn_act
+    InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info } = pragInfoInline prag_info
+
 
 
 {- *********************************************************************
@@ -4210,7 +4214,7 @@ simplLetUnfolding env bind_cxt id new_rhs rhs_ty arity unf
 mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
 mkLetUnfolding !uf_opts top_lvl src id new_rhs
-  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming may_inline new_rhs Nothing)
+  = return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs Nothing)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -4223,7 +4227,6 @@ mkLetUnfolding !uf_opts top_lvl src id new_rhs
     !is_top_lvl   = isTopLevel top_lvl
     -- See Note [Force bottoming field]
     !is_bottoming = isDeadEndId id
-    !may_inline = not . isNoInlinePragma . idInlinePragma $ id
 
 -------------------
 simplStableUnfolding :: SimplEnv -> BindContext
