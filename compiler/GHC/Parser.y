@@ -41,7 +41,7 @@ where
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
-import Data.Maybe       ( maybeToList )
+import Data.Maybe       ( maybeToList, fromMaybe )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
@@ -628,6 +628,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
  '{-# OPAQUE'             { L _ (ITopaque_prag _) }
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
+ '{-# SPECREC'           { L _ (ITspec_rec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
  '{-# RULES'              { L _ (ITrules_prag _) }
@@ -2606,6 +2607,11 @@ sigdecl :: { LHsDecl GhcPs }
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc Nothing
                 ; acsA (\cs -> sLL $1 $> (SigD noExtField (SCCFunSig ((EpAnn (glR $1) [mo $1, mc $4] cs), (getSCC_PRAGs $1)) $2 (Just ( sL1a $3 str_lit))))) }}
+
+        -- Transitive specialization
+        | '{-# SPECREC' activation qvarcon '#-}'
+                {% acsA (\cs -> (sLL $1 $> $ SigD noExtField (SpecRecSig (EpAnn (glR $1) ((mo $1:fst $2) ++ [mc $4]) cs) $3
+                            ( fromMaybe AlwaysActive $ snd $2 )))) }
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% acsA (\cs ->

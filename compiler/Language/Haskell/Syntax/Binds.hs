@@ -33,10 +33,10 @@ import Language.Haskell.Syntax.Type
 
 import GHC.Types.Fixity (Fixity)
 import GHC.Data.Bag (Bag)
-import GHC.Types.Basic (InlinePragma)
+import GHC.Types.Basic (InlinePragma, Activation)
 
 import GHC.Data.BooleanFormula (LBooleanFormula)
-import GHC.Types.SourceText (StringLiteral)
+import GHC.Types.SourceText (StringLiteral, SourceText)
 
 import Data.Void
 import Data.Bool
@@ -408,6 +408,11 @@ data Sig pass
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
                                    --    SPECIALISE, not SPECIALISE_INLINE
+
+  | SpecRecSig  (XSpecRec pass)
+                -- (SourceText) -- TODO
+                (LIdP pass)        -- Function name
+                Activation       -- Never defaultInlinePragma
 
         -- | A specialisation pragma for instance declarations only
         --

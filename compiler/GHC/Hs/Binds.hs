@@ -675,6 +675,7 @@ type instance XPatSynSig        (GhcPass p) = EpAnn AnnSig
 type instance XClassOpSig       (GhcPass p) = EpAnn AnnSig
 type instance XFixSig           (GhcPass p) = EpAnn [AddEpAnn]
 type instance XInlineSig        (GhcPass p) = EpAnn [AddEpAnn]
+type instance XSpecRec          (GhcPass p) = EpAnn [AddEpAnn]
 type instance XSpecSig          (GhcPass p) = EpAnn [AddEpAnn]
 type instance XSpecInstSig      (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
 type instance XMinimalSig       (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
@@ -760,6 +761,9 @@ ppr_sig (InlineSig _ var inl)
         NoSourceText   -> text "{-#" <+> inlinePragmaName (inl_inline inl)
 ppr_sig (SpecInstSig (_, src) ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
+ppr_sig (SpecRecSig _ext var act)
+  = text "{-# SPECREC " <> pprPrefixOcc (unLoc var) <> ppr act <+> text "#-}"
+
 ppr_sig (MinimalSig (_, src) bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig _ names sig_ty)
@@ -801,6 +805,7 @@ hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
 hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
+hsSigDoc (SpecRecSig {})        = text "SPECREC pragma"
 hsSigDoc (XSig _)               = case ghcPass @p of
                                     GhcRn -> text "id signature"
                                     GhcTc -> text "id signature"
