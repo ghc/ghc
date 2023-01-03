@@ -34,6 +34,8 @@ ref    compiler/GHC/Tc/Instance/Family.hs:474:35:     Note [Constrained family i
 ref    compiler/GHC/Tc/Module.hs:711:15:     Note [Extra dependencies from .hs-boot files]
 ref    compiler/GHC/Tc/Solver/Rewrite.hs:1009:7:     Note [Stability of rewriting]
 ref    compiler/GHC/Tc/TyCl.hs:1130:6:     Note [Unification variables need fresh Names]
+ref    compiler/GHC/Tc/TyCl.hs:4982:17:     Note [Missing role annotations warning]
+ref    compiler/GHC/Tc/TyCl.hs:5008:3:     Note [Missing role annotations warning]
 ref    compiler/GHC/Tc/Types.hs:692:33:     Note [Extra dependencies from .hs-boot files]
 ref    compiler/GHC/Tc/Types.hs:1423:47:     Note [Care with plugin imports]
 ref    compiler/GHC/Tc/Types/Constraint.hs:226:34:     Note [NonCanonical Semantics]

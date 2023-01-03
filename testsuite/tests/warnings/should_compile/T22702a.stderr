@@ -1,0 +1,6 @@
+
+T22702a.hs:12:1: warning: [GHC-65490] [-Wmissing-role-annotations]
+    Missing role annotation: type role Foo representational phantom
+
+T22702a.hs:21:1: warning: [GHC-65490] [-Wmissing-role-annotations]
+    Missing role annotation: type role Bar representational nominal

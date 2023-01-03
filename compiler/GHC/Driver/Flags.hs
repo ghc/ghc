@@ -636,6 +636,7 @@ data WarningFlag =
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
    | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
    | Opt_WarnTermVariableCapture                     -- Since 9.8
+   | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -742,6 +743,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnTypeEqualityOutOfScope                  -> "type-equality-out-of-scope" :| []
   Opt_WarnLoopySuperclassSolve                    -> "loopy-superclass-solve" :| []
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
+  Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

@@ -4976,9 +4976,13 @@ checkValidRoleAnnots role_annots tc
       | isVisibleTyConBinder tvb = Just (role, binderVar tvb)
       | otherwise                = Nothing
 
-    check_roles
-      = whenIsJust role_annot_decl_maybe $
-          \decl@(L loc (RoleAnnotDecl _ _ the_role_annots)) ->
+    check_roles = case role_annot_decl_maybe of
+      Nothing ->
+          setSrcSpan (getSrcSpan name) $
+          -- See Note [Missing role annotations warning]
+          warnIf (not (isClassTyCon tc) && not (null vis_roles)) $
+          TcRnMissingRoleAnnotation name vis_roles
+      Just (decl@(L loc (RoleAnnotDecl _ _ the_role_annots))) ->
           addRoleAnnotCtxt name $
           setSrcSpanA loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
@@ -5000,6 +5004,39 @@ checkValidRoleAnnots role_annots tc
 
     check_no_roles
       = whenIsJust role_annot_decl_maybe illegalRoleAnnotDecl
+
+-- Note [Missing role annotations warning]
+--
+-- We warn about missing role annotations for tycons
+-- 1. not type-classes:
+--    type classes are nominal by default, which is most conservative
+--    choice. E.g. we cannot have a type-class with an (accidentally)
+--    phantom or representational type variable, as we can with
+--    data types.
+-- 2. with visible roles
+--
+-- We don't make any exceptions for other data types.
+-- In particular we explicitly warn about omitted (default and common)
+-- representational roles. That is the point of the warning.
+-- For example the default representational role for `Map`s key type parameter
+-- would be wrong, and this warning is there to warn about it,
+-- asking users to be explicit.
+--
+-- If the default roles have been nominal, i.e. as conservative as possible,
+-- the warning would still be valuable, as most types can be `representational`
+-- (c.f. type-classes, which usually cannot).
+--
+-- We don't warn about types with invisible roles only, because users cannot
+-- specify them:
+--
+--    type Foo :: forall {k}. Type
+--    data Foo = Foo Int
+--    type role Foo phantom
+--
+-- is incorrect, GHC complains:
+-- Wrong number of roles listed in role annotation;
+-- Expected 0, got 1:
+--
 
 checkRoleAnnot :: TyVar -> LocatedAn NoEpAnns (Maybe Role) -> Role -> TcM ()
 checkRoleAnnot _  (L _ Nothing)   _  = return ()

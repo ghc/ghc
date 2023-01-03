@@ -1338,6 +1338,9 @@ instance Diagnostic TcRnMessage where
     TcRnSectionWithoutParentheses expr -> mkSimpleDecorated $
       hang (text "A section must be enclosed in parentheses")
          2 (text "thus:" <+> (parens (ppr expr)))
+    TcRnMissingRoleAnnotation name roles -> mkSimpleDecorated $
+      hang (text "Missing role annotation" <> colon)
+         2 (text "type role" <+> ppr name <+> hsep (map ppr roles))
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -2547,6 +2550,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnGhciMonadLookupFail {}
       -> ErrorWithoutFlag
+    TcRnMissingRoleAnnotation{}
+      -> WarningWithFlag Opt_WarnMissingRoleAnnotations
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3225,6 +3230,8 @@ instance Diagnostic TcRnMessage where
     TcRnGhciUnliftedBind {}
       -> noHints
     TcRnGhciMonadLookupFail {}
+      -> noHints
+    TcRnMissingRoleAnnotation{}
       -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode

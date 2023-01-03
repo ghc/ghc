@@ -2393,6 +2393,28 @@ of ``-W(no-)*``.
     When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
     that would stop working under ``RequiredTypeArguments``.
 
+.. ghc-flag:: -Wmissing-role-annotations
+    :shortdesc: warn when type declarations don't have role annotations
+    :type: dynamic
+    :reverse: -Wno-role-annotations-signatures
+    :category:
+
+    :since: 9.8
+    :default: off
+
+    .. index::
+         single: roles, missing
+
+    If you would like GHC to check that every data type definition
+    has a :ref:`role annotation <role-annotations>`, use the
+    :ghc-flag:`-Wmissing-role-annotations` option.
+    You can specify the role via :extension:`RoleAnnotations`.
+
+    GHC will not warn about type class definitions with missing role annotations,
+    as their default roles are the strictest: all nominal.
+    In other words the type-class role cannot be accidentally left
+    representational or phantom, which could affected the code correctness.
+
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

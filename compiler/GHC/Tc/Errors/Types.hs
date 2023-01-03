@@ -4168,6 +4168,18 @@ data TcRnMessage where
     -> Maybe [GlobalRdrElt] -- ^ lookup result
     -> TcRnMessage
 
+  {- TcRnMissingRoleAnnotation is a warning that occurs when type declaration
+     doesn't have a role annotatiosn
+
+     Controlled by flags:
+       - Wmissing-role-annotations
+
+     Test cases:
+       T22702
+
+  -}
+  TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
