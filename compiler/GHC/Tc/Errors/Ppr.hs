@@ -926,14 +926,10 @@ instance Diagnostic TcRnMessage where
           same_rec_group_msg = text "it is defined and used in the same recursive group"
     TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $
-           (vcat [ pprArgsContext argsContext <+>
+           (vcat [ pprMatchContextNouns argsContext <+>
                    text "have different numbers of arguments"
                  , nest 2 (ppr (getLocA match1))
                  , nest 2 (ppr (getLocA (NE.head bad_matches)))])
-        where
-          pprArgsContext = \case
-            EquationArgs name -> (text "Equations for" <+>) . quotes $ ppr name
-            PatternArgs matchCtx -> pprMatchContextNouns matchCtx
     TcRnCannotBindScopedTyVarInPatSig sig_tvs
       -> mkSimpleDecorated $
            hang (text "You cannot bind scoped type variable"

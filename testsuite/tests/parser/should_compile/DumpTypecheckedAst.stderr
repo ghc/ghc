@@ -1560,7 +1560,7 @@
               (FunRhs
                (L
                 (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
-                {Var: main})
+                {Name: main})
                (Prefix)
                (NoSrcStrict))
               []
