@@ -275,6 +275,8 @@ library
                         stg/SMP.h
                         stg/Ticky.h
                         stg/Types.h
+
+      -- See Note [Undefined symbols in the RTS]
       if flag(64bit)
         if flag(leading-underscore)
           ld-options:
@@ -474,6 +476,8 @@ library
         ld-options: "-Wl,-search_paths_first"
                     -- See Note [fd_set_overflow]
                     "-Wl,-U,___darwin_check_fd_set_overflow"
+                    -- See Note [Undefined symbols in the RTS]
+                    "-Wl,-undefined,dynamic_lookup"
         if !arch(x86_64) && !arch(aarch64)
            ld-options: -read_only_relocs warning
 
@@ -714,3 +718,35 @@ library
 --     , https://github.com/sitsofe/fio/commit/b6a1e63a1ff607692a3caf3c2db2c3d575ba2320
 
 -- The issue was originally reported in #19950
+
+
+-- Note [Undefined symbols in the RTS]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The RTS is built with a number of `-u` flags. This is to handle cyclic
+-- dependencies between the RTS and other libraries which we normally think of as
+-- downstream from the RTS. "Regular" dependencies from usages in those libraries
+-- to definitions in the RTS are handled normally. "Reverse" dependencies from
+-- usages in the RTS to definitions in those libraries get the `-u` flag in the
+-- RTS.
+--
+-- The symbols are specified literally, but follow C ABI conventions (as all 3 of
+-- C, C--, and Haskell do currently). Thus, we have to be careful to include a
+-- leading underscore or not based on those conventions for the given platform in
+-- question.
+--
+-- A tricky part is that different linkers have different policies regarding
+-- undefined symbols (not defined in the current binary, or found in a shared
+-- library that could be loaded at run time). GNU Binutils' linker is fine with
+-- undefined symbols by default, but Apple's "cctools" linker is not. To appease
+-- that linker we either need to do a blanket `-undefined dynamic_lookup` or
+-- whitelist each such symbol with an additional `-U` (see the man page for more
+-- details).
+--
+-- GHC already does `-undefined dynamic_lookup`, so we just do that for now, but
+-- we might try to get more precise with `-U` in the future.
+--
+-- Note that the RTS also `-u`s some atomics symbols that *are* defined --- and
+-- defined within the RTS! It is not immediately clear why this is needed. This
+-- dates back to c06e3f46d24ef69f3a3d794f5f604cb8c2a40cbc which mentions a build
+-- failure that it was suggested that this fix, but the precise reasoning is not
+-- explained.
