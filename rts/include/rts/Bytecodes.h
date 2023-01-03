@@ -95,6 +95,23 @@
 #define bci_RETURN_T                    69
 #define bci_PUSH_ALTS_T                 70
 
+#define bci_TESTLT_I64                  71
+#define bci_TESTEQ_I64                  72
+#define bci_TESTLT_I32                  73
+#define bci_TESTEQ_I32                  74
+#define bci_TESTLT_I16                  75
+#define bci_TESTEQ_I16                  76
+#define bci_TESTLT_I8                   77
+#define bci_TESTEQ_I8                   78
+#define bci_TESTLT_W64                  79
+#define bci_TESTEQ_W64                  80
+#define bci_TESTLT_W32                  81
+#define bci_TESTEQ_W32                  82
+#define bci_TESTLT_W16                  83
+#define bci_TESTEQ_W16                  84
+#define bci_TESTLT_W8                   85
+#define bci_TESTEQ_W8                   86
+
 #define bci_PRIMCALL                    87
 
 /* If you need to go past 255 then you will run into the flags */

@@ -458,6 +458,38 @@ assembleI platform i = case i of
                                  emit bci_TESTLT_W [Op np, LabelOp l]
   TESTEQ_W  w l            -> do np <- word w
                                  emit bci_TESTEQ_W [Op np, LabelOp l]
+  TESTLT_I64  i l          -> do np <- int64 i
+                                 emit bci_TESTLT_I64 [Op np, LabelOp l]
+  TESTEQ_I64  i l          -> do np <- int64 i
+                                 emit bci_TESTEQ_I64 [Op np, LabelOp l]
+  TESTLT_I32  i l          -> do np <- int (fromIntegral i)
+                                 emit bci_TESTLT_I32 [Op np, LabelOp l]
+  TESTEQ_I32 i l           -> do np <- int (fromIntegral i)
+                                 emit bci_TESTEQ_I32 [Op np, LabelOp l]
+  TESTLT_I16  i l          -> do np <- int (fromIntegral i)
+                                 emit bci_TESTLT_I16 [Op np, LabelOp l]
+  TESTEQ_I16 i l           -> do np <- int (fromIntegral i)
+                                 emit bci_TESTEQ_I16 [Op np, LabelOp l]
+  TESTLT_I8  i l           -> do np <- int (fromIntegral i)
+                                 emit bci_TESTLT_I8 [Op np, LabelOp l]
+  TESTEQ_I8 i l            -> do np <- int (fromIntegral i)
+                                 emit bci_TESTEQ_I8 [Op np, LabelOp l]
+  TESTLT_W64  w l          -> do np <- word64 w
+                                 emit bci_TESTLT_W64 [Op np, LabelOp l]
+  TESTEQ_W64  w l          -> do np <- word64 w
+                                 emit bci_TESTEQ_W64 [Op np, LabelOp l]
+  TESTLT_W32  w l          -> do np <- word (fromIntegral w)
+                                 emit bci_TESTLT_W32 [Op np, LabelOp l]
+  TESTEQ_W32  w l          -> do np <- word (fromIntegral w)
+                                 emit bci_TESTEQ_W32 [Op np, LabelOp l]
+  TESTLT_W16  w l          -> do np <- word (fromIntegral w)
+                                 emit bci_TESTLT_W16 [Op np, LabelOp l]
+  TESTEQ_W16  w l          -> do np <- word (fromIntegral w)
+                                 emit bci_TESTEQ_W16 [Op np, LabelOp l]
+  TESTLT_W8  w l           -> do np <- word (fromIntegral w)
+                                 emit bci_TESTLT_W8 [Op np, LabelOp l]
+  TESTEQ_W8  w l           -> do np <- word (fromIntegral w)
+                                 emit bci_TESTEQ_W8 [Op np, LabelOp l]
   TESTLT_F  f l            -> do np <- float f
                                  emit bci_TESTLT_F [Op np, LabelOp l]
   TESTEQ_F  f l            -> do np <- float f
@@ -524,6 +556,7 @@ assembleI platform i = case i of
     int16 = words . mkLitI64 platform
     int32 = words . mkLitI64 platform
     int64 = words . mkLitI64 platform
+    word64 = words . mkLitW64 platform
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]
 
@@ -612,6 +645,7 @@ mkLitI   ::             Int    -> [Word]
 mkLitF   :: Platform -> Float  -> [Word]
 mkLitD   :: Platform -> Double -> [Word]
 mkLitI64 :: Platform -> Int64  -> [Word]
+mkLitW64 :: Platform -> Word64 -> [Word]
 
 mkLitF platform f = case platformWordSize platform of
   PW4 -> runST $ do
@@ -658,13 +692,18 @@ mkLitI64 platform ii = case platformWordSize platform of
         w1 <- readArray d_arr 1
         return [w0 :: Word,w1]
      )
-   PW8 -> runST (do
-        arr <- newArray_ ((0::Int),0)
-        writeArray arr 0 ii
+   PW8 -> [fromIntegral ii :: Word]
+
+mkLitW64 platform ww = case platformWordSize platform of
+   PW4 -> runST (do
+        arr <- newArray_ ((0::Word),1)
+        writeArray arr 0 ww
         d_arr <- castSTUArray arr
         w0 <- readArray d_arr 0
-        return [w0 :: Word]
+        w1 <- readArray d_arr 1
+        return [w0 :: Word,w1]
      )
+   PW8 -> [fromIntegral ww :: Word]
 
 mkLitI i = [fromIntegral i :: Word]
 

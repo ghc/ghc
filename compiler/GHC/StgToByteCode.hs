@@ -962,12 +962,26 @@ doCase d s p scrut bndr alts
               | otherwise
               -> DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
             LitAlt l -> case l of
-              LitNumber LitNumInt i  -> DiscrI (fromInteger i)
-              LitNumber LitNumWord w -> DiscrW (fromInteger w)
-              LitFloat r             -> DiscrF (fromRational r)
-              LitDouble r            -> DiscrD (fromRational r)
-              LitChar i              -> DiscrI (ord i)
-              _ -> pprPanic "schemeE(StgCase).my_discr" (ppr l)
+              LitNumber LitNumInt i    -> DiscrI (fromInteger i)
+              LitNumber LitNumInt8 i   -> DiscrI8 (fromInteger i)
+              LitNumber LitNumInt16 i  -> DiscrI16 (fromInteger i)
+              LitNumber LitNumInt32 i  -> DiscrI32 (fromInteger i)
+              LitNumber LitNumInt64 i  -> DiscrI64 (fromInteger i)
+              LitNumber LitNumWord w   -> DiscrW (fromInteger w)
+              LitNumber LitNumWord8 w  -> DiscrW8 (fromInteger w)
+              LitNumber LitNumWord16 w -> DiscrW16 (fromInteger w)
+              LitNumber LitNumWord32 w -> DiscrW32 (fromInteger w)
+              LitNumber LitNumWord64 w -> DiscrW64 (fromInteger w)
+              LitNumber LitNumBigNat _ -> unsupported
+              LitFloat r               -> DiscrF (fromRational r)
+              LitDouble r              -> DiscrD (fromRational r)
+              LitChar i                -> DiscrI (ord i)
+              LitString {}             -> unsupported
+              LitRubbish {}            -> unsupported
+              LitNullAddr {}           -> unsupported
+              LitLabel {}              -> unsupported
+              where
+                  unsupported = pprPanic "schemeE(StgCase).my_discr:" (ppr l)
 
         maybe_ncons
            | not isAlgCase = Nothing
@@ -1961,14 +1975,30 @@ mkMultiBranch maybe_ncons raw_ways = do
          notd_ways = sortBy (comparing fst) not_defaults
 
          testLT (DiscrI i) fail_label = TESTLT_I i fail_label
+         testLT (DiscrI8 i) fail_label = TESTLT_I8 (fromIntegral i) fail_label
+         testLT (DiscrI16 i) fail_label = TESTLT_I16 (fromIntegral i) fail_label
+         testLT (DiscrI32 i) fail_label = TESTLT_I32 (fromIntegral i) fail_label
+         testLT (DiscrI64 i) fail_label = TESTLT_I64 (fromIntegral i) fail_label
          testLT (DiscrW i) fail_label = TESTLT_W i fail_label
+         testLT (DiscrW8 i) fail_label = TESTLT_W8 (fromIntegral i) fail_label
+         testLT (DiscrW16 i) fail_label = TESTLT_W16 (fromIntegral i) fail_label
+         testLT (DiscrW32 i) fail_label = TESTLT_W32 (fromIntegral i) fail_label
+         testLT (DiscrW64 i) fail_label = TESTLT_W64 (fromIntegral i) fail_label
          testLT (DiscrF i) fail_label = TESTLT_F i fail_label
          testLT (DiscrD i) fail_label = TESTLT_D i fail_label
          testLT (DiscrP i) fail_label = TESTLT_P i fail_label
          testLT NoDiscr    _          = panic "mkMultiBranch NoDiscr"
 
          testEQ (DiscrI i) fail_label = TESTEQ_I i fail_label
+         testEQ (DiscrI8 i) fail_label = TESTEQ_I8 (fromIntegral i) fail_label
+         testEQ (DiscrI16 i) fail_label = TESTEQ_I16 (fromIntegral i) fail_label
+         testEQ (DiscrI32 i) fail_label = TESTEQ_I32 (fromIntegral i) fail_label
+         testEQ (DiscrI64 i) fail_label = TESTEQ_I64 (fromIntegral i) fail_label
          testEQ (DiscrW i) fail_label = TESTEQ_W i fail_label
+         testEQ (DiscrW8 i) fail_label = TESTEQ_W8 (fromIntegral i) fail_label
+         testEQ (DiscrW16 i) fail_label = TESTEQ_W16 (fromIntegral i) fail_label
+         testEQ (DiscrW32 i) fail_label = TESTEQ_W32 (fromIntegral i) fail_label
+         testEQ (DiscrW64 i) fail_label = TESTEQ_W64 (fromIntegral i) fail_label
          testEQ (DiscrF i) fail_label = TESTEQ_F i fail_label
          testEQ (DiscrD i) fail_label = TESTEQ_D i fail_label
          testEQ (DiscrP i) fail_label = TESTEQ_P i fail_label
@@ -1981,7 +2011,15 @@ mkMultiBranch maybe_ncons raw_ways = do
             | otherwise
             = case fst (head notd_ways) of
                 DiscrI _ -> ( DiscrI minBound,  DiscrI maxBound )
+                DiscrI8 _ -> ( DiscrI8 minBound, DiscrI8 maxBound )
+                DiscrI16 _ -> ( DiscrI16 minBound, DiscrI16 maxBound )
+                DiscrI32 _ -> ( DiscrI32 minBound, DiscrI32 maxBound )
+                DiscrI64 _ -> ( DiscrI64 minBound, DiscrI64 maxBound )
                 DiscrW _ -> ( DiscrW minBound,  DiscrW maxBound )
+                DiscrW8 _ -> ( DiscrW8 minBound, DiscrW8 maxBound )
+                DiscrW16 _ -> ( DiscrW16 minBound, DiscrW16 maxBound )
+                DiscrW32 _ -> ( DiscrW32 minBound, DiscrW32 maxBound )
+                DiscrW64 _ -> ( DiscrW64 minBound, DiscrW64 maxBound )
                 DiscrF _ -> ( DiscrF minF,      DiscrF maxF )
                 DiscrD _ -> ( DiscrD minD,      DiscrD maxD )
                 DiscrP _ -> ( DiscrP algMinBound, DiscrP algMaxBound )
@@ -2017,7 +2055,15 @@ mkMultiBranch maybe_ncons raw_ways = do
 -- Describes case alts
 data Discr
    = DiscrI Int
+   | DiscrI8 Int8
+   | DiscrI16 Int16
+   | DiscrI32 Int32
+   | DiscrI64 Int64
    | DiscrW Word
+   | DiscrW8 Word8
+   | DiscrW16 Word16
+   | DiscrW32 Word32
+   | DiscrW64 Word64
    | DiscrF Float
    | DiscrD Double
    | DiscrP Word16
@@ -2026,7 +2072,15 @@ data Discr
 
 instance Outputable Discr where
    ppr (DiscrI i) = int i
+   ppr (DiscrI8 i) = text (show i)
+   ppr (DiscrI16 i) = text (show i)
+   ppr (DiscrI32 i) = text (show i)
+   ppr (DiscrI64 i) = text (show i)
    ppr (DiscrW w) = text (show w)
+   ppr (DiscrW8 w) = text (show w)
+   ppr (DiscrW16 w) = text (show w)
+   ppr (DiscrW32 w) = text (show w)
+   ppr (DiscrW64 w) = text (show w)
    ppr (DiscrF f) = text (show f)
    ppr (DiscrD d) = text (show d)
    ppr (DiscrP i) = ppr i

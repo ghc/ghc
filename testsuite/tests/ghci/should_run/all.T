@@ -84,3 +84,4 @@ test('T19628', [extra_files(['T19628a.hs']), only_ways(['ghci']) ], compile_and_
 test('T21052', just_ghci, ghci_script, ['T21052.script'])
 test('T21300', just_ghci, ghci_script, ['T21300.script'])
 test('UnliftedDataType2', just_ghci, compile_and_run, [''])
+

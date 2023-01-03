@@ -24,7 +24,9 @@ import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
 
+import Data.Int
 import Data.Word
+
 import GHC.Stack.CCS (CostCentre)
 
 import GHC.Stg.Syntax
@@ -145,6 +147,22 @@ data BCInstr
    | TESTEQ_I  Int    LocalLabel
    | TESTLT_W  Word   LocalLabel
    | TESTEQ_W  Word   LocalLabel
+   | TESTLT_I64 Int64 LocalLabel
+   | TESTEQ_I64 Int64 LocalLabel
+   | TESTLT_I32 Int32 LocalLabel
+   | TESTEQ_I32 Int32 LocalLabel
+   | TESTLT_I16 Int16 LocalLabel
+   | TESTEQ_I16 Int16 LocalLabel
+   | TESTLT_I8 Int8   LocalLabel
+   | TESTEQ_I8 Int16  LocalLabel
+   | TESTLT_W64 Word64 LocalLabel
+   | TESTEQ_W64 Word64 LocalLabel
+   | TESTLT_W32 Word32 LocalLabel
+   | TESTEQ_W32 Word32 LocalLabel
+   | TESTLT_W16 Word16 LocalLabel
+   | TESTEQ_W16 Word16 LocalLabel
+   | TESTLT_W8 Word8 LocalLabel
+   | TESTEQ_W8 Word8 LocalLabel
    | TESTLT_F  Float  LocalLabel
    | TESTEQ_F  Float  LocalLabel
    | TESTLT_D  Double LocalLabel
@@ -298,6 +316,22 @@ instance Outputable BCInstr where
    ppr (TESTEQ_I  i lab)     = text "TESTEQ_I" <+> int i <+> text "__" <> ppr lab
    ppr (TESTLT_W  i lab)     = text "TESTLT_W" <+> int (fromIntegral i) <+> text "__" <> ppr lab
    ppr (TESTEQ_W  i lab)     = text "TESTEQ_W" <+> int (fromIntegral i) <+> text "__" <> ppr lab
+   ppr (TESTLT_I64  i lab)   = text "TESTLT_I64" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_I64  i lab)   = text "TESTEQ_I64" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_I32  i lab)   = text "TESTLT_I32" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_I32  i lab)   = text "TESTEQ_I32" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_I16  i lab)   = text "TESTLT_I16" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_I16  i lab)   = text "TESTEQ_I16" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_I8  i lab)    = text "TESTLT_I8" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_I8  i lab)    = text "TESTEQ_I8" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_W64  i lab)   = text "TESTLT_W64" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_W64  i lab)   = text "TESTEQ_W64" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_W32  i lab)   = text "TESTLT_W32" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_W32  i lab)   = text "TESTEQ_W32" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_W16  i lab)   = text "TESTLT_W16" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_W16  i lab)   = text "TESTEQ_W16" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTLT_W8  i lab)    = text "TESTLT_W8" <+> ppr i <+> text "__" <> ppr lab
+   ppr (TESTEQ_W8  i lab)    = text "TESTEQ_W8" <+> ppr i <+> text "__" <> ppr lab
    ppr (TESTLT_F  f lab)     = text "TESTLT_F" <+> float f <+> text "__" <> ppr lab
    ppr (TESTEQ_F  f lab)     = text "TESTEQ_F" <+> float f <+> text "__" <> ppr lab
    ppr (TESTLT_D  d lab)     = text "TESTLT_D" <+> double d <+> text "__" <> ppr lab
@@ -389,6 +423,22 @@ bciStackUse TESTLT_I{}            = 0
 bciStackUse TESTEQ_I{}            = 0
 bciStackUse TESTLT_W{}            = 0
 bciStackUse TESTEQ_W{}            = 0
+bciStackUse TESTLT_I64{}          = 0
+bciStackUse TESTEQ_I64{}          = 0
+bciStackUse TESTLT_I32{}          = 0
+bciStackUse TESTEQ_I32{}          = 0
+bciStackUse TESTLT_I16{}          = 0
+bciStackUse TESTEQ_I16{}          = 0
+bciStackUse TESTLT_I8{}           = 0
+bciStackUse TESTEQ_I8{}           = 0
+bciStackUse TESTLT_W64{}          = 0
+bciStackUse TESTEQ_W64{}          = 0
+bciStackUse TESTLT_W32{}          = 0
+bciStackUse TESTEQ_W32{}          = 0
+bciStackUse TESTLT_W16{}          = 0
+bciStackUse TESTEQ_W16{}          = 0
+bciStackUse TESTLT_W8{}           = 0
+bciStackUse TESTEQ_W8{}           = 0
 bciStackUse TESTLT_F{}            = 0
 bciStackUse TESTEQ_F{}            = 0
 bciStackUse TESTLT_D{}            = 0
