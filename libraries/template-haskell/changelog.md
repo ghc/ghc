@@ -7,6 +7,7 @@
 
   * Add `TypeDataD` constructor to the `Dec` type for `type data`
     declarations (GHC proposal #106).
+  * Add `instance Lift (Fixed a)`
 
 ## 2.19.0.0
 

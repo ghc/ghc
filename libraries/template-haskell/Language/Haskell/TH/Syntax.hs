@@ -31,6 +31,7 @@ module Language.Haskell.TH.Syntax
     -- $infix
     ) where
 
+import qualified Data.Fixed as Fixed
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
@@ -1055,6 +1056,15 @@ instance Lift Word64 where
 instance Lift Natural where
   liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
+
+instance Lift (Fixed.Fixed a) where
+  liftTyped x = unsafeCodeCoerce (lift x)
+  lift (Fixed.MkFixed x) = do
+    ex <- lift x
+    return (ConE mkFixedName `AppE` ex)
+    where
+      mkFixedName =
+        mkNameG DataName "base" "Data.Fixed" "MkFixed"
 
 instance Integral a => Lift (Ratio a) where
   liftTyped x = unsafeCodeCoerce (lift x)
