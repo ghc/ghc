@@ -1680,7 +1680,10 @@ data HsMatchContext p
   = FunRhs
     -- ^ A pattern matching on an argument of a
     -- function binding
-      { mc_fun        :: LIdP p    -- ^ function binder of @f@
+      { mc_fun        :: LIdP (NoGhcTc p)    -- ^ function binder of @f@
+                                             -- See Note [mc_fun field of FunRhs]
+                                             -- See #20415 for a long discussion about
+                                             -- this field and why it uses NoGhcTc.
       , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
       , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                        -- See Note [FunBind vs PatBind]
@@ -1706,6 +1709,21 @@ data HsMatchContext p
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
+
+{-
+Note [mc_fun field of FunRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The mc_fun field of FunRhs has type `LIdP (NoGhcTc p)`, which means it will be
+a `RdrName` in pass `GhcPs`, a `Name` in `GhcRn`, and (importantly) still a
+`Name` in `GhcTc` -- not an `Id`.  See Note [NoGhcTc] in GHC.Hs.Extension.
+
+Why a `Name` in the typechecker phase?  Because:
+* A `Name` is all we need, as it turns out.
+* Using an `Id` involves knot-tying in the monad, which led to #22695.
+
+See #20415 for a long discussion.
+
+-}
 
 isPatSynCtxt :: HsMatchContext p -> Bool
 isPatSynCtxt ctxt =
@@ -1801,7 +1819,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (IdP p), UnXRec p)
+pprMatchContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -1812,10 +1830,10 @@ pprMatchContext ctxt
     want_an (ArrowMatchCtxt KappaExpr) = True
     want_an _                          = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNoun :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                     => HsMatchContext p -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
-                                              <+> quotes (ppr (unXRec @p fun))
+                                              <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
 pprMatchContextNoun CaseAlt                 = text "case alternative"
 pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
                                               <+> text "alternative"
@@ -1831,10 +1849,10 @@ pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
                                               $$ pprAStmtContext ctxt
 pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
 
-pprMatchContextNouns :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNouns :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                      => HsMatchContext p -> SDoc
 pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for"
-                                               <+> quotes (ppr (unXRec @p fun))
+                                               <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
 pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
 pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
 pprMatchContextNouns (StmtCtxt ctxt)         = text "pattern bindings in"
@@ -1855,7 +1873,7 @@ pprArrowMatchContextNouns (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_varia
 pprArrowMatchContextNouns ctxt                         = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+pprAStmtContext, pprStmtContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                                 => HsStmtContext p -> SDoc
 pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
 pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt

@@ -31,7 +31,7 @@ module GHC.Tc.Gen.Match
    , tcBody
    , tcDoStmt
    , tcGuardStmt
-   , checkPatCounts
+   , checkArgCounts
    )
 where
 
@@ -93,12 +93,12 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 -}
 
-tcMatchesFun :: LocatedN Id -- MatchContext Id
+tcMatchesFun :: LocatedN Name -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
-tcMatchesFun fun_id matches exp_ty
+tcMatchesFun fun_name matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely
@@ -106,9 +106,7 @@ tcMatchesFun fun_id matches exp_ty
            -- ann-grabbing, because we don't always have annotations in
            -- hand when we call tcMatchesFun...
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
-           -- We can't easily call checkPatCounts here because fun_id can be an
-           -- unfilled thunk
-        ; checkArgCounts fun_name matches
+        ; checkArgCounts what matches
 
         ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
              -- NB: exp_type may be polymorphic, but
@@ -122,17 +120,11 @@ tcMatchesFun fun_id matches exp_ty
           -- a multiplicity argument, and scale accordingly.
           tcMatches match_ctxt pat_tys rhs_ty matches }
   where
-    fun_name = idName (unLoc fun_id)
     arity  = matchGroupArity matches
-    herald = ExpectedFunTyMatches (NameThing fun_name) matches
+    herald = ExpectedFunTyMatches (NameThing (unLoc fun_name)) matches
     ctxt   = GenSigCtxt  -- Was: FunSigCtxt fun_name True
                          -- But that's wrong for f :: Int -> forall a. blah
-    what   = FunRhs { mc_fun = fun_id, mc_fixity = Prefix, mc_strictness = strictness }
-                    -- Careful: this fun_id could be an unfilled
-                    -- thunk from fixM in tcMonoBinds, so we're
-                    -- not allowed to look at it, except for
-                    -- idName.
-                    -- See Note [fixM for rhs_ty in tcMonoBinds]
+    what   = FunRhs { mc_fun = fun_name, mc_fixity = Prefix, mc_strictness = strictness }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
@@ -164,7 +156,7 @@ tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys
               -> ExpRhoType
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
-  =  do { checkPatCounts (mc_what match_ctxt) match
+  =  do { checkArgCounts (mc_what match_ctxt) match
         ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
             -- checking argument counts since this is also used for \cases
             tcMatches match_ctxt pat_tys rhs_ty match }
@@ -1136,39 +1128,28 @@ the variables they bind into scope, and typecheck the thing_inside.
 \subsection{Errors and contexts}
 *                                                                      *
 ************************************************************************
-
-@checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
-number of args are used in each equation.
 -}
 
+-- | @checkArgCounts@ takes a @[RenamedMatch]@ and decides whether the same
+-- number of args are used in each equation.
 checkArgCounts :: AnnoBody body
-               => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
-checkArgCounts = check_match_pats . (text "Equations for" <+>) . quotes . ppr
-
--- @checkPatCounts@ takes a @[RenamedMatch]@ and decides whether the same
--- number of patterns are used in each alternative
-checkPatCounts :: AnnoBody body
-               => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (body GhcRn))
-               -> TcM ()
-checkPatCounts = check_match_pats . pprMatchContextNouns
-
-check_match_pats :: AnnoBody body
-                 => SDoc -> MatchGroup GhcRn (LocatedA (body GhcRn))
-                 -> TcM ()
-check_match_pats _ (MG { mg_alts = L _ [] })
+          => HsMatchContext GhcTc -> MatchGroup GhcRn (LocatedA (body GhcRn))
+          -> TcM ()
+checkArgCounts _ (MG { mg_alts = L _ [] })
     = return ()
-check_match_pats err_msg (MG { mg_alts = L _ (match1:matches) })
-    | null bad_matches
-    = return ()
-    | otherwise
+checkArgCounts matchContext (MG { mg_alts = L _ (match1:matches) })
+    | not (null bad_matches)
     = failWithTc $ TcRnUnknownMessage $ mkPlainError noHints $
       (vcat [ err_msg <+>
               text "have different numbers of arguments"
             , nest 2 (ppr (getLocA match1))
             , nest 2 (ppr (getLocA (head bad_matches)))])
+    | otherwise
+    = return ()
   where
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
+    err_msg = pprMatchContextNouns matchContext
 
     args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
     args_in_match (L _ (Match { m_pats = pats })) = length pats

@@ -840,7 +840,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                        , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (mkPrefixFunRhs (L loc patsyn_id)) []
+             match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id))) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)

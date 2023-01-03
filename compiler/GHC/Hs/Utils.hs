@@ -912,7 +912,7 @@ mkSimpleGeneratedFunBind loc fun pats expr
                        emptyLocalBinds]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
-mkPrefixFunRhs :: LIdP p -> HsMatchContext p
+mkPrefixFunRhs :: LIdP (NoGhcTc p) -> HsMatchContext p
 mkPrefixFunRhs n = FunRhs { mc_fun = n
                           , mc_fixity = Prefix
                           , mc_strictness = NoSrcStrict }
