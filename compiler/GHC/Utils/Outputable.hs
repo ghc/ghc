@@ -896,6 +896,12 @@ instance Outputable Ordering where
     ppr EQ = text "EQ"
     ppr GT = text "GT"
 
+instance Outputable Int8 where
+   ppr n = integer $ fromIntegral n
+
+instance Outputable Int16 where
+   ppr n = integer $ fromIntegral n
+
 instance Outputable Int32 where
    ppr n = integer $ fromIntegral n
 
@@ -907,6 +913,9 @@ instance Outputable Int where
 
 instance Outputable Integer where
     ppr n = integer n
+
+instance Outputable Word8 where
+    ppr n = integer $ fromIntegral n
 
 instance Outputable Word16 where
     ppr n = integer $ fromIntegral n

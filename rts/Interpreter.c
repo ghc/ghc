@@ -75,6 +75,8 @@
 
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]
+#define BCO_LITW64(n) (*(StgWord64*)(literals+n))
+#define BCO_LITI64(n) (*(StgInt64*)(literals+n))
 
 #define LOAD_STACK_POINTERS                                     \
     Sp = cap->r.rCurrentTSO->stackobj->sp;                      \
@@ -1728,6 +1730,46 @@ run_BCO:
             goto nextInsn;
         }
 
+        case bci_TESTLT_I64: {
+            // There should be an Int64 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt64 stackInt = (*(StgInt64*)Sp_plusW(1));
+            if (stackInt >= BCO_LITI64(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_I32: {
+            // There should be an Int32 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt32 stackInt = (*(StgInt32*)Sp_plusW(1));
+            if (stackInt >= (StgInt32)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_I16: {
+            // There should be an Int16 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt16 stackInt = (*(StgInt16*)Sp_plusW(1));
+            if (stackInt >= (StgInt16)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_I8: {
+            // There should be an Int8 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt8 stackInt = (*(StgInt8*)Sp_plusW(1));
+            if (stackInt >= (StgInt8)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
         case bci_TESTEQ_I: {
             // There should be an Int at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
@@ -1739,8 +1781,52 @@ run_BCO:
             goto nextInsn;
         }
 
+        case bci_TESTEQ_I64: {
+            // There should be an Int64 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt64 stackInt = (*(StgInt64*)Sp_plusW(1));
+            if (stackInt != BCO_LITI64(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_I32: {
+            // There should be an Int32 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt32 stackInt = (*(StgInt32*)Sp_plusW(1));
+            if (stackInt != (StgInt32)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_I16: {
+            // There should be an Int16 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt16 stackInt = (*(StgInt16*)Sp_plusW(1));
+            if (stackInt != (StgInt16)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_I8: {
+            // There should be an Int8 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgInt8 stackInt = (*(StgInt8*)Sp_plusW(1));
+            if (stackInt != (StgInt8)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
         case bci_TESTLT_W: {
-            // There should be an Int at SpW(1), and an info table at SpW(0).
+            // There should be a Word at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             W_ stackWord = (W_)SpW(1);
@@ -1749,12 +1835,96 @@ run_BCO:
             goto nextInsn;
         }
 
+        case bci_TESTLT_W64: {
+            // There should be a Word64 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord64 stackWord = (*(StgWord64*)Sp_plusW(1));
+            if (stackWord >= BCO_LITW64(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_W32: {
+            // There should be a Word32 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord32 stackWord = (*(StgWord32*)Sp_plusW(1));
+            if (stackWord >= (StgWord32)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_W16: {
+            // There should be a Word16 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord16 stackWord = (*(StgWord16*)Sp_plusW(1));
+            if (stackWord >= (StgWord16)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
+        case bci_TESTLT_W8: {
+            // There should be a Word8 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord8 stackWord = (*(StgWord8*)Sp_plusW(1));
+            if (stackWord >= (StgWord8)BCO_LIT(discr))
+                bciPtr = failto;
+            goto nextInsn;
+        }
+
         case bci_TESTEQ_W: {
-            // There should be an Int at SpW(1), and an info table at SpW(0).
+            // There should be a Word at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             W_ stackWord = (W_)SpW(1);
             if (stackWord != (W_)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_W64: {
+            // There should be a Word64 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord64 stackWord = (*(StgWord64*)Sp_plusW(1));
+            if (stackWord != BCO_LITW64(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_W32: {
+            // There should be a Word32 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord32 stackWord = (*(StgWord32*)Sp_plusW(1));
+            if (stackWord != (StgWord32)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_W16: {
+            // There should be a Word16 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord16 stackWord = (*(StgWord16*)Sp_plusW(1));
+            if (stackWord != (StgWord16)BCO_LIT(discr)) {
+                bciPtr = failto;
+            }
+            goto nextInsn;
+        }
+
+        case bci_TESTEQ_W8: {
+            // There should be a Word8 at SpW(1), and an info table at SpW(0).
+            int discr   = BCO_GET_LARGE_ARG;
+            int failto  = BCO_GET_LARGE_ARG;
+            StgWord8 stackWord = (*(StgWord8*)Sp_plusW(1));
+            if (stackWord != (StgWord8)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
             goto nextInsn;
