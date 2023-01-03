@@ -2002,7 +2002,7 @@ matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
 
-pprMatchContext :: (Outputable (IdP p), UnXRec p)
+pprMatchContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                 => HsMatchContext p -> SDoc
 pprMatchContext ctxt
   | want_an ctxt = text "an" <+> pprMatchContextNoun ctxt
@@ -2013,10 +2013,10 @@ pprMatchContext ctxt
     want_an (ArrowMatchCtxt KappaExpr) = True
     want_an _                          = False
 
-pprMatchContextNoun :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNoun :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                     => HsMatchContext p -> SDoc
 pprMatchContextNoun (FunRhs {mc_fun=fun})   = text "equation for"
-                                              <+> quotes (ppr (unXRec @p fun))
+                                                <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
 pprMatchContextNoun CaseAlt                 = text "case alternative"
 pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
                                               <+> text "alternative"
@@ -2032,10 +2032,10 @@ pprMatchContextNoun (StmtCtxt ctxt)         = text "pattern binding in"
                                               $$ pprAStmtContext ctxt
 pprMatchContextNoun PatSyn                  = text "pattern synonym declaration"
 
-pprMatchContextNouns :: forall p. (Outputable (IdP p), UnXRec p)
+pprMatchContextNouns :: forall p. (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                      => HsMatchContext p -> SDoc
 pprMatchContextNouns (FunRhs {mc_fun=fun})   = text "equations for"
-                                               <+> quotes (ppr (unXRec @p fun))
+                                               <+> quotes (ppr (unXRec @(NoGhcTc p) fun))
 pprMatchContextNouns PatBindGuards           = text "pattern binding guards"
 pprMatchContextNouns (ArrowMatchCtxt c)      = pprArrowMatchContextNouns c
 pprMatchContextNouns (StmtCtxt ctxt)         = text "pattern bindings in"
@@ -2056,7 +2056,7 @@ pprArrowMatchContextNouns (ArrowLamCaseAlt lc_variant) = lamCaseKeyword lc_varia
 pprArrowMatchContextNouns ctxt                         = pprArrowMatchContextNoun ctxt <> char 's'
 
 -----------------
-pprAStmtContext, pprStmtContext :: (Outputable (IdP p), UnXRec p)
+pprAStmtContext, pprStmtContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                                 => HsStmtContext p -> SDoc
 pprAStmtContext (HsDoStmt flavour) = pprAHsDoFlavour flavour
 pprAStmtContext ctxt = text "a" <+> pprStmtContext ctxt
