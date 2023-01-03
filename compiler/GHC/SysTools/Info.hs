@@ -136,7 +136,8 @@ getLinkerInfo' logger dflags = do
         -- Darwin has neither GNU Gold or GNU LD, but a strange linker
         -- that doesn't support --version. We can just assume that's
         -- what we're using.
-        return $ DarwinLD []
+        -- See Note [Dynamic lookup and chained fixups]
+        return $ DarwinLD [Option "-Wl,-no_fixup_chains"]
       OSMinGW32 ->
         -- GHC doesn't support anything but GNU ld on Windows anyway.
         -- Process creation is also fairly expensive on win32, so
@@ -236,3 +237,27 @@ getCompilerInfo' logger pgm = do
             text "Make sure you're using GNU gcc, or clang"
           return UnknownCC
       )
+
+{-
+Note [Dynamic lookup and chained fixups]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Recent versions of MacOS use a version of ld where `-fixup_chains` is on by default.
+This is incompatible with our usage of `-undefined dynamic_lookup`. Therefore we
+explicitly disable `fixup_chains` by passing `-no_fixup_chains` to the linker on
+darwin. This results in a warning of the form:
+
+ld: warning: -undefined dynamic_lookup may not work with chained fixups
+
+The manual explains the incompatible nature of these two flags:
+
+     -undefined treatment
+             Specifies how undefined symbols are to be treated. Options are: error, warning,
+             suppress, or dynamic_lookup.  The default is error. Note: dynamic_lookup that
+             depends on lazy binding will not work with chained fixups.
+
+A relevant ticket is #22429
+
+-}
+
+
