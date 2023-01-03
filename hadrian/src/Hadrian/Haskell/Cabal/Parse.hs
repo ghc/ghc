@@ -148,6 +148,8 @@ configurePackage context@Context {..} = do
     -- Figure out what hooks we need.
     hooks <- case C.buildType (C.flattenPackageDescription gpd) of
         C.Configure -> pure C.autoconfUserHooks
+        C.Simple -> pure C.simpleUserHooks
+        C.Make -> fail "build-type: Make is not supported"
         -- The 'time' package has a 'C.Custom' Setup.hs, but it's actually
         -- 'C.Configure' plus a @./Setup test@ hook. However, Cabal is also
         -- 'C.Custom', but doesn't have a configure script.
@@ -155,12 +157,6 @@ configurePackage context@Context {..} = do
             configureExists <- doesFileExist $
                 replaceFileName (pkgCabalFile package) "configure"
             pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
-        -- Not quite right, but good enough for us:
-        _ | package == rts ->
-            -- Don't try to do post configuration validation for 'rts'. This
-            -- will simply not work, due to the @ld-options@ and @Stg.h@.
-            pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
-          | otherwise -> pure C.simpleUserHooks
 
     -- Compute the list of flags, and the Cabal configuration arguments
     flavourArgs <- args <$> flavour
