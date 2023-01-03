@@ -2094,7 +2094,7 @@ data TcRnMessage where
                 typecheck/should_fail/T20768_fail
   -}
   TcRnMatchesHaveDiffNumArgs
-    :: !MatchArgsContext
+    :: !(HsMatchContext GhcTc) -- ^ Pattern match specifics
     -> !MatchArgBadMatches
     -> TcRnMessage
 

@@ -957,7 +957,7 @@ instance HiePass p => ToHie (HsMatchContext (GhcPass p)) where
       name' :: LocatedN Name
       name' = case hiePass @p of
         HieRn -> name
-        HieTc -> fmap varName name
+        HieTc -> name
   toHie (StmtCtxt a) = toHie a
   toHie _ = pure []
 

@@ -1533,7 +1533,10 @@ data HsMatchContext p
   = FunRhs
     -- ^ A pattern matching on an argument of a
     -- function binding
-      { mc_fun        :: LIdP p    -- ^ function binder of @f@
+      { mc_fun        :: LIdP (NoGhcTc p)    -- ^ function binder of @f@
+                                             -- See Note [mc_fun field of FunRhs]
+                                             -- See #20415 for a long discussion about
+                                             -- this field and why it uses NoGhcTc.
       , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
       , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                        -- See Note [FunBind vs PatBind]
@@ -1559,6 +1562,21 @@ data HsMatchContext p
   | ThPatSplice            -- ^A Template Haskell pattern splice
   | ThPatQuote             -- ^A Template Haskell pattern quotation [p| (a,b) |]
   | PatSyn                 -- ^A pattern synonym declaration
+
+{-
+Note [mc_fun field of FunRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The mc_fun field of FunRhs has type `LIdP (NoGhcTc p)`, which means it will be
+a `RdrName` in pass `GhcPs`, a `Name` in `GhcRn`, and (importantly) still a
+`Name` in `GhcTc` -- not an `Id`.  See Note [NoGhcTc] in GHC.Hs.Extension.
+
+Why a `Name` in the typechecker phase?  Because:
+* A `Name` is all we need, as it turns out.
+* Using an `Id` involves knot-tying in the monad, which led to #22695.
+
+See #20415 for a long discussion.
+
+-}
 
 isPatSynCtxt :: HsMatchContext p -> Bool
 isPatSynCtxt ctxt =
