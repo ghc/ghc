@@ -83,7 +83,8 @@ module GHC.Types.Id (
 
         -- ** Inline pragma stuff
         idPragmaInfo, idInlinePragma, idHasInlineable, setInlinePragma,
-        setIdPragmaInfo, modifyInlinePragma, setHasInlineable,
+        idHasSpecRec, idSpecRec,
+        setIdPragmaInfo, modifyInlinePragma, setHasInlineable, setHasSpecRec,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
         -- ** One-shot lambdas
@@ -176,6 +177,7 @@ infixl  1 `setIdUnfolding`,
           `setIdSpecialisation`,
           `setInlinePragma`,
           `setHasInlineable`,
+          `setHasSpecRec`,
           `setIdPragmaInfo`,
           `setInlineActivation`,
           `idCafInfo`,
@@ -899,6 +901,12 @@ idInlinePragma id = inlinePragInfo (idInfo id)
 idHasInlineable :: Id -> Bool
 idHasInlineable id = inlineableInfo (idInfo id)
 
+idHasSpecRec :: Id -> Bool
+idHasSpecRec id = isJust $ specRecInfo (idInfo id)
+
+idSpecRec :: Id -> Maybe Activation
+idSpecRec id = specRecInfo (idInfo id)
+
 idPragmaInfo :: Id -> PragInfo
 idPragmaInfo id = pragInfo (idInfo id)
 
@@ -907,6 +915,9 @@ setInlinePragma id prag = modifyIdInfo (`setInlinePragInfo` prag) id
 
 setHasInlineable :: Id -> Bool -> Id
 setHasInlineable id inlineable = modifyIdInfo (`setHasInlineableInfo` inlineable) id
+
+setHasSpecRec :: Id -> (Maybe Activation) -> Id
+setHasSpecRec id spec_rec = modifyIdInfo (`setHasSpecRecInfo` spec_rec) id
 
 setIdPragmaInfo :: Id -> PragInfo -> Id
 setIdPragmaInfo id pragInfo = modifyIdInfo (`setPragInfo` pragInfo) id
@@ -1053,6 +1064,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_arity       = arityInfo old_info
     old_inline_prag = inlinePragInfo old_info
     old_unf_info    = inlineableInfo old_info
+    old_spec_rec    = specRecInfo old_info
     old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
     new_occ_info    = zapOccTailCallInfo old_occ_info
@@ -1077,6 +1089,7 @@ transferPolyIdInfo old_id abstract_wrt new_id
     transfer new_info = new_info `setArityInfo`      new_arity
                                  `setInlinePragInfo` old_inline_prag
                                  `setHasInlineableInfo` old_unf_info
+                                 `setHasSpecRecInfo` old_spec_rec
                                  `setOccInfo`        new_occ_info
                                  `setDmdSigInfo`     new_strictness
                                  `setCprSigInfo`     new_cpr

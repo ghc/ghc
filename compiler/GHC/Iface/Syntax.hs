@@ -358,6 +358,7 @@ data IfaceInfoItem
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsInlineable
+  | HsSpecRec       Activation
   | HsNoCafRefs
   | HsLFInfo        IfaceLFInfo
   | HsTagSig        TagSig
@@ -1517,6 +1518,7 @@ instance Outputable IfaceInfoItem where
                               <> colon <+> ppr unf
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
   ppr (HsInlineable)        = text "HasInlineable:True"
+  ppr (HsSpecRec act)       = text "SpecRec:" <> ppr act
   ppr (HsArity arity)       = text "Arity:" <+> int arity
   ppr (HsDmdSig str)        = text "Strictness:" <+> ppr str
   ppr (HsCprSig cpr)        = text "CPR:" <+> ppr cpr
@@ -2287,7 +2289,8 @@ instance Binary IfaceInfoItem where
     put_ bh (HsCprSig cpr)        = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
     put_ bh (HsTagSig sig)        = putByte bh 8 >> put_ bh sig
-    put_ bh (HsInlineable)           = putByte bh 9
+    put_ bh (HsInlineable)        = putByte bh 9
+    put_ bh (HsSpecRec act)       = putByte bh 10 >> put_ bh act
 
     get bh = do
         h <- getByte bh
@@ -2303,6 +2306,7 @@ instance Binary IfaceInfoItem where
             7 -> HsLFInfo <$> get bh
             8 -> HsTagSig <$> get bh
             9 -> pure HsInlineable
+            10 -> HsSpecRec <$> get bh
             _ -> error "Binary:IfaceInfoItem - Invalid byte"
 
 instance Binary IfaceUnfolding where
@@ -2713,6 +2717,7 @@ instance NFData IfaceInfoItem where
     HsLFInfo lf_info -> lf_info `seq` () -- TODO: seq further?
     HsTagSig sig -> sig `seq` ()
     HsInlineable -> ()
+    HsSpecRec act -> rnf act
 
 instance NFData IfGuidance where
   rnf = \case

@@ -993,6 +993,8 @@ rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | otherwise    = mapM (rep_ty_sig sigDName (locA loc) ty) nms
 rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d (locA loc) fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
+rep_sig (L loc (SpecRecSig _ nm act))
+  = rep_specrec nm act (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
 rep_sig (L loc (SpecInstSig _ ty))  = rep_specialiseInst ty (locA loc)
@@ -1096,6 +1098,8 @@ rep_inline nm ispec loc
        ; pragma <- repPragInl nm1 inline rm phases
        ; return [(loc, pragma)]
        }
+
+rep_specrec = error "TODO"
 
 rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma
                -> SrcSpan

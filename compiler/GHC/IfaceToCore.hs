@@ -1725,6 +1725,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsCprSig cpr)     = return (info `setCprSigInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
     tcPrag info (HsInlineable)     = return (info `setHasInlineableInfo` True)
+    tcPrag info (HsSpecRec act)    = return (info `setHasSpecRecInfo` (Just act))
     tcPrag info (HsLFInfo lf_info) = do
       lf_info <- tcLFInfo lf_info
       return (info `setLFInfo` lf_info)

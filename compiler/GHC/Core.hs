@@ -60,7 +60,7 @@ module GHC.Core (
 
         -- ** Predicates and deconstruction on 'Unfolding'
         unfoldingTemplate, expandUnfolding_maybe,
-        maybeUnfoldingTemplate, otherCons,
+        maybeUnfoldingTemplate, maybeUnfoldingSource, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
         isStableUnfolding, isStableUserUnfolding, isStableSystemUnfolding,
@@ -1453,6 +1453,11 @@ maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args 
   = Just (mkLams bndrs (mkApps (Var (dataConWorkId con)) args))
 maybeUnfoldingTemplate _
   = Nothing
+
+maybeUnfoldingSource :: Unfolding -> Maybe UnfoldingSource
+maybeUnfoldingSource (CoreUnfolding { uf_src = src })
+  = Just src
+maybeUnfoldingSource _ = Nothing
 
 -- | The constructors that the unfolding could never be:
 -- returns @[]@ if no information is available

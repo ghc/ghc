@@ -36,7 +36,7 @@ import GHC.Data.Bag (Bag)
 import GHC.Types.Basic (InlinePragma, Activation)
 
 import GHC.Data.BooleanFormula (LBooleanFormula)
-import GHC.Types.SourceText (StringLiteral, SourceText)
+import GHC.Types.SourceText (StringLiteral)
 
 import Data.Void
 import Data.Bool
@@ -482,6 +482,10 @@ isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
 isSpecLSig (unXRec @p -> SpecSig {}) = True
 isSpecLSig _                 = False
 
+isSpecRecLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecRecLSig (unXRec @p -> SpecRecSig {}) = True
+isSpecRecLSig _                 = False
+
 isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
 isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
 isSpecInstLSig _                      = False
@@ -491,6 +495,7 @@ isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 isPragLSig (unXRec @p -> SpecSig {})   = True
 isPragLSig (unXRec @p -> InlineSig {}) = True
 isPragLSig (unXRec @p -> SCCFunSig {}) = True
+isPragLSig (unXRec @p -> SpecRecSig {}) = True
 isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
 isPragLSig _                    = False
 

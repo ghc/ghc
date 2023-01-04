@@ -1900,6 +1900,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                 tcMethodBodyHelp sig_fn sel_id local_meth_id (L bind_loc lm_bind)
 
        ; global_meth_id <- addInlinePrags global_meth_id prags
+       ; global_meth_id <- addSpecRecPrags global_meth_id prags
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
@@ -2113,7 +2114,11 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                            = []
                  -- Copy the inline pragma (if any) from the default method
                  -- to this version. Note [INLINE and default methods]
-
+              spec_rec = idSpecRec dm_id
+              spec_rec_prag | Just act <- spec_rec
+                            = [noLocA (SpecRecSig noAnn fn act)]
+                            | otherwise
+                            = []
               fn   = noLocA (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderForAllTyFlag tcb /= Inferred ]
@@ -2127,7 +2132,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-       ; return (bind, inline_prags) }
+       ; return (bind, spec_rec_prag ++ inline_prags) }
   where
     (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
 

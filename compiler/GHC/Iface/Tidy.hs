@@ -384,6 +384,8 @@ tidyProgram opts (ModGuts { mg_module           = mod
   (unfold_env, tidy_occ_env) <- chooseExternalIds opts mod all_binds imp_rules
   let (trimmed_binds, trimmed_rules) = findExternalRules opts all_binds imp_rules unfold_env
 
+  -- pprTraceM "trimmed_binds" (ppr $ bindersOfBinds trimmed_binds)
+
   (tidy_env, tidy_binds) <- tidyTopBinds unfold_env boot_exports tidy_occ_env trimmed_binds
 
   -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
@@ -652,7 +654,9 @@ chooseExternalIds :: TidyOpts
 
 chooseExternalIds opts mod binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
+      --  ; pprTraceM "unfoldEnv" (ppr unfold_env1)
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
+      --  ; pprTraceM "internals" (ppr internal_ids)
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
  where
   name_cache = opt_name_cache opts
@@ -717,7 +721,9 @@ chooseExternalIds opts mod binds imp_id_rules
   search [] unfold_env occ_env = return (unfold_env, occ_env)
 
   search ((idocc,referrer) : rest) unfold_env occ_env
-    | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
+    | idocc `elemVarEnv` unfold_env =
+      -- pprTrace "search.1" (ppr idocc <+> ppr referrer) $
+      search rest unfold_env occ_env
     | otherwise = do
       (occ_env', name') <- tidyTopName mod name_cache (Just referrer) occ_env idocc
       let
@@ -733,6 +739,11 @@ chooseExternalIds opts mod binds imp_id_rules
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
+      -- pprTraceM "search.2"
+      --   (ppr idocc <+> ppr referrer $$
+      --    text "show:" <> ppr show_unfold $$
+      --    text "name',external:" <> ppr (name', isExternalName name')
+      --    )
       search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
 
   tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
@@ -762,6 +773,7 @@ addExternal opts id
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isDeadEndSig (dmdSigInfo idinfo)
     inlineable     = inlineableInfo idinfo
+    spec_rec       = specRecInfo idinfo
 
         -- Stuff to do with the Id's unfolding
         -- We leave the unfolding there even if there is a worker
@@ -776,6 +788,7 @@ addExternal opts id
                                  -- source is an inline rule
 
        || inlineable
+       || isJust spec_rec
 
        || not dont_inline
        where
@@ -1033,7 +1046,11 @@ findExternalRules opts binds imp_id_rules unfold_env
        where
          stuff@(binds', bndr_set, needed_fvs, rules)
                        = trim_binds binds
-         needed bndr   = isExportedId bndr || bndr `elemVarSet` needed_fvs
+         shows_unf bndr = case lookupVarEnv unfold_env bndr of
+                            Just (name, show_unf)
+                              | isExternalName name || show_unf -> True
+                            _ -> False
+         needed bndr   = isExportedId bndr || bndr `elemVarSet` needed_fvs || shows_unf bndr
 
          bndrs         = bindersOf  bind
          rhss          = rhssOfBind bind
@@ -1281,7 +1298,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
           Nothing            -> False
           Just (arity, _, _) -> not (isDeadEndAppSig id_sig arity)
 
-    prag_info = mkPragInfo (inlinePragInfo idinfo) (inlineableInfo idinfo)
+    prag_info = mkPragInfo (inlinePragInfo idinfo) (inlineableInfo idinfo) (specRecInfo idinfo)
     --------- Unfolding ------------
     -- Force unfold_info (hence bangs), otherwise the old unfolding
     -- is retained during code generation. See #22071

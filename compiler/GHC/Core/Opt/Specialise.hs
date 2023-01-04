@@ -34,6 +34,7 @@ import GHC.Core.Utils     ( exprIsTrivial
 import GHC.Core.FVs
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
+import GHC.Core.Opt.SpecRec (transferSpecRecs)
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -52,6 +53,7 @@ import GHC.Types.Var      ( PiTyBinder(..), isLocalVar, isInvisibleFunArg )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Error
 
 import GHC.Utils.Error ( mkMCDiagnostic )
@@ -636,10 +638,13 @@ Hence, the invariant is this:
 
 -- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
-specProgram guts@(ModGuts { mg_module = this_mod
-                          , mg_rules  = local_rules
-                          , mg_binds  = binds })
+specProgram guts_in
   = do { dflags   <- getDynFlags
+
+       ; let guts@(ModGuts  { mg_module = this_mod
+                            , mg_rules  = local_rules
+                            , mg_binds  = binds }) = transferSpecRecs guts_in
+
        ; rule_env <- initRuleEnv guts
                      -- See Note [Fire rules in the specialiser]
 
@@ -1613,6 +1618,7 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
   |  notNull calls_for_me               -- And there are some calls to specialise
   ,  not (isNeverActive inl_act)
   || idHasInlineable fn -- Explicit INLINEABLE pragma
+  || idHasSpecRec fn -- SpecRec
   || gopt Opt_SpecialiseAggressively dflags -- -fspecialise-aggressively
   , not (isOpaquePragma inl_prag)
   -- Don't specialise NOINLINE things by default.
@@ -1766,6 +1772,11 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                   | otherwise
                   = inl_prag
 
+                spec_inlineable = idHasInlineable fn
+                spec_rec = idSpecRec fn
+
+                spec_prag_info = mkPragInfo spec_inl_prag spec_inlineable spec_rec
+
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster
                 --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
@@ -1773,7 +1784,7 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
                 -- So if f has INLINE[1] so does spec_fn
                 arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
                 spec_f_w_arity = spec_fn `setIdArity`      max 0 (fn_arity - arity_decr)
-                                         `setInlinePragma` spec_inl_prag
+                                         `setIdPragmaInfo` spec_prag_info
                                          `setIdUnfolding`  spec_unf
                                          `asJoinId_maybe`  spec_join_arity
 

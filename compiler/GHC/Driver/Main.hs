@@ -175,6 +175,7 @@ import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
+import GHC.Core.Opt.SpecRec
 import GHC.Core.Opt.Pipeline.Types      ( CoreToDo (..))
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
@@ -2488,11 +2489,16 @@ hscTidy hsc_env guts = do
   let logger   = hsc_logger hsc_env
   let this_mod = mg_module guts
 
+  (specrec_guts) <- withTiming logger
+    (text "CoreTidy"<+>brackets (ppr this_mod))
+    (const ())
+    $! {-# SCC "CoreTidy" #-} (return $ transferSpecRecs guts)
+
   opts <- initTidyOpts hsc_env
   (cgguts, details) <- withTiming logger
     (text "CoreTidy"<+>brackets (ppr this_mod))
     (const ())
-    $! {-# SCC "CoreTidy" #-} tidyProgram opts guts
+    $! {-# SCC "CoreTidy" #-} tidyProgram opts specrec_guts
 
   -- post tidy pretty-printing and linting...
   let tidy_rules     = md_rules details

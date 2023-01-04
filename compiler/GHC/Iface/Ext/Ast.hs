@@ -1718,6 +1718,11 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
         InlineSig _ name _ ->
           [ toHie $ (C Use) name
           ]
+        SpecRecSig _ name act ->
+          [ toHie $ (C Use) name
+            -- TODO: activation
+          -- , toHie $ act
+          ]
         SpecSig _ name typs _ ->
           [ toHie $ (C Use) name
           , toHie $ map (TS (ResolvedScopes [])) typs

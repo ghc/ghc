@@ -489,6 +489,9 @@ pprIdBndrInfo info
     has_inlineable = inlineableInfo info &&
                      isNoInlinePragma prag_info -- The flag is redundant
                                                 -- unless we have NOINLINE.
+    spec_rec = specRecInfo info
+    has_spec_rec = isJust spec_rec || True
+
 
     occ_info  = occInfo info
     dmd_info  = demandInfo info
@@ -502,6 +505,7 @@ pprIdBndrInfo info
     doc = showAttributes
           [ (has_prag, text "InlPrag=" <> pprInlineDebug prag_info)
           , (has_inlineable, text "Inlineable")
+          , (has_spec_rec, text "SpecRec:" <> ppr spec_rec)
           , (has_occ,  text "Occ=" <> ppr occ_info)
           , (has_dmd,  text "Dmd=" <> ppr dmd_info)
           , (has_lbv , text "OS=" <> ppr lbv_info)
@@ -512,6 +516,7 @@ instance Outputable IdInfo where
     [ (has_prag,         text "InlPrag=" <> pprInlineDebug prag_info)
     -- Todo: This is only interesting for NoInline pragmas
     , (has_inlineable,   text "Inlineable")
+    , (has_spec_rec,     text "SpecRec:" <> ppr spec_rec)
     , (has_occ,          text "Occ=" <> ppr occ_info)
     , (has_dmd,          text "Dmd=" <> ppr dmd_info)
     , (has_lbv ,         text "OS=" <> ppr lbv_info)
@@ -525,6 +530,9 @@ instance Outputable IdInfo where
     where
       prag_info = inlinePragInfo info
       has_prag  = not (isDefaultInlinePragma prag_info)
+      spec_rec = specRecInfo info
+      has_spec_rec = isJust spec_rec  || True
+
 
       occ_info  = occInfo info
       has_occ   = not (isManyOccs occ_info)

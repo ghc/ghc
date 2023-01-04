@@ -22,7 +22,7 @@ module GHC.Tc.Gen.Sig(
 
        TcPragEnv, emptyPragEnv, lookupPragEnv, extendPragEnv,
        mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags,
-       addInlinePrags, addInlinePragArity
+       addInlinePrags, addInlinePragArity, addSpecRecPrags
    ) where
 
 import GHC.Prelude
@@ -56,8 +56,7 @@ import GHC.Core.TyCo.Rep( mkNakedFunTy )
 
 import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
-import GHC.Types.Id  ( Id, idName, idType, setIdPragmaInfo
-                     , mkLocalId, realIdUnfolding )
+import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Basic
 import GHC.Types.Name
@@ -592,6 +591,7 @@ mkPragEnv sigs binds
     get_sig sig@(L _ (SpecSig _ (L _ nm) _ _))   = Just (nm, add_arity nm sig)
     get_sig sig@(L _ (InlineSig _ (L _ nm) _))   = Just (nm, add_arity nm sig)
     get_sig sig@(L _ (SCCFunSig _ (L _ nm) _)) = Just (nm, sig)
+    get_sig sig@(L _ (SpecRecSig _ (L _ nm) _)) = Just (nm, sig)
     get_sig _ = Nothing
 
     add_arity n sig  -- Adjust inl_sat field to match visible arity of function
@@ -633,7 +633,7 @@ computePragmaInfo info (prag:prags)
       -- INLINEABLE + NOINLINE
       | NoInline{} <- new_spec
       , isDefaultActivationPragma old_prag
-      -> computePragmaInfo (mkPragInfo prag True) prags
+      -> computePragmaInfo (mkPragInfo prag True spec_rec) prags
       | otherwise -> Nothing
     NoInline{}
       -- NOINLINE + INLINEABLE
@@ -645,12 +645,13 @@ computePragmaInfo info (prag:prags)
     Opaque{} -> Nothing
     NoUserInlinePrag ->
       computePragmaInfo
-          (mkPragInfo prag (isInlinablePragma prag))
+          (mkPragInfo prag (isInlinablePragma prag) spec_rec)
           prags
   where
     old_prag = pragInfoInline $ info
     old_spec = inl_inline old_prag
     new_spec = inl_inline prag
+    spec_rec = pragSpecRec info
 
 
 
@@ -659,7 +660,7 @@ addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | inl@(L _ inl_prag) : inls <- inl_prags
   = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr inl_prag)
-       ; let  init_info = (mkPragInfo inl_prag $ isInlinablePragma inl_prag)
+       ; let  init_info = mkPragInfo inl_prag (isInlinablePragma inl_prag) (idSpecRec poly_id)
               m_prag_info = computePragmaInfo
                             init_info
                             (map unLoc inls)
@@ -687,6 +688,15 @@ addInlinePrags poly_id prags_for_me
          let dia = TcRnMultipleInlinePragmas poly_id inl1 (inl2 NE.:| inls)
          in addDiagnosticTc dia
 
+-----------------
+addSpecRecPrags :: TcId -> [LSig GhcRn] -> TcM TcId
+addSpecRecPrags poly_id prags_for_me
+  = case spec_rec of
+      [] -> return poly_id
+      [L _ act] -> return $ setHasSpecRec poly_id (Just act)
+      (_:_) -> error "TODO: Duplicate SpecRec"
+  where
+    spec_rec = [L loc act | L loc (SpecRecSig _ _ act) <- prags_for_me]
 
 {- Note [Pattern synonym inline arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -829,7 +839,7 @@ tcSpecPrags poly_id prag_sigs
   where
     spec_sigs = filter isSpecLSig prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
-    is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
+    is_bad_sig s = not (isSpecLSig s || isSpecRecLSig s || isInlineLSig s || isSCCFunSig s)
 
     warn_discarded_sigs bad_sigs_ne
       = let dia = TcRnUnexpectedPragmas poly_id bad_sigs_ne

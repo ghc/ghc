@@ -26,8 +26,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
-                      , addInlinePrags, addInlinePragArity )
+import GHC.Tc.Gen.Sig
 import GHC.Tc.Solver
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
@@ -851,9 +850,11 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
        -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
        -- NB: prag_fn is keyed by the PatSyn Name, not the (internal) matcher name
-       ; matcher_prag_id <- addInlinePrags matcher_id              $
-                            map (addInlinePragArity matcher_arity) $
-                            lookupPragEnv prag_fn ps_name
+       ; let prags = map (addInlinePragArity matcher_arity) $
+                     lookupPragEnv prag_fn ps_name
+
+       ; matcher_prag_id <- addInlinePrags matcher_id prags
+       ; matcher_prag_id <- addSpecRecPrags matcher_prag_id prags
 
        ; let bind = FunBind{ fun_id = L loc matcher_prag_id
                            , fun_matches = mg
@@ -949,9 +950,11 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
 
        -- Add INLINE pragmas; see Note [Pragmas for pattern synonyms]
        -- NB: prag_fn is keyed by the PatSyn Name, not the (internal) builder name
-       ; builder_id <- addInlinePrags builder_id              $
-                       map (addInlinePragArity builder_arity) $
-                       lookupPragEnv prag_fn ps_name
+       ; let prags = map (addInlinePragArity builder_arity) $
+                     lookupPragEnv prag_fn ps_name
+       ; builder_id <- addInlinePrags builder_id prags
+       ; builder_id <- addSpecRecPrags builder_id prags
+
 
        ; let match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group

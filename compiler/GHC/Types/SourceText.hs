@@ -39,6 +39,8 @@ import Data.Data
 import GHC.Real ( Ratio(..) )
 import GHC.Types.SrcLoc
 
+import Control.DeepSeq
+
 {-
 Note [Pragma source text]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -120,6 +122,10 @@ instance Binary SourceText where
         s <- get bh
         return (SourceText s)
       _ -> panic $ "Binary SourceText:" ++ show h
+
+instance NFData SourceText where
+  rnf NoSourceText = ()
+  rnf (SourceText s) = rnf s
 
 -- | Special combinator for showing string literals.
 pprWithSourceText :: SourceText -> SDoc -> SDoc

@@ -57,6 +57,7 @@ import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
 import GHC.Core.Rules
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
+import GHC.Core.Opt.SpecRec
 import GHC.Core.Ppr
 
 import GHC.Builtin.Names
@@ -254,7 +255,7 @@ deSugar hsc_env
 
         ; docs <- extractDocs dflags tcg_env
 
-        ; let mod_guts = ModGuts {
+        ; let mod_guts = transferSpecRecs ModGuts {
                 mg_module       = mod,
                 mg_hsc_src      = hsc_src,
                 mg_loc          = mkFileSrcSpan mod_loc,
@@ -284,6 +285,7 @@ deSugar hsc_env
                 mg_complete_matches = complete_matches,
                 mg_docs         = docs
               }
+
         ; return (msgs, Just mod_guts)
         }}}}
 

@@ -1054,6 +1054,10 @@ renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRnN ctxt sig v
         ; return (InlineSig noAnn new_v s, emptyFVs) }
 
+renameSig ctxt sig@(SpecRecSig _ v s)
+  = do  { new_v <- lookupSigOccRnN ctxt sig v
+        ; return (SpecRecSig noAnn new_v s, emptyFVs) }
+
 renameSig ctxt (FixSig _ fsig)
   = do  { new_fsig <- rnSrcFixityDecl ctxt fsig
         ; return (FixSig noAnn new_fsig, emptyFVs) }
@@ -1138,6 +1142,10 @@ okHsSig ctxt (L _ sig)
      (InlineSig {}, HsBootCtxt {}) -> False
      (InlineSig {}, _)             -> True
 
+     (SpecRecSig {}, HsBootCtxt {}) -> False
+     (SpecRecSig {}, LocalBindCtxt {}) -> False
+     (SpecRecSig {}, _)             -> True
+
      (SpecSig {}, TopSigCtxt {})    -> True
      (SpecSig {}, LocalBindCtxt {}) -> True
      (SpecSig {}, InstDeclCtxt {})  -> True
@@ -1176,10 +1184,11 @@ findDupSigs sigs
     expand_sig :: Sig GhcPs -> [(LocatedN RdrName, Sig GhcPs)] -- AZ
     expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
+    expand_sig sig@(SpecRecSig _ n _)            = [(n,sig)]
     expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
     expand_sig sig@(ClassOpSig _ _ ns _)         = [(n,sig) | n <- ns]
     expand_sig sig@(PatSynSig _ ns  _ )          = [(n,sig) | n <- ns]
-    expand_sig sig@(SCCFunSig (_, _) n _)           = [(n,sig)]
+    expand_sig sig@(SCCFunSig (_, _) n _)        = [(n,sig)]
     expand_sig _ = []
 
     matching_sig :: (LocatedN RdrName, Sig GhcPs) -> (LocatedN RdrName, Sig GhcPs) -> Bool --AZ
@@ -1194,6 +1203,7 @@ findDupSigs sigs
     mtch (ClassOpSig _ d1 _ _) (ClassOpSig _ d2 _ _) = d1 == d2
     mtch (PatSynSig _ _ _)     (PatSynSig _ _ _)   = True
     mtch (SCCFunSig{})         (SCCFunSig{})       = True
+    mtch (SpecRecSig{})        (SpecRecSig{})      = True
     mtch _ _ = False
 
 -- Warn about multiple MINIMAL signatures

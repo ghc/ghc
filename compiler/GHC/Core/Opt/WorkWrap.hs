@@ -830,6 +830,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
       -- inl_inline: copy from fn_id; see Note [Worker/wrapper for INLINABLE functions]
       -- inl_act:    see Note [Worker activation]
       -- inl_rule:   it does not make sense for workers to be constructorlike.
+    work_prag_info = mkPragInfo work_prag fn_has_inlineable fn_spec_rec
 
     work_join_arity | isJoinId fn_id = Just join_arity
                     | otherwise      = Nothing
@@ -844,8 +845,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                         -- Doesn't matter much, since we will simplify next, but
                         -- seems right-er to do so
 
-                `setInlinePragma` work_prag
-                `setHasInlineable` fn_has_inlineable
+                `setIdPragmaInfo` work_prag_info
 
                 `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
                         -- See Note [Worker/wrapper for INLINABLE functions]
@@ -874,6 +874,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
 
     wrap_rhs  = wrap_fn work_id
     wrap_prag = mkStrWrapperInlinePrag fn_inl_prag fn_rules
+    wrap_prag_info = mkPragInfo wrap_prag fn_has_inlineable fn_spec_rec
     wrap_unf  = mkWrapperUnfolding (simpleOptExpr simpl_opts wrap_rhs) arity
 
     wrap_id   = fn_id `setIdUnfolding`  wrap_unf
@@ -881,7 +882,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                       `setIdOccInfo`    noOccInfo
                       -- We must keep hasInlineable to ensure wrappers can specialise
                       -- if they are NOINLINE[final]
-                      `setHasInlineable`fn_has_inlineable
+                      `setIdPragmaInfo` wrap_prag_info
                         -- Zap any loop-breaker-ness, to avoid bleating from Lint
                         -- about a loop breaker with an INLINE rule
 
@@ -890,6 +891,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
     fn_unfolding    = realUnfoldingInfo fn_info
     fn_has_inlineable = inlineableInfo fn_info
     fn_rules        = ruleInfoRules (ruleInfo fn_info)
+    fn_spec_rec     = specRecInfo fn_info
 
 mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl

@@ -32,7 +32,7 @@ import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Zonk
-import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
+import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate
 import GHC.Types.FieldLabel
@@ -265,7 +265,11 @@ newLetBndr LetLclBndr name w ty
   = do { mono_name <- cloneLocalName name
        ; return (mkLocalId mono_name w ty) }
 newLetBndr (LetGblBndr prags) name w ty
-  = addInlinePrags (mkLocalId name w ty) (lookupPragEnv prags name)
+  = do  { let prags' = (lookupPragEnv prags name)
+        ; bndr <- addInlinePrags (mkLocalId name w ty) prags'
+        ; bndr <- addSpecRecPrags bndr prags'
+        ; return bndr
+        }
 
 tc_sub_type :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt

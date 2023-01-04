@@ -1711,6 +1711,15 @@ instance Binary Activation where
                       ab <- get bh
                       return (ActiveAfter src ab)
 
+instance NFData Activation where
+  rnf act = case act of
+    AlwaysActive -> ()
+    NeverActive -> ()
+    ActiveBefore src phase -> src `deepseq` phase `deepseq` ()
+    ActiveAfter src phase -> src `deepseq` phase `deepseq` ()
+    FinalActive -> ()
+
+
 instance Outputable RuleMatchInfo where
    ppr ConLike = text "CONLIKE"
    ppr FunLike = text "FUNLIKE"

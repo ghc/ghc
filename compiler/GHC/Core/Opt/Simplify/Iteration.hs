@@ -677,6 +677,7 @@ mkCastWrapperPragInfo prag_info
                     , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
                                     -- RuleMatchInfo is (and must be) unaffected
         (pragHasInlineable prag_info)
+        (pragSpecRec prag_info)
   where
     -- See Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
     -- But simpler, because we don't need to disable during InitialPhase

@@ -1035,9 +1035,14 @@ addFingerprints hsc_env iface0
                      -- See Note [Identity versus semantic module]
                      | semantic_mod /= this_mod
                      , not (isHoleModule semantic_mod) = global_hash_fn name
-                     | otherwise = return (snd (lookupOccEnv local_env (getOccName name)
-                           `orElse` pprPanic "urk! lookup local fingerprint"
-                                       (ppr name $$ ppr local_env)))
+                     | otherwise = do
+                        let fp = lookupOccEnv local_env (getOccName name) `orElse`
+                                   (pprTrace "urk! lookup local fingerprint"
+                                       (ppr (nameModule name) $$ ppr name $$ ppr local_env)
+                                       -- TODO: ???
+                                       (undefined, fingerprint0)
+                                       )
+                        return $ snd fp
                 -- This panic indicates that we got the dependency
                 -- analysis wrong, because we needed a fingerprint for
                 -- an entity that wasn't in the environment.  To debug

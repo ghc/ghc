@@ -84,7 +84,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
-import Data.Maybe ( isNothing, catMaybes )
+import Data.Maybe
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -463,7 +463,7 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
-               inline_hsinfo,  has_inlineable_hsinfo, unfold_hsinfo]
+               inline_hsinfo,  has_inlineable_hsinfo, unfold_hsinfo, spec_rec_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
@@ -502,6 +502,10 @@ toIfaceIdInfo id_info
     has_inlineable_hsinfo
       | has_inlineable = Just HsInlineable
       | otherwise = Nothing
+
+    ------------ SpecRec flag ------------
+    spec_rec_hsinfo = maybe Nothing (Just . HsSpecRec) (specRecInfo id_info)
+
 
 
 toIfaceJoinInfo :: Maybe JoinArity -> IfaceJoinInfo

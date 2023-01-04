@@ -49,10 +49,11 @@ module GHC.Types.Id.Info (
         -- ** Unfolding Info
         realUnfoldingInfo, unfoldingInfo, setUnfoldingInfo, hasInlineUnfolding,
         inlinePragInfo, setInlinePragInfo, inlineableInfo, setHasInlineableInfo,
+        specRecInfo, setHasSpecRecInfo,
 
         -- ** The PragInfo type
         setPragInfo, pragInfo, PragInfo, mkPragInfo,
-        pragInfoInline, pragHasInlineable,
+        pragInfoInline, pragHasInlineable, pragSpecRec,
         setPragInfoInline,
 
         -- ** The OccInfo type
@@ -117,6 +118,7 @@ infixl  1 `setRuleInfo`,
           `setArityInfo`,
           `setInlinePragInfo`,
           `setHasInlineableInfo`,
+          `setHasSpecRecInfo`,
           `setUnfoldingInfo`,
           `setOneShotInfo`,
           `setOccInfo`,
@@ -439,6 +441,9 @@ inlinePragInfo = pragInfoInline . pragInfo
 inlineableInfo :: IdInfo -> Bool
 inlineableInfo = pragHasInlineable . pragInfo
 
+specRecInfo :: IdInfo -> (Maybe Activation)
+specRecInfo = pragSpecRec . pragInfo
+
 -- | Info about a lambda-bound variable, if the 'Id' is one
 oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
@@ -474,6 +479,9 @@ setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { pragInfo = setPragInfoInline pr (pragInfo info) }
 setHasInlineableInfo :: IdInfo -> Bool -> IdInfo
 setHasInlineableInfo  info pr = pr `seq` info { pragInfo = setPragInfoUnf pr (pragInfo info) }
+setHasSpecRecInfo :: IdInfo -> (Maybe Activation) -> IdInfo
+setHasSpecRecInfo  info pr = pr `seq` info { pragInfo = setPragInfoSpecRec pr (pragInfo info) }
+
         -- Try to avoid space leaks by seq'ing
 
 -- | Essentially returns the 'realUnfoldingInfo' field, but does not expose the
@@ -641,18 +649,21 @@ ppArityInfo n = hsep [text "Arity", int n]
 -- entirely as a way to inhibit inlining until we want it
 data PragInfo = PragInfo
   { -- | INLINE etc info
-    pragInfoInline :: !InlinePragma
+    pragInfoInline :: InlinePragma
   , -- | Should we keep the unfolding?
-    pragHasInlineable :: !Bool
+    pragHasInlineable :: Bool
+  , -- | Allow specialisation transitively?
+    pragSpecRec :: (Maybe Activation)
   } deriving Eq
 
 instance Outputable PragInfo where
   ppr prag = text "PragInfo=" <> braces
     (ppr (pragInfoInline prag) <> comma <>
-     text "HasInlineable:" <> ppr (pragHasInlineable prag))
+     text "HasInlineable:" <> ppr (pragHasInlineable prag) <> comma <>
+     text "SpecRec:" <> ppr (pragSpecRec prag))
 
--- | mkPragInfo inl_prag has_inlineable
-mkPragInfo :: InlinePragma -> Bool -> PragInfo
+-- | mkPragInfo inl_prag has_inlineable spec_rec
+mkPragInfo :: InlinePragma -> Bool -> (Maybe Activation) -> PragInfo
 mkPragInfo = PragInfo
 
 setPragInfoInline :: InlinePragma -> PragInfo -> PragInfo
@@ -661,13 +672,20 @@ setPragInfoInline inl prag_info = prag_info { pragInfoInline = inl }
 setPragInfoUnf :: Bool -> PragInfo -> PragInfo
 setPragInfoUnf keep prag_info = prag_info { pragHasInlineable = keep }
 
+setPragInfoSpecRec :: (Maybe Activation) -> PragInfo -> PragInfo
+setPragInfoSpecRec spec_rec prag_info = prag_info { pragSpecRec = spec_rec }
+
 defaultPragInfo :: PragInfo
 defaultPragInfo = PragInfo
   { pragInfoInline = defaultInlinePragma
-  , pragHasInlineable = defaultHasInlineableInfo }
+  , pragHasInlineable = defaultHasInlineableInfo
+  , pragSpecRec = defaultSpecRecInfo }
 
 defaultHasInlineableInfo :: Bool
 defaultHasInlineableInfo = False
+
+defaultSpecRecInfo :: Maybe Activation
+defaultSpecRecInfo = Nothing
 
 {-
 ************************************************************************
