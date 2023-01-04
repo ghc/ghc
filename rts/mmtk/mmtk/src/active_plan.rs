@@ -11,15 +11,44 @@ use crate::stg_closures::*;
 use crate::stg_info_table::*;
 
 
-static mut STATIC_FLAG: bool = false;
+enum StaticFlag { A, B }
 
-pub fn bump_static_flag() {
-    unsafe {
-        STATIC_FLAG = !STATIC_FLAG;
+impl StaticFlag {
+    pub fn negate(self) -> self {
+        use StaticFlag::*;
+        match STATIC_FLAG {
+            A => B,
+            B => A
+        }
     }
 }
 
-fn get_static_flag() -> bool {
+/// The tag encoded in the low bits of CAF's `static_link` field.
+/// See Note [STATIC_LINK fields].
+enum StaticTag {
+    NotVisited,          // Tag value 0
+    Visited(StaticFlag), // Tag values 1, 2
+    NotACaf              // Tag value 3
+}
+
+fn get_static_tag(r: const TaggedClosureRef) -> StaticTag {
+    match r.get_tag() {
+        0 => NotVisited,
+        1 => Visited(A),
+        2 => Visited(B),
+        3 => NotACaf,
+    }
+}
+
+static mut STATIC_FLAG: StaticFlag = StaticFlag::A;
+
+pub fn bump_static_flag() {
+    unsafe {
+        STATIC_FLAG = STATIC_FLAG.negate();
+    }
+}
+
+fn get_static_flag() -> StaticFlag {
     unsafe {
         STATIC_FLAG
     }
@@ -77,9 +106,12 @@ impl ActivePlan<GHCVM> for VMActivePlan {
         // Modelled after evacuate_static_object, returns true if this 
         // is the first time the object has been visited in this GC.
         let mut evacuate_static = |static_link: &mut TaggedClosureRef| -> bool {
-            let cur_static_flag = if get_static_flag() { 2 } else { 1 };
-            let prev_static_flag = if get_static_flag() { 1 } else { 2 };
-            let object_visited: bool = (static_link.get_tag() | prev_static_flag) != 3;
+            let cur_static_flag = get_static_flag();
+            let object_visited: bool = match get_static_tag(static_link) {
+                NotACaf => True,
+                NotVisited => False,
+                Visited(flag) => flag == cur_static_flag,
+            };
             if !object_visited {
                 // N.B. We don't need to maintain a list of static objects, therefore ZERO
                 *static_link = TaggedClosureRef::from_address(Address::ZERO).set_tag(cur_static_flag);
