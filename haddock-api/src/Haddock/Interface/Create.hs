@@ -424,7 +424,7 @@ moduleWarning dflags gre (WarnAll w) = Just <$> parseWarning dflags gre w
 parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt a -> ErrMsgM (Doc Name)
 parseWarning dflags gre w = case w of
   DeprecatedTxt _ msg -> format "Deprecated: " (foldMap (unpackFS . sl_fs . hsDocString . unLoc) msg)
-  WarningTxt    _ msg -> format "Warning: "    (foldMap (unpackFS . sl_fs . hsDocString . unLoc) msg)
+  WarningTxt _  _ msg -> format "Warning: "    (foldMap (unpackFS . sl_fs . hsDocString . unLoc) msg)
   where
     format x bs = DocWarning . DocParagraph . DocAppend (DocString x)
                   <$> processDocStringFromString dflags gre bs
