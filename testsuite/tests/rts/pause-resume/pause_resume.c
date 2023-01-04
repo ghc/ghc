@@ -187,7 +187,7 @@ void pauseAndResumeViaThread
     )
 {
     OSThreadId threadId;
-    createOSThread(&threadId, "Pause and resume thread", &pauseAndResumeViaThread_helper, (void *)count);
+    createOSThread(&threadId, "pause-resume", &pauseAndResumeViaThread_helper, (void *)count);
 }
 
 const int TIMEOUT = 1000000; // 1 second

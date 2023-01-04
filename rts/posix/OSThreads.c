@@ -218,6 +218,12 @@ start_thread (void *param)
     return startProc(startParam);
 }
 
+/* Note: at least on Linux/Glibc, `pthread_setname_np` restricts the name of
+ * a thread to 16 bytes, including the terminating null byte. Hence, make sure
+ * to only pass in names of up to 15 characters. Otherwise,
+ * `pthread_setname_np` when called in `start_thread` will fail with `ERANGE`,
+ * which is not checked for, and the thread won't be named at all.
+ */
 int
 createOSThread (OSThreadId* pId, const char *name,
                 OSThreadProc *startProc, void *param)

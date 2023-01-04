@@ -1015,7 +1015,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
         OSThreadId thread;
-        if (createOSThread(&thread, "non-moving mark thread",
+        if (createOSThread(&thread, "nonmoving-mark",
                            nonmovingConcurrentMark, mark_queue) != 0) {
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
