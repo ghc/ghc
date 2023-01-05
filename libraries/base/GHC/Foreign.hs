@@ -202,11 +202,11 @@ peekEncodedCString :: TextEncoding -- ^ Encoding of CString
 peekEncodedCString (TextEncoding { mkTextDecoder = mk_decoder }) (p, sz_bytes)
   = bracket mk_decoder close $ \decoder -> do
       let chunk_size = sz_bytes `max` 1 -- Decode buffer chunk size in characters: one iteration only for ASCII
-      from0 <- fmap (\fp -> bufferAdd sz_bytes (emptyBuffer fp sz_bytes ReadBuffer)) $ newForeignPtr_ (castPtr p)
-      to <- newCharBuffer chunk_size WriteBuffer
+      !from0 <- fmap (\fp -> bufferAdd sz_bytes (emptyBuffer fp sz_bytes ReadBuffer)) $ newForeignPtr_ (castPtr p)
+      !to    <- newCharBuffer chunk_size WriteBuffer
 
-      let go !iteration from = do
-            (why, from', to') <- encode decoder from to
+      let go !iteration !from = do
+            (why, from', !to') <- encode decoder from to
             if isEmptyBuffer from'
              then
               -- No input remaining: @why@ will be InputUnderflow, but we don't care
@@ -281,11 +281,11 @@ newEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s
 
 tryFillBuffer :: TextEncoder dstate -> Bool -> Buffer Char -> Ptr Word8 -> Int
                     ->  IO (Maybe (Buffer Word8))
-tryFillBuffer encoder null_terminate from0 to_p to_sz_bytes = do
-    to_fp <- newForeignPtr_ to_p
-    go (0 :: Int) (from0, emptyBuffer to_fp to_sz_bytes WriteBuffer)
+tryFillBuffer encoder null_terminate from0 to_p !to_sz_bytes = do
+    !to_fp <- newForeignPtr_ to_p
+    go (0 :: Int) from0 (emptyBuffer to_fp to_sz_bytes WriteBuffer)
   where
-    go !iteration (from, to) = do
+    go !iteration !from !to = do
       (why, from', to') <- encode encoder from to
       putDebugMsg ("tryFillBufferAndCall: " ++ show iteration ++ " " ++ show why ++ " " ++ summaryBuffer from ++ " " ++ summaryBuffer from')
       if isEmptyBuffer from'
@@ -293,8 +293,8 @@ tryFillBuffer encoder null_terminate from0 to_p to_sz_bytes = do
              then return Nothing -- We had enough for the string but not the terminator: ask the caller for more buffer
              else return (Just to')
        else case why of -- We didn't consume all of the input
-              InputUnderflow  -> recover encoder from' to' >>= go (iteration + 1) -- These conditions are equally bad
-              InvalidSequence -> recover encoder from' to' >>= go (iteration + 1) -- since the input was truncated/invalid
+              InputUnderflow  -> recover encoder from' to' >>= \(a,b) -> go (iteration + 1) a b -- These conditions are equally bad
+              InvalidSequence -> recover encoder from' to' >>= \(a,b) -> go (iteration + 1) a b -- since the input was truncated/invalid
               OutputUnderflow -> return Nothing -- Oops, out of buffer during decoding: ask the caller for more
 {-
 Note [Check *before* fill in withEncodedCString]
