@@ -3,9 +3,10 @@ module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 import GHC.Prelude
 import GHC.Platform
 import GHC.Unit.Module
+import GHC.Utils.Encoding
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
-import GHC.Data.FastString (unpackFS)
+import GHC.Data.FastString (fastStringToShortByteString)
 
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr
@@ -15,8 +16,8 @@ import GHC.StgToCmm.Lit (newByteStringCLit)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 
-import GHC.Data.ShortText (ShortText)
-import qualified GHC.Data.ShortText as ST
+import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short          as ST
 
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.State.Strict
@@ -34,7 +35,9 @@ emitIpeBufferListNode this_mod ents = do
         platform = stgToCmmPlatform cfg
 
     let (cg_ipes, strtab) = flip runState emptyStringTable $ do
-            module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)
+            module_name <- lookupStringTable
+                           $ utf8EncodeShortByteString
+                           $ renderWithContext ctx (ppr this_mod)
             mapM (toCgIPE platform ctx module_name) ents
 
     let -- Emit the fields of an IpeBufferEntry struct.
@@ -64,20 +67,20 @@ emitIpeBufferListNode this_mod ents = do
 
 toCgIPE :: Platform -> SDocContext -> StrTabOffset -> InfoProvEnt -> State StringTable CgInfoProvEnt
 toCgIPE platform ctx module_name ipe = do
-    table_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (pprCLabel platform (infoTablePtr ipe))
-    closure_desc <- lookupStringTable $ ST.pack $ show (infoProvEntClosureType ipe)
-    type_desc <- lookupStringTable $ ST.pack $ infoTableType ipe
+    table_name   <- lookupStringTable $ utf8EncodeShortByteString $ renderWithContext ctx (pprCLabel platform (infoTablePtr ipe))
+    closure_desc <- lookupStringTable $ utf8EncodeShortByteString $ show (infoProvEntClosureType ipe)
+    type_desc <- lookupStringTable $ utf8EncodeShortByteString $ infoTableType ipe
     let label_str = maybe "" snd (infoTableProv ipe)
     let (src_loc_file, src_loc_span) =
             case infoTableProv ipe of
-              Nothing -> ("", "")
+              Nothing -> (mempty, "")
               Just (span, _) ->
-                  let file = unpackFS $ srcSpanFile span
+                  let file = fastStringToShortByteString $ srcSpanFile span
                       coords = renderWithContext ctx (pprUserRealSpan False span)
                   in (file, coords)
-    label <- lookupStringTable $ ST.pack label_str
-    src_file <- lookupStringTable $ ST.pack src_loc_file
-    src_span <- lookupStringTable $ ST.pack src_loc_span
+    label    <- lookupStringTable $ utf8EncodeShortByteString label_str
+    src_file <- lookupStringTable src_loc_file
+    src_span <- lookupStringTable $ utf8EncodeShortByteString src_loc_span
     return $ CgInfoProvEnt { ipeInfoTablePtr = infoTablePtr ipe
                            , ipeTableName = table_name
                            , ipeClosureDesc = closure_desc
@@ -99,9 +102,9 @@ data CgInfoProvEnt = CgInfoProvEnt
                                , ipeSrcSpan :: !StrTabOffset
                                }
 
-data StringTable = StringTable { stStrings :: DList ShortText
+data StringTable = StringTable { stStrings :: DList ShortByteString
                                , stLength :: !Int
-                               , stLookup :: !(M.Map ShortText StrTabOffset)
+                               , stLookup :: !(M.Map ShortByteString StrTabOffset)
                                }
 
 newtype StrTabOffset = StrTabOffset Int
@@ -118,15 +121,15 @@ getStringTableStrings st =
     BSL.toStrict $ BSB.toLazyByteString
     $ foldMap f $ dlistToList (stStrings st)
   where
-    f x = BSB.shortByteString (ST.contents x) `mappend` BSB.word8 0
+    f x = BSB.shortByteString x `mappend` BSB.word8 0
 
-lookupStringTable :: ShortText -> State StringTable StrTabOffset
+lookupStringTable :: ShortByteString -> State StringTable StrTabOffset
 lookupStringTable str = state $ \st ->
     case M.lookup str (stLookup st) of
       Just off -> (off, st)
       Nothing ->
           let !st' = st { stStrings = stStrings st `snoc` str
-                        , stLength  = stLength st + ST.byteLength str + 1
+                        , stLength  = stLength st + ST.length str + 1
                         , stLookup  = M.insert str res (stLookup st)
                         }
               res = StrTabOffset (stLength st)
