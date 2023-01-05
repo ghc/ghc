@@ -4,16 +4,11 @@ module GHC.SysTools.Terminal (stderrSupportsAnsiColors) where
 
 import GHC.Prelude
 
-#if defined(MIN_VERSION_terminfo)
-import GHC.IO (catchException)
-import Data.Maybe (fromMaybe)
-import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
-                                setupTermFromEnv, termColors)
-import System.Posix (queryTerminal, stdError)
-#elif defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
+import System.IO (hIsTerminalDevice, stderr)
+#else
 import GHC.IO (catchException)
 import GHC.Utils.Exception (try)
--- import Data.Bits ((.|.), (.&.))
 import Foreign (Ptr, peek, with)
 import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
@@ -40,18 +35,10 @@ stderrSupportsAnsiColors = unsafePerformIO stderrSupportsAnsiColors'
 -- | Check if ANSI escape sequences can be used to control color in stderr.
 stderrSupportsAnsiColors' :: IO Bool
 stderrSupportsAnsiColors' = do
-#if defined(MIN_VERSION_terminfo)
-    stderr_available <- queryTerminal stdError
-    if stderr_available then
-      fmap termSupportsColors setupTermFromEnv
-        `catchException` \ (_ :: SetupTermError) -> pure False
-    else
-      pure False
-  where
-    termSupportsColors :: Terminal -> Bool
-    termSupportsColors term = fromMaybe 0 (getCapability term termColors) > 0
-
-#elif defined(mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
+    -- Coloured text is a part of ANSI standard, no reason to query terminfo
+    hIsTerminalDevice stderr
+#else
   h <- Win32.getStdHandle Win32.sTD_ERROR_HANDLE
          `catchException` \ (_ :: IOError) ->
            pure Win32.nullHANDLE
@@ -100,6 +87,4 @@ foreign import WINAPI unsafe "windows.h GetConsoleMode" c_GetConsoleMode
 foreign import WINAPI unsafe "windows.h SetConsoleMode" c_SetConsoleMode
   :: Win32.HANDLE -> Win32.DWORD -> IO Win32.BOOL
 
-#else
-   pure False
 #endif
