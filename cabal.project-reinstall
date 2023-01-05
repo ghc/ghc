@@ -48,7 +48,7 @@ packages: ./compiler
           ./utils/iserv
           ./linters/**/*.cabal
 
-constraints: ghc +internal-interpreter +dynamic-system-linke +terminfo,
+constraints: ghc +internal-interpreter +dynamic-system-linke,
              ghc-bin +internal-interpreter +threaded,
              ghci +internal-interpreter,
              haddock +in-ghc-tree,

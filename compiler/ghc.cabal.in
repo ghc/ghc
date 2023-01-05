@@ -46,11 +46,6 @@ Flag internal-interpreter
     Default: False
     Manual: True
 
-Flag terminfo
-    Description: Build GHC with terminfo support on non-Windows platforms.
-    Default: True
-    Manual: True
-
 Flag dynamic-system-linker
     Description: The system can load dynamic code. This is not the case for musl.
     Default: True
@@ -98,8 +93,6 @@ Library
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.14
     else
-        if flag(terminfo)
-            Build-Depends: terminfo == 0.4.*
         Build-Depends: unix   >= 2.7 && < 2.9
 
     GHC-Options: -Wall

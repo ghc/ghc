@@ -172,7 +172,7 @@ toolTargets = [ binary
               , text
               , transformers
               , unlit  -- # executable
-              ] ++ if windowsHost then [ win32 ] else [ terminfo, unix ]
+              ] ++ if windowsHost then [ win32 ] else [ unix ]
 
 -- | Create a mapping from files to which component it belongs to.
 dirMap :: Action [(FilePath, (Package, [String]))]
