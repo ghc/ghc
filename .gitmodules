@@ -110,3 +110,6 @@
 [submodule "libraries/exceptions"]
 	path = libraries/exceptions
 	url = https://gitlab.haskell.org/ghc/packages/exceptions.git
+[submodule "utils/hpc"]
+	path = utils/hpc
+	url = https://gitlab.haskell.org/hpc/hpc-bin.git
