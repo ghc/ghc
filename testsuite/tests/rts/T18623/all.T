@@ -5,6 +5,9 @@ test('T18623',
      # This keeps failing on aarch64-linux for reasons that are not
      # fully clear.  Maybe it needs a higher limit due to LLMV?
      when(arch('aarch64'), skip),
+     # Recent versions of osx report an error when running `ulimit -v`
+     when(arch('darwin'), skip),
+     when(arch('powerpc64le'), skip),
      cmd_prefix('ulimit -v ' + str(1024 ** 2) + ' && '),
      ignore_stdout],
     run_command,
