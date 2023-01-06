@@ -98,6 +98,6 @@ pkgs.writeTextFile {
     export CABAL="$CABAL_INSTALL"
 
     sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
-    export CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi"
+    export CONFIGURE_ARGS="$CONFIGURE_ARGS --with-ffi-libraries=$sdk_path/usr/lib --with-ffi-includes=$sdk_path/usr/include/ffi --build=${targetTriple}"
   '';
 }
