@@ -1809,7 +1809,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-aarch64-linux-deb10-release": {
+  "release-aarch64-linux-deb10-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1819,7 +1819,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-aarch64-linux-deb10-release.tar.xz",
+        "ghc-aarch64-linux-deb10-release+no_split_sections.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1861,11 +1861,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-release",
-      "BUILD_FLAVOUR": "release",
+      "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-release+no_split_sections",
+      "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "IGNORE_PERF_FAILURES": "all",
-      "TEST_ENV": "aarch64-linux-deb10-release",
+      "TEST_ENV": "aarch64-linux-deb10-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },
