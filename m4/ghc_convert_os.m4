@@ -27,7 +27,7 @@ AC_DEFUN([GHC_CONVERT_OS],[
         $3="$1"
         ;;
       msys)
-        AC_MSG_ERROR([Building GHC using the msys toolchain is not supported; please use mingw instead. Perhaps you need to set 'MSYSTEM=MINGW64 or MINGW32?'])
+        AC_MSG_ERROR([Building GHC using the msys toolchain is not supported; please use mingw instead. Perhaps you need to set 'MSYSTEM=CLANG64?'])
         ;;
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
         $3="aix"

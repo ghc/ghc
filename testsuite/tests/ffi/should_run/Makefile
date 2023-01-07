@@ -52,7 +52,7 @@ T15933:
 
 .PHONY: T22159
 T22159:
-	C_INCLUDE_PATH=/mingw64/include '$(TEST_HC)' $(TEST_HC_OPTS) -c T22159.hs
-	C_INCLUDE_PATH=/mingw64/include '$(TEST_HC)' $(TEST_HC_OPTS) -c T22159_c.c
-	C_INCLUDE_PATH=/mingw64/include '$(TEST_HC)' $(TEST_HC_OPTS) T22159.o T22159_c.o -o T22159
+	C_INCLUDE_PATH=/clang64/include '$(TEST_HC)' $(TEST_HC_OPTS) -c T22159.hs
+	C_INCLUDE_PATH=/clang64/include '$(TEST_HC)' $(TEST_HC_OPTS) -c T22159_c.c
+	C_INCLUDE_PATH=/clang64/include '$(TEST_HC)' $(TEST_HC_OPTS) T22159.o T22159_c.o -o T22159
 	./T22159

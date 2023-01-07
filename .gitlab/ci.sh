@@ -59,7 +59,7 @@ Environment variables affecting both build systems:
   CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
   RUNTEST_ARGS      Arguments passed to runtest.py
-  MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+  MSYSTEM           (Windows-only) Which platform to build from (CLANG64).
   IGNORE_PERF_FAILURES
                     Whether to ignore perf failures (one of "increases",
                     "decreases", or "all")
@@ -141,11 +141,7 @@ function setup_locale() {
 
 function mingw_init() {
   case "$MSYSTEM" in
-    MINGW32)
-      target_triple="i386-unknown-mingw32"
-      boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
-      ;;
-    MINGW64)
+    CLANG64)
       target_triple="x86_64-unknown-mingw32"
       boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
       ;;
@@ -320,8 +316,7 @@ function fetch_cabal() {
         # N.B. Windows uses zip whereas all others use .tar.xz
         MSYS_*|MINGW*)
           case "$MSYSTEM" in
-            MINGW32) cabal_arch="i386" ;;
-            MINGW64) cabal_arch="x86_64" ;;
+            CLANG64) cabal_arch="x86_64" ;;
             *) fail "unknown MSYSTEM $MSYSTEM" ;;
           esac
           url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-windows.zip"

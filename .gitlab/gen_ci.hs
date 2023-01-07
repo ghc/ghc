@@ -375,7 +375,7 @@ opsysVariables Amd64 (Darwin {}) =
 
           ]
 opsysVariables _ (Windows {}) =
-  mconcat [ "MSYSTEM" =: "MINGW64"
+  mconcat [ "MSYSTEM" =: "CLANG64"
           , "HADRIAN_ARGS" =: "--docs=no-sphinx"
           , "LANG" =: "en_US.UTF-8"
           , "CABAL_INSTALL_VERSION" =: "3.8.1.0"
@@ -842,4 +842,3 @@ main = do
     [] -> B.putStrLn
     (fp:_) -> B.writeFile fp)
     (A.encode jobs)
-

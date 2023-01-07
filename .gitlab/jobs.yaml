@@ -1798,7 +1798,7 @@
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-int_native-validate",
       "XZ_OPT": "-9"
     }
@@ -1857,7 +1857,7 @@
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-validate",
       "XZ_OPT": "-9"
     }
@@ -2963,7 +2963,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-int_native-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -3023,7 +3023,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -4331,7 +4331,7 @@
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-int_native-validate"
     }
   },
@@ -4389,7 +4389,7 @@
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
-      "MSYSTEM": "MINGW64",
+      "MSYSTEM": "CLANG64",
       "TEST_ENV": "x86_64-windows-validate"
     }
   }
