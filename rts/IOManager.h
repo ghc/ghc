@@ -317,19 +317,4 @@ bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
 void awaitEvent(Capability *cap, bool wait);
 #endif
 
-
-/* Pedantic warning cleanliness
- */
-#if !defined(THREADED_RTS) && defined(mingw32_HOST_OS)
-#define USED_IF_NOT_THREADS_AND_MINGW32
-#else
-#define USED_IF_NOT_THREADS_AND_MINGW32 STG_UNUSED
-#endif
-
-#if defined(THREADED_RTS) && !defined(mingw32_HOST_OS)
-#define USED_IF_THREADS_AND_NOT_MINGW32
-#else
-#define USED_IF_THREADS_AND_NOT_MINGW32 STG_UNUSED
-#endif
-
 #include "EndPrivate.h"

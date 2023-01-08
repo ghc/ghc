@@ -45,6 +45,24 @@
 #include <string.h>
 
 
+/* We have lots of functions below with conditional implementations for
+ * different I/O managers. Some functions, for some I/O managers, naturally
+ * have implementations that do nothing or barf. When only one such I/O
+ * manager is enabled then the whole function implementation will have an
+ * implementation that does nothing or barfs. This then results in warnings
+ * from gcc that parameters are unused, or that the function should be marked
+ * with attribute noreturn (since barf does not return). The USED_IF_THREADS
+ * trick for fine-grained warning supression is fine for just two cases, but an
+ * equivalent here would need USED_IF_THE_ONLY_ENABLED_IOMGR_IS_X_OR_Y which
+ * would have combinitorial blowup. So we take a coarse grained approach and
+ * simply disable these two warnings for the whole file.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
+#pragma GCC diagnostic ignored "-Wmissing-noreturn"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+
 /* Global var to tell us which I/O manager impl we are using */
 IOManagerType iomgr_type;
 
@@ -305,7 +323,7 @@ initIOManager(void)
 /* Called from forkProcess in the child process on the surviving capability.
  */
 void
-initIOManagerAfterFork(Capability **pcap USED_IF_THREADS_AND_NOT_MINGW32)
+initIOManagerAfterFork(Capability **pcap)
 {
 
     switch (iomgr_type) {
@@ -370,7 +388,7 @@ stopIOManager(void)
 /* Called in the RTS shutdown after the scheduler exits
  */
 void
-exitIOManager(bool wait_threads USED_IF_NOT_THREADS_AND_MINGW32)
+exitIOManager(bool wait_threads)
 {
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_WINIO)
@@ -424,9 +442,9 @@ void wakeupIOManager(void)
     }
 }
 
-void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
-                             void         *user  USED_IF_NOT_THREADS,
-                             CapIOManager *iomgr USED_IF_NOT_THREADS)
+void markCapabilityIOManager(evac_fn       evac,
+                             void         *user,
+                             CapIOManager *iomgr)
 {
 
     switch (iomgr_type) {
@@ -456,7 +474,7 @@ void markCapabilityIOManager(evac_fn       evac  USED_IF_NOT_THREADS,
  */
 #if !defined(mingw32_HOST_OS)
 void
-setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
+setIOManagerControlFd(uint32_t cap_no, int fd) {
 #if defined(THREADED_RTS)
     if (cap_no < getNumCapabilities()) {
         RELAXED_STORE(&getCapability(cap_no)->iomgr->control_fd, fd);
@@ -468,7 +486,7 @@ setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 #endif
 
 
-bool anyPendingTimeoutsOrIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
+bool anyPendingTimeoutsOrIO(CapIOManager *iomgr)
 {
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
@@ -520,13 +538,11 @@ bool anyPendingTimeoutsOrIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
     }
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
 
-void syncIOWaitReady(Capability   *cap USED_IF_NOT_THREADS,
-                     StgTSO       *tso USED_IF_NOT_THREADS,
-                     IOReadOrWrite rw  USED_IF_NOT_THREADS,
-                     HsInt         fd  USED_IF_NOT_THREADS)
+void syncIOWaitReady(Capability   *cap,
+                     StgTSO       *tso,
+                     IOReadOrWrite rw,
+                     HsInt         fd)
 {
     ASSERT(tso->why_blocked == NotBlocked);
     switch (iomgr_type) {
@@ -600,7 +616,6 @@ void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
             barf("syncDelay not supported for I/O manager %d", iomgr_type);
     }
 }
-#pragma GCC diagnostic pop
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)
@@ -658,3 +673,7 @@ bool is_io_mng_native_p (void)
             return false;
     }
 }
+
+
+/* See comment above with the #pragma GCC diagnostic push */
+#pragma GCC diagnostic pop
