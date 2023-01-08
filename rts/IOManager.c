@@ -467,6 +467,59 @@ setIOManagerControlFd(uint32_t cap_no USED_IF_THREADS, int fd USED_IF_THREADS) {
 }
 #endif
 
+
+bool anyPendingTimeoutsOrIO(CapIOManager *iomgr USED_IF_NOT_THREADS)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+          return (iomgr->blocked_queue_hd != END_TSO_QUEUE)
+              || (iomgr->sleeping_queue   != END_TSO_QUEUE);
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+          return (iomgr->blocked_queue_hd != END_TSO_QUEUE);
+#endif
+
+    /* For the purpose of the scheduler, the threaded I/O managers never have
+       pending I/O or timers. Of course in reality they do, but they're
+       managed via other primitives that the scheduler can see into (threads,
+       MVars and foreign blocking calls).
+     */
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+          return false;
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+          return false;
+#endif
+
+#if defined(IOMGR_ENABLED_WINIO)
+#if defined(THREADED_RTS)
+        /* As above, the threaded variants never have pending I/O or timers */
+        case IO_MANAGER_WINIO:
+          return false;
+#else
+        case IO_MANAGER_WINIO:
+          return false;
+        /* FIXME: But what is this? The WinIO I/O manager *also* returns false
+           in the non-threaded case! This is *totally bogus*! In the
+           non-threaded RTS the scheduler expects to be able to poll for IO.
+           The fact that this gives a wrong and useless answer for WinIO is
+           probably the cause of the complication in the scheduler with having
+           to call awaitCompletedTimeoutsOrIO() in multiple places (on Windows,
+           non-threaded).
+         */
+#endif
+#endif
+        default:
+            barf("anyPendingTimeoutsOrIO not implemented");
+    }
+}
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsuggest-attribute=noreturn"
 
