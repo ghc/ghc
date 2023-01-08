@@ -37,7 +37,8 @@ ghcWarningsArgs = do
                                       ]
         , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]
         , package haddock      ? pure [ "-Wno-unused-imports"
-                                      , "-Wno-deprecations" ]
+                                      , "-Wno-deprecations"
+                                      , "-Wno-x-partial" ]
         , package haskeline    ? pure [ "-Wno-deprecations"
                                       , "-Wno-x-partial"
                                       , "-Wno-unused-imports"
