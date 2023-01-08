@@ -277,7 +277,14 @@ void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
  */
 typedef enum { IORead, IOWrite } IOReadOrWrite;
 
+/* Synchronous operations: I/O and delays. As synchronous operations they
+ * necessarily operate on threads. The thread is suspended until the operation
+ * completes.
+ */
+
 void syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
+
+void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
 
 #if !defined(THREADED_RTS)
 /* Add a thread to the end of the queue of threads blocked on I/O.

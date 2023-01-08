@@ -27,9 +27,18 @@
 #include "posix/Signals.h"
 #endif
 
-#if defined(mingw32_HOST_OS)
+#if defined(IOMGR_ENABLED_MIO_WIN32)
 #include "win32/ThrIOManager.h"
 #include "win32/AsyncMIO.h"
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+#include "win32/AsyncMIO.h"
+#include "win32/MIOManager.h"
+#endif
+
+#if defined(IOMGR_ENABLED_WINIO)
+#include "win32/ThrIOManager.h"
 #include "win32/AsyncWinIO.h"
 #endif
 
@@ -492,8 +501,48 @@ void syncIOWaitReady(Capability   *cap USED_IF_NOT_THREADS,
             barf("waitRead# / waitWrite# not available for current I/O manager");
     }
 }
-#pragma GCC diagnostic pop
 
+void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
+{
+    ASSERT(tso->why_blocked == NotBlocked);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+        {
+            LowResTime target = getDelayTarget(us_delay);
+            tso->block_info.target = target;
+            RELEASE_STORE(&tso->why_blocked, BlockedOnDelay);
+            insertIntoSleepingQueue(cap, tso, target);
+            break;
+        }
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            /* It would be nice to allocate this on the heap instead as it
+             * would make the primops more consistent.
+             */
+        {
+            StgAsyncIOResult *ares = stgMallocBytes(sizeof(StgAsyncIOResult),
+                                                    "syncDelay");
+            ares->reqID   = addDelayRequest(us_delay);
+            ares->len     = 0;
+            ares->errCode = 0;
+            tso->block_info.async_result = ares;
+
+            /* Having all async-blocked threads reside on the blocked_queue
+             * simplifies matters, so set the status to OnDoProc and put the
+             * delayed thread on the blocked_queue.
+             */
+            RELEASE_STORE(&tso->why_blocked, BlockedOnDoProc);
+            appendToIOBlockedQueue(cap, tso);
+            break;
+        }
+#endif
+        default:
+            barf("syncDelay not supported for I/O manager %d", iomgr_type);
+    }
+}
+#pragma GCC diagnostic pop
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)

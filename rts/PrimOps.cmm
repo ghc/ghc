@@ -2562,49 +2562,19 @@ stg_waitWritezh ( W_ fd )
 
 stg_delayzh ( W_ us_delay )
 {
-#if defined(mingw32_HOST_OS)
-    W_ ares;
-    CInt reqID;
-#else
-    W_ t, prev, target;
-#endif
+    ccall syncDelay(MyCapability() "ptr", CurrentTSO "ptr", us_delay);
 
-#if defined(THREADED_RTS)
-    ccall barf("delay# on threaded RTS") never returns;
-#else
-
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I32);
-
-#if defined(mingw32_HOST_OS)
-
-    /* could probably allocate this on the heap instead */
-    ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        "stg_delayzh");
-    (reqID) = ccall addDelayRequest(us_delay);
-    StgAsyncIOResult_reqID(ares)   = reqID;
-    StgAsyncIOResult_len(ares)     = 0;
-    StgAsyncIOResult_errCode(ares) = 0;
-    StgTSO_block_info(CurrentTSO)  = ares;
-
-    /* Having all async-blocked threads reside on the blocked_queue
-     * simplifies matters, so change the status to OnDoProc put the
-     * delayed thread on the blocked_queue.
+    /* Annoyingly, we cannot be consistent with how we wait and resume the
+     * blocked thread. The reason is that the win32 legacy I/O manager
+     * allocates a StgAsyncIOResult struct on the C heap which has to be
+     * freed when the thread resumes. It's a bit awkward to arrange to
+     * allocate it on the GC heap instead, so that's how it is for now. Sigh.
      */
-    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I32;
-    ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
+#if defined(mingw32_HOST_OS)
     jump stg_block_async_void();
-
 #else
-
-    %relaxed StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I32;
-    (target) = ccall getDelayTarget(us_delay);
-
-    StgTSO_block_info(CurrentTSO) = target;
-
-    ccall insertIntoSleepingQueue(MyCapability() "ptr", CurrentTSO "ptr", target);
     jump stg_block_noregs();
 #endif
-#endif /* !THREADED_RTS */
 }
 
 
