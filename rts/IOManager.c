@@ -502,6 +502,11 @@ void syncIOWaitReady(Capability   *cap USED_IF_NOT_THREADS,
     }
 }
 
+#if defined(IOMGR_ENABLED_SELECT)
+static void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target);
+#endif
+
+
 void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
 {
     ASSERT(tso->why_blocked == NotBlocked);
@@ -559,7 +564,15 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)
 #endif
 
 #if defined(IOMGR_ENABLED_SELECT)
-void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target)
+/* Insert a thread into the queue of threads blocked on timers.
+ *
+ * This is used by the select() I/O manager implementation only.
+ *
+ * The sleeping queue is defined for other non-threaded I/O managers but not
+ * used. This is a wart that should be excised.
+ */
+// TODO: move to Select.c and rename
+static void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target)
 {
     CapIOManager *iomgr = cap->iomgr;
     StgTSO *prev = NULL;

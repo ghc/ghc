@@ -286,22 +286,13 @@ void syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
 void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
 
-#if !defined(THREADED_RTS)
+#if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 /* Add a thread to the end of the queue of threads blocked on I/O.
  *
  * This is used by the select() and the Windows MIO non-threaded I/O manager
- * implementation.
+ * implementation. Called from CMM code.
  */
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
-
-/* Insert a thread into the queue of threads blocked on timers.
- *
- * This is used by the select() I/O manager implementation only.
- *
- * The sleeping queue is defined for other non-threaded I/O managers but not
- * used. This is a wart that should be excised.
- */
-void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target);
 #endif
 
 /* Check to see if there are any pending timeouts or I/O operations
