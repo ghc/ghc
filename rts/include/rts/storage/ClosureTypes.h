@@ -16,6 +16,7 @@
  *   - the closure flags table in rts/ClosureFlags.c
  *   - isRetainer in rts/RetainerProfile.c
  *   - the closure_type_names list in rts/Printer.c
+ *   - the ClosureType sum type in libraries/ghc-internal/src/GHC/Internal/ClosureTypes.hs
  */
 
 /* CONSTR/THUNK/FUN_$A_$B mean they have $A pointers followed by $B

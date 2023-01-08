@@ -91,6 +91,7 @@ Library
         ghc-bignum >= 1.0 && < 2.0
 
     exposed-modules:
+        GHC.Internal.ClosureTypes
         GHC.Internal.Control.Arrow
         GHC.Internal.Control.Category
         GHC.Internal.Control.Concurrent.MVar

@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -30,9 +29,9 @@ import GHC.Internal.Exts () -- (Int (I#), RealWorld, StackSnapshot#, ThreadId#, 
 import GHC.Internal.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Internal.Num
 import GHC.Internal.Stable
-import GHC.Internal.Text.Read
 import GHC.Internal.Text.Show
 import GHC.Internal.Ptr
+import GHC.Internal.ClosureTypes ( ClosureType(..) )
 
 -- | A frozen snapshot of the state of an execution stack.
 --
@@ -210,7 +209,7 @@ data StackEntry = StackEntry
   { functionName :: String,
     moduleName :: String,
     srcLoc :: String,
-    closureType :: Word
+    closureType :: ClosureType
   }
   deriving (Show, Eq)
 
@@ -249,8 +248,7 @@ decode stackSnapshot = do
         { functionName = ipLabel infoProv,
           moduleName = ipMod infoProv,
           srcLoc = ipLoc infoProv,
-          -- read looks dangerous, be we can trust that the closure type is always there.
-          closureType = read . ipDesc $ infoProv
+          closureType = ipDesc $ infoProv
         }
 
 getDecodedStackArray :: StackSnapshot -> IO [Ptr InfoProvEnt]

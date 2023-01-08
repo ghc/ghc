@@ -8065,7 +8065,7 @@ module GHC.IORef where
 module GHC.InfoProv where
   -- Safety: Safe
   type InfoProv :: *
-  data InfoProv = InfoProv {ipName :: GHC.Internal.Base.String, ipDesc :: GHC.Internal.Base.String, ipTyDesc :: GHC.Internal.Base.String, ipLabel :: GHC.Internal.Base.String, ipMod :: GHC.Internal.Base.String, ipSrcFile :: GHC.Internal.Base.String, ipSrcSpan :: GHC.Internal.Base.String}
+  data InfoProv = InfoProv {ipName :: GHC.Internal.Base.String, ipDesc :: GHC.Internal.ClosureTypes.ClosureType, ipTyDesc :: GHC.Internal.Base.String, ipLabel :: GHC.Internal.Base.String, ipMod :: GHC.Internal.Base.String, ipSrcFile :: GHC.Internal.Base.String, ipSrcSpan :: GHC.Internal.Base.String}
   type InfoProvEnt :: *
   data InfoProvEnt
   ipLoc :: InfoProv -> GHC.Internal.Base.String
@@ -9354,7 +9354,7 @@ module GHC.Stack.CCS where
 module GHC.Stack.CloneStack where
   -- Safety: None
   type StackEntry :: *
-  data StackEntry = StackEntry {functionName :: GHC.Internal.Base.String, moduleName :: GHC.Internal.Base.String, srcLoc :: GHC.Internal.Base.String, closureType :: GHC.Types.Word}
+  data StackEntry = StackEntry {functionName :: GHC.Internal.Base.String, moduleName :: GHC.Internal.Base.String, srcLoc :: GHC.Internal.Base.String, closureType :: GHC.Internal.ClosureTypes.ClosureType}
   type StackSnapshot :: *
   data StackSnapshot = StackSnapshot GHC.Prim.StackSnapshot#
   cloneMyStack :: GHC.Types.IO StackSnapshot

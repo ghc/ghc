@@ -1,6 +1,7 @@
 module Main where
 
 import GHC.Stack.CloneStack
+import GHC.Internal.ClosureTypes
 import System.IO.Unsafe
 import Control.Monad
 
@@ -34,16 +35,16 @@ main = do
     StackEntry
       { functionName = "assertEqual",
         moduleName = "Main",
-        srcLoc = "decodeMyStack_underflowFrames.hs:23:11",
-        closureType = 53
+        srcLoc = "decodeMyStack_underflowFrames.hs:24:11",
+        closureType = STACK
       }
   assertEqual
     (stack !! 1)
     StackEntry
       { functionName = "main.(...)",
         moduleName = "Main",
-        srcLoc = "decodeMyStack_underflowFrames.hs:29:20-36",
-        closureType = 53
+        srcLoc = "decodeMyStack_underflowFrames.hs:30:20-36",
+        closureType = STACK
       }
   forM_
     [2 .. 1001]
@@ -53,8 +54,8 @@ main = do
           StackEntry
             { functionName = "getDeepStack.getDeepStackCase",
               moduleName = "Main",
-              srcLoc = "decodeMyStack_underflowFrames.hs:19:26-28",
-              closureType = 53
+              srcLoc = "decodeMyStack_underflowFrames.hs:20:26-28",
+              closureType = STACK
             }
     )
   assertEqual
@@ -62,6 +63,6 @@ main = do
     StackEntry
       { functionName = "getDeepStack.getDeepStackCase",
         moduleName = "Main",
-        srcLoc = "decodeMyStack_underflowFrames.hs:14:7-21",
-        closureType = 53
+        srcLoc = "decodeMyStack_underflowFrames.hs:15:7-21",
+        closureType = STACK
       }

@@ -21,6 +21,8 @@
   * Add `System.Mem.performMajorGC` ([CLC proposal #230](https://github.com/haskell/core-libraries-committee/issues/230))
   * Fix exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
   * Implement `many` and `some` methods of `instance Alternative (Compose f g)` explicitly. ([CLC proposal #181](https://github.com/haskell/core-libraries-committee/issues/181))
+  * Change the types of the `GHC.Stack.StackEntry.closureType` and `GHC.InfoProv.InfoProv.ipDesc` record fields to use `GHC.Exts.Heap.ClosureType` rather than an `Int`.
+    To recover the old value use `fromEnum`. ([CLC proposal #210](https://github.com/haskell/core-libraries-committee/issues/210))
 
   * The functions `GHC.Exts.dataToTag#` and `GHC.Base.getTag` have had
     their types changed to the following:

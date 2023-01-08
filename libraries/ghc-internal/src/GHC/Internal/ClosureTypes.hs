@@ -1,23 +1,22 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# OPTIONS_HADDOCK not-home   #-}
 
-module GHC.Exts.Heap.ClosureTypes
+module GHC.Internal.ClosureTypes
     ( ClosureType(..)
-    , closureTypeHeaderSize
     ) where
 
-import Prelude -- See note [Why do we import Prelude here?]
-#if __GLASGOW_HASKELL__ >= 909
-import GHC.Internal.ClosureTypes
-#else
-import GHC.Generics
+import GHC.Internal.Data.Eq
+import GHC.Internal.Data.Ord
+import GHC.Internal.Enum
+import GHC.Internal.Generics
+import GHC.Internal.Show
 
-{- ---------------------------------------------
--- Enum representing closure types
+-- |  Enum representing closure types
 -- This is a mirror of:
--- rts/include/rts/storage/ClosureTypes.h
--- ---------------------------------------------}
-
+-- @rts/include/rts/storage/ClosureTypes.h@
+--
+-- @since 0.1.0.0
 data ClosureType
     = INVALID_OBJECT
     | CONSTR
@@ -85,23 +84,4 @@ data ClosureType
     | COMPACT_NFDATA
     | CONTINUATION
     | N_CLOSURE_TYPES
- deriving (Enum, Eq, Ord, Show, Generic)
-#endif
-
--- | Return the size of the closures header in words
-closureTypeHeaderSize :: ClosureType -> Int
-closureTypeHeaderSize closType =
-    case closType of
-        ct | THUNK <= ct && ct <= THUNK_0_2 -> thunkHeader
-        ct | ct == THUNK_SELECTOR -> thunkHeader
-        ct | ct == AP -> thunkHeader
-        ct | ct == AP_STACK -> thunkHeader
-        _ -> header
-  where
-    header = 1 + prof
-    thunkHeader = 2 + prof
-#if defined(PROFILING)
-    prof = 2
-#else
-    prof = 0
-#endif
+    deriving (Enum, Eq, Ord, Show, Generic)

@@ -27,6 +27,9 @@ library
                   , rts              == 1.0.*
                   , containers       >= 0.6.2.1 && < 0.8
 
+  if impl(ghc >= 9.9)
+    build-depends:  ghc-internal     >= 0.1 && < 0.2
+
   ghc-options:      -Wall
   if !os(ghcjs)
     cmm-sources:      cbits/HeapPrim.cmm

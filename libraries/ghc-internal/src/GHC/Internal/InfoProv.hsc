@@ -2,6 +2,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -36,15 +37,19 @@ module GHC.Internal.InfoProv
 #include "Rts.h"
 
 import GHC.Internal.Base
+import GHC.Internal.Enum
 import GHC.Internal.Show
 import GHC.Internal.Ptr (Ptr(..), plusPtr, nullPtr)
 import GHC.Internal.IO.Encoding (utf8)
 import GHC.Internal.Foreign.Storable (peekByteOff)
 import GHC.Internal.Foreign.C.String.Encoding
+import GHC.Internal.Text.Read (readMaybe)
+import GHC.Internal.Data.Maybe (maybe)
+import GHC.Internal.ClosureTypes ( ClosureType(..) )
 
 data InfoProv = InfoProv {
   ipName :: String,
-  ipDesc :: String,
+  ipDesc :: ClosureType,
   ipTyDesc :: String,
   ipLabel :: String,
   ipMod :: String,
@@ -85,7 +90,9 @@ peekInfoProv infop = do
   span <- peekCString utf8 =<< peekIpSrcSpan infop
   return InfoProv {
       ipName = name,
-      ipDesc = desc,
+      -- The INVALID_OBJECT case should be impossible as we
+      -- control the C code generating these values.
+      ipDesc = maybe INVALID_OBJECT toEnum . readMaybe @Int $ desc,
       ipTyDesc = tyDesc,
       ipLabel = label,
       ipMod = mod,
