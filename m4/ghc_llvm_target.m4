@@ -50,5 +50,10 @@ AC_DEFUN([GHC_LLVM_TARGET], [
 # require it.
 AC_DEFUN([GHC_LLVM_TARGET_SET_VAR], [
   AC_REQUIRE([FPTOOLS_SET_PLATFORMS_VARS])
-  GHC_LLVM_TARGET([$target],[$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+  if test "$bootstrap_llvm_target" != ""
+  then
+    $5=$bootstrap_llvm_target
+  else
+    GHC_LLVM_TARGET([$target],[$TargetArch],[$TargetVendor],[$TargetOS],[LlvmTarget])
+  fi
 ])

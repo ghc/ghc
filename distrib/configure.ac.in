@@ -18,6 +18,8 @@ dnl--------------------------------------------------------------------
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
+bootstrap_llvm_target=@LlvmTarget@
+
 TargetHasRTSLinker=@TargetHasRTSLinker@
 AC_SUBST(TargetHasRTSLinker)
 
