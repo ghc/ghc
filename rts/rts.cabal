@@ -557,6 +557,8 @@ library
                    wasm/JSFFI.c
                    wasm/JSFFIGlobals.c
                    posix/Select.c
+                   posix/Poll.c
+                   posix/Timeout.c
         cmm-sources: wasm/jsval.cmm
                      wasm/blocker.cmm
                      wasm/scheduler.cmm
@@ -566,8 +568,10 @@ library
                     posix/Ticker.c
                     posix/OSMem.c
                     posix/OSThreads.c
+                    posix/Poll.c
                     posix/Select.c
                     posix/Signals.c
+                    posix/Timeout.c
                     posix/TTY.c
                     -- ticker/*.c
                     -- We don't want to compile posix/ticker/*.c, these will be #included

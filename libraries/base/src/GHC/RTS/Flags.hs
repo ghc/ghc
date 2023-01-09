@@ -388,6 +388,11 @@ internal_to_base_MiscFlags i@Internal.MiscFlags{..} =
     internal_to_base_ioManager :: Internal.IoManagerFlag -> IoManagerFlag
     internal_to_base_ioManager Internal.IoManagerFlagAuto        = IoManagerFlagAuto
     internal_to_base_ioManager Internal.IoManagerFlagSelect      = IoManagerFlagSelect
+    internal_to_base_ioManager Internal.IoManagerFlagPoll        = IoManagerFlagAuto
+      -- This is a lie, we cannot translate poll. We cannot translate
+      -- accurately because want to freeze the API of the the compat RTS flags
+      -- here. Using "auto" is the least bad translation.
+      -- https://github.com/haskell/core-libraries-committee/issues/362
     internal_to_base_ioManager Internal.IoManagerFlagMIO         = IoManagerFlagMIO
     internal_to_base_ioManager Internal.IoManagerFlagWinIO       = IoManagerFlagWinIO
     internal_to_base_ioManager Internal.IoManagerFlagWin32Legacy = IoManagerFlagWin32Legacy

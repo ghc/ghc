@@ -6341,7 +6341,7 @@ module GHC.RTS.Flags.Experimental where
   type HpcFlags :: *
   data HpcFlags = HpcFlags {readTixFile :: GHC.Internal.Types.Bool, writeTixFile :: GHC.Internal.Types.Bool}
   type IoManagerFlag :: *
-  data IoManagerFlag = IoManagerFlagAuto | IoManagerFlagSelect | IoManagerFlagMIO | IoManagerFlagWinIO | IoManagerFlagWin32Legacy
+  data IoManagerFlag = IoManagerFlagAuto | IoManagerFlagSelect | IoManagerFlagPoll | IoManagerFlagMIO | IoManagerFlagWinIO | IoManagerFlagWin32Legacy
   type IoSubSystem :: *
   data IoSubSystem = IoPOSIX | IoNative
   type MiscFlags :: *

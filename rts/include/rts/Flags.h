@@ -237,7 +237,12 @@ typedef struct _CONCURRENT_FLAGS {
 #define DEFAULT_LINKER_ALWAYS_PIC false
 #endif
 
-/* Which I/O Manager to use in the target program. */
+/* Which I/O Manager to use in the target program.
+ *
+ * If you modify this enum, you must update the corresponding IoManagerFlag
+ * type and Enum instance in GHC.Internal.RTS.Flags and GHC.RTS.Flags (but be
+ * aware that the latter is a public API).
+ */
 typedef enum _IO_MANAGER_FLAG {
 
     /* Select an I/O manager automatically. This will pick the one determined
@@ -249,6 +254,7 @@ typedef enum _IO_MANAGER_FLAG {
 
     /* All other choices pick only the requested one, with no fallback. */
     IO_MNGR_FLAG_SELECT,          /* Unix only,    non-threaded RTS only */
+    IO_MNGR_FLAG_POLL,            /* Unix only,    non-threaded RTS only */
     IO_MNGR_FLAG_MIO,             /* cross-platform,   threaded RTS only */
     IO_MNGR_FLAG_WINIO,           /* Windows only                        */
     IO_MNGR_FLAG_WIN32_LEGACY,    /* Windows only, non-threaded RTS only */

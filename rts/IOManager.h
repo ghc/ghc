@@ -43,6 +43,9 @@
 #if defined(IOMGR_BUILD_SELECT) && !defined(THREADED_RTS)
     #define IOMGR_ENABLED_SELECT
 #endif
+#if defined(IOMGR_BUILD_POLL) && !defined(THREADED_RTS)
+    #define IOMGR_ENABLED_POLL
+#endif
 #if defined(IOMGR_BUILD_MIO) && defined(THREADED_RTS)
 /* For MIO, it is really two separate I/O manager implementations: one for
  * Windows and one for non-Windows. This is clear from both the C code on the
@@ -82,6 +85,8 @@
 #else // !defined(THREADED_RTS)
 #if   defined(IOMGR_DEFAULT_NON_THREADED_SELECT)
     #define IOMGR_DEFAULT_STR "select"
+#elif defined(IOMGR_DEFAULT_NON_THREADED_POLL)
+    #define IOMGR_DEFAULT_STR "poll"
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WINIO)
     #define IOMGR_DEFAULT_STR "winio"
 #elif defined(IOMGR_DEFAULT_NON_THREADED_WIN32_LEGACY)
@@ -100,6 +105,11 @@
 #else
     #define IOMGR_ENABLED_STR_SELECT ""
 #endif
+#if defined(IOMGR_ENABLED_POLL)
+    #define IOMGR_ENABLED_STR_POLL " poll"
+#else
+    #define IOMGR_ENABLED_STR_POLL ""
+#endif
 #if defined(IOMGR_ENABLED_MIO_POSIX) || defined(IOMGR_ENABLED_MIO_WIN32)
     #define IOMGR_ENABLED_STR_MIO " mio"
 #else
@@ -117,6 +127,7 @@
 #endif
 #define IOMGRS_ENABLED_STR \
           IOMGR_ENABLED_STR_SELECT \
+          IOMGR_ENABLED_STR_POLL \
           IOMGR_ENABLED_STR_MIO \
           IOMGR_ENABLED_STR_WINIO \
           IOMGR_ENABLED_STR_WIN32_LEGACY
@@ -128,6 +139,9 @@
 typedef enum {
 #if defined(IOMGR_ENABLED_SELECT)
     IO_MANAGER_SELECT,
+#endif
+#if defined(IOMGR_ENABLED_POLL)
+    IO_MANAGER_POLL,
 #endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
     IO_MANAGER_MIO_POSIX,

@@ -14,6 +14,12 @@
 
 #include "IOManager.h"
 
+#if defined(IOMGR_ENABLED_POLL)
+#include <poll.h> /* for struct pollfd */
+#include "ClosureTable.h"
+#include "TimeoutQueue.h"
+#endif
+
 #include "BeginPrivate.h"
 
 /* The per-capability data structures belonging to the I/O manager.
@@ -34,6 +40,17 @@ struct _CapIOManager {
 
     /* Thread queue for threads blocked on timeouts. */
     StgTSO *sleeping_queue;
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+    /* AIOP and timeout collections shared by several I/O manager impls */
+    ClosureTable     aiop_table;
+    StgTimeoutQueue *timeout_queue;
+#endif
+
+#if defined(IOMGR_ENABLED_POLL)
+    /* Auxiliary table with size and indexes matching the aiop_table */
+    struct pollfd *aiop_poll_table;
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
