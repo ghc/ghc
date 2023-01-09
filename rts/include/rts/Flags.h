@@ -246,6 +246,7 @@ typedef enum _IO_MANAGER_FLAG {
 
     /* All other choices pick only the requested one, with no fallback. */
     IO_MNGR_FLAG_SELECT,          /* Unix only,    non-threaded RTS only */
+    IO_MNGR_FLAG_POLL,            /* Unix only,    non-threaded RTS only */
     IO_MNGR_FLAG_MIO,             /* cross-platform,   threaded RTS only */
     IO_MNGR_FLAG_WINIO,           /* Windows only                        */
     IO_MNGR_FLAG_WIN32_LEGACY,    /* Windows only, non-threaded RTS only */

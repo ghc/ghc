@@ -321,6 +321,7 @@ Miscellaneous RTS options
      Name            Platforms RTS way
     ================ ========= ============
     ``select``       Posix     Non-threaded
+    ``poll``         Posix     Non-threaded
     ``mio``          All       Threaded
     ``win32-legacy`` Windows   Non-threaded
     ``winio``        Windows   All
