@@ -54,7 +54,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_buil
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
@@ -304,7 +304,8 @@ testOneFile _ libdir fileName mchanger = do
 
        (changedSourceOk, expectedSource, changedSource) <- case mchanger of
          Just changer -> do
-           (pped', ast') <- exactprintWithChange libdir changer p
+           let changer' = changer `debug` ("****Starting to run changer****")
+           (pped', ast') <- exactprintWithChange libdir changer' p
            writeBinFile changedAstFile (ppAst ast')
            writeBinFile newFileChanged pped'
 
@@ -461,8 +462,7 @@ changeAddDecl1 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
   let decl' = setEntryDP decl (DifferentLine 2 0)
 
-  let (p',_,_) = runTransform doAddDecl
-      doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
+  let (p',_,_) = runTransform (replaceTopLevelDecls top)
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtStart m decl'
   return p'
@@ -472,10 +472,10 @@ changeAddDecl1 libdir top = do
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
+  let decl' = setEntryDP decl (DifferentLine 2 0)
 
   let (p',_,_) = runTransform doAddDecl
-      doAddDecl = everywhereM (mkM replaceTopLevelDecls) (makeDeltaAst top)
+      doAddDecl = everywhereM (mkM replaceTopLevelDecls) top
       replaceTopLevelDecls :: ParsedSource -> Transform ParsedSource
       replaceTopLevelDecls m = insertAtEnd m decl'
   return p'
@@ -590,12 +590,14 @@ addLocaLDecl1 libdir top = do
   Right (L ld (ValD _ decl)) <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
   let decl' = setEntryDP (L ld decl) (DifferentLine 1 5)
       doAddLocal = do
-        let lp = makeDeltaAst top
+        -- let lp = makeDeltaAst top
+        let lp = top
         (de1:d2:d3:_) <- hsDecls lp
         (de1'',d2') <- balanceComments de1 d2
+        let d2'' = setEntryDP d2' (DifferentLine 2 0)
         (de1',_) <- modifyValD (getLocA de1'') de1'' $ \_m d -> do
           return ((wrapDecl decl' : d),Nothing)
-        replaceDecls lp [de1', d2', d3]
+        replaceDecls lp [de1', d2'', d3]
 
   (lp',_,w) <- runTransformT doAddLocal
   debugM $ "addLocaLDecl1:" ++ intercalate "\n" w
@@ -902,7 +904,8 @@ addHiding1 _libdir (L l p) = do
                                               [])
                                        emptyComments) l0) [v1,v2]
           imp1' = imp1 { ideclImportList = Just (EverythingBut,impHiding)}
-          p' = p { hsmodImports = [L li imp1',imp2]}
+          imp2' = setEntryDP imp2 (DifferentLine 2 0)
+          p' = p { hsmodImports = [L li imp1',imp2']}
         return (L l p')
 
   let (lp',_,_w) = runTransform doTransform

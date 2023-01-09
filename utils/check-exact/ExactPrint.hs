@@ -1385,10 +1385,14 @@ markTopLevelList ls = mapM (\a -> setLayoutTopLevelP $ markAnnotated a) ls
 instance (ExactPrint a) => ExactPrint (Located a) where
   getAnnotationEntry (L l _) = case l of
     UnhelpfulSpan _ -> NoEntryVal
-    _ -> Entry (hackSrcSpanToAnchor l) emptyComments NoFlushComments CanUpdateAnchorOnly
+    _ -> Entry (spanAsAnchor l) emptyComments NoFlushComments NoCanUpdateAnchor
+  -- getAnnotationEntry (L l _) = case l of
+  --   UnhelpfulSpan _ -> NoEntryVal
+  --   _ -> Entry (hackSrcSpanToAnchor l) emptyComments NoFlushComments CanUpdateAnchorOnly
 
-  setAnnotationAnchor (L _ a) anc _cs = (L (hackAnchorToSrcSpan anc) a)
-                 `debug` ("setAnnotationAnchor(Located):" ++ showAst anc)
+  -- setAnnotationAnchor (L _ a) anc _cs = (L (hackAnchorToSrcSpan anc) a)
+  --                `debug` ("setAnnotationAnchor(Located):" ++ showAst anc)
+  setAnnotationAnchor ls _ _ = ls
 
   exact (L l a) = L l <$> markAnnotated a
 
