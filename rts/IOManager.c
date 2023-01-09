@@ -80,6 +80,17 @@
 #pragma GCC diagnostic ignored "-Wmissing-noreturn"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+/* Sanity check that the size of the C struct StgAsyncIOOp matches the
+ * corresponding info table declaration in StgMiscClosures.cmm:
+ * INFO_TABLE_CONSTR(stg_ASYNCIOOP, ...)
+ * We put this check here since it has to live somewhere, and the main users
+ * of StgAsyncIOOp are I/O managers.
+ */
+GHC_STATIC_ASSERT(sizeof(StgAsyncIOOp)
+               == sizeof(StgHeader)
+                + sizeof(StgPtr)  * stg_ASYNCIOOP_NUM_PTRS
+                + sizeof(StgWord) * stg_ASYNCIOOP_NUM_NONPTRS,
+                "sizeof(StgAsyncIOOp) does not match expected size");
 
 /* Global var to tell us which I/O manager impl we are using */
 IOManagerType iomgr_type;

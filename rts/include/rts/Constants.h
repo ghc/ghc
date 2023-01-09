@@ -396,3 +396,10 @@
 #else
 #define stg_TIMEOUT_QUEUE_NUM_NONPTRS 2
 #endif
+
+#define stg_ASYNCIOOP_NUM_PTRS 2
+#if SIZEOF_VOID_P == 4
+#define stg_ASYNCIOOP_NUM_NONPTRS 4
+#else
+#define stg_ASYNCIOOP_NUM_NONPTRS 2
+#endif

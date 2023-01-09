@@ -1014,6 +1014,25 @@ INFO_TABLE_CONSTR(stg_TIMEOUT_QUEUE_EMPTY,0,0,0,CONSTR_NOCAF,"TIMEOUT_QUEUE_EMPT
 CLOSURE(stg_TIMEOUT_QUEUE_EMPTY_closure,stg_TIMEOUT_QUEUE_EMPTY);
 
 /* ----------------------------------------------------------------------------
+   Async I/O operation closures: StgAsyncIOOp and two StgAsyncIOLive
+   ------------------------------------------------------------------------- */
+
+/* PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.
+ * We need that here because while we do not mutate the pointer fields, we do
+ * mutate the non-pointer fields: the operation result.
+ */
+INFO_TABLE_CONSTR(stg_ASYNCIOOP,
+                  stg_ASYNCIOOP_NUM_PTRS,
+                  stg_ASYNCIOOP_NUM_NONPTRS,
+                  0,PRIM,"ASYNCIOOP","ASYNCIOOP")
+{ foreign "C" barf("ASYNCIOOP object (%p) entered!", R1) never returns; }
+
+INFO_TABLE_CONSTR(stg_ASYNCIO_LIVE0,0,0,0,CONSTR_NOCAF,"ASYNCIO_LIVE0","ASYNCIO_LIVE0")
+{ foreign "C" barf("ASYNCIO_LIVE0 object (%p) entered!", R1) never returns; }
+
+CLOSURE(stg_ASYNCIO_LIVE0_closure,stg_ASYNCIO_LIVE0);
+
+/* ----------------------------------------------------------------------------
    Note [CHARLIKE and INTLIKE closures]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    These are static representations of Chars and small Ints, so that
