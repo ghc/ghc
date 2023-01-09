@@ -8,10 +8,14 @@
 
 #pragma once
 
+#include "BeginPrivate.h"
+
 // An absolute time value in units of 10ms.
 typedef StgWord LowResTime;
 
-RTS_PRIVATE LowResTime getDelayTarget (HsInt us);
+LowResTime getDelayTarget (HsInt us);
 
 void awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait);
+
+#include "EndPrivate.h"
 

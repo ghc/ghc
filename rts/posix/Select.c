@@ -36,7 +36,7 @@
 
 #include "Clock.h"
 
-#if !defined(THREADED_RTS)
+#if defined(IOMGR_ENABLED_SELECT)
 
 // The target time for a threadDelay is stored in a one-word quantity
 // in the TSO (tso->block_info.target).  On a 32-bit machine we
@@ -463,4 +463,4 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
                   && emptyRunQueue(cap));
 }
 
-#endif /* THREADED_RTS */
+#endif /* IOMGR_ENABLED_SELECT */
