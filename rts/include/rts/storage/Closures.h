@@ -758,3 +758,61 @@ typedef struct StgTimeoutQueue_ {
      * Either32Or64Bit(3,2) for the non-pointer words.
      */
 } StgTimeoutQueue;
+
+/* ----------------------------------------------------------------------------
+   Asynchronous I/O operation data structures used by some RTS I/O managers
+   ------------------------------------------------------------------------- */
+
+/* A handle to an in-progress asynchronous I/O operation.
+ */
+typedef struct {
+    StgHeader header;
+
+      // What to notify of the completion of the I/O operation, either a TSO,
+      // an MVar, or hopefully in future a TVar.
+      // The notify_type field below tells us which of these it is.
+    union NotifyCompletion notify;
+
+      // Any heap object to keep alive for the duration of the I/O operation,
+      // for example I/O buffers.
+    StgClosure *live;
+
+      // The per-capability stable table index of this I/O operation.
+    uint32_t index;
+
+      // The capability the I/O op is running on.
+      // In the threaded way there is one timeout heap per capability. We have
+      // to handle cross-capability I/O op cancellation specially, so we need
+      // to know which capability an aiop is on.
+    uint16_t capno;
+
+      // Tells us which thing the notify union above contains.
+      // This is a value from enum IONotify but we don't use the enum type
+      // here due to portability concerns for this size C enum bitfield.
+    uint16_t notify_type: 2;
+
+      // The outcome:
+      // 0: success, result field contains the result code
+      // 1: failed, error field contains the error code
+      // 2: cancelled, no detail
+    uint16_t outcome: 2;
+
+      // 12 bits going spare!
+
+    union {
+          // For successful outcomes, this is the result code.
+        uint32_t result;
+
+          // For failed outcomes, this is the error code.
+        uint32_t error;
+    };
+
+        // Round it up to 2 words on 64bit platforms.
+        // This is also space for future extension, without increasing the size.
+    uint32_t padding;
+
+      // Note that because we use fixed size Ctypes here then the size in words
+      // of this heap object is different on 32bit and 64bit platforms.
+      // We handle this in the INFO_TABLE_CONSTR decl for stg_ASYNCIOOP using
+      // Either32Or64Bit(4,2) for the non-pointer words.
+} StgAsyncIOOp;

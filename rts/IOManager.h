@@ -196,6 +196,13 @@ char * showIOManager(void);
  */
 bool is_io_mng_native_p (void);
 
+/* Values for StgAsyncIOOp.outcome.
+ */
+enum IOOpOutcome {
+    IOOpOutcomeSuccess   = 0,
+    IOOpOutcomeFailed    = 1,
+    IOOpOutcomeCancelled = 2
+};
 
 /* Init hook: called from hs_init_ghc, early in the startup after the RTS flags
  * have been processed.
