@@ -1,0 +1,4 @@
+[2 of 2] Compiling T22728b          ( T22728b.hs, T22728b.o )
+
+T22728b.hs:6:1: error: [GHC-82658] [-Winferred-safe-imports, Werror=inferred-safe-imports]
+    Importing Safe-Inferred module T22728b_B from explicitly Safe module
