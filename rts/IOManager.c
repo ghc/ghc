@@ -174,8 +174,11 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag)
  *
  * This fills in the iomgr_type and rts_IOManagerIsWin32Native globals.
  * Must be called before the I/O manager is started.
+ *
+ * Called early in the RTS initialisation, after the RTS flags have been
+ * processed.
  */
-static void selectIOManager(void)
+void selectIOManager(void)
 {
     switch (RtsFlags.MiscFlags.ioManager) {
         case IO_MNGR_FLAG_AUTO:
@@ -242,9 +245,13 @@ static void selectIOManager(void)
 
 
 /* Allocate and initialise the per-capability CapIOManager that lives in each
- * Capability. Called early in the RTS initialisation.
+ * Capability. Called from initCapability(), which is done in the RTS startup
+ * in initCapabilities(), and later at runtime via setNumCapabilities().
+ *
+ * Note that during RTS startup this is called _before_ the storage manager
+ * is initialised, so this is not allowed to allocate on the GC heap.
  */
-void initCapabilityIOManager(CapIOManager **piomgr)
+void initCapabilityIOManager(Capability *cap)
 {
     CapIOManager *iomgr =
       (CapIOManager *) stgMallocBytes(sizeof(CapIOManager),
@@ -275,20 +282,18 @@ void initCapabilityIOManager(CapIOManager **piomgr)
             break;
     }
 
-    *piomgr = iomgr;
+    cap->iomgr = iomgr;
 }
 
 
 /* Called late in the RTS initialisation
  */
-void
-initIOManager(void)
+void initIOManager(void)
 {
-    selectIOManager();
 
     switch (iomgr_type) {
 
-        /* The IO_MANAGER_SELECT needs no initialisation */
+        /* The IO_MANAGER_SELECT needs no global initialisation */
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:

@@ -214,11 +214,19 @@ typedef struct {
 } CapIOManager;
 
 
-/* Allocate and initialise the per-capability CapIOManager that lives in each
- * Capability. It is called from initCapability, via initScheduler,
- * via hs_init_ghc.
+/* Init hook: called from hs_init_ghc, early in the startup after the RTS flags
+ * have been processed.
+ *
+ * Based on the I/O manager RTS flag, select an I/O manager to use.
  */
-void initCapabilityIOManager(CapIOManager **iomgr);
+void selectIOManager(void);
+
+
+/* Allocate and initialise the per-capability CapIOManager that lives in each
+ * Capability. Called from initCapability(), which is done in the RTS startup
+ * in initCapabilities(), and later at runtime via setNumCapabilities().
+ */
+void initCapabilityIOManager(Capability *cap);
 
 
 /* Init hook: called from hs_init_ghc, very late in the startup after almost

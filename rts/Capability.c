@@ -281,7 +281,7 @@ initCapability (Capability *cap, uint32_t i)
 #endif
     cap->total_allocated        = 0;
 
-    initCapabilityIOManager(&cap->iomgr);
+    initCapabilityIOManager(cap); /* initialises cap->iomgr */
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;

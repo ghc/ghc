@@ -331,6 +331,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif /* DEBUG */
     }
 
+    /* Based on the RTS flags, decide which I/O manager to use. */
+    selectIOManager();
+
     /* Initialize console Codepage.  */
 #if defined(mingw32_HOST_OS)
    if (is_io_mng_native_p())
