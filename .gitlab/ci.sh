@@ -233,6 +233,10 @@ function set_toolchain_paths() {
   export CABAL
   export HAPPY
   export ALEX
+
+  if [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
+    source "/home/ghc/.ghc-wasm/env"
+  fi
 }
 
 function cabal_update() {
