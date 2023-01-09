@@ -256,11 +256,6 @@ function setup() {
       cp -Rf "$CABAL_CACHE"/* "$CABAL_DIR"
   fi
 
-  case "${CONFIGURE_WRAPPER:-}" in
-    emconfigure) time_it "setup" setup_emscripten ;;
-    *) ;;
-  esac
-
   case $toolchain_source in
     extracted) time_it "setup" setup_toolchain ;;
     *) ;;
@@ -377,14 +372,6 @@ function setup_toolchain() {
   $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
-function setup_emscripten() {
-  git clone https://github.com/emscripten-core/emsdk.git
-  cd emsdk
-  ./emsdk install latest
-  ./emsdk activate latest
-  cd ..
-}
-
 function cleanup_submodules() {
   start_section "clean submodules"
   if [ -d .git ]; then
@@ -423,7 +410,7 @@ EOF
 
 function configure() {
   case "${CONFIGURE_WRAPPER:-}" in
-    emconfigure) source emsdk/emsdk_env.sh ;;
+    emconfigure) source "$EMSDK/emsdk_env.sh" ;;
     *) ;;
   esac
 
@@ -561,7 +548,7 @@ function make_install_destdir() {
 # install the binary distribution in directory $1 to $2.
 function install_bindist() {
   case "${CONFIGURE_WRAPPER:-}" in
-    emconfigure) source emsdk/emsdk_env.sh ;;
+    emconfigure) source "$EMSDK/emsdk_env.sh" ;;
     *) ;;
   esac
 
