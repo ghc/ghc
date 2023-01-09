@@ -486,6 +486,7 @@ usage_text[] = {
 "  -Dr  DEBUG: sparks",
 "  -DC  DEBUG: compact",
 "  -Dk  DEBUG: continuation",
+"  -Do  DEBUG: iomanager",
 "",
 "     NOTE: DEBUG events are sent to stderr by default; add -l to create a",
 "     binary event log file instead.",
@@ -2258,6 +2259,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'k':
             RtsFlags.DebugFlags.continuation = true;
+            break;
+        case 'o':
+            RtsFlags.DebugFlags.iomanager = true;
             break;
         default:
             bad_option( arg );

@@ -117,6 +117,7 @@ typedef struct _DEBUG_FLAGS {
     bool numa;           /* '--debug-numa' */
     bool compact;        /* 'C' */
     bool continuation;   /* 'k' */
+    bool iomanager;      /* 'o' */
 } DEBUG_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
