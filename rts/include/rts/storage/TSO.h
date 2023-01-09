@@ -54,6 +54,8 @@ typedef union {
   struct MessageThrowTo_ *throwto;
   struct MessageWakeup_  *wakeup;
   StgInt fd;    /* StgInt instead of int, so that it's the same size as the ptrs */
+  StgAsyncIOOp *aiop;
+  StgTimeoutQueue *timeout;
 #if defined(mingw32_HOST_OS)
   StgAsyncIOResult *async_result;
 #endif
