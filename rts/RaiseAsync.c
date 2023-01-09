@@ -20,6 +20,7 @@
 #include "sm/Sanity.h"
 #include "Profiling.h"
 #include "Messages.h"
+#include "IOManager.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/MIOManager.h"
 #endif
@@ -703,26 +704,17 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       break;
   }
 
-#if !defined(THREADED_RTS)
   case BlockedOnRead:
   case BlockedOnWrite:
-#if defined(mingw32_HOST_OS)
   case BlockedOnDoProc:
-#endif
-      removeThreadFromDeQueue(cap, &cap->iomgr->blocked_queue_hd,
-                                   &cap->iomgr->blocked_queue_tl, tso);
-#if defined(mingw32_HOST_OS)
-      /* (Cooperatively) signal that the worker thread should abort
-       * the request.
-       */
-      abandonWorkRequest(tso->block_info.async_result->reqID);
-#endif
+      // These blocking reasons are only used by some I/O managers
+      syncIOCancel(cap, tso);
       goto done;
 
   case BlockedOnDelay:
-        removeThreadFromQueue(cap, &cap->iomgr->sleeping_queue, tso);
-        goto done;
-#endif
+      // This blocking reasons is only used by some I/O managers
+      syncDelayCancel(cap, tso);
+      goto done;
 
   default:
       barf("removeFromQueues: %d", tso->why_blocked);

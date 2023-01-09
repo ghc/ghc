@@ -23,7 +23,13 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 
-#if !defined(mingw32_HOST_OS) && defined(HAVE_SIGNAL_H)
+#if defined(IOMGR_ENABLED_SELECT)
+#include "Threads.h"
+#include "posix/Select.h"
+#include "posix/Signals.h"
+#endif
+
+#if defined(IOMGR_ENABLED_MIO_POSIX)
 #include "posix/Signals.h"
 #endif
 
@@ -33,6 +39,7 @@
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
+#include "Threads.h"
 #include "win32/AsyncMIO.h"
 #include "win32/MIOManager.h"
 #endif
@@ -571,6 +578,29 @@ void syncIOWaitReady(Capability   *cap,
     }
 }
 
+
+void syncIOCancel(Capability *cap, StgTSO *tso)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            removeThreadFromDeQueue(cap, &cap->iomgr->blocked_queue_hd,
+                                         &cap->iomgr->blocked_queue_tl, tso);
+            break;
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            removeThreadFromDeQueue(cap, &cap->iomgr->blocked_queue_hd,
+                                         &cap->iomgr->blocked_queue_tl, tso);
+            abandonWorkRequest(tso->block_info.async_result->reqID);
+            break;
+#endif
+        default:
+            barf("syncIOCancel not supported for I/O manager %d", iomgr_type);
+    }
+}
+
+
 #if defined(IOMGR_ENABLED_SELECT)
 static void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime target);
 #endif
@@ -616,6 +646,29 @@ void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
             barf("syncDelay not supported for I/O manager %d", iomgr_type);
     }
 }
+
+
+void syncDelayCancel(Capability *cap, StgTSO *tso)
+{
+    debugTrace(DEBUG_iomanager, "cancelling delay for thread %ld", (long) tso->id);
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            removeThreadFromQueue(cap, &cap->iomgr->sleeping_queue, tso);
+            break;
+#endif
+        /* Note: no case for IO_MANAGER_WIN32_LEGACY despite it having a case
+         * for syncDelay above. This is because the win32 legacy I/O manager
+         * treats delay as an I/O operation, using the BlockedOnDoProc blocking
+         * reason, rather than the BlockedOnDelay reason. As a consequence,
+         * cancellation goes via syncIOCancel instead. Yes, it's a bit weird.
+         */
+
+        default:
+            barf("syncDelayCancel not supported for I/O manager %d", iomgr_type);
+    }
+}
+
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 void appendToIOBlockedQueue(Capability *cap, StgTSO *tso)

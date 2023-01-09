@@ -284,7 +284,11 @@ typedef enum { IORead, IOWrite } IOReadOrWrite;
 
 void syncIOWaitReady(Capability *cap, StgTSO *tso, IOReadOrWrite rw, HsInt fd);
 
+void syncIOCancel(Capability *cap, StgTSO *tso);
+
 void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay);
+
+void syncDelayCancel(Capability *cap, StgTSO *tso);
 
 #if defined(IOMGR_ENABLED_SELECT) || defined(IOMGR_ENABLED_WIN32_LEGACY)
 /* Add a thread to the end of the queue of threads blocked on I/O.
