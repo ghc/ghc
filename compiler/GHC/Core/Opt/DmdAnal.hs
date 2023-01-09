@@ -48,7 +48,6 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
 
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1922,7 +1921,7 @@ finaliseArgBoxities env fn arity rhs div
     -- uses the info on the binders directly.
   where
     opts            = ae_opts env
-    (bndrs, _body)  = collectBinders rhs
+    (bndrs, _body)  = collectBindersThroughCasts rhs
     unarise_arity   = sum [ unariseArity (idType b) | b <- bndrs, isId b ]
     max_wkr_args    = dmd_max_worker_args opts `max` unarise_arity
                       -- This is the budget initialisation step of
@@ -1947,17 +1946,19 @@ finaliseArgBoxities env fn arity rhs div
         --     catch newtype dictionaries too.
         -- NB: even for bottoming functions, don't unbox dictionaries
 
-      | is_bot_fn = unboxDeeplyDmd dmd
-        -- See Note [Boxity for bottoming functions], case (B)
-
       | is_opaque = trimBoxity dmd
         -- See Note [OPAQUE pragma]
         -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
 
+      | is_bot_fn = unboxDeeplyDmd dmd
+        -- See Note [Boxity for bottoming functions], case (B)
+
+
       | otherwise = dmd
       where
         dmd       = idDemandInfo bndr
-        is_opaque = isOpaquePragma (idInlinePragma fn)
+
+    is_opaque = isOpaquePragma (idInlinePragma fn)
 
     -- is_bot_fn:  see Note [Boxity for bottoming functions]
     is_bot_fn = div == botDiv
@@ -2017,6 +2018,7 @@ finaliseArgBoxities env fn arity rhs div
     add_demands :: [Demand] -> CoreExpr -> CoreExpr
     -- Attach the demands to the outer lambdas of this expression
     add_demands [] e = e
+    add_demands (dmds) (Cast e co) = Cast (add_demands dmds e) co
     add_demands (dmd:dmds) (Lam v e)
       | isTyVar v = Lam v (add_demands (dmd:dmds) e)
       | otherwise = Lam (v `setIdDemandInfo` dmd) (add_demands dmds e)

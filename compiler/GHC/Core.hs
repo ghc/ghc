@@ -41,6 +41,7 @@ module GHC.Core (
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
+        collectBindersThroughCasts,
         collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
         collectFunSimple,
@@ -1954,6 +1955,7 @@ flattenBinds []                   = []
 collectBinders         :: Expr b   -> ([b],     Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar], CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],    CoreExpr)
+collectBindersThroughCasts :: Expr Var -> ([Var], Expr Var)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
 
 -- | Strip off exactly N leading lambdas (type or value).
@@ -1978,6 +1980,14 @@ collectValBinders expr
   where
     go ids (Lam b e) | isId b = go (b:ids) e
     go ids body               = (reverse ids, body)
+
+-- | Look through casts when collecting binders
+collectBindersThroughCasts expr
+  = go [] expr
+  where
+    go ids (Cast e _) = go ids e
+    go ids (Lam b e)  = go (b:ids) e
+    go ids body       = (reverse ids, body)
 
 collectTyAndValBinders expr
   = (tvs, ids, body)

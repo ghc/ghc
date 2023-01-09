@@ -398,6 +398,7 @@ test('OpaqueNoSpecConstr', [ req_interp, grep_errmsg(r'$sloop') ], compile, ['-O
 test('OpaqueNoSpecialise', [ grep_errmsg(r'$sf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoStrictArgWW', [ grep_errmsg(r'$wf') ], compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoWW', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoWW2', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T21144',  normal, compile, ['-O'])
 

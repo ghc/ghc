@@ -637,8 +637,9 @@ all2 _ []     []     = True
 all2 p (x:xs) (y:ys) = p x y && all2 p xs ys
 all2 _ _      _      = False
 
--- Count the number of times a predicate is true
-
+-- | Count the number of times a predicate is true
+--
+-- A manually fused alternative to @length . filter p@
 count :: (a -> Bool) -> [a] -> Int
 count p = go 0
   where go !n [] = n
