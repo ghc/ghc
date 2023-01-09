@@ -640,16 +640,14 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
   where
     check_lang_exts :: RnM ()
     check_lang_exts = do
-      scoped_tyvars <- xoptM LangExt.ScopedTypeVariables
-      type_app      <- xoptM LangExt.TypeApplications
-      unless (scoped_tyvars && type_app) $
+      type_abs <- xoptM LangExt.TypeAbstractions
+      unless type_abs $
         case listToMaybe tyargs of
           Nothing -> pure ()
           Just tyarg -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
             hang (text "Illegal visible type application in a pattern:"
                     <+> quotes (ppr tyarg))
-               2 (text "Both ScopedTypeVariables and TypeApplications are"
-                    <+> text "required to use this feature")
+               2 (text "Perhaps you intended to use TypeAbstractions")
     rnConPatTyArg (HsConPatTyArg at t) = do
       t' <- liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
       return (HsConPatTyArg at t')

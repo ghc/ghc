@@ -10,4 +10,4 @@ a :: () -> Proxy Int
 a () = Proxy @Int
 
 b :: Proxy Int -> ()
-b (Proxy @Int) = ()       -- This should compile, but doesn't
+b (Proxy @Int) = ()

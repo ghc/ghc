@@ -227,7 +227,7 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
          case f of
            (_ :: F (Maybe z) (Maybe z)) -> Nothing @z
 
-   Another way is to use :ref:`type-applications-in-patterns` instead of a
+   Another way is to use :ref:`type-abstractions-in-patterns` instead of a
    pattern type signature: ::
 
        g4 :: F a a -> a

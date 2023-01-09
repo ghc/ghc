@@ -1412,6 +1412,7 @@ languageExtensions (Just GHC2021)
        LangExt.PostfixOperators,
        LangExt.RankNTypes,
        LangExt.ScopedTypeVariables,
+       LangExt.TypeAbstractions,     -- implied by ScopedTypeVariables according to GHC Proposal #448 "Modern Scoped Type Variables"
        LangExt.StandaloneDeriving,
        LangExt.StandaloneKindSignatures,
        LangExt.TupleSections,
@@ -3766,6 +3767,7 @@ xFlagsDeps = [
   flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
+  flagSpec "TypeAbstractions"                 LangExt.TypeAbstractions,
   flagSpec "TypeApplications"                 LangExt.TypeApplications,
   flagSpec "TypeData"                         LangExt.TypeData,
   depFlagSpec' "TypeInType"                   LangExt.TypeInType
@@ -3901,6 +3903,9 @@ impliedXFlags
     , (LangExt.FunctionalDependencies,    turnOn, LangExt.MultiParamTypeClasses)
     , (LangExt.MultiParamTypeClasses,     turnOn, LangExt.ConstrainedClassMethods)  -- c.f. #7854
     , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
+
+    -- In accordance with GHC Proposal #448 "Modern Scoped Type Variables"
+    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.TypeAbstractions)
 
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
 
