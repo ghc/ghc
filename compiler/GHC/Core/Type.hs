@@ -1337,7 +1337,7 @@ ty_con_app_fun_maybe many_ty_co tc args
       | otherwise
       = Nothing
 
-mkFunctionType :: Mult -> Type -> Type -> Type
+mkFunctionType :: HasDebugCallStack => Mult -> Type -> Type -> Type
 -- ^ This one works out the FunTyFlag from the argument type
 -- See GHC.Types.Var Note [FunTyFlag]
 mkFunctionType mult arg_ty res_ty
