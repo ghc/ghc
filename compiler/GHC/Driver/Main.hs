@@ -1283,19 +1283,29 @@ checkSafeImports tcg_env
         -- restore old errors
         logWarnings oldErrs
 
-        case (isEmptyBag safeErrs) of
-          -- Failed safe check
-          False -> liftIO . throwIO . mkSrcErr $ safeErrs
+        logger <- getLogger
+        -- Will throw if failed safe check
+        --
+        -- Zubin: printOrThrowWarnings doesn't actually throw if we
+        -- have SevError warnings, so we need to do an additional check
+        -- before calling it to see if we need to throw, because SevError
+        -- safe haskell warnings are supposed to be fatal.
+        -- We don't want to modify printOrThrowWarnings on GHC 9.2 to
+        -- perform this check because it affects other error messages (like T10647)
+        -- and changes the behavior of the compiler.
+        -- This is fixed in GHC 9.4
+        when (anyBag isErrorMessage safeErrs) $
+          liftIO $ throwIO (mkSrcErr safeErrs)
+        liftIO $ printOrThrowWarnings logger dflags safeErrs
 
-          -- Passed safe check
-          True -> do
-            let infPassed = isEmptyBag infErrs
-            tcg_env' <- case (not infPassed) of
-              True  -> markUnsafeInfer tcg_env infErrs
-              False -> return tcg_env
-            when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
-            let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
-            return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
+        -- No fatal warnings or errors: passed safe check
+        let infPassed = isEmptyBag infErrs
+        tcg_env' <- case (not infPassed) of
+          True  -> markUnsafeInfer tcg_env infErrs
+          False -> return tcg_env
+        when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
+        let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
+        return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
 
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
