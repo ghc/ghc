@@ -480,6 +480,32 @@ void markCapabilityIOManager(evac_fn       evac,
 }
 
 
+void scavengeTSOIOManager(StgTSO *tso)
+{
+    switch (iomgr_type) {
+
+            /* case IO_MANAGER_SELECT:
+             * BlockedOn{Read,Write} uses block_info.fd
+             * BlockedOnDelay        uses block_info.target
+             * both of these are not GC pointers, so there is nothing to do.
+             */
+
+            /* case IO_MANAGER_WIN32_LEGACY:
+             * BlockedOn{Read,Write,DoProc} uses block_info.async_result
+             * The StgAsyncIOResult async_result is allocated on the C heap.
+             * It'd probably be better if it used the GC heap. If it did we'd
+             * scavenge it here.
+             */
+
+        default:
+            /* All the other I/O managers do not use I/O-related why_blocked
+             * reasons, so there are no cases to handle.
+             */
+            break;
+    }
+}
+
+
 /* Declared in rts/IOInterface.h. Used only by the MIO threaded I/O manager on
  * Unix platforms.
  */

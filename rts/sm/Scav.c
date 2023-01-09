@@ -61,6 +61,7 @@
 #include "Trace.h"
 #include "Sanity.h"
 #include "Capability.h"
+#include "IOManager.h"
 #include "LdvProfile.h"
 #include "HeapUtils.h"
 #include "Hash.h"
@@ -144,6 +145,12 @@ scavengeTSO (StgTSO *tso)
     case BlockedOnMsgThrowTo:
     case NotBlocked:
         evacuate(&tso->block_info.closure);
+        break;
+    case BlockedOnRead:
+    case BlockedOnWrite:
+    case BlockedOnDelay:
+    case BlockedOnDoProc:
+        scavengeTSOIOManager(tso);
         break;
     default:
 #if defined(THREADED_RTS)
