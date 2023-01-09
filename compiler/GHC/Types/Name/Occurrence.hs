@@ -201,7 +201,7 @@ pprNonVarNameSpace :: NameSpace -> SDoc
 pprNonVarNameSpace VarName = empty
 pprNonVarNameSpace ns = pprNameSpace ns
 
-pprNameSpaceBrief :: IsLine doc => NameSpace -> doc
+pprNameSpaceBrief :: NameSpace -> SDoc
 pprNameSpaceBrief DataName  = char 'd'
 pprNameSpaceBrief VarName   = char 'v'
 pprNameSpaceBrief TvName    = text "tv"
@@ -287,10 +287,9 @@ instance OutputableBndr OccName where
 
 pprOccName :: IsLine doc => OccName -> doc
 pprOccName (OccName sp occ)
-  = docWithContext $ \ sty ->
-    if codeStyle (sdocStyle sty)
-    then ztext (zEncodeFS occ)
-    else ftext occ <> whenPprDebug (braces (pprNameSpaceBrief sp))
+  = docWithStyle (ztext (zEncodeFS occ)) (\_ -> ftext occ <> whenPprDebug (braces (pprNameSpaceBrief sp)))
+{-# SPECIALIZE pprOccName :: OccName -> SDoc #-}
+{-# SPECIALIZE pprOccName :: OccName -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 {-
 ************************************************************************

@@ -265,10 +265,8 @@ instance Outputable CostCentre where
   ppr = pprCostCentre
 
 pprCostCentre :: IsLine doc => CostCentre -> doc
-pprCostCentre cc = docWithContext $ \ sty ->
-  if codeStyle (sdocStyle sty)
-  then ppCostCentreLbl cc
-  else ftext (costCentreUserNameFS cc)
+pprCostCentre cc = docWithStyle (ppCostCentreLbl cc)
+                                (\_ -> ftext (costCentreUserNameFS cc))
 {-# SPECIALISE pprCostCentre :: CostCentre -> SDoc #-}
 {-# SPECIALISE pprCostCentre :: CostCentre -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
