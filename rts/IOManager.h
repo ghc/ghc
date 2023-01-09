@@ -185,6 +185,12 @@ enum IOManagerAvailability {
 enum IOManagerAvailability
 parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag);
 
+
+/* The string name of the current I/O manager. Initialised by selectIOManager().
+ */
+char * showIOManager(void);
+
+
 /* Temporary compat helper function used in the Win32 I/O managers.
  * TODO: replace by consulting the iomgr_type global instead.
  */

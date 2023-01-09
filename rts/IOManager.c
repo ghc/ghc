@@ -248,6 +248,35 @@ void selectIOManager(void)
 }
 
 
+char * showIOManager(void)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            return "select";
+#endif
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            return "mio";
+#endif
+#if defined(IOMGR_ENABLED_MIO_WIN32)
+        case IO_MANAGER_MIO_WIN32:
+            return "mio";
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+            return "winio";
+#endif
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+            return "win32-legacy";
+#endif
+        default:
+          barf("showIOManager: %d", iomgr_type);
+    }
+}
+
+
 /* Allocate and initialise the per-capability CapIOManager that lives in each
  * Capability. Called from initCapability(), which is done in the RTS startup
  * in initCapabilities(), and later at runtime via setNumCapabilities().
@@ -257,6 +286,9 @@ void selectIOManager(void)
  */
 void initCapabilityIOManager(Capability *cap)
 {
+    debugTrace(DEBUG_iomanager, "initialising I/O manager %s for cap %d",
+               showIOManager(), cap->no);
+
     CapIOManager *iomgr =
       (CapIOManager *) stgMallocBytes(sizeof(CapIOManager),
                                       "initCapabilityIOManager");
@@ -294,6 +326,7 @@ void initCapabilityIOManager(Capability *cap)
  */
 void initIOManager(void)
 {
+    debugTrace(DEBUG_iomanager, "initialising %s I/O manager", showIOManager());
 
     switch (iomgr_type) {
 
@@ -677,6 +710,9 @@ void syncIOWaitReady(Capability   *cap,
                      IOReadOrWrite rw,
                      HsInt         fd)
 {
+    debugTrace(DEBUG_iomanager,
+               "thread %ld waiting for %s I/O readiness on fd %d",
+               (long) tso->id, rw == IORead ? "read" : "write", (int) fd);
     ASSERT(tso->why_blocked == NotBlocked);
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
@@ -707,6 +743,7 @@ void syncIOWaitReady(Capability   *cap,
 
 void syncIOCancel(Capability *cap, StgTSO *tso)
 {
+    debugTrace(DEBUG_iomanager, "cancelling I/O for thread %ld", (long) tso->id);
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
@@ -734,6 +771,7 @@ static void insertIntoSleepingQueue(Capability *cap, StgTSO *tso, LowResTime tar
 
 void syncDelay(Capability *cap, StgTSO *tso, HsInt us_delay)
 {
+    debugTrace(DEBUG_iomanager, "thread %ld waiting for %lld us", tso->id, us_delay);
     ASSERT(tso->why_blocked == NotBlocked);
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
