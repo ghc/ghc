@@ -516,6 +516,13 @@ function build_hadrian() {
 
   check_release_build
 
+  # We can safely enable parallel compression for x64. By the time
+  # hadrian calls tar/xz to produce bindist, there's no other build
+  # work taking place.
+  if [[ "${CI_JOB_NAME:-}" != *"i386"* ]]; then
+    XZ_OPT="${XZ_OPT:-} -T$cores"
+  fi
+
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian build-cabal -V
   else
