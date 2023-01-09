@@ -19,10 +19,9 @@
 
 #pragma once
 
-#include "BeginPrivate.h"
-
 #include "sm/GC.h" // for evac_fn
-#include "posix/Select.h" // for LowResTime TODO: switch to normal Time
+
+#include "BeginPrivate.h"
 
 /* The ./configure gives us a set of CPP flags, one for each named I/O manager:
  * IOMGR_BUILD_<name>                : which ones should be built (some)
@@ -156,6 +155,20 @@ extern bool rts_IOManagerIsWin32Native;
 #endif
 
 
+/* The CapIOManager is the per-capability data structure belonging to the I/O
+ * manager. It is defined in full in IOManagerInternals.h. The opaque forward
+ * declaration for it lives in Capability.h, and looks like:
+ *
+ * struct _CapIOManager;
+ * typedef struct _CapIOManager CapIOManager;
+ *
+ * It can be accessed as cap->iomgr.
+ *
+ * The content of the structure is defined conditionally so it is different for
+ * each I/O manager implementation.
+ */
+
+
 /* Parse the I/O manager flag value, returning if is available, unavailable or
  * unrecognised.
  *
@@ -176,42 +189,6 @@ parseIOManagerFlag(const char *iomgrstr, IO_MANAGER_FLAG *flag);
  * TODO: replace by consulting the iomgr_type global instead.
  */
 bool is_io_mng_native_p (void);
-
-/* The per-capability data structures belonging to the I/O manager.
- *
- * It can be accessed as cap->iomgr.
- *
- * The content of the structure is defined conditionally so it is different for
- * each I/O manager implementation.
- *
- * TODO: once the content of this struct is genuinely private, and not shared
- * with other parts of the RTS, then it can be made opaque, so the content is
- * known only to the I/O manager and not the rest of the RTS.
- */
-typedef struct {
-
-#if defined(IOMGR_ENABLED_SELECT)
-    /* Thread queue for threads blocked on I/O completion. */
-    StgTSO *blocked_queue_hd;
-    StgTSO *blocked_queue_tl;
-
-    /* Thread queue for threads blocked on timeouts. */
-    StgTSO *sleeping_queue;
-#endif
-
-#if defined(IOMGR_ENABLED_WIN32_LEGACY)
-    /* Thread queue for threads blocked on I/O completion. */
-    StgTSO *blocked_queue_hd;
-    StgTSO *blocked_queue_tl;
-#endif
-
-#if defined(IOMGR_ENABLED_MIO_POSIX)
-    /* Control FD for the (posix) MIO manager for this capability,
-     */
-    int control_fd;
-#endif
-
-} CapIOManager;
 
 
 /* Init hook: called from hs_init_ghc, early in the startup after the RTS flags
@@ -283,7 +260,7 @@ void wakeupIOManager(void);
 
 /* GC hook: mark any per-capability GC roots the I/O manager uses.
  */
-void markCapabilityIOManager(evac_fn evac, void *user, CapIOManager *iomgr);
+void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap);
 
 
 /* GC hook: scavenge I/O related tso->block_info. Used by scavengeTSO.
@@ -324,7 +301,7 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
  * This is used by the scheduler as part of deadlock-detection, and the
  * "context switch as often as possible" test.
  */
-bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
+bool anyPendingTimeoutsOrIO(Capability *cap);
 
 /* If there are any completed I/O operations or expired timers, process the
  * completions as appropriate (which will typically unblock some waiting

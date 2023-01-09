@@ -19,7 +19,7 @@
 #include "RtsUtils.h"
 #include "Capability.h"
 #include "Select.h"
-#include "IOManager.h"
+#include "IOManagerInternals.h"
 #include "Stats.h"
 #include "GetTime.h"
 

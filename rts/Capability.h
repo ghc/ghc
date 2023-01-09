@@ -24,7 +24,6 @@
 #include "Task.h"
 #include "Sparks.h"
 #include "sm/NonMovingMark.h" // for MarkQueue
-#include "IOManager.h" // for CapIOManager
 
 #include "BeginPrivate.h"
 
@@ -35,6 +34,15 @@
 #else
 #define CAPABILITY_ALIGNMENT 64
 #endif
+
+/* A forward declaration of the per-capability data structures belonging to
+ * the I/O manager. It is opaque and only passed by pointer, so the full
+ * structure definition is not needed. The full definition can be found in
+ * IOManagerInternals.h, which is only used by IOManager.c and the individual
+ * I/O manager implementations.
+ */
+struct _CapIOManager;
+typedef struct _CapIOManager CapIOManager;
 
 /* N.B. This must be consistent with CapabilityPublic in RtsAPI.h */
 struct Capability_ {

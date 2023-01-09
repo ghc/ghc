@@ -19,6 +19,12 @@
 #include "ThreadLabels.h"
 #include "Libdw.h"
 
+/* TODO: eliminate this include. This file should be about signals, not be
+ * part of an I/O manager implementation. The code here that are really part
+ * of an I/O manager should be moved into an appropriate I/O manager impl.
+ */
+#include "IOManagerInternals.h"
+
 #if defined(alpha_HOST_ARCH)
 # if defined(linux_HOST_OS)
 #  include <asm/fpu.h>

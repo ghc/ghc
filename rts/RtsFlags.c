@@ -16,6 +16,7 @@
 #include "sm/OSMem.h"
 #include "hooks/Hooks.h"
 #include "Capability.h"
+#include "IOManager.h"
 
 #if defined(HAVE_CTYPE_H)
 #include <ctype.h>

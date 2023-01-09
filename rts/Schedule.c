@@ -405,7 +405,7 @@ schedule (Capability *initialCapability, Task *task)
      */
     if (RtsFlags.ConcFlags.ctxtSwitchTicks == 0 &&
         (!emptyRunQueue(cap) ||
-          anyPendingTimeoutsOrIO(cap->iomgr))) {
+          anyPendingTimeoutsOrIO(cap))) {
         RELAXED_STORE(&cap->context_switch, 1);
     }
 
@@ -932,7 +932,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * awaitCompletedTimeoutsOrIO below for the case of !defined(THREADED_RTS)
      * && defined(mingw32_HOST_OS).
      */
-    if (anyPendingTimeoutsOrIO(cap->iomgr))
+    if (anyPendingTimeoutsOrIO(cap))
     {
         if (emptyRunQueue(cap)) {
             // block and wait
@@ -959,7 +959,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
      * other tasks are waiting for work, we must have a deadlock of
      * some description.
      */
-    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap->iomgr) )
+    if ( emptyRunQueue(cap) && !anyPendingTimeoutsOrIO(cap) )
     {
 #if defined(THREADED_RTS)
         /*

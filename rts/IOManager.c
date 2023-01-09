@@ -22,6 +22,9 @@
 #include "Schedule.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "sm/Evac.h"
+
+#include "IOManagerInternals.h"
 
 #if defined(IOMGR_ENABLED_SELECT)
 #include "Threads.h"
@@ -475,30 +478,32 @@ void wakeupIOManager(void)
     }
 }
 
-void markCapabilityIOManager(evac_fn       evac,
-                             void         *user,
-                             CapIOManager *iomgr)
+void markCapabilityIOManager(evac_fn evac, void *user, Capability *cap)
 {
-
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
+        {
+            CapIOManager *iomgr = cap->iomgr;
             evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
             evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
             evac(user, (StgClosure **)(void *)&iomgr->sleeping_queue);
             break;
+        }
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
+        {
+            CapIOManager *iomgr = cap->iomgr;
             evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_hd);
             evac(user, (StgClosure **)(void *)&iomgr->blocked_queue_tl);
             break;
+        }
 #endif
         default:
             break;
     }
-
 }
 
 
@@ -545,18 +550,24 @@ setIOManagerControlFd(uint32_t cap_no, int fd) {
 #endif
 
 
-bool anyPendingTimeoutsOrIO(CapIOManager *iomgr)
+bool anyPendingTimeoutsOrIO(Capability *cap)
 {
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
-          return (iomgr->blocked_queue_hd != END_TSO_QUEUE)
-              || (iomgr->sleeping_queue   != END_TSO_QUEUE);
+        {
+            CapIOManager *iomgr = cap->iomgr;
+            return (iomgr->blocked_queue_hd != END_TSO_QUEUE)
+                || (iomgr->sleeping_queue   != END_TSO_QUEUE);
+        }
 #endif
 
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
         case IO_MANAGER_WIN32_LEGACY:
-          return (iomgr->blocked_queue_hd != END_TSO_QUEUE);
+        {
+            CapIOManager *iomgr = cap->iomgr;
+            return (iomgr->blocked_queue_hd != END_TSO_QUEUE);
+        }
 #endif
 
     /* For the purpose of the scheduler, the threaded I/O managers never have

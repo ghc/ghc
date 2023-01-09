@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include "Schedule.h"
 #include "Capability.h"
+#include "IOManagerInternals.h"
 #include "win32/AsyncMIO.h"
 #include "win32/MIOManager.h"
 
