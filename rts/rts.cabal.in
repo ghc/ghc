@@ -742,8 +742,8 @@ library
 -- whitelist each such symbol with an additional `-U` (see the man page for more
 -- details).
 --
--- GHC already does `-undefined dynamic_lookup`, so we just do that for now, but
--- we might try to get more precise with `-U` in the future.
+-- We do `-undefined dynamic_lookup` for now, but we might try to get more
+-- precise with `-U` in the future.
 --
 -- Note that the RTS also `-u`s some atomics symbols that *are* defined --- and
 -- defined within the RTS! It is not immediately clear why this is needed. This
