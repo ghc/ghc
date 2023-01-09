@@ -12,3 +12,6 @@
 typedef StgWord LowResTime;
 
 RTS_PRIVATE LowResTime getDelayTarget (HsInt us);
+
+void awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait);
+

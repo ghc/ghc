@@ -41,12 +41,16 @@
 #if defined(IOMGR_ENABLED_WIN32_LEGACY)
 #include "Threads.h"
 #include "win32/AsyncMIO.h"
+#include "win32/AwaitEvent.h"
 #include "win32/MIOManager.h"
 #endif
 
 #if defined(IOMGR_ENABLED_WINIO)
 #include "win32/ThrIOManager.h"
 #include "win32/AsyncWinIO.h"
+#if !defined(THREADED_RTS)
+#include "win32/AwaitEvent.h"
+#endif
 #endif
 
 #include <string.h>
@@ -552,7 +556,7 @@ void pollCompletedTimeoutsOrIO(Capability *cap)
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
-          awaitEvent(cap, false);
+          awaitCompletedTimeoutsOrIOSelect(cap, false);
           break;
 #endif
 
@@ -564,7 +568,7 @@ void pollCompletedTimeoutsOrIO(Capability *cap)
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
 #endif
-          awaitEvent(cap, false);
+          awaitCompletedTimeoutsOrIOWin32(cap, false);
           break;
 #endif
         default:
@@ -579,7 +583,7 @@ void awaitCompletedTimeoutsOrIO(Capability *cap)
     switch (iomgr_type) {
 #if defined(IOMGR_ENABLED_SELECT)
         case IO_MANAGER_SELECT:
-          awaitEvent(cap, true);
+          awaitCompletedTimeoutsOrIOSelect(cap, true);
           break;
 #endif
 
@@ -591,7 +595,7 @@ void awaitCompletedTimeoutsOrIO(Capability *cap)
 #if defined(IOMGR_ENABLED_WINIO)
         case IO_MANAGER_WINIO:
 #endif
-          awaitEvent(cap, true);
+          awaitCompletedTimeoutsOrIOWin32(cap, true);
           break;
 #endif
         default:

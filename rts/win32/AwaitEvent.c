@@ -18,6 +18,7 @@
 #include "Schedule.h"
 #include "IOManager.h"
 #include <windows.h>
+#include "win32/AwaitEvent.h"
 #include "win32/AsyncMIO.h"
 #include "win32/AsyncWinIO.h"
 #include "win32/ConsoleHandler.h"
@@ -28,7 +29,7 @@
 static bool workerWaitingForRequests = false;
 
 void
-awaitEvent(Capability *cap, bool wait)
+awaitCompletedTimeoutsOrIOWin32(Capability *cap, bool wait)
 {
   do {
     /* Try to de-queue completed IO requests

@@ -230,7 +230,7 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
             stg_pending_buf[stg_pending_events] = dwCtrlType;
             stg_pending_events++;
         }
-        // we need to wake up awaitEvent()
+        // we need to wake up awaitCompletedTimeoutsOrIO()
         abandonRequestWait();
 #endif
         return true;

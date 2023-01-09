@@ -217,7 +217,7 @@ static enum FdState fdPollWriteState (int fd)
  *
  */
 void
-awaitEvent(Capability *cap, bool wait)
+awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
 {
     CapIOManager *iomgr = cap->iomgr;
     StgTSO *tso, *prev, *next;
@@ -417,7 +417,7 @@ awaitEvent(Capability *cap, bool wait)
                   }
                   break;
               default:
-                  barf("awaitEvent");
+                  barf("awaitCompletedTimeoutsOrIOSelect");
               }
 
               switch (fd_state) {
