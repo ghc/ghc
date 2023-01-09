@@ -627,21 +627,30 @@ instance OutputableBndr Name where
 
 pprName :: forall doc. IsLine doc => Name -> doc
 pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
-  = docWithContext $ \ctx ->
-    let sty = sdocStyle ctx
-        debug = sdocPprDebug ctx
-        listTuplePuns = sdocListTuplePuns ctx
-    in handlePuns listTuplePuns (namePun_maybe name) $
-    case sort of
-      WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
-      External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
-      System                  -> pprSystem   debug sty uniq occ
-      Internal                -> pprInternal debug sty uniq occ
+  = docWithStyle codeDoc normalDoc
   where
-    -- Print GHC.Types.List as [], etc.
-    handlePuns :: Bool -> Maybe FastString -> doc -> doc
-    handlePuns True (Just pun) _ = ftext pun
-    handlePuns _    _          r = r
+   codeDoc = case sort of
+               WiredIn mod _ _ -> pprModule mod <> char '_' <> ppr_z_occ_name occ
+               External mod    -> pprModule mod <> char '_' <> ppr_z_occ_name occ
+                                  -- In code style, always qualify
+                                  -- ToDo: maybe we could print all wired-in things unqualified
+                                  --       in code style, to reduce symbol table bloat?
+               System          -> pprUniqueAlways uniq
+               Internal        -> pprUniqueAlways uniq
+
+   normalDoc sty =
+     getPprDebug $ \debug ->
+     sdocOption sdocListTuplePuns $ \listTuplePuns ->
+       handlePuns listTuplePuns (namePun_maybe name) $
+       case sort of
+         WiredIn mod _ builtin   -> pprExternal debug sty uniq mod occ True  builtin
+         External mod            -> pprExternal debug sty uniq mod occ False UserSyntax
+         System                  -> pprSystem   debug sty uniq occ
+         Internal                -> pprInternal debug sty uniq occ
+
+   handlePuns :: Bool -> Maybe FastString -> SDoc -> SDoc
+   handlePuns True (Just pun) _ = ftext pun
+   handlePuns _    _          r = r
 {-# SPECIALISE pprName :: Name -> SDoc #-}
 {-# SPECIALISE pprName :: Name -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
@@ -674,12 +683,8 @@ pprTickyName this_mod name
 pprNameUnqualified :: Name -> SDoc
 pprNameUnqualified Name { n_occ = occ } = ppr_occ_name occ
 
-pprExternal :: IsLine doc => Bool -> PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> doc
+pprExternal :: Bool -> PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal debug sty uniq mod occ is_wired is_builtin
-  | codeStyle sty = pprModule mod <> char '_' <> ppr_z_occ_name occ
-        -- In code style, always qualify
-        -- ToDo: maybe we could print all wired-in things unqualified
-        --       in code style, to reduce symbol table bloat?
   | debug         = pp_mod <> ppr_occ_name occ
                      <> braces (hsep [if is_wired then text "(w)" else empty,
                                       pprNameSpaceBrief (occNameSpace occ),
@@ -695,9 +700,8 @@ pprExternal debug sty uniq mod occ is_wired is_builtin
     pp_mod = ppUnlessOption sdocSuppressModulePrefixes
                (pprModule mod <> dot)
 
-pprInternal :: IsLine doc => Bool -> PprStyle -> Unique -> OccName -> doc
+pprInternal :: Bool -> PprStyle -> Unique -> OccName -> SDoc
 pprInternal debug sty uniq occ
-  | codeStyle sty  = pprUniqueAlways uniq
   | debug          = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
                                                        pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
@@ -706,9 +710,8 @@ pprInternal debug sty uniq occ
   | otherwise      = ppr_occ_name occ   -- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
-pprSystem :: IsLine doc => Bool -> PprStyle -> Unique -> OccName -> doc
-pprSystem debug sty uniq occ
-  | codeStyle sty  = pprUniqueAlways uniq
+pprSystem :: Bool -> PprStyle -> Unique -> OccName -> SDoc
+pprSystem debug _sty uniq occ
   | debug          = ppr_occ_name occ <> ppr_underscore_unique uniq
                      <> braces (pprNameSpaceBrief (occNameSpace occ))
   | otherwise      = ppr_occ_name occ <> ppr_underscore_unique uniq
@@ -717,7 +720,7 @@ pprSystem debug sty uniq occ
                                 -- so print the unique
 
 
-pprModulePrefix :: IsLine doc => PprStyle -> Module -> OccName -> doc
+pprModulePrefix :: PprStyle -> Module -> OccName -> SDoc
 -- Print the "M." part of a name, based on whether it's in scope or not
 -- See Note [Printing original names] in GHC.Types.Name.Ppr
 pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
@@ -728,20 +731,20 @@ pprModulePrefix sty mod occ = ppUnlessOption sdocSuppressModulePrefixes $
                           <> pprModuleName (moduleName mod) <> dot    -- scope either
       NameUnqual       -> empty                   -- In scope unqualified
 
-pprUnique :: IsLine doc => Unique -> doc
+pprUnique :: Unique -> SDoc
 -- Print a unique unless we are suppressing them
 pprUnique uniq
   = ppUnlessOption sdocSuppressUniques $
       pprUniqueAlways uniq
 
-ppr_underscore_unique :: IsLine doc => Unique -> doc
+ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique
 -- But suppress it if we aren't printing the uniques anyway
 ppr_underscore_unique uniq
   = ppUnlessOption sdocSuppressUniques $
       char '_' <> pprUniqueAlways uniq
 
-ppr_occ_name :: IsLine doc => OccName -> doc
+ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)
         -- Don't use pprOccName; instead, just print the string of the OccName;
         -- we print the namespace in the debug stuff above

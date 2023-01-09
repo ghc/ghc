@@ -126,6 +126,7 @@ import GHC.Data.FastString
 import qualified GHC.Utils.Ppr as Pretty
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
+import GHC.Utils.Panic.Plain (assert)
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
@@ -855,9 +856,10 @@ ppWhenOption f doc = sdocOption f $ \case
    False -> empty
 
 {-# INLINE CONLIKE ppUnlessOption #-}
-ppUnlessOption :: IsLine doc => (SDocContext -> Bool) -> doc -> doc
-ppUnlessOption f doc = docWithContext $
-                          \ctx -> if f ctx then empty else doc
+ppUnlessOption :: (SDocContext -> Bool) -> SDoc -> SDoc
+ppUnlessOption f doc = sdocOption f $ \case
+   True  -> empty
+   False -> doc
 
 -- | Apply the given colour\/style for the argument.
 --
@@ -1040,10 +1042,7 @@ instance Outputable ModuleName where
 
 pprModuleName :: IsLine doc => ModuleName -> doc
 pprModuleName (ModuleName nm) =
-    docWithContext $ \ctx ->
-    if codeStyle (sdocStyle ctx)
-        then ztext (zEncodeFS nm)
-        else ftext nm
+    docWithStyle (ztext (zEncodeFS nm)) (\_ -> ftext nm)
 {-# SPECIALIZE pprModuleName :: ModuleName -> SDoc #-}
 {-# SPECIALIZE pprModuleName :: ModuleName -> HLine #-} -- see Note [SPECIALIZE to HDoc]
 
@@ -1633,6 +1632,7 @@ IsOutput, that allows these combinators to be generic over both variants:
     class IsOutput doc where
       empty :: doc
       docWithContext :: (SDocContext -> doc) -> doc
+      docWithStyle :: doc -> (PprStyle -> SDoc) -> doc
 
     class IsOutput doc => IsLine doc
     class (IsOutput doc, IsLine (Line doc)) => IsDoc doc
@@ -1669,13 +1669,22 @@ arguments depending on the type they are instantiated at. They serve as a
 difficult to make completely equivalent under both printer implementations.
 
 These operations should generally be avoided, as they can result in surprising
-changes in behavior when the printer implementation is changed. However, in
-certain cases, the alternative is even worse. For example, we use dualLine in
-the implementation of pprUnitId, as the hack we use for printing unit ids
-(see Note [Pretty-printing UnitId] in GHC.Unit) is difficult to adapt to HLine
-and is not necessary for code paths that use it, anyway.
+changes in behavior when the printer implementation is changed.
+Right now, they are used only when outputting debugging comments in
+codegen, as it is difficult to adapt that code to use HLine and not necessary.
 
-Use these operations wisely. -}
+Use these operations wisely.
+
+Note [docWithStyle]
+~~~~~~~~~~~~~~~~~~~
+Sometimes when printing, we consult the printing style. This can be done
+with 'docWithStyle c f'. This is similar to 'docWithContext (f . sdocStyle)',
+but:
+* For code style, 'docWithStyle c f' will return 'c'.
+* For other styles, 'docWithStyle c f', will call 'f style', but expect
+  an SDoc rather than doc. This removes the need to write code polymorphic
+  in SDoc and HDoc, since the latter is used only for code style.
+-}
 
 -- | Represents a single line of output that can be efficiently printed directly
 -- to a 'System.IO.Handle' (actually a 'BufHandle').
@@ -1700,7 +1709,7 @@ pattern HDoc f <- HDoc' f
 {-# COMPLETE HDoc #-}
 
 bPutHDoc :: BufHandle -> SDocContext -> HDoc -> IO ()
-bPutHDoc h ctx (HDoc f) = f ctx h
+bPutHDoc h ctx (HDoc f) = assert (codeStyle (sdocStyle ctx)) (f ctx h)
 
 -- | A superclass for 'IsLine' and 'IsDoc' that provides an identity, 'empty',
 -- as well as access to the shared 'SDocContext'.
@@ -1709,6 +1718,7 @@ bPutHDoc h ctx (HDoc f) = f ctx h
 class IsOutput doc where
   empty :: doc
   docWithContext :: (SDocContext -> doc) -> doc
+  docWithStyle :: doc -> (PprStyle -> SDoc) -> doc  -- see Note [docWithStyle]
 
 -- | A class of types that represent a single logical line of text, with support
 -- for horizontal composition.
@@ -1779,6 +1789,11 @@ instance IsOutput SDoc where
   {-# INLINE CONLIKE empty #-}
   docWithContext = sdocWithContext
   {-# INLINE docWithContext #-}
+  docWithStyle c f = sdocWithContext (\ctx -> let sty = sdocStyle ctx
+                                              in if codeStyle sty then c
+                                                                  else f sty)
+                     -- see Note [docWithStyle]
+  {-# INLINE CONLIKE docWithStyle #-}
 
 instance IsLine SDoc where
   char c = docToSDoc $ Pretty.char c
@@ -1823,12 +1838,16 @@ instance IsOutput HLine where
   {-# INLINE empty #-}
   docWithContext f = HLine $ \ctx h -> runHLine (f ctx) ctx h
   {-# INLINE CONLIKE docWithContext #-}
+  docWithStyle c _ = c  -- see Note [docWithStyle]
+  {-# INLINE CONLIKE docWithStyle #-}
 
 instance IsOutput HDoc where
   empty = HDoc (\_ _ -> pure ())
   {-# INLINE empty #-}
   docWithContext f = HDoc $ \ctx h -> runHDoc (f ctx) ctx h
   {-# INLINE CONLIKE docWithContext #-}
+  docWithStyle c _ = c  -- see Note [docWithStyle]
+  {-# INLINE CONLIKE docWithStyle #-}
 
 instance IsLine HLine where
   char c = HLine (\_ h -> bPutChar h c)
