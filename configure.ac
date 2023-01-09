@@ -694,6 +694,8 @@ GHC_LLVM_TARGET_SET_VAR
 # we intend to pass trough --targets to llvm as is.
 LLVMTarget_CPP=`    echo "$LlvmTarget"`
 AC_SUBST(LLVMTarget_CPP)
+# The target is substituted into the distrib/configure.ac file
+AC_SUBST(LlvmTarget)
 
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[012] accordingly.
