@@ -307,6 +307,29 @@ void appendToIOBlockedQueue(Capability *cap, StgTSO *tso);
  */
 bool anyPendingTimeoutsOrIO(CapIOManager *iomgr);
 
+/* If there are any completed I/O operations or expired timers, process the
+ * completions as appropriate (which will typically unblock some waiting
+ * threads, but no guarantee). If there are none, return without waiting.
+ *
+ * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ */
+void pollCompletedTimeoutsOrIO(Capability *cap);
+
+ /* If there are any completed I/O operations or expired timers, process the
+ * completions as appropriate. If there are none, wait until I/O or a timer
+ * does complete (or we get a signal with a handler) and process the
+ * completions as appropriate.
+ *
+ * Upon return this guarantees that the scheduler run queue is non-empty or
+ * that the scheduler is no longer in the running state. Succinctly, the
+ * post-condition is (!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING).
+ *
+ * This is only expected to be called if anyPendingTimeoutsOrIO() returns true,
+ * i.e. there actually is something to wait for.
+ *
+ * Called from schedule() both *before* and *after* scheduleDetectDeadlock().
+ */
+void awaitCompletedTimeoutsOrIO(Capability *cap);
 
 #if !defined(THREADED_RTS)
 /* Check whether there is any completed I/O or expired timers. If so,

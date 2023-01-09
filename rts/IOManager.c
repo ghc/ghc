@@ -546,6 +546,61 @@ bool anyPendingTimeoutsOrIO(CapIOManager *iomgr)
 }
 
 
+void pollCompletedTimeoutsOrIO(Capability *cap)
+{
+    debugTrace(DEBUG_iomanager, "polling for completed IO or timeouts");
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+          awaitEvent(cap, false);
+          break;
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY) || \
+   (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+#endif
+          awaitEvent(cap, false);
+          break;
+#endif
+        default:
+            barf("pollCompletedTimeoutsOrIO not implemented");
+    }
+}
+
+
+void awaitCompletedTimeoutsOrIO(Capability *cap)
+{
+    debugTrace(DEBUG_iomanager, "waiting for completed IO or timeouts");
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+          awaitEvent(cap, true);
+          break;
+#endif
+
+#if defined(IOMGR_ENABLED_WIN32_LEGACY) || \
+   (defined(IOMGR_ENABLED_WINIO) && !defined(THREADED_RTS))
+#if defined(IOMGR_ENABLED_WIN32_LEGACY)
+        case IO_MANAGER_WIN32_LEGACY:
+#endif
+#if defined(IOMGR_ENABLED_WINIO)
+        case IO_MANAGER_WINIO:
+#endif
+          awaitEvent(cap, true);
+          break;
+#endif
+        default:
+            barf("pollCompletedTimeoutsOrIO not implemented");
+    }
+    ASSERT(!emptyRunQueue(cap) || getSchedState() != SCHED_RUNNING);
+}
+
+
 void syncIOWaitReady(Capability   *cap,
                      StgTSO       *tso,
                      IOReadOrWrite rw,

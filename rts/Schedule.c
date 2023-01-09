@@ -303,7 +303,7 @@ schedule (Capability *initialCapability, Task *task)
     // this point when blocked on an IO Port.  If this is the case the only
     // thing that could unblock it is an I/O event.
     //
-    // win32: might be here due to awaitEvent() being abandoned
+    // win32: might be here due to awaitCompletedTimeoutsOrIO() being abandoned
     // as a result of a console event having been delivered or as a result of
     // waiting on an async I/O to complete with WinIO.
 
@@ -319,10 +319,10 @@ schedule (Capability *initialCapability, Task *task)
         /* Notify the I/O manager that we have nothing to do.  If there are
            any outstanding I/O requests we'll block here.  If there are not
            then this is a user error and we will abort soon.  */
-        /* TODO: see if we can rationalise these two awaitEvent calls before
-         *       and after scheduleDetectDeadlock().
+        /* TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
+         *       calls before and after scheduleDetectDeadlock().
          */
-        awaitEvent (cap, emptyRunQueue(cap));
+        awaitCompletedTimeoutsOrIO(cap);
 #else
         ASSERT(getSchedState() >= SCHED_INTERRUPTING);
 #endif
@@ -913,8 +913,8 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * If the run queue is empty, and there are no other threads running, we
      * can wait indefinitely for something to happen.
      *
-     * TODO: see if we can rationalise these two awaitEvent calls before
-     * and after scheduleDetectDeadlock()
+     * TODO: see if we can rationalise these two awaitCompletedTimeoutsOrIO
+     * calls before and after scheduleDetectDeadlock()
      *
      * TODO: this test anyPendingTimeoutsOrIO does not have a proper
      * implementation the WinIO I/O manager!
@@ -927,13 +927,20 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
      * The WinIO I/O manager does not use either the sleeping_queue or the
      * blocked_queue, but it's implementation of anyPendingTimeoutsOrIO still
      * checks both! Since both queues will _always_ be empty then it will
-     * _always_ return false and so awaitEvent will _never_ be called here for
-     * WinIO. This may explain why there is a second call to awaitEvent below
-     * for the case of !defined(THREADED_RTS) && defined(mingw32_HOST_OS).
+     * _always_ return false and so awaitCompletedTimeoutsOrIO will _never_ be
+     * called here for WinIO. This may explain why there is a second call to
+     * awaitCompletedTimeoutsOrIO below for the case of !defined(THREADED_RTS)
+     * && defined(mingw32_HOST_OS).
      */
     if (anyPendingTimeoutsOrIO(cap->iomgr))
     {
-        awaitEvent (cap, emptyRunQueue(cap));
+        if (emptyRunQueue(cap)) {
+            // block and wait
+            awaitCompletedTimeoutsOrIO(cap);
+        } else {
+            // poll but do not wait
+            pollCompletedTimeoutsOrIO(cap);
+        }
     }
 #endif
 }
