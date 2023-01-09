@@ -725,16 +725,6 @@ void syncIOWaitReady(Capability   *cap,
             break;
         }
 #endif
-#if defined(IOMGR_ENABLED_WIN32_LEGACY)
-        case IO_MANAGER_WIN32_LEGACY:
-        {
-            StgWord why_blocked = rw == IORead ? BlockedOnRead : BlockedOnWrite;
-            tso->block_info.fd = fd;
-            RELEASE_STORE(&tso->why_blocked, why_blocked);
-            appendToIOBlockedQueue(cap, tso);
-            break;
-        }
-#endif
         default:
             barf("waitRead# / waitWrite# not available for current I/O manager");
     }
