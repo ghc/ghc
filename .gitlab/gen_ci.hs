@@ -7,12 +7,10 @@
 build-depends: base, aeson >= 1.8.1, containers, bytestring
 -}
 
-import Data.Coerce
-import Data.String (String)
 import Data.Aeson as A
 import qualified Data.Map as Map
 import Data.Map (Map)
-import qualified Data.ByteString.Lazy as B hiding (putStrLn)
+import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.List (intercalate)
 import Data.Set (Set)
@@ -135,7 +133,7 @@ data BuildConfig
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
 configureArgsStr :: BuildConfig -> String
-configureArgsStr bc = intercalate " " $
+configureArgsStr bc = unwords $
   ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
   ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
@@ -232,7 +230,7 @@ noTntc = vanilla { tablesNextToCode = False }
 
 -- | These tags have to match what we call the runners on gitlab
 runnerTag :: Arch -> Opsys -> String
-runnerTag arch (Linux distro) =
+runnerTag arch (Linux _) =
   case arch of
     Amd64   -> "x86_64-linux"
     AArch64 -> "aarch64-linux"
@@ -241,6 +239,7 @@ runnerTag AArch64 Darwin = "aarch64-darwin"
 runnerTag Amd64 Darwin = "x86_64-darwin-m1"
 runnerTag Amd64 Windows = "new-x86_64-windows"
 runnerTag Amd64 FreeBSD13 = "x86_64-freebsd13"
+runnerTag _ _ = error "Invalid arch/opsys"
 
 tags :: Arch -> Opsys -> BuildConfig -> [String]
 tags arch opsys _bc = [runnerTag arch opsys] -- Tag for which runners we can use
@@ -331,7 +330,7 @@ instance (Ord k, Semigroup v) => Semigroup (MonoidalMap k v) where
     (MonoidalMap a) <> (MonoidalMap b) = MonoidalMap (Map.unionWith (<>) a b)
 
 instance (Ord k, Semigroup v) => Monoid (MonoidalMap k v) where
-    mempty = MonoidalMap (Map.empty)
+    mempty = MonoidalMap Map.empty
 
 mminsertWith :: Ord k => (a -> a -> a) -> k -> a -> MonoidalMap k a -> MonoidalMap k a
 mminsertWith f k v (MonoidalMap m) = MonoidalMap (Map.insertWith f k v m)
@@ -498,13 +497,13 @@ instance ToJSON ManualFlag where
   toJSON OnSuccess = "on_success"
 
 instance ToJSON OnOffRules where
-  toJSON rules = toJSON [(object ([
+  toJSON rules = toJSON [object ([
     "if" A..= and_all (map one_rule (enumRules rules))
     , "when" A..= toJSON (when rules)]
     -- Necessary to stop manual jobs stopping pipeline progress
     -- https://docs.gitlab.com/ee/ci/yaml/#rulesallow_failure
     ++
-    ["allow_failure" A..= True | when rules == Manual ]))]
+    ["allow_failure" A..= True | when rules == Manual ])]
 
     where
       one_rule (OnOffRule onoff r) = ruleString onoff r
@@ -580,7 +579,7 @@ instance ToJSON Job where
     , "allow_failure" A..= jobAllowFailure
     -- Joining up variables like this may well be the wrong thing to do but
     -- at least it doesn't lose information silently by overriding.
-    , "variables" A..= fmap (intercalate " ") jobVariables
+    , "variables" A..= fmap unwords jobVariables
     , "artifacts" A..= jobArtifacts
     , "cache" A..= jobCache
     , "after_script" A..= jobAfterScript
@@ -677,11 +676,11 @@ job arch opsys buildConfig = (jobName, Job {..})
 
 -- | Modify all jobs in a 'JobGroup'
 modifyJobs :: (a -> a) -> JobGroup a -> JobGroup a
-modifyJobs f = fmap f
+modifyJobs = fmap
 
 -- | Modify just the validate jobs in a 'JobGroup'
 modifyValidateJobs :: (a -> a) -> JobGroup a -> JobGroup a
-modifyValidateJobs f jg = jg { v = f <$> (v jg) }
+modifyValidateJobs f jg = jg { v = f <$> v jg }
 
 -- Generic helpers
 
@@ -695,15 +694,16 @@ addVariable k v j = j { jobVariables = mminsertWith (++) k [v] (jobVariables j) 
 --
 -- | Make a normal validate CI job
 validate :: Arch -> Opsys -> BuildConfig -> (String, Job)
-validate arch opsys bc =
-  job arch opsys bc
+validate = job
 
 -- | Make a normal nightly CI job
+nightly :: Arch -> Opsys -> BuildConfig -> ([Char], Job)
 nightly arch opsys bc =
   let (n, j) = job arch opsys bc
   in ("nightly-" ++ n, addJobRule Nightly . keepArtifacts "8 weeks" . highCompression $ j)
 
 -- | Make a normal release CI job
+release :: Arch -> Opsys -> BuildConfig -> ([Char], Job)
 release arch opsys bc =
   let (n, j) = job arch opsys (bc { buildFlavour = Release })
   in ("release-" ++ n, addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . highCompression $ j)
@@ -786,10 +786,10 @@ flattenJobGroup (ValidateOnly a b) = [a, b]
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap flattenJobGroup $
+jobs = Map.fromList $ concatMap flattenJobGroup
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
-     , (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
-     , (validateBuilds Amd64 (Linux Debian10) nativeInt)
+     , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
+     , validateBuilds Amd64 (Linux Debian10) nativeInt
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
      , modifyValidateJobs manual tsan_jobs
@@ -804,7 +804,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
-     , (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
+     , standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
@@ -836,6 +836,7 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
         . addVariable "HADRIAN_ARGS" "--docs=none") $
       validateBuilds Amd64 (Linux Debian10) tsan
 
+main :: IO ()
 main = do
   as <- getArgs
   (case as of

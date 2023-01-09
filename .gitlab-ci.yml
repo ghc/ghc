@@ -262,26 +262,20 @@ lint-author:
     - *drafts-can-fail-lint
 
 lint-ci-config:
-  image: "nixos/nix:2.8.0"
+  image: nixos/nix:2.12.0
   extends: .lint
+  # We don't need history/submodules in this job
   variables:
-    BUILD_FLAVOUR: default
+    GIT_DEPTH: 1
+    GIT_SUBMODULE_STRATEGY: none
   before_script:
-    - mkdir -p ~/.cabal
-    - cp -Rf cabal-cache/* ~/.cabal || true
+    - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    - nix-channel --update
   script:
-    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#cabal-install nixpkgs#ghc -c cabal update
     - .gitlab/generate_jobs
-        # 1 if .gitlab/generate_jobs changed the output of the generated config
-    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#git -c git diff --exit-code
-  after_script:
-    - rm -Rf cabal-cache
-    - cp -Rf ~/.cabal cabal-cache
+    # 1 if .gitlab/generate_jobs changed the output of the generated config
+    - nix shell nixpkgs#git -c git diff --exit-code
   dependencies: []
-  cache:
-    key: lint-ci-$CACHE_REV
-    paths:
-      - cabal-cache
 
 lint-submods:
   extends: .lint-submods
