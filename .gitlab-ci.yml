@@ -538,8 +538,6 @@ doc-tarball:
 hackage-doc-tarball:
   stage: packaging
   needs:
-    - job: x86_64-linux-fedora33-release-hackage
-      optional: true
     - job: nightly-x86_64-linux-fedora33-release-hackage
       optional: true
     - job: release-x86_64-linux-fedora33-release-hackage
@@ -942,64 +940,3 @@ pages:
   artifacts:
     paths:
       - public
-
-.x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release:
-  stage: full-build
-  rules:
-    # See #22664 to see what needs to be done to bring this up to the validate pipeline standards.
-    - if: $NIGHTLY
-  tags:
-    - x86_64-linux
-  image: registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV
-  before_script:
-    - sudo chown ghc:ghc -R .
-  variables:
-    BIN_DIST_NAME: ghc-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release
-    BUILD_FLAVOUR: perf
-    CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi
-    XZ_OPT: "-9"
-    CONF_CC_OPTS_STAGE2: -Wno-int-conversion -Wno-strict-prototypes -mnontrapping-fptoint -msign-ext -mbulk-memory -mmutable-globals -mreference-types
-    CONF_CXX_OPTS_STAGE2: -fno-exceptions -Wno-int-conversion -Wno-strict-prototypes -mnontrapping-fptoint -msign-ext -mbulk-memory -mmutable-globals -mreference-types
-    CONF_GCC_LINKER_OPTS_STAGE2: -Wl,--error-limit=0,--growable-table,--stack-first -Wno-unused-command-line-argument
-    CROSS_EMULATOR: wasmtime
-    CROSS_TARGET: wasm32-wasi
-    HADRIAN_ARGS: --docs=none
-    TEST_ENV: x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release
-  script:
-    - |
-      pushd libraries/process
-      curl https://patch-diff.githubusercontent.com/raw/haskell/process/pull/240.diff | git apply
-      popd
-      pushd utils/hsc2hs
-      curl https://patch-diff.githubusercontent.com/raw/haskell/hsc2hs/pull/68.diff | git apply
-      popd
-
-      pushd "$(mktemp -d)"
-      curl -L https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz | tar xz --strip-components=1
-      PREFIX=/tmp/.ghc-wasm SKIP_GHC=1 ./setup.sh
-      source /tmp/.ghc-wasm/env
-      popd
-
-      .gitlab/ci.sh setup
-      .gitlab/ci.sh configure
-      .gitlab/ci.sh build_hadrian
-      .gitlab/ci.sh test_hadrian
-
-  after_script:
-    - cat ci-timings
-
-  artifacts:
-    expire_in: 8 weeks
-    paths:
-      - ghc-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release.tar.xz
-    when: always
-
-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_gmp-release:
-  extends: .x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release
-  variables:
-    BIGNUM_BACKEND: gmp
-
-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_native-release:
-  extends: .x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release
-  variables:
-    BIGNUM_BACKEND: native

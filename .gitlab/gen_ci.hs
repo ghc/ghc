@@ -10,6 +10,7 @@ build-depends: base, aeson >= 1.8.1, containers, bytestring
 import Data.Aeson as A
 import qualified Data.Map as Map
 import Data.Map (Map)
+import Data.Maybe
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.List (intercalate)
@@ -137,6 +138,7 @@ configureArgsStr bc = unwords $
   ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
   ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
+  ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
@@ -323,7 +325,7 @@ dockerImage _ _ = Nothing
 -- The "proper" solution would be to use a dependent monoidal map where each key specifies
 -- the combination behaviour of it's values. Ie, whether setting it multiple times is an error
 -- or they should be combined.
-newtype MonoidalMap k v = MonoidalMap (Map k v)
+newtype MonoidalMap k v = MonoidalMap { unMonoidalMap :: Map k v }
     deriving (Eq, Show, Functor, ToJSON)
 
 instance (Ord k, Semigroup v) => Semigroup (MonoidalMap k v) where
@@ -607,6 +609,7 @@ job arch opsys buildConfig = (jobName, Job {..})
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
+        [ "sudo apk del --purge glibc*" | opsys == Linux Alpine, isNothing $ crossTarget buildConfig ] ++
         [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
@@ -689,6 +692,12 @@ addJobRule r j = j { jobRules = enableRule r (jobRules j) }
 
 addVariable :: String -> String -> Job -> Job
 addVariable k v j = j { jobVariables = mminsertWith (++) k [v] (jobVariables j) }
+
+setVariable :: String -> String -> Job -> Job
+setVariable k v j = j { jobVariables = MonoidalMap $ Map.insert k [v] $ unMonoidalMap $ jobVariables j }
+
+delVariable :: String -> Job -> Job
+delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap $ jobVariables j }
 
 -- Building the standard jobs
 --
@@ -786,7 +795,7 @@ flattenJobGroup (ValidateOnly a b) = [a, b]
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap flattenJobGroup
+jobs = Map.fromList $ concatMap (filter is_enabled_job . flattenJobGroup)
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
      , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
      , validateBuilds Amd64 (Linux Debian10) nativeInt
@@ -823,9 +832,14 @@ jobs = Map.fromList $ concatMap flattenJobGroup
         )
         { bignumBackend = Native
         }
+     , make_wasm_jobs wasm_build_config
+     , disableValidate $ make_wasm_jobs wasm_build_config { bignumBackend = Native }
+     , disableValidate $ make_wasm_jobs wasm_build_config { unregisterised = True }
      ]
 
   where
+    is_enabled_job (_, Job {jobRules = OnOffRules {..}}) = not $ Disable `S.member` rule_set
+
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
 
     tsan_jobs =
@@ -835,6 +849,23 @@ jobs = Map.fromList $ concatMap flattenJobGroup
          -- memory.
         . addVariable "HADRIAN_ARGS" "--docs=none") $
       validateBuilds Amd64 (Linux Debian10) tsan
+
+    make_wasm_jobs cfg =
+      modifyJobs
+        ( delVariable "BROKEN_TESTS"
+            . setVariable "HADRIAN_ARGS" "--docs=none"
+            . delVariable "INSTALL_CONFIGURE_ARGS"
+        )
+        $ StandardTriple
+          (validate Amd64 (Linux Alpine) cfg)
+          (nightly Amd64 (Linux Alpine) cfg)
+          (release Amd64 (Linux Alpine) cfg)
+
+    wasm_build_config =
+      (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)
+        { buildFlavour = Release,
+          fullyStatic = True
+        }
 
 main :: IO ()
 main = do
