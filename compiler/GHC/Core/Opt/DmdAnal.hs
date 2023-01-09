@@ -275,7 +275,7 @@ dmdAnalBindLetUp :: TopLevelFlag
                  -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec id' rhs') (body'))
   where
-    WithDmdType body_ty body'   = anal_body env
+    WithDmdType body_ty body'   = anal_body (addInScopeAnalEnv env id)
     WithDmdType body_ty' id_dmd = findBndrDmd env notArgOfDfun body_ty id
     !id'                = setBindIdDemandInfo top_lvl id id_dmd
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
@@ -405,7 +405,8 @@ dmdAnal' env dmd (App fun arg)
 dmdAnal' env dmd (Lam var body)
   | isTyVar var
   = let
-        WithDmdType body_ty body' = dmdAnal env dmd body
+        WithDmdType body_ty body' = dmdAnal (addInScopeAnalEnv env var) dmd body
+        -- See Note [Bringing a new variable into scope]
     in
     WithDmdType body_ty (Lam var body')
 
@@ -413,7 +414,8 @@ dmdAnal' env dmd (Lam var body)
   = let (n, body_dmd)    = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
-        WithDmdType body_ty body' = dmdAnal env body_dmd body
+        WithDmdType body_ty body' = dmdAnal (addInScopeAnalEnv env var) body_dmd body
+        -- See Note [Bringing a new variable into scope]
         WithDmdType lam_ty var'   = annotateLamIdBndr env notArgOfDfun body_ty var
         new_dmd_type = multDmdType n lam_ty
     in
@@ -424,7 +426,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
   -- If it's a DataAlt, it should be the only constructor of the type.
   | is_single_data_alt alt
   = let
-        WithDmdType rhs_ty rhs'           = dmdAnal env dmd rhs
+        rhs_env = addInScopeAnalEnvs env (case_bndr:bndrs)
+        -- See Note [Bringing a new variable into scope]
+        WithDmdType rhs_ty rhs'           = dmdAnal rhs_env dmd rhs
         WithDmdType alt_ty1 dmds          = findBndrsDmds env rhs_ty bndrs
         WithDmdType alt_ty2 case_bndr_dmd = findBndrDmd env False alt_ty1 case_bndr
         -- Evaluation cardinality on the case binder is irrelevant and a no-op.
@@ -547,7 +551,9 @@ forcesRealWorld fam_envs ty
 
 dmdAnalSumAlt :: AnalEnv -> SubDemand -> Id -> Alt Var -> WithDmdType (Alt Var)
 dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
-  | WithDmdType rhs_ty rhs' <- dmdAnal env dmd rhs
+  | let rhs_env = addInScopeAnalEnvs env (case_bndr:bndrs)
+    -- See Note [Bringing a new variable into scope]
+  , WithDmdType rhs_ty rhs' <- dmdAnal rhs_env dmd rhs
   , WithDmdType alt_ty dmds <- findBndrsDmds env rhs_ty bndrs
   , let (_ :* case_bndr_sd) = findIdDemand alt_ty case_bndr
         -- See Note [Demand on scrutinee of a product case]
@@ -1437,7 +1443,7 @@ emptyAnalEnv opts fam_envs
 emptySigEnv :: SigEnv
 emptySigEnv = emptyVarEnv
 
--- | Extend an environment with the strictness IDs attached to the id
+-- | Extend an environment with the strictness sigs attached to the Ids
 extendAnalEnvs :: TopLevelFlag -> AnalEnv -> [Id] -> AnalEnv
 extendAnalEnvs top_lvl env vars
   = env { ae_sigs = extendSigEnvs top_lvl (ae_sigs env) vars }
@@ -1455,6 +1461,12 @@ extendSigEnv top_lvl sigs var sig = extendVarEnv sigs var (sig, top_lvl)
 
 lookupSigEnv :: AnalEnv -> Id -> Maybe (StrictSig, TopLevelFlag)
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
+
+addInScopeAnalEnv :: AnalEnv -> Var -> AnalEnv
+addInScopeAnalEnv env id = env { ae_sigs = delVarEnv (ae_sigs env) id }
+
+addInScopeAnalEnvs :: AnalEnv -> [Var] -> AnalEnv
+addInScopeAnalEnvs env ids = env { ae_sigs = delVarEnvList (ae_sigs env) ids }
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
@@ -1496,8 +1508,20 @@ findBndrDmd env arg_of_dfun dmd_ty id
 
     fam_envs = ae_fam_envs env
 
-{- Note [Initialising strictness]
+{- Note [Bringing a new variable into scope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f x = blah
+   g = ...(\f. ...f...)...
+
+In the body of the '\f', any occurrence of `f` refers to the lambda-bound `f`,
+not the top-level `f` (which will be in `ae_sigs`).  So it's very important
+to delete `f` from `ae_sigs` when we pass a lambda/case/let-up binding of `f`.
+Otherwise chaos results (#22718).
+
+Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 See section 9.2 (Finding fixpoints) of the paper.
 
 Our basic plan is to initialise the strictness of each Id in a
