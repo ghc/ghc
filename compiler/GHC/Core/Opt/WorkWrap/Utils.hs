@@ -9,7 +9,7 @@ A library for the ``worker\/wrapper'' back-end to the strictness analyser
 
 module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), initWwOpts, mkWwBodies, mkWWstr, mkWWstr_one
-   , needsVoidWorkerArg, addVoidWorkerArg
+   , needsVoidWorkerArg
    , DataConPatContext(..)
    , UnboxingDecision(..), wantToUnboxArg
    , findTypeShape, IsRecDataConResult(..), isRecDataCon
@@ -387,25 +387,34 @@ We use the state-token type which generates no code.
 -- Note [Preserving float barriers].
 needsVoidWorkerArg :: Id -> [Var] -> [Var] -> Bool
 needsVoidWorkerArg fn_id wrap_args work_args
-  =  not (isJoinId fn_id) && no_value_arg -- See Note [Protecting the last value argument]
-  || needs_float_barrier                  -- See Note [Preserving float barriers]
+  =  thunk_problem         -- See Note [Protecting the last value argument]
+  || needs_float_barrier   -- See Note [Preserving float barriers]
   where
-    no_value_arg        = all (not . isId) work_args
+    -- thunk_problem: see Note [Protecting the last value argument]
+    -- For join points we are only worried about (4), not (1-4).
+    -- And (4) can't happen if (null work_args)
+    --     (We could be more clever, by looking at the result type, but
+    --      this approach is simple and conservative.)
+    thunk_problem | isJoinId fn_id = no_value_arg && not (null work_args)
+                  | otherwise      = no_value_arg
+    no_value_arg = not (any isId work_args)
+
+    -- needs_float_barrier: see Note [Preserving float barriers]
+    needs_float_barrier = wrap_had_barrier && not work_has_barrier
     is_float_barrier v  = isId v && hasNoOneShotInfo (idOneShotInfo v)
     wrap_had_barrier    = any is_float_barrier wrap_args
     work_has_barrier    = any is_float_barrier work_args
-    needs_float_barrier = wrap_had_barrier && not work_has_barrier
 
--- | Inserts a `Void#` arg before the first argument.
---
--- Why as the first argument? See Note [SpecConst needs to add void args first]
--- in SpecConstr.
+-- | Inserts a `Void#` arg as the last argument.
+-- Why last? See Note [Worker/wrapper needs to add void arg last]
 addVoidWorkerArg :: [Var] -> [StrictnessMark]
-                 -> ([Var],     -- Lambda bound args
-                     [Var],     -- Args at call site
-                     [StrictnessMark]) -- cbv semantics for the worker args.
-addVoidWorkerArg work_args cbv_marks
-  = (voidArgId : work_args, voidPrimId:work_args, NotMarkedStrict:cbv_marks)
+                 -> ( [Var]     -- Lambda bound args
+                    , [Var]     -- Args at call site
+                    , [StrictnessMark]) -- str semantics for the worker args
+addVoidWorkerArg work_args str_marks
+  = ( work_args ++ [voidArgId]
+    , work_args ++ [voidPrimId]
+    , str_marks ++ [NotMarkedStrict] )
 
 {-
 Note [Protecting the last value argument]
@@ -413,8 +422,8 @@ Note [Protecting the last value argument]
 If the user writes (\_ -> E), they might be intentionally disallowing
 the sharing of E. Since absence analysis and worker-wrapper are keen
 to remove such unused arguments, we add in a void argument to prevent
-the function from becoming a thunk.  Three reasons why turning a function
-into a thunk might be bad:
+the function from becoming a thunk.  Here are several reasons why turning
+a function into a thunk might be bad:
 
 1) It can create a space leak. e.g.
       f x = let y () = [1..x]
@@ -433,7 +442,19 @@ into a thunk might be bad:
        g = \x. 30#
    Removing the \x would leave an unlifted binding.
 
-NB: none of these apply to a join point.
+4) It can create a worker of ill-kinded type (#22275).  Consider
+     f :: forall r (a :: TYPE r). () -> a
+     f x = f x
+   Here `x` is absent, but if we simply drop it we'd end up with
+     $wf :: forall r (a :: TYPE r). a
+   But alas $wf's type is ill-kinded: the kind of (/\r (a::TYPE r).a)
+   is (TYPE r), which mentions the bound variable `r`.  See also
+   Note [Worker/wrapper needs to add void arg last]
+
+See also Note [Preserving float barriers]
+
+NB: Of these, only (1-3) don't apply to a join point, which can be
+unlifted even if the RHS is not ok-for-speculation.
 
 Note [Preserving float barriers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -467,7 +488,7 @@ which some are absent or one-shot and the resulting worker arguments:
 
   * \a{Abs}.\b{os}.\c{os}... ==> \b{os}.\c{os}.\(_::Void#)...
     Wrapper arg `a` was the only float barrier and had been dropped. Hence Void#
-  * \a{Abs,os}.\b{os}.\c... ==> \b{os}.\c...
+p  * \a{Abs,os}.\b{os}.\c... ==> \b{os}.\c...
     Worker arg `c` is a float barrier.
   * \a.\b{Abs}.\c{os}... ==> \a.\c{os}...
     Worker arg `a` is a float barrier.
@@ -478,6 +499,27 @@ which some are absent or one-shot and the resulting worker arguments:
     enough to subsume Note [Protecting the last value argument].
 
 Executable examples in T21150.
+
+Note [Worker/wrapper needs to add void arg last]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider point (4) of Note [Protecting the last value argument]
+
+  f :: forall r (a :: TYPE r). () -> a
+  f x = f x
+
+As pointed out in (4) we need to add a void argument.  But if we add
+it /first/ we'd get
+
+  $wf :: Void# -> forall r (a :: TYPE r). a
+  $wf = ...
+
+But alas $wf's type is /still/ still-kinded, just as before in (4).
+Solution is simple: put the void argument /last/:
+
+  $wf :: forall r (a :: TYPE r). Void# -> a
+  $wf = ...
+
+c.f Note [SpecConstr void argument insertion] in GHC.Core.Opt.SpecConstr
 
 Note [Join points and beta-redexes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

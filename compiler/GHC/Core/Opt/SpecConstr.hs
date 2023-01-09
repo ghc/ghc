@@ -45,6 +45,7 @@ import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Literal ( litIsLifted )
 import GHC.Types.Id
+import GHC.Types.Id.Make ( voidArgId, voidPrimId )
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name
@@ -1741,24 +1742,13 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
 --        return ()
 
                 -- And build the results
-        ; let spec_body_ty   = exprType spec_body
-              (spec_lam_args1, spec_sig, spec_arity1, spec_join_arity1)
-                  = calcSpecInfo fn call_pat extra_bndrs
-                  -- Annotate the variables with the strictness information from
-                  -- the function (see Note [Strictness information in worker binders])
-              add_void_arg = needsVoidWorkerArg fn arg_bndrs spec_lam_args1
-              (spec_lam_args, spec_call_args, spec_arity, spec_join_arity)
-                  | add_void_arg
-                  -- See Note [SpecConst needs to add void args first]
-                  , (spec_lam_args, spec_call_args, _) <- addVoidWorkerArg spec_lam_args1 []
-                      -- needsVoidWorkerArg: usual w/w hack to avoid generating
-                      -- a spec_rhs of unlifted type and no args.
-                  , !spec_arity      <- spec_arity1 + 1
-                  , !spec_join_arity <- fmap (+ 1) spec_join_arity1
-                  = (spec_lam_args,  spec_call_args, spec_arity,  spec_join_arity)
-                  | otherwise
-                  = (spec_lam_args1, spec_lam_args1, spec_arity1, spec_join_arity1)
+        ; let spec_body_ty = exprType spec_body
+              (spec_lam_args, spec_call_args, spec_sig)
+                  = calcSpecInfo fn arg_bndrs call_pat extra_bndrs
 
+              spec_arity = count isId spec_lam_args
+              spec_join_arity | isJoinId fn = Just (length spec_call_args)
+                              | otherwise   = Nothing
               spec_id    = asWorkerLikeId $
                            mkLocalId spec_name Many
                                      (mkLamTypes spec_lam_args spec_body_ty)
@@ -1768,13 +1758,9 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                              `setIdArity`     spec_arity
                              `asJoinId_maybe` spec_join_arity
 
-                -- Conditionally use result of new worker-wrapper transform
-              spec_rhs   = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
-              rule_rhs = mkVarApps (Var spec_id) $
-                              -- This will give us all the arguments we quantify over
-                              -- in the rule plus the void argument if present
-                              -- since `length(qvars) + void + length(extra_bndrs) = length spec_call_args`
-                              dropTail (length extra_bndrs) spec_call_args
+        -- Conditionally use result of new worker-wrapper transform
+              spec_rhs = mkLams spec_lam_args (mkSeqs cbv_args spec_body_ty spec_body)
+              rule_rhs = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
               this_mod   = sc_module env
               rule       = mkRule this_mod True {- Auto -} True {- Local -}
@@ -1814,72 +1800,128 @@ mkSeqs seqees res_ty rhs =
         = rhs
 
 
-{- Note [SpecConst needs to add void args first]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [SpecConstr void argument insertion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a function
+    f :: Bool -> forall t. blah
     f start @t = e
 We want to specialize for a partially applied call `f True`.
 See also Note [SpecConstr call patterns], second Wrinkle.
 Naively we would expect to get
+    $sf :: forall t. blah
     $sf @t = $se
     RULE: f True = $sf
-The specialized function only takes a single type argument
-so we add a void argument to prevent it from turning into
-a thunk. See Note [Protecting the last value argument] for details
-why. Normally we would add the void argument after the
-type argument giving us:
+The specialized function only takes a single type argument so we add a
+void argument to prevent it from turning into a thunk. See Note
+[Protecting the last value argument] for details why. Normally we
+would add the void argument after the type argument giving us:
+
     $sf :: forall t. Void# -> bla
     $sf @t void = $se
     RULE: f True = $sf void# (wrong)
-But if you look closely this wouldn't typecheck!
-If we substitute `f True` with `$sf void#` we expect the type argument to be applied first
-but we apply void# first.
-The easist fix seems to be just to add the void argument to the front of the arguments.
-Now we get:
+
+But if you look closely this wouldn't typecheck!  If we substitute `f
+True` with `$sf void#` we expect the type argument to be applied first
+but we apply void# first.  The easiest fix seems to be just to add the
+void argument to the front of the arguments.  Now we get:
+
     $sf :: Void# -> forall t. bla
     $sf void @t = $se
     RULE: f True = $sf void#
+
 And now we can substitute `f True` with `$sf void#` with everything working out nicely!
+
+More precisely, in `calcSpecInfo`
+(i)  we need the void arg to /precede/ the `extra_bndrs`, but
+(ii) it must still /follow/ `qvar_bndrs`.
+
+Example to illustrate (ii):
+  f :: forall r (a :: TYPE r). Bool -> a
+  f = /\r. /\(a::TYPE r). \b. body
+
+  {- Specialise for f _ _ True -}
+
+  $sf :: forall r (a :: TYPE r). Void# -> a
+  $sf = /\r. /\(a::TYPE r). \v. body[True/b]
+  RULE: forall r (a :: TYPE r). f @r @a True = $sf @r @a void#
+
+The void argument must follow the foralls, lest the forall be
+ill-kinded.  See Note [Worker/wrapper needs to add void arg last] in
+GHC.Core.Opt.WorkWrap.Utils.
+
+Note [generaliseDictPats]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider these two rules (#21831, item 2):
+  RULE "SPEC:foo"  forall d1 d2. foo @Int @Integer d1 d2 = $sfoo1
+  RULE "SC:foo"    forall a. foo @Int @a $fNumInteger = $sfoo2 @a
+The former comes from the type class specialiser, the latter from SpecConstr.
+Note that $fNumInteger is a top-level binding for Num Integer.
+
+The trouble is that neither is more general than the other.  In a call
+   (foo @Int @Integer $fNumInteger d)
+it isn't clear which rule to fire.
+
+The trouble is that the SpecConstr rule fires on a /specific/ dict, $fNumInteger,
+but actually /could/ fire regardless.  That is, it could be
+  RULE "SC:foo"    forall a d. foo @Int @a d = $sfoo2 @a
+
+Now, it is clear that SPEC:foo is more specific.  But GHC can't tell
+that, because SpecConstr doesn't know that dictionary arguments are
+singleton types!  So generaliseDictPats teaches it this fact.  It
+spots such patterns (using typeDeterminesValue), and quantifies over
+the dictionary.  Now we get
+
+  RULE "SC:foo"    forall a d. foo @Int @a d = $sfoo2 @a
+
+And /now/ "SPEC:foo" is clearly more specific: we can instantiate the new
+"SC:foo" to match the (prefix of) "SPEC:foo".
 -}
 
-calcSpecInfo :: Id                     -- The original function
-             -> CallPat                -- Call pattern
-             -> [Var]                  -- Extra bndrs
-             -> ( [Var]                     -- Demand-decorated binders
-                , DmdSig                    -- Strictness of specialised thing
-                , Arity, Maybe JoinArity )  -- Arities of specialised thing
--- Calcuate bits of IdInfo for the specialised function
+calcSpecInfo :: Id           -- The original function
+             -> [InVar]      -- Lambda binders of original RHS
+             -> CallPat      -- Call pattern
+             -> [Var]        -- Extra bndrs
+             -> ( [Var]           -- Demand-decorated lambda binders
+                                  --   for RHS of specialised function
+                , [Var]           -- Args for call site
+                , DmdSig )        -- Strictness of specialised thing
+-- Calculate bits of IdInfo for the specialised function
 -- See Note [Transfer strictness]
 -- See Note [Strictness information in worker binders]
-calcSpecInfo fn (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
-  | isJoinId fn    -- Join points have strictness and arity for LHS only
-  = ( bndrs_w_dmds
-    , mkClosedDmdSig qvar_dmds div
-    , count isId qvars
-    , Just (length qvars) )
-  | otherwise
-  = ( bndrs_w_dmds
-    , mkClosedDmdSig (qvar_dmds ++ extra_dmds) div
-    , count isId qvars + count isId extra_bndrs
-    , Nothing )
+calcSpecInfo fn arg_bndrs (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
+  = ( spec_lam_bndrs_w_dmds
+    , spec_call_args
+    , mkClosedDmdSig [idDemandInfo b | b <- spec_lam_bndrs_w_dmds, isId b] div )
   where
     DmdSig (DmdType _ fn_dmds div) = idDmdSig fn
 
-    val_pats   = filterOut isTypeArg pats -- value args at call sites, used to determine how many demands to drop
-                                          -- from the original functions demand and for setting up dmd_env.
+    val_pats   = filterOut isTypeArg pats
+                 -- Value args at call sites, used to determine how many demands to drop
+                 -- from the original functions demand and for setting up dmd_env.
+    dmd_env    = go emptyVarEnv fn_dmds val_pats
     qvar_dmds  = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     extra_dmds = dropList val_pats fn_dmds
 
-    bndrs_w_dmds =  set_dmds qvars       qvar_dmds
-                 ++ set_dmds extra_bndrs extra_dmds
+    -- Annotate the variables with the strictness information from
+    -- the function (see Note [Strictness information in worker binders])
+    qvars_w_dmds          = set_dmds qvars       qvar_dmds
+    extras_w_dmds         = set_dmds extra_bndrs extra_dmds
+    spec_lam_bndrs_w_dmds = final_qvars_w_dmds ++ extras_w_dmds
+
+    (final_qvars_w_dmds, spec_call_args)
+       | needsVoidWorkerArg fn arg_bndrs (qvars ++ extra_bndrs)
+         -- Usual w/w hack to avoid generating
+         -- a spec_rhs of unlifted or ill-kinded type and no args.
+         -- See Note [SpecConstr void argument insertion]
+       = ( qvars_w_dmds ++ [voidArgId], qvars ++ [voidPrimId] )
+       | otherwise
+       = ( qvars_w_dmds,                qvars )
 
     set_dmds :: [Var] -> [Demand] -> [Var]
     set_dmds [] _   = []
     set_dmds vs  [] = vs  -- Run out of demands
     set_dmds (v:vs) ds@(d:ds') | isTyVar v = v                   : set_dmds vs ds
                                | otherwise = setIdDemandInfo v d : set_dmds vs ds'
-
-    dmd_env = go emptyVarEnv fn_dmds val_pats
 
     go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
     -- We've filtered out all the type patterns already
@@ -1893,7 +1935,6 @@ calcSpecInfo fn (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
       , Just (_b, ds) <- viewProd (length args) cd -- TODO: We may want to look at boxity _b, though...
       = go env ds args
     go_one env _  _ = env
-
 
 {-
 Note [spec_usg includes rhs_usg]

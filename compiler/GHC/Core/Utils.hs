@@ -166,7 +166,7 @@ coreAltsType :: [CoreAlt] -> Type
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "coreAltsType"
 
-mkLamType  :: Var -> Type -> Type
+mkLamType  :: HasDebugCallStack => Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
