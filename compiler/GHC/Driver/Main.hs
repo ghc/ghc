@@ -1303,19 +1303,20 @@ checkSafeImports tcg_env
         -- restore old errors
         logDiagnostics oldErrs
 
-        case (isEmptyMessages safeErrs) of
-          -- Failed safe check
-          False -> liftIO . throwErrors $ safeErrs
+        diag_opts <- initDiagOpts <$> getDynFlags
+        logger <- getLogger
 
-          -- Passed safe check
-          True -> do
-            let infPassed = isEmptyMessages infErrs
-            tcg_env' <- case (not infPassed) of
-              True  -> markUnsafeInfer tcg_env infErrs
-              False -> return tcg_env
-            when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
-            let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
-            return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
+        -- Will throw if failed safe check
+        liftIO $ printOrThrowDiagnostics logger diag_opts safeErrs
+
+        -- No fatal warnings or errors: passed safe check
+        let infPassed = isEmptyMessages infErrs
+        tcg_env' <- case (not infPassed) of
+          True  -> markUnsafeInfer tcg_env infErrs
+          False -> return tcg_env
+        when (packageTrustOn dflags) $ checkPkgTrust pkgReqs
+        let newTrust = pkgTrustReqs dflags safePkgs infPkgs infPassed
+        return tcg_env' { tcg_imports = impInfo `plusImportAvails` newTrust }
 
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
