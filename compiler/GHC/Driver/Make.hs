@@ -105,6 +105,7 @@ import GHC.Types.Target
 import GHC.Types.SourceFile
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
+import GHC.Types.Unique.Map
 import GHC.Types.PkgQual
 
 import GHC.Unit
@@ -129,6 +130,7 @@ import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.Maybe
 import Data.Time
+import Data.List (sortOn)
 import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
@@ -529,7 +531,7 @@ warnUnusedPackages us dflags mod_graph =
                   guard (Set.notMember (unitId ui) used_args)
                   return (unitId ui, unitPackageName ui, unitPackageVersion ui, flag)
 
-        unusedArgs = mapMaybe resolve (explicitUnits us)
+        unusedArgs = sortOn (\(u,_,_,_) -> u) $ mapMaybe resolve (explicitUnits us)
 
         warn = singleMessage $ mkPlainMsgEnvelope diag_opts noSrcSpan (DriverUnusedPackages unusedArgs)
 
@@ -1733,7 +1735,7 @@ checkHomeUnitsClosed ue home_id_set home_imp_ids
     loop (from_uid, uid) =
       let us = ue_findHomeUnitEnv from_uid ue in
       let um = unitInfoMap (homeUnitEnv_units us) in
-      case Map.lookup uid um of
+      case lookupUniqMap um uid of
         Nothing -> pprPanic "uid not found" (ppr uid)
         Just ui ->
           let depends = unitDepends ui

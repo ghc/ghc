@@ -1366,7 +1366,7 @@ zonkAndGroupSkolTvs hole_ty = do
     group_skolems :: UM.UniqMap SkolemInfo ([(TcTyVar, Int)])
     group_skolems = bagToList <$> UM.listToUniqMap_C unionBags [(skolemSkolInfo tv, unitBag (tv, n)) | tv <- skol_tvs | n <- [0..]]
 
-    skolem_list = sortBy (comparing (sort . map snd . snd)) (UM.nonDetEltsUniqMap group_skolems)
+    skolem_list = sortBy (comparing (sort . map snd . snd)) (UM.nonDetUniqMapToList group_skolems)
 
 {- Note [Adding deferred bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

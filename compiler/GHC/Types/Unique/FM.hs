@@ -57,6 +57,7 @@ module GHC.Types.Unique.FM (
         mergeUFM,
         plusMaybeUFM_C,
         plusUFMList,
+        plusUFMListWith,
         sequenceUFMList,
         minusUFM,
         minusUFM_C,
@@ -330,6 +331,9 @@ plusMaybeUFM_C f (UFM xm) (UFM ym)
 
 plusUFMList :: [UniqFM key elt] -> UniqFM key elt
 plusUFMList = foldl' plusUFM emptyUFM
+
+plusUFMListWith :: (elt -> elt -> elt) -> [UniqFM key elt] -> UniqFM key elt
+plusUFMListWith f xs = unsafeIntMapToUFM $ M.unionsWith f (map ufmToIntMap xs)
 
 sequenceUFMList :: forall key elt. [UniqFM key elt] -> UniqFM key [elt]
 sequenceUFMList = foldr (plusUFM_CD2 cons) emptyUFM

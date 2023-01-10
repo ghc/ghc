@@ -91,6 +91,8 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
+import GHC.Types.Unique.Map
+import GHC.Types.Unique
 import GHC.Types.PkgQual
 
 import GHC.Utils.Misc
@@ -110,13 +112,10 @@ import System.FilePath as FilePath
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
-import Data.List ( intersperse, partition, sortBy, isSuffixOf )
-import Data.Map (Map)
+import Data.List ( intersperse, partition, sortBy, isSuffixOf, sortOn )
 import Data.Set (Set)
 import Data.Monoid (First(..))
 import qualified Data.Semigroup as Semigroup
-import qualified Data.Map as Map
-import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
 import GHC.LanguageExtensions
 import Control.Applicative
@@ -260,7 +259,7 @@ originEmpty _ = False
 type PreloadUnitClosure = UniqSet UnitId
 
 -- | 'UniqFM' map from 'Unit' to a 'UnitVisibility'.
-type VisibilityMap = Map Unit UnitVisibility
+type VisibilityMap = UniqMap Unit UnitVisibility
 
 -- | 'UnitVisibility' records the various aspects of visibility of a particular
 -- 'Unit'.
@@ -274,7 +273,7 @@ data UnitVisibility = UnitVisibility
       -- ^ The package name associated with the 'Unit'.  This is used
       -- to implement legacy behavior where @-package foo-0.1@ implicitly
       -- hides any packages named @foo@
-    , uv_requirements :: Map ModuleName (Set InstantiatedModule)
+    , uv_requirements :: UniqMap ModuleName (Set InstantiatedModule)
       -- ^ The signatures which are contributed to the requirements context
       -- from this unit ID.
     , uv_explicit :: Maybe PackageArg
@@ -298,7 +297,7 @@ instance Semigroup UnitVisibility where
           { uv_expose_all = uv_expose_all uv1 || uv_expose_all uv2
           , uv_renamings = uv_renamings uv1 ++ uv_renamings uv2
           , uv_package_name = mappend (uv_package_name uv1) (uv_package_name uv2)
-          , uv_requirements = Map.unionWith Set.union (uv_requirements uv1) (uv_requirements uv2)
+          , uv_requirements = plusUniqMap_C Set.union (uv_requirements uv2) (uv_requirements uv1)
           , uv_explicit = uv_explicit uv1 <|> uv_explicit uv2
           }
 
@@ -307,7 +306,7 @@ instance Monoid UnitVisibility where
              { uv_expose_all = False
              , uv_renamings = []
              , uv_package_name = First Nothing
-             , uv_requirements = Map.empty
+             , uv_requirements = emptyUniqMap
              , uv_explicit = Nothing
              }
     mappend = (Semigroup.<>)
@@ -407,7 +406,7 @@ initUnitConfig dflags cached_dbs home_units =
 -- origin for a given 'Module'
 
 type ModuleNameProvidersMap =
-    Map ModuleName (Map Module ModuleOrigin)
+    UniqMap ModuleName (UniqMap Module ModuleOrigin)
 
 data UnitState = UnitState {
   -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
@@ -431,10 +430,10 @@ data UnitState = UnitState {
   packageNameMap            :: UniqFM PackageName UnitId,
 
   -- | A mapping from database unit keys to wired in unit ids.
-  wireMap :: Map UnitId UnitId,
+  wireMap :: UniqMap UnitId UnitId,
 
   -- | A mapping from wired in unit ids to unit keys from the database.
-  unwireMap :: Map UnitId UnitId,
+  unwireMap :: UniqMap UnitId UnitId,
 
   -- | The units we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a unit
@@ -464,7 +463,7 @@ data UnitState = UnitState {
   -- and @r[C=\<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
-  requirementContext :: Map ModuleName [InstantiatedModule],
+  requirementContext :: UniqMap ModuleName [InstantiatedModule],
 
   -- | Indicate if we can instantiate units on-the-fly.
   --
@@ -475,17 +474,17 @@ data UnitState = UnitState {
 
 emptyUnitState :: UnitState
 emptyUnitState = UnitState {
-    unitInfoMap = Map.empty,
+    unitInfoMap    = emptyUniqMap,
     preloadClosure = emptyUniqSet,
     packageNameMap = emptyUFM,
-    wireMap   = Map.empty,
-    unwireMap = Map.empty,
-    preloadUnits = [],
-    explicitUnits = [],
+    wireMap        = emptyUniqMap,
+    unwireMap      = emptyUniqMap,
+    preloadUnits   = [],
+    explicitUnits  = [],
     homeUnitDepends = [],
-    moduleNameProvidersMap = Map.empty,
-    pluginModuleNameProvidersMap = Map.empty,
-    requirementContext = Map.empty,
+    moduleNameProvidersMap       = emptyUniqMap,
+    pluginModuleNameProvidersMap = emptyUniqMap,
+    requirementContext           = emptyUniqMap,
     allowVirtualUnits = False
     }
 
@@ -498,7 +497,7 @@ data UnitDatabase unit = UnitDatabase
 instance Outputable u => Outputable (UnitDatabase u) where
   ppr (UnitDatabase fp _u) = text "DB:" <+> text fp
 
-type UnitInfoMap = Map UnitId UnitInfo
+type UnitInfoMap = UniqMap UnitId UnitInfo
 
 -- | Find the unit we know about with the given unit, if any
 lookupUnit :: UnitState -> Unit -> Maybe UnitInfo
@@ -514,20 +513,20 @@ lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs) (prelo
 lookupUnit' :: Bool -> UnitInfoMap -> PreloadUnitClosure -> Unit -> Maybe UnitInfo
 lookupUnit' allowOnTheFlyInst pkg_map closure u = case u of
    HoleUnit   -> error "Hole unit"
-   RealUnit i -> Map.lookup (unDefinite i) pkg_map
+   RealUnit i -> lookupUniqMap pkg_map (unDefinite i)
    VirtUnit i
       | allowOnTheFlyInst
       -> -- lookup UnitInfo of the indefinite unit to be instantiated and
          -- instantiate it on-the-fly
          fmap (renameUnitInfo pkg_map closure (instUnitInsts i))
-           (Map.lookup (instUnitInstanceOf i) pkg_map)
+           (lookupUniqMap pkg_map (instUnitInstanceOf i))
 
       | otherwise
       -> -- lookup UnitInfo by virtual UnitId. This is used to find indefinite
          -- units. Even if they are real, installed units, they can't use the
          -- `RealUnit` constructor (it is reserved for definite units) so we use
          -- the `VirtUnit` constructor.
-         Map.lookup (virtualUnitId i) pkg_map
+         lookupUniqMap pkg_map (virtualUnitId i)
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnitId :: UnitState -> UnitId -> Maybe UnitInfo
@@ -535,7 +534,7 @@ lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
 
 -- | Find the unit we know about with the given unit id, if any
 lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
-lookupUnitId' db uid = Map.lookup uid db
+lookupUnitId' db uid = lookupUniqMap db uid
 
 
 -- | Looks up the given unit in the unit state, panicking if it is not found
@@ -569,12 +568,12 @@ searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
 resolvePackageImport :: UnitState -> ModuleName -> PackageName -> Maybe UnitId
 resolvePackageImport unit_st mn pn = do
   -- 1. Find all modules providing the ModuleName (this accounts for visibility/thinning etc)
-  providers <- Map.filter originVisible <$> Map.lookup mn (moduleNameProvidersMap unit_st)
+  providers <- filterUniqMap originVisible <$> lookupUniqMap (moduleNameProvidersMap unit_st) mn
   -- 2. Get the UnitIds of the candidates
-  let candidates_uid = concatMap to_uid $ Map.assocs providers
+  let candidates_uid = concatMap to_uid $ sortOn fst $ nonDetUniqMapToList providers
   -- 3. Get the package names of the candidates
   let candidates_units = map (\ui -> ((unitPackageName ui), unitId ui))
-                              $ mapMaybe (\uid -> Map.lookup uid (unitInfoMap unit_st)) candidates_uid
+                              $ mapMaybe (\uid -> lookupUniqMap (unitInfoMap unit_st) uid) candidates_uid
   -- 4. Check to see if the PackageName helps us disambiguate any candidates.
   lookup pn candidates_units
 
@@ -600,23 +599,22 @@ resolvePackageImport unit_st mn pn = do
 -- with module holes).
 --
 mkUnitInfoMap :: [UnitInfo] -> UnitInfoMap
-mkUnitInfoMap infos = foldl' add Map.empty infos
+mkUnitInfoMap infos = foldl' add emptyUniqMap infos
   where
    mkVirt      p = virtualUnitId (mkInstantiatedUnit (unitInstanceOf p) (unitInstantiations p))
    add pkg_map p
       | not (null (unitInstantiations p))
-      = Map.insert (mkVirt p) p
-         $ Map.insert (unitId p) p
-         $ pkg_map
+      = addToUniqMap (addToUniqMap pkg_map (mkVirt p) p)
+                     (unitId p) p
       | otherwise
-      = Map.insert (unitId p) p pkg_map
+      = addToUniqMap pkg_map (unitId p) p
 
 -- | Get a list of entries from the unit database.  NB: be careful with
 -- this function, although all units in this map are "visible", this
 -- does not imply that the exposed-modules of the unit are available
 -- (they may have been thinned or renamed).
 listUnitInfo :: UnitState -> [UnitInfo]
-listUnitInfo state = Map.elems (unitInfoMap state)
+listUnitInfo state = nonDetEltsUniqMap (unitInfoMap state)
 
 -- ----------------------------------------------------------------------------
 -- Loading the unit db files and building up the unit state
@@ -904,20 +902,20 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
            -- This method is responsible for computing what our
            -- inherited requirements are.
            reqs | UnitIdArg orig_uid <- arg = collectHoles orig_uid
-                | otherwise                 = Map.empty
+                | otherwise                 = emptyUniqMap
 
            collectHoles uid = case uid of
-             HoleUnit       -> Map.empty
-             RealUnit {}    -> Map.empty -- definite units don't have holes
+             HoleUnit       -> emptyUniqMap
+             RealUnit {}    -> emptyUniqMap -- definite units don't have holes
              VirtUnit indef ->
-                  let local = [ Map.singleton
+                  let local = [ unitUniqMap
                                   (moduleName mod)
                                   (Set.singleton $ Module indef mod_name)
                               | (mod_name, mod) <- instUnitInsts indef
                               , isHoleModule mod ]
                       recurse = [ collectHoles (moduleUnit mod)
                                 | (_, mod) <- instUnitInsts indef ]
-                  in Map.unionsWith Set.union $ local ++ recurse
+                  in plusUniqMapListWith Set.union $ local ++ recurse
 
            uv = UnitVisibility
                 { uv_expose_all = b
@@ -926,7 +924,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
                 , uv_requirements = reqs
                 , uv_explicit = Just arg
                 }
-           vm' = Map.insertWith mappend (mkUnit p) uv vm_cleared
+           vm' = addToUniqMap_C mappend vm_cleared (mkUnit p) uv
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
            -- (or if p-0.1 was registered in the pkgdb as exposed: True),
            -- the second package flag would override the first one and you
@@ -950,7 +948,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
            vm_cleared | no_hide_others = vm
                       -- NB: renamings never clear
                       | (_:_) <- rns = vm
-                      | otherwise = Map.filterWithKey
+                      | otherwise = filterWithKeyUniqMap
                             (\k uv -> k == mkUnit p
                                    || First (Just n) /= uv_package_name uv) vm
          _ -> panic "applyPackageFlag"
@@ -958,7 +956,7 @@ applyPackageFlag prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
     HidePackage str ->
        case findPackages prec_map pkg_map closure (PackageArg str) pkgs unusable of
          Left ps  -> Failed (PackageFlagErr flag ps)
-         Right ps -> Succeeded $ foldl' (flip Map.delete) vm (map mkUnit ps)
+         Right ps -> Succeeded $ foldl' delFromUniqMap vm (map mkUnit ps)
 
 -- | Like 'selectPackages', but doesn't return a list of unmatched
 -- packages.  Furthermore, any packages it returns are *renamed*
@@ -974,7 +972,7 @@ findPackages prec_map pkg_map closure arg pkgs unusable
   = let ps = mapMaybe (finder arg) pkgs
     in if null ps
         then Left (mapMaybe (\(x,y) -> finder arg x >>= \x' -> return (x',y))
-                            (Map.elems unusable))
+                            (nonDetEltsUniqMap unusable))
         else Right (sortByPreference prec_map ps)
   where
     finder (PackageArg str) p
@@ -999,7 +997,7 @@ selectPackages prec_map arg pkgs unusable
   = let matches = matching arg
         (ps,rest) = partition matches pkgs
     in if null ps
-        then Left (filter (matches.fst) (Map.elems unusable))
+        then Left (filter (matches.fst) (nonDetEltsUniqMap unusable))
         else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'UnitInfo' according to some module instantiation.
@@ -1053,8 +1051,8 @@ compareByPreference
 compareByPreference prec_map pkg pkg'
   = case comparing unitPackageVersion pkg pkg' of
         GT -> GT
-        EQ | Just prec  <- Map.lookup (unitId pkg)  prec_map
-           , Just prec' <- Map.lookup (unitId pkg') prec_map
+        EQ | Just prec  <- lookupUniqMap prec_map (unitId pkg)
+           , Just prec' <- lookupUniqMap prec_map (unitId pkg')
            -- Prefer the unit from the later DB flag (i.e., higher
            -- precedence)
            -> compare prec prec'
@@ -1080,7 +1078,7 @@ pprTrustFlag flag = case flag of
 --
 -- See Note [Wired-in units] in GHC.Unit.Types
 
-type WiringMap = Map UnitId UnitId
+type WiringMap = UniqMap UnitId UnitId
 
 findWiredInUnits
    :: Logger
@@ -1120,7 +1118,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
         findWiredInUnit pkgs wired_pkg = firstJustsM [try all_exposed_ps, try all_ps, notfound]
           where
                 all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
-                all_exposed_ps = [ p | p <- all_ps, Map.member (mkUnit p) vis_map ]
+                all_exposed_ps = [ p | p <- all_ps, (mkUnit p) `elemUniqMap` vis_map ]
 
                 try ps = case sortByPreference prec_map ps of
                     p:_ -> Just <$> pick p
@@ -1146,8 +1144,8 @@ findWiredInUnits logger prec_map pkgs vis_map = do
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
 
-        wiredInMap :: Map UnitId UnitId
-        wiredInMap = Map.fromList
+        wiredInMap :: UniqMap UnitId UnitId
+        wiredInMap = listToUniqMap
           [ (unitId realUnitInfo, wiredInUnitId)
           | (wiredInUnitId, realUnitInfo) <- wired_in_pkgs
           , not (unitIsIndefinite realUnitInfo)
@@ -1155,7 +1153,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
 
         updateWiredInDependencies pkgs = map (upd_deps . upd_pkg) pkgs
           where upd_pkg pkg
-                  | Just wiredInUnitId <- Map.lookup (unitId pkg) wiredInMap
+                  | Just wiredInUnitId <- lookupUniqMap wiredInMap (unitId pkg)
                   = pkg { unitId         = wiredInUnitId
                         , unitInstanceOf = wiredInUnitId
                            -- every non instantiated unit is an instance of
@@ -1196,18 +1194,17 @@ upd_wired_in_uid wiredInMap u = case u of
 
 upd_wired_in :: WiringMap -> UnitId -> UnitId
 upd_wired_in wiredInMap key
-    | Just key' <- Map.lookup key wiredInMap = key'
+    | Just key' <- lookupUniqMap wiredInMap key = key'
     | otherwise = key
 
 updateVisibilityMap :: WiringMap -> VisibilityMap -> VisibilityMap
-updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
-  where f vm (from, to) = case Map.lookup (RealUnit (Definite from)) vis_map of
+updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (nonDetUniqMapToList wiredInMap)
+  where f vm (from, to) = case lookupUniqMap vis_map (RealUnit (Definite from)) of
                     Nothing -> vm
-                    Just r -> Map.insert (RealUnit (Definite to)) r
-                                (Map.delete (RealUnit (Definite from)) vm)
+                    Just r -> addToUniqMap (delFromUniqMap vm (RealUnit (Definite from)))
+                              (RealUnit (Definite to)) r
 
-
--- ----------------------------------------------------------------------------
+  -- ----------------------------------------------------------------------------
 
 -- | The reason why a unit is unusable.
 data UnusableUnitReason
@@ -1234,7 +1231,7 @@ instance Outputable UnusableUnitReason where
     ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
     ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
 
-type UnusableUnits = Map UnitId (UnitInfo, UnusableUnitReason)
+type UnusableUnits = UniqMap UnitId (UnitInfo, UnusableUnitReason)
 
 pprReason :: SDoc -> UnusableUnitReason -> SDoc
 pprReason pref reason = case reason of
@@ -1264,7 +1261,7 @@ reportCycles logger sccs = mapM_ report sccs
             nest 2 (hsep (map (ppr . unitId) vs))
 
 reportUnusable :: Logger -> UnusableUnits -> IO ()
-reportUnusable logger pkgs = mapM_ report (Map.toList pkgs)
+reportUnusable logger pkgs = mapM_ report (nonDetUniqMapToList pkgs)
   where
     report (ipid, (_, reason)) =
        debugTraceMsg logger 2 $
@@ -1278,14 +1275,15 @@ reportUnusable logger pkgs = mapM_ report (Map.toList pkgs)
 
 -- | A reverse dependency index, mapping an 'UnitId' to
 -- the 'UnitId's which have a dependency on it.
-type RevIndex = Map UnitId [UnitId]
+type RevIndex = UniqMap UnitId [UnitId]
 
 -- | Compute the reverse dependency index of a unit database.
 reverseDeps :: UnitInfoMap -> RevIndex
-reverseDeps db = Map.foldl' go Map.empty db
+reverseDeps db = nonDetFoldUniqMap go emptyUniqMap db
   where
-    go r pkg = foldl' (go' (unitId pkg)) r (unitDepends pkg)
-    go' from r to = Map.insertWith (++) to [from] r
+    go :: (UnitId, UnitInfo) -> RevIndex -> RevIndex
+    go (_uid, pkg) r = foldl' (go' (unitId pkg)) r (unitDepends pkg)
+    go' from r to = addToUniqMap_C (++) r to [from]
 
 -- | Given a list of 'UnitId's to remove, a database,
 -- and a reverse dependency index (as computed by 'reverseDeps'),
@@ -1299,10 +1297,10 @@ removeUnits uids index m = go uids (m,[])
   where
     go [] (m,pkgs) = (m,pkgs)
     go (uid:uids) (m,pkgs)
-        | Just pkg <- Map.lookup uid m
-        = case Map.lookup uid index of
-            Nothing    -> go uids (Map.delete uid m, pkg:pkgs)
-            Just rdeps -> go (rdeps ++ uids) (Map.delete uid m, pkg:pkgs)
+        | Just pkg <- lookupUniqMap m uid
+        = case lookupUniqMap index uid of
+            Nothing    -> go uids (delFromUniqMap m uid, pkg:pkgs)
+            Just rdeps -> go (rdeps ++ uids) (delFromUniqMap m uid, pkg:pkgs)
         | otherwise
         = go uids (m,pkgs)
 
@@ -1311,7 +1309,7 @@ removeUnits uids index m = go uids (m,[])
 depsNotAvailable :: UnitInfoMap
                  -> UnitInfo
                  -> [UnitId]
-depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (unitDepends pkg)
+depsNotAvailable pkg_map pkg = filter (not . (`elemUniqMap` pkg_map)) (unitDepends pkg)
 
 -- | Given a 'UnitInfo' from some 'UnitInfoMap' return all entries in
 -- 'unitAbiDepends' which correspond to units that do not exist, OR have
@@ -1322,7 +1320,7 @@ depsAbiMismatch :: UnitInfoMap
 depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends pkg
   where
     abiMatch (dep_uid, abi)
-        | Just dep_pkg <- Map.lookup dep_uid pkg_map
+        | Just dep_pkg <- lookupUniqMap pkg_map dep_uid
         = unitAbiHash dep_pkg == abi
         | otherwise
         = False
@@ -1331,7 +1329,7 @@ depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends
 -- Ignore units
 
 ignoreUnits :: [IgnorePackageFlag] -> [UnitInfo] -> UnusableUnits
-ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
+ignoreUnits flags pkgs = listToUniqMap (concatMap doit flags)
   where
   doit (IgnorePackage str) =
      case partition (matchingStr str) pkgs of
@@ -1351,7 +1349,7 @@ ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
 -- the command line.  We use this mapping to make sure we prefer
 -- units that were defined later on the command line, if there
 -- is an ambiguity.
-type UnitPrecedenceMap = Map UnitId Int
+type UnitPrecedenceMap = UniqMap UnitId Int
 
 -- | Given a list of databases, merge them together, where
 -- units with the same unit id in later databases override
@@ -1359,7 +1357,7 @@ type UnitPrecedenceMap = Map UnitId Int
 -- makes sense (that's done by 'validateDatabase').
 mergeDatabases :: Logger -> [UnitDatabase UnitId]
                -> IO (UnitInfoMap, UnitPrecedenceMap)
-mergeDatabases logger = foldM merge (Map.empty, Map.empty) . zip [1..]
+mergeDatabases logger = foldM merge (emptyUniqMap, emptyUniqMap) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
       debugTraceMsg logger 2 $
@@ -1371,22 +1369,22 @@ mergeDatabases logger = foldM merge (Map.empty, Map.empty) . zip [1..]
       return (pkg_map', prec_map')
      where
       db_map = mk_pkg_map db
-      mk_pkg_map = Map.fromList . map (\p -> (unitId p, p))
+      mk_pkg_map = listToUniqMap . map (\p -> (unitId p, p))
 
       -- The set of UnitIds which appear in both db and pkgs.  These are the
       -- ones that get overridden.  Compute this just to give some
       -- helpful debug messages at -v2
       override_set :: Set UnitId
-      override_set = Set.intersection (Map.keysSet db_map)
-                                      (Map.keysSet pkg_map)
+      override_set = Set.intersection (nonDetUniqMapToKeySet db_map)
+                                      (nonDetUniqMapToKeySet pkg_map)
 
       -- Now merge the sets together (NB: in case of duplicate,
       -- first argument preferred)
       pkg_map' :: UnitInfoMap
-      pkg_map' = Map.union db_map pkg_map
+      pkg_map' = pkg_map `plusUniqMap` db_map
 
       prec_map' :: UnitPrecedenceMap
-      prec_map' = Map.union (Map.map (const i) db_map) prec_map
+      prec_map' = prec_map `plusUniqMap` (mapUniqMap (const i) db_map)
 
 -- | Validates a database, removing unusable units from it
 -- (this includes removing units that the user has explicitly
@@ -1409,39 +1407,45 @@ validateDatabase cfg pkg_map1 =
 
     -- Helper function
     mk_unusable mk_err dep_matcher m uids =
-      Map.fromList [ (unitId pkg, (pkg, mk_err (dep_matcher m pkg)))
-                   | pkg <- uids ]
+      listToUniqMap [ (unitId pkg, (pkg, mk_err (dep_matcher m pkg)))
+                    | pkg <- uids
+                    ]
 
     -- Find broken units
     directly_broken = filter (not . null . depsNotAvailable pkg_map1)
-                             (Map.elems pkg_map1)
+                             (nonDetEltsUniqMap pkg_map1)
     (pkg_map2, broken) = removeUnits (map unitId directly_broken) index pkg_map1
     unusable_broken = mk_unusable BrokenDependencies depsNotAvailable pkg_map2 broken
 
     -- Find recursive units
     sccs = stronglyConnComp [ (pkg, unitId pkg, unitDepends pkg)
-                            | pkg <- Map.elems pkg_map2 ]
+                            | pkg <- nonDetEltsUniqMap pkg_map2 ]
     getCyclicSCC (CyclicSCC vs) = map unitId vs
     getCyclicSCC (AcyclicSCC _) = []
     (pkg_map3, cyclic) = removeUnits (concatMap getCyclicSCC sccs) index pkg_map2
     unusable_cyclic = mk_unusable CyclicDependencies depsNotAvailable pkg_map3 cyclic
 
     -- Apply ignore flags
-    directly_ignored = ignoreUnits ignore_flags (Map.elems pkg_map3)
-    (pkg_map4, ignored) = removeUnits (Map.keys directly_ignored) index pkg_map3
+    directly_ignored = ignoreUnits ignore_flags (nonDetEltsUniqMap pkg_map3)
+    (pkg_map4, ignored) = removeUnits (nonDetKeysUniqMap directly_ignored) index pkg_map3
     unusable_ignored = mk_unusable IgnoredDependencies depsNotAvailable pkg_map4 ignored
 
     -- Knock out units whose dependencies don't agree with ABI
     -- (i.e., got invalidated due to shadowing)
     directly_shadowed = filter (not . null . depsAbiMismatch pkg_map4)
-                               (Map.elems pkg_map4)
+                               (nonDetEltsUniqMap pkg_map4)
     (pkg_map5, shadowed) = removeUnits (map unitId directly_shadowed) index pkg_map4
     unusable_shadowed = mk_unusable ShadowedDependencies depsAbiMismatch pkg_map5 shadowed
 
-    unusable = directly_ignored `Map.union` unusable_ignored
-                                `Map.union` unusable_broken
-                                `Map.union` unusable_cyclic
-                                `Map.union` unusable_shadowed
+    -- combine all unusables. The order is important for shadowing.
+    -- plusUniqMapList folds using plusUFM which is right biased (opposite of
+    -- Data.Map.union) so the head of the list should be the least preferred
+    unusable = plusUniqMapList [ unusable_shadowed
+                               , unusable_cyclic
+                               , unusable_broken
+                               , unusable_ignored
+                               , directly_ignored
+                               ]
 
 -- -----------------------------------------------------------------------------
 -- When all the command-line options are in, we can process our unit
@@ -1540,7 +1544,7 @@ mkUnitState logger cfg = do
   -- or not packages are visible or not)
   pkgs1 <- mayThrowUnitErr
             $ foldM (applyTrustFlag prec_map unusable)
-                 (Map.elems pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
+                 (nonDetEltsUniqMap pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
   let prelim_pkg_db = mkUnitInfoMap pkgs1
 
   --
@@ -1580,17 +1584,16 @@ mkUnitState logger cfg = do
                             -- default, because it's almost assuredly not
                             -- what you want (no mix-in linking has occurred).
                             if unitIsExposed p && unitIsDefinite (mkUnit p) && mostPreferable p
-                               then Map.insert (mkUnit p)
+                               then addToUniqMap vm (mkUnit p)
                                                UnitVisibility {
                                                  uv_expose_all = True,
                                                  uv_renamings = [],
                                                  uv_package_name = First (Just (fsPackageName p)),
-                                                 uv_requirements = Map.empty,
+                                                 uv_requirements = emptyUniqMap,
                                                  uv_explicit = Nothing
                                                }
-                                               vm
                                else vm)
-                         Map.empty pkgs1
+                         emptyUniqMap pkgs1
 
   --
   -- Compute a visibility map according to the command-line flags (-package,
@@ -1618,9 +1621,9 @@ mkUnitState logger cfg = do
     case unitConfigFlagsPlugins cfg of
         -- common case; try to share the old vis_map
         [] | not hide_plugin_pkgs -> return vis_map
-           | otherwise -> return Map.empty
+           | otherwise -> return emptyUniqMap
         _ -> do let plugin_vis_map1
-                        | hide_plugin_pkgs = Map.empty
+                        | hide_plugin_pkgs = emptyUniqMap
                         -- Use the vis_map PRIOR to wired in,
                         -- because otherwise applyPackageFlag
                         -- won't work.
@@ -1649,9 +1652,9 @@ mkUnitState logger cfg = do
   -- The requirement context is directly based off of this: we simply
   -- look for nested unit IDs that are directly fed holes: the requirements
   -- of those units are precisely the ones we need to track
-  let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- Map.toList vis_map]
-      req_ctx = Map.map (Set.toList)
-              $ Map.unionsWith Set.union (map uv_requirements (Map.elems vis_map))
+  let explicit_pkgs = [(k, uv_explicit v) | (k, v) <- nonDetUniqMapToList vis_map]
+      req_ctx = mapUniqMap (Set.toList)
+              $ plusUniqMapListWith Set.union (map uv_requirements (nonDetEltsUniqMap vis_map))
 
 
   --
@@ -1664,11 +1667,11 @@ mkUnitState logger cfg = do
   -- NB: preload IS important even for type-checking, because we
   -- need the correct include path to be set.
   --
-  let preload1 = Map.keys (Map.filter (isJust . uv_explicit) vis_map)
+  let preload1 = nonDetKeysUniqMap (filterUniqMap (isJust . uv_explicit) vis_map)
 
       -- add default preload units if they can be found in the db
       basicLinkedUnits = fmap (RealUnit . Definite)
-                         $ filter (flip Map.member pkg_db)
+                         $ filter (flip elemUniqMap pkg_db)
                          $ unitConfigAutoLink cfg
       preload3 = ordNub $ (basicLinkedUnits ++ preload1)
 
@@ -1679,7 +1682,7 @@ mkUnitState logger cfg = do
 
   let mod_map1 = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
-      mod_map = Map.union mod_map1 mod_map2
+      mod_map = mod_map2 `plusUniqMap` mod_map1
 
   -- Force the result to avoid leaking input parameters
   let !state = UnitState
@@ -1692,7 +1695,7 @@ mkUnitState logger cfg = do
          , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
-         , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
+         , unwireMap                    = listToUniqMap [ (v,k) | (k,v) <- nonDetUniqMapToList wired_map ]
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
@@ -1715,7 +1718,7 @@ selectHomeUnits home_units flags = foldl' go Set.empty flags
 -- that it was recorded as in the package database.
 unwireUnit :: UnitState -> Unit -> Unit
 unwireUnit state uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap state))
+    maybe uid (RealUnit . Definite) (lookupUniqMap (unwireMap state) def_uid)
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
@@ -1750,36 +1753,35 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
     -- entries for every definite (for non-Backpack) and
     -- indefinite (for Backpack) package, so that we get the
     -- hidden entries we need.
-    Map.foldlWithKey extend_modmap emptyMap vis_map_extended
+    nonDetFoldUniqMap extend_modmap emptyMap vis_map_extended
  where
-  vis_map_extended = Map.union vis_map {- preferred -} default_vis
+  vis_map_extended = {- preferred -} default_vis `plusUniqMap` vis_map
 
-  default_vis = Map.fromList
+  default_vis = listToUniqMap
                   [ (mkUnit pkg, mempty)
-                  | pkg <- Map.elems pkg_map
+                  | (_, pkg) <- nonDetUniqMapToList pkg_map
                   -- Exclude specific instantiations of an indefinite
                   -- package
                   , unitIsIndefinite pkg || null (unitInstantiations pkg)
                   ]
 
-  emptyMap = Map.empty
+  emptyMap = emptyUniqMap
   setOrigins m os = fmap (const os) m
-  extend_modmap modmap uid
-    UnitVisibility { uv_expose_all = b, uv_renamings = rns }
+  extend_modmap (uid, UnitVisibility { uv_expose_all = b, uv_renamings = rns }) modmap
     = addListTo modmap theBindings
    where
     pkg = unit_lookup uid
 
-    theBindings :: [(ModuleName, Map Module ModuleOrigin)]
+    theBindings :: [(ModuleName, UniqMap Module ModuleOrigin)]
     theBindings = newBindings b rns
 
     newBindings :: Bool
                 -> [(ModuleName, ModuleName)]
-                -> [(ModuleName, Map Module ModuleOrigin)]
+                -> [(ModuleName, UniqMap Module ModuleOrigin)]
     newBindings e rns  = es e ++ hiddens ++ map rnBinding rns
 
     rnBinding :: (ModuleName, ModuleName)
-              -> (ModuleName, Map Module ModuleOrigin)
+              -> (ModuleName, UniqMap Module ModuleOrigin)
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
@@ -1788,7 +1790,7 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 
-    es :: Bool -> [(ModuleName, Map Module ModuleOrigin)]
+    es :: Bool -> [(ModuleName, UniqMap Module ModuleOrigin)]
     es e = do
      (m, exposedReexport) <- exposed_mods
      let (pk', m', origin') =
@@ -1798,7 +1800,7 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
               (pk', m', fromReexportedModules e pkg)
      return (m, mkModMap pk' m' origin')
 
-    esmap :: UniqFM ModuleName (Map Module ModuleOrigin)
+    esmap :: UniqFM ModuleName (UniqMap Module ModuleOrigin)
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
@@ -1814,10 +1816,10 @@ mkModuleNameProvidersMap logger cfg pkg_map closure vis_map =
 -- | Make a 'ModuleNameProvidersMap' covering a set of unusable packages.
 mkUnusableModuleNameProvidersMap :: UnusableUnits -> ModuleNameProvidersMap
 mkUnusableModuleNameProvidersMap unusables =
-    Map.foldl' extend_modmap Map.empty unusables
+    nonDetFoldUniqMap extend_modmap emptyUniqMap unusables
  where
-    extend_modmap modmap (pkg, reason) = addListTo modmap bindings
-      where bindings :: [(ModuleName, Map Module ModuleOrigin)]
+    extend_modmap (_uid, (pkg, reason)) modmap = addListTo modmap bindings
+      where bindings :: [(ModuleName, UniqMap Module ModuleOrigin)]
             bindings = exposed ++ hidden
 
             origin = ModUnusable reason
@@ -1826,7 +1828,7 @@ mkUnusableModuleNameProvidersMap unusables =
             exposed = map get_exposed exposed_mods
             hidden = [(m, mkModMap pkg_id m origin) | m <- hidden_mods]
 
-            get_exposed (mod, Just mod') = (mod, Map.singleton mod' origin)
+            get_exposed (mod, Just mod') = (mod, unitUniqMap mod' origin)
             get_exposed (mod, _)         = (mod, mkModMap pkg_id mod origin)
 
             exposed_mods = unitExposedModules pkg
@@ -1837,16 +1839,16 @@ mkUnusableModuleNameProvidersMap unusables =
 -- The outer map is processed with 'Data.Map.Strict' to prevent memory leaks
 -- when reloading modules in GHCi (see #4029). This ensures that each
 -- value is forced before installing into the map.
-addListTo :: (Monoid a, Ord k1, Ord k2)
-          => Map k1 (Map k2 a)
-          -> [(k1, Map k2 a)]
-          -> Map k1 (Map k2 a)
+addListTo :: (Monoid a, Ord k1, Ord k2, Uniquable k1, Uniquable k2)
+          => UniqMap k1 (UniqMap k2 a)
+          -> [(k1, UniqMap k2 a)]
+          -> UniqMap k1 (UniqMap k2 a)
 addListTo = foldl' merge
-  where merge m (k, v) = MapStrict.insertWith (Map.unionWith mappend) k v m
+  where merge m (k, v) = addToUniqMap_C (plusUniqMap_C mappend) m k v
 
 -- | Create a singleton module mapping
-mkModMap :: Unit -> ModuleName -> ModuleOrigin -> Map Module ModuleOrigin
-mkModMap pkg mod = Map.singleton (mkModule pkg mod)
+mkModMap :: Unit -> ModuleName -> ModuleOrigin -> UniqMap Module ModuleOrigin
+mkModMap pkg mod = unitUniqMap (mkModule pkg mod)
 
 
 -- -----------------------------------------------------------------------------
@@ -1924,10 +1926,10 @@ lookupModuleWithSuggestions' :: UnitState
                             -> PkgQual
                             -> LookupResult
 lookupModuleWithSuggestions' pkgs mod_map m mb_pn
-  = case Map.lookup m mod_map of
+  = case lookupUniqMap mod_map m of
         Nothing -> LookupNotFound suggestions
         Just xs ->
-          case foldl' classify ([],[],[], []) (Map.toList xs) of
+          case foldl' classify ([],[],[], []) (sortOn fst $ nonDetUniqMapToList xs) of
             ([], [], [], []) -> LookupNotFound suggestions
             (_, _, _, [(m, o)])             -> LookupFound m (mod_unit m, o)
             (_, _, _, exposed@(_:_))        -> LookupMultiple exposed
@@ -1985,8 +1987,8 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
     all_mods :: [(String, ModuleSuggestion)]     -- All modules
     all_mods = sortBy (comparing fst) $
         [ (moduleNameString m, suggestion)
-        | (m, e) <- Map.toList (moduleNameProvidersMap pkgs)
-        , suggestion <- map (getSuggestion m) (Map.toList e)
+        | (m, e) <- nonDetUniqMapToList (moduleNameProvidersMap pkgs)
+        , suggestion <- map (getSuggestion m) (nonDetUniqMapToList e)
         ]
     getSuggestion name (mod, origin) =
         (if originVisible origin then SuggestVisible else SuggestHidden)
@@ -1994,8 +1996,8 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
 
 listVisibleModuleNames :: UnitState -> [ModuleName]
 listVisibleModuleNames state =
-    map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
-  where visible (_, ms) = any originVisible (Map.elems ms)
+    map fst (filter visible (nonDetUniqMapToList (moduleNameProvidersMap state)))
+  where visible (_, ms) = anyUniqMap originVisible ms
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
 -- messages), and returns the list with dependencies included, in reverse
@@ -2006,7 +2008,7 @@ closeUnitDeps pkg_map ps = closeUnitDeps' pkg_map [] ps
 -- | Similar to closeUnitDeps but takes a list of already loaded units as an
 -- additional argument.
 closeUnitDeps' :: UnitInfoMap -> [UnitId] -> [(UnitId,Maybe UnitId)] -> MaybeErr UnitErr [UnitId]
-closeUnitDeps' pkg_map current_ids ps = foldM (add_unit pkg_map) current_ids ps
+closeUnitDeps' pkg_map current_ids ps = foldM (uncurry . add_unit pkg_map) current_ids ps
 
 -- | Add a UnitId and those it depends on (recursively) to the given list of
 -- UnitIds if they are not already in it. Return a list in reverse dependency
@@ -2017,9 +2019,10 @@ closeUnitDeps' pkg_map current_ids ps = foldM (add_unit pkg_map) current_ids ps
 -- error message ("dependency of <PARENT>").
 add_unit :: UnitInfoMap
             -> [UnitId]
-            -> (UnitId,Maybe UnitId)
+            -> UnitId
+            -> Maybe UnitId
             -> MaybeErr UnitErr [UnitId]
-add_unit pkg_map ps (p, mb_parent)
+add_unit pkg_map ps p mb_parent
   | p `elem` ps = return ps     -- Check if we've already added this unit
   | otherwise   = case lookupUnitId' pkg_map p of
       Nothing   -> Failed (CloseUnitErr p mb_parent)
@@ -2028,8 +2031,8 @@ add_unit pkg_map ps (p, mb_parent)
          ps' <- foldM add_unit_key ps (unitDepends info)
          return (p : ps')
         where
-          add_unit_key ps key
-            = add_unit pkg_map ps (key, Just p)
+          add_unit_key xs key
+            = add_unit pkg_map xs key (Just p)
 
 data UnitErr
   = CloseUnitErr !UnitId !(Maybe UnitId)
@@ -2073,7 +2076,7 @@ instance Outputable UnitErr where
 -- to form @mod_name@, or @[]@ if this is not a requirement.
 requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
-    fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+  fromMaybe [] (lookupUniqMap (requirementContext pkgstate) mod_name)
 
 -- -----------------------------------------------------------------------------
 
@@ -2128,9 +2131,9 @@ pprUnitsSimple = pprUnitsWith pprIPI
 -- | Show the mapping of modules to where they come from.
 pprModuleMap :: ModuleNameProvidersMap -> SDoc
 pprModuleMap mod_map =
-  vcat (map pprLine (Map.toList mod_map))
+  vcat (map pprLine (nonDetUniqMapToList mod_map))
     where
-      pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (Map.toList e)))
+      pprLine (m,e) = ppr m $$ nest 50 (vcat (map (pprEntry m) (nonDetUniqMapToList e)))
       pprEntry :: Outputable a => ModuleName -> (Module, a) -> SDoc
       pprEntry m (m',o)
         | m == moduleName m' = ppr (moduleUnit m') <+> parens (ppr o)

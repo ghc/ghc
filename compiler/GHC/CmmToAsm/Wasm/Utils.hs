@@ -23,7 +23,7 @@ detEltsUFM :: Ord k => UniqFM k0 (k, a) -> [(k, a)]
 detEltsUFM = sortOn fst . nonDetEltsUFM
 
 detEltsUniqMap :: Ord k => UniqMap k a -> [(k, a)]
-detEltsUniqMap = sortOn fst . nonDetEltsUniqMap
+detEltsUniqMap = sortOn fst . nonDetUniqMapToList
 
 builderCommas :: (a -> Builder) -> [a] -> Builder
 builderCommas f xs = mconcat (intersperse ", " (map f xs))

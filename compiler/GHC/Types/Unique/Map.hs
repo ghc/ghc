@@ -30,20 +30,25 @@ module GHC.Types.Unique.Map (
     plusUniqMap_C,
     plusMaybeUniqMap_C,
     plusUniqMapList,
+    plusUniqMapListWith,
     minusUniqMap,
     intersectUniqMap,
     intersectUniqMap_C,
     disjointUniqMap,
     mapUniqMap,
     filterUniqMap,
+    filterWithKeyUniqMap,
     partitionUniqMap,
     sizeUniqMap,
     elemUniqMap,
+    nonDetKeysUniqMap,
+    nonDetEltsUniqMap,
     lookupUniqMap,
     lookupWithDefaultUniqMap,
     anyUniqMap,
     allUniqMap,
-    nonDetEltsUniqMap,
+    nonDetUniqMapToList,
+    nonDetUniqMapToKeySet,
     nonDetFoldUniqMap
     -- Non-deterministic functions omitted
 ) where
@@ -60,6 +65,8 @@ import Data.Coerce
 import Data.Maybe
 import Data.Data
 import Control.DeepSeq
+
+import Data.Set (Set, fromList)
 
 -- | Maps indexed by 'Uniquable' keys
 newtype UniqMap k a = UniqMap { getUniqMap :: UniqFM k (k, a) }
@@ -192,6 +199,13 @@ plusMaybeUniqMap_C f (UniqMap m1) (UniqMap m2) = UniqMap $
 plusUniqMapList :: [UniqMap k a] -> UniqMap k a
 plusUniqMapList xs = UniqMap $ plusUFMList (coerce xs)
 
+plusUniqMapListWith :: (a -> a -> a) -> [UniqMap k a] -> UniqMap k a
+plusUniqMapListWith f xs = UniqMap $ plusUFMListWith go (coerce xs)
+  where
+    -- l and r keys will be identical so we choose the former
+    go (l_key, l) (_r, r) = (l_key, f l r)
+{-# INLINE plusUniqMapListWith #-}
+
 minusUniqMap :: UniqMap k a -> UniqMap k b -> UniqMap k a
 minusUniqMap (UniqMap m1) (UniqMap m2) = UniqMap $ minusUFM m1 m2
 
@@ -201,6 +215,7 @@ intersectUniqMap (UniqMap m1) (UniqMap m2) = UniqMap $ intersectUFM m1 m2
 -- | Intersection with a combining function.
 intersectUniqMap_C :: (a -> b -> c) -> UniqMap k a -> UniqMap k b -> UniqMap k c
 intersectUniqMap_C f (UniqMap m1) (UniqMap m2) = UniqMap $ intersectUFM_C (\(k, a) (_, b) -> (k, f a b)) m1 m2
+{-# INLINE intersectUniqMap #-}
 
 disjointUniqMap :: UniqMap k a -> UniqMap k b -> Bool
 disjointUniqMap (UniqMap m1) (UniqMap m2) = disjointUFM m1 m2
@@ -210,6 +225,9 @@ mapUniqMap f (UniqMap m) = UniqMap $ mapUFM (fmap f) m -- (,) k instance
 
 filterUniqMap :: (a -> Bool) -> UniqMap k a -> UniqMap k a
 filterUniqMap f (UniqMap m) = UniqMap $ filterUFM (f . snd) m
+
+filterWithKeyUniqMap :: (k -> a -> Bool) -> UniqMap k a -> UniqMap k a
+filterWithKeyUniqMap f (UniqMap m) = UniqMap $ filterUFM (uncurry f) m
 
 partitionUniqMap :: (a -> Bool) -> UniqMap k a -> (UniqMap k a, UniqMap k a)
 partitionUniqMap f (UniqMap m) =
@@ -233,8 +251,21 @@ anyUniqMap f (UniqMap m) = anyUFM (f . snd) m
 allUniqMap :: (a -> Bool) -> UniqMap k a -> Bool
 allUniqMap f (UniqMap m) = allUFM (f . snd) m
 
-nonDetEltsUniqMap :: UniqMap k a -> [(k, a)]
-nonDetEltsUniqMap (UniqMap m) = nonDetEltsUFM m
+nonDetUniqMapToList :: UniqMap k a -> [(k, a)]
+nonDetUniqMapToList (UniqMap m) = nonDetEltsUFM m
+{-# INLINE nonDetUniqMapToList #-}
+
+nonDetUniqMapToKeySet :: Ord k => UniqMap k a -> Set k
+nonDetUniqMapToKeySet m = fromList (nonDetKeysUniqMap m)
+
+nonDetKeysUniqMap :: UniqMap k a -> [k]
+nonDetKeysUniqMap m = map fst (nonDetUniqMapToList m)
+{-# INLINE nonDetKeysUniqMap #-}
+
+nonDetEltsUniqMap :: UniqMap k a -> [a]
+nonDetEltsUniqMap m = map snd (nonDetUniqMapToList m)
+{-# INLINE nonDetEltsUniqMap #-}
 
 nonDetFoldUniqMap :: ((k, a) -> b -> b) -> b -> UniqMap k a -> b
 nonDetFoldUniqMap go z (UniqMap m) = nonDetFoldUFM go z m
+{-# INLINE nonDetFoldUniqMap #-}

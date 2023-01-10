@@ -82,7 +82,7 @@ identsV = \case
   JInt{}       -> []
   JStr{}       -> []
   JRegEx{}     -> []
-  JHash m      -> concatMap (identsE . snd) (nonDetEltsUniqMap m)
+  JHash m      -> concatMap identsE (nonDetEltsUniqMap m)
   JFunc args s -> args ++ identsS s
   UnsatVal{}   -> error "identsV: UnsatVal"
 
@@ -183,7 +183,7 @@ jmcompos ret app f' v =
            JHash   m -> ret JHash `app` m'
                -- nonDetEltsUniqMap doesn't introduce nondeterminism here because the
                -- elements are treated independently before being re-added to a UniqMap
-               where (ls, vs) = unzip (nonDetEltsUniqMap m)
+               where (ls, vs) = unzip (nonDetUniqMapToList m)
                      m' = ret (listToUniqMap . zip ls) `app` mapM' f vs
            JFunc xs s -> ret JFunc `app` mapM' f xs `app` f s
            UnsatVal _ -> ret v'

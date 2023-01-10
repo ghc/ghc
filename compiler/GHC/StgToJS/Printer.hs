@@ -104,7 +104,7 @@ ghcjsRenderJsV r (JHash m)
                           map (\(x,y) -> quoteIfRequired x <> PP.colon <+> jsToDocR r y)
                           -- nonDetEltsUniqMap doesn't introduce non-determinism here because
                           -- we sort the elements lexically
-                          . sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m
+                          . sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m
   where
     quoteIfRequired :: FastString -> Doc
     quoteIfRequired x

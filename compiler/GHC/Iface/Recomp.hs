@@ -58,6 +58,7 @@ import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
+import GHC.Types.Unique.Map
 import GHC.Unit.External
 import GHC.Unit.Finder
 import GHC.Unit.State
@@ -558,8 +559,8 @@ checkMergedSignatures hsc_env mod_summary iface = do
     let logger     = hsc_logger hsc_env
     let unit_state = hsc_units hsc_env
     let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
-        new_merged = case Map.lookup (ms_mod_name mod_summary)
-                                     (requirementContext unit_state) of
+        new_merged = case lookupUniqMap (requirementContext unit_state)
+                          (ms_mod_name mod_summary) of
                         Nothing -> []
                         Just r -> sort $ map (instModuleToModule unit_state) r
     if old_merged == new_merged

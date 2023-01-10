@@ -436,7 +436,6 @@ instance Binary Sat.JStat where
     n -> error ("Binary get bh JStat: invalid tag: " ++ show n)
 
 
-
 instance Binary Sat.JExpr where
   put_ bh (Sat.ValExpr v)          = putByte bh 1 >> put_ bh v
   put_ bh (Sat.SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
@@ -463,7 +462,7 @@ instance Binary Sat.JVal where
   put_ bh (Sat.JInt i)      = putByte bh 4 >> put_ bh i
   put_ bh (Sat.JStr xs)     = putByte bh 5 >> put_ bh xs
   put_ bh (Sat.JRegEx xs)   = putByte bh 6 >> put_ bh xs
-  put_ bh (Sat.JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
+  put_ bh (Sat.JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m)
   put_ bh (Sat.JFunc is s)  = putByte bh 8 >> put_ bh is >> put_ bh s
   get bh = getByte bh >>= \case
     1 -> Sat.JVar    <$> get bh

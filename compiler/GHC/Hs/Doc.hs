@@ -224,8 +224,8 @@ instance NFData Docs where
 instance Binary Docs where
   put_ bh docs = do
     put_ bh (docs_mod_hdr docs)
-    put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetEltsUniqMap $ docs_decls docs)
-    put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetEltsUniqMap $ docs_args docs)
+    put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_decls docs)
+    put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_args docs)
     put_ bh (docs_structure docs)
     put_ bh (Map.toList $ docs_named_chunks docs)
     put_ bh (docs_haddock_opts docs)

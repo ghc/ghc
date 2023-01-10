@@ -196,9 +196,9 @@ defRenderJsV r = \case
     | isNullUniqMap m  -> text "{}"
     | otherwise -> braceNest . hsep . punctuate comma .
                           map (\(x,y) -> squotes (ftext x) <> colon <+> jsToDocR r y)
-                          -- nonDetEltsUniqMap doesn't introduce non-determinism here
+                          -- nonDetKeysUniqMap doesn't introduce non-determinism here
                           -- because we sort the elements lexically
-                          $ sortOn (LexicalFastString . fst) (nonDetEltsUniqMap m)
+                          $ sortOn (LexicalFastString . fst) (nonDetUniqMapToList m)
   JFunc is b -> parens $ hangBrace (text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
 
 defRenderJsI :: RenderJs -> Ident -> Doc
