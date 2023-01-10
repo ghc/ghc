@@ -527,7 +527,7 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
               | show_warn_groups =
                     case smallestWarningGroups flag of
                         [] -> empty
-                        groups -> text $ "(in " ++ intercalate ", " (map ("-W"++) groups) ++ ")"
+                        groups -> text $ "(in " ++ intercalate ", " (map (("-W"++) . warningGroupName) groups) ++ ")"
               | otherwise = empty
 
           -- Add prefixes, like    Foo.hs:34: warning:

@@ -7,6 +7,9 @@ module GHC.Driver.Flags
    , optimisationFlags
 
    -- * Warnings
+   , WarningGroup(..)
+   , warningGroupName
+   , warningGroupFlags
    , WarningFlag(..)
    , warnFlagNames
    , warningGroups
@@ -747,19 +750,40 @@ warnFlagNames wflag = case wflag of
 --
 --  docs/users_guide/using-warnings.rst
 
+
+-- | A group of warning flags that can be enabled or disabled collectively,
+-- e.g. using @-Wcompat@ to enable all warnings in the 'W_compat' group.
+data WarningGroup = W_compat
+                  | W_unused_binds
+                  | W_default
+                  | W_extra
+                  | W_all
+                  | W_everything
+  deriving (Bounded, Enum, Eq)
+
+warningGroupName :: WarningGroup -> String
+warningGroupName W_compat            = "compat"
+warningGroupName W_unused_binds      = "unused-binds"
+warningGroupName W_default           = "default"
+warningGroupName W_extra             = "extra"
+warningGroupName W_all               = "all"
+warningGroupName W_everything        = "everything"
+
+warningGroupFlags :: WarningGroup -> [WarningFlag]
+warningGroupFlags W_compat            = minusWcompatOpts
+warningGroupFlags W_unused_binds      = unusedBindsFlags
+warningGroupFlags W_default           = standardWarnings
+warningGroupFlags W_extra             = minusWOpts
+warningGroupFlags W_all               = minusWallOpts
+warningGroupFlags W_everything        = minusWeverythingOpts
+
+
 -- | Warning groups.
 --
 -- As all warnings are in the Weverything set, it is ignored when
 -- displaying to the user which group a warning is in.
-warningGroups :: [(String, [WarningFlag])]
-warningGroups =
-    [ ("compat",       minusWcompatOpts)
-    , ("unused-binds", unusedBindsFlags)
-    , ("default",      standardWarnings)
-    , ("extra",        minusWOpts)
-    , ("all",          minusWallOpts)
-    , ("everything",   minusWeverythingOpts)
-    ]
+warningGroups :: [WarningGroup]
+warningGroups = [minBound..maxBound]
 
 -- | Warning group hierarchies, where there is an explicit inclusion
 -- relation.
@@ -772,23 +796,21 @@ warningGroups =
 -- hierarchies with no inherent relation to be defined.
 --
 -- The special-case Weverything group is not included.
-warningHierarchies :: [[String]]
+warningHierarchies :: [[WarningGroup]]
 warningHierarchies = hierarchies ++ map (:[]) rest
   where
-    hierarchies = [["default", "extra", "all"]]
-    rest = filter (`notElem` "everything" : concat hierarchies) $
-           map fst warningGroups
+    hierarchies = [[W_default, W_extra, W_all]]
+    rest = filter (`notElem` W_everything : concat hierarchies) warningGroups
 
 -- | Find the smallest group in every hierarchy which a warning
 -- belongs to, excluding Weverything.
-smallestWarningGroups :: WarningFlag -> [String]
+smallestWarningGroups :: WarningFlag -> [WarningGroup]
 smallestWarningGroups flag = mapMaybe go warningHierarchies where
     -- Because each hierarchy is arranged from smallest to largest,
     -- the first group we find in a hierarchy which contains the flag
     -- is the smallest.
     go (group:rest) = fromMaybe (go rest) $ do
-        flags <- lookup group warningGroups
-        guard (flag `elem` flags)
+        guard (flag `elem` warningGroupFlags group)
         pure (Just group)
     go [] = Nothing
 
