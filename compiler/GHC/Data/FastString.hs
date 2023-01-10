@@ -52,6 +52,9 @@ module GHC.Data.FastString
         fastStringToShortByteString,
         mkFastStringShortByteString,
 
+        -- * ShortText
+        fastStringToShortText,
+
         -- * FastZString
         FastZString,
         hPutFZS,
@@ -130,6 +133,7 @@ import qualified Data.ByteString.Short    as SBS
 #if !MIN_VERSION_bytestring(0,11,0)
 import qualified Data.ByteString.Short.Internal as SBS
 #endif
+import GHC.Data.ShortText (ShortText(..))
 import Foreign.C
 import System.IO
 import Data.Data
@@ -158,6 +162,9 @@ fastStringToByteString = bytesFS
 
 fastStringToShortByteString :: FastString -> ShortByteString
 fastStringToShortByteString = fs_sbs
+
+fastStringToShortText :: FastString -> ShortText
+fastStringToShortText = ShortText . fs_sbs
 
 fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
