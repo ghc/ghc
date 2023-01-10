@@ -32,7 +32,7 @@ module GHC.Utils.Error (
         formatBulleted,
 
         -- ** Construction
-        DiagOpts (..), diag_wopt, diag_fatal_wopt,
+        DiagOpts (..), emptyDiagOpts, diag_wopt, diag_fatal_wopt,
         emptyMessages, mkDecorated, mkLocMessage,
         mkMsgEnvelope, mkPlainMsgEnvelope, mkPlainErrorMsgEnvelope,
         mkErrorMsgEnvelope,
@@ -79,6 +79,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Types.Error
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Unit.Module.Warnings
 
 import System.Exit      ( ExitCode(..), exitWith )
 import Data.List        ( sortBy )
@@ -93,17 +94,38 @@ import System.CPUTime
 data DiagOpts = DiagOpts
   { diag_warning_flags       :: !(EnumSet WarningFlag) -- ^ Enabled warnings
   , diag_fatal_warning_flags :: !(EnumSet WarningFlag) -- ^ Fatal warnings
+  , diag_custom_warning_categories       :: !WarningCategorySet -- ^ Enabled custom warning categories
+  , diag_fatal_custom_warning_categories :: !WarningCategorySet -- ^ Fatal custom warning categories
   , diag_warn_is_error       :: !Bool                  -- ^ Treat warnings as errors
   , diag_reverse_errors      :: !Bool                  -- ^ Reverse error reporting order
   , diag_max_errors          :: !(Maybe Int)           -- ^ Max reported error count
   , diag_ppr_ctx             :: !SDocContext           -- ^ Error printing context
   }
 
+emptyDiagOpts :: DiagOpts
+emptyDiagOpts =
+    DiagOpts
+        { diag_warning_flags = EnumSet.empty
+        , diag_fatal_warning_flags = EnumSet.empty
+        , diag_custom_warning_categories = emptyWarningCategorySet
+        , diag_fatal_custom_warning_categories = emptyWarningCategorySet
+        , diag_warn_is_error = False
+        , diag_reverse_errors = False
+        , diag_max_errors = Nothing
+        , diag_ppr_ctx = defaultSDocContext
+        }
+
 diag_wopt :: WarningFlag -> DiagOpts -> Bool
 diag_wopt wflag opts = wflag `EnumSet.member` diag_warning_flags opts
 
 diag_fatal_wopt :: WarningFlag -> DiagOpts -> Bool
 diag_fatal_wopt wflag opts = wflag `EnumSet.member` diag_fatal_warning_flags opts
+
+diag_wopt_custom :: WarningCategory -> DiagOpts -> Bool
+diag_wopt_custom wflag opts = wflag `elemWarningCategorySet` diag_custom_warning_categories opts
+
+diag_fatal_wopt_custom :: WarningCategory -> DiagOpts -> Bool
+diag_fatal_wopt_custom wflag opts = wflag `elemWarningCategorySet` diag_fatal_custom_warning_categories opts
 
 -- | Computes the /right/ 'Severity' for the input 'DiagnosticReason' out of
 -- the 'DiagOpts. This function /has/ to be called when a diagnostic is constructed,
@@ -116,6 +138,10 @@ diagReasonSeverity opts reason = case reason of
     | not (diag_wopt wflag opts) -> SevIgnore
     | diag_fatal_wopt wflag opts -> SevError
     | otherwise                  -> SevWarning
+  WarningWithCategory wcat
+    | not (diag_wopt_custom wcat opts) -> SevIgnore
+    | diag_fatal_wopt_custom wcat opts -> SevError
+    | otherwise                        -> SevWarning
   WarningWithoutFlag
     | diag_warn_is_error opts -> SevError
     | otherwise             -> SevWarning

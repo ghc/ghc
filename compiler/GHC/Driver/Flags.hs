@@ -10,11 +10,14 @@ module GHC.Driver.Flags
    , WarningGroup(..)
    , warningGroupName
    , warningGroupFlags
+   , warningGroupIncludesExtendedWarnings
    , WarningFlag(..)
    , warnFlagNames
    , warningGroups
    , warningHierarchies
    , smallestWarningGroups
+   , smallestWarningGroupsForCategory
+
    , standardWarnings
    , minusWOpts
    , minusWallOpts
@@ -563,7 +566,6 @@ data WarningFlag =
    | Opt_WarnUnusedRecordWildcards
    | Opt_WarnRedundantBangPatterns
    | Opt_WarnRedundantRecordWildcards
-   | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnMissingMonadFailInstances               -- since 8.0, has no effect since 8.8
    | Opt_WarnSemigroup                               -- since 8.0
@@ -649,7 +651,6 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnbangedStrictPatterns                  -> "unbanged-strict-patterns" :| []
   Opt_WarnDeferredTypeErrors                      -> "deferred-type-errors" :| []
   Opt_WarnDeferredOutOfScopeVariables             -> "deferred-out-of-scope-variables" :| []
-  Opt_WarnWarningsDeprecations                    -> "deprecations" :| ["warnings-deprecations"]
   Opt_WarnDeprecatedFlags                         -> "deprecated-flags" :| []
   Opt_WarnDerivingDefaults                        -> "deriving-defaults" :| []
   Opt_WarnDerivingTypeable                        -> "deriving-typeable" :| []
@@ -757,6 +758,7 @@ warnFlagNames wflag = case wflag of
 -- e.g. using @-Wcompat@ to enable all warnings in the 'W_compat' group.
 data WarningGroup = W_compat
                   | W_unused_binds
+                  | W_extended_warnings
                   | W_default
                   | W_extra
                   | W_all
@@ -766,6 +768,7 @@ data WarningGroup = W_compat
 warningGroupName :: WarningGroup -> String
 warningGroupName W_compat            = "compat"
 warningGroupName W_unused_binds      = "unused-binds"
+warningGroupName W_extended_warnings = "extended-warnings"
 warningGroupName W_default           = "default"
 warningGroupName W_extra             = "extra"
 warningGroupName W_all               = "all"
@@ -774,11 +777,26 @@ warningGroupName W_everything        = "everything"
 warningGroupFlags :: WarningGroup -> [WarningFlag]
 warningGroupFlags W_compat            = minusWcompatOpts
 warningGroupFlags W_unused_binds      = unusedBindsFlags
+warningGroupFlags W_extended_warnings = []
 warningGroupFlags W_default           = standardWarnings
 warningGroupFlags W_extra             = minusWOpts
 warningGroupFlags W_all               = minusWallOpts
 warningGroupFlags W_everything        = minusWeverythingOpts
 
+-- | Does this warning group contain (all) extended warning categories?  See
+-- Note [Warning categories] in GHC.Unit.Module.Warnings.
+--
+-- The 'W_extended_warnings' group contains extended warnings but no
+-- 'WarningFlag's, but extended warnings are also treated as part of 'W_default'
+-- and every warning group that includes it.
+warningGroupIncludesExtendedWarnings :: WarningGroup -> Bool
+warningGroupIncludesExtendedWarnings W_compat            = False
+warningGroupIncludesExtendedWarnings W_unused_binds      = False
+warningGroupIncludesExtendedWarnings W_extended_warnings = True
+warningGroupIncludesExtendedWarnings W_default           = True
+warningGroupIncludesExtendedWarnings W_extra             = True
+warningGroupIncludesExtendedWarnings W_all               = True
+warningGroupIncludesExtendedWarnings W_everything        = True
 
 -- | Warning groups.
 --
@@ -816,11 +834,16 @@ smallestWarningGroups flag = mapMaybe go warningHierarchies where
         pure (Just group)
     go [] = Nothing
 
+-- | The smallest group in every hierarchy to which a custom warning
+-- category belongs is currently always @-Wextended-warnings@.
+-- See Note [Warning categories] in "GHC.Unit.Module.Warnings".
+smallestWarningGroupsForCategory :: [WarningGroup]
+smallestWarningGroupsForCategory = [W_extended_warnings]
+
 -- | Warnings enabled unless specified otherwise
 standardWarnings :: [WarningFlag]
 standardWarnings -- see Note [Documenting warning flags]
     = [ Opt_WarnOverlappingPatterns,
-        Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
         Opt_WarnDeferredTypeErrors,
         Opt_WarnTypedHoles,

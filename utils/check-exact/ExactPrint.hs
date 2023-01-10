@@ -1424,13 +1424,13 @@ instance ExactPrint (LocatedP (WarningTxt GhcPs)) where
   getAnnotationEntry = entryFromLocatedA
   setAnnotationAnchor = setAnchorAn
 
-  exact (L (SrcSpanAnn an l) (WarningTxt (L la src) ws)) = do
+  exact (L (SrcSpanAnn an l) (WarningTxt mb_cat (L la src) ws)) = do
     an0 <- markAnnOpenP an src "{-# WARNING"
     an1 <- markEpAnnL an0 lapr_rest AnnOpenS
     ws' <- markAnnotated ws
     an2 <- markEpAnnL an1 lapr_rest AnnCloseS
     an3 <- markAnnCloseP an2
-    return (L (SrcSpanAnn an3 l) (WarningTxt (L la src) ws'))
+    return (L (SrcSpanAnn an3 l) (WarningTxt mb_cat (L la src) ws'))
 
   exact (L (SrcSpanAnn an l) (DeprecatedTxt (L ls src) ws)) = do
     an0 <- markAnnOpenP an src "{-# DEPRECATED"
@@ -1766,9 +1766,9 @@ instance ExactPrint (WarnDecl GhcPs) where
     an0 <- markEpAnnL an lidl AnnOpenS -- "["
     txt' <-
       case txt of
-        WarningTxt    src ls -> do
+        WarningTxt mb_cat src ls -> do
           ls' <- markAnnotated ls
-          return (WarningTxt    src ls')
+          return (WarningTxt mb_cat src ls')
         DeprecatedTxt src ls -> do
           ls' <- markAnnotated ls
           return (DeprecatedTxt src ls')

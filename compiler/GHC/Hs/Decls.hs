@@ -126,6 +126,7 @@ import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Core.TyCon (TyConFlavour(NewtypeFlavour,DataTypeFlavour))
 import GHC.Types.ForeignCall
+import GHC.Unit.Module.Warnings (WarningTxt(..))
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -1229,8 +1230,13 @@ instance OutputableBndrId p
 instance OutputableBndrId p
        => Outputable (WarnDecl (GhcPass p)) where
     ppr (Warning _ thing txt)
-      = hsep ( punctuate comma (map ppr thing))
+      = ppr_category
+              <+> hsep (punctuate comma (map ppr thing))
               <+> ppr txt
+      where
+        ppr_category = case txt of
+                         WarningTxt (Just cat) _ _ -> text "[" <> ppr (unLoc cat) <> text "]"
+                         _ -> empty
 
 {-
 ************************************************************************

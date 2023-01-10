@@ -164,7 +164,7 @@ rnExports :: Bool       -- False => no 'module M(..) where' header at all
 rnExports explicit_mod exports
  = checkNoErrs $   -- Fail if anything in rnExports finds
                    -- an error fails, to avoid error cascade
-   unsetWOptM Opt_WarnWarningsDeprecations $
+   updTopFlags wopt_unset_all_custom $
        -- Do not report deprecations arising from the export
        -- list, to avoid bleating about re-exporting a deprecated
        -- thing (especially via 'module Foo' export item)

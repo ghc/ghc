@@ -920,9 +920,9 @@ maybemodwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
     : '{-# DEPRECATED' strings '#-}'
                       {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
                               (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
-    | '{-# WARNING' strings '#-}'
-                         {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
-                                 (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2))}
+    | '{-# WARNING' warning_category strings '#-}'
+                         {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                                 (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
     |  {- empty -}                  { Nothing }
 
 body    :: { (AnnList
@@ -1941,6 +1941,10 @@ to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 -----------------------------------------------------------------------------
 -- Warnings and deprecations (c.f. rules)
 
+warning_category :: { Maybe (Located WarningCategory) }
+        : 'in' STRING                  { Just (sL1 $2 (mkWarningCategory (getSTRING $2))) }
+        | {- empty -}                  { Nothing }
+
 warnings :: { OrdList (LWarnDecl GhcPs) }
         : warnings ';' warning         {% if isNilOL $1
                                            then return ($1 `appOL` $3)
@@ -1959,10 +1963,10 @@ warnings :: { OrdList (LWarnDecl GhcPs) }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
 warning :: { OrdList (LWarnDecl GhcPs) }
-        : namelist strings
-                {% fmap unitOL $ acsA (\cs -> sLL $1 $>
-                     (Warning (EpAnn (glR $1) (fst $ unLoc $2) cs) (unLoc $1)
-                              (WarningTxt (noLoc NoSourceText) $ map stringLiteralToHsDocWst $ snd $ unLoc $2))) }
+        : warning_category namelist strings
+                {% fmap unitOL $ acsA (\cs -> sLL $2 $>
+                     (Warning (EpAnn (glR $2) (fst $ unLoc $3) cs) (unLoc $2)
+                              (WarningTxt $1 (noLoc NoSourceText) $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
         : deprecations ';' deprecation

@@ -98,17 +98,17 @@ other compilers.
 
 .. pragma:: WARNING
 
-    :where: declaration
+    :where: declaration or module name
 
     The ``WARNING`` pragma allows you to attach an arbitrary warning to a
-    particular function, class, or type.
+    particular function, class, type, or module.
 
 .. pragma:: DEPRECATED
 
-    :where: declaration
+    :where: declaration or module name
 
     A ``DEPRECATED`` pragma lets you specify that a particular function, class,
-    or type is deprecated.
+    type, or module is deprecated.
 
 There are two ways of using these pragmas.
 
@@ -153,8 +153,23 @@ in an export list. The latter reduces spurious complaints within a
 library in which one module gathers together and re-exports the exports
 of several others.
 
-You can suppress the warnings with the flag
-:ghc-flag:`-Wno-warnings-deprecations <-Wwarnings-deprecations>`.
+A ``WARNING`` pragma (but not a ``DEPRECATED`` pragma) may optionally specify a
+*warning category* as a string literal following the ``in`` keyword.  This affects the flag used to suppress
+the warning.  The examples above do not specify a category, so the default
+category ``deprecations`` applies, and they can be suppressed with the flag
+:ghc-flag:`-Wno-deprecations <-Wdeprecations>` (and its synonym
+:ghc-flag:`-Wno-warnings-deprecations <-Wwarnings-deprecations>`).
+
+If a category is specified, the warning can instead be suppressed with the flag
+``-Wno-x-⟨category⟩``, for example warnings from the following pragma can be
+suppressed with ``-Wno-x-partial``::
+
+    {-# WARNING in "x-partial" head "This function is partial..." #-}
+
+Alternatively, warnings from all ``WARNING`` and ``DEPRECATED`` pragmas
+regardless of category can be suppressed with
+:ghc-flag:`-Wno-extended-warnings <-Wextended-warnings>`).
+
 
 .. _minimal-pragma:
 

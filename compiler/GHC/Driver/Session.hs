@@ -33,6 +33,11 @@ module GHC.Driver.Session (
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
         wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
+        wopt_set_all_custom, wopt_unset_all_custom,
+        wopt_set_all_fatal_custom, wopt_unset_all_fatal_custom,
+        wopt_set_custom, wopt_unset_custom,
+        wopt_set_fatal_custom, wopt_unset_fatal_custom,
+        wopt_any_custom,
         xopt, xopt_set, xopt_unset,
         xopt_set_unlessExplSpec,
         xopt_DuplicateRecordFields,
@@ -227,6 +232,7 @@ import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
 import GHC.Builtin.Names ( mAIN_NAME )
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
@@ -640,6 +646,8 @@ data DynFlags = DynFlags {
   generalFlags          :: EnumSet GeneralFlag,
   warningFlags          :: EnumSet WarningFlag,
   fatalWarningFlags     :: EnumSet WarningFlag,
+  customWarningCategories      :: WarningCategorySet, -- See Note [Warning categories]
+  fatalCustomWarningCategories :: WarningCategorySet, -- in GHC.Unit.Module.Warnings
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
   -- | Safe Haskell mode
@@ -1242,6 +1250,8 @@ defaultDynFlags mySettings =
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
         warningFlags = EnumSet.fromList standardWarnings,
         fatalWarningFlags = EnumSet.empty,
+        customWarningCategories = completeWarningCategorySet,
+        fatalCustomWarningCategories = emptyWarningCategorySet,
         ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_None,
@@ -1504,6 +1514,50 @@ wopt_set_fatal dfs f
 wopt_unset_fatal :: DynFlags -> WarningFlag -> DynFlags
 wopt_unset_fatal dfs f
     = dfs { fatalWarningFlags = EnumSet.delete f (fatalWarningFlags dfs) }
+
+
+-- | Enable all custom warning categories.
+wopt_set_all_custom :: DynFlags -> DynFlags
+wopt_set_all_custom dfs
+    = dfs{ customWarningCategories = completeWarningCategorySet }
+
+-- | Disable all custom warning categories.
+wopt_unset_all_custom :: DynFlags -> DynFlags
+wopt_unset_all_custom dfs
+    = dfs{ customWarningCategories = emptyWarningCategorySet }
+
+-- | Mark all custom warning categories as fatal (do not set the flags).
+wopt_set_all_fatal_custom :: DynFlags -> DynFlags
+wopt_set_all_fatal_custom dfs
+    = dfs { fatalCustomWarningCategories = completeWarningCategorySet }
+
+-- | Mark all custom warning categories as non-fatal.
+wopt_unset_all_fatal_custom :: DynFlags -> DynFlags
+wopt_unset_all_fatal_custom dfs
+    = dfs { fatalCustomWarningCategories = emptyWarningCategorySet }
+
+-- | Set a custom 'WarningCategory'
+wopt_set_custom :: DynFlags -> WarningCategory -> DynFlags
+wopt_set_custom dfs f = dfs{ customWarningCategories = insertWarningCategorySet f (customWarningCategories dfs) }
+
+-- | Unset a custom 'WarningCategory'
+wopt_unset_custom :: DynFlags -> WarningCategory -> DynFlags
+wopt_unset_custom dfs f = dfs{ customWarningCategories = deleteWarningCategorySet f (customWarningCategories dfs) }
+
+-- | Mark a custom 'WarningCategory' as fatal (do not set the flag)
+wopt_set_fatal_custom :: DynFlags -> WarningCategory -> DynFlags
+wopt_set_fatal_custom dfs f
+    = dfs { fatalCustomWarningCategories = insertWarningCategorySet f (fatalCustomWarningCategories dfs) }
+
+-- | Mark a custom 'WarningCategory' as not fatal
+wopt_unset_fatal_custom :: DynFlags -> WarningCategory -> DynFlags
+wopt_unset_fatal_custom dfs f
+    = dfs { fatalCustomWarningCategories = deleteWarningCategorySet f (fatalCustomWarningCategories dfs) }
+
+-- | Are there any custom warning categories enabled?
+wopt_any_custom :: DynFlags -> Bool
+wopt_any_custom dfs = not (nullWarningCategorySet (customWarningCategories dfs))
+
 
 -- | Test whether a 'LangExt.Extension' is set
 xopt :: LangExt.Extension -> DynFlags -> Bool
@@ -2929,10 +2983,18 @@ dynamic_flags_deps = [
      -- Note that -Weverything > -Wall > -Wextra > -Wdefault > -Wno-everything
  ++ warningControls setWarningGroup unSetWarningGroup setWErrorWarningGroup unSetFatalWarningGroup warningGroupsDeps
  ++ warningControls setWarningFlag unSetWarningFlag setWErrorFlag unSetFatalWarningFlag wWarningFlagsDeps
+ ++ warningControls setCustomWarningFlag unSetCustomWarningFlag setCustomWErrorFlag unSetCustomFatalWarningFlag
+      [(NotDeprecated, FlagSpec "warnings-deprecations" defaultWarningCategory nop AllModes)]
+      -- See Note [Warning categories] in GHC.Unit.Module.Warnings.
 
- ++ [ (NotDeprecated, unrecognisedWarning "W")
-    , (Deprecated,    unrecognisedWarning "fwarn-")
-    , (Deprecated,    unrecognisedWarning "fno-warn-") ]
+ ++ [ (NotDeprecated, customOrUnrecognisedWarning "Wno-"       unSetCustomWarningFlag)
+    , (NotDeprecated, customOrUnrecognisedWarning "Werror="    setCustomWErrorFlag)
+    , (NotDeprecated, customOrUnrecognisedWarning "Wwarn="     unSetCustomFatalWarningFlag)
+    , (NotDeprecated, customOrUnrecognisedWarning "Wno-error=" unSetCustomFatalWarningFlag)
+    , (NotDeprecated, customOrUnrecognisedWarning "W"          setCustomWarningFlag)
+    , (Deprecated,    customOrUnrecognisedWarning "fwarn-"     setCustomWarningFlag)
+    , (Deprecated,    customOrUnrecognisedWarning "fno-warn-"  unSetCustomWarningFlag)
+    ]
 
      ------ Language flags -------------------------------------------------
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
@@ -2960,13 +3022,21 @@ warningControls set unset set_werror unset_fatal xs =
  ++ map (mkFlag turnOn  "fwarn-"     set   . hideFlag) xs
  ++ map (mkFlag turnOff "fno-warn-"  unset . hideFlag) xs
 
--- | This is where we handle unrecognised warning flags. We only issue a warning
--- if -Wunrecognised-warning-flags is set. See #11429 for context.
-unrecognisedWarning :: String -> Flag (CmdLineP DynFlags)
-unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
+-- | This is where we handle unrecognised warning flags. If the flag is valid as
+-- an extended warning category, we call the supplied action. Otherwise, issue a
+-- warning if -Wunrecognised-warning-flags is set. See #11429 for context.
+-- See Note [Warning categories] in GHC.Unit.Module.Warnings.
+customOrUnrecognisedWarning :: String -> (WarningCategory -> DynP ()) -> Flag (CmdLineP DynFlags)
+customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
   where
     action :: String -> EwM (CmdLineP DynFlags) ()
-    action flag = do
+    action flag
+      | validWarningCategory cat = custom cat
+      | otherwise = unrecognised flag
+      where
+        cat = mkWarningCategory (mkFastString flag)
+
+    unrecognised flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
       when f $ addFlagWarn (WarningWithFlag Opt_WarnUnrecognisedWarningFlags) $
         "unrecognised warning flag: -" ++ prefix ++ flag
@@ -3217,7 +3287,6 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnUnbangedStrictPatterns,
   warnSpec    Opt_WarnDeferredTypeErrors,
   warnSpec    Opt_WarnDeferredOutOfScopeVariables,
-  warnSpec    Opt_WarnWarningsDeprecations,
   warnSpec    Opt_WarnDeprecatedFlags,
   warnSpec    Opt_WarnDerivingDefaults,
   warnSpec    Opt_WarnDerivingTypeable,
@@ -4238,12 +4307,14 @@ unSetGeneralFlag' f dflags = foldr ($) (gopt_unset dflags f) deps
 
 --------------------------
 setWarningGroup :: WarningGroup -> DynP ()
-setWarningGroup g =
+setWarningGroup g = do
     mapM_ setWarningFlag (warningGroupFlags g)
+    when (warningGroupIncludesExtendedWarnings g) $ upd wopt_set_all_custom
 
 unSetWarningGroup :: WarningGroup -> DynP ()
-unSetWarningGroup g =
+unSetWarningGroup g = do
     mapM_ unSetWarningFlag (warningGroupFlags g)
+    when (warningGroupIncludesExtendedWarnings g) $ upd wopt_unset_all_custom
 
 setWErrorWarningGroup :: WarningGroup -> DynP ()
 setWErrorWarningGroup g =
@@ -4251,12 +4322,14 @@ setWErrorWarningGroup g =
      ; setFatalWarningGroup g }
 
 setFatalWarningGroup :: WarningGroup -> DynP ()
-setFatalWarningGroup g =
+setFatalWarningGroup g = do
     mapM_ setFatalWarningFlag (warningGroupFlags g)
+    when (warningGroupIncludesExtendedWarnings g) $ upd wopt_set_all_fatal_custom
 
 unSetFatalWarningGroup :: WarningGroup -> DynP ()
-unSetFatalWarningGroup g =
+unSetFatalWarningGroup g = do
     mapM_ unSetFatalWarningFlag (warningGroupFlags g)
+    when (warningGroupIncludesExtendedWarnings g) $ upd wopt_unset_all_fatal_custom
 
 
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
@@ -4271,6 +4344,21 @@ setWErrorFlag :: WarningFlag -> DynP ()
 setWErrorFlag flag =
   do { setWarningFlag flag
      ; setFatalWarningFlag flag }
+
+
+setCustomWarningFlag, unSetCustomWarningFlag :: WarningCategory -> DynP ()
+setCustomWarningFlag   f = upd (\dfs -> wopt_set_custom dfs f)
+unSetCustomWarningFlag f = upd (\dfs -> wopt_unset_custom dfs f)
+
+setCustomFatalWarningFlag, unSetCustomFatalWarningFlag :: WarningCategory -> DynP ()
+setCustomFatalWarningFlag   f = upd (\dfs -> wopt_set_fatal_custom dfs f)
+unSetCustomFatalWarningFlag f = upd (\dfs -> wopt_unset_fatal_custom dfs f)
+
+setCustomWErrorFlag :: WarningCategory -> DynP ()
+setCustomWErrorFlag flag =
+  do { setCustomWarningFlag flag
+     ; setCustomFatalWarningFlag flag }
+
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: LangExt.Extension -> DynP ()

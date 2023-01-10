@@ -337,6 +337,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIdNotExportedFromModuleSig"                = 44188
   GhcDiagnosticCode "TcRnIdNotExportedFromLocalSig"                 = 50058
   GhcDiagnosticCode "TcRnShadowedName"                              = 63397
+  GhcDiagnosticCode "TcRnInvalidWarningCategory"                    = 53573
   GhcDiagnosticCode "TcRnDuplicateWarningDecls"                     = 00711
   GhcDiagnosticCode "TcRnSimplifierTooManyIterations"               = 95822
   GhcDiagnosticCode "TcRnIllegalPatSynDecl"                         = 82077
