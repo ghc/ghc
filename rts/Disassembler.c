@@ -83,6 +83,9 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("CCALL    marshaller at 0x%" FMT_HexWord "\n",
                          literals[instrs[pc]] );
          pc += 1; break;
+      case bci_PRIMCALL:
+         debugBelch("PRIMCALL\n");
+         break;
      case bci_STKCHECK:  {
          StgWord stk_words_reqd = BCO_GET_LARGE_ARG + 1;
          debugBelch("STKCHECK %" FMT_Word "\n", (W_)stk_words_reqd );

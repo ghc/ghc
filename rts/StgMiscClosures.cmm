@@ -342,20 +342,10 @@ MK_STG_CTOI_T(61)
 MK_STG_CTOI_T(62)
 
 /*
-  Note [GHCi tuple layout]
-  ~~~~~~~~~~~~~~~~~~~~~~~~
-  the tuple_info word describes the register and stack usage of the tuple:
+  Convert a tuple return value to be used in bytecode.
 
-  [ ssss ssss rrrr rrrr rrrr rrrr rrrr rrrr ]
-
-  - r: bitmap of live registers, corresponding to the list of registers
-       returned by GHC.Cmm.CallConv.tupleRegsCover (the least significant
-       bit corresponds to the first element in the list)
-  - s: number of words on stack (in addition to registers)
-
-  The order of the live registers in the bitmap is the same as the list
-  given by GHC.Cmm.CallConv.tupleRegsCover, with the least significant
-  bit corresponding to the first register in the list.
+  See Note [GHCi and native call registers] for information on how
+  values are moved between the stack and registers.
  */
 
 stg_ctoi_t
@@ -378,7 +368,7 @@ stg_ctoi_t
 
     Sp = Sp - WDS(tuple_stack);
 
-    PUSH_TUPLE_REGS(tuple_info);
+    PUSH_ARG_REGS(tuple_info);
 
     /* jump to the BCO that will finish the return of the tuple */
     Sp_adj(-3);
@@ -399,12 +389,56 @@ INFO_TABLE_RET( stg_ret_t, RET_BCO )
     /* number of words spilled on stack */
     tuple_stack  = (tuple_info >> 24) & 0xff;
 
-    POP_TUPLE_REGS(tuple_info);
+    POP_ARG_REGS(tuple_info);
 
     /* Sp points to the topmost argument now */
     jump %ENTRY_CODE(Sp(tuple_stack)) [*]; // NB. all registers live!
 }
 
+
+ /*
+
+    The stg_primcall frame is used by the bytecode interpreter to call
+    a Cmm function. The frame contains a call_info word that contains
+    a bitmap describing the register arguments.
+
+    When the target function is called, Sp points to the topmost stack
+    argument.
+
+       ...
+       next_stack_frame
+       arg_1
+       arg_2
+       ...
+       arg_n
+       target_funptr       (pointer to the function we're calling)
+       call_info           (describes the registers containing the arguments)
+       primcall_BCO        (contains bitmap describing pointers in args)
+       stg_primcall_info   <- Sp
+
+    See Note [GHCi and native call registers] for information on the call_info
+    word and how registers are moved between the stack and registers.
+
+ */
+
+INFO_TABLE_RET ( stg_primcall, RET_BCO )
+{
+    W_ args_info, prim_fun;
+
+    /* Sp(1) would be the BCO containing the stack description bitmap */
+    args_info = Sp(2);
+    prim_fun = Sp(3);
+
+    Sp_adj(4);
+
+    /* Sp points to the top of the register arguments now,
+       load them into actual registers */
+    POP_ARG_REGS(args_info);
+
+    /* Sp points to the topmost stack argument now */
+
+    jump prim_fun [*]; // NB. all registers live!
+}
 
 /*
  * Dummy info table pushed on the top of the stack when the interpreter

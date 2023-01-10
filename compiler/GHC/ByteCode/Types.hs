@@ -9,7 +9,7 @@ module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode
   , FFIInfo(..)
   , RegBitmap(..)
-  , TupleInfo(..), voidTupleInfo
+  , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
   , ByteOff(..), WordOff(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
@@ -103,22 +103,32 @@ newtype RegBitmap = RegBitmap { unRegBitmap :: Word32 }
 
    See GHC.StgToByteCode.layoutTuple for more details.
 -}
-data TupleInfo = TupleInfo
-  { tupleSize            :: !WordOff   -- total size of tuple in words
-  , tupleRegs            :: !GlobalRegSet
-  , tupleNativeStackSize :: !WordOff {- words spilled on the stack by
-                                        GHCs native calling convention -}
-  } deriving (Show)
 
-instance Outputable TupleInfo where
-  ppr TupleInfo{..} = text "<size" <+> ppr tupleSize <+>
-                      text "stack" <+> ppr tupleNativeStackSize <+>
-                      text "regs"  <+>
-                      ppr (map (text.show) $ regSetToList tupleRegs) <>
-                      char '>'
+data NativeCallType = NativePrimCall
+                    | NativeTupleReturn
+  deriving (Eq)
 
-voidTupleInfo :: TupleInfo
-voidTupleInfo = TupleInfo 0 emptyRegSet 0
+data NativeCallInfo = NativeCallInfo
+  { nativeCallType           :: !NativeCallType
+  , nativeCallSize           :: !WordOff   -- total size of arguments in words
+  , nativeCallRegs           :: !GlobalRegSet
+  , nativeCallStackSpillSize :: !WordOff {- words spilled on the stack by
+                                            GHCs native calling convention -}
+  }
+
+instance Outputable NativeCallInfo where
+  ppr NativeCallInfo{..} = text "<arg_size" <+> ppr nativeCallSize <+>
+                           text "stack" <+> ppr nativeCallStackSpillSize <+>
+                           text "regs"  <+>
+                           ppr (map (text . show) $ regSetToList nativeCallRegs) <>
+                           char '>'
+
+
+voidTupleReturnInfo :: NativeCallInfo
+voidTupleReturnInfo = NativeCallInfo NativeTupleReturn 0 emptyRegSet 0
+
+voidPrimCallInfo :: NativeCallInfo
+voidPrimCallInfo = NativeCallInfo NativePrimCall 0 emptyRegSet 0
 
 type ItblEnv = NameEnv (Name, ItblPtr)
 type AddrEnv = NameEnv (Name, AddrPtr)

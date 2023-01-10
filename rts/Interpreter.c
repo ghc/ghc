@@ -1868,6 +1868,12 @@ run_BCO:
             goto nextInsn;
         }
 
+        case bci_PRIMCALL: {
+            Sp_subW(1);
+            SpW(0) = (W_)&stg_primcall_info;
+            RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
+        }
+
         case bci_CCALL: {
             void *tok;
             int stk_offset            = BCO_NEXT;

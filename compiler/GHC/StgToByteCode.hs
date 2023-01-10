@@ -59,7 +59,7 @@ import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Exception (evaluate)
-import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds )
+import GHC.StgToCmm.Closure ( NonVoid(..), fromNonVoid, nonVoidIds, argPrimRep )
 import GHC.StgToCmm.Layout
 import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
@@ -485,10 +485,10 @@ returnUnliftedReps d s szb reps = do
              [rep] -> return (unitOL $ RETURN_UNLIFTED (toArgRep platform rep))
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
-               let (tuple_info, args_offsets) = layoutTuple profile 0 (primRepCmmType platform) nv_reps
+               let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 (primRepCmmType platform) nv_reps
                    args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off)) args_offsets
-               tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
-               return $ PUSH_UBX (mkTupleInfoLit platform tuple_info) 1 `consOL`
+               tuple_bco <- emitBc (tupleBCO platform call_info args_ptrs)
+               return $ PUSH_UBX (mkNativeCallInfoLit platform call_info) 1 `consOL`
                         PUSH_BCO tuple_bco `consOL`
                         unitOL RETURN_TUPLE
     return ( mkSlideB platform szb (d - s) -- clear to sequel
@@ -505,7 +505,11 @@ returnUnboxedTuple d s p es = do
     profile <- getProfile
     let platform = profilePlatform profile
         arg_ty e = primRepCmmType platform (atomPrimRep e)
-        (tuple_info, tuple_components) = layoutTuple profile d arg_ty es
+        (call_info, tuple_components) = layoutNativeCall profile
+                                                         NativeTupleReturn
+                                                         d
+                                                         arg_ty
+                                                         es
         go _   pushes [] = return (reverse pushes)
         go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
                                          massert (off == dd + szb)
@@ -513,7 +517,7 @@ returnUnboxedTuple d s p es = do
     pushes <- go d [] tuple_components
     ret <- returnUnliftedReps d
                               s
-                              (wordsToBytes platform $ tupleSize tuple_info)
+                              (wordsToBytes platform $ nativeCallSize call_info)
                               (map atomPrimRep es)
     return (mconcat pushes `appOL` ret)
 
@@ -669,14 +673,14 @@ schemeT d s p app
    -- Case 1
 schemeT d s p (StgOpApp (StgFCallOp (CCall ccall_spec) _ty) args result_ty)
    = if isSupportedCConv ccall_spec
-      then generateCCall d s p ccall_spec result_ty (reverse args)
+      then generateCCall d s p ccall_spec result_ty args
       else unsupportedCConvException
 
 schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
    = doTailCall d s p (primOpId op) (reverse args)
 
-schemeT _d _s _p (StgOpApp StgPrimCallOp{} _args _ty)
-   = unsupportedCConvException
+schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
+   = generatePrimCall d s p label (Just unit) result_ty args
 
    -- Case 2: Unboxed tuple
 schemeT d s p (StgConApp con _cn args _tys)
@@ -861,18 +865,18 @@ doCase d s p scrut bndr alts
                              | ubx_frame       = wordSize platform
                              | otherwise       = 0
 
-        (bndr_size, tuple_info, args_offsets)
+        (bndr_size, call_info, args_offsets)
            | ubx_tuple_frame =
                let bndr_ty = primRepCmmType platform
                    bndr_reps = filter (not.isVoidRep) (bcIdPrimReps bndr)
-                   (tuple_info, args_offsets) =
-                       layoutTuple profile 0 bndr_ty bndr_reps
-               in ( wordsToBytes platform (tupleSize tuple_info)
-                  , tuple_info
+                   (call_info, args_offsets) =
+                       layoutNativeCall profile NativeTupleReturn 0 bndr_ty bndr_reps
+               in ( wordsToBytes platform (nativeCallSize call_info)
+                  , call_info
                   , args_offsets
                   )
            | otherwise = ( wordsToBytes platform (idSizeW platform bndr)
-                         , voidTupleInfo
+                         , voidTupleReturnInfo
                          , []
                          )
 
@@ -906,17 +910,18 @@ doCase d s p scrut bndr alts
            | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty =
              let bndr_ty = primRepCmmType platform . bcIdPrimRep
                  tuple_start = d_bndr
-                 (tuple_info, args_offsets) =
-                   layoutTuple profile
-                               0
-                               bndr_ty
-                               bndrs
+                 (call_info, args_offsets) =
+                   layoutNativeCall profile
+                                    NativeTupleReturn
+                                    0
+                                    bndr_ty
+                                    bndrs
 
                  stack_bot = d_alts
 
                  p' = Map.insertList
                         [ (arg, tuple_start -
-                                wordsToBytes platform (tupleSize tuple_info) +
+                                wordsToBytes platform (nativeCallSize call_info) +
                                 offset)
                         | (arg, offset) <- args_offsets
                         , not (isVoidRep $ bcIdPrimRep arg)]
@@ -988,8 +993,8 @@ doCase d s p scrut bndr alts
 
         -- unboxed tuples get two more words, the second is a pointer (tuple_bco)
         (extra_pointers, extra_slots)
-           | ubx_tuple_frame && profiling = ([1], 3) -- tuple_info, tuple_BCO, CCCS
-           | ubx_tuple_frame              = ([1], 2) -- tuple_info, tuple_BCO
+           | ubx_tuple_frame && profiling = ([1], 3) -- call_info, tuple_BCO, CCCS
+           | ubx_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
            | otherwise                    = ([], 0)
 
         bitmap_size = trunc16W $ fromIntegral extra_slots +
@@ -1035,8 +1040,8 @@ doCase d s p scrut bndr alts
               let args_ptrs =
                     map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off))
                         args_offsets
-              tuple_bco <- emitBc (tupleBCO platform tuple_info args_ptrs)
-              return (PUSH_ALTS_TUPLE alt_bco' tuple_info tuple_bco
+              tuple_bco <- emitBc (tupleBCO platform call_info args_ptrs)
+              return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
                       `consOL` scrut_code)
        else let push_alts
                   | not ubx_frame
@@ -1057,14 +1062,15 @@ doCase d s p scrut bndr alts
 -- The native calling convention uses registers for tuples, but in the
 -- bytecode interpreter, all values live on the stack.
 
-layoutTuple :: Profile
-            -> ByteOff
-            -> (a -> CmmType)
-            -> [a]
-            -> ( TupleInfo      -- See Note [GHCi TupleInfo]
-               , [(a, ByteOff)] -- argument, offset on stack
-               )
-layoutTuple profile start_off arg_ty reps =
+layoutNativeCall :: Profile
+                 -> NativeCallType
+                 -> ByteOff
+                 -> (a -> CmmType)
+                 -> [a]
+                 -> ( NativeCallInfo      -- See Note [GHCi TupleInfo]
+                    , [(a, ByteOff)] -- argument, offset on stack
+                    )
+layoutNativeCall profile call_type start_off arg_ty reps =
   let platform = profilePlatform profile
       (orig_stk_bytes, pos) = assignArgumentsPos profile
                                                  0
@@ -1077,7 +1083,7 @@ layoutTuple profile start_off arg_ty reps =
 
       -- sort the register parameters by register and add them to the stack
       regs_order :: Map.Map GlobalReg Int
-      regs_order = Map.fromList $ zip (tupleRegsCover platform) [0..]
+      regs_order = Map.fromList $ zip (allArgRegsCover platform) [0..]
 
       reg_order :: GlobalReg -> (Int, GlobalReg)
       reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)
@@ -1106,10 +1112,11 @@ layoutTuple profile start_off arg_ty reps =
       get_byte_off _                 =
           panic "GHC.StgToByteCode.layoutTuple get_byte_off"
 
-  in ( TupleInfo
-         { tupleSize        = bytesToWords platform (ByteOff new_stk_bytes)
-         , tupleRegs        = regs_set
-         , tupleNativeStackSize = bytesToWords platform
+  in ( NativeCallInfo
+         { nativeCallType           = call_type
+         , nativeCallSize           = bytesToWords platform (ByteOff new_stk_bytes)
+         , nativeCallRegs           = regs_set
+         , nativeCallStackSpillSize = bytesToWords platform
                                                (ByteOff orig_stk_bytes)
          }
      , sortBy (comparing snd) $
@@ -1134,7 +1141,7 @@ usePlainReturn t
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   We have the bytecode instructions RETURN_TUPLE and PUSH_ALTS_TUPLE to
   return and receive arbitrary unboxed tuples, respectively. These
-  instructions use the helper data tuple_BCO and tuple_info.
+  instructions use the helper data tuple_BCO and call_info.
 
   The helper data is used to convert tuples between GHCs native calling
   convention (object code), which uses stack and registers, and the bytecode
@@ -1146,7 +1153,7 @@ usePlainReturn t
   =================
 
   Bytecode that returns a tuple first pushes all the tuple fields followed
-  by the appropriate tuple_info and tuple_BCO onto the stack. It then
+  by the appropriate call_info and tuple_BCO onto the stack. It then
   executes the RETURN_TUPLE instruction, which causes the interpreter
   to push stg_ret_t_info to the top of the stack. The stack (growing down)
   then looks as follows:
@@ -1157,14 +1164,14 @@ usePlainReturn t
       tuple_field_2
       ...
       tuple_field_n
-      tuple_info
+      call_info
       tuple_BCO
       stg_ret_t_info <- Sp
 
   If next_frame is bytecode, the interpreter will start executing it. If
   it's object code, the interpreter jumps back to the scheduler, which in
   turn jumps to stg_ret_t. stg_ret_t converts the tuple to the native
-  calling convention using the description in tuple_info, and then jumps
+  calling convention using the description in call_info, and then jumps
   to next_frame.
 
 
@@ -1176,13 +1183,13 @@ usePlainReturn t
   tuple. The PUSH_ALTS_TUPLE instuction contains three pieces of data:
 
      * cont_BCO: the continuation that receives the tuple
-     * tuple_info: see below
+     * call_info: see below
      * tuple_BCO: see below
 
   The interpreter pushes these onto the stack when the PUSH_ALTS_TUPLE
   instruction is executed, followed by stg_ctoi_tN_info, with N depending
   on the number of stack words used by the tuple in the GHC native calling
-  convention. N is derived from tuple_info.
+  convention. N is derived from call_info.
 
   For example if we expect a tuple with three words on the stack, the stack
   looks as follows after PUSH_ALTS_TUPLE:
@@ -1193,7 +1200,7 @@ usePlainReturn t
       cont_free_var_2
       ...
       cont_free_var_n
-      tuple_info
+      call_info
       tuple_BCO
       cont_BCO
       stg_ctoi_t3_info <- Sp
@@ -1213,20 +1220,20 @@ usePlainReturn t
   that is already on the stack.
 
 
-  The tuple_info word
+  The call_info word
   ===================
 
-  The tuple_info word describes the stack and STG register (e.g. R1..R6,
-  D1..D6) usage for the tuple. tuple_info contains enough information to
+  The call_info word describes the stack and STG register (e.g. R1..R6,
+  D1..D6) usage for the tuple. call_info contains enough information to
   convert the tuple between the stack-only bytecode and stack+registers
   GHC native calling conventions.
 
-  See Note [GHCi tuple layout] for more details of how the data is packed
-  in a single word.
+  See Note [GHCi and native call registers] for more details of how the
+  data is packed in a single word.
 
  -}
 
-tupleBCO :: Platform -> TupleInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+tupleBCO :: Platform -> NativeCallInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
 tupleBCO platform info pointers =
   mkProtoBCO platform invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
@@ -1240,14 +1247,102 @@ tupleBCO platform info pointers =
     -}
     invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "tuple")
 
-    -- the first word in the frame is the tuple_info word,
+    -- the first word in the frame is the call_info word,
     -- which is not a pointer
-    bitmap_size = trunc16W $ 1 + tupleSize info
+    bitmap_size = trunc16W $ 1 + nativeCallSize info
     bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
                   map ((+1) . fromIntegral . bytesToWords platform . snd)
                       (filter fst pointers)
     body_code = mkSlideW 0 1          -- pop frame header
                 `snocOL` RETURN_TUPLE -- and add it again
+
+primCallBCO ::  Platform -> NativeCallInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+primCallBCO platform args_info pointers =
+  mkProtoBCO platform invented_name body_code (Left [])
+             0{-no arity-} bitmap_size bitmap False{-is alts-}
+
+  where
+    {-
+      The primcall BCO is never referred to by name, so we can get away
+      with using a fake name here. We will need to change this if we want
+      to save some memory by sharing the BCO between places that have
+      the same tuple shape
+    -}
+    invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "primcall")
+
+    -- the first three words in the frame are the BCO describing the
+    -- pointers in the frame, the call_info word and the pointer
+    -- to the Cmm function being called. None of these is a pointer that
+    -- should be followed by the garbage collector
+    bitmap_size = trunc16W $ 2 + nativeCallSize args_info
+    bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
+                  map ((+2) . fromIntegral . bytesToWords platform . snd)
+                      (filter fst pointers)
+    -- if the primcall BCO is ever run it's a bug, since the BCO should only
+    -- be pushed immediately before running the PRIMCALL bytecode instruction,
+    -- which immediately leaves the interpreter to jump to the stg_primcall_info
+    -- Cmm function
+    body_code =  unitOL CASEFAIL
+
+-- -----------------------------------------------------------------------------
+-- Deal with a primitive call to native code.
+
+generatePrimCall
+    :: StackDepth
+    -> Sequel
+    -> BCEnv
+    -> CLabelString          -- where to call
+    -> Maybe Unit
+    -> Type
+    -> [StgArg]              -- args (atoms)
+    -> BcM BCInstrList
+generatePrimCall d s p target _mb_unit _result_ty args
+ = do
+     profile <- getProfile
+     let
+         platform = profilePlatform profile
+
+         non_void VoidRep = False
+         non_void _       = True
+
+         nv_args :: [StgArg]
+         nv_args = filter (non_void . argPrimRep) args
+
+         (args_info, args_offsets) =
+              layoutNativeCall profile
+                               NativePrimCall
+                               d
+                               (primRepCmmType platform . argPrimRep)
+                               nv_args
+
+         args_ptrs :: [(Bool, ByteOff)]
+         args_ptrs =
+            map (\(r, off) ->
+                  (isFollowableArg (toArgRep platform . argPrimRep $ r), off))
+                args_offsets
+
+         push_target = PUSH_UBX (LitLabel target Nothing IsFunction) 1
+         push_info = PUSH_UBX (mkNativeCallInfoLit platform args_info) 1
+         {-
+            compute size to move payload (without stg_primcall_info header)
+
+            size of arguments plus three words for:
+                - function pointer to the target
+                - call_info word
+                - BCO to describe the stack frame
+          -}
+         szb = wordsToBytes platform (nativeCallSize args_info + 3)
+         go _   pushes [] = return (reverse pushes)
+         go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
+                                          massert (off == dd + szb)
+                                          go (dd + szb) (push:pushes) cs
+     push_args <- go d [] args_offsets
+     args_bco <- emitBc (primCallBCO platform args_info args_ptrs)
+     return $ mconcat push_args `appOL`
+              (push_target `consOL`
+               push_info `consOL`
+               PUSH_BCO args_bco `consOL`
+               (mkSlideB platform szb (d - s) `appOL` unitOL PRIMCALL))
 
 -- -----------------------------------------------------------------------------
 -- Deal with a CCall.
@@ -1266,11 +1361,17 @@ generateCCall
     -> Type
     -> [StgArg]              -- args (atoms)
     -> BcM BCInstrList
-generateCCall d0 s p (CCallSpec target cconv safety) result_ty args_r_to_l
+generateCCall d0 s p (CCallSpec target PrimCallConv _) result_ty args
+ | (StaticTarget _ label mb_unit _) <- target
+ = generatePrimCall d0 s p label mb_unit result_ty args
+ | otherwise
+ = panic "GHC.StgToByteCode.generateCCall: primcall convention only supports static targets"
+generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
  = do
      profile <- getProfile
 
      let
+         args_r_to_l = reverse args
          platform = profilePlatform profile
          -- useful constants
          addr_size_b :: ByteOff
@@ -1974,7 +2075,7 @@ isSupportedCConv :: CCallSpec -> Bool
 isSupportedCConv (CCallSpec _ cconv _) = case cconv of
    CCallConv            -> True     -- we explicitly pattern match on every
    StdCallConv          -> True     -- convention to ensure that a warning
-   PrimCallConv         -> False    -- is triggered when a new one is added
+   PrimCallConv         -> True     -- is triggered when a new one is added
    JavaScriptCallConv   -> False
    CApiConv             -> True
 

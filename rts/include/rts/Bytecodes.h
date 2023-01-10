@@ -94,6 +94,9 @@
 
 #define bci_RETURN_T                    69
 #define bci_PUSH_ALTS_T                 70
+
+#define bci_PRIMCALL                    87
+
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */

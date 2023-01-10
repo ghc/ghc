@@ -12,7 +12,7 @@ module GHC.ByteCode.Asm (
         bcoFreeNames,
         SizedSeq, sizeSS, ssElts,
         iNTERP_STACK_CHECK_THRESH,
-        mkTupleInfoLit
+        mkNativeCallInfoLit
   ) where
 
 import GHC.Prelude
@@ -32,7 +32,6 @@ import GHC.Types.Unique.DSet
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import GHC.Core.TyCon
 import GHC.Data.FastString
@@ -40,7 +39,7 @@ import GHC.Data.SizedSeq
 
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Cmm.Expr
-import GHC.Cmm.CallConv        ( tupleRegsCover )
+import GHC.Cmm.CallConv        ( allArgRegsCover )
 import GHC.Platform
 import GHC.Platform.Profile
 
@@ -215,7 +214,8 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
   (final_insns, final_lits, final_ptrs) <- flip execStateT initial_state $ runAsm platform long_jumps env asm
 
   -- precomputed size should be equal to final size
-  massert (n_insns == sizeSS final_insns)
+  massertPpr (n_insns == sizeSS final_insns)
+             (text "bytecode instruction count mismatch")
 
   let asm_insns = ssElts final_insns
       insns_arr = Array.listArray (0, fromIntegral n_insns - 1) asm_insns
@@ -364,7 +364,9 @@ largeArg platform w = case platformWordSize platform of
            fromIntegral (w `shiftR` 32),
            fromIntegral (w `shiftR` 16),
            fromIntegral w]
-   PW4 -> [fromIntegral (w `shiftR` 16),
+   PW4 -> assertPpr (w < fromIntegral (maxBound :: Word32))
+                    (text "largeArg too big:" <+> ppr w) $
+          [fromIntegral (w `shiftR` 16),
            fromIntegral w]
 
 largeArg16s :: Platform -> Word
@@ -400,14 +402,14 @@ assembleI platform i = case i of
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
-  PUSH_ALTS_TUPLE proto tuple_info tuple_proto
+  PUSH_ALTS_TUPLE proto call_info tuple_proto
                            -> do let ul_bco = assembleBCO platform proto
                                      ul_tuple_bco = assembleBCO platform
                                                                 tuple_proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  p_tup <- ioptr (liftM BCOPtrBCO ul_tuple_bco)
                                  info <- int (fromIntegral $
-                                              mkTupleInfoSig platform tuple_info)
+                                              mkNativeCallInfoSig platform call_info)
                                  emit bci_PUSH_ALTS_T
                                       [Op p, Op info, Op p_tup]
   PUSH_PAD8                -> emit bci_PUSH_PAD8 []
@@ -475,6 +477,7 @@ assembleI platform i = case i of
   RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
+  PRIMCALL                 -> emit bci_PRIMCALL []
   BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
                                  q <- int (getKey uniq)
                                  np <- addr cc
@@ -563,41 +566,44 @@ return_unlifted V64 = error "return_unlifted: vector"
   maximum number of tuple elements may be larger. Elements can also
   take multiple words on the stack (for example Double# on a 32 bit
   platform).
-
  -}
-maxTupleNativeStackSize :: WordOff
-maxTupleNativeStackSize = 62
+maxTupleReturnNativeStackSize :: WordOff
+maxTupleReturnNativeStackSize = 62
 
 {-
-  Construct the tuple_info word that stg_ctoi_t and stg_ret_t use
-  to convert a tuple between the native calling convention and the
+  Construct the call_info word that stg_ctoi_t, stg_ret_t and stg_primcall
+  use to convert arguments between the native calling convention and the
   interpreter.
 
-  See Note [GHCi tuple layout] for more information.
+  See Note [GHCi and native call registers] for more information.
  -}
-mkTupleInfoSig :: Platform -> TupleInfo -> Word32
-mkTupleInfoSig platform TupleInfo{..}
-  | tupleNativeStackSize > maxTupleNativeStackSize
-  = pprPanic "mkTupleInfoSig: tuple too big for the bytecode compiler"
-             (ppr tupleNativeStackSize <+> text "stack words." <+>
+mkNativeCallInfoSig :: Platform -> NativeCallInfo -> Word32
+mkNativeCallInfoSig platform NativeCallInfo{..}
+  | nativeCallType == NativeTupleReturn && nativeCallStackSpillSize > maxTupleReturnNativeStackSize
+  = pprPanic "mkNativeCallInfoSig: tuple too big for the bytecode compiler"
+             (ppr nativeCallStackSpillSize <+> text "stack words." <+>
               text "Use -fobject-code to get around this limit"
              )
   | otherwise
-  = assert (length regs <= 24) {- 24 bits for bitmap -}
-    assert (tupleNativeStackSize < 255) {- 8 bits for stack size -}
-    assert (all (`elem` regs) (regSetToList tupleRegs)) {- all regs accounted for -}
-    foldl' reg_bit 0 (zip regs [0..]) .|.
-      (fromIntegral tupleNativeStackSize `shiftL` 24)
+  = assertPpr (length regs <= 24) (text "too many registers for bitmap:" <+> ppr (length regs)) {- 24 bits for register bitmap -}
+    assertPpr (cont_offset < 255) (text "continuation offset too large:" <+> ppr cont_offset) {- 8 bits for continuation offset (only for NativeTupleReturn) -}
+    assertPpr (all (`elem` regs) (regSetToList nativeCallRegs)) (text "not all registers accounted for") {- all regs accounted for -}
+    foldl' reg_bit 0 (zip regs [0..]) .|. (cont_offset `shiftL` 24)
   where
+    cont_offset :: Word32
+    cont_offset
+      | nativeCallType == NativeTupleReturn = fromIntegral nativeCallStackSpillSize
+      | otherwise                           = 0 -- there is no continuation for primcalls
+
     reg_bit :: Word32 -> (GlobalReg, Int) -> Word32
     reg_bit x (r, n)
-      | r `elemRegSet` tupleRegs = x .|. 1 `shiftL` n
-      | otherwise                = x
-    regs = tupleRegsCover platform
+      | r `elemRegSet` nativeCallRegs = x .|. 1 `shiftL` n
+      | otherwise                     = x
+    regs = allArgRegsCover platform
 
-mkTupleInfoLit :: Platform -> TupleInfo -> Literal
-mkTupleInfoLit platform tuple_info =
-  mkLitWord platform . fromIntegral $ mkTupleInfoSig platform tuple_info
+mkNativeCallInfoLit :: Platform -> NativeCallInfo -> Literal
+mkNativeCallInfoLit platform call_info =
+  mkLitWord platform . fromIntegral $ mkNativeCallInfoSig platform call_info
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the

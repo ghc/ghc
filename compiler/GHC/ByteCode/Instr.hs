@@ -88,7 +88,7 @@ data BCInstr
    | PUSH_ALTS          (ProtoBCO Name)
    | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
    | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
-                        !TupleInfo
+                        !NativeCallInfo
                         (ProtoBCO Name) -- tuple return BCO
 
    -- Pushing 8, 16 and 32 bits of padding (for constructors).
@@ -169,6 +169,8 @@ data BCInstr
                                 --
                                 -- (XXX: inefficient, but I don't know
                                 -- what the alignment constraints are.)
+
+   | PRIMCALL
 
    -- For doing magic ByteArray passing to foreign calls
    | SWIZZLE          Word16 -- to the ptr N words down the stack,
@@ -255,8 +257,8 @@ instance Outputable BCInstr where
 
    ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
    ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
-   ppr (PUSH_ALTS_TUPLE bco tuple_info tuple_bco) =
-                               hang (text "PUSH_ALTS_TUPLE" <+> ppr tuple_info)
+   ppr (PUSH_ALTS_TUPLE bco call_info tuple_bco) =
+                               hang (text "PUSH_ALTS_TUPLE" <+> ppr call_info)
                                     2
                                     (ppr tuple_bco $+$ ppr bco)
 
@@ -311,6 +313,7 @@ instance Outputable BCInstr where
                                                       0x1 -> text "(interruptible)"
                                                       0x2 -> text "(unsafe)"
                                                       _   -> empty)
+   ppr PRIMCALL              = text "PRIMCALL"
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
@@ -353,11 +356,11 @@ bciStackUse (PUSH_ALTS bco)       = 2 {- profiling only, restore CCCS -} +
 bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 {- profiling only, restore CCCS -} +
                                          4 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
-   -- (tuple_bco, tuple_info word, cont_bco, stg_ctoi_t)
+   -- (tuple_bco, call_info word, cont_bco, stg_ctoi_t)
    -- tuple
-   -- (tuple_info, tuple_bco, stg_ret_t)
+   -- (call_info, tuple_bco, stg_ret_t)
    1 {- profiling only -} +
-   7 + fromIntegral (tupleSize info) + protoBCOStackUse bco
+   7 + fromIntegral (nativeCallSize info) + protoBCOStackUse bco
 bciStackUse (PUSH_PAD8)           = 1  -- overapproximation
 bciStackUse (PUSH_PAD16)          = 1  -- overapproximation
 bciStackUse (PUSH_PAD32)          = 1  -- overapproximation on 64bit arch
@@ -399,6 +402,7 @@ bciStackUse RETURN{}              = 0
 bciStackUse RETURN_UNLIFTED{}     = 1 -- pushes stg_ret_X for some X
 bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
+bciStackUse PRIMCALL{}            = 1 -- pushes stg_primcall
 bciStackUse SWIZZLE{}             = 0
 bciStackUse BRK_FUN{}             = 0
 
