@@ -1136,6 +1136,8 @@ data CollectFlag p where
     CollNoDictBinders   :: CollectFlag p
     -- | Collect evidence binders
     CollWithDictBinders :: CollectFlag GhcTc
+    -- | Collect variable and type variable binders, but no evidence binders
+    CollVarTyVarBinders :: CollectFlag GhcRn
 
 collect_lpat :: forall p. CollectPass p
              => CollectFlag p
@@ -1171,6 +1173,63 @@ collect_pat flag pat bndrs = case pat of
     CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
     CollWithDictBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
                            ++ collectEvBinders (cpt_binds (pat_con_ext pat))
+    CollVarTyVarBinders ->
+      let { unwrapTyArg (HsConPatTyArg _ t) = hsps_body t
+          ; bndrs'  = foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
+          ; bndrs'' = foldr (collect_ltypat . unwrapTyArg) bndrs' (hsConPatTyArgs ps)
+          } in bndrs''
+
+collect_ltypat :: LHsType GhcRn -> [Name] -> [Name]
+collect_ltypat ltypat = collect_typat (unLoc ltypat)
+
+collect_typat :: HsType GhcRn -> [Name] -> [Name]
+collect_typat typat bndrs = case typat of
+  HsTyVar _ _ (L _ name)
+    | isTyVarName name -> name : bndrs
+    | otherwise        -> bndrs
+  HsParTy _ t             -> collect_ltypat t bndrs
+  HsWildCardTy _          -> bndrs
+  HsAppTy _ t1 t2         -> collect_ltypat t1 (collect_ltypat t2 bndrs)
+  HsAppKindTy _ t1 _ t2   -> collect_ltypat t1 (collect_ltypat t2 bndrs)
+  HsOpTy _ _ t1 op t2     -> unLoc op : collect_ltypat t1 (collect_ltypat t2 bndrs)
+  HsQualTy _ (L _ ts) t   -> foldr collect_ltypat (collect_ltypat t bndrs) ts
+  HsFunTy _ arr t1 t2     -> collect_arr arr (collect_ltypat t1 (collect_ltypat t2 bndrs))
+  HsListTy _ t            -> collect_ltypat t bndrs
+  HsTupleTy _ _ ts        -> foldr collect_ltypat bndrs ts
+  HsSumTy _ ts            -> foldr collect_ltypat bndrs ts
+  HsExplicitListTy _ _ ts -> foldr collect_ltypat bndrs ts
+  HsExplicitTupleTy _ ts  -> foldr collect_ltypat bndrs ts
+  HsStarTy _ _            -> bndrs
+  HsKindSig _ t _         ->
+    -- Do not collect variables in the sig: they are usages, not bindings.
+    -- See ghc-proposals/pull/556
+    collect_ltypat t bndrs
+  HsForAllTy _ _ t        ->
+    -- Discard the telescope since it does not affect what variables are bound.
+    -- Consider:
+    --    f (MkT @(forall a. Maybe a)) = rhs
+    -- The "a" in "Maybe a" is *not* forall-bound, it is its own binding
+    -- that scopes outside the forall.
+    collect_ltypat t bndrs
+  HsBangTy _ _ t          -> collect_ltypat t bndrs
+  HsDocTy _ t _           -> collect_ltypat t bndrs
+  HsIParamTy _ _ t        -> collect_ltypat t bndrs
+  HsTyLit _ _             -> bndrs
+  HsSpliceTy _ _          -> bndrs    -- FIXME (int-index): reconsider after fixing the fSpliceTy example
+  HsRecTy{} ->
+    -- Not valid syntax in type patterns, but we need to return something
+    -- instead of panicking to let the type error (generated elsewhere) propagate.
+    bndrs
+  XHsType{} ->
+    -- XHsType at GhcRn is only produced by deriving, which never generates type patterns,
+    -- so this case is unreachable at the moment.
+    panic "collect_typat: XHsType"
+
+  where
+    collect_arr :: HsArrow GhcRn -> [Name] -> [Name]
+    collect_arr (HsUnrestrictedArrow _) = id
+    collect_arr (HsLinearArrow _) = id
+    collect_arr (HsExplicitMult _ t _) = collect_ltypat t
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs

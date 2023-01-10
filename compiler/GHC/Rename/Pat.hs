@@ -53,7 +53,8 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier )
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier
+                           , bindLocalNamesFV )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 import GHC.Types.Avail ( greNameMangledName )
@@ -75,8 +76,11 @@ import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, unless )
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Writer.CPS
 import Data.Foldable
 import Data.Functor.Identity ( Identity (..) )
+import qualified Data.Semigroup as S
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
@@ -144,6 +148,14 @@ wrapSrcSpanCps fn (L loc a)
   = CpsRn (\k -> setSrcSpanA loc $
                  unCpsRn (fn a) $ \v ->
                  k (L loc v))
+
+wrapSrcSpanWriterCps :: Monoid w => (a -> WriterT w CpsRn b) -> LocatedAn ann a -> WriterT w CpsRn (LocatedAn ann b)
+wrapSrcSpanWriterCps fn (L loc a) =
+  mapWriterT
+    (\m -> CpsRn (\k -> setSrcSpanA loc $
+                        unCpsRn m $ \(v, acc) ->
+                        k (L loc v, acc)))
+    (fn a)
 
 lookupConCps :: LocatedN RdrName -> CpsRn (LocatedN Name)
 lookupConCps con_rdr
@@ -424,7 +436,7 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See Note [Don't report shadowing for pattern synonyms]
-        ; let bndrs = collectPatsBinders CollNoDictBinders (toList pats')
+        ; let bndrs = collectPatsBinders CollVarTyVarBinders (toList pats')
         ; addErrCtxt doc_pat $
           if isPatSynCtxt ctxt
              then checkDupNames bndrs
@@ -649,7 +661,7 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
                     <+> quotes (ppr tyarg))
                2 (text "Perhaps you intended to use TypeAbstractions")
     rnConPatTyArg (HsConPatTyArg at t) = do
-      t' <- liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
+      t' <- rnHsTyPat t
       return (HsConPatTyArg at t')
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
@@ -711,6 +723,140 @@ rnHsRecPatsAndThen mk (L _ con)
     nested_mk (Just (unLoc -> n)) (LamMk report_unused) n'
       = LamMk (report_unused && (n' <= n))
 
+{- *********************************************************************
+*                                                                      *
+                         Type patterns
+*                                                                      *
+********************************************************************* -}
+
+data TyPatVarsAccum =
+  TyPatVarsAccum {
+    tpv_acc_nwcs    :: [Name] -> [Name], -- ^ Wildcard names
+    tpv_acc_exp_tvs :: [Name] -> [Name], -- ^ Explicitly bound variable names
+    tpv_acc_imp_tvs :: [Name] -> [Name]  -- ^ Implicitly bound variable names
+  }
+
+instance Semigroup TyPatVarsAccum where
+  TyPatVarsAccum a1 b1 c1 <> TyPatVarsAccum a2 b2 c2 =
+    TyPatVarsAccum (a1 S.<> a2) (b1 S.<> b2) (c1 S.<> c2)
+
+instance Monoid TyPatVarsAccum where
+  mempty = TyPatVarsAccum id id id
+
+tpv_HsPSRn :: TyPatVarsAccum -> HsPSRn
+tpv_HsPSRn (TyPatVarsAccum nwcs_acc exp_tvs_acc imp_tvs_acc) =
+  HsPSRn (nwcs_acc []) (exp_tvs_acc (imp_tvs_acc []))
+
+tpv_exp_tv :: Name -> TyPatVarsAccum
+tpv_exp_tv tv = mempty { tpv_acc_exp_tvs = (tv:) }
+
+tpv_sig_tvs :: HsPSRn -> TyPatVarsAccum
+tpv_sig_tvs (HsPSRn nwcs imp_tvs) =
+  mempty { tpv_acc_nwcs    = (nwcs++)
+         , tpv_acc_imp_tvs = (imp_tvs++) }
+
+rnHsTyPat :: HsPatSigType GhcPs -> CpsRn (HsPatSigType GhcRn)
+rnHsTyPat (HsPS _ hs_top_ty) =
+  do { (hs_top_ty', tpv_acc) <- runWriterT (go_lty hs_top_ty)
+     ; return (HsPS (tpv_HsPSRn tpv_acc) hs_top_ty') }
+  where
+    go_lty :: LHsType GhcPs -> WriterT TyPatVarsAccum CpsRn (LHsType GhcRn)
+    go_lty = wrapSrcSpanWriterCps go_ty
+
+    go_ty :: HsType GhcPs -> WriterT TyPatVarsAccum CpsRn (HsType GhcRn)
+    go_ty (HsTyVar _ prom lrdr) =
+      fmap (\lnm -> HsTyVar noAnn prom lnm)
+           (go_name prom lrdr)
+    go_ty (HsParTy _ t) =
+      do { t' <- go_lty t
+         ; return (HsParTy noAnn t') }
+    go_ty (HsWildCardTy _) = return (HsWildCardTy noExtField)
+    go_ty (HsAppTy _ ty1 ty2) =
+      do { ty1' <- go_lty ty1
+         ; ty2' <- go_lty ty2
+         ; return (HsAppTy noExtField ty1' ty2') }
+    go_ty (HsAppKindTy _ ty1 at ty2) =
+      do { ty1' <- go_lty ty1
+         ; ty2' <- go_lty ty2
+         ; return (HsAppKindTy noExtField ty1' at ty2') }
+    go_ty (HsOpTy _ prom ty1 op ty2) =
+      do { op' <- go_name prom op
+         ; ty1' <- go_lty ty1
+         ; ty2' <- go_lty ty2
+         ; return (HsOpTy noAnn prom ty1' op' ty2') }
+         -- FIXME (int-index): check operator fixity
+    go_ty (HsQualTy _ lctx t) =
+      do { lctx' <- wrapSrcSpanWriterCps (mapM go_lty) lctx
+         ; t' <- go_lty t
+         ; return (HsQualTy noExtField lctx' t') }
+    go_ty (HsFunTy u mult ty1 ty2) =
+      do { mult' <- go_arr mult
+         ; ty1' <- go_lty ty1
+         ; ty2' <- go_lty ty2
+         ; return (HsFunTy u mult' ty1' ty2') }
+    go_ty (HsListTy x t) =
+      do { t' <- go_lty t
+         ; return (HsListTy x t') }
+    go_ty (HsTupleTy x tup_con ts) =
+      do { ts' <- mapM go_lty ts
+         ; return (HsTupleTy x tup_con ts') }
+    go_ty (HsSumTy x ts) =
+      do { ts' <- mapM go_lty ts
+         ; return (HsSumTy x ts') }
+    go_ty (HsExplicitListTy _ prom ts) =
+      do { ts' <- mapM go_lty ts
+         ; return (HsExplicitListTy noExtField prom ts') }
+    go_ty (HsExplicitTupleTy _ ts) =
+      do { ts' <- mapM go_lty ts
+         ; return (HsExplicitTupleTy noExtField ts') }
+    go_ty (HsStarTy _ isUni) = return (HsStarTy noExtField isUni)
+    go_ty (HsKindSig x t k) =
+      do { k' <- go_lksig k
+         ; t' <- go_lty t
+         ; return (HsKindSig x t' k') }
+    go_ty (HsForAllTy _ _ _) = panic "rnHsTyPat: HsForAllTy"
+    go_ty (HsBangTy _ _ _) = panic "rnHsTyPat: HsBangTy"
+    go_ty (HsDocTy _ _ _) = panic "rnHsTyPat: HsDocTy"
+    go_ty (HsIParamTy x n t) =
+      do { t' <- go_lty t
+         ; return (HsIParamTy x n t') }
+    go_ty (HsTyLit src lit) = return (HsTyLit src (rnHsTyLit lit))
+    go_ty (HsSpliceTy _ _) = panic "rnHsTyPat: HsSpliceTy"
+    go_ty HsRecTy{} = panic "rnHsTyPat: HsRecTy"
+    go_ty XHsType{} =
+      -- XHsType at GhcRn is only produced by deriving, which never generates type patterns,
+      -- so this case is unreachable at the moment.
+      panic "rnHsTyPat: XHsType"
+
+    go_lksig :: LHsKind GhcPs -> WriterT TyPatVarsAccum CpsRn (LHsKind GhcRn)
+    go_lksig k =
+      do { sig' <- lift $ liftCpsWithCont $ rnHsPatSigType AlwaysBind PatCtx (HsPS noAnn k)
+         ; let !(HsPS x k') = sig'
+         ; writer (k', tpv_sig_tvs x) }
+
+    go_name :: PromotionFlag -> LIdP GhcPs -> WriterT TyPatVarsAccum CpsRn (LIdP GhcRn)
+    go_name _ lrdr
+      | isRdrTyVar (unLoc lrdr) = go_var lrdr    -- Type variable binding
+      | otherwise = lift $ liftCpsFV $           -- Type constructor usage
+          do { lnm@(L _ nm) <- rnLTyVar lrdr
+             ; return (lnm, unitFV nm) }
+
+    go_var :: LIdP GhcPs -> WriterT TyPatVarsAccum CpsRn (LIdP GhcRn)
+    go_var lrdr =
+      writerT $ liftCpsWithCont $ \thing_inside ->
+            do { nm <- newTyVarNameRn Nothing lrdr
+               ; let lnm = L (getLoc lrdr) nm
+               ; bindLocalNamesFV [nm] $
+                 thing_inside (lnm, tpv_exp_tv nm)
+               }
+
+    go_arr :: HsArrow GhcPs -> WriterT TyPatVarsAccum CpsRn (HsArrow GhcRn)
+    go_arr (HsUnrestrictedArrow arr) = return (HsUnrestrictedArrow arr)
+    go_arr (HsLinearArrow (HsPct1 pct1 arr)) = return (HsLinearArrow (HsPct1 pct1 arr))
+    go_arr (HsLinearArrow (HsLolly arr)) = return (HsLinearArrow (HsLolly arr))
+    go_arr (HsExplicitMult pct p arr) =
+      do { p' <- go_lty p
+         ; return (HsExplicitMult pct p' arr) }
 
 {- *********************************************************************
 *                                                                      *

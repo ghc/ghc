@@ -28,7 +28,7 @@ module GHC.Hs.Pat (
         HsPatExpansion(..),
         XXPatGhcTc(..),
 
-        HsConPatDetails, hsConPatArgs,
+        HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
         HsConPatTyArg(..),
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,

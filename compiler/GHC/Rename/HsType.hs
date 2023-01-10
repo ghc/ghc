@@ -14,12 +14,13 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
+        rnHsSigType, rnHsWcType,
         HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
         lookupField,
         rnLTyVar,
+        rnHsTyLit,
 
         rnScaledLHsType,
 
@@ -81,8 +82,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List (nubBy, partition)
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
 
 {-
@@ -184,57 +183,6 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
-
--- Similar to rnHsWcType, but rather than requiring free variables in the type to
--- already be in scope, we are going to require them not to be in scope,
--- and we bind them.
-rnHsPatSigTypeBindingVars :: HsDocContext
-                          -> HsPatSigType GhcPs
-                          -> (HsPatSigType GhcRn -> RnM (r, FreeVars))
-                          -> RnM (r, FreeVars)
-rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
-  (HsPS { hsps_body = hs_ty }) -> do
-    rdr_env <- getLocalRdrEnv
-    let (varsInScope, varsNotInScope) =
-          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty)
-    -- TODO: Resolve and remove this comment.
-    -- This next bit is in some contention. The original proposal #126
-    -- (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0126-type-applications-in-patterns.rst)
-    -- says that in-scope variables are fine here: don't bind them, just use
-    -- the existing vars, like in type signatures. An amendment #291
-    -- (https://github.com/ghc-proposals/ghc-proposals/pull/291) says that the
-    -- use of an in-scope variable should *shadow* an in-scope tyvar, like in
-    -- terms. In an effort to make forward progress, the current implementation
-    -- just rejects any use of an in-scope variable, meaning GHC will accept
-    -- a subset of programs common to both variants. If this comment still exists
-    -- in mid-to-late 2021 or thereafter, we have done a poor job on following
-    -- up on this point.
-    -- Example:
-    --   f :: forall a. ...
-    --   f (MkT @a ...) = ...
-    -- Should the inner `a` refer to the outer one? shadow it? We are, as yet, undecided,
-    -- so we currently reject.
-    when (not (null varsInScope)) $
-      addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-        vcat
-          [ text "Type variable" <> plural varsInScope
-            <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
-            <+> isOrAre varsInScope
-            <+> text "already in scope."
-          , text "Type applications in patterns must bind fresh variables, without shadowing."
-          ]
-    (wcVars, ibVars) <- partition_nwcs varsNotInScope
-    rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
-      (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
-      let sig_ty = HsPS
-            { hsps_body = hs_ty'
-            , hsps_ext = HsPSRn
-              { hsps_nwcs    = wcVars'
-              , hsps_imp_tvs = ibVars'
-              }
-            }
-      (res, fvs') <- thing_inside sig_ty
-      return (res, fvs `plusFV` fvs')
 
 rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
@@ -431,34 +379,6 @@ As a result, we make the `SrcSpan`s for `a` and `b` span the entirety of the
 type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
-
--- | Create fresh type variables for binders, disallowing multiple occurrences of the same variable. Similar to `rnImplicitTvOccs` except that duplicate occurrences will
--- result in an error, and the source locations of the variables are not adjusted, as these variable occurrences are themselves the binding sites for the type variables,
--- rather than the variables being implicitly bound by a signature.
-rnImplicitTvBndrs :: HsDocContext
-                  -> Maybe assoc
-                  -- ^ @'Just' _@ => an associated type decl
-                  -> FreeKiTyVars
-                  -- ^ Surface-syntax free vars that we will implicitly bind.
-                  -- Duplicate variables will cause a compile-time error regarding repeated bindings.
-                  -> ([Name] -> RnM (a, FreeVars))
-                  -> RnM (a, FreeVars)
-rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (NE.groupAllWith unLoc $ implicit_vs_with_dups) $ \case
-           (x :| []) -> return x
-           (x :| _) -> do
-             let msg = mkTcRnUnknownMessage $ mkPlainError noHints $
-                   text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
-             addErr msg
-             return x
-
-       ; traceRn "rnImplicitTvBndrs" $
-         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
-
-       ; vars <- mapM (newTyVarNameRn mb_assoc) implicit_vs
-
-       ; bindLocalNamesFV vars $
-         thing_inside vars }
 
 {- ******************************************************
 *                                                       *
