@@ -116,12 +116,10 @@ In both cases ``e`` is evaluated before starting to evaluate ``body``.
 
 Note the following points:
 
-- This form is not the same as a bang pattern:
-  The declarations ``f3 (x,y) = ...`` and ``f4 !(x,y) = ....``
-  are equivalent (because the constructor pattern ``(x,y)`` forces the argument),
-  but the expressions ``let (p,q) = e in body`` and ``let !(p,q) = e in body``
-  are different. The former will not evaluate ``e`` unless
-  ``p`` or ``q`` is forced in ``body``.
+- A strict binding (with a top level ``!``) should not be thought of as a regular
+  pattern binding that happens to have a bang pattern (:ref:`bang-patterns-informal`) on the LHS.
+  Rather, the top level ``!`` should be considered part of the let-binding, rather than
+  part of the pattern.  This makes a difference when we come to the rules in :ref:`bang-patterns-sem`.
 
 - Only a top-level bang (perhaps under parentheses) makes the binding strict; otherwise,
   it is considered a normal bang pattern. For example, ::
@@ -354,8 +352,8 @@ Dynamic semantics of bang patterns
 ----------------------------------
 
 The semantics of Haskell pattern matching is described in `Section
-3.17.2 <https://www.haskell.org/onlinereport/exps.html#sect3.17.2>`__ of
-the Haskell Report. To this description add one extra item 10, saying:
+3.17.2 <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-610003.17.2>`__ of
+the Haskell Report. To this description add one extra item 9, saying:
 
 -  Matching the pattern ``!pat`` against a value ``v`` behaves as
    follows:
@@ -365,8 +363,8 @@ the Haskell Report. To this description add one extra item 10, saying:
    -  otherwise, ``pat`` is matched against ``v``
 
 Similarly, in Figure 4 of `Section
-3.17.3 <https://www.haskell.org/onlinereport/exps.html#sect3.17.3>`__,
-add a new case (t): ::
+3.17.3 <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-440003.12>`__,
+add a new case (w): ::
 
     case v of { !pat -> e; _ -> e' }
        = v `seq` case v of { pat -> e; _ -> e' }
@@ -377,20 +375,62 @@ Haskell Report.
 Replace the "Translation" there with the following one.  Given
 ``let { bind1 ... bindn } in body``:
 
-.. admonition:: FORCE
+.. admonition:: SPLIT-LAZY
 
-    Replace any binding ``!p = e`` with ``v = case e of p -> (x1, ..., xn); (x1, ..., xn) = v`` and replace
-    ``body`` with ``v seq body``, where ``v`` is fresh. This translation works fine if
-    ``p`` is already a variable ``x``, but can obviously be optimised by not
-    introducing a fresh variable ``v``.
+    Given a lazy pattern binding ``p = e``, where ``p`` is not a variable,
+    and ``x1...xn`` are the variables bound by ``p``,
+    and all these binders have lifted type,
+    replace the binding with this (where ``v`` is fresh)::
 
-.. admonition:: SPLIT
+       v = case e of { p -> (x1, ..., xn) }
+       x1 = case v of { (x1, ..., xn) -> x1 }
+       ...
+       xn = case v of { (x1, ..., xn) -> xn }``
 
-    Replace any binding ``p = e``, where ``p`` is not a variable, with
-    ``v = e; x1 = case v of p -> x1; ...; xn = case v of p -> xn``, where
-    ``v`` is fresh and ``x1``.. ``xn`` are the bound variables of ``p``.
-    Again if ``e`` is a variable, this can be optimised by not introducing a
-    fresh variable.
+    If n=1 (i.e. exactly one variable is bound),
+    the desugaring uses the ``Solo`` type to make a 1-tuple.
+
+.. admonition:: SPLIT-STRICT
+
+    Given a strict pattern binding ``!p = e``, where
+    ``x1...xn`` are the variables bound by ``p``,
+    and all these binders have lifted type:
+
+    1. Replace the binding with this (where ``v`` is fresh)::
+
+          v = case e of { !p -> (x1, ..., xn) }
+          (x1, ..., xn) = v
+
+    2. Replace ``body`` with ``v `seq` body``.
+
+    As in SPLIT-LAZY, if n=1 the desugaring uses the ``Solo`` type to make a 1-tuple.
+
+    This transformation is illegal at the top
+    level of a module (since there is no ``body``), so strict bindings are illegal at top level.
+
+    The transformation is correct when ``p`` is a variable ``x``, but can be optimised to::
+
+       let !x = e in body  ==>   let x = e in x `seq` body
+
+.. admonition:: CASE
+
+    Given a non-recursive strict pattern binding ``!p = e``,
+    where ``x1...xn`` are the variables bound by ``p``,
+    and any of the binders has unlifted type:
+    replace the binding with nothing at all, and replace
+    ``body`` with ``case e of p -> body``.
+
+    This transformation is illegal at the top
+    level of a module, so such bindings are rejected.
+
+    The result of this transformation is ill-scoped if any of the binders
+    ``x1...xn`` appears in ``e``; hence the restriction to non-recursive pattern bindings.
+
+    Exactly the same transformation applies to a non-recursive lazy pattern binding
+    (i.e. one lacking a top-level ``!``) that binds any unlifted variables; but
+    such a binding emits a warning :ghc-flag:`-Wunbanged-strict-patterns`. The
+    warning encourages the programmer to make visible the fact that this binding
+    is necessarily strict.
 
 The result will be a (possibly) recursive set of bindings, binding
 only simple variables on the left hand side. (One could go one step
@@ -412,56 +452,106 @@ Here is a simple non-recursive case: ::
         !x = factorial y
     in body
 
-    ===> (FORCE)
-        let x = factorial y in x `seq` body
+    ===> (SPLIT-STRICT)
+         let x = factorial y in x `seq` body
 
     ===> (inline seq)
-        let x = factorial y in case x of x -> body
+         let x = factorial y in case x of !x -> body
 
     ===> (inline x)
-        case factorial y of x -> body
+         case factorial y of !x -> body
 
 Same again, only with a pattern binding: ::
 
-    let !(Just x, Left y) = e in body
+    let !(Just x) = e in body
 
-    ===> (FORCE)
-        let v = case e of (Just x, Left y) -> (x,y)
-            (x,y) = v
-        in v `seq` body
+    ===> (SPLIT-STRICT)
+         let v = case e of !(Just x) -> Solo x
+             Solo x = v
+         in v `seq` body
 
-    ===> (SPLIT)
-        let v = case e of (Just x, Left y) -> (x,y)
-            x = case v of (x,y) -> x
-            y = case v of (x,y) -> y
-        in v `seq` body
+    ===> (SPLIT-LAZY, drop redundant bang)
+         let v = case e of Just x -> Solo x
+             x = case v of Solo x -> x
+         in v `seq` body
 
     ===> (inline seq, float x,y bindings inwards)
-        let v = case e of (Just x, Left y) -> (x,y)
-        in case v of v -> let x = case v of (x,y) -> x
-                              y = case v of (x,y) -> y
-                          in body
+         let v = case e of Just x -> Solo x
+         in case v of !v -> let x = case v of Solo x -> x
+                            in body
 
     ===> (fluff up v's pattern; this is a standard Core optimisation)
-        let v = case e of (Just x, Left y) -> (x,y)
-        in case v of v@(p,q) -> let x = case v of (x,y) -> x
-                                    y = case v of (x,y) -> y
-                                in body
+         let v = case e of Just x -> Solo x
+         in case v of v@(Solo p) -> let x = case v of Solo x -> x
+                                    in body
 
     ===> (case of known constructor)
-        let v = case e of (Just x, Left y) -> (x,y)
-        in case v of v@(p,q) -> let x = p
-                                    y = q
-                                in body
+         let v = case e of Just x -> Solo x
+         in case v of v@(Solo p) -> let x = p
+                                    in body
 
-    ===> (inline x,y, v)
-        case (case e of (Just x, Left y) -> (x,y) of
-            (p,q) -> body[p/x, q/y]
+    ===> (inline x, v)
+         case (case e of Just x -> Solo x) of
+            Solo p -> body[p/x]
 
     ===> (case of case)
-        case e of (Just x, Left y) -> body[p/x, q/y]
+         case e of Just x -> body[p/x]
 
-The final form is just what we want: a simple case expression.
+The final form is just what we want: a simple case expression.  Notice, crucially,
+that that *pattern* ``Just x`` is forced eagerly, but ``x`` itself is not evaluated
+unless and until ``body`` does so.  Note also that this example uses a pattern
+that binds exactly one variable, and illustrates the use of the ``Solo`` 1-tuple.
+
+Rule (SPLIT-STRICT) applies even if the pattern binds no variables::
+
+    let !(True,False) = e in body
+
+    ===> (SPLIT-STRICT)
+         let v = case e of !(True,False) -> (); () = v in v `seq` body
+
+    ===> (inline, simplify, drop redundant bang)
+         case e of (True,False) -> body
+
+That is, we force ``e`` and check that it has the right form before proceeding with ``body``.
+This happens even if the pattern is itself vacuous::
+
+    let !_ = e in body
+
+    ===> (SPLIT-STRICT)
+         let v = case e of !_ -> (); () = v in v `seq` body
+
+    ===> (inline, simplify)
+         case e of !_ -> body
+
+Again, ``e`` is forced before evaluating ``body``.  This (along with ``!x = e``) is the reason
+that (SPLIT-STRICT) uses a bang-pattern in the ``case`` in the desugared right-hand side.
+
+Note that rule (CASE) applies only when any of the *binders* is unlifted;
+it is irrelevant whether the binding *itself* is unlifted (see
+`GHC proposal #35 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-unbanged-strict-patterns.rst>`__).
+For example (see :ref:`primitives`)::
+
+    let (# a::Int, b::Bool #) = e in body
+    ===> (SPLIT-LAZY)
+        let v = case e of (# a,b #) -> (a,b)
+            a = case v of (a,b) -> a
+            b = case v of (a,b) -> b
+        in body
+
+Even though the tuple pattern is unboxed, it is matched only when ``a`` or ``b`` are evaluated in ``body``.
+
+Here is an example with an unlifted data type::
+
+    type T :: UnliftedType
+    data T = MkT Int
+    f1 x = let MkT y  = blah in body1
+    f2 x = let z :: T = blah in body2
+    f3 x = let _ :: T = blah in body3
+
+In ``f1``, even though ``T`` is an unlifted type, the pattern ``MkT y`` binds a lifted
+variable ``y``, so (SPLIT-LAZY) applies, and ``blah`` is not evaluated until ``body1`` evaluates ``y``.
+In contrast, in ``f2`` the pattern ``z :: T`` binds a variable ``z`` of unlifted type, so (CASE) applies
+and the let-binding is strict.  In ``f3`` the pattern binds no variables, so again it is lazy like ``f1``.
 
 Here is a recursive case ::
 
@@ -469,14 +559,14 @@ Here is a recursive case ::
             !xs = factorial y : xs
     in body
 
-    ===> (FORCE)
-        letrec xs = factorial y : xs in xs `seq` body
+    ===> (SPLIT-STRICT)
+         letrec xs = factorial y : xs in xs `seq` body
 
     ===> (inline seq)
-        letrec xs = factorial y : xs in case xs of xs -> body
+         letrec xs = factorial y : xs in case xs of xs -> body
 
     ===> (eliminate case of value)
-        letrec xs = factorial y : xs in body
+         letrec xs = factorial y : xs in body
 
 and a polymorphic one: ::
 
@@ -484,10 +574,11 @@ and a polymorphic one: ::
         !f = fst (reverse, True)
     in body
 
-    ===> (FORCE)
-        let f = /\a. fst (reverse a, True) in f `seq` body
+    ===> (SPLIT-STRICT)
+         let f = /\a. fst (reverse a, True) in f `seq` body
+
     ===> (inline seq, inline f)
-        case (/\a. fst (reverse a, True)) of f -> body
+         case (/\a. fst (reverse a, True)) of !f -> body
 
 Notice that the ``seq`` is added only in the translation to Core
 If we did it in Haskell source, thus ::
@@ -507,10 +598,10 @@ intuitive: ::
         !f = fst (member, True)
     in body
 
-    ===> (FORCE)
-        let f = /\a \(d::Eq a). fst (member, True) in f `seq` body
+    ===> (SPLIT-STRICT)
+         let f = /\a \(d::Eq a). fst (member, True) in f `seq` body
 
     ===> (inline seq, case of value)
-        let f = /\a \(d::Eq a). fst (member, True) in body
+         let f = /\a \(d::Eq a). fst (member, True) in body
 
 Note that the bang has no effect at all in this case

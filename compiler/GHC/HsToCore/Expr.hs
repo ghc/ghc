@@ -197,7 +197,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; let rhs' = core_wrap (mkOptTickBox tick rhs)
        ; return (bindNonRec fun rhs' body) }
 
-dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
+dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = (ty, _) }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body

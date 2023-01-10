@@ -1,0 +1,30 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 25, types: 10, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+ex1 :: ()
+[GblId, Unf=OtherCon []]
+ex1 = GHC.Tuple.Prim.()
+
+Rec {
+-- RHS size: {terms: 15, types: 5, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker] :: Int -> T
+[GblId, Arity=1, Unf=OtherCon []]
+f = \ (ds :: Int) ->
+      case ds of wild { I# ds1 ->
+      case ds1 of {
+        __DEFAULT -> f (- @Int GHC.Num.$fNumInt wild (GHC.Types.I# 1#));
+        0# -> T22719.T
+      }
+      }
+end Rec }
+
+-- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
+ex2 :: ()
+[GblId]
+ex2 = case f (GHC.Types.I# 10#) of { T -> GHC.Tuple.Prim.() }
+
+
+
