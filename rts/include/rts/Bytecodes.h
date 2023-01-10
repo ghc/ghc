@@ -112,6 +112,8 @@
 #define bci_TESTLT_W8                   85
 #define bci_TESTEQ_W8                   86
 
+#define bci_PRIMCALL                    87
+
 /* If you need to go past 255 then you will run into the flags */
 
 /* If you need to go below 0x0100 then you will run into the instructions */
