@@ -2652,50 +2652,6 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
                                                          d { avx512pf = True }))
 
-     ------ Warning opts -------------------------------------------------
-  , make_ord_flag defFlag "W"       (NoArg (mapM_ setWarningFlag minusWOpts))
-  , make_ord_flag defFlag "Werror"
-               (NoArg (do { setGeneralFlag Opt_WarnIsError
-                          ; mapM_ setFatalWarningFlag minusWeverythingOpts   }))
-  , make_ord_flag defFlag "Wwarn"
-               (NoArg (do { unSetGeneralFlag Opt_WarnIsError
-                          ; mapM_ unSetFatalWarningFlag minusWeverythingOpts }))
-                          -- Opt_WarnIsError is still needed to pass -Werror
-                          -- to CPP; see runCpp in SysTools
-  , make_dep_flag defFlag "Wnot"    (NoArg (upd (\d ->
-                                              d {warningFlags = EnumSet.empty})))
-                                             "Use -w or -Wno-everything instead"
-  , make_ord_flag defFlag "w"       (NoArg (upd (\d ->
-                                              d {warningFlags = EnumSet.empty})))
-
-     -- New-style uniform warning sets
-     --
-     -- Note that -Weverything > -Wall > -Wextra > -Wdefault > -Wno-everything
-  , make_ord_flag defFlag "Weverything"    (NoArg (mapM_
-                                           setWarningFlag minusWeverythingOpts))
-  , make_ord_flag defFlag "Wno-everything"
-                           (NoArg (upd (\d -> d {warningFlags = EnumSet.empty})))
-
-  , make_ord_flag defFlag "Wall"           (NoArg (mapM_
-                                                  setWarningFlag minusWallOpts))
-  , make_ord_flag defFlag "Wno-all"        (NoArg (mapM_
-                                                unSetWarningFlag minusWallOpts))
-
-  , make_ord_flag defFlag "Wextra"         (NoArg (mapM_
-                                                     setWarningFlag minusWOpts))
-  , make_ord_flag defFlag "Wno-extra"      (NoArg (mapM_
-                                                   unSetWarningFlag minusWOpts))
-
-  , make_ord_flag defFlag "Wdefault"       (NoArg (mapM_
-                                               setWarningFlag standardWarnings))
-  , make_ord_flag defFlag "Wno-default"    (NoArg (mapM_
-                                             unSetWarningFlag standardWarnings))
-
-  , make_ord_flag defFlag "Wcompat"        (NoArg (mapM_
-                                               setWarningFlag minusWcompatOpts))
-  , make_ord_flag defFlag "Wno-compat"     (NoArg (mapM_
-                                             unSetWarningFlag minusWcompatOpts))
-
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
   , make_ord_flag defGhcFlag "fplugin-trustworthy"
@@ -2911,11 +2867,6 @@ dynamic_flags_deps = [
       (NoArg enableGlasgowExts) "Use individual extensions instead"
   , make_dep_flag defFlag "fno-glasgow-exts"
       (NoArg disableGlasgowExts) "Use individual extensions instead"
-  , make_ord_flag defFlag "Wunused-binds" (NoArg enableUnusedBinds)
-  , make_ord_flag defFlag "Wno-unused-binds" (NoArg disableUnusedBinds)
-  , make_ord_flag defHiddenFlag "fwarn-unused-binds" (NoArg enableUnusedBinds)
-  , make_ord_flag defHiddenFlag "fno-warn-unused-binds" (NoArg
-                                                            disableUnusedBinds)
 
         ------ Safe Haskell flags -------------------------------------------
   , make_ord_flag defFlag "fpackage-trust"   (NoArg setPackageTrust)
@@ -2938,32 +2889,58 @@ dynamic_flags_deps = [
  ++ map (mkFlag turnOff "dno-"      unSetGeneralFlag  ) dFlagsDeps
  ++ map (mkFlag turnOn  "f"         setGeneralFlag    ) fFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetGeneralFlag  ) fFlagsDeps
- ++ map (mkFlag turnOn  "W"         setWarningFlag    ) wWarningFlagsDeps
- ++ map (mkFlag turnOff "Wno-"      unSetWarningFlag  ) wWarningFlagsDeps
- ++ map (mkFlag turnOn  "Werror="   setWErrorFlag )     wWarningFlagsDeps
- ++ map (mkFlag turnOn  "Wwarn="     unSetFatalWarningFlag )
-                                                        wWarningFlagsDeps
- ++ map (mkFlag turnOn  "Wno-error=" unSetFatalWarningFlag )
-                                                        wWarningFlagsDeps
- ++ map (mkFlag turnOn  "fwarn-"    setWarningFlag   . hideFlag)
-    wWarningFlagsDeps
- ++ map (mkFlag turnOff "fno-warn-" unSetWarningFlag . hideFlag)
-    wWarningFlagsDeps
- ++ [ (NotDeprecated, unrecognisedWarning "W"),
-      (Deprecated,    unrecognisedWarning "fwarn-"),
-      (Deprecated,    unrecognisedWarning "fno-warn-") ]
- ++ [ make_ord_flag defFlag "Werror=compat"
-        (NoArg (mapM_ setWErrorFlag minusWcompatOpts))
-    , make_ord_flag defFlag "Wno-error=compat"
-        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts))
-    , make_ord_flag defFlag "Wwarn=compat"
-        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts)) ]
+ ++
+
+        ------ Warning flags -------------------------------------------------
+  [ make_ord_flag defFlag "W"       (NoArg (setWarningGroup W_extra))
+  , make_ord_flag defFlag "Werror"
+               (NoArg (do { setGeneralFlag Opt_WarnIsError
+                          ; setFatalWarningGroup W_everything }))
+  , make_ord_flag defFlag "Wwarn"
+               (NoArg (do { unSetGeneralFlag Opt_WarnIsError
+                          ; unSetFatalWarningGroup W_everything }))
+                          -- Opt_WarnIsError is still needed to pass -Werror
+                          -- to CPP; see runCpp in SysTools
+  , make_dep_flag defFlag "Wnot"    (NoArg (unSetWarningGroup W_everything))
+                                             "Use -w or -Wno-everything instead"
+  , make_ord_flag defFlag "w"       (NoArg (unSetWarningGroup W_everything))
+  ]
+
+     -- New-style uniform warning sets
+     --
+     -- Note that -Weverything > -Wall > -Wextra > -Wdefault > -Wno-everything
+ ++ warningControls setWarningGroup unSetWarningGroup setWErrorWarningGroup unSetFatalWarningGroup warningGroupsDeps
+ ++ warningControls setWarningFlag unSetWarningFlag setWErrorFlag unSetFatalWarningFlag wWarningFlagsDeps
+
+ ++ [ (NotDeprecated, unrecognisedWarning "W")
+    , (Deprecated,    unrecognisedWarning "fwarn-")
+    , (Deprecated,    unrecognisedWarning "fno-warn-") ]
+
+     ------ Language flags -------------------------------------------------
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
  ++ map (mkFlag turnOff "XNo"       unSetExtensionFlag) xFlagsDeps
  ++ map (mkFlag turnOn  "X"         setLanguage       ) languageFlagsDeps
  ++ map (mkFlag turnOn  "X"         setSafeHaskell    ) safeHaskellFlagsDeps
+
+-- | Warnings have both new-style flags to control their state (@-W@, @-Wno-@,
+-- @-Werror=@, @-Wwarn=@) and old-style flags (@-fwarn-@, @-fno-warn-@).  We
+-- define these uniformly for individual warning flags and groups of warnings.
+warningControls :: (warn_flag -> DynP ()) -- ^ Set the warning
+                -> (warn_flag -> DynP ()) -- ^ Unset the warning
+                -> (warn_flag -> DynP ()) -- ^ Make the warning an error
+                -> (warn_flag -> DynP ()) -- ^ Clear the error status
+                -> [(Deprecation, FlagSpec warn_flag)]
+                -> [(Deprecation, Flag (CmdLineP DynFlags))]
+warningControls set unset set_werror unset_fatal xs =
+    map (mkFlag turnOn  "W"          set             ) xs
+ ++ map (mkFlag turnOff "Wno-"       unset           ) xs
+ ++ map (mkFlag turnOn  "Werror="    set_werror      ) xs
+ ++ map (mkFlag turnOn  "Wwarn="     unset_fatal     ) xs
+ ++ map (mkFlag turnOn  "Wno-error=" unset_fatal     ) xs
+ ++ map (mkFlag turnOn  "fwarn-"     set   . hideFlag) xs
+ ++ map (mkFlag turnOff "fno-warn-"  unset . hideFlag) xs
 
 -- | This is where we handle unrecognised warning flags. We only issue a warning
 -- if -Wunrecognised-warning-flags is set. See #11429 for context.
@@ -3327,6 +3304,11 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnTypeEqualityRequiresOperators,
   warnSpec    Opt_WarnTermVariableCapture
  ]
+
+warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
+warningGroupsDeps = map mk warningGroups
+  where
+    mk g = (NotDeprecated, FlagSpec (warningGroupName g) g nop AllModes)
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
 negatableFlagsDeps :: [(Deprecation, FlagSpec GeneralFlag)]
@@ -4045,12 +4027,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     ]
 
 
-enableUnusedBinds :: DynP ()
-enableUnusedBinds = mapM_ setWarningFlag unusedBindsFlags
-
-disableUnusedBinds :: DynP ()
-disableUnusedBinds = mapM_ unSetWarningFlag unusedBindsFlags
-
 -- | Things you get with `-dlint`.
 enableDLint :: DynP ()
 enableDLint = do
@@ -4243,6 +4219,28 @@ unSetGeneralFlag' f dflags = foldr ($) (gopt_unset dflags f) deps
    --     imply further flags.
 
 --------------------------
+setWarningGroup :: WarningGroup -> DynP ()
+setWarningGroup g =
+    mapM_ setWarningFlag (warningGroupFlags g)
+
+unSetWarningGroup :: WarningGroup -> DynP ()
+unSetWarningGroup g =
+    mapM_ unSetWarningFlag (warningGroupFlags g)
+
+setWErrorWarningGroup :: WarningGroup -> DynP ()
+setWErrorWarningGroup g =
+  do { setWarningGroup g
+     ; setFatalWarningGroup g }
+
+setFatalWarningGroup :: WarningGroup -> DynP ()
+setFatalWarningGroup g =
+    mapM_ setFatalWarningFlag (warningGroupFlags g)
+
+unSetFatalWarningGroup :: WarningGroup -> DynP ()
+unSetFatalWarningGroup g =
+    mapM_ unSetFatalWarningFlag (warningGroupFlags g)
+
+
 setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
 setWarningFlag   f = upd (\dfs -> wopt_set dfs f)
 unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)

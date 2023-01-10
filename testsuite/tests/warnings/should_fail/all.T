@@ -10,6 +10,7 @@ def normalise_whitespace_carefully(s):
 
 test('WerrorFail', normal, compile_fail, [''])
 test('WerrorFail2', normal, compile_fail, [''])
+test('WarningGroups', normal, compile_fail, [''])
 test('CaretDiagnostics1',
      [normalise_whitespace_fun(normalise_whitespace_carefully)],
      compile_fail,
