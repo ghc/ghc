@@ -79,3 +79,7 @@
 /libraries/base/cbits/Win32Utils.c                   @Phyx
 /libraries/base/cbits/consUtils.c                    @Phyx
 /libraries/base/include/winio_structs.h              @Phyx
+
+[CI]
+/.gitlab/                         @chreekat @bgamari @mpickering
+/.gitlab-ci.yml                   @chreekat @bgamari @mpickering
