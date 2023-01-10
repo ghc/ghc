@@ -145,7 +145,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
-import GHC.Unit.Module.Warnings (WarningTxt)
+import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Generics ( Generic )
@@ -410,6 +410,22 @@ data TcRnMessage where
   -}
   TcRnShadowedName :: OccName -> ShadowedNameProvenance -> TcRnMessage
 
+  {-| TcRnInvalidWarningCategory is an error that occurs when a warning is declared
+      with a category name that is not the special category "deprecations", and
+      either does not begin with the prefix "x-" indicating a user-defined
+      category, or contains characters not valid in category names.  See Note
+      [Warning categories] in GHC.Unit.Module.Warnings
+
+      Examples(s):
+        module M {-# WARNING in "invalid" "Oops" #-} where
+
+        {-# WARNING in "x- spaces not allowed" foo "Oops" #-}
+
+     Test cases: warnings/should_fail/WarningCategoryInvalid
+  -}
+  TcRnInvalidWarningCategory :: !WarningCategory -> TcRnMessage
+
+
   {-| TcRnDuplicateWarningDecls is an error that occurs whenever
       a warning is declared twice.
 
@@ -421,7 +437,7 @@ data TcRnMessage where
   -}
   TcRnDuplicateWarningDecls :: !(LocatedN RdrName) -> !RdrName -> TcRnMessage
 
-  {-| TcRnDuplicateWarningDecls is an error that occurs whenever
+  {-| TcRnSimplifierTooManyIterations is an error that occurs whenever
       the constraint solver in the simplifier hits the iterations' limit.
 
       Examples(s):

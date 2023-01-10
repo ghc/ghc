@@ -16,7 +16,6 @@ import GHC.Types.SourceText
 import GHC.Data.StringBuffer
 import qualified GHC.Data.Strict as Strict
 import GHC.Types.Name.Reader
-import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Encoding
 import GHC.Hs.Extension
@@ -180,14 +179,7 @@ validateIdentWith identParser mloc str0 =
                  dopts
                  []
                  False False False False
-      dopts = DiagOpts
-        { diag_warning_flags = EnumSet.empty
-          , diag_fatal_warning_flags = EnumSet.empty
-          , diag_warn_is_error = False
-          , diag_reverse_errors = False
-          , diag_max_errors = Nothing
-          , diag_ppr_ctx = defaultSDocContext
-        }
+      dopts = emptyDiagOpts
       buffer = stringBufferFromByteString str0
       realSrcLc = case mloc of
         RealSrcSpan loc _ -> realSrcSpanStart loc

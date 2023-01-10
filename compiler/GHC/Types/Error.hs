@@ -91,6 +91,7 @@ import GHC.Data.FastString (unpackFS)
 import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
 import GHC.Utils.Panic
+import GHC.Unit.Module.Warnings (WarningCategory)
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
@@ -330,6 +331,8 @@ data DiagnosticReason
   -- ^ Born as a warning.
   | WarningWithFlag !WarningFlag
   -- ^ Warning was enabled with the flag.
+  | WarningWithCategory !WarningCategory
+  -- ^ Warning was enabled with a custom category.
   | ErrorWithoutFlag
   -- ^ Born as an error.
   deriving (Eq, Show)
@@ -338,6 +341,7 @@ instance Outputable DiagnosticReason where
   ppr = \case
     WarningWithoutFlag  -> text "WarningWithoutFlag"
     WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
+    WarningWithCategory cat -> text "WarningWithCategory" <+> ppr cat
     ErrorWithoutFlag    -> text "ErrorWithoutFlag"
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
@@ -510,24 +514,30 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
           flag_msg SevError WarningWithoutFlag = Just (col "-Werror")
           flag_msg SevError (WarningWithFlag wflag) =
             let name = NE.head (warnFlagNames wflag) in
-            Just $ col ("-W" ++ name) <+> warn_flag_grp wflag
+            Just $ col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag)
                                       <> comma
                                       <+> col ("Werror=" ++ name)
+          flag_msg SevError   (WarningWithCategory cat) =
+            Just $ coloured msg_colour (text "-W" <> ppr cat)
+                       <+> warn_flag_grp smallestWarningGroupsForCategory
+                       <> comma
+                       <+> coloured msg_colour (text "-Werror=" <> ppr cat)
           flag_msg SevError   ErrorWithoutFlag   = Nothing
           flag_msg SevWarning WarningWithoutFlag = Nothing
           flag_msg SevWarning (WarningWithFlag wflag) =
             let name = NE.head (warnFlagNames wflag) in
-            Just (col ("-W" ++ name) <+> warn_flag_grp wflag)
+            Just (col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag))
+          flag_msg SevWarning (WarningWithCategory cat) =
+            Just (coloured msg_colour (text "-W" <> ppr cat)
+                      <+> warn_flag_grp smallestWarningGroupsForCategory)
           flag_msg SevWarning ErrorWithoutFlag =
             pprPanic "SevWarning with ErrorWithoutFlag" $
               vcat [ text "locn:" <+> ppr locn
                    , text "msg:" <+> ppr msg ]
 
-          warn_flag_grp flag
-              | show_warn_groups =
-                    case smallestWarningGroups flag of
-                        [] -> empty
-                        groups -> text $ "(in " ++ intercalate ", " (map (("-W"++) . warningGroupName) groups) ++ ")"
+          warn_flag_grp groups
+              | show_warn_groups, not (null groups)
+                          = text $ "(in " ++ intercalate ", " (map (("-W"++) . warningGroupName) groups) ++ ")"
               | otherwise = empty
 
           -- Add prefixes, like    Foo.hs:34: warning:

@@ -295,9 +295,12 @@ rnSrcWarnDecls bndr_set decls'
                    $ concatMap (\(L _ (Warning _ ns _)) -> ns) decls
 
 rnWarningTxt :: WarningTxt GhcPs -> RnM (WarningTxt GhcRn)
-rnWarningTxt (WarningTxt st wst) = do
+rnWarningTxt (WarningTxt mb_cat st wst) = do
+  forM_ mb_cat $ \(L loc cat) ->
+    unless (validWarningCategory cat) $
+      addErrAt loc (TcRnInvalidWarningCategory cat)
   wst' <- traverse (traverse rnHsDoc) wst
-  pure (WarningTxt st wst')
+  pure (WarningTxt mb_cat st wst')
 rnWarningTxt (DeprecatedTxt st wst) = do
   wst' <- traverse (traverse rnHsDoc) wst
   pure (DeprecatedTxt st wst')

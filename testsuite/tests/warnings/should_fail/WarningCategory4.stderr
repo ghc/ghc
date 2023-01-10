@@ -1,0 +1,8 @@
+
+WarningCategory1.hs:7:8: error: [GHC-63394] [-Wx-dangerous (in -Wextended-warnings), -Werror=x-dangerous]
+    In the use of ‘foo’ (imported from WarningCategory1_B):
+    "foo is dangerous"
+
+WarningCategory1.hs:7:13: warning: [GHC-63394] [-Wx-mostly-harmless (in -Wextended-warnings)]
+    In the use of ‘bar’ (imported from WarningCategory1_B):
+    "bar is mostly harmless"

@@ -488,9 +488,65 @@ of ``-W(no-)*``.
 
     Alias for :ghc-flag:`-Wall-missed-specialisations`
 
+.. ghc-flag:: -Wextended-warnings
+    :shortdesc: warn about uses of functions & types that have WARNING or
+        DEPRECATED pragmas, across all categories
+    :type: dynamic
+    :reverse: -Wno-extended-warnings
+    :category:
+
+    :since: 9.8.1
+
+    :default: on
+
+    .. index::
+       pair: deprecations; warnings
+
+    Causes a warning to be emitted when a module, function or type with a
+    ``WARNING`` or ``DEPRECATED`` pragma is used, regardless of the category
+    which may be associated with the pragma. See
+    :ref:`warning-deprecated-pragma` for more details on the pragmas.  This
+    implies :ghc-flag:`-Wdeprecations` and all ``-Wx-⟨category⟩`` flags.
+
+.. ghc-flag:: -Wx-⟨category⟩
+    :shortdesc: warn about uses of functions & types that have WARNING pragmas
+        with the given category
+    :type: dynamic
+    :reverse: -Wno-x-⟨category⟩
+    :category:
+
+    :since: 9.8.1
+
+    :default: on
+
+    .. index::
+       pair: deprecations; warnings
+
+    Causes a warning to be emitted when a module, function or type with a
+    ``WARNING in "x-⟨category⟩"`` pragma is used. See
+    :ref:`warning-deprecated-pragma` for more details on the pragmas.
+
+.. ghc-flag:: -Wdeprecations
+    :shortdesc: warn about uses of functions & types that have DEPRECATED pragmas,
+        or WARNING pragmas with the ``deprecated`` category.
+    :type: dynamic
+    :reverse: -Wno-deprecations
+    :category:
+
+    :default: on
+
+    .. index::
+       pair: deprecations; warnings
+
+    Causes a warning to be emitted when a module, function or type with
+    ``DEPRECATED pragma``, or a ``WARNING`` pragma with the ``deprecated``
+    category, is used. See :ref:`warning-deprecated-pragma` for more details on
+    the pragmas.
+
 .. ghc-flag:: -Wwarnings-deprecations
-    :shortdesc: warn about uses of functions & types that have warnings or
-        deprecated pragmas
+    :shortdesc: warn about uses of functions & types that have DEPRECATED pragmas,
+        or WARNING pragmas with the ``deprecated`` category.
+        Alias for :ghc-flag:`-Wdeprecations`.
     :type: dynamic
     :reverse: -Wno-warnings-deprecations
     :category:
@@ -503,25 +559,9 @@ of ``-W(no-)*``.
        pair: deprecations; warnings
 
     Causes a warning to be emitted when a module, function or type with
-    a ``WARNING`` or ``DEPRECATED pragma`` is used. See
-    :ref:`warning-deprecated-pragma` for more details on the pragmas.
-
-.. ghc-flag:: -Wdeprecations
-    :shortdesc: warn about uses of functions & types that have warnings or
-        deprecated pragmas. Alias for :ghc-flag:`-Wwarnings-deprecations`
-    :type: dynamic
-    :reverse: -Wno-deprecations
-    :category:
-
-    :default: on
-
-    .. index::
-       single: deprecations
-
-    Causes a warning to be emitted when a module, function or type with
-    a ``WARNING`` or ``DEPRECATED pragma`` is used. See
-    :ref:`warning-deprecated-pragma` for more details on the pragmas.
-    An alias for :ghc-flag:`-Wwarnings-deprecations`.
+    ``DEPRECATED pragma``, or a ``WARNING`` pragma with the ``deprecated``
+    category, is used. See :ref:`warning-deprecated-pragma` for more details on
+    the pragmas. An alias for :ghc-flag:`-Wdeprecations`.
 
 .. ghc-flag:: -Wnoncanonical-monad-instances
     :shortdesc: warn when ``Applicative`` or ``Monad`` instances have

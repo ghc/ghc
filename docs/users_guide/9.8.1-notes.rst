@@ -35,6 +35,12 @@ Compiler
 - Fix a bug in TH causing excessive calls to ``setNumCapabilities`` when ``-j`` is greater than ``-N``.
   See GHC ticket #23049.
 
+- ``WARNING`` pragmas may now be annotated with a category, following
+  `GHC proposal #541 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0541-warning-pragmas-with-categories.rst>`_, in which case they are controlled with new
+  ``-Wx-⟨category⟩`` flags rather than :ghc-flag:`-Wdeprecations`.
+  A new warning group :ghc-flag:`-Wextended-warnings` includes all such warnings
+  regardless of category.  See :ref:`warning-deprecated-pragma`.
+
 
 GHCi
 ~~~~

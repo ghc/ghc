@@ -78,7 +78,7 @@ import GHC.Types.Fixity (defaultFixity)
 
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import GHC.Unit.Module
-import GHC.Unit.Module.Warnings  ( pprWarningTxtForMsg )
+import GHC.Unit.Module.Warnings  ( warningTxtCategory, pprWarningTxtForMsg )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
@@ -178,6 +178,11 @@ instance Diagnostic TcRnMessage where
             sep [text "This binding for" <+> quotes (ppr occ)
              <+> text "shadows the existing binding" <> plural shadowed_locs,
                    nest 2 (vcat shadowed_locs)]
+    TcRnInvalidWarningCategory cat
+      -> mkSimpleDecorated $
+           vcat [text "Warning category" <+> quotes (ppr cat) <+> text "is not valid",
+                 text "(user-defined category names must begin with" <+> quotes (text "x-"),
+                 text "and contain only letters, numbers, apostrophes and dashes)" ]
     TcRnDuplicateWarningDecls d rdr_name
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
@@ -1518,6 +1523,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnShadowedName{}
       -> WarningWithFlag Opt_WarnNameShadowing
+    TcRnInvalidWarningCategory{}
+      -> ErrorWithoutFlag
     TcRnDuplicateWarningDecls{}
       -> ErrorWithoutFlag
     TcRnSimplifierTooManyIterations{}
@@ -1799,8 +1806,8 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnSpecialiseNotVisible{}
       -> WarningWithoutFlag
-    TcRnPragmaWarning{}
-      -> WarningWithFlag Opt_WarnWarningsDeprecations
+    TcRnPragmaWarning{pragma_warning_msg}
+      -> WarningWithCategory (warningTxtCategory pragma_warning_msg)
     TcRnIllegalHsigDefaultMethods{}
       -> ErrorWithoutFlag
     TcRnHsigFixityMismatch{}
@@ -2001,6 +2008,8 @@ instance Diagnostic TcRnMessage where
     TcRnIdNotExportedFromLocalSig name
       -> [SuggestAddToHSigExportList name Nothing]
     TcRnShadowedName{}
+      -> noHints
+    TcRnInvalidWarningCategory{}
       -> noHints
     TcRnDuplicateWarningDecls{}
       -> noHints

@@ -431,7 +431,7 @@ rnImportDecl this_mod
     case mi_warns iface of
        WarnAll txt -> do
          let msg = mkTcRnUnknownMessage $
-               mkPlainDiagnostic (WarningWithFlag Opt_WarnWarningsDeprecations)
+               mkPlainDiagnostic (WarningWithCategory (warningTxtCategory txt))
                                  noHints
                                  (moduleWarn imp_mod_name txt)
          addDiagnostic msg
@@ -2213,7 +2213,7 @@ missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
 
 moduleWarn :: ModuleName -> WarningTxt GhcRn -> SDoc
-moduleWarn mod (WarningTxt _ txt)
+moduleWarn mod (WarningTxt _ _ txt)
   = sep [ text "Module" <+> quotes (ppr mod) <> colon,
           nest 2 (vcat (map (ppr . hsDocString . unLoc) txt)) ]
 moduleWarn mod (DeprecatedTxt _ txt)

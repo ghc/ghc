@@ -77,7 +77,7 @@ import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Warnings  ( WarningTxt )
+import GHC.Unit.Module.Warnings  ( WarningTxt(..) )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -1597,7 +1597,7 @@ warnIfDeprecated gre@(GRE { gre_imp = iss })
   | Just imp_spec <- headMaybe iss
   = do { dflags <- getDynFlags
        ; this_mod <- getModule
-       ; when (wopt Opt_WarnWarningsDeprecations dflags &&
+       ; when (wopt_any_custom dflags &&
                not (nameIsLocalOrFrom this_mod name)) $
                    -- See Note [Handling of deprecations]
          do { iface <- loadInterfaceForName doc name
