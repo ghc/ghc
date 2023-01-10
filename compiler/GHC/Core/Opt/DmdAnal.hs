@@ -41,7 +41,6 @@ import GHC.Core.Opt.Arity ( typeArity )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.Maybe
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Types.Unique.Set
@@ -1078,9 +1077,8 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
 
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
     DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
-    -- See Note [Boxity for bottoming functions]
-    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id threshold_arity rhs' rhs_div
-                                  `orElse` (rhs_dmds, rhs')
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id threshold_arity
+                                                      rhs_dmds rhs_div rhs'
 
     sig = mkDmdSigForArity threshold_arity (DmdType sig_fv final_rhs_dmds rhs_div)
 
@@ -1259,7 +1257,9 @@ The threshold we use is
 * Ordinary bindings: idArity f.
   Why idArity arguments? Because that's a conservative estimate of how many
   arguments we must feed a function before it does anything interesting with
-  them.  Also it elegantly subsumes the trivial RHS and PAP case.
+  them.  Also it elegantly subsumes the trivial RHS and PAP case.  E.g. for
+      f = g
+  we want to use a threshold arity based on g, not 0!
 
   idArity is /at least/ the number of manifest lambdas, but might be higher for
   PAPs and trivial RHS (see Note [Demand analysis for trivial right-hand sides]).
@@ -1909,21 +1909,37 @@ spendTopBudget m (MkB n bg) = MkB (n-m) bg
 positiveTopBudget :: Budgets -> Bool
 positiveTopBudget (MkB n _) = n >= 0
 
-finaliseArgBoxities :: AnalEnv -> Id -> Arity -> CoreExpr -> Divergence
-                    -> Maybe ([Demand], CoreExpr)
-finaliseArgBoxities env fn arity rhs div
-  | arity > count isId bndrs  -- Can't find enough binders
-  = Nothing  -- This happens if we have   f = g
-             -- Then there are no binders; we don't worker/wrapper; and we
-             -- simply want to give f the same demand signature as g
+finaliseArgBoxities :: AnalEnv -> Id -> Arity
+                    -> [Demand] -> Divergence
+                    -> CoreExpr -> ([Demand], CoreExpr)
+finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
 
-  | otherwise -- NB: arity is the threshold_arity, which might be less than
+  -- Check for an OPAQUE function: see Note [OPAQUE pragma]
+  -- In that case, trim off all boxity info from argument demands
+  -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
+  | isOpaquePragma (idInlinePragma fn)
+  , let trimmed_rhs_dmds = map trimBoxity rhs_dmds
+  = (trimmed_rhs_dmds, add_demands trimmed_rhs_dmds rhs)
+
+  -- Check that we have enough visible binders to match the
+  -- threshold arity; if not, we won't do worker/wrapper
+  -- This happens if we have simply  {f = g} or a PAP {f = h 13}
+  -- we simply want to give f the same demand signature as g
+  -- How can such bindings arise?  Perhaps from {-# NOLINE[2] f #-},
+  -- or if the call to `f` is currently not-applied (map f xs).
+  -- It's a bit of a corner case.  Anyway for now we pass on the
+  -- unadulterated demands from the RHS, without any boxity trimming.
+  | threshold_arity > count isId bndrs
+  = (rhs_dmds, rhs)
+
+  -- The normal case
+  | otherwise -- NB: threshold_arity might be less than
               -- manifest arity for join points
   = -- pprTrace "finaliseArgBoxities" (
     --   vcat [text "function:" <+> ppr fn
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
     --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
-    Just (arg_dmds', add_demands arg_dmds' rhs)
+    (arg_dmds', add_demands arg_dmds' rhs)
     -- add_demands: we must attach the final boxities to the lambda-binders
     -- of the function, both because that's kosher, and because CPR analysis
     -- uses the info on the binders directly.
@@ -1941,7 +1957,7 @@ finaliseArgBoxities env fn arity rhs div
     (remaining_budget, arg_dmds') = go_args (MkB max_wkr_args remaining_budget) arg_triples
 
     arg_triples :: [(Type, StrictnessMark, Demand)]
-    arg_triples = take arity $
+    arg_triples = take threshold_arity $
                   [ (bndr_ty, NotMarkedStrict, get_dmd bndr bndr_ty)
                   | bndr <- bndrs
                   , isRuntimeVar bndr, let bndr_ty = idType bndr ]
@@ -1957,14 +1973,9 @@ finaliseArgBoxities env fn arity rhs div
       | is_bot_fn = unboxDeeplyDmd dmd
         -- See Note [Boxity for bottoming functions], case (B)
 
-      | is_opaque = trimBoxity dmd
-        -- See Note [OPAQUE pragma]
-        -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
-
       | otherwise = dmd
       where
-        dmd       = idDemandInfo bndr
-        is_opaque = isOpaquePragma (idInlinePragma fn)
+        dmd = idDemandInfo bndr
 
     -- is_bot_fn:  see Note [Boxity for bottoming functions]
     is_bot_fn = div == botDiv
@@ -2027,6 +2038,10 @@ finaliseArgBoxities env fn arity rhs div
     add_demands (dmd:dmds) (Lam v e)
       | isTyVar v = Lam v (add_demands (dmd:dmds) e)
       | otherwise = Lam (v `setIdDemandInfo` dmd) (add_demands dmds e)
+    add_demands dmds (Cast e co) = Cast (add_demands dmds e) co
+       -- This case happens for an OPAQUE function, which may look like
+       --     f = (\x y. blah) |> co
+       -- We give it strictness but no boxity (#22502)
     add_demands dmds e = pprPanic "add_demands" (ppr dmds $$ ppr e)
 
 finaliseLetBoxity
