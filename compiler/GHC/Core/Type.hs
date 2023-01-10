@@ -770,7 +770,7 @@ isBoxedRuntimeRep rep = isJust (isBoxedRuntimeRep_maybe rep)
 -- expands to `Boxed lev` and returns `Nothing` otherwise.
 --
 -- Types with this runtime rep are represented by pointers on the GC'd heap.
-isBoxedRuntimeRep_maybe :: RuntimeRepType -> Maybe Type
+isBoxedRuntimeRep_maybe :: RuntimeRepType -> Maybe LevityType
 isBoxedRuntimeRep_maybe rep
   | Just (rr_tc, args) <- splitRuntimeRep_maybe rep
   , rr_tc `hasKey` boxedRepDataConKey

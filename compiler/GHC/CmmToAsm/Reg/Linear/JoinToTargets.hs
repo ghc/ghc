@@ -199,8 +199,7 @@ joinToTargets_again
                         (return ())
                 -}
                 delta           <- getDeltaR
-                fixUpInstrs_    <- mapM (handleComponent delta instr) sccs
-                let fixUpInstrs = concat fixUpInstrs_
+                fixUpInstrs     <- concatMapM (handleComponent delta instr) sccs
 
                 -- make a new basic block containing the fixup code.
                 --      A the end of the current block we will jump to the fixup one,

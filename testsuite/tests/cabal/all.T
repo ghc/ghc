@@ -1,5 +1,5 @@
 def normaliseDynlibNames(str):
-    return re.sub('-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
+    return re.sub(r'-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
 
 def ignore_warnings(str):
     return re.sub(r'Warning:.*\n', '', str)
