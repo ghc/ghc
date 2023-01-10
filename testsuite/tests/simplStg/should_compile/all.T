@@ -11,6 +11,6 @@ setTestOpts(f)
 
 test('T13588', [ grep_errmsg('case') ] , compile, ['-dverbose-stg2stg -fno-worker-wrapper'])
 test('T19717', normal, compile, ['-ddump-stg-final -dsuppress-uniques -dno-typeable-binds'])
-test('inferTags002', [ only_ways(['optasm']), grep_errmsg('(call stg\_ap\_0)', [1])], compile, ['-ddump-cmm -dsuppress-uniques -dno-typeable-binds -O'])
+test('inferTags002', [ only_ways(['optasm']), grep_errmsg(r'(call stg\_ap\_0)', [1])], compile, ['-ddump-cmm -dsuppress-uniques -dno-typeable-binds -O'])
 
 test('T22212', normal, compile, ['-O'])

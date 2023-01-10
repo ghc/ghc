@@ -81,7 +81,6 @@ import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence
@@ -995,19 +994,10 @@ mkOptTickBox = flip (foldr Tick)
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
-       uq <- newUnique
        this_mod <- getModule
-       let bndr1 = mkSysLocal (fsLit "t1") uq OneTy boolTy
-         -- It's always sufficient to pattern-match on a boolean with
-         -- multiplicity 'One'.
-       let
+       let trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)
-           trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)
-       --
-       return $ Case e bndr1 boolTy
-                       [ Alt (DataAlt falseDataCon) [] falseBox
-                       , Alt (DataAlt trueDataCon)  [] trueBox
-                       ]
+       return $ mkIfThenElse e trueBox falseBox
 
 
 

@@ -68,9 +68,7 @@ info for exported values).
 wwTopBinds :: WwOpts -> UniqSupply -> CoreProgram -> CoreProgram
 
 wwTopBinds ww_opts us top_binds
-  = initUs_ us $ do
-    top_binds' <- mapM (wwBind ww_opts) top_binds
-    return (concat top_binds')
+  = initUs_ us $ concatMapM (wwBind ww_opts) top_binds
 
 {-
 ************************************************************************

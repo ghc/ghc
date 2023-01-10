@@ -6,7 +6,7 @@ module GHC.Core.Make (
         mkCoreLet, mkCoreLets,
         mkCoreApp, mkCoreApps, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
-        mkWildValBinder, mkWildEvBinder,
+        mkWildValBinder,
         mkSingleAltCase,
         sortQuantVars, castBottomExpr,
 
@@ -54,7 +54,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Id
-import GHC.Types.Var  ( EvVar, setTyVarUnique, visArgConstraintLike )
+import GHC.Types.Var  ( setTyVarUnique, visArgConstraintLike )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
@@ -172,9 +172,6 @@ mkCoreAppTyped d (fun, fun_ty) arg
               Building case expressions
 *                                                                      *
 ********************************************************************* -}
-
-mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder ManyTy pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
@@ -1082,8 +1079,9 @@ mkImpossibleExpr :: Type -> String -> CoreExpr
 mkImpossibleExpr res_ty str
   = mkRuntimeErrorApp err_id res_ty str
   where    -- See Note [Type vs Constraint for error ids]
-    err_id | isConstraintLikeKind (typeKind res_ty) = iMPOSSIBLE_CONSTRAINT_ERROR_ID
-           | otherwise                              = iMPOSSIBLE_ERROR_ID
+    err_id = case typeTypeOrConstraint res_ty of
+               TypeLike       -> iMPOSSIBLE_ERROR_ID
+               ConstraintLike -> iMPOSSIBLE_CONSTRAINT_ERROR_ID
 
 {- Note [Type vs Constraint for error ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1207,8 +1205,9 @@ mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
 mkAbsentErrorApp res_ty err_msg
   = mkApps (Var err_id) [ Type res_ty, err_string ]
   where
-    err_id | isConstraintLikeKind (typeKind res_ty) = aBSENT_CONSTRAINT_ERROR_ID
-           | otherwise                              = aBSENT_ERROR_ID
+    err_id = case typeTypeOrConstraint res_ty of
+               TypeLike       -> aBSENT_ERROR_ID
+               ConstraintLike -> aBSENT_CONSTRAINT_ERROR_ID
     err_string = Lit (mkLitString err_msg)
 
 absentErrorName, absentConstraintErrorName :: Name
