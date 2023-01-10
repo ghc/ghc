@@ -223,7 +223,7 @@ instance Eq GlobalReg where
    _r1 == _r2 = False
 
 -- NOTE: this Ord instance affects the tuple layout in GHCi, see
---       Note [GHCi tuple layout]
+--       Note [GHCi and native call registers]
 instance Ord GlobalReg where
    compare (VanillaReg i _) (VanillaReg j _) = compare i j
      -- Ignore type when seeking clashes

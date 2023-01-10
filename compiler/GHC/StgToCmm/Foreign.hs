@@ -15,8 +15,8 @@ module GHC.StgToCmm.Foreign (
   emitLoadThreadState,
   emitSaveRegs,
   emitRestoreRegs,
-  emitPushTupleRegs,
-  emitPopTupleRegs,
+  emitPushArgRegs,
+  emitPopArgRegs,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
@@ -349,7 +349,7 @@ emitRestoreRegs = do
 -- bytecode interpreter.
 --
 -- The "live registers" bitmap corresponds to the list of registers given by
--- 'tupleRegsCover', with the least significant bit indicating liveness of
+-- 'allArgRegsCover', with the least significant bit indicating liveness of
 -- the first register in the list.
 --
 -- Each register is saved to a stack slot of one or more machine words, even
@@ -362,12 +362,12 @@ emitRestoreRegs = do
 --    if((mask & 2) != 0) { Sp_adj(-1); Sp(0) = R2; }
 --    if((mask & 1) != 0) { Sp_adj(-1); Sp(0) = R1; }
 --
--- See Note [GHCi tuple layout]
+-- See Note [GHCi and native call registers]
 
-emitPushTupleRegs :: CmmExpr -> FCode ()
-emitPushTupleRegs regs_live = do
+emitPushArgRegs :: CmmExpr -> FCode ()
+emitPushArgRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (tupleRegsCover platform) [0..]
+  let regs = zip (allArgRegsCover platform) [0..]
       save_arg (reg, n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
@@ -381,11 +381,11 @@ emitPushTupleRegs regs_live = do
         in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
   emit . catAGraphs =<< mapM save_arg (reverse regs)
 
--- | Pop a subset of STG registers from the stack (see 'emitPushTupleRegs')
-emitPopTupleRegs :: CmmExpr -> FCode ()
-emitPopTupleRegs regs_live = do
+-- | Pop a subset of STG registers from the stack (see 'emitPushArgRegs')
+emitPopArgRegs :: CmmExpr -> FCode ()
+emitPopArgRegs regs_live = do
   platform <- getPlatform
-  let regs = zip (tupleRegsCover platform) [0..]
+  let regs = zip (allArgRegsCover platform) [0..]
       save_arg (reg, n) =
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
