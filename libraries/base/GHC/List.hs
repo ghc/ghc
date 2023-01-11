@@ -1094,15 +1094,27 @@ span p xs@(x:xs')
 -- ([1,2,3],[])
 --
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
-break                   :: (a -> Bool) -> [a] -> ([a],[a])
+break, break_, break' :: (a -> Bool) -> [a] -> ([a],[a])
 #if defined(USE_REPORT_PRELUDE)
-break p                 =  span (not . p)
+break_ p                 =  span (not . p)
 #else
 -- HBC version (stolen)
-break _ xs@[]           =  (xs, xs)
-break p xs@(x:xs')
-           | p x        =  ([],xs)
-           | otherwise  =  let (ys,zs) = break p xs' in (x:ys,zs)
+break_ _ xs@[]          =  (xs, xs)
+break_ p xs@(x:xs')
+            | p x       =  ([],xs)
+            | otherwise =  let (ys,zs)   = break_ p xs' in (x:ys,zs)
+#endif
+
+break' _ xs@[]          = (xs, xs)
+break' p xs@(x:xs')
+            | p x       = ([], xs)
+	    | otherwise = let !(ys, zs) = break' p xs' in (x:ys, zs)
+
+break = break'
+#if MIN_VERSION_base(4,17,0)
+-- break = break'
+#else
+-- break = break_
 #endif
 
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
