@@ -11,20 +11,31 @@ GHC has a number of options that select which types of non-fatal error
 messages, otherwise known as warnings, can be generated during compilation.
 Some options control individual warnings and others control collections
 of warnings.
-To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
-To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
+Use ``-W⟨wflag⟩`` to turn on an individual warning or a collection, or use
+``-Wno-⟨wflag⟩`` to turn it off.
+Use ``-Werror`` to make all warnings into fatal errors, or ``-Werror=⟨wflag⟩`` to
+make a specific warning into an error. Reverse this with ``-Wwarn`` to make all
+warnings non-fatal, or ``-Wwarn=⟨wflag⟩`` to make a specific warning non-fatal.
 
 .. note::
-   In GHC < 8 the syntax for ``-W<wflag>`` was ``-fwarn-<wflag>``
+   In GHC < 8 the syntax for ``-W⟨wflag⟩`` was ``-fwarn-⟨wflag⟩``
    (e.g. ``-fwarn-incomplete-patterns``).
    This spelling is deprecated, but still accepted for backwards compatibility.
-   Likewise, ``-Wno-<wflag>`` used to be ``fno-warn-<wflag>``
+   Likewise, ``-Wno-⟨wflag⟩`` used to be ``fno-warn-⟨wflag⟩``
    (e.g. ``-fno-warn-incomplete-patterns``).
 
+
+Warning groups
+==============
+
+The following flags are simple ways to select standard "packages" of
+warnings. They can be reversed using ``-Wno-⟨group⟩``, which has the same effect
+as ``-Wno-...`` for every individual warning in the group.
 
 .. ghc-flag:: -Wdefault
     :shortdesc: enable default flags
     :type: dynamic
+    :reverse: -Wno-default
     :category:
 
     :since: 8.0
@@ -67,12 +78,10 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
 
-The following flags are simple ways to select standard "packages" of warnings:
-
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
     :type: dynamic
-    :reverse: -w
+    :reverse: -Wno-extra
     :category:
 
     Provides the standard warnings plus
@@ -92,14 +101,14 @@ The following flags are simple ways to select standard "packages" of warnings:
 .. ghc-flag:: -Wextra
     :shortdesc: alias for :ghc-flag:`-W`
     :type: dynamic
-    :reverse: -w
+    :reverse: -Wno-extra
 
     Alias for :ghc-flag:`-W`
 
 .. ghc-flag:: -Wall
     :shortdesc: enable almost all warnings (details in :ref:`options-sanity`)
     :type: dynamic
-    :reverse: -w
+    :reverse: -Wno-all
     :category:
 
     Turns on all warning options that indicate potentially suspicious
@@ -133,6 +142,7 @@ The following flags are simple ways to select standard "packages" of warnings:
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
     :type: dynamic
+    :reverse: -w
     :category:
 
     :since: 8.0
@@ -164,14 +174,6 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wcompat-unqualified-imports`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
 
-.. ghc-flag:: -Wno-compat
-    :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
-    :type: dynamic
-    :reverse: -Wcompat
-    :category:
-
-    Disables all warnings enabled by :ghc-flag:`-Wcompat`.
-
 .. ghc-flag:: -w
     :shortdesc: disable all warnings
     :type: dynamic
@@ -186,6 +188,24 @@ The following flags are simple ways to select standard "packages" of warnings:
 
     Deprecated alias for :ghc-flag:`-w`
 
+When a warning is emitted, the specific warning flag which controls
+it is shown, but the group can optionally be shown as well:
+
+.. ghc-flag:: -fshow-warning-groups
+    :shortdesc: show which group an emitted warning belongs to.
+    :type: dynamic
+    :reverse: -fno-show-warning-groups
+    :category:
+
+    :default: off
+
+    When showing which flag controls a warning, also show the
+    respective warning group flag(s) that warning is contained in.
+
+
+Treating warnings as fatal errors
+=================================
+
 These options control which warnings are considered fatal and cause compilation
 to abort.
 
@@ -199,7 +219,7 @@ to abort.
 
     Makes any warning into a fatal error. Useful so that you don't miss
     warnings when doing batch compilation. To reverse ``-Werror`` and stop
-    treating any warnings as errors use ``-Wwarn``, or use ``-Wwarn=<wflag>``
+    treating any warnings as errors use ``-Wwarn``, or use ``-Wwarn=⟨wflag⟩``
     to stop treating specific warnings as errors.
 
 .. ghc-flag:: -Werror=⟨wflag⟩
@@ -209,13 +229,14 @@ to abort.
     :category:
     :noindex:
 
-    :implies: ``-W<wflag>``
+    :implies: ``-W⟨wflag⟩``
 
     Makes a specific warning into a fatal error. The warning will be enabled if
-    it hasn't been enabled yet. Can be reversed with ``-Wwarn=<wflag>``.
+    it hasn't been enabled yet. Can be reversed with ``-Wwarn=⟨wflag⟩``.
 
-    ``-Werror=compat`` has the same effect as ``-Werror=...`` for each warning
-    flag in the :ghc-flag:`-Wcompat` option group.
+    ``-Werror=⟨group⟩`` has the same effect as ``-Werror=...`` for each warning
+    flag in the group (for example, ``-Werror=compat`` will turn every warning
+    in the :ghc-flag:`-Wcompat` group into a fatal error).
 
 .. ghc-flag:: -Wwarn
     :shortdesc: make warnings non-fatal
@@ -235,25 +256,25 @@ to abort.
 
     Causes a specific warning to be treated as normal warning, not fatal error.
 
-    Note that it doesn't fully negate the effects of ``-Werror=<wflag>`` - the
+    Note that it doesn't fully negate the effects of ``-Werror=⟨wflag⟩`` - the
     warning will still be enabled.
 
-    ``-Wwarn=compat`` has the same effect as ``-Wwarn=...`` for each warning
-    flag in the :ghc-flag:`-Wcompat` option group.
+    ``-Wwarn=⟨group⟩`` has the same effect as ``-Wwarn=...`` for each warning
+    flag in the group (for example, ``-Wwarn=compat`` will mark every warning in
+    the :ghc-flag:`-Wcompat` group as non-fatal).
 
-When a warning is emitted, the specific warning flag which controls
-it is shown.
-
-.. ghc-flag:: -fshow-warning-groups
-    :shortdesc: show which group an emitted warning belongs to.
+.. ghc-flag:: -Wno-error=⟨wflag⟩
+    :shortdesc: make a specific warning non-fatal
     :type: dynamic
-    :reverse: -fno-show-warning-groups
+    :reverse: -Werror=⟨wflag⟩
     :category:
+    :noindex:
 
-    :default: off
+    Alternative spelling for ``-Wwarn=⟨wflag⟩``.
 
-    When showing which flag controls a warning, also show the
-    respective warning group flag(s) that warning is contained in.
+
+Individual warning options
+==========================
 
 The full set of warning options is described below. To turn off any
 warning, simply give the corresponding ``-Wno-...`` option on the
