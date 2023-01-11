@@ -360,6 +360,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger
 import GHC.Utils.Fingerprint
 
@@ -561,7 +562,12 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
 
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
-  = do { env <- liftIO $
+  = do { -- The call to c_keepCAFsForGHCi must not be optimized away. Even in non-debug builds.
+         -- So we can't use assertM here.
+         -- See Note [keepCAFsForGHCi] in keepCAFsForGHCi.c for details about why.
+         !keep_cafs <- liftIO $ c_keepCAFsForGHCi
+       ; massert keep_cafs
+       ; env <- liftIO $
                 do { top_dir <- findTopDir mb_top_dir
                    ; mySettings <- initSysTools top_dir
                    ; myLlvmConfig <- lazyInitLlvmConfig top_dir
@@ -606,7 +612,6 @@ checkBrokenTablesNextToCode' logger dflags
   where platform = targetPlatform dflags
         arch = platformArch platform
         tablesNextToCode = platformTablesNextToCode platform
-
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -1994,3 +1999,6 @@ instance Exception GhcApiError
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
+
+foreign import ccall unsafe "keepCAFsForGHCi"
+    c_keepCAFsForGHCi   :: IO Bool
