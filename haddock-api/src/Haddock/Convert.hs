@@ -438,7 +438,7 @@ synifyDataCon use_gadt_syntax dc =
            , con_doc    = Nothing }
 
 synifyNameN :: NamedThing n => n -> LocatedN Name
-synifyNameN n = L (noAnnSrcSpan $ srcLocSpan (getSrcLoc n)) (getName n)
+synifyNameN n = L (noAnnSrcSpan $! srcLocSpan (getSrcLoc n)) (getName n)
 
 -- synifyName :: NamedThing n => n -> LocatedA Name
 -- synifyName n = L (noAnnSrcSpan $ srcLocSpan (getSrcLoc n)) (getName n)

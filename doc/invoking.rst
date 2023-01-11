@@ -257,10 +257,6 @@ The following options are available:
        name. Note that for the per-entity URLs this is the name of the
        *exporting* module.
 
-    -  The string ``%F`` or ``%{FILE}`` is replaced by the original
-       source file name. Note that for the per-entity URLs this is the
-       name of the *defining* module.
-
     -  The string ``%N`` or ``%{NAME}`` is replaced by the name of the
        exported value or type. This is only valid for the
        :option:`--source-entity` option.
@@ -275,9 +271,6 @@ The following options are available:
 
     -  The string ``%%`` is replaced by ``%``.
 
-    For example, if your sources are online under some directory, you
-    would say ``haddock --source-base=url/ --source-module=url/%F``
-
     If you have html versions of your sources online with anchors for
     each type and function name, you would say
     ``haddock --source-base=url/ --source-module=url/%M.html --source-entity=url/%M.html#%N``
@@ -287,11 +280,6 @@ The following options are available:
     (some web servers are known to get confused by multiple ``.``
     characters in a file name). To replace it with a character c use
     ``%{MODULE/./c}``.
-
-    Similarly, for the ``%{FILE}`` substitution you may want to replace
-    the ``/`` character in the file names with some other character
-    (especially for links to colourised entity source code with a shared
-    css file). To replace it with a character c use ``%{FILE///c}``/
 
     One example of a tool that can generate syntax-highlighted HTML from
     your source code, complete with anchors suitable for use from
@@ -484,13 +472,6 @@ The following options are available:
     from all the specified interfaces (interfaces are specified using
     :option:`-i` or :option:`--read-interface`). This is used to generate a single
     contents and/or index for multiple sets of Haddock documentation.
-
-.. option:: --ignore-all-exports
-
-    Causes Haddock to behave as if every module has the
-    ``ignore-exports`` attribute (:ref:`module-attrs`). This might be useful for
-    generating implementation documentation rather than interface
-    documentation, for example.
 
 .. option:: --hide <module>
 

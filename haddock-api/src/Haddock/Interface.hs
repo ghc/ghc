@@ -33,41 +33,48 @@
 -- using this environment.
 -----------------------------------------------------------------------------
 module Haddock.Interface (
-    plugin
-  , processModules
+  processModules
 ) where
 
 
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1)
+import Haddock.Interface.Create (createInterface1, fromClsInst)
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
-import Control.Monad (unless, when)
-import Data.IORef (atomicModifyIORef', newIORef, readIORef, IORef)
+import Control.DeepSeq (force)
 import Data.List (foldl', isPrefixOf)
-import Data.Maybe (mapMaybe)
 import Data.Traversable (for)
-import Text.Printf (printf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import System.Exit (exitFailure ) -- TODO use Haddock's die
+import Text.Printf
 
-import GHC hiding (verbosity)
+import GHC hiding (verbosity, SuccessFlag(..))
+import GHC.Core.InstEnv (instEnvElts)
+import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
+import GHC.Data.Maybe
 import GHC.Driver.Env
-import GHC.Driver.Monad (modifySession, withTimingM)
+import GHC.Driver.Monad
+import GHC.Driver.Make
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Plugins
-import GHC.Tc.Types (TcGblEnv (..), TcM)
-import GHC.Tc.Utils.Env (tcLookupGlobal)
-import GHC.Tc.Utils.Monad (getTopEnv)
-import GHC.Unit.Module.Graph
+import GHC.Types.Name.Occurrence (emptyOccEnv)
+import GHC.Unit.Module.Graph (ModuleGraphNode (..))
+import GHC.Unit.Module.ModDetails
+import GHC.Unit.Module.ModSummary (isBootSummary)
+import GHC.Utils.Outputable ((<+>), pprModuleName)
 import GHC.Utils.Error (withTiming)
+import Control.Monad
+import Debug.Trace (traceMarkerIO)
+import GHC.Unit.Home.ModInfo
+import GHC.Tc.Utils.Env (lookupGlobal_maybe)
+import GHC.Utils.Outputable (Outputable)
 
 #if defined(mingw32_HOST_OS)
 import System.IO
@@ -94,9 +101,6 @@ processModules verbosity modules flags extIfaces = do
 
   dflags <- getDynFlags
 
-  out verbosity verbose "Creating interfaces..."
-
-
   -- Map from a module to a corresponding installed interface
   let instIfaceMap :: InstIfaceMap
       instIfaceMap = Map.fromList
@@ -105,26 +109,22 @@ processModules verbosity modules flags extIfaces = do
         , iface <- ifInstalledIfaces ext
         ]
 
-  (interfaces, ms) <- createIfaces verbosity modules flags instIfaceMap
+  interfaces <- createIfaces verbosity modules flags instIfaceMap
 
   let exportedNames =
         Set.unions $ map (Set.fromList . ifaceExports) $
         filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
       mods = Set.fromList $ map ifaceMod interfaces
 
-  out verbosity verbose "Attaching instances..."
   interfaces' <- {-# SCC attachInstances #-}
                  withTimingM "attachInstances" (const ()) $ do
-                   attachInstances (exportedNames, mods) interfaces instIfaceMap ms
+                   attachInstances (exportedNames, mods) interfaces instIfaceMap
 
-  out verbosity verbose "Building cross-linking environment..."
   -- Combine the link envs of the external packages into one
   let extLinks  = Map.unions (map ifLinkEnv extIfaces)
       homeLinks = buildHomeLinks interfaces' -- Build the environment for the home
                                              -- package
       links     = homeLinks `Map.union` extLinks
-
-  out verbosity verbose "Renaming interfaces..."
 
   let warnings = Flag_NoWarnings `notElem` flags
       ignoredSymbolSet = ignoredSymbols flags
@@ -151,205 +151,112 @@ createIfaces
     -- ^ Command line flags which Hadddock was invoked with
     -> InstIfaceMap
     -- ^ Map from module to corresponding installed interface file
-    -> Ghc ([Interface], ModuleSet)
+    -> Ghc [Interface]
     -- ^ Resulting interfaces
 createIfaces verbosity modules flags instIfaceMap = do
-  -- Initialize the IORefs for the interface map and the module set
-  (ifaceMapRef, moduleSetRef) <- liftIO $ do
-    m <- newIORef Map.empty
-    s <- newIORef emptyModuleSet
-    return (m, s)
-
-  let
-    haddockPlugin = plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef
-
-    installHaddockPlugin :: HscEnv -> HscEnv
-    installHaddockPlugin hsc_env =
-      let
-        old_plugins = hsc_plugins hsc_env
-        new_plugins = old_plugins { staticPlugins = haddockPlugin : staticPlugins old_plugins }
-        hsc_env'    = hsc_env { hsc_plugins = new_plugins }
-      in hscUpdateFlags (flip gopt_set Opt_PluginTrustworthy) hsc_env'
-
-  -- Note that we would rather use withTempSession but as long as we
-  -- have the separate attachInstances step we need to keep the session
-  -- alive to be able to find all the instances.
-  modifySession installHaddockPlugin
-
   targets <- mapM (\filePath -> guessTarget filePath Nothing Nothing) modules
   setTargets targets
+  (_errs, modGraph) <- depanalE [] False
 
-  loadOk <- withTimingM "load" (const ()) $
-    {-# SCC load #-} GHC.load LoadAllTargets
+  liftIO $ traceMarkerIO "Load started"
+  -- Create (if necessary) and load .hi-files.
+  success <- withTimingM "load'" (const ()) $
+               load' noIfaceCache LoadAllTargets Nothing modGraph
+  when (failed success) $ do
+    out verbosity normal "load' failed"
+    liftIO exitFailure
+  liftIO $ traceMarkerIO "Load ended"
 
-  case loadOk of
-    Failed ->
-      throwE "Cannot typecheck modules"
-    Succeeded -> do
-      modGraph <- GHC.getModuleGraph
-
-      (ifaceMap, moduleSet) <- liftIO $ do
-        m <- atomicModifyIORef' ifaceMapRef (Map.empty,)
-        s <- atomicModifyIORef' moduleSetRef (Set.empty,)
-        return (m, s)
-
-      let
-        -- We topologically sort the module graph including boot files,
-        -- so it should be acylic (hopefully we failed much earlier if this is not the case)
-        -- We then filter out boot modules from the resultant topological sort
-        --
-        -- We do it this way to make 'buildHomeLinks' a bit more stable
-        -- 'buildHomeLinks' depends on the topological order of its input in order
-        -- to construct its result. In particular, modules closer to the bottom of
-        -- the dependency chain are to be prefered for link destinations.
-        --
-        -- If there are cycles in the graph, then this order is indeterminate
-        -- (the nodes in the cycle can be ordered in any way).
-        -- While 'topSortModuleGraph' does guarantee stability for equivalent
-        -- module graphs, seemingly small changes in the ModuleGraph can have
-        -- big impacts on the `LinkEnv` constructed.
-        --
-        -- For example, suppose
-        --  G1 = A.hs -> B.hs -> C.hs (where '->' denotes an import).
-        --
-        -- Then suppose C.hs is changed to have a cyclic dependency on A
-        --
-        --  G2 = A.hs -> B.hs -> C.hs -> A.hs-boot
-        --
-        -- For G1, `C.hs` is preferred for link destinations. However, for G2,
-        -- the topologically sorted order not taking into account boot files (so
-        -- C -> A) is completely indeterminate.
-        -- Using boot files to resolve cycles, we end up with the original order
-        -- [C, B, A] (in decreasing order of preference for links)
-        --
-        -- This exact case came up in testing for the 'base' package, where there
-        -- is a big module cycle involving 'Prelude' on windows, but the cycle doesn't
-        -- include 'Prelude' on non-windows platforms. This lead to drastically different
-        -- LinkEnv's (and failing haddockHtmlTests) across the platforms
-        --
-        -- In effect, for haddock users this behaviour (using boot files to eliminate cycles)
-        -- means that {-# SOURCE #-} imports no longer count towards re-ordering
-        -- the preference of modules for linking.
-        --
-        -- i.e. if module A imports B, then B is preferred over A,
-        -- but if module A {-# SOURCE #-} imports B, then we can't say the same.
-        --
-        go :: SCC ModuleGraphNode -> Maybe Module
-        go (AcyclicSCC (ModuleNode _ ms))
-          | NotBoot <- isBootSummary ms = Just $ ms_mod ms
-          | otherwise = Nothing
-        go (AcyclicSCC _) = Nothing
-        go (CyclicSCC _) = error "haddock: module graph cyclic even with boot files"
-
-        ifaces :: [Interface]
-        ifaces =
-          [ Map.findWithDefault
-              (error "haddock:iface")
-              m
-              ifaceMap
-          | m <- mapMaybe go $ topSortModuleGraph False modGraph Nothing
-          ]
-
-      return (ifaces, moduleSet)
-
-
--- | A `Plugin` that hooks into GHC's compilation pipeline to generate Haddock
--- interfaces. Due to the plugin nature we benefit from GHC's capabilities to
--- parallelize the compilation process.
-plugin
-  :: Verbosity
-  -- ^ Verbosity requested by the Haddock caller
-  -> [Flag]
-  -- ^ Command line flags which Hadddock was invoked with
-  -> InstIfaceMap
-  -- ^ Map from module to corresponding installed interface file
-  -> IORef IfaceMap
-  -- ^ The 'IORef' to write the interface map to
-  -> IORef ModuleSet
-  -- ^ The 'IORef' to write the module set to
-  -> StaticPlugin -- the plugin to install with GHC
-plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef =
+      -- We topologically sort the module graph including boot files,
+      -- so it should be acylic (hopefully we failed much earlier if this is not the case)
+      -- We then filter out boot modules from the resultant topological sort
+      --
+      -- We do it this way to make 'buildHomeLinks' a bit more stable
+      -- 'buildHomeLinks' depends on the topological order of its input in order
+      -- to construct its result. In particular, modules closer to the bottom of
+      -- the dependency chain are to be prefered for link destinations.
+      --
+      -- If there are cycles in the graph, then this order is indeterminate
+      -- (the nodes in the cycle can be ordered in any way).
+      -- While 'topSortModuleGraph' does guarantee stability for equivalent
+      -- module graphs, seemingly small changes in the ModuleGraph can have
+      -- big impacts on the `LinkEnv` constructed.
+      --
+      -- For example, suppose
+      --  G1 = A.hs -> B.hs -> C.hs (where '->' denotes an import).
+      --
+      -- Then suppose C.hs is changed to have a cyclic dependency on A
+      --
+      --  G2 = A.hs -> B.hs -> C.hs -> A.hs-boot
+      --
+      -- For G1, `C.hs` is preferred for link destinations. However, for G2,
+      -- the topologically sorted order not taking into account boot files (so
+      -- C -> A) is completely indeterminate.
+      -- Using boot files to resolve cycles, we end up with the original order
+      -- [C, B, A] (in decreasing order of preference for links)
+      --
+      -- This exact case came up in testing for the 'base' package, where there
+      -- is a big module cycle involving 'Prelude' on windows, but the cycle doesn't
+      -- include 'Prelude' on non-windows platforms. This lead to drastically different
+      -- LinkEnv's (and failing haddockHtmlTests) across the platforms
+      --
+      -- In effect, for haddock users this behaviour (using boot files to eliminate cycles)
+      -- means that {-# SOURCE #-} imports no longer count towards re-ordering
+      -- the preference of modules for linking.
+      --
+      -- i.e. if module A imports B, then B is preferred over A,
+      -- but if module A {-# SOURCE #-} imports B, then we can't say the same.
+      --
   let
-    processTypeCheckedResult :: ModSummary -> TcGblEnv -> TcM ()
-    processTypeCheckedResult mod_summary tc_gbl_env
-      -- Don't do anything for hs-boot modules
-      | IsBoot <- isBootSummary mod_summary =
-          pure ()
-      | otherwise = do
-          hsc_env <- getTopEnv
-          ifaces <- liftIO $ readIORef ifaceMapRef
+      go (AcyclicSCC (ModuleNode _ ms))
+        | NotBoot <- isBootSummary ms = [ms]
+        | otherwise = []
+      go (AcyclicSCC _) = []
+      go (CyclicSCC _) = error "haddock: module graph cyclic even with boot files"
 
-          (iface, modules) <-
-            withTiming (hsc_logger hsc_env) "processModule1" (const ()) $
-              processModule1 verbosity flags ifaces instIfaceMap hsc_env mod_summary tc_gbl_env
+      -- Visit modules in that order
+      sortedMods = concatMap go $ topSortModuleGraph False modGraph Nothing
+  out verbosity normal "Haddock coverage:"
+  (ifaces, _) <- foldM f ([], Map.empty) sortedMods
+  return (reverse ifaces)
+  where
+    f (ifaces, ifaceMap) modSummary = do
+      x <- {-# SCC processModule #-}
+           withTimingM "processModule" (const ()) $ do
+             processModule verbosity modSummary flags ifaceMap instIfaceMap
+      return $ case x of
+        Just iface -> ( iface:ifaces
+                      , Map.insert (ifaceMod iface) iface ifaceMap )
+        Nothing    -> ( ifaces
+                      , ifaceMap ) -- Boot modules don't generate ifaces.
 
-          liftIO $ do
-            atomicModifyIORef' ifaceMapRef $ \xs ->
-              (Map.insert (ms_mod mod_summary) iface xs, ())
+dropErr :: MaybeErr e a -> Maybe a
+dropErr (Succeeded a) = Just a
+dropErr (Failed _) = Nothing
 
-            atomicModifyIORef' moduleSetRef $ \xs ->
-              (modules `unionModuleSet` xs, ())
-  in
-    StaticPlugin
-      {
-        spPlugin = PluginWithArgs
-        {
-          paPlugin = defaultPlugin
-          {
-            renamedResultAction = keepRenamedSource
-          , typeCheckResultAction = \_ mod_summary tc_gbl_env -> do
-              processTypeCheckedResult mod_summary tc_gbl_env
-              pure tc_gbl_env
-          }
-        , paArguments = []
-        }
-      }
+processModule :: Verbosity -> ModSummary -> [Flag] -> IfaceMap -> InstIfaceMap -> Ghc (Maybe Interface)
+processModule verbosity modSummary flags ifaceMap instIfaceMap = do
+  out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modSummary) ++ "..."
 
-processModule1
-  :: Verbosity
-  -- ^ Verbosity requested by the Haddock caller
-  -> [Flag]
-  -- ^ Command line flags which Hadddock was invoked with
-  -> IfaceMap
-  -- ^ Map from module to corresponding interface, for the modules we have
-  -- already processed
-  -> InstIfaceMap
-  -- ^ Map from module to corresponding installed interface file
-  -> HscEnv
-  -> ModSummary
-  -> TcGblEnv
-  -> TcM (Interface, ModuleSet)
-processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env = do
-  out verbosity verbose "Creating interface..."
+  hsc_env <- getSession
+  dflags <- getDynFlags
+  let hmi = case lookupHpt (hsc_HPT hsc_env) (moduleName $ ms_mod modSummary) of
+        Nothing -> error "processModule: All modules should be loaded into the HPT by this point"
+        Just x -> x
+      mod_iface = hm_iface hmi
+      unit_state = hsc_units hsc_env
 
-  let
-    TcGblEnv { tcg_rdr_env } = tc_gbl_env
-
-    unit_state = hsc_units hsc_env
+      do_hoogle = Flag_Hoogle `elem` flags
+      cls_insts = force . map (fromClsInst do_hoogle dflags unit_state)  . instEnvElts . md_insts $ hm_details hmi
+      fam_insts = md_fam_insts $ hm_details hmi
+      insts = (cls_insts, fam_insts)
 
   !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
-        runIfM (fmap Just . tcLookupGlobal) $
-          createInterface1 flags unit_state mod_summary tc_gbl_env ifaces inst_ifaces
-
-  -- We need to keep track of which modules were somehow in scope so that when
-  -- Haddock later looks for instances, it also looks in these modules too.
-  --
-  -- See https://github.com/haskell/haddock/issues/469.
-  let
-    mods :: ModuleSet
-    !mods = mkModuleSet
-      [ nameModule name
-      | gre <- globalRdrEnvElts tcg_rdr_env
-      , let name = greMangledName gre
-      , nameIsFromExternalPackage (hsc_home_unit hsc_env) name
-      , isTcOcc (nameOccName name)   -- Types and classes only
-      , unQualOK gre -- In scope unqualified
-      ]
-
-  dflags <- getDynFlags
+        runIfM (liftIO . fmap dropErr . lookupGlobal_maybe hsc_env) $
+          createInterface1 flags unit_state modSummary mod_iface ifaceMap instIfaceMap insts
 
   let
     (haddockable, haddocked) =
@@ -401,7 +308,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       unless header $ out verbosity normal "    Module header"
       mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
 
-  pure (interface, mods)
+  return (Just interface)
 
 
 --------------------------------------------------------------------------------

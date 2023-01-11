@@ -109,14 +109,13 @@ definitions with "[thing]"
   Omit this module from the docs
 {-# OPTIONS_HADDOCK prune #-}
   Omit definitions without docs
-{-# OPTIONS_HADDOCK ignore-exports #-}
-  Treat this module as though all
-  top-level items are exported
 {-# OPTIONS_HADDOCK not-home #-}
   Do not treat this module as the
   "home" of identifiers it exports
 {-# OPTIONS_HADDOCK show-extensions #-}
   Show all enabled LANGUAGE extensions
+{-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
+  Show all `RuntimeRep` type variables
 ```
 
 # Grid tables

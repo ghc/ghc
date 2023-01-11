@@ -9,6 +9,7 @@
 {-# LANGUAGE MonadComprehensions #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -34,14 +35,15 @@ import qualified Data.Set as Set
 
 import Haddock.Types( DocName, DocNameI, XRecCond )
 
+import GHC
+import GHC.Builtin.Names
+import GHC.Data.FastString
+import GHC.Driver.Ppr (showPpr )
+import GHC.Driver.Session
+import GHC.Types.Name
 import GHC.Utils.FV as FV
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Utils.Panic ( panic )
-import GHC.Driver.Ppr (showPpr )
-import GHC.Types.Name
-import GHC.Unit.Module
-import GHC
-import GHC.Driver.Session
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
                          , tyVarKind, updateTyVarKind, isInvisibleForAllTyFlag )
@@ -58,7 +60,7 @@ import           Data.ByteString ( ByteString )
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Internal as BS
 
-import GHC.HsToCore.Docs
+import GHC.HsToCore.Docs hiding (sigNameNoLoc)
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -100,7 +102,16 @@ ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
 sigName :: LSig GhcRn -> [IdP GhcRn]
-sigName (L _ sig) = sigNameNoLoc emptyOccEnv sig
+sigName (L _ sig) = sigNameNoLoc' emptyOccEnv sig
+
+sigNameNoLoc' :: forall pass w. UnXRec pass => w -> Sig pass -> [IdP pass]
+sigNameNoLoc' _ (TypeSig    _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (ClassOpSig _ _ ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (PatSynSig  _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (SpecSig    _   n _ _)        = [unXRec @pass n]
+sigNameNoLoc' _ (InlineSig  _   n _)          = [unXRec @pass n]
+sigNameNoLoc' _ (FixSig _ (FixitySig _ ns _)) = map (unXRec @pass) ns
+sigNameNoLoc' _ _                             = []
 
 -- | Was this signature given by the user?
 isUserLSig :: forall p. UnXRec p => LSig p -> Bool
@@ -112,6 +123,12 @@ isClassD _ = False
 
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
+
+dataListModule :: Module
+dataListModule = mkBaseModule (fsLit "Data.List")
+
+dataTupleModule :: Module
+dataTupleModule = mkBaseModule (fsLit "Data.Tuple")
 
 -- ---------------------------------------------------------------------
 
@@ -197,7 +214,7 @@ getMainDeclBinderI (ValD _ d) =
   case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
-getMainDeclBinderI (SigD _ d) = sigNameNoLoc emptyOccEnv d
+getMainDeclBinderI (SigD _ d) = sigNameNoLoc' emptyOccEnv d
 getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinderI _ = []

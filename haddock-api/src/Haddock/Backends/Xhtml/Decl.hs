@@ -601,12 +601,12 @@ ppClassDecl summary links instances fixities loc d subdocs
     ppDefaultFunSig n (t, d') = ppFunSig summary links loc (keyword "default")
       d' [n] t [] splice unicode pkg qual
 
-    lookupDM name = Map.lookup (getOccString name) defaultMethods
+    lookupDM name = Map.lookup (occNameString $ mkDefaultMethodOcc $ getOccName name) defaultMethods
     defaultMethods = Map.fromList
       [ (nameStr, (typ, doc))
       | ClassOpSig _ True lnames typ <- sigs
       , name <- map unLoc lnames
-      , let doc = noDocForDecl -- TODO: get docs for method defaults
+      , let doc = lookupAnySubdoc name subdocs
             nameStr = getOccString name
       ]
 
@@ -619,7 +619,8 @@ ppClassDecl summary links instances fixities loc d subdocs
 
       -- Minimal complete definition = the only shown method
       Var (L _ n) : _ | [getName n] ==
-                        [getName n' | L _ (ClassOpSig _ _ ns _) <- lsigs, L _ n' <- ns]
+                        [getName n' | ClassOpSig _ _ ns _ <- sigs, L _ n' <- ns]
+
         -> noHtml
 
       -- Minimal complete definition = nothing

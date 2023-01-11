@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 {-# OPTIONS_GHC -Wwarn           #-}
 -----------------------------------------------------------------------------
 -- |
@@ -587,8 +586,15 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
     parseGhcFlags logger dynflags = do
       -- TODO: handle warnings?
 
-      let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
-                     | otherwise = [Opt_Haddock]
+      let extra_opts =
+            [ Opt_Haddock
+              -- Include docstrings in .hi-files.
+
+            -- , Opt_WriteInterface
+              -- If we can't use an old .hi-file, save the new one.
+            ] ++ if needHieFiles
+                    then [Opt_WriteHie] -- Generate .hie-files
+                    else []
           dynflags' = (foldl' gopt_set dynflags extra_opts)
                         { backend = noBackend
                         , ghcMode = CompManager

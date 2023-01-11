@@ -337,7 +337,6 @@ qualification flags =
       ["full"]       -> Right OptFullQual
       ["local"]      -> Right OptLocalQual
       ["relative"]   -> Right OptRelativeQual
-      ["aliased"]    -> Right OptAliasedQual
       [arg]          -> Left $ "unknown qualification type " ++ show arg
       _:_            -> Left "qualification option given multiple times"
 

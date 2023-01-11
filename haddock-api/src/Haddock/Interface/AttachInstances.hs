@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -36,7 +37,8 @@ import GHC.Core.Class
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
-import GHC.Unit.Module.Env ( ModuleSet, moduleSetElts )
+import GHC.Unit.Module.Env ( moduleSetElts, mkModuleSet )
+import GHC.Unit.State
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable (text, sep, (<+>))
@@ -46,19 +48,38 @@ import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Types.Var hiding (varName)
 import GHC.HsToCore.Docs
+import GHC.Driver.Env.Types
+import GHC.Unit.Env
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module
 type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
-attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> ModuleSet -> Ghc [Interface]
-attachInstances expInfo ifaces instIfaceMap mods = do
+attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
+attachInstances expInfo ifaces instIfaceMap = do
+
+  -- We need to keep load modules in which we will look for instances. We've
+  -- somewhat arbitrarily decided to load all modules which are available -
+  -- either directly or from a re-export.
+  --
+  -- See https://github.com/haskell/haddock/issues/469.
+  env <- getSession
+  let mod_to_pkg_conf = moduleNameProvidersMap $ ue_units $ hsc_unit_env env
+      mods = mkModuleSet [ m
+                         | mod_map <- Map.elems mod_to_pkg_conf
+                         , ( m
+                           , ModOrigin { fromOrigUnit = fromOrig
+                                       , fromExposedReexport = reExp
+                                       }
+                           ) <- Map.toList mod_map
+                         , fromOrig == Just True || not (null reExp)
+                         ]
+      mods' = Just (moduleSetElts mods)
+
   (_msgs, mb_index) <- getNameToInstancesIndex (map ifaceMod ifaces) mods'
   mapM (attach $ fromMaybe emptyNameEnv mb_index) ifaces
   where
-    mods' = Just (moduleSetElts mods)
-
     -- TODO: take an IfaceMap as input
     ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
 
