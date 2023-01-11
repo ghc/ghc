@@ -34,13 +34,71 @@ to suppress these warnings.
 
 This flag implies the :ghc-flag:`-fdefer-typed-holes` and
 :ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this behaviour
-for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
+for :ref:`typed-holes` and variables. Should you so wish, it is
 possible to enable :ghc-flag:`-fdefer-type-errors` without enabling
 :ghc-flag:`-fdefer-typed-holes` or :ghc-flag:`-fdefer-out-of-scope-variables`,
 by explicitly specifying :ghc-flag:`-fno-defer-typed-holes
 <-fdefer-typed-holes>` or :ghc-flag:`-fno-defer-out-of-scope-variables
 <-fdefer-out-of-scope-variables>` on the command-line after the
 :ghc-flag:`-fdefer-type-errors` flag.
+
+.. ghc-flag:: -fdefer-type-errors
+    :shortdesc: Turn type errors into warnings, :ref:`deferring the error until
+        runtime <defer-type-errors>`. Implies
+        :ghc-flag:`-fdefer-typed-holes` and
+        :ghc-flag:`-fdefer-out-of-scope-variables`.
+        See also :ghc-flag:`-Wdeferred-type-errors`.
+    :type: dynamic
+    :reverse: -fno-defer-type-errors
+    :category:
+
+    :since: 7.6
+
+    :implies: :ghc-flag:`-fdefer-typed-holes`, :ghc-flag:`-fdefer-out-of-scope-variables`
+
+    Defer as many type errors as possible until runtime. At compile time
+    you get a warning (instead of an error). At runtime, if you use a
+    value that depends on a type error, you get a runtime error; but you
+    can run any type-correct parts of your code just fine.
+    See also :ghc-flag:`-Wdeferred-type-errors`.
+
+.. ghc-flag:: -fdefer-typed-holes
+    :shortdesc: Convert :ref:`typed hole <typed-holes>` errors into warnings,
+        :ref:`deferring the error until runtime <defer-type-errors>`.
+        Implied by :ghc-flag:`-fdefer-type-errors`.
+        See also :ghc-flag:`-Wtyped-holes`.
+    :type: dynamic
+    :reverse: -fno-defer-typed-holes
+    :category:
+
+    :since: 7.10
+
+    Defer typed holes errors (errors about names with a leading underscore
+    (e.g., “_”, “_foo”, “_bar”)) until runtime. This will turn the errors
+    produced by :ref:`typed holes <typed-holes>` into warnings. Using a value
+    that depends on a typed hole produces a runtime error, the same as
+    :ghc-flag:`-fdefer-type-errors` (which implies this option). See :ref:`typed-holes`.
+
+    Implied by :ghc-flag:`-fdefer-type-errors`. See also :ghc-flag:`-Wtyped-holes`.
+
+.. ghc-flag:: -fdefer-out-of-scope-variables
+    :shortdesc: Convert variable out of scope variables errors into warnings.
+        Implied by :ghc-flag:`-fdefer-type-errors`.
+        See also :ghc-flag:`-Wdeferred-out-of-scope-variables`.
+    :type: dynamic
+    :reverse: -fno-defer-out-of-scope-variables
+    :category:
+
+    :since: 8.0
+
+    Defer variable out-of-scope errors (errors about names without a leading underscore)
+    until runtime. This will turn variable-out-of-scope errors into warnings.
+    Using a value that depends on an out-of-scope variable produces a runtime error,
+    the same as :ghc-flag:`-fdefer-type-errors` (which implies this option).
+    See :ref:`typed-holes`.
+
+    Implied by :ghc-flag:`-fdefer-type-errors`. See also :ghc-flag:`-Wdeferred-out-of-scope-variables`.
+
 
 At runtime, whenever a term containing a type error would need to be
 evaluated, the error is converted into a runtime exception of type
