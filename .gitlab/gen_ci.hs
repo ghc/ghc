@@ -109,7 +109,13 @@ data Opsys
   | Windows deriving (Eq)
 
 data LinuxDistro
-  = Debian11 | Debian10 | Debian9 | Fedora33 | Ubuntu2004 | Centos7 | Alpine deriving (Eq)
+  = Debian11 | Debian10 | Debian9
+  | Fedora33
+  | Ubuntu2004
+  | Centos7
+  | Alpine
+  | Rocky8
+  deriving (Eq)
 
 data Arch = Amd64 | AArch64 | I386
 
@@ -267,6 +273,7 @@ distroName Fedora33  = "fedora33"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
 distroName Alpine     = "alpine3_12"
+distroName Rocky8     = "rocky8"
 
 opsysName :: Opsys -> String
 opsysName (Linux distro) = "linux-" ++ distroName distro
@@ -411,6 +418,9 @@ distroVariables Alpine = mconcat
   , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
   ]
 distroVariables Centos7 = mconcat [
+  "HADRIAN_ARGS" =: "--docs=no-sphinx"
+  ]
+distroVariables Rocky8 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
   ]
 distroVariables Fedora33 = mconcat
@@ -851,6 +861,7 @@ job_groups =
      -- not being at EOL until April 2023 and they still need tinfo5.
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
+     , disableValidate (standardBuilds Amd64 (Linux Rocky8))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
