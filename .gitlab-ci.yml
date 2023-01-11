@@ -6,7 +6,7 @@ variables:
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.
-  CACHE_REV: 9
+  CACHE_REV: 10
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
