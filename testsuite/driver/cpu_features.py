@@ -17,7 +17,8 @@ cpu_feature_cache = None
 
 def get_cpu_features():
     if config.os in ['mingw32', 'linux'] and os.path.exists('/proc/cpuinfo'):
-        f = open('/proc/cpuinfo').read()
+        with open('/proc/cpuinfo') as x:
+            f = x.read()
         flags = re.search(r'flags\s*:\s*.*$', f, re.M)
         if flags is None:
             print('get_cpu_features: failed to find cpu features')

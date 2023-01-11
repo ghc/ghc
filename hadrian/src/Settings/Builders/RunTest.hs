@@ -181,7 +181,7 @@ assertSameCompilerArgs stg = do
     ]
 
 
--- Command line arguments for invoking the @runtest.py@ script. A lot of this
+-- Command line arguments for invoking the @runtests.py@ script. A lot of this
 -- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder Testsuite ? do
@@ -227,7 +227,8 @@ runTestBuilderArgs = builder Testsuite ? do
         asBool s b = s ++ show b
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
-    mconcat [ arg $ "testsuite/driver/runtests.py"
+    mconcat [ arg "-Wdefault"  -- see #22727
+            , arg $ "testsuite/driver/runtests.py"
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
             , arg "--top", arg (top -/- "testsuite")
             , arg "-e", arg $ "windows=" ++ show windowsHost

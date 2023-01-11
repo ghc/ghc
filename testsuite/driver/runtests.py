@@ -99,7 +99,8 @@ if args.e:
 
 if args.config_file:
     for arg in args.config_file:
-        exec(open(arg).read())
+        with io.open(arg) as f:
+            exec(f.read())
 
 if args.config:
     for arg in args.config:
@@ -349,8 +350,6 @@ except Exception as e:
     print('Failed to detect CPU features: ', e)
 
 sys.stdout.flush()
-# we output text, which cannot be unbuffered
-sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w")
 
 if config.local:
     tempdir = ''
@@ -607,6 +606,7 @@ else:
       print("WARNING - skipping all tests and only reporting required hadrian dependencies:", config.hadrian_deps)
       for d in config.hadrian_deps:
         print(d,file=config.only_report_hadrian_deps)
+      config.only_report_hadrian_deps.close()
 
 if len(t.unexpected_failures) > 0 or \
    len(t.unexpected_stat_failures) > 0 or \
