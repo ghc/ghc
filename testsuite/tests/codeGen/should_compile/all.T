@@ -96,7 +96,7 @@ test('T14373c',
      switch_skeleton_only])
 
 switch_skeleton_and_entries_only = (r'grep -e "switch \[" -e "case " -e "default: " -e "Default_entry(" -e "R1 = .*_closure+2;"'
-                                     '| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;.*|R1 = XYZ_closure+2;|g" -e "s|//.*|//|g"')
+                                    r'| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;.*|R1 = XYZ_closure+2;|g" -e "s|//.*|//|g"')
 
 test('T14373d',
       [ js_skip # JS backend doesn't produce Cmm
