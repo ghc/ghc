@@ -560,7 +560,7 @@ hackage-doc-tarball:
     - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C ghc*/
   script:
     - cd ghc*/
-    - mv .gitlab/upload_ghc_libs.py .
+    - mv .gitlab/rel_eng/upload_ghc_libs.py .
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - ./upload_ghc_libs.py prepare --bindist ghc*linux/
