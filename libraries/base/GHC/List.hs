@@ -1270,6 +1270,7 @@ elem x                  =  any (== x)
 elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
+{-# INLINABLE elem #-}
 {-# RULES
 "elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
@@ -1295,6 +1296,7 @@ notElem x               =  all (/= x)
 notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
+{-# INLINABLE notElem #-}
 {-# RULES
 "notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
@@ -1312,6 +1314,7 @@ notElem x (y:ys)=  x /= y && notElem x ys
 -- >>> lookup 2 [(1, "first"), (2, "second"), (3, "third")]
 -- Just "second"
 --
+{-# INLINABLE lookup #-}
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
 lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
