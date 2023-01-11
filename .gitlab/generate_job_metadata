@@ -1,0 +1,5 @@
+#! /usr/bin/env nix-shell
+#! nix-shell -i bash -p cabal-install ghc jq
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+./gen_ci.hs metadata jobs-metadata.json

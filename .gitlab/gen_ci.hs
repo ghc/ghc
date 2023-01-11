@@ -18,6 +18,7 @@ import Data.List (intercalate)
 import Data.Set (Set)
 import qualified Data.Set as S
 import System.Environment
+import Data.Maybe
 
 {-
 Note [Generating the CI pipeline]
@@ -84,6 +85,16 @@ names of jobs to update these other places.
 2. The fetch-gitlab release utility pulls release artifacts from the
 3. The ghc-head-from script downloads release artifacts based on a pipeline change.
 4. Some subsequent CI jobs have explicit dependencies (for example docs-tarball, perf, perf-nofib)
+
+Note [Generation Modes]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+There are two different modes this  script can operate in:
+
+* `gitlab`: Generates a job.yaml which defines all the pipelines for the platforms
+* `metadata`: Generates a file which maps a platform the the "default" validate and
+              nightly pipeline. This file is intended to be used when generating
+              ghcup metadata.
 
 -}
 
@@ -336,6 +347,9 @@ instance (Ord k, Semigroup v) => Monoid (MonoidalMap k v) where
 mminsertWith :: Ord k => (a -> a -> a) -> k -> a -> MonoidalMap k a -> MonoidalMap k a
 mminsertWith f k v (MonoidalMap m) = MonoidalMap (Map.insertWith f k v m)
 
+mmlookup :: Ord k => k -> MonoidalMap k a -> Maybe a
+mmlookup k (MonoidalMap m) = Map.lookup k m
+
 type Variables = MonoidalMap String [String]
 
 (=:) :: String -> String -> Variables
@@ -566,6 +580,7 @@ data Job
         , jobArtifacts :: Artifacts
         , jobCache :: Cache
         , jobRules :: OnOffRules
+        , jobPlatform  :: (Arch, Opsys)
         }
 
 instance ToJSON Job where
@@ -589,9 +604,11 @@ instance ToJSON Job where
     ]
 
 -- | Build a job description from the system description and 'BuildConfig'
-job :: Arch -> Opsys -> BuildConfig -> (String, Job)
-job arch opsys buildConfig = (jobName, Job {..})
+job :: Arch -> Opsys -> BuildConfig -> NamedJob Job
+job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
   where
+    jobPlatform = (arch, opsys)
+
     jobRules = emptyRules
 
     jobName = testEnv arch opsys buildConfig
@@ -694,19 +711,19 @@ addVariable k v j = j { jobVariables = mminsertWith (++) k [v] (jobVariables j) 
 -- Building the standard jobs
 --
 -- | Make a normal validate CI job
-validate :: Arch -> Opsys -> BuildConfig -> (String, Job)
+validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 validate arch opsys bc =
   job arch opsys bc
 
 -- | Make a normal nightly CI job
 nightly arch opsys bc =
-  let (n, j) = job arch opsys bc
-  in ("nightly-" ++ n, addJobRule Nightly . keepArtifacts "8 weeks" . highCompression $ j)
+  let NamedJob n j = job arch opsys bc
+  in NamedJob { name = "nightly-" ++ n, jobInfo = addJobRule Nightly . keepArtifacts "8 weeks" . highCompression $ j}
 
 -- | Make a normal release CI job
 release arch opsys bc =
-  let (n, j) = job arch opsys (bc { buildFlavour = Release })
-  in ("release-" ++ n, addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . highCompression $ j)
+  let NamedJob n j = job arch opsys (bc { buildFlavour = Release })
+  in NamedJob { name = "release-" ++ n, jobInfo = addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . highCompression $ j}
 
 -- Specific job modification functions
 
@@ -749,17 +766,33 @@ addValidateRule t = modifyValidateJobs (addJobRule t)
 disableValidate :: JobGroup Job -> JobGroup Job
 disableValidate = addValidateRule Disable
 
+data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving Functor
+
+renameJob :: (String -> String) -> NamedJob a -> NamedJob a
+renameJob f (NamedJob n i) = NamedJob (f n) i
+
+instance ToJSON a => ToJSON (NamedJob a) where
+  toJSON nj = object
+    [ "name" A..= name nj
+    , "jobInfo" A..= jobInfo nj ]
+
 -- Jobs are grouped into either triples or pairs depending on whether the
 -- job is just validate and nightly, or also release.
-data JobGroup a = StandardTriple { v :: (String, a)
-                                 , n :: (String, a)
-                                 , r :: (String, a) }
-                | ValidateOnly   { v :: (String, a)
-                                 , n :: (String, a) } deriving Functor
+data JobGroup a = StandardTriple { v :: NamedJob a
+                                 , n :: NamedJob a
+                                 , r :: NamedJob a }
+                | ValidateOnly   { v :: NamedJob a
+                                 , n :: NamedJob a } deriving Functor
+
+instance ToJSON a => ToJSON (JobGroup a) where
+  toJSON jg = object
+    [ "n" A..= n jg
+    , "r" A..= r jg
+    ]
 
 rename :: (String -> String) -> JobGroup a -> JobGroup a
-rename f (StandardTriple (nv, v) (nn, n) (nr, r)) = StandardTriple (f nv, v) (f nn, n) (f nr, r)
-rename f (ValidateOnly (nv, v) (nn, n)) = ValidateOnly (f nv, v) (f nn, n)
+rename f (StandardTriple nv nn nr) = StandardTriple (renameJob f nv) (renameJob f nn) (renameJob f nr)
+rename f (ValidateOnly nv nn) = ValidateOnly (renameJob f nv) (renameJob f nn)
 
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release build with
 -- a specific config.
@@ -780,13 +813,19 @@ validateBuilds :: Arch -> Opsys -> BuildConfig -> JobGroup Job
 validateBuilds a op bc = ValidateOnly (validate a op bc) (nightly a op bc)
 
 flattenJobGroup :: JobGroup a -> [(String, a)]
-flattenJobGroup (StandardTriple a b c) = [a,b,c]
-flattenJobGroup (ValidateOnly a b) = [a, b]
+flattenJobGroup (StandardTriple a b c) = map flattenNamedJob [a,b,c]
+flattenJobGroup (ValidateOnly a b) = map flattenNamedJob [a, b]
+
+flattenNamedJob :: NamedJob a -> (String, a)
+flattenNamedJob (NamedJob n i) = (n, i)
 
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap flattenJobGroup $
+jobs = Map.fromList $ concatMap flattenJobGroup job_groups
+
+job_groups :: [JobGroup Job]
+job_groups =
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
      , (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
      , (validateBuilds Amd64 (Linux Debian10) nativeInt)
@@ -826,7 +865,6 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
 
   where
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
-
     tsan_jobs =
       modifyJobs
         ( addVariable "TSAN_OPTIONS" "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
@@ -835,10 +873,58 @@ jobs = Map.fromList $ concatMap flattenJobGroup $
         . addVariable "HADRIAN_ARGS" "--docs=none") $
       validateBuilds Amd64 (Linux Debian10) tsan
 
+
+mkPlatform :: Arch -> Opsys -> String
+mkPlatform arch opsys = archName arch <> "-" <> opsysName opsys
+
+-- | This map tells us for a specific arch/opsys combo what the job name for
+-- nightly/release pipelines is. This is used by the ghcup metadata generation so that
+-- things like bindist names etc are kept in-sync.
+--
+-- For cases where there are just
+--
+-- Otherwise:
+--  * Prefer jobs which have a corresponding release pipeline
+--  * Explicitly require tie-breaking for other cases.
+platform_mapping :: Map String (JobGroup BindistInfo)
+platform_mapping = Map.map go $
+  Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ v j)), j) | j <- job_groups ]
+  where
+    whitelist = [ "x86_64-linux-alpine3_12-int_native-validate+fully_static"
+                , "x86_64-linux-deb10-validate"
+                , "x86_64-linux-fedora33-release"
+                , "x86_64-windows-validate"
+                ]
+
+    combine a b
+      | name (v a) `elem` whitelist = a -- Explicitly selected
+      | name (v b) `elem` whitelist = b
+      | hasReleaseBuild a, not (hasReleaseBuild b) = a -- Has release build, but other doesn't
+      | hasReleaseBuild b, not (hasReleaseBuild a) = b
+      | otherwise = error (show (name (v a)) ++ show (name (v b)))
+
+    go = fmap (BindistInfo . unwords . fromJust . mmlookup "BIN_DIST_NAME" . jobVariables)
+
+    hasReleaseBuild (StandardTriple{}) = True
+    hasReleaseBuild (ValidateOnly{}) = False
+
+data BindistInfo = BindistInfo { bindistName :: String }
+
+instance ToJSON BindistInfo where
+  toJSON (BindistInfo n) = object [ "bindistName" A..= n ]
+
+
 main = do
-  as <- getArgs
+  ass <- getArgs
+  case ass of
+    -- See Note [Generation Modes]
+    ("gitlab":as) -> write_result as jobs
+    ("metadata":as) -> write_result as platform_mapping
+    _ -> error "gen_ci.hs <gitlab|metadata> [file.json]"
+
+write_result as obj =
   (case as of
     [] -> B.putStrLn
     (fp:_) -> B.writeFile fp)
-    (A.encode jobs)
+    (A.encode obj)
 

@@ -947,62 +947,133 @@ pages:
     paths:
       - public
 
-.x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release:
-  stage: full-build
-  rules:
-    - when: always
+#############################################################
+# Generation of GHCUp metadata
+#############################################################
+
+project-version:
+  stage: packaging
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  dependencies: null
   tags:
     - x86_64-linux
-  image: registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV
-  before_script:
-    - sudo chown ghc:ghc -R .
   variables:
-    BIN_DIST_NAME: ghc-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release
-    BUILD_FLAVOUR: perf
-    CONFIGURE_ARGS: --with-intree-gmp --with-system-libffi
-    XZ_OPT: "-9"
-    CONF_CC_OPTS_STAGE2: -Wno-int-conversion -Wno-strict-prototypes -mnontrapping-fptoint -msign-ext -mbulk-memory -mmutable-globals -mreference-types
-    CONF_CXX_OPTS_STAGE2: -fno-exceptions -Wno-int-conversion -Wno-strict-prototypes -mnontrapping-fptoint -msign-ext -mbulk-memory -mmutable-globals -mreference-types
-    CONF_GCC_LINKER_OPTS_STAGE2: -Wl,--error-limit=0,--growable-table,--stack-first -Wno-unused-command-line-argument
-    CROSS_EMULATOR: wasmtime
-    CROSS_TARGET: wasm32-wasi
-    HADRIAN_ARGS: --docs=none
-    TEST_ENV: x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release
+    BUILD_FLAVOUR: default
   script:
-    - |
-      pushd libraries/process
-      curl https://patch-diff.githubusercontent.com/raw/haskell/process/pull/240.diff | git apply
-      popd
-      pushd utils/hsc2hs
-      curl https://patch-diff.githubusercontent.com/raw/haskell/hsc2hs/pull/68.diff | git apply
-      popd
+    # Calculate the project version
+    - .gitlab/ci.sh configure
+    - cp hadrian/bindist/Makefile .
+    - touch config.mk
+    - make show VALUE=ProjectVersion > version.sh
 
-      pushd "$(mktemp -d)"
-      curl -L https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz | tar xz --strip-components=1
-      PREFIX=/tmp/.ghc-wasm SKIP_GHC=1 ./setup.sh
-      source /tmp/.ghc-wasm/env
-      popd
+  dependencies: []
+  artifacts:
+    paths:
+      - version.sh
+  rules:
+    - if: '$NIGHTLY'
+    - if: '$RELEASE_JOB == "yes"'
 
-      .gitlab/ci.sh setup
-      .gitlab/ci.sh configure
-      .gitlab/ci.sh build_hadrian
-      .gitlab/ci.sh test_hadrian
+.ghcup-metadata:
+  stage: deploy
+  image: "nixos/nix:2.8.0"
+  dependencies: null
+  tags:
+    - x86_64-linux
+  variables:
+    BUILD_FLAVOUR: default
+    GIT_SUBMODULE_STRATEGY: "none"
+  before_script:
+    - ls
+    - cat version.sh
+    # Calculate the project version
+    - . ./version.sh
 
-  after_script:
-    - cat ci-timings
+    # Download existing ghcup metadata
+    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#wget -c wget "https://raw.githubusercontent.com/haskell/ghcup-metadata/develop/ghcup-0.0.7.yaml"
+
+    - .gitlab/generate_jobs_metadata
 
   artifacts:
-    expire_in: 1 year
     paths:
-      - ghc-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_$BIGNUM_BACKEND-release.tar.xz
-    when: always
+      - metadata_test.yaml
+      - version.sh
 
-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_gmp-release:
-  extends: .x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release
-  variables:
-    BIGNUM_BACKEND: gmp
+ghcup-metadata-nightly:
+  extends: .ghcup-metadata
+  # Explicit needs for validate pipeline because we only need certain bindists
+  needs:
+    - job: nightly-x86_64-linux-fedora33-release
+      artifacts: false
+    - job: nightly-x86_64-linux-centos7-validate
+      artifacts: false
+    - job: nightly-x86_64-darwin-validate
+      artifacts: false
+    - job: nightly-aarch64-darwin-validate
+      artifacts: false
+    - job: nightly-x86_64-windows-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static
+      artifacts: false
+    - job: nightly-x86_64-linux-deb9-validate
+      artifacts: false
+    - job: nightly-i386-linux-deb9-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-deb11-validate
+      artifacts: false
+    - job: source-tarball
+      artifacts: false
+  needs:
+    - job: project-version
+  script:
+    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+  rules:
+    - if: $NIGHTLY
 
-x86_64-linux-ubuntu20_04-cross_wasm32-wasi-int_native-release:
-  extends: .x86_64-linux-ubuntu20_04-cross_wasm32-wasi-release
+ghcup-metadata-release:
+  # No explicit needs for release pipeline as we assume we need everything and everything will pass.
+  extends: .ghcup-metadata
+  script:
+    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+
+.ghcup-metadata-testing:
+  stage: deploy
   variables:
-    BIGNUM_BACKEND: native
+    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
+    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
+    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
+    RELEASE_JOB: "$RELEASE_JOB"
+  trigger:
+    project: "ghc/ghcup-ci"
+    branch: "upstream-testing"
+    strategy: "depend"
+
+ghcup-metadata-testing-nightly:
+  needs:
+    - job: ghcup-metadata-nightly
+      artifacts: false
+  extends: .ghcup-metadata-testing
+  variables:
+      NIGHTLY: "$NIGHTLY"
+      UPSTREAM_JOB_NAME: "ghcup-metadata-nightly"
+  rules:
+    - if: '$NIGHTLY == "1"'
+
+ghcup-metadata-testing-release:
+  needs:
+    - job: ghcup-metadata-release
+      artifacts: false
+  extends: .ghcup-metadata-testing
+  variables:
+      UPSTREAM_JOB_NAME: "ghcup-metadata-release"
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+  when: manual
+
+

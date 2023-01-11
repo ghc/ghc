@@ -1,0 +1,23 @@
+# fetch-gitlab-artifacts
+
+This script is used to fetch and rename GHC binary distributions from GitLab
+Pipelines for upload to `downloads.haskell.org`.
+
+## Workflow
+
+1. [Configure]() a `python-gitlab` profile for <https://gitlab.haskell.org/>:
+   ```
+   $ cat > $HOME/.python-gitlab.cfg <<EOF
+   [haskell]
+   url = https://gitlab.haskell.org/
+   private_token = $PRIVATE_GITLAB_TOKEN
+   ssl_verify = true
+   api_version = 4
+   EOF
+   ```
+1. Push a release tag to ghc/ghc>
+1. Wait until the CI pipeline completes
+1. Run `fetch-gitlab -p $PIPELINE_ID -r $RELEASE_NAME` where `$PIPELINE_ID` is
+   the ID of the GitLab release pipeline and `$RELEASE_NAME` is the name of the
+   GHC release (e.g. `8.8.1` or `8.8.1-alpha1`)
+1. The binary distributions will be placed in the `out` directory.
