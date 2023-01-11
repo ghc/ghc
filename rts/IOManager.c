@@ -31,6 +31,7 @@
 
 #if defined(IOMGR_ENABLED_MIO_POSIX)
 #include "posix/Signals.h"
+#include "Prelude.h"
 #endif
 
 #if defined(IOMGR_ENABLED_MIO_WIN32)
@@ -356,6 +357,22 @@ initIOManagerAfterFork(Capability **pcap)
         /* The IO_MANAGER_SELECT needs no initialisation */
 
         /* No impl for any of the Windows I/O managers, since no forking. */
+        default:
+            break;
+    }
+}
+
+
+/* Called from setNumCapabilities.
+ */
+void notifyIOManagerCapabilitiesChanged(Capability **pcap)
+{
+    switch (iomgr_type) {
+#if defined(IOMGR_ENABLED_MIO_POSIX)
+        case IO_MANAGER_MIO_POSIX:
+            rts_evalIO(pcap, ioManagerCapabilitiesChanged_closure, NULL);
+            break;
+#endif
         default:
             break;
     }

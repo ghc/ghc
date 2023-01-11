@@ -226,6 +226,7 @@ void initCapabilityIOManager(CapIOManager **iomgr);
  */
 void initIOManager(void);
 
+
 /* Init hook: called from forkProcess in the child process on the surviving
  * capability.
  *
@@ -237,6 +238,11 @@ void initIOManagerAfterFork(/* inout */ Capability **pcap);
 /* TODO: rationalise initIOManager and initIOManagerAfterFork into a single
          per-capability init function.
  */
+
+
+/* Called from setNumCapabilities.
+ */
+void notifyIOManagerCapabilitiesChanged(Capability **pcap);
 
 
 /* Shutdown hooks: called from hs_exit_ before and after the scheduler exits.
