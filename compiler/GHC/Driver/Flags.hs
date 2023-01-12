@@ -49,7 +49,7 @@ instance NFData Language where
 
 -- | Debugging flags
 data DumpFlag
--- See Note [Updating flag description in the User's Guide]
+-- See Note [Updating flag description in the User's Guide] in GHC.Driver.Session
 
    -- debugging flags
    = Opt_D_dump_cmm
@@ -196,7 +196,7 @@ enabledIfVerbose _                                 = True
 
 -- | Enumerates the simple on-or-off dynamic flags
 data GeneralFlag
--- See Note [Updating flag description in the User's Guide]
+-- See Note [Updating flag description in the User's Guide] in GHC.Driver.Session
 
    = Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
    | Opt_DumpWithWays                   -- ^ Use foo.ways.<dumpFlag> instead of foo.<dumpFlag>
@@ -533,7 +533,7 @@ optimisationFlags = EnumSet.fromList
    ]
 
 data WarningFlag =
--- See Note [Updating flag description in the User's Guide]
+-- See Note [Updating flag description in the User's Guide] in GHC.Driver.Session
      Opt_WarnDuplicateExports
    | Opt_WarnDuplicateConstraints
    | Opt_WarnRedundantConstraints
@@ -745,7 +745,7 @@ warnFlagNames wflag = case wflag of
 -- Note [Documenting warning flags]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- If you change the list of warning enabled by default
+-- If you change the list of warnings enabled by default
 -- please remember to update the User's Guide. The relevant file is:
 --
 --  docs/users_guide/using-warnings.rst
