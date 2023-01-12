@@ -593,7 +593,7 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
            FCallId _        -> sizeN (callSize (length val_args) voids)
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op _    -> primOpSize op (length val_args)
-           ClassOpId _      -> classOpSize opts top_args val_args
+           ClassOpId {}     -> classOpSize opts top_args val_args
            _                -> funSize opts top_args fun (length val_args) voids
 
     ------------

@@ -91,8 +91,7 @@ import GHC.Types.Literal
 import GHC.Types.Tickish
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Basic( Arity, Levity(..)
-                       )
+import GHC.Types.Basic( Arity )
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Demand
@@ -1574,6 +1573,13 @@ app_ok fun_ok primop_ok fun args
                 -- been expressed by its "wrapper", so we don't need
                 -- to take the arguments into account
 
+      ClassOpId _ is_terminating_result
+        | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
+        -> assertPpr (n_val_args == 1) (ppr fun $$ ppr args) $
+           True
+           -- assert: terminating result type => can't be applied;
+           -- c.f the _other case below
+
       PrimOpId op _
         | primOpIsDiv op
         , [arg1, Lit lit] <- args
@@ -1596,14 +1602,16 @@ app_ok fun_ok primop_ok fun args
         -> primop_ok op  -- Check the primop itself
         && and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
-      _  -- Unlifted types
-         -- c.f. the Var case of exprIsHNF
-         | Just Unlifted <- typeLevity_maybe (idType fun)
+      _other  -- Unlifted and terminating types;
+              -- Also c.f. the Var case of exprIsHNF
+         |  isTerminatingType fun_ty  -- See Note [exprOkForSpeculation and type classes]
+         || definitelyUnliftedType fun_ty
          -> assertPpr (n_val_args == 0) (ppr fun $$ ppr args)
-            True  -- Our only unlifted types are Int# etc, so will have
-                  -- no value args.  The assert is just to check this.
-                  -- If we added unlifted function types this would change,
-                  -- and we'd need to actually test n_val_args == 0.
+            True  -- Both terminating types (e.g. Eq a), and unlifted types (e.g. Int#)
+                  -- are non-functions and so will have no value args.  The assert is
+                  -- just to check this.
+                  -- (If we added unlifted function types this would change,
+                  -- and we'd need to actually test n_val_args == 0.)
 
          -- Partial applications
          | idArity fun > n_val_args ->
@@ -1618,14 +1626,15 @@ app_ok fun_ok primop_ok fun args
              --     for evaluated-ness of the fun;
              --     see Note [exprOkForSpeculation and evaluated variables]
   where
+    fun_ty       = idType fun
     n_val_args   = valArgCount args
-    (arg_tys, _) = splitPiTys (idType fun)
+    (arg_tys, _) = splitPiTys fun_ty
 
     -- Used for arguments to primops and to partial applications
     arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty _) arg      -- A term argument
-       | Just Lifted <- typeLevity_maybe (scaledThing ty)
+       | definitelyLiftedType (scaledThing ty)
        = True -- See Note [Primops with lifted arguments]
        | otherwise
        = expr_ok fun_ok primop_ok arg
@@ -1655,8 +1664,36 @@ etaExpansionTick id t
   = hasNoBinding id &&
     ( tickishFloatable t || isProfTick t )
 
-{- Note [exprOkForSpeculation: case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [exprOkForSpeculation and type classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#22745, #15205)
+
+  \(d :: C a b). case eq_sel (sc_sel d) of
+                   (co :: t1 ~# t2) [Dead] ->  blah
+
+We know that
+* eq_sel's argument (sc_sel d) has dictionary type, so it definitely terminates
+  (again Note [NON-BOTTOM-DICTS invariant] in GHC.Core)
+* eq_sel is simply a superclass selector, and hence is fast
+* The field that eq_sel picks is of unlifted type, and hence can't be bottom
+  (remember the dictionary argument itself is non-bottom)
+
+So we can treat (eq_sel (sc_sel d)) as ok-for-speculation.  We must check
+
+a) That the function is a class-op, with IdDetails of ClassOpId
+
+b) That the result type of the class-op is terminating or unlifted.  E.g. for
+     class C a => D a where ...
+     class C a where { op :: a -> a }
+   Since C is represented by a newtype, (sc_sel (d :: D a)) might
+   not be terminating.
+
+Rather than repeatedly test if the result of the class-op is a
+terminating/unlifted type, we cache it as a field of ClassOpId. See
+GHC.Types.Id.Make.mkDictSelId for where this field is initialised.
+
+Note [exprOkForSpeculation: case expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprOkForSpeculation accepts very special case expressions.
 Reason: (a ==# b) is ok-for-speculation, but the litEq rules
 in GHC.Core.Opt.ConstantFold convert it (a ==# 3#) to
@@ -1881,7 +1918,8 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
         -- We don't look through loop breakers here, which is a bit conservative
         -- but otherwise I worry that if an Id's unfolding is just itself,
         -- we could get an infinite loop
-      || ( typeLevity_maybe (idType v) == Just Unlifted )
+
+      || definitelyUnliftedType (idType v)
         -- Unlifted binders are always evaluated (#20140)
 
     is_hnf_like (Lit l)          = not (isLitRubbish l)

@@ -685,7 +685,7 @@ mkArgInfo env rule_base fun cont
       | Just (_, _, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       , dmd : rest_dmds <- dmds
       , let dmd'
-             | Just Unlifted <- typeLevity_maybe arg_ty
+             | definitelyUnliftedType arg_ty
              = strictifyDmd dmd
              | otherwise
              -- Something that's not definitely unlifted.

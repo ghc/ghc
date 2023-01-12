@@ -22,8 +22,7 @@ import GHC.Prelude
 
 import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Types.Basic     ( CbvMark (..), isMarkedCbv
-                           , TopLevelFlag(..), isTopLevel
-                           , Levity(..) )
+                           , TopLevelFlag(..), isTopLevel )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
@@ -257,7 +256,7 @@ isTagged v = do
                                     (TagSig TagDunno)
     case nameIsLocalOrFrom this_mod (idName v) of
         True
-            | Just Unlifted <- typeLevity_maybe (idType v)
+            | definitelyUnliftedType (idType v)
               -- NB: v might be the Id of a representation-polymorphic join point,
               -- so we shouldn't use isUnliftedType here. See T22212.
             -> return True

@@ -491,12 +491,12 @@ isNaughtyRecordSelector id = case Var.idDetails id of
                         _                               -> False
 
 isClassOpId id = case Var.idDetails id of
-                        ClassOpId _   -> True
-                        _other        -> False
+                        ClassOpId {} -> True
+                        _other       -> False
 
 isClassOpId_maybe id = case Var.idDetails id of
-                        ClassOpId cls -> Just cls
-                        _other        -> Nothing
+                        ClassOpId cls _ -> Just cls
+                        _other          -> Nothing
 
 isPrimOpId id = case Var.idDetails id of
                         PrimOpId {} -> True

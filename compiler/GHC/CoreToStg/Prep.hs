@@ -1648,12 +1648,16 @@ long as the callee might evaluate it. And if it is evaluated on
 most code paths anyway, we get to turn the unknown eval in the
 callee into a known call at the call site.
 
-However, we must be very careful not to speculate recursive calls!
-Doing so might well change termination behavior.
+Very Nasty Wrinkle
+
+We must be very careful not to speculate recursive calls!  Doing so
+might well change termination behavior.
 
 That comes up in practice for DFuns, which are considered ok-for-spec,
 because they always immediately return a constructor.
-Not so if you speculate the recursive call, as #20836 shows:
+See Note [NON-BOTTOM-DICTS invariant] in GHC.Core.
+
+But not so if you speculate the recursive call, as #20836 shows:
 
   class Foo m => Foo m where
     runFoo :: m a -> m a

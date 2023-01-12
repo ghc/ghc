@@ -465,7 +465,7 @@ mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
 mkDictSelId name clas
-  = mkGlobalId (ClassOpId clas) name sel_ty info
+  = mkGlobalId (ClassOpId clas terminating) name sel_ty info
   where
     tycon          = classTyCon clas
     sel_names      = map idName (classAllSelIds clas)
@@ -476,10 +476,15 @@ mkDictSelId name clas
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkInvisForAllTys tyvars $
-             mkFunctionType ManyTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             scaledThing (getNth arg_tys val_index)
-               -- See Note [Type classes and linear types]
+    pred_ty = mkClassPred clas (mkTyVarTys (binderVars tyvars))
+    res_ty  = scaledThing (getNth arg_tys val_index)
+    sel_ty  = mkInvisForAllTys tyvars $
+              mkFunctionType ManyTy pred_ty res_ty
+             -- See Note [Type classes and linear types]
+
+    terminating = isTerminatingType res_ty || definitelyUnliftedType res_ty
+                  -- If the field is unlifted, it can't be bottom
+                  -- Ditto if it's a terminating type
 
     base_info = noCafIdInfo
                 `setArityInfo`  1

@@ -395,7 +395,7 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
 anticipateANF :: CoreExpr -> Card -> Card
 anticipateANF e n
   | exprIsTrivial e                               = n -- trivial expr won't have a binding
-  | Just Unlifted <- typeLevity_maybe (exprType e)
+  | definitelyUnliftedType (exprType e)
   , not (isAbs n && exprOkForSpeculation e)       = case_bind n
   | otherwise                                     = let_bind  n
   where

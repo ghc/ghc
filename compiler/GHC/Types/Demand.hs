@@ -92,8 +92,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
 
-import GHC.Core.Type    ( Type )
-import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
+import GHC.Core.Type    ( Type, isTerminatingType )
 import GHC.Core.DataCon ( splitDataProductType_maybe, StrictnessMark, isMarkedStrict )
 import GHC.Core.Multiplicity    ( scaledThing )
 
@@ -988,7 +987,10 @@ oneifyDmd (n :* sd) = oneifyCard n :* sd
 strictifyDmd :: Demand -> Demand
 strictifyDmd = plusDmd seqDmd
 
--- | If the argument is a used non-newtype dictionary, give it strict demand.
+-- | If the argument is a guaranteed-terminating type
+--   (i.e. a non-newtype dictionary) give it strict demand.
+--   This is sound because terminating types can't be bottom:
+--         See GHC.Core Note [NON-BOTTOM-DICTS invariant]
 -- Also split the product type & demand and recur in order to similarly
 -- strictify the argument's contained used non-newtype superclass dictionaries.
 -- We use the demand as our recursive measure to guarantee termination.
@@ -1002,11 +1004,9 @@ strictifyDictDmd ty (n :* Prod b ds)
     -- Return a TyCon and a list of field types if the given
     -- type is a non-newtype dictionary type
     as_non_newtype_dict ty
-      | Just (tycon, _arg_tys, _data_con, map scaledThing -> inst_con_arg_tys)
-          <- splitDataProductType_maybe ty
-      , not (isNewTyCon tycon)
-      , isClassTyCon tycon
-      = Just inst_con_arg_tys
+      | isTerminatingType ty
+      , Just (_tc, _arg_tys, _data_con, field_tys) <- splitDataProductType_maybe ty
+      = Just (map scaledThing field_tys)
       | otherwise
       = Nothing
 strictifyDictDmd _  dmd = dmd
