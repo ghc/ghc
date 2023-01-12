@@ -1026,7 +1026,6 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: source-tarball
       artifacts: false
-  needs:
     - job: project-version
   script:
     - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
