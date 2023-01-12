@@ -966,6 +966,7 @@ project-version:
     - .gitlab/ci.sh run_hadrian VERSION
     - echo "ProjectVersion=$(cat VERSION)" > version.sh
 
+  needs: []
   dependencies: []
   artifacts:
     paths:
