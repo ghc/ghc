@@ -116,9 +116,9 @@ packageArgs = do
           [
           -- The use case here is that we want to build @iserv-proxy@ for the
           -- cross compiler. That one needs to be compiled by the bootstrap
-          -- compiler as it needs to run on the host. Hence @libiserv@ needs
-          -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
-          -- behind the @-finternal-interpreter@ flag.
+          -- compiler as it needs to run on the host. Hence @iserv@ needs
+          -- @GHCi.TH@, @GHCi.Message@, @GHCi.Run@, and @GHCi.Server@ from
+          -- @ghci@. And those are behind the @-finternal-interpreter@ flag.
           --
           -- But it may not build if we have made some changes to ghci's
           -- dependencies (see #16051).

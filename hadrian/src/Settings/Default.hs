@@ -151,7 +151,6 @@ stage1Packages = do
         [ haddock
         , hpcBin
         , iserv
-        , libiserv
         , runGhc
         ]
       , when (winTarget && not cross)

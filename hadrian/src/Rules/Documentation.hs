@@ -76,7 +76,6 @@ needDocDeps = do
             [ ghcBoot
             , ghcBootTh
             , ghci
-            , libiserv
             , compiler
             , ghcHeap
             , templateHaskell

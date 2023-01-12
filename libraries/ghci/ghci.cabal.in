@@ -57,6 +57,7 @@ library
             GHCi.Signals
             GHCi.StaticPtrTable
             GHCi.TH
+            GHCi.Server
 
     exposed-modules:
         GHCi.BreakArray
@@ -66,6 +67,7 @@ library
         GHCi.RemoteTypes
         GHCi.FFI
         GHCi.TH.Binary
+        GHCi.Utils
 
     Build-Depends:
         rts,

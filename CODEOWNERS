@@ -59,7 +59,6 @@
 /libraries/template-haskell/      @rae
 
 [Internal utilities and libraries]
-/libraries/libiserv/              @angerman @simonmar
 /utils/iserv-proxy/               @angerman @simonmar
 /utils/iserv/                     @angerman @simonmar
 /utils/fs/                        @Phyx

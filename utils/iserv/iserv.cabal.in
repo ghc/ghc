@@ -18,9 +18,6 @@ Description:
   compiling Template Haskell, by spawning a separate delegate (so
   called runner on the javascript vm) and evaluating the splices
   there.
-  .
-  To use iserv with cross compilers, please see @libraries/libiserv@
-  and @utils/iserv-proxy@.
 
 Category: Development
 build-type: Simple
@@ -39,8 +36,7 @@ Executable iserv
                    bytestring >= 0.10 && < 0.12,
                    containers >= 0.5 && < 0.7,
                    deepseq    >= 1.4 && < 1.5,
-                   ghci       == @ProjectVersionMunged@,
-                   libiserv   == @ProjectVersionMunged@
+                   ghci       == @ProjectVersionMunged@
 
     if os(windows)
         Cpp-Options: -DWINDOWS

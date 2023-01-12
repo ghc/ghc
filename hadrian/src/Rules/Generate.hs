@@ -326,7 +326,6 @@ templateRules = do
   templateRule "driver/ghci/ghci-wrapper.cabal" $ projectVersion
   templateRule "ghc/ghc-bin.cabal" $ projectVersion
   templateRule "utils/iserv/iserv.cabal" $ projectVersion
-  templateRule "utils/iserv-proxy/iserv-proxy.cabal" $ projectVersion
   templateRule "utils/remote-iserv/remote-iserv.cabal" $ projectVersion
   templateRule "utils/runghc/runghc.cabal" $ projectVersion
   templateRule "libraries/ghc-boot/ghc-boot.cabal" $ projectVersion
@@ -334,7 +333,6 @@ templateRules = do
   templateRule "libraries/ghci/ghci.cabal" $ projectVersion
   templateRule "libraries/ghc-heap/ghc-heap.cabal" $ projectVersion
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
-  templateRule "libraries/libiserv/libiserv.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
 

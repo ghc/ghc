@@ -1,17 +1,27 @@
-{-# LANGUAGE RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
-module IServ (serv) where
+{-# LANGUAGE CPP, RankNTypes, RecordWildCards, GADTs, ScopedTypeVariables #-}
+module GHCi.Server
+  ( serv
+  , defaultServer
+  )
+where
 
+import Prelude
 import GHCi.Run
 import GHCi.TH
 import GHCi.Message
+import GHCi.Signals
+import GHCi.Utils
 
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
+import Control.Concurrent (threadDelay)
 import Data.Binary
+import Data.IORef
 
 import Text.Printf
-import System.Environment (getProgName)
+import System.Environment (getProgName, getArgs)
+import System.Exit
 
 type MessageHook = Msg -> IO Msg
 
@@ -84,3 +94,55 @@ serv verbose hook pipe restore = loop
       Left UserInterrupt -> return () >> discardCtrlC
       Left e -> throwIO e
       _ -> return ()
+
+-- | Default server
+defaultServer :: IO ()
+defaultServer = do
+  args <- getArgs
+  (outh, inh, rest) <-
+      case args of
+        arg0:arg1:rest -> do
+            inh  <- readGhcHandle arg1
+            outh <- readGhcHandle arg0
+            return (outh, inh, rest)
+        _ -> dieWithUsage
+
+  (verbose, rest') <- case rest of
+    "-v":rest' -> return (True, rest')
+    _ -> return (False, rest)
+
+  (wait, rest'') <- case rest' of
+    "-wait":rest'' -> return (True, rest'')
+    _ -> return (False, rest')
+
+  unless (null rest'') $
+    dieWithUsage
+
+  when verbose $
+    printf "GHC iserv starting (in: %s; out: %s)\n" (show inh) (show outh)
+  installSignalHandlers
+  lo_ref <- newIORef Nothing
+  let pipe = Pipe{pipeRead = inh, pipeWrite = outh, pipeLeftovers = lo_ref}
+
+  when wait $ do
+    when verbose $
+      putStrLn "Waiting 3s"
+    threadDelay 3000000
+
+  uninterruptibleMask $ serv verbose hook pipe
+
+  where hook = return -- empty hook
+    -- we cannot allow any async exceptions while communicating, because
+    -- we will lose sync in the protocol, hence uninterruptibleMask.
+
+dieWithUsage :: IO a
+dieWithUsage = do
+    prog <- getProgName
+    die $ prog ++ ": " ++ msg
+  where
+#if defined(WINDOWS)
+    msg = "usage: iserv <write-handle> <read-handle> [-v]"
+#else
+    msg = "usage: iserv <write-fd> <read-fd> [-v]"
+#endif
+

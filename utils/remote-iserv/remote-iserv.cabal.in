@@ -13,7 +13,7 @@ Synopsis: iserv allows GHC to delegate Template Haskell computations
 Description:
   This is a very simple remote runner for iserv, to be used together
   with iserv-proxy.  The foundamental idea is that this this wrapper
-  starts running libiserv on a given port to which iserv-proxy will
+  starts running the GHCi server on a given port to which iserv-proxy will
   then connect.
 Category: Development
 build-type: Simple
@@ -24,4 +24,4 @@ Executable remote-iserv
    Main-Is: Cli.hs
    Hs-Source-Dirs: src
    Build-Depends: base       >= 4   && < 5,
-                  libiserv   == @ProjectVersionMunged@
+                  ghci       == @ProjectVersionMunged@
