@@ -201,10 +201,20 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
             , "Darwin": { "unknown_versioning": darwin_arm64 }
             }
 
+    if release_mode:
+        version_parts = version.split('.')
+        eprint(version_parts)
+        if len(version_parts) == 3:
+            final_version = version
+        elif len(version_parts) == 4:
+            final_version = '.'.join(version_parts[:2] + [str(int(version_parts[2]) + 1)])
+        change_log = f"https://downloads.haskell.org/~ghc/{version}/docs/users_guide/{final_version}-notes.html"
+    else:
+        change_log =  "https://gitlab.haskell.org"
 
     return { "viTags": ["Latest", "TODO_base_version"]
         # Check that this link exists
-        , "viChangeLog": "https://downloads.haskell.org/~ghc/9.6.0.123123/docs/users_guide/9.6.1-notes.html"
+        , "viChangeLog": change_log
         , "viSourceDL": source
         , "viPostRemove": "*ghc-post-remove"
         , "viArch": { "A_64": a64
