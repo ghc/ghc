@@ -46,7 +46,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 
-import GHC.Types.Basic (Levity(..))
 import GHC.Types.CompleteMatch
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.DSet
@@ -675,7 +674,7 @@ addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 filterUnliftedFields :: PmAltCon -> [Id] -> [Id]
 filterUnliftedFields con args =
   [ arg | (arg, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
-        , isBanged bang || typeLevity_maybe (idType arg) == Just Unlifted ]
+        , isBanged bang || definitelyUnliftedType (idType arg) ]
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
@@ -687,7 +686,7 @@ addBotCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=env } } x = do
     IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
     MaybeBot               -- We add x ~ ⊥
-      | Just Unlifted <- typeLevity_maybe (idType x)
+      | definitelyUnliftedType (idType x)
       -- Case (3) in Note [Strict fields and variables of unlifted type]
       -> mzero -- unlifted vars can never be ⊥
       | otherwise

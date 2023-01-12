@@ -28,7 +28,7 @@ import GHC.Core.Utils
 import GHC.Core.FVs
 import GHC.Core.Type
 
-import GHC.Types.Basic      ( RecFlag(..), isRec, Levity(Unlifted) )
+import GHC.Types.Basic      ( RecFlag(..), isRec )
 import GHC.Types.Id         ( idType, isJoinId, isJoinId_maybe )
 import GHC.Types.Tickish
 import GHC.Types.Var
@@ -618,7 +618,7 @@ noFloatIntoRhs is_rec bndr rhs
   | isJoinId bndr
   = isRec is_rec -- Joins are one-shot iff non-recursive
 
-  | Just Unlifted <- typeLevity_maybe (idType bndr)
+  | definitelyUnliftedType (idType bndr)
   = True  -- Preserve let-can-float invariant, see Note [noFloatInto considerations]
 
   | otherwise

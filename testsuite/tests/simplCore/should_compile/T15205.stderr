@@ -1,0 +1,43 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 25, types: 62, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 7, types: 15, coercions: 0, joins: 0/0}
+Foo.$p1C [InlPrag=[~]] :: forall a b. C a b => a ~ b
+[GblId[ClassOp],
+ Arity=1,
+ Str=<S!P(SL,A)>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (@a) (@b) (v [Occ=Once1!] :: C a b) ->
+                 case v of { Foo.C:C v2 [Occ=Once1] _ [Occ=Dead] -> v2 }}]
+Foo.$p1C
+  = \ (@a) (@b) (v :: C a b) -> case v of v1 { Foo.C:C v2 v3 -> v2 }
+
+-- RHS size: {terms: 7, types: 15, coercions: 0, joins: 0/0}
+op [InlPrag=[~]] :: forall a b. C a b => a -> a -> b
+[GblId[ClassOp],
+ Arity=1,
+ Str=<S!P(A,SL)>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=False,boring_ok=False)
+         Tmpl= \ (@a) (@b) (v [Occ=Once1!] :: C a b) ->
+                 case v of { Foo.C:C _ [Occ=Dead] v3 [Occ=Once1] -> v3 }}]
+op
+  = \ (@a) (@b) (v :: C a b) -> case v of v1 { Foo.C:C v2 v3 -> v3 }
+
+-- RHS size: {terms: 8, types: 8, coercions: 0, joins: 0/0}
+f :: forall a b. C a b => a -> b
+[GblId,
+ Arity=2,
+ Str=<1P(A,1C(1,C(1,L)))><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [30 0] 40 0}]
+f = \ (@a) (@b) ($dC :: C a b) (x :: a) -> op @a @b $dC x x
+
+
+

@@ -224,11 +224,12 @@ isEqPredClass :: Class -> Bool
 isEqPredClass cls =  cls `hasKey` eqTyConKey
                   || cls `hasKey` heqTyConKey
 
-isClassPred, isEqPred, isEqPrimPred :: PredType -> Bool
+isClassPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon | isClassTyCon tyCon -> True
-    _                               -> False
+    Just tc -> isClassTyCon tc
+    _       -> False
 
+isEqPred :: PredType -> Bool
 isEqPred ty  -- True of (a ~ b) and (a ~~ b)
              -- ToDo: should we check saturation?
   | Just tc <- tyConAppTyCon_maybe ty
@@ -237,6 +238,7 @@ isEqPred ty  -- True of (a ~ b) and (a ~~ b)
   | otherwise
   = False
 
+isEqPrimPred :: PredType -> Bool
 isEqPrimPred ty = isCoVarType ty
   -- True of (a ~# b) (a ~R# b)
 

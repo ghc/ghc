@@ -2057,7 +2057,7 @@ reifyThing (AGlobal (AnId id))
   = do  { ty <- reifyType (idType id)
         ; let v = reifyName id
         ; case idDetails id of
-            ClassOpId cls -> return (TH.ClassOpI v ty (reifyName cls))
+            ClassOpId cls _ -> return (TH.ClassOpI v ty (reifyName cls))
             RecSelId{sel_tycon=RecSelData tc}
                           -> return (TH.VarI (reifySelector id tc) ty Nothing)
             _             -> return (TH.VarI     v ty Nothing)

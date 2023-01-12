@@ -132,8 +132,9 @@ module GHC.Core.Type (
         isUnliftedType, isBoxedType, isUnboxedTupleType, isUnboxedSumType,
         kindBoxedRepLevity_maybe,
         mightBeLiftedType, mightBeUnliftedType,
+        definitelyLiftedType, definitelyUnliftedType,
         isAlgType, isDataFamilyAppType,
-        isPrimitiveType, isStrictType,
+        isPrimitiveType, isStrictType, isTerminatingType,
         isLevityTy, isLevityVar,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
@@ -2198,18 +2199,6 @@ isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
--- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or representational
---    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
-isCoVarType :: Type -> Bool
-  -- ToDo: should we check saturation?
-isCoVarType ty
-  | Just tc <- tyConAppTyCon_maybe ty
-  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-  | otherwise
-  = False
-
 buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
               -> [Role] -> KnotTied Type -> TyCon
 -- This function is here because here is where we have
@@ -2256,8 +2245,7 @@ isUnliftedType ty =
   case typeLevity_maybe ty of
     Just Lifted   -> False
     Just Unlifted -> True
-    Nothing       ->
-      pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty))
+    Nothing       -> pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 -- | Returns:
 --
@@ -2267,6 +2255,9 @@ isUnliftedType ty =
 mightBeLiftedType :: Type -> Bool
 mightBeLiftedType = mightBeLifted . typeLevity_maybe
 
+definitelyLiftedType :: Type -> Bool
+definitelyLiftedType = not . mightBeUnliftedType
+
 -- | Returns:
 --
 -- * 'False' if the type is /guaranteed/ lifted or
@@ -2274,6 +2265,9 @@ mightBeLiftedType = mightBeLifted . typeLevity_maybe
 --    (e.g. in a representation-polymorphic case)
 mightBeUnliftedType :: Type -> Bool
 mightBeUnliftedType = mightBeUnlifted . typeLevity_maybe
+
+definitelyUnliftedType :: Type -> Bool
+definitelyUnliftedType = not . mightBeLiftedType
 
 -- | See "Type#type_classification" for what a boxed type is.
 -- Panics on representation-polymorphic types; See 'mightBeUnliftedType' for
@@ -2370,6 +2364,28 @@ isDataFamilyAppType ty = case tyConAppTyCon_maybe ty of
 -- Panics on representation-polymorphic types.
 isStrictType :: HasDebugCallStack => Type -> Bool
 isStrictType = isUnliftedType
+
+isTerminatingType :: HasDebugCallStack => Type -> Bool
+-- ^ True <=> a term of this type cannot be bottom
+-- This identifies the types described by
+--    Note [NON-BOTTOM-DICTS invariant] in GHC.Core
+-- NB: unlifted types are not terminating types!
+--     e.g. you can write a term (loop 1)::Int# that diverges.
+isTerminatingType ty = case tyConAppTyCon_maybe ty of
+    Just tc -> isClassTyCon tc && not (isNewTyCon tc)
+    _       -> False
+
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or representational
+--    (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
+isCoVarType :: Type -> Bool
+  -- ToDo: should we check saturation?
+isCoVarType ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
+  | otherwise
+  = False
 
 isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.

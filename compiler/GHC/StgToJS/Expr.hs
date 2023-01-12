@@ -51,7 +51,6 @@ import GHC.StgToJS.Utils
 import GHC.StgToJS.Stack
 import GHC.StgToJS.Ids
 
-import GHC.Types.Basic
 import GHC.Types.CostCentre
 import GHC.Types.Tickish
 import GHC.Types.Var.Set
@@ -484,7 +483,7 @@ genStaticRefs lv
   | otherwise         = do
       unfloated <- State.gets gsUnfloated
       let xs = filter (\x -> not (elemUFM x unfloated ||
-                                  typeLevity_maybe (idType x) == Just Unlifted))
+                                  definitelyUnliftedType (idType x)))
                       (dVarSetElems sv)
       CIStaticRefs . catMaybes <$> mapM getStaticRef xs
   where

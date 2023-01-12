@@ -150,8 +150,13 @@ data IdDetails
                                 --  a) to support isImplicitId
                                 --  b) when desugaring a RecordCon we can get
                                 --     from the Id back to the data con]
-  | ClassOpId Class             -- ^ The 'Id' is a superclass selector,
-                                -- or class operation of a class
+
+  | ClassOpId                   -- ^ The 'Id' is a superclass selector or class operation
+      Class                     --    for this class
+      Bool                      --   True <=> given a non-bottom dictionary, the class op will
+                                --            definitely return a non-bottom result
+                                --   and Note [exprOkForSpeculation and type classes]
+                                --       in GHC.Core.Utils
 
   | PrimOpId PrimOp Bool        -- ^ The 'Id' is for a primitive operator
                                 -- True <=> is representation-polymorphic,
