@@ -49,7 +49,7 @@ import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Validity (checkValidType)
+import GHC.Tc.Validity (checkValidType, checkEscapingKind)
 
 import GHC.Core.Predicate
 import GHC.Core.Reduction ( Reduction(..) )
@@ -906,7 +906,8 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
                                           , ppr inferred_poly_ty])
        ; unless insoluble $
          addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
-         checkValidType (InfSigCtxt poly_name) inferred_poly_ty
+         do { checkEscapingKind inferred_poly_ty
+            ; checkValidType (InfSigCtxt poly_name) inferred_poly_ty }
          -- See Note [Validity of inferred types]
          -- If we found an insoluble error in the function definition, don't
          -- do this check; otherwise (#14000) we may report an ambiguity

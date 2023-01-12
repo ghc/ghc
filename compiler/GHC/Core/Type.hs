@@ -50,7 +50,7 @@ module GHC.Core.Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
-        splitForAllTyCoVars,
+        splitForAllTyCoVars, splitForAllTyVars,
         splitForAllReqTyBinders, splitForAllInvisTyBinders,
         splitForAllForAllTyBinders,
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
