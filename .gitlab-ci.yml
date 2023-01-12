@@ -166,7 +166,9 @@ not-interruptible:
   stage: not-interruptible
   script: "true"
   interruptible: false
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  image: "debian:10"
+  variables:
+    GIT_STRATEGY: none
   tags:
     - lint
   rules:
