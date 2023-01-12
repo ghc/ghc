@@ -1108,7 +1108,7 @@ break_ p xs@(x:xs')
 break' _ xs@[]          = (xs, xs)
 break' p xs@(x:xs')
             | p x       = ([], xs)
-	    | otherwise = let !(ys, zs) = break' p xs' in (x:ys, zs)
+            | otherwise = let !(ys, zs) = break' p xs' in (x:ys, zs)
 
 break = break'
 #if MIN_VERSION_base(4,17,0)
