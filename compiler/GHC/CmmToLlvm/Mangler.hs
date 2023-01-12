@@ -38,7 +38,7 @@ llvmFixupAsm platform f1 f2 = {-# SCC "llvm_mangler" #-}
 
 -- | These are the rewrites that the mangler will perform
 rewrites :: [Rewrite]
-rewrites = [rewriteSymType, rewriteAVX, rewriteCall]
+rewrites = [rewriteSymType, rewriteAVX, rewriteCall, rewriteJump]
 
 type Rewrite = Platform -> B.ByteString -> Maybe B.ByteString
 
@@ -121,6 +121,29 @@ rewriteCall platform l
         replaceOnce (B.pack call) (B.pack ("la\t" ++ reg ++ ",")) l
       where
         removePlt = replaceOnce (B.pack "@plt") (B.pack "")
+        appendInsn i = (`B.append` B.pack ("\n\t" ++ i))
+
+-- | This rewrites bl and b jump inst to avoid creating PLT entries for
+-- functions on loongarch64, because there is no separate call instruction
+-- for function calls in loongarch64. Also, this replacement will load
+-- the function address from the GOT, which is resolved to point to the
+-- real address of the function.
+rewriteJump :: Rewrite
+rewriteJump platform l
+  | not isLoongArch64 = Nothing
+  | isBL l            = Just $ replaceJump "bl" "$ra" "$ra" l
+  | isB l             = Just $ replaceJump "b" "$zero" "$t0" l
+  | otherwise         = Nothing
+  where
+    isLoongArch64 = platformArch platform == ArchLoongArch64
+    isBL = B.isPrefixOf (B.pack "bl\t")
+    isB = B.isPrefixOf (B.pack "b\t")
+
+    replaceJump jump rd rj l =
+        appendInsn ("jirl" ++ "\t" ++ rd ++ ", " ++ rj ++ ", 0") $ removeBracket $
+        replaceOnce (B.pack (jump ++ "\t%plt(")) (B.pack ("la\t" ++ rj ++ ", ")) l
+      where
+        removeBracket = replaceOnce (B.pack ")") (B.pack "")
         appendInsn i = (`B.append` B.pack ("\n\t" ++ i))
 
 -- | @replaceOnce match replace bs@ replaces the first occurrence of the

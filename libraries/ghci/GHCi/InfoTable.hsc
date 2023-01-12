@@ -228,6 +228,15 @@ mkJumpToAddr a = case hostPlatformArch of
                  , fromIntegral w64
                  , fromIntegral (w64 `shiftR` 32) ]
 
+    ArchLoongArch64 -> pure $
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
+        in Right [ 0x1c00000c          -- pcaddu12i $t0,0
+                 , 0x28c0418c          -- ld.d      $t0,$t0,16
+                 , 0x4c000180          -- jr        $t0
+                 , 0x03400000          -- nop
+                 , fromIntegral w64
+                 , fromIntegral (w64 `shiftR` 32) ]
+
     arch ->
       -- The arch isn't supported. You either need to add your architecture as a
       -- distinct case, or use non-TABLES_NEXT_TO_CODE mode.

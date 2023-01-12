@@ -557,6 +557,7 @@ Library
         GHC.Platform.ARM
         GHC.Platform.AArch64
         GHC.Platform.Constants
+        GHC.Platform.LoongArch64
         GHC.Platform.NoRegs
         GHC.Platform.PPC
         GHC.Platform.Profile
@@ -564,7 +565,6 @@ Library
         GHC.Platform.Reg.Class
         GHC.Platform.Regs
         GHC.Platform.RISCV64
-        GHC.Platform.LoongArch64
         GHC.Platform.S390X
         GHC.Platform.Wasm32
         GHC.Platform.Ways
