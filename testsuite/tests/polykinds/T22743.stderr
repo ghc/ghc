@@ -1,0 +1,7 @@
+
+T22743.hs:10:1: error:
+    • Quantified type's kind mentions quantified type variable
+        type: ‘forall {f :: * -> RuntimeRep} {g} {a :: TYPE (f g)}. a’
+      where the body of the forall has this kind: ‘TYPE (f g)’
+    • When checking the inferred type
+        x :: forall {f :: * -> RuntimeRep} {g} {a :: TYPE (f g)}. a

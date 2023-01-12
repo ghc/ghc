@@ -4384,10 +4384,7 @@ checkValidDataCon dflags existential_ok tc con
           --  e.g. reject this:   MkT :: T (forall a. a->a)
           -- Reason: it's really the argument of an equality constraint
         ; checkValidMonoType orig_res_ty
-
-        -- Check for an escaping result kind
-        -- See Note [Check for escaping result kind]
-        ; checkEscapingKind con
+        ; checkEscapingKind (dataConWrapperType con)
 
         -- For /data/ types check that each argument has a fixed runtime rep
         -- If we are dealing with a /newtype/, we allow representation
@@ -4557,46 +4554,6 @@ checkNewDataCon con
     ok_mult One = True
     ok_mult _   = False
 
-
--- | Reject nullary data constructors where a type variables
--- would escape through the result kind
--- See Note [Check for escaping result kind]
-checkEscapingKind :: DataCon -> TcM ()
-checkEscapingKind data_con
-  | null eq_spec, null theta, null arg_tys
-  , let tau_kind = tcTypeKind res_ty
-  , Nothing <- occCheckExpand (univ_tvs ++ ex_tvs) tau_kind
-    -- Ensure that none of the tvs occur in the kind of the forall
-    -- /after/ expanding type synonyms.
-    -- See Note [Phantom type variables in kinds] in GHC.Core.Type
-  = failWithTc $ TcRnForAllEscapeError (dataConWrapperType data_con) tau_kind
-  | otherwise
-  = return ()
-  where
-    (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty)
-      = dataConFullSig data_con
-
-{- Note [Check for escaping result kind]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider:
-  type T :: TYPE (BoxedRep l)
-  data T = MkT
-This is not OK: we get
-  MkT :: forall l. T @l :: TYPE (BoxedRep l)
-which is ill-kinded.
-
-For ordinary type signatures f :: blah, we make this check as part of kind-checking
-the type signature; see Note [Escaping kind in type signatures] in GHC.Tc.Gen.HsType.
-But for data constructors we check the type piecemeal, and there is no very
-convenient place to do it.  For example, note that it only applies for /nullary/
-constructors.  If we had
-  data T = MkT Int
-then the type of MkT would be MkT :: forall l. Int -> T @l, which is fine.
-
-So we make the check in checkValidDataCon.
-
-Historical note: we used to do the check in checkValidType (#20929 discusses).
--}
 
 -------------------------------
 checkValidClass :: Class -> TcM ()

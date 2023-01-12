@@ -13,7 +13,7 @@ module GHC.Tc.Validity (
   Rank(..), UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta,
   checkValidInstance, checkValidInstHead, validDerivPred,
-  checkTySynRhs,
+  checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
   arityErr,
@@ -460,6 +460,53 @@ checkTySynRhs ctxt ty
   where
     actual_kind = tcTypeKind ty
 
+{- Note [Check for escaping result kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+  type T :: TYPE (BoxedRep l)
+  data T = MkT
+This is not OK: we get
+  MkT :: forall l. T @l :: TYPE (BoxedRep l)
+which is ill-kinded.
+
+For ordinary /user-written type signatures f :: blah, we make this
+check as part of kind-checking the type signature in tcHsSigType; see
+Note [Escaping kind in type signatures] in GHC.Tc.Gen.HsType.
+
+But in two other places we need to check for an escaping result kind:
+
+* For data constructors we check the type piecemeal, and there is no
+  very convenient place to do it.  For example, note that it only
+  applies for /nullary/ constructors.  If we had
+    data T = MkT Int
+  then the type of MkT would be MkT :: forall l. Int -> T @l, which is fine.
+
+  So we make the check in checkValidDataCon.
+
+* When inferring the type of a function, there is no user-written type
+  that we are checking.  Forgetting this led to #22743.  Now we call
+  checkEscapingKind in GHC.Tc.Gen.Bind.mkInferredPolyId
+
+Historical note: we used to do the escaping-kind check in
+checkValidType (#20929 discusses), but that is now redundant.
+-}
+
+checkEscapingKind :: Type -> TcM ()
+-- Give a sigma-type (forall a1 .. an. ty), where (ty :: ki),
+-- check that `ki` does not mention any of the binders a1..an.
+-- Otherwise the type is ill-kinded
+-- See Note [Check for escaping result kind]
+checkEscapingKind poly_ty
+  | (tvs, tau) <- splitForAllTyVars poly_ty
+  , let tau_kind = typeKind tau
+  , Nothing <- occCheckExpand tvs tau_kind
+    -- Ensure that none of the tvs occur in the kind of the forall
+    -- /after/ expanding type synonyms.
+    -- See Note [Phantom type variables in kinds] in GHC.Core.Type
+  = failWithTc $ TcRnForAllEscapeError poly_ty tau_kind
+  | otherwise
+  = return ()
+
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
 funArgResRank other_rank               = (other_rank, other_rank)
@@ -757,6 +804,9 @@ check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
         ; check_type (ve{ve_tidy_env = env'}) tau
                 -- Allow foralls to right of arrow
 
+        -- Note: skolem-escape in types (e.g. forall r (a::r). a) is handled
+        --       by tcHsSigType and the constraint solver, so no need to
+        --       check it here; c.f. #20929
         }
   where
     (tvbs, phi)   = tcSplitForAllTyVarBinders ty
