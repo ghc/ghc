@@ -240,7 +240,9 @@ function set_toolchain_paths() {
 }
 
 function cabal_update() {
-  run "$CABAL" update --index="$HACKAGE_INDEX_STATE"
+  # In principle -w shouldn't be necessary here but with
+  # cabal-install 3.8.1.0 it is, due to cabal#8447.
+  run "$CABAL" update -w "$GHC" --index="$HACKAGE_INDEX_STATE"
 }
 
 
