@@ -1094,15 +1094,15 @@ span p xs@(x:xs')
 -- ([1,2,3],[])
 --
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
-break, break_, break' :: (a -> Bool) -> [a] -> ([a],[a])
+break, break' :: (a -> Bool) -> [a] -> ([a],[a])
 #if defined(USE_REPORT_PRELUDE)
 break_ p                 =  span (not . p)
 #else
 -- HBC version (stolen)
-break_ _ xs@[]          =  (xs, xs)
-break_ p xs@(x:xs')
-            | p x       =  ([],xs)
-            | otherwise =  let (ys,zs)   = break_ p xs' in (x:ys,zs)
+-- break_ _ xs@[]          =  (xs, xs)
+-- break_ p xs@(x:xs')
+--             | p x       =  ([],xs)
+--             | otherwise =  let (ys,zs)   = break_ p xs' in (x:ys,zs)
 #endif
 
 break' _ xs@[]          = (xs, xs)
