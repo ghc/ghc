@@ -954,7 +954,6 @@ pages:
 project-version:
   stage: packaging
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies: null
   tags:
     - x86_64-linux
   variables:
@@ -962,9 +961,8 @@ project-version:
   script:
     # Calculate the project version
     - .gitlab/ci.sh configure
-    - cp hadrian/bindist/Makefile .
-    - touch config.mk
-    - make show VALUE=ProjectVersion > version.sh
+    - .gitlab/ci.sh run_hadrian VERSION
+    - echo "ProjectVersion=$(cat VERSION)" > version.sh
 
   dependencies: []
   artifacts:
@@ -984,7 +982,6 @@ project-version:
     BUILD_FLAVOUR: default
     GIT_SUBMODULE_STRATEGY: "none"
   before_script:
-    - ls
     - cat version.sh
     # Calculate the project version
     - . ./version.sh

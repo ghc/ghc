@@ -193,7 +193,7 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
 
     a32 = { "Linux_Debian": { "<10": deb9_i386, "unknown_versioning": deb9_i386 }
           , "Linux_Ubuntu": { "unknown_versioning": deb9_i386 }
-          , "Linux_Mint" : { "unknown_versioing": deb9_i386 }
+          , "Linux_Mint" : { "unknown_versioning": deb9_i386 }
           , "Linux_UnknownLinux" : { "unknown_versioning": deb9_i386 }
           }
 
@@ -203,7 +203,8 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
 
 
     return { "viTags": ["Latest", "TODO_base_version"]
-        , "viChangeLog": "https://downloads.haskell.org/~ghc/9.4.4/docs/users_guide/9.4.4-notes.html"
+        # Check that this link exists
+        , "viChangeLog": "https://downloads.haskell.org/~ghc/9.6.0.123123/docs/users_guide/9.6.1-notes.html"
         , "viSourceDL": source
         , "viPostRemove": "*ghc-post-remove"
         , "viArch": { "A_64": a64
