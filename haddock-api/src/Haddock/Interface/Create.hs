@@ -521,7 +521,7 @@ mkMaps dflags pkgName gre instances decls thDocs = do
           ds2mdoc :: (HsDoc GhcRn) -> ErrMsgM (MDoc Name)
           ds2mdoc = processDocStringParas dflags pkgName gre . hsDocString
 
-      let cvt = M.fromList . nonDetEltsUniqMap
+      let cvt = M.fromList . nonDetUniqMapToList
 
       declDocs' <- mapM ds2mdoc (cvt declDocs)
       argDocs'  <- mapM (mapM ds2mdoc) (cvt argDocs)
