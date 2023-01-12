@@ -29,6 +29,8 @@ import GHC.Utils.Constants
 import GHC.Utils.Exception as Exception
 import GHC.Stack
 import GHC.Prelude.Basic
+
+import Control.Monad (when)
 import System.IO.Unsafe
 
 -- | This type is very similar to 'GHC.Utils.Panic.GhcException', but it omits
@@ -150,4 +152,8 @@ massert cond = withFrozenCallStack (assert cond (pure ()))
 
 assertM :: (HasCallStack, Monad m) => m Bool -> m ()
 {-# INLINE assertM #-}
-assertM mcond = withFrozenCallStack (mcond >>= massert)
+assertM mcond
+  | debugIsOn = withFrozenCallStack $ do
+      res <- mcond
+      when (not res) assertPanic'
+  | otherwise = return ()
