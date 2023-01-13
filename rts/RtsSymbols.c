@@ -985,6 +985,7 @@ extern char **environ;
       SymI_HasDataProto(stg_unpack_cstring_info)                            \
       SymI_HasDataProto(stg_unpack_cstring_utf8_info)                       \
       SymI_HasDataProto(stg_upd_frame_info)                                 \
+      SymI_HasDataProto(stg_marked_upd_frame_info)                          \
       SymI_HasDataProto(stg_bh_upd_frame_info)                              \
       SymI_HasProto(suspendThread)                                      \
       SymI_HasDataProto(stg_takeMVarzh)                                     \
