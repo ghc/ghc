@@ -856,15 +856,13 @@ jobs = Map.fromList $ concatMap (filter is_enabled_job . flattenJobGroup)
             . setVariable "HADRIAN_ARGS" "--docs=none"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
-        $ StandardTriple
-          (validate Amd64 (Linux Alpine) cfg)
-          (nightly Amd64 (Linux Alpine) cfg)
-          (release Amd64 (Linux Alpine) cfg)
+        $ validateBuilds Amd64 (Linux Alpine) cfg
 
     wasm_build_config =
       (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)
-        { buildFlavour = Release,
+        {
           fullyStatic = True
+          , buildFlavour     = Release -- TODO: This needs to be validate but wasm backend doesn't pass yet
         }
 
 main :: IO ()
