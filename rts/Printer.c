@@ -729,7 +729,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, (int)fun_info->f.fun_type);
             switch (fun_info->f.fun_type) {
             case ARG_GEN:
-                printSmallBitmap(spBottom, sp+2,
+                printSmallBitmap(spBottom, sp+3,
                                  BITMAP_BITS(fun_info->f.b.bitmap),
                                  BITMAP_SIZE(fun_info->f.b.bitmap));
                 break;

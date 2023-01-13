@@ -52,6 +52,8 @@ foreign import prim "any_ret_big_closures_two_words_framezh" any_ret_big_closure
 
 foreign import prim "any_ret_fun_arg_n_prim_framezh" any_ret_fun_arg_n_prim_framezh# :: SetupFunction
 
+foreign import prim "any_ret_fun_arg_gen_framezh" any_ret_fun_arg_gen_framezh# :: SetupFunction
+
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
@@ -193,6 +195,30 @@ main = do
         assertEqual (length pCs) 1
         let wds = map  getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1]
+      e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_fun_arg_gen_framezh# $
+    \case
+      RetFun {..} -> do
+        assertEqual retFunType ARG_GEN
+        assertEqual retFunSize 8
+        fc <- getBoxedClosureData retFunFun
+        case fc of
+          FunClosure {..} -> do
+            assertEqual (tipe info) FUN_STATIC
+            assertEqual (null dataArgs) True
+            assertEqual (null ptrArgs) True
+          e -> error $ "Wrong closure type: " ++ show e
+        pCs <- mapM getBoxedClosureData retFunPayload
+        assertEqual (length pCs) 8
+        let w0 = getWordFromUnknownTypeWordSizedPrimitive (head pCs)
+            w1 = getWordFromConstr01 (pCs !! 1)
+            w2 = getWordFromConstr01 (pCs !! 2)
+            w3 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 3)
+            w4 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 4)
+            w5 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 5)
+            w6 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 6)
+            w7 = getWordFromConstr01 (pCs !! 7)
+        assertEqual [w0, w1, w2, w3, w4, w5, w6, w7] [1, 2 ,3, 4, 5, 6, 7, 8]
       e -> error $ "Wrong closure type: " ++ show e
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)

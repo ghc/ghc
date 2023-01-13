@@ -117,7 +117,7 @@ getRetFunSmallBitmapzh(P_ stack, W_ index) {
   (bitmap) = ccall getRetFunBitmapWord(c);
   (size) = ccall getRetFunBitmapSize(c);
 
-  ccall debugBelch("getRetFunSmallBitmapzh - bitmap %ul , size %u", bitmap, size);
+  ccall debugBelch("getRetFunSmallBitmapzh - bitmap %ul , size %u\n", bitmap, size);
   return (bitmap, size);
 }
 

@@ -111,7 +111,7 @@ StgWord getRetFunBitmapSize(StgRetFun *ret_fun) {
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   switch (fun_info->f.fun_type) {
     case ARG_GEN:
-        return BITMAP_BITS(fun_info->f.b.bitmap);
+        return BITMAP_SIZE(fun_info->f.b.bitmap);
     case ARG_GEN_BIG:
         return GET_FUN_LARGE_BITMAP(fun_info)->size;
     default:

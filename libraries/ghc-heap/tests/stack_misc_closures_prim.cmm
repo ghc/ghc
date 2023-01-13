@@ -78,6 +78,11 @@ any_ret_fun_arg_n_prim_framezh() {
     return (stack);
 }
 
+any_ret_fun_arg_gen_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_fun_arg_gen_frame(MyCapability() "ptr");
+    return (stack);
+}
 
 INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
 #if SIZEOF_VOID_P == 4
@@ -195,7 +200,7 @@ INFO_TABLE_RET ( test_ret_fun, RET_FUN, W_ info_ptr, W_ size, P_ fun, P_ payload
     return ();
 }
 
-INFO_TABLE_FUN ( test_fun_0_1, 0 , 0, FUN_0_1, "FUN_0_1", "FUN_0_1", 1,  ARG_N)
+INFO_TABLE_FUN ( test_arg_n_fun_0_1, 0 , 0, FUN_0_1, "FUN_0_1", "FUN_0_1", 1,  ARG_N)
     return (/* no return values */)
 {
     return ();

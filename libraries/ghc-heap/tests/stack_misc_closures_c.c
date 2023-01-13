@@ -8,9 +8,12 @@
 #include "rts/storage/Closures.h"
 #include "rts/storage/InfoTables.h"
 #include "rts/storage/TSO.h"
+#include "stg/MiscClosures.h"
 #include "stg/Types.h"
 
+// TODO: Delete when development finished
 extern void printStack(StgStack *stack);
+extern void printObj(StgClosure *obj);
 
 // See rts/Threads.c
 #define MIN_STACK_WORDS (RESERVED_STACK_WORDS + sizeofW(StgStopFrame) + 3)
@@ -155,13 +158,14 @@ void create_any_ret_big_closures_two_words_frame(Capability *cap,
 }
 
 RTS_RET(test_ret_fun);
-RTS_RET(test_fun_0_1);
+RTS_RET(test_arg_n_fun_0_1);
 void create_any_ret_fun_arg_n_prim_frame(Capability *cap, StgStack *stack,
                                          StgWord w) {
   StgRetFun *c = (StgRetFun *)stack->sp;
   c->info = &test_ret_fun_info;
-  StgClosure *f = (StgClosure *)allocate(cap, sizeofW(StgClosure) * sizeofW(StgWord));
-  SET_HDR(f, &test_fun_0_1_info, ccs)
+  StgClosure *f =
+      (StgClosure *)allocate(cap, sizeofW(StgClosure) + sizeofW(StgWord));
+  SET_HDR(f, &test_arg_n_fun_0_1_info, ccs)
   c->fun = f;
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
   c->size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
@@ -169,10 +173,39 @@ void create_any_ret_fun_arg_n_prim_frame(Capability *cap, StgStack *stack,
   // memory layout fits.
   c->payload[0] = (StgClosure *)w;
   f->payload[0] = (StgClosure *)w;
-  printStack(stack);
 }
 
-void checkSTACK(StgStack *stack);
+RTS_CLOSURE(base_GHCziIOziEncodingziLatin1_zdwasciizuencode_closure);
+void create_any_ret_fun_arg_gen_frame(Capability *cap, StgStack *stack,
+                                      StgWord w) {
+  StgRetFun *c = (StgRetFun *)stack->sp;
+  c->info = &test_ret_fun_info;
+  // The selection of this closure was a bit arbitrary: There aren't many
+  // ARG_GEN closures around and I found this one first. N.B.: The payload
+  // values (and their types) are non-sense. But, this should be okay as we're
+  // only testing de-serialization.
+  c->fun = &base_GHCziIOziEncodingziLatin1_zdwasciizuencode_closure;
+  const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
+  c->size = BITMAP_SIZE(fun_info->f.b.bitmap);
+  c->payload[0] = (StgClosure *)w;
+  c->payload[1] = rts_mkWord(cap, ++w);
+  c->payload[2] = rts_mkWord(cap, ++w);
+  c->payload[3] = (StgClosure *)++w;
+  c->payload[4] = (StgClosure *)++w;
+  c->payload[5] = (StgClosure *)++w;
+  c->payload[6] = (StgClosure *)++w;
+  c->payload[7] = rts_mkWord(cap, ++w);
+
+  // TODO: Is this really needed? ghc-heap does not need it. Does the GC need
+  // it?
+  for (int i = 0; i < 8; i++) {
+    c->fun->payload[i] = c->payload[i];
+  }
+}
+
+// Import from Sanity.c
+extern void checkSTACK(StgStack *stack);
+
 StgStack *setup(Capability *cap, StgWord closureSizeWords,
                 void (*f)(Capability *, StgStack *, StgWord)) {
   StgWord totalSizeWords =
@@ -195,6 +228,8 @@ StgStack *setup(Capability *cap, StgWord closureSizeWords,
   // have distinct values in the closure to ensure nothing gets mixed up.
   f(cap, stack, 1);
 
+  // Make a sanitiy check to find unsound closures before the GC and the decode
+  // code.
   checkSTACK(stack);
   return stack;
 }
@@ -263,6 +298,12 @@ StgStack *any_ret_big_prims_min_frame(Capability *cap) {
 StgStack *any_ret_fun_arg_n_prim_frame(Capability *cap) {
   return setup(cap, sizeofW(StgRetFun) + sizeofW(StgWord),
                &create_any_ret_fun_arg_n_prim_frame);
+}
+
+StgStack *any_ret_fun_arg_gen_frame(Capability *cap) {
+  return setup(
+      cap, sizeofW(StgRetFun) + 5 * sizeofW(StgWord) + 3 * sizeofW(StgClosure),
+      &create_any_ret_fun_arg_gen_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }

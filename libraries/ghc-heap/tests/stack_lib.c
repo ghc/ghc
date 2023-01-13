@@ -177,7 +177,7 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
       ClosureTypeList *bitmapList;
       switch (fun_info->f.fun_type) {
       case ARG_GEN:
-        bitmapList = foldSmallBitmapToList(spBottom, sp + 2,
+        bitmapList = foldSmallBitmapToList(spBottom, sp + 3,
                                            BITMAP_BITS(fun_info->f.b.bitmap),
                                            BITMAP_SIZE(fun_info->f.b.bitmap));
         break;
@@ -189,16 +189,17 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
       }
       default: {
         bitmapList = foldSmallBitmapToList(
-            spBottom, sp + 2,
+            spBottom, sp + 3,
             BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
             BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
         break;
       }
       }
       result = concat(result, bitmapList);
+      continue;
     }
     default: {
-      errorBelch("Unexpected closure type!");
+      errorBelch("Unexpected closure type: %us", info->type);
       break;
     }
     }
