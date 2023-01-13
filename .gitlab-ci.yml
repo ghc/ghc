@@ -942,3 +942,138 @@ pages:
   artifacts:
     paths:
       - public
+
+#############################################################
+# Generation of GHCUp metadata
+#############################################################
+
+
+# TODO: MP: This way of determining the project version is sadly very slow.
+# It seems overkill to have to setup a complete environment, and build hadrian to get
+# it to generate a single file containing the version information.
+project-version:
+  stage: packaging
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  tags:
+    - x86_64-linux
+  variables:
+    BUILD_FLAVOUR: default
+  script:
+    # Calculate the project version
+    - sudo chown ghc:ghc -R .
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian VERSION
+    - echo "ProjectVersion=$(cat VERSION)" > version.sh
+
+  needs: []
+  dependencies: []
+  artifacts:
+    paths:
+      - version.sh
+  rules:
+    - if: '$NIGHTLY'
+    - if: '$RELEASE_JOB == "yes"'
+
+.ghcup-metadata:
+  stage: deploy
+  image: "nixos/nix:2.12.0"
+  dependencies: null
+  tags:
+    - x86_64-linux
+  variables:
+    BUILD_FLAVOUR: default
+    GIT_SUBMODULE_STRATEGY: "none"
+  before_script:
+    - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    - nix-channel --update
+    - cat version.sh
+    # Calculate the project version
+    - . ./version.sh
+
+    # Download existing ghcup metadata
+    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#wget -c wget "https://raw.githubusercontent.com/haskell/ghcup-metadata/develop/ghcup-0.0.7.yaml"
+
+    - .gitlab/generate_job_metadata
+
+  artifacts:
+    paths:
+      - metadata_test.yaml
+      - version.sh
+
+ghcup-metadata-nightly:
+  extends: .ghcup-metadata
+  # Explicit needs for validate pipeline because we only need certain bindists
+  needs:
+    - job: nightly-x86_64-linux-fedora33-release
+      artifacts: false
+    - job: nightly-x86_64-linux-centos7-validate
+      artifacts: false
+    - job: nightly-x86_64-darwin-validate
+      artifacts: false
+    - job: nightly-aarch64-darwin-validate
+      artifacts: false
+    - job: nightly-x86_64-windows-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static
+      artifacts: false
+    - job: nightly-x86_64-linux-deb9-validate
+      artifacts: false
+    - job: nightly-i386-linux-deb9-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-x86_64-linux-deb11-validate
+      artifacts: false
+    - job: source-tarball
+      artifacts: false
+    - job: project-version
+  script:
+    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+  rules:
+    - if: $NIGHTLY
+
+ghcup-metadata-release:
+  # No explicit needs for release pipeline as we assume we need everything and everything will pass.
+  extends: .ghcup-metadata
+  script:
+    - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --release-mode --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+
+.ghcup-metadata-testing:
+  stage: deploy
+  variables:
+    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
+    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
+    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
+    RELEASE_JOB: "$RELEASE_JOB"
+  trigger:
+    project: "ghc/ghcup-ci"
+    branch: "upstream-testing"
+    strategy: "depend"
+
+ghcup-metadata-testing-nightly:
+  needs:
+    - job: ghcup-metadata-nightly
+      artifacts: false
+  extends: .ghcup-metadata-testing
+  variables:
+      NIGHTLY: "$NIGHTLY"
+      UPSTREAM_JOB_NAME: "ghcup-metadata-nightly"
+  rules:
+    - if: '$NIGHTLY == "1"'
+
+ghcup-metadata-testing-release:
+  needs:
+    - job: ghcup-metadata-release
+      artifacts: false
+  extends: .ghcup-metadata-testing
+  variables:
+      UPSTREAM_JOB_NAME: "ghcup-metadata-release"
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+  when: manual
+
