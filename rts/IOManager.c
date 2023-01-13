@@ -20,6 +20,7 @@
 #include "IOManager.h"       // RTS internal
 #include "Capability.h"
 #include "Schedule.h"
+#include "Prelude.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "sm/Evac.h"
@@ -296,8 +297,15 @@ void initIOManager(void)
 
     switch (iomgr_type) {
 
-        /* The IO_MANAGER_SELECT needs no global initialisation */
-
+#if defined(IOMGR_ENABLED_SELECT)
+        case IO_MANAGER_SELECT:
+            /* Make the exception CAF a GC root. See initBuiltinGcRoots for
+             * similar examples. We throw this exception if a thread tries to
+             * wait on an invalid FD.
+             */
+            getStablePtr((StgPtr)blockedOnBadFD_closure);
+            break;
+#endif
 #if defined(IOMGR_ENABLED_MIO_POSIX)
         case IO_MANAGER_MIO_POSIX:
             /* Posix implementation in posix/Signals.c
