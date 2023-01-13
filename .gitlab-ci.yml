@@ -962,6 +962,7 @@ project-version:
     BUILD_FLAVOUR: default
   script:
     # Calculate the project version
+    - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh run_hadrian VERSION
     - echo "ProjectVersion=$(cat VERSION)" > version.sh
