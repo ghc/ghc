@@ -1615,7 +1615,7 @@ lines ""                =  []
 -- so s' keeps a reference to the first line via the pair and we have
 -- a space leak (cf. #4334).
 -- So we need to make GHC see the selector thunks with a trick.
-lines s                 =  cons (case break (== '\n') s of
+lines s                 =  cons (case break_ (== '\n') s of
                                     (l, s') -> (l, case s' of
                                                     []      -> []
                                                     _:s''   -> lines s''))

@@ -34,7 +34,7 @@ module GHC.List (
    head, last, tail, init, uncons, (!?), (!!),
    scanl, scanl1, scanl', scanr, scanr1,
    iterate, iterate', repeat, replicate, cycle,
-   take, drop, splitAt, takeWhile, dropWhile, span, break, reverse,
+   take, drop, splitAt, takeWhile, dropWhile, span, break, break_, reverse,
    zip, zip3, zipWith, zipWith3, unzip, unzip3,
    errorEmptyList,
 
@@ -1094,15 +1094,15 @@ span p xs@(x:xs')
 -- ([1,2,3],[])
 --
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
-break, break' :: (a -> Bool) -> [a] -> ([a],[a])
+break, break_, break' :: (a -> Bool) -> [a] -> ([a],[a])
 #if defined(USE_REPORT_PRELUDE)
 break_ p                 =  span (not . p)
 #else
 -- HBC version (stolen)
--- break_ _ xs@[]          =  (xs, xs)
--- break_ p xs@(x:xs')
---             | p x       =  ([],xs)
---             | otherwise =  let (ys,zs)   = break_ p xs' in (x:ys,zs)
+break_ _ xs@[]          =  (xs, xs)
+break_ p xs@(x:xs')
+             | p x       =  ([],xs)
+             | otherwise =  let (ys,zs)   = break_ p xs' in (x:ys,zs)
 #endif
 
 break' _ xs@[]          = (xs, xs)
