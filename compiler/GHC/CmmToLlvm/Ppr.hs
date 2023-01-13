@@ -26,22 +26,28 @@ import GHC.Types.Unique
 --
 
 -- | Pretty print LLVM data code
-pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc
+pprLlvmData :: IsDoc doc => LlvmCgConfig -> LlvmData -> doc
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc #-}
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> HDoc #-}
 pprLlvmData cfg (globals, types) =
-    let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
+    let ppLlvmTys (LMAlias    a) = line $ ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
         ppLlvmTys _other         = empty
 
         types'   = vcat $ map ppLlvmTys types
         globals' = ppLlvmGlobals cfg globals
-    in types' $+$ globals'
+    in types' $$ globals'
 
 
 -- | Pretty print LLVM code
-pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
+-- pprLlvmCmmDecl :: IsDoc doc => LlvmCmmDecl -> LlvmM doc
+pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
+-- {-# SPECIALIZE pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM SDoc #-}
+-- {-# SPECIALIZE pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM HDoc #-}
 pprLlvmCmmDecl (CmmData _ lmdata) = do
   opts <- getConfig
-  return (vcat $ map (pprLlvmData opts) lmdata, [])
+  return ( vcat $ map (pprLlvmData opts) lmdata
+         , vcat $ map (pprLlvmData opts) lmdata)
 
 pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
   = do let lbl = case mb_info of
@@ -92,7 +98,8 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            i8Ptr)
 
-       return (ppLlvmGlobal cfg alias $+$ ppLlvmFunction cfg fun', [])
+       return ( vcat [line $ ppLlvmGlobal cfg alias, ppLlvmFunction cfg fun']
+              , vcat [line $ ppLlvmGlobal cfg alias, ppLlvmFunction cfg fun'])
 
 
 -- | The section we are putting info tables and their entry code into, should
