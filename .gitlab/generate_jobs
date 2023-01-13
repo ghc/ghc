@@ -7,7 +7,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 tmp=$(mktemp)
-cabal run gen_ci -- $tmp
+cabal run gen_ci -- gitlab $tmp
 rm -f jobs.yaml
 echo "### THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY" > jobs.yaml
 cat $tmp | jq | tee -a jobs.yaml
