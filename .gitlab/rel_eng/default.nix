@@ -5,6 +5,7 @@ let sources = import ./nix/sources.nix; in
 with nixpkgs;
 let
   fetch-gitlab-artifacts = nixpkgs.callPackage ./fetch-gitlab-artifacts {};
+  mk-ghcup-metadata = nixpkgs.callPackage ./mk-ghcup-metadata { fetch-gitlab=fetch-gitlab-artifacts;};
 
 
   bindistPrepEnv = pkgs.buildFHSUserEnv {
@@ -50,5 +51,6 @@ in
     paths = [
       scripts
       fetch-gitlab-artifacts
+      mk-ghcup-metadata
     ];
   }
