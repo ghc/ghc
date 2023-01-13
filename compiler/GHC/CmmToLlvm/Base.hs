@@ -371,13 +371,13 @@ dumpIfSetLlvm flag hdr fmt doc = do
   liftIO $ putDumpFileMaybe logger flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
-renderLlvm :: Outp.SDoc -> LlvmM ()
-renderLlvm sdoc = do
+renderLlvm :: Outp.HDoc -> Outp.SDoc -> LlvmM ()
+renderLlvm hdoc sdoc = do
 
     -- Write to output
     ctx <- llvmCgContext <$> getConfig
     out <- getEnv envOutput
-    liftIO $ Outp.bufLeftRenderSDoc ctx out sdoc
+    liftIO $ Outp.bPutHDoc out ctx hdoc
 
     -- Dump, if requested
     dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" FormatLLVM sdoc
@@ -428,7 +428,7 @@ ghcInternalFunctions = do
       let n' = fsLit n
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
-      renderLlvm $ ppLlvmFunctionDecl decl
+      renderLlvm (ppLlvmFunctionDecl decl) (ppLlvmFunctionDecl decl)
       funInsert n' (LMFunction decl)
 
 -- ----------------------------------------------------------------------------

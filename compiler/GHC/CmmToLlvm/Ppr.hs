@@ -26,22 +26,28 @@ import GHC.Types.Unique
 --
 
 -- | Pretty print LLVM data code
-pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc
+pprLlvmData :: IsDoc doc => LlvmCgConfig -> LlvmData -> doc
 pprLlvmData cfg (globals, types) =
-    let ppLlvmTys (LMAlias    a) = ppLlvmAlias a
+    let ppLlvmTys (LMAlias    a) = line $ ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
         ppLlvmTys _other         = empty
 
         types'   = vcat $ map ppLlvmTys types
         globals' = ppLlvmGlobals cfg globals
-    in types' $+$ globals'
+    in types' $$ globals'
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc #-}
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Pretty print LLVM code
-pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (SDoc, [LlvmVar])
+-- The HDoc we return is used to produce the final LLVM file, with the
+-- SDoc being returned alongside for use when @Opt_D_dump_llvm@ is set
+-- as we can't (currently) dump HDocs.
+pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
 pprLlvmCmmDecl (CmmData _ lmdata) = do
   opts <- getConfig
-  return (vcat $ map (pprLlvmData opts) lmdata, [])
+  return ( vcat $ map (pprLlvmData opts) lmdata
+         , vcat $ map (pprLlvmData opts) lmdata)
 
 pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
   = do let lbl = case mb_info of
@@ -92,7 +98,8 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            i8Ptr)
 
-       return (ppLlvmGlobal cfg alias $+$ ppLlvmFunction cfg fun', [])
+       return ( vcat [line $ ppLlvmGlobal cfg alias, ppLlvmFunction cfg fun']
+              , vcat [line $ ppLlvmGlobal cfg alias, ppLlvmFunction cfg fun'])
 
 
 -- | The section we are putting info tables and their entry code into, should

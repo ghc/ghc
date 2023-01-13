@@ -91,7 +91,7 @@ llvmCodeGen logger cfg h cmm_stream
 llvmCodeGen' :: LlvmCgConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
 llvmCodeGen' cfg cmm_stream
   = do  -- Preamble
-        renderLlvm header
+        renderLlvm (llvmHeader cfg) (llvmHeader cfg)
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
@@ -99,20 +99,23 @@ llvmCodeGen' cfg cmm_stream
         a <- Stream.consume cmm_stream liftIO llvmGroupLlvmGens
 
         -- Declare aliases for forward references
-        renderLlvm . pprLlvmData cfg =<< generateExternDecls
+        decls <- generateExternDecls
+        renderLlvm (pprLlvmData cfg decls)
+                   (pprLlvmData cfg decls)
 
         -- Postamble
         cmmUsedLlvmGens
 
         return a
-  where
-    header :: SDoc
-    header =
-      let target  = llvmCgLlvmTarget cfg
-          llvmCfg = llvmCgLlvmConfig cfg
-      in     (text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\"")
-         $+$ (text "target triple = \"" <> text target <> text "\"")
 
+llvmHeader :: IsDoc doc => LlvmCgConfig -> doc
+llvmHeader cfg =
+  let target  = llvmCgLlvmTarget cfg
+      llvmCfg = llvmCgLlvmConfig cfg
+  in lines_
+      [ text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\""
+      , text "target triple = \"" <> text target <> text "\"" ]
+  where
     getDataLayout :: LlvmConfig -> String -> String
     getDataLayout config target =
       case lookup target (llvmTargets config) of
@@ -121,6 +124,8 @@ llvmCodeGen' cfg cmm_stream
                    text "Target:" <+> text target $$
                    hang (text "Available targets:") 4
                         (vcat $ map (text . fst) $ llvmTargets config)
+{-# SPECIALIZE llvmHeader :: LlvmCgConfig -> SDoc #-}
+{-# SPECIALIZE llvmHeader :: LlvmCgConfig -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do
@@ -156,10 +161,11 @@ cmmDataLlvmGens statics
                         = funInsert l ty
            regGlobal _  = pure ()
        mapM_ regGlobal gs
-       gss' <- mapM aliasify $ gs
+       gss' <- mapM aliasify gs
 
        cfg <- getConfig
-       renderLlvm $ pprLlvmData cfg (concat gss', concat tss)
+       renderLlvm (pprLlvmData cfg (concat gss', concat tss))
+                  (pprLlvmData cfg (concat gss', concat tss))
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen ::RawCmmDecl -> LlvmM ()
@@ -175,12 +181,12 @@ cmmLlvmGen cmm@CmmProc{} = do
     -- generate llvm code from cmm
     llvmBC <- withClearVars $ genLlvmProc fixed_cmm
 
-    -- pretty print
-    (docs, ivars) <- fmap unzip $ mapM pprLlvmCmmDecl llvmBC
-
-    -- Output, note down used variables
-    renderLlvm (vcat docs)
-    mapM_ markUsedVar $ concat ivars
+    -- pretty print - print as we go, since we produce HDocs, we know
+    -- no nesting state needs to be maintained for the SDocs.
+    forM_ llvmBC (\decl -> do
+        (hdoc, sdoc) <- pprLlvmCmmDecl decl
+        renderLlvm (hdoc $$ empty) (sdoc $$ empty)
+      )
 
 cmmLlvmGen _ = return ()
 
@@ -204,7 +210,8 @@ cmmMetaLlvmPrelude = do
               -- name.
               Nothing -> [ MetaStr name ]
   cfg <- getConfig
-  renderLlvm $ ppLlvmMetas cfg metas
+  renderLlvm (ppLlvmMetas cfg metas)
+             (ppLlvmMetas cfg metas)
 
 -- -----------------------------------------------------------------------------
 -- | Marks variables as used where necessary
@@ -229,4 +236,7 @@ cmmUsedLlvmGens = do
       lmUsed    = LMGlobal lmUsedVar (Just usedArray)
   if null ivars
      then return ()
-     else getConfig >>= renderLlvm . flip pprLlvmData ([lmUsed], [])
+     else do
+      cfg <- getConfig
+      renderLlvm (pprLlvmData cfg ([lmUsed], []))
+                 (pprLlvmData cfg ([lmUsed], []))

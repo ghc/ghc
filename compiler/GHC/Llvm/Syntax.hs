@@ -150,7 +150,7 @@ data LlvmStatement
       * value: Variable/Constant to store.
       * ptr:   Location to store the value in
   -}
-  | Store LlvmVar LlvmVar LMAlign
+  | Store LlvmVar LlvmVar LMAlign [MetaAnnot]
 
   {- |
     Multiway branch
@@ -185,11 +185,6 @@ data LlvmStatement
     then to wrap LLvmStatement in a Just or [].
   -}
   | Nop
-
-  {- |
-    A LLVM statement with metadata attached to it.
-  -}
-  | MetaStmt [MetaAnnot] LlvmStatement
 
   deriving (Eq)
 
