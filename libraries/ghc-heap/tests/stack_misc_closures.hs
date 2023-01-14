@@ -202,7 +202,7 @@ main = do
     \case
       RetFun {..} -> do
         assertEqual retFunType ARG_GEN
-        assertEqual retFunSize 8
+        assertEqual retFunSize 9
         fc <- getBoxedClosureData retFunFun
         case fc of
           FunClosure {..} -> do
@@ -211,22 +211,15 @@ main = do
             assertEqual (null ptrArgs) True
           e -> error $ "Wrong closure type: " ++ show e
         pCs <- mapM getBoxedClosureData retFunPayload
-        assertEqual (length pCs) 8
-        let w0 = getWordFromUnknownTypeWordSizedPrimitive (head pCs)
-            w1 = getWordFromConstr01 (pCs !! 1)
-            w2 = getWordFromConstr01 (pCs !! 2)
-            w3 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 3)
-            w4 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 4)
-            w5 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 5)
-            w6 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 6)
-            w7 = getWordFromConstr01 (pCs !! 7)
-        assertEqual [w0, w1, w2, w3, w4, w5, w6, w7] [1, 2, 3, 4, 5, 6, 7, 8]
+        assertEqual (length pCs) 9
+        let wds = map getWordFromConstr01 pCs
+        assertEqual wds [1 .. 9]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_fun_arg_gen_big_framezh# $
     \case
       RetFun {..} -> do
         assertEqual retFunType ARG_GEN_BIG
-        assertEqual retFunSize 70
+        assertEqual retFunSize 59
         fc <- getBoxedClosureData retFunFun
         case fc of
           FunClosure {..} -> do
@@ -235,10 +228,9 @@ main = do
             assertEqual (null ptrArgs) True
           e -> error $ "Wrong closure type: " ++ show e
         pCs <- mapM getBoxedClosureData retFunPayload
-        traceM $ "pCs " ++ show pCs
-        assertEqual (length pCs) 70
+        assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
-        assertEqual wds [1 .. 70]
+        assertEqual wds [1 .. 59]
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -322,19 +314,13 @@ assertUnknownTypeWordSizedPrimitive w c = case c of
 unboxSingletonTuple :: (# StackSnapshot# #) -> StackSnapshot#
 unboxSingletonTuple (# s# #) = s#
 
-{-# NOINLINE bigFun #-}
-bigFun ::
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
-  Word ->
+-- | A function with 59 arguments
+--
+-- A small bitmap has @64 - 6 = 58@ entries on 64bit machines. On 32bit machines
+-- it's less (for obvious reasons.) I.e. this function's bitmap a large one;
+-- function type is @ARG_GEN_BIG@.
+{-# NOINLINE argGenBigFun #-}
+argGenBigFun ::
   Word ->
   Word ->
   Word ->
@@ -395,5 +381,24 @@ bigFun ::
   Word ->
   Word ->
   Word
-bigFun a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32 a33 a34 a35 a36 a37 a38 a39 a40 a41 a42 a43 a44 a45 a46 a47 a48 a49 a50 a51 a52 a53 a54 a55 a56 a57 a58 a59 a60 a61 a62 a63 a64 a65 a66 a67 a68 a69 a70 =
-    a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47 + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 + a59 + a60 + a61 + a62 + a63 + a64 + a65 + a66 + a67 + a68 + a69 + a70
+argGenBigFun a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32 a33 a34 a35 a36 a37 a38 a39 a40 a41 a42 a43 a44 a45 a46 a47 a48 a49 a50 a51 a52 a53 a54 a55 a56 a57 a58 a59 =
+    a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47 + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 + a59
+
+-- | A function with more arguments than the pre-generated (@ARG_PPPPPPPP -> 8@) ones
+-- have
+--
+-- This results in a @ARG_GEN@ function (the number of arguments still fits in a
+-- small bitmap).
+{-# NOINLINE  argGenFun #-}
+argGenFun ::
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word
+argGenFun a1 a2 a3 a4 a5 a6 a7 a8 a9 = a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9

@@ -175,40 +175,28 @@ void create_any_ret_fun_arg_n_prim_frame(Capability *cap, StgStack *stack,
   f->payload[0] = (StgClosure *)w;
 }
 
-RTS_CLOSURE(base_GHCziIOziEncodingziLatin1_zdwasciizuencode_closure);
+RTS_CLOSURE(Main_argGenFun_closure);
 void create_any_ret_fun_arg_gen_frame(Capability *cap, StgStack *stack,
                                       StgWord w) {
   StgRetFun *c = (StgRetFun *)stack->sp;
   c->info = &test_ret_fun_info;
-  // The selection of this closure was a bit arbitrary: There aren't many
-  // ARG_GEN closures around and I found this one first. N.B.: The payload
-  // values (and their types) are non-sense. But, this should be okay as we're
-  // only testing de-serialization.
-  c->fun = &base_GHCziIOziEncodingziLatin1_zdwasciizuencode_closure;
+  c->fun = &Main_argGenFun_closure;
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
+  debugBelch("type %ul", fun_info->i.type);
+  debugBelch("fun type %ul", fun_info->f.fun_type);
   c->size = BITMAP_SIZE(fun_info->f.b.bitmap);
-  c->payload[0] = (StgClosure *)w;
-  c->payload[1] = rts_mkWord(cap, ++w);
-  c->payload[2] = rts_mkWord(cap, ++w);
-  c->payload[3] = (StgClosure *)++w;
-  c->payload[4] = (StgClosure *)++w;
-  c->payload[5] = (StgClosure *)++w;
-  c->payload[6] = (StgClosure *)++w;
-  c->payload[7] = rts_mkWord(cap, ++w);
-
-  // TODO: Is this really needed? ghc-heap does not need it. Does the GC need
-  // it?
-  for (int i = 0; i < 8; i++) {
-    c->fun->payload[i] = c->payload[i];
+  debugBelch("size %lu", c->size);
+  for (int i = 0; i < c->size; i++) {
+    c->payload[i] = rts_mkWord(cap, w++);
   }
 }
 
-RTS_CLOSURE(Main_bigFun_closure);
+RTS_CLOSURE(Main_argGenBigFun_closure);
 void create_any_ret_fun_arg_gen_big_frame(Capability *cap, StgStack *stack,
                                           StgWord w) {
   StgRetFun *c = (StgRetFun *)stack->sp;
   c->info = &test_ret_fun_info;
-  c->fun = &Main_bigFun_closure;
+  c->fun = &Main_argGenBigFun_closure;
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
   c->size = GET_FUN_LARGE_BITMAP(fun_info)->size;
   for (int i = 0; i < c->size; i++) {
@@ -315,13 +303,13 @@ StgStack *any_ret_fun_arg_n_prim_frame(Capability *cap) {
 
 StgStack *any_ret_fun_arg_gen_frame(Capability *cap) {
   return setup(
-      cap, sizeofW(StgRetFun) + 5 * sizeofW(StgWord) + 3 * sizeofW(StgClosure),
+      cap, sizeofW(StgRetFun) + 9 * sizeofW(StgClosure),
       &create_any_ret_fun_arg_gen_frame);
 }
 
 StgStack *any_ret_fun_arg_gen_big_frame(Capability *cap) {
   return setup(
-      cap, sizeofW(StgRetFun) + 70 * sizeofW(StgWord),
+      cap, sizeofW(StgRetFun) + 59 * sizeofW(StgWord),
       &create_any_ret_fun_arg_gen_big_frame);
 }
 
