@@ -183,7 +183,7 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
         break;
       case ARG_GEN_BIG: {
         bitmapList = foldLargeBitmapToList(
-            spBottom, sp + 2, GET_FUN_LARGE_BITMAP(fun_info),
+            spBottom, sp + 3, GET_FUN_LARGE_BITMAP(fun_info),
             GET_FUN_LARGE_BITMAP(fun_info)->size);
         break;
       }

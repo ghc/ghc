@@ -39,20 +39,20 @@ test('closure_size_noopt',
      compile_and_run, [''])
 
 test('tso_and_stack_closures',
-     [extra_files(['create_tso.c','create_tso.h','TestUtils.hs']),
+     [extra_files(['create_tso.c','create_tso.h','TestUtils.hs','stack_lib.c']),
       only_ways(['profthreaded']),
       ignore_stdout,
       ignore_stderr
      ],
-     multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c','')], ''])
+     multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c',''), ('stack_lib.c', '')], ''])
 
 test('parse_tso_flags',
-     [extra_files(['TestUtils.hs']),
+     [extra_files(['stack_lib.c', 'TestUtils.hs']),
       only_ways(['normal']),
       ignore_stdout,
       ignore_stderr
      ],
-     compile_and_run, [''])
+     multi_compile_and_run, ['parse_tso_flags', [('stack_lib.c','')], ''])
 test('T21622',
      only_ways(['normal']),
      compile_and_run, [''])
@@ -108,5 +108,5 @@ test('stack_misc_closures',
          ,('stack_misc_closures_prim.cmm', '')
          ,('stack_lib.c', '')
          ]
-      , '-debug -optc-g -g'
+      , '-debug -optc-g -g -ddump-to-file -dlint -dppr-debug -ddump-cmm'
       ])

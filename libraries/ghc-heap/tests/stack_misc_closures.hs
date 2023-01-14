@@ -12,19 +12,19 @@
 
 module Main where
 
+-- TODO: Remove later
+import Debug.Trace
 import GHC.Exts
 import GHC.Exts.DecodeStack
 import GHC.Exts.Heap
+import GHC.Exts.Heap (GenClosure (wordVal), HasHeapRep (getClosureData))
 import GHC.Exts.Heap.Closures
+import GHC.IO (IO (..))
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack (StackSnapshot (..))
+import System.Mem
 import TestUtils
 import Unsafe.Coerce (unsafeCoerce)
-import GHC.Exts.Heap (GenClosure(wordVal), HasHeapRep (getClosureData))
-import System.Mem
---TODO: Remove later
-import Debug.Trace
-import GHC.IO (IO (..))
 
 foreign import prim "any_update_framezh" any_update_frame# :: SetupFunction
 
@@ -53,6 +53,8 @@ foreign import prim "any_ret_big_closures_two_words_framezh" any_ret_big_closure
 foreign import prim "any_ret_fun_arg_n_prim_framezh" any_ret_fun_arg_n_prim_framezh# :: SetupFunction
 
 foreign import prim "any_ret_fun_arg_gen_framezh" any_ret_fun_arg_gen_framezh# :: SetupFunction
+
+foreign import prim "any_ret_fun_arg_gen_big_framezh" any_ret_fun_arg_gen_big_framezh# :: SetupFunction
 
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
@@ -142,7 +144,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
         let wds = map getWordFromConstr01 pCs
-        assertEqual wds [1..58]
+        assertEqual wds [1 .. 58]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_small_prims_frame# $
     \case
@@ -151,7 +153,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
-        assertEqual wds [1..58]
+        assertEqual wds [1 .. 58]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_big_prims_min_frame# $
     \case
@@ -159,7 +161,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
-        assertEqual wds [1..59]
+        assertEqual wds [1 .. 59]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_big_prims_min_frame# $
     \case
@@ -167,7 +169,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
-        assertEqual wds [1..59]
+        assertEqual wds [1 .. 59]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_big_closures_min_frame# $
     \case
@@ -175,7 +177,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
-        assertEqual wds [1..59]
+        assertEqual wds [1 .. 59]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_big_closures_two_words_frame# $
     \case
@@ -183,7 +185,7 @@ main = do
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 65
         let wds = map getWordFromConstr01 pCs
-        assertEqual wds [1..65]
+        assertEqual wds [1 .. 65]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_fun_arg_n_prim_framezh# $
     \case
@@ -193,7 +195,7 @@ main = do
         assertFun01Closure 1 =<< getBoxedClosureData retFunFun
         pCs <- mapM getBoxedClosureData retFunPayload
         assertEqual (length pCs) 1
-        let wds = map  getWordFromUnknownTypeWordSizedPrimitive pCs
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1]
       e -> error $ "Wrong closure type: " ++ show e
   test any_ret_fun_arg_gen_framezh# $
@@ -218,29 +220,46 @@ main = do
             w5 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 5)
             w6 = getWordFromUnknownTypeWordSizedPrimitive (pCs !! 6)
             w7 = getWordFromConstr01 (pCs !! 7)
-        assertEqual [w0, w1, w2, w3, w4, w5, w6, w7] [1, 2 ,3, 4, 5, 6, 7, 8]
+        assertEqual [w0, w1, w2, w3, w4, w5, w6, w7] [1, 2, 3, 4, 5, 6, 7, 8]
       e -> error $ "Wrong closure type: " ++ show e
+  test any_ret_fun_arg_gen_big_framezh# $
+    \case
+      RetFun {..} -> do
+        assertEqual retFunType ARG_GEN_BIG
+        assertEqual retFunSize 70
+        fc <- getBoxedClosureData retFunFun
+        case fc of
+          FunClosure {..} -> do
+            assertEqual (tipe info) FUN_STATIC
+            assertEqual (null dataArgs) True
+            assertEqual (null ptrArgs) True
+          e -> error $ "Wrong closure type: " ++ show e
+        pCs <- mapM getBoxedClosureData retFunPayload
+        traceM $ "pCs " ++ show pCs
+        assertEqual (length pCs) 70
+        let wds = map getWordFromConstr01 pCs
+        assertEqual wds [1 .. 70]
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
 test :: HasCallStack => SetupFunction -> (Closure -> IO ()) -> IO ()
 test setup assertion = do
-    sn <- getStackSnapshot setup
-    -- Run garbage collection now, to prevent later surprises: It's hard to debug
-    -- when the GC suddenly does it's work and there were bad closures or pointers.
-    -- Better fail early, here.
-    performGC
-    stack <- decodeStack' sn
-    assert sn stack
-    -- The result of HasHeapRep should be similar (wrapped in the closure for
-    -- StgStack itself.)
-    let (StackSnapshot sn#) = sn
-    stack' <- getClosureData sn#
-    case stack' of
-      SimpleStack {..} -> do
-        !cs <- mapM getBoxedClosureData stackClosures
-        assert sn cs
-      _ -> error $ "Unexpected closure type : " ++ show stack'
+  sn <- getStackSnapshot setup
+  -- Run garbage collection now, to prevent later surprises: It's hard to debug
+  -- when the GC suddenly does it's work and there were bad closures or pointers.
+  -- Better fail early, here.
+  performGC
+  stack <- decodeStack' sn
+  assert sn stack
+  -- The result of HasHeapRep should be similar (wrapped in the closure for
+  -- StgStack itself.)
+  let (StackSnapshot sn#) = sn
+  stack' <- getClosureData sn#
+  case stack' of
+    SimpleStack {..} -> do
+      !cs <- mapM getBoxedClosureData stackClosures
+      assert sn cs
+    _ -> error $ "Unexpected closure type : " ++ show stack'
   where
     assert :: StackSnapshot -> [Closure] -> IO ()
     assert sn stack = do
@@ -261,7 +280,7 @@ test setup assertion = do
 -- just pulls a @StgStack@ from RTS to Haskell land.
 getStackSnapshot :: SetupFunction -> IO StackSnapshot
 getStackSnapshot action# = IO $ \s ->
-   case action# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
+  case action# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
 
 assertConstrClosure :: HasCallStack => Word -> Closure -> IO ()
 assertConstrClosure w c = case c of
@@ -302,3 +321,79 @@ assertUnknownTypeWordSizedPrimitive w c = case c of
 
 unboxSingletonTuple :: (# StackSnapshot# #) -> StackSnapshot#
 unboxSingletonTuple (# s# #) = s#
+
+{-# NOINLINE bigFun #-}
+bigFun ::
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word ->
+  Word
+bigFun a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32 a33 a34 a35 a36 a37 a38 a39 a40 a41 a42 a43 a44 a45 a46 a47 a48 a49 a50 a51 a52 a53 a54 a55 a56 a57 a58 a59 a60 a61 a62 a63 a64 a65 a66 a67 a68 a69 a70 =
+    a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47 + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 + a59 + a60 + a61 + a62 + a63 + a64 + a65 + a66 + a67 + a68 + a69 + a70

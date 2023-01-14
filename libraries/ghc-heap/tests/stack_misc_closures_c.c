@@ -203,6 +203,19 @@ void create_any_ret_fun_arg_gen_frame(Capability *cap, StgStack *stack,
   }
 }
 
+RTS_CLOSURE(Main_bigFun_closure);
+void create_any_ret_fun_arg_gen_big_frame(Capability *cap, StgStack *stack,
+                                          StgWord w) {
+  StgRetFun *c = (StgRetFun *)stack->sp;
+  c->info = &test_ret_fun_info;
+  c->fun = &Main_bigFun_closure;
+  const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
+  c->size = GET_FUN_LARGE_BITMAP(fun_info)->size;
+  for (int i = 0; i < c->size; i++) {
+    c->payload[i] = rts_mkWord(cap, w++);
+  }
+}
+
 // Import from Sanity.c
 extern void checkSTACK(StgStack *stack);
 
@@ -304,6 +317,12 @@ StgStack *any_ret_fun_arg_gen_frame(Capability *cap) {
   return setup(
       cap, sizeofW(StgRetFun) + 5 * sizeofW(StgWord) + 3 * sizeofW(StgClosure),
       &create_any_ret_fun_arg_gen_frame);
+}
+
+StgStack *any_ret_fun_arg_gen_big_frame(Capability *cap) {
+  return setup(
+      cap, sizeofW(StgRetFun) + 70 * sizeofW(StgWord),
+      &create_any_ret_fun_arg_gen_big_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }

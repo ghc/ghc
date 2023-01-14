@@ -61,11 +61,6 @@ StgStack* cloneStack(Capability* capability, const StgStack* stack)
       break;
     }
   }
-
-#if defined(DEBUG)
-  printStack(top_stack);
-#endif
-
   return top_stack;
 }
 
