@@ -1003,35 +1003,39 @@ project-version:
 
 ghcup-metadata-nightly:
   extends: .ghcup-metadata
+  needs: []
   # Explicit needs for validate pipeline because we only need certain bindists
-  needs:
-    - job: nightly-x86_64-linux-fedora33-release
-      artifacts: false
-    - job: nightly-x86_64-linux-centos7-validate
-      artifacts: false
-    - job: nightly-x86_64-darwin-validate
-      artifacts: false
-    - job: nightly-aarch64-darwin-validate
-      artifacts: false
-    - job: nightly-x86_64-windows-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static
-      artifacts: false
-    - job: nightly-x86_64-linux-deb9-validate
-      artifacts: false
-    - job: nightly-i386-linux-deb9-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-aarch64-linux-deb10-validate
-      artifacts: false
-    - job: nightly-x86_64-linux-deb11-validate
-      artifacts: false
-    - job: source-tarball
-      artifacts: false
-    - job: project-version
+  #  needs:
+  #    - job: nightly-x86_64-linux-fedora33-release
+  #      artifacts: false
+  #    - job: nightly-x86_64-linux-centos7-validate
+  #      artifacts: false
+  #    - job: nightly-x86_64-darwin-validate
+  #      artifacts: false
+  #    - job: nightly-aarch64-darwin-validate
+  #      artifacts: false
+  #    - job: nightly-x86_64-windows-validate
+  #      artifacts: false
+  #    - job: nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static
+  #      artifacts: false
+  #    - job: nightly-x86_64-linux-deb9-validate
+  #      artifacts: false
+  #    - job: nightly-i386-linux-deb9-validate
+  #      artifacts: false
+  #    - job: nightly-x86_64-linux-deb10-validate
+  #      artifacts: false
+  #    - job: nightly-aarch64-linux-deb10-validate
+  #      artifacts: false
+  #    - job: nightly-x86_64-linux-deb11-validate
+  #      artifacts: false
+  #    - job: source-tarball
+  #      artifacts: false
+  #    - job: project-version
   script:
+    - export CI_PIPELINE_ID=61573
+    - export ProjectVersion=9.7.20230113
     - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
+    - echo "ProjectVersion=$ProjectVersion" > version.sh
   rules:
     - if: $NIGHTLY
 
