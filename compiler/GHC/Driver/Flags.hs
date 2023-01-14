@@ -631,7 +631,7 @@ data WarningFlag =
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
-   | Opt_WarnTermVariableCapture
+   | Opt_WarnTermVariableCapture                     -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag

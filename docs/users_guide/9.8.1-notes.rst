@@ -1,0 +1,13 @@
+.. _release-9-8-1:
+
+Version 9.8.1
+=============
+
+Language
+~~~~~~~~
+
+Compiler
+~~~~~~~~
+
+- Added a new warning :ghc-flag:`-Wterm-variable-capture` that helps to make code compatible with
+  the future extension ``RequiredTypeArguments``.

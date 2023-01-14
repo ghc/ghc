@@ -2319,8 +2319,8 @@ of ``-W(no-)*``.
 .. ghc-flag:: -Wterm-variable-capture
     :shortdesc: warn when an implicitly quantified type variable captures a term's name
     :type: dynamic
-    
-    :since: 9.6.1
+
+    :since: 9.8.1
 
     In accordance with `GHC Proposal #281
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`__,
