@@ -573,7 +573,7 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 allClosures (SimpleStack {..}) = stackClosures
 allClosures (UpdateFrame {..}) = [updatee]
 allClosures (CatchFrame {..}) = [handler]
