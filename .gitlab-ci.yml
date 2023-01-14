@@ -633,6 +633,7 @@ test-bootstrap:
   parallel: *bootstrap_matrix
   dependencies: null
   script:
+    - sudo chown ghc:ghc -R .
     - mkdir test-bootstrap
     - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
     - tar -xf ghc-*-testsuite.tar.xz -C test-bootstrap
