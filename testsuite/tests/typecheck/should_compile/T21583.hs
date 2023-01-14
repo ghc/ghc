@@ -5,13 +5,15 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Telomare.Possible where
 
+import Data.Kind (Type)
+
 data PartExprF f
   = ZeroSF
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 newtype EnhancedExpr f = EnhancedExpr {unEnhanceExpr :: SplitFunctor f PartExprF (EnhancedExpr f)} -- deriving (Eq, Show)
 
-type family Base t :: * -> *
+type family Base t :: Type -> Type
 
 type instance Base (EnhancedExpr f) = SplitFunctor f PartExprF
 

@@ -15,7 +15,6 @@ other dynamic, non-language, flag settings:
   -fprefer-byte-code
 warning settings:
   -Wsemigroup
-  -Wstar-is-type
   -Wcompat-unqualified-imports
   -Wtype-equality-out-of-scope
 ~~~~~~~~~~ Testing :set -a

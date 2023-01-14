@@ -96,6 +96,10 @@ Compiler
 - The :ghc-flag:`-Woperator-whitespace` warning no longer ignores constructor symbols
   (operators starting with ``:``).
 
+- The :ghc-flag:`-Wstar-is-type` warning is now enabled by default, continuing
+  the implementation of GHC proposal `#143
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0143-remove-star-kind.rst>`_.
+
 GHCi
 ~~~~
 
