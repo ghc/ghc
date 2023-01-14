@@ -987,6 +987,7 @@ project-version:
     BUILD_FLAVOUR: default
     GIT_SUBMODULE_STRATEGY: "none"
   before_script:
+    - touch version.sh
     - cat version.sh
     # Calculate the project version
     - . ./version.sh
