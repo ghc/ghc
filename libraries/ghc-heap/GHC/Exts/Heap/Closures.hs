@@ -323,7 +323,7 @@ data GenClosure b
 #endif
       }
 
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
     -- TODO: I could model stack chunks here (much better). However, I need the
     -- code to typecheck, now.
   | SimpleStack {
