@@ -63,7 +63,9 @@ data LlvmType
 instance Outputable LlvmType where
   ppr = ppType
 
-ppType :: IsLine doc => LlvmType ->  doc
+ppType :: IsLine doc => LlvmType -> doc
+{-# SPECIALIZE ppType :: LlvmType -> SDoc #-}
+{-# SPECIALIZE ppType :: LlvmType -> HLine #-}
 ppType t = case t of
   LMInt size     -> char 'i' <> int size
   LMFloat        -> text "float"
@@ -82,7 +84,9 @@ ppType t = case t of
   LMFunction (LlvmFunctionDecl _ _ _ r varg p _)
     -> ppType r <+> lparen <> ppParams varg p <> rparen
 
-ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] ->  doc
+ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
+{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc #-}
+{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> HLine #-}
 ppParams varg p
   = let varg' = case varg of
           VarArgs | null args -> text "..."
@@ -388,6 +392,8 @@ instance Outputable LlvmParamAttr where
   ppr = ppLlvmParamAttr
 
 ppLlvmParamAttr :: IsLine doc => LlvmParamAttr -> doc
+{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> SDoc #-}
+{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> HLine #-}
 ppLlvmParamAttr ZeroExt   = text "zeroext"
 ppLlvmParamAttr SignExt   = text "signext"
 ppLlvmParamAttr InReg     = text "inreg"
@@ -479,6 +485,8 @@ instance Outputable LlvmFuncAttr where
   ppr = ppLlvmFuncAttr
 
 ppLlvmFuncAttr :: IsLine doc => LlvmFuncAttr -> doc
+{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> SDoc #-}
+{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> HLine #-}
 ppLlvmFuncAttr AlwaysInline       = text "alwaysinline"
 ppLlvmFuncAttr InlineHint         = text "inlinehint"
 ppLlvmFuncAttr NoInline           = text "noinline"
@@ -542,6 +550,8 @@ instance Outputable LlvmCallConvention where
   ppr = ppLlvmCallConvention
 
 ppLlvmCallConvention :: IsLine doc => LlvmCallConvention -> doc
+{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> SDoc #-}
+{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> HLine #-}
 ppLlvmCallConvention CC_Ccc       = text "ccc"
 ppLlvmCallConvention CC_Fastcc    = text "fastcc"
 ppLlvmCallConvention CC_Coldcc    = text "coldcc"
@@ -609,6 +619,8 @@ instance Outputable LlvmLinkageType where
   ppr = ppLlvmLinkageType
 
 ppLlvmLinkageType :: IsLine doc => LlvmLinkageType -> doc
+{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> SDoc #-}
+{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> HLine #-}
 ppLlvmLinkageType Internal          = text "internal"
 ppLlvmLinkageType LinkOnce          = text "linkonce"
 ppLlvmLinkageType Weak              = text "weak"
@@ -660,6 +672,8 @@ instance Outputable LlvmMachOp where
   ppr = ppLlvmMachOp
 
 ppLlvmMachOp :: IsLine doc => LlvmMachOp -> doc
+{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> HLine #-}
 ppLlvmMachOp LM_MO_Add  = text "add"
 ppLlvmMachOp LM_MO_Sub  = text "sub"
 ppLlvmMachOp LM_MO_Mul  = text "mul"
@@ -707,6 +721,8 @@ instance Outputable LlvmCmpOp where
   ppr = ppLlvmCmpOp
 
 ppLlvmCmpOp :: IsLine doc => LlvmCmpOp -> doc
+{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> HLine #-}
 ppLlvmCmpOp LM_CMP_Eq  = text "eq"
 ppLlvmCmpOp LM_CMP_Ne  = text "ne"
 ppLlvmCmpOp LM_CMP_Ugt = text "ugt"
@@ -745,6 +761,8 @@ instance Outputable LlvmCastOp where
   ppr = ppLlvmCastOp
 
 ppLlvmCastOp :: IsLine doc => LlvmCastOp -> doc
+{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> HLine #-}
 ppLlvmCastOp LM_Trunc    = text "trunc"
 ppLlvmCastOp LM_Zext     = text "zext"
 ppLlvmCastOp LM_Sext     = text "sext"
@@ -768,7 +786,9 @@ ppLlvmCastOp LM_Bitcast  = text "bitcast"
 -- regardless of underlying architecture.
 --
 -- See Note [LLVM Float Types].
-ppDouble :: IsLine doc => Platform -> Double ->  doc
+ppDouble :: IsLine doc => Platform -> Double -> doc
+{-# SPECIALIZE ppDouble :: Platform -> Double -> SDoc #-}
+{-# SPECIALIZE ppDouble :: Platform -> Double -> HLine #-}
 ppDouble platform d
   = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
@@ -808,7 +828,9 @@ widenFp :: Float -> Double
 {-# NOINLINE widenFp #-}
 widenFp = float2Double
 
-ppFloat :: IsLine doc => Platform -> Float ->  doc
+ppFloat :: IsLine doc => Platform -> Float -> doc
+{-# SPECIALIZE ppFloat :: Platform -> Float -> SDoc #-}
+{-# SPECIALIZE ppFloat :: Platform -> Float -> HLine #-}
 ppFloat platform = ppDouble platform . widenFp
 
 
@@ -816,14 +838,12 @@ ppFloat platform = ppDouble platform . widenFp
 -- * Misc functions
 --------------------------------------------------------------------------------
 
--- ppCommaJoin :: IsLine doc => (Outputable a) => [a] ->  doc
--- ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
-
-ppCommaJoin :: IsLine doc => (a -> doc) -> [a] ->  doc
+ppCommaJoin :: IsLine doc => (a -> doc) -> [a] -> doc
+{-# SPECIALIZE ppCommaJoin :: (a -> SDoc) -> [a] -> SDoc #-}
+{-# SPECIALIZE ppCommaJoin :: (a -> HLine) -> [a] -> HLine #-}
 ppCommaJoin ppr strs = hsep $ punctuate comma (map ppr strs)
 
--- ppSpaceJoin :: IsLine doc => (Outputable a) => [a] ->  doc
--- ppSpaceJoin strs = hsep (map ppr strs)
-
-ppSpaceJoin :: IsLine doc => (a -> doc) -> [a] ->  doc
+ppSpaceJoin :: IsLine doc => (a -> doc) -> [a] -> doc
+{-# SPECIALIZE ppSpaceJoin :: (a -> SDoc) -> [a] -> SDoc #-}
+{-# SPECIALIZE ppSpaceJoin :: (a -> HLine) -> [a] -> HLine #-}
 ppSpaceJoin ppr strs = hsep (map ppr strs)

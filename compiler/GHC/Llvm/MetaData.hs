@@ -67,6 +67,8 @@ instance Outputable MetaId where
     ppr = ppMetaId
 
 ppMetaId :: IsLine doc => MetaId -> doc
+{-# SPECIALIZE ppMetaId :: MetaId -> SDoc #-}
+{-# SPECIALIZE ppMetaId :: MetaId -> HLine #-}
 ppMetaId (MetaId n) = char '!' <> int n
 
 -- | LLVM metadata expressions
