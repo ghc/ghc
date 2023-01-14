@@ -74,7 +74,7 @@ import GHC.Exts.DecodeHeap
 import GHC.Exts
 import GHC.Int
 import GHC.Word
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 import GHC.Stack.CloneStack
 import GHC.Exts.DecodeStack
 #endif
@@ -133,7 +133,7 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
     getClosureData x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 instance {-# OVERLAPPING #-} HasHeapRep StackSnapshot# where
     getClosureData s# = decodeStack (StackSnapshot s#)
 #endif
@@ -174,6 +174,6 @@ getClosureDataFromHeapObject x = do
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 getBoxedClosureData (DecodedClosureBox a) = pure a
 #endif

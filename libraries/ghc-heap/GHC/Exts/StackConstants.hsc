@@ -2,7 +2,7 @@
 module GHC.Exts.StackConstants where
 
 -- TODO: Better expression to allow is only for the latest (this branch) GHC?
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 
 import           Prelude
 

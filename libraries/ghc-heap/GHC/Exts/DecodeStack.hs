@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if MIN_VERSION_base(4,17,0)
+#if MIN_TOOL_VERSION_ghc(9,5,0)
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
