@@ -2578,7 +2578,7 @@ data TcRnMessage where
          testsuite/tests/typecheck/should_compile/tc078
          testsuite/tests/typecheck/should_compile/tc161
          testsuite/tests/typecheck/should_fail/T5051
-         testsuite/tests/typecheck/should_fail/T21583
+         testsuite/tests/typecheck/should_compile/T21583
          testsuite/tests/backpack/should_compile/bkp47
          testsuite/tests/backpack/should_fail/bkpfail25
          testsuite/tests/parser/should_compile/T2245

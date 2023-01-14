@@ -822,6 +822,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnUnrecognisedWarningFlags,
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
+        Opt_WarnStarIsType,
         Opt_WarnInaccessibleCode,
         Opt_WarnSpaceAfterBang,
         Opt_WarnNonCanonicalMonadInstances,
@@ -863,7 +864,6 @@ minusWallOpts
         Opt_WarnMissingPatternSynonymSignatures,
         Opt_WarnUnusedRecordWildcards,
         Opt_WarnRedundantRecordWildcards,
-        Opt_WarnStarIsType,
         Opt_WarnIncompleteUniPatterns,
         Opt_WarnIncompletePatternsRecUpd
       ]
@@ -881,7 +881,6 @@ minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
     = [ Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
-      , Opt_WarnStarIsType
       , Opt_WarnCompatUnqualifiedImports
       , Opt_WarnTypeEqualityOutOfScope
       ]

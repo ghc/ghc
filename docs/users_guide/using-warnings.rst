@@ -60,6 +60,7 @@ To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
         * :ghc-flag:`-Wunrecognised-warning-flags`
         * :ghc-flag:`-Winaccessible-code`
         * :ghc-flag:`-Wstar-binder`
+        * :ghc-flag:`-Wstar-is-type`
         * :ghc-flag:`-Woperator-whitespace-ext-conflict`
         * :ghc-flag:`-Wambiguous-fields`
         * :ghc-flag:`-Wunicode-bidirectional-format-characters`
@@ -160,7 +161,6 @@ The following flags are simple ways to select standard "packages" of warnings:
 
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
-        * :ghc-flag:`-Wstar-is-type`
         * :ghc-flag:`-Wcompat-unqualified-imports`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
 
@@ -1504,9 +1504,6 @@ of ``-W(no-)*``.
      This warning allows to detect such uses of ``*`` before the actual
      breaking change takes place. The recommended fix is to replace ``*`` with
      ``Type`` imported from ``Data.Kind``.
-
-     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
-     default, but will be switched on in a future GHC release.
 
 .. ghc-flag:: -Wstar-binder
      :shortdesc: warn about binding the ``(*)`` type operator despite
