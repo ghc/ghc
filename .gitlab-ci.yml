@@ -979,7 +979,7 @@ project-version:
 
 .ghcup-metadata:
   stage: deploy
-  image: "nixos/nix:2.8.0"
+  image: "nixos/nix:2.12.0"
   dependencies: null
   tags:
     - x86_64-linux
@@ -987,6 +987,8 @@ project-version:
     BUILD_FLAVOUR: default
     GIT_SUBMODULE_STRATEGY: "none"
   before_script:
+    - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+    - nix-channel --update
     - touch version.sh
     - cat version.sh
     # Calculate the project version
