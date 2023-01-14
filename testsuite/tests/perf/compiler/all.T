@@ -646,6 +646,9 @@ test ('T20261',
       [''])
 
 # Track perf of generics based binary instances
+# See also T21839r in perf/should_run... the testsuite
+# does not sensibly handle one test acting as both
+# a compile-time and a run-time performance test
 test('T21839c',
     [   collect_compiler_stats('all', 10),
         collect_compiler_stats('bytes allocated', 1),

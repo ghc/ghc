@@ -400,11 +400,13 @@ test('T19347',
     compile_and_run,
     ['-O'])
 
-# Track perf of generics based binary instances
+# Track runtime perf of generics based binary instances
+# See also T21839c in perf/compiler... the testsuite
+# does not sensibly handle one test acting as both
+# a compile-time and a run-time performance test
 test('T21839r',
     [   collect_stats('bytes allocated', 10),
         collect_runtime_residency(10),
-        collect_compiler_stats('bytes allocated', 1),
         only_ways(['normal'])],
     compile_and_run,
     ['-O'])
