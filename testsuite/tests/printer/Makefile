@@ -775,3 +775,9 @@ HsDocTy:
 	# See comment on pprWithDocString, this won't round trip
 	# $(CHECK_PPR)   $(LIBDIR) HsDocTy.hs
 	$(CHECK_EXACT) $(LIBDIR) HsDocTy.hs
+
+.PHONY: Test22765
+Test22765:
+	$(CHECK_PPR)   $(LIBDIR) Test22765.hs
+	$(CHECK_EXACT) $(LIBDIR) Test22765.hs
+
