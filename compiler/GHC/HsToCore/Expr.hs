@@ -525,10 +525,10 @@ dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
 -- HsSyn constructs that just shouldn't be here, because
 -- the renamer removed them.  See GHC.Rename.Expr.
 -- Note [Handling overloaded and rebindable constructs]
-dsExpr (HsOverLabel x _) = dataConCantHappen x
-dsExpr (OpApp x _ _ _)   = dataConCantHappen x
-dsExpr (SectionL x _ _)  = dataConCantHappen x
-dsExpr (SectionR x _ _)  = dataConCantHappen x
+dsExpr (HsOverLabel x _ _) = dataConCantHappen x
+dsExpr (OpApp x _ _ _)     = dataConCantHappen x
+dsExpr (SectionL x _ _)    = dataConCantHappen x
+dsExpr (SectionR x _ _)    = dataConCantHappen x
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ cc) expr = do

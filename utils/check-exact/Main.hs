@@ -204,7 +204,8 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
- "../../testsuite/tests/printer/Test22765.hs" Nothing
+--  "../../testsuite/tests/printer/Test22765.hs" Nothing
+ "../../testsuite/tests/printer/Test22771.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
