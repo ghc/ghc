@@ -455,7 +455,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 }
 
 <0> {
-  "#" $labelchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid ITlabelvarid }
+  "#" $labelchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src ITlabelvarid }
   "#" \" / { ifExtension OverloadedLabelsBit } { lex_quoted_label }
 }
 
@@ -853,7 +853,10 @@ data Token
   | ITqconsym (FastString,FastString)
 
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
-  | ITlabelvarid   FastString   -- Overloaded label: #x
+  | ITlabelvarid SourceText FastString   -- Overloaded label: #x
+                                         -- The SourceText is required because we can
+                                         -- have a string literal as a label
+                                         -- Note [Literal source text] in "GHC.Types.Basic"
 
   | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.Basic"
   | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.Basic"
@@ -1113,6 +1116,11 @@ qdo_token con span buf len _buf2 = do
 skip_one_varid :: (FastString -> Token) -> Action
 skip_one_varid f span buf len _buf2
   = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
+
+skip_one_varid_src :: (SourceText -> FastString -> Token) -> Action
+skip_one_varid_src f span buf len _buf2
+  = return (L span $! f (SourceText $ lexemeToString (stepOn buf) (len-1))
+                        (lexemeToFastString (stepOn buf) (len-1)))
 
 skip_two_varid :: (FastString -> Token) -> Action
 skip_two_varid f span buf len _buf2
@@ -2032,12 +2040,13 @@ lex_string_tok span buf _len _buf2 = do
 
 
 lex_quoted_label :: Action
-lex_quoted_label span _buf _len _buf2 = do
+lex_quoted_label span buf _len _buf2 = do
   start <- getInput
   s <- lex_string_helper "" start
-  (AI end _) <- getInput
+  (AI end bufEnd) <- getInput
   let
-    token = ITlabelvarid (mkFastString s)
+    token = ITlabelvarid (SourceText src) (mkFastString s)
+    src = lexemeToString (stepOn buf) (cur bufEnd - cur buf - 1)
     start = psSpanStart span
 
   return $ L (mkPsSpan start end) token

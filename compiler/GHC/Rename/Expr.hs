@@ -284,9 +284,9 @@ rnExpr (HsUnboundVar _ v)
   = return (HsUnboundVar noExtField v, emptyFVs)
 
 -- HsOverLabel: see Note [Handling overloaded and rebindable constructs]
-rnExpr (HsOverLabel _ v)
+rnExpr (HsOverLabel _ src v)
   = do { (from_label, fvs) <- lookupSyntaxName fromLabelClassOpName
-       ; return ( mkExpandedExpr (HsOverLabel noAnn v) $
+       ; return ( mkExpandedExpr (HsOverLabel noAnn src v) $
                   HsAppType noExtField (genLHsVar from_label) noHsTok hs_ty_arg
                 , fvs ) }
   where

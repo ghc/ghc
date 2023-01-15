@@ -745,7 +745,7 @@ zonkExpr env (HsRecSel _ (FieldOcc v occ))
 
 zonkExpr _ (HsIPVar x _) = dataConCantHappen x
 
-zonkExpr _ (HsOverLabel x _) = dataConCantHappen x
+zonkExpr _ (HsOverLabel x _ _) = dataConCantHappen x
 
 zonkExpr env (HsLit x (HsRat e f ty))
   = do new_ty <- zonkTcTypeToTypeX env ty
