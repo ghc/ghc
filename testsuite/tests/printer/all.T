@@ -189,3 +189,4 @@ test('T20531_red_ticks', extra_files(['T20531_defs.hs']), ghci_script, ['T20531_
 test('T22785', normal, compile_fail, [''])
 test('HsDocTy', [ignore_stderr, req_ppr_deps], makefile_test, ['HsDocTy'])
 test('Test22765', [ignore_stderr, req_ppr_deps], makefile_test, ['Test22765'])
+test('Test22771', [ignore_stderr, req_ppr_deps], makefile_test, ['Test22771'])

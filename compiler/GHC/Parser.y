@@ -706,7 +706,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  MDO            { L _ (ITmdo _) }
 
  IPDUPVARID     { L _ (ITdupipvarid   _) }              -- GHC extension
- LABELVARID     { L _ (ITlabelvarid   _) }
+ LABELVARID     { L _ (ITlabelvarid _ _) }
 
  CHAR           { L _ (ITchar   _ _) }
  STRING         { L _ (ITstring _ _) }
@@ -2901,7 +2901,7 @@ aexp2   :: { ECP }
         | qcon                          { ECP $ mkHsVarPV $! $1 }
         -- See Note [%shift: aexp2 -> ipvar]
         | ipvar %shift                  {% acsExpr (\cs -> sL1a $1 (HsIPVar (comment (glRR $1) cs) $! unLoc $1)) }
-        | overloaded_label              {% acsExpr (\cs -> sL1a $1 (HsOverLabel (comment (glRR $1) cs) $! unLoc $1)) }
+        | overloaded_label              {% acsExpr (\cs -> sL1a $1 (HsOverLabel (comment (glRR $1) cs) (fst $! unLoc $1) (snd $! unLoc $1))) }
         | literal                       { ECP $ pvA (mkHsLitPV $! $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -XOverloadedStrings is on.
@@ -3487,8 +3487,8 @@ ipvar   :: { Located HsIPName }
 -----------------------------------------------------------------------------
 -- Overloaded labels
 
-overloaded_label :: { Located FastString }
-        : LABELVARID          { sL1 $1 (getLABELVARID $1) }
+overloaded_label :: { Located (SourceText, FastString) }
+        : LABELVARID          { sL1 $1 (getLABELVARIDs $1, getLABELVARID $1) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
@@ -3916,7 +3916,7 @@ getQCONID       (L _ (ITqconid   x)) = x
 getQVARSYM      (L _ (ITqvarsym  x)) = x
 getQCONSYM      (L _ (ITqconsym  x)) = x
 getIPDUPVARID   (L _ (ITdupipvarid   x)) = x
-getLABELVARID   (L _ (ITlabelvarid   x)) = x
+getLABELVARID   (L _ (ITlabelvarid _ x)) = x
 getCHAR         (L _ (ITchar   _ x)) = x
 getSTRING       (L _ (ITstring _ x)) = x
 getINTEGER      (L _ (ITinteger x))  = x
@@ -3940,6 +3940,8 @@ getPRIMCHARs    (L _ (ITprimchar   src _)) = src
 getPRIMSTRINGs  (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs (L _ (ITprimint    src _)) = src
 getPRIMWORDs    (L _ (ITprimword   src _)) = src
+
+getLABELVARIDs   (L _ (ITlabelvarid src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.Basic" for the following
 getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl

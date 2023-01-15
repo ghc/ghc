@@ -489,7 +489,9 @@ ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
 ppr_expr (HsRecSel _ f)      = pprPrefixOcc f
 ppr_expr (HsIPVar _ v)       = ppr v
-ppr_expr (HsOverLabel _ l)   = char '#' <> ppr l
+ppr_expr (HsOverLabel _ s l) = char '#' <> case s of
+                                             NoSourceText -> ppr l
+                                             SourceText src -> text src
 ppr_expr (HsLit _ lit)       = ppr lit
 ppr_expr (HsOverLit _ lit)   = ppr lit
 ppr_expr (HsPar _ _ e _)     = parens (ppr_lexpr e)

@@ -2633,7 +2633,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getAnnotationEntry (HsVar{})                    = NoEntryVal
   getAnnotationEntry (HsUnboundVar an _)          = fromAnn an
   getAnnotationEntry (HsRecSel{})                 = NoEntryVal
-  getAnnotationEntry (HsOverLabel an _)           = fromAnn an
+  getAnnotationEntry (HsOverLabel an _ _)         = fromAnn an
   getAnnotationEntry (HsIPVar an _)               = fromAnn an
   getAnnotationEntry (HsOverLit an _)             = fromAnn an
   getAnnotationEntry (HsLit an _)                 = fromAnn an
@@ -2671,7 +2671,7 @@ instance ExactPrint (HsExpr GhcPs) where
   setAnnotationAnchor a@(HsVar{})              _ _s = a
   setAnnotationAnchor (HsUnboundVar an a)    anc cs = (HsUnboundVar (setAnchorEpa an anc cs) a)
   setAnnotationAnchor a@(HsRecSel{})           _ _s  = a
-  setAnnotationAnchor (HsOverLabel an a)     anc cs = (HsOverLabel (setAnchorEpa an anc cs) a)
+  setAnnotationAnchor (HsOverLabel an s a)   anc cs = (HsOverLabel (setAnchorEpa an anc cs) s a)
   setAnnotationAnchor (HsIPVar an a)         anc cs = (HsIPVar (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsOverLit an a)       anc cs = (HsOverLit (setAnchorEpa an anc cs) a)
   setAnnotationAnchor (HsLit an a)           anc cs = (HsLit (setAnchorEpa an anc cs) a)
@@ -2717,7 +2717,12 @@ instance ExactPrint (HsExpr GhcPs) where
         printStringAtAA l  "_" >> return ()
         printStringAtAA cb "`" >> return ()
         return x
-  exact x@(HsOverLabel _ _) = withPpr x
+  exact x@(HsOverLabel _ src l) = do
+    printStringAtLsDelta (SameLine 0) "#"
+    case src of
+      NoSourceText   -> printStringAtLsDelta (SameLine 0) (unpackFS l)
+      SourceText txt -> printStringAtLsDelta (SameLine 0) txt
+    return x
 
   exact x@(HsIPVar _ (HsIPName n))
     = printStringAdvance ("?" ++ unpackFS n) >> return x
