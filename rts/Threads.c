@@ -931,13 +931,13 @@ printThreadBlockage(StgTSO *tso)
 #endif
 #if !defined(THREADED_RTS)
   case BlockedOnRead:
-    debugBelch("is blocked on read from fd %d", (int)(tso->block_info.fd));
+    debugBelch("is blocked on waitRead#");
     break;
   case BlockedOnWrite:
-    debugBelch("is blocked on write to fd %d", (int)(tso->block_info.fd));
+    debugBelch("is blocked on waitWrite#");
     break;
   case BlockedOnDelay:
-    debugBelch("is blocked until %ld", (long)(tso->block_info.target));
+    debugBelch("is blocked on delay#");
     break;
 #endif
     break;
