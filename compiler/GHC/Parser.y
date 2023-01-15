@@ -1276,7 +1276,7 @@ ty_decl :: { LTyClDecl GhcPs }
                 {% mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
                                    (fmap reverse $5)
-                           ((fstOf3 $ unLoc $1):(fst $ unLoc $4)) }
+                           ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)) }
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1287,7 +1287,7 @@ ty_decl :: { LTyClDecl GhcPs }
             {% mkTyData (comb4 $1 $3 $5 $6) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
                             (fmap reverse $6)
-                            ((fstOf3 $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
+                            ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)++(fst $ unLoc $5)) }
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
 
@@ -1511,10 +1511,10 @@ at_decl_inst :: { LInstDecl GhcPs }
                                 (fmap reverse $7)
                         ((fst $ unLoc $1):$2++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
-type_data_or_newtype :: { Located (AddEpAnn, Bool, NewOrData) }
-        : 'data'        { sL1 $1 (mj AnnData    $1,False,DataType) }
-        | 'newtype'     { sL1 $1 (mj AnnNewtype $1,False,NewType) }
-        | 'type' 'data' { sL1 $1 (mj AnnData    $1,True ,DataType) }
+type_data_or_newtype :: { Located ([AddEpAnn], Bool, NewOrData) }
+        : 'data'        { sL1 $1 ([mj AnnData    $1],            False,DataType) }
+        | 'newtype'     { sL1 $1 ([mj AnnNewtype $1],            False,NewType) }
+        | 'type' 'data' { sL1 $1 ([mj AnnType $1, mj AnnData $2],True ,DataType) }
 
 data_or_newtype :: { Located (AddEpAnn, NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }

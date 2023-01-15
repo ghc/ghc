@@ -3638,9 +3638,13 @@ exactDataDefn an exactHdr
 
   an' <- annotationsToComments an lidl [AnnOpenP, AnnCloseP]
 
-  an0 <- markEpAnnL an' lidl $ case condecls of
-    DataTypeCons _ _ -> AnnData
-    NewTypeCon   _ -> AnnNewtype
+  an0 <- case condecls of
+    DataTypeCons is_type_data _ -> do
+      an0' <- if is_type_data
+                then markEpAnnL an' lidl AnnType
+                else return an'
+      markEpAnnL an0' lidl AnnData
+    NewTypeCon   _ -> markEpAnnL an' lidl AnnNewtype
 
   an1 <- markEpAnnL an0 lidl AnnInstance -- optional
   mb_ct' <- mapM markAnnotated mb_ct
