@@ -3936,7 +3936,7 @@ genAtomicWrite width mord addr val = do
   code <- assignMem_IntCode (intFormat width) addr val
   let needs_fence = case mord of
         MemOrderSeqCst  -> True
-        MemOrderRelease -> True
+        MemOrderRelease -> False
         MemOrderAcquire -> pprPanic "genAtomicWrite: acquire ordering on write" empty
         MemOrderRelaxed -> False
   return $ if needs_fence then code `snocOL` MFENCE else code
