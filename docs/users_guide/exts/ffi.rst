@@ -807,11 +807,9 @@ the different kinds of allocation perform with GHC.
     the other forms of allocation above.
 
 ``Foreign.Marshal.Pool``
-    Pools are currently implemented using ``malloc/free``, so while they
-    might be a more convenient way to structure your memory allocation
-    than using one of the other forms of allocation, they won't be any
-    more efficient. We do plan to provide an improved-performance
-    implementation of Pools in the future, however.
+    Pools can be a more convenient way to structure your memory
+    allocation than using one of the other forms of allocation. They are
+    backed by the RTS internal arena instead of ``malloc/free``.
 
 .. _ffi-threads:
 
