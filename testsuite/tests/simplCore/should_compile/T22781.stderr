@@ -1,0 +1,56 @@
+
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 37, types: 10, coercions: 0, joins: 0/0}
+
+Rec {
+go
+  = \ ds ds ->
+      case ds of ds {
+        __DEFAULT ->
+          case ds of ds {
+            __DEFAULT -> go ds (-# ds 1#);
+            0# -> 3#
+          };
+        0# ->
+          case ds of ds {
+            __DEFAULT -> go 0# (-# ds 1#);
+            0# -> 3#;
+            1# -> 1#
+          }
+      }
+end Rec }
+
+bar = case go 0# 1# of ds { __DEFAULT -> I# ds }
+
+
+
+
+==================== SpecConstr ====================
+Result size of SpecConstr
+  = {terms: 40, types: 13, coercions: 0, joins: 0/0}
+
+Rec {
+$sgo = \ void -> 1#
+
+go
+  = \ ds ds ->
+      case ds of ds {
+        __DEFAULT ->
+          case ds of ds {
+            __DEFAULT -> go ds (-# ds 1#);
+            0# -> 3#
+          };
+        0# ->
+          case ds of ds {
+            __DEFAULT -> go 0# (-# ds 1#);
+            0# -> 3#;
+            1# -> 1#
+          }
+      }
+end Rec }
+
+bar = case go 0# 1# of ds { __DEFAULT -> I# ds }
+
+
+

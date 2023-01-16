@@ -1530,10 +1530,15 @@ scExpr' env (Case scrut b ty alts)
           ; (usg, rhs') <- scExpr env2 rhs
           ; let (usg', b_occ:arg_occs) = lookupOccs usg (b':bs2)
                 scrut_occ = case con of
-                               DataAlt dc -- See Note [Do not specialise evals]
+                              DataAlt dc -- See Note [Do not specialise evals]
                                   | not (single_alt && all deadArgOcc arg_occs)
-                                  -> ScrutOcc (unitUFM dc arg_occs)
-                               _  -> UnkOcc
+                                  -> -- pprTrace "sc_alt1" (ppr b' $$ ppr con $$ ppr bs $$ ppr arg_occs) $
+                                     ScrutOcc (unitUFM dc arg_occs)
+                              LitAlt _
+                                  | not single_alt
+                                  -> ScrutOcc (emptyUFM)
+                              _   -> -- pprTrace "sc_alt1" (ppr b' $$ ppr con $$ ppr bs $$ ppr arg_occs) $
+                                     UnkOcc
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 
@@ -2631,6 +2636,11 @@ argToPat in_scope val_env arg arg_occ
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
 argToPat1 env in_scope val_env arg arg_occ _arg_str
+  | Just (ConVal (LitAlt lit) _args) <- isValue val_env arg
+  , mb_scrut_lit
+  = do {
+       ; return (True, Lit lit , []) }
+
   | Just (ConVal (DataAlt dc) args) <- isValue val_env arg
   , not (ignoreDataCon env dc)        -- See Note [NoSpecConstr]
   , Just arg_occs <- mb_scrut dc
@@ -2660,6 +2670,13 @@ argToPat1 env in_scope val_env arg arg_occ _arg_str
                             -> Just (repeat UnkOcc)
                             | otherwise
                             -> Nothing
+    mb_scrut_lit = case arg_occ of
+                ScrutOcc _  -> True
+                _other      | sc_force env || sc_keen (sc_opts env)
+                            -> True
+                            | otherwise
+                            -> False
+
     match_vals bangs (arg:args)
       | isTypeArg arg
       = NotMarkedStrict : match_vals bangs args

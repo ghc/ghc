@@ -474,3 +474,5 @@ test('T15205', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress
 test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
 
 test('RewriteHigherOrderPatterns', normal, compile, ['-O -ddump-rule-rewrites -dsuppress-all -dsuppress-uniques'])
+# SpecConstr firing on literals
+test('T22781', [grep_errmsg(r'.*go') ], compile, ['-O2 -ddump-spec -dsuppress-uniques -dsuppress-all -dno-typeable-binds'])
