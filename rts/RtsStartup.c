@@ -68,7 +68,7 @@
 #endif
 
 // Count of how many outstanding hs_init()s there have been.
-static int hs_init_count = 0;
+static StgWord hs_init_count = 0;
 static bool rts_shutdown = false;
 
 #if defined(mingw32_HOST_OS)
@@ -242,8 +242,9 @@ hs_init_with_rtsopts(int *argc, char **argv[])
 void
 hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 {
-    hs_init_count++;
-    if (hs_init_count > 1) {
+    // N.B. atomic_inc returns the new value.
+    StgWord init_count = atomic_inc(&hs_init_count, 1);
+    if (init_count > 1) {
         // second and subsequent inits are ignored
         return;
     }
@@ -452,15 +453,17 @@ hs_exit_(bool wait_foreign)
 {
     uint32_t g, i;
 
-    if (hs_init_count <= 0) {
-        errorBelch("warning: too many hs_exit()s");
-        return;
-    }
-    hs_init_count--;
-    if (hs_init_count > 0) {
+    // N.B. atomic_dec returns the new value.
+    StgInt init_count = (StgInt)atomic_dec(&hs_init_count);
+    if (init_count > 0) {
         // ignore until it's the last one
         return;
     }
+    if (init_count < 0) {
+        errorBelch("warning: too many hs_exit()s");
+        return;
+    }
+
     rts_shutdown = true;
 
     /* start timing the shutdown */
