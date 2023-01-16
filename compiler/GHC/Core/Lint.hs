@@ -96,6 +96,7 @@ import Data.Foldable      ( for_, toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
+import Data.Ord           ( comparing )
 import GHC.Data.Pair
 import GHC.Base (oneShot)
 import GHC.Data.Unboxed
@@ -471,17 +472,15 @@ lintCoreBindings' cfg binds
 
     (_, dups) = removeDups compare binders
 
-    -- dups_ext checks for names with different uniques
+    -- ext_dups checks for names with different uniques
     -- but the same External name M.n.  We don't
     -- allow this at top level:
     --    M.n{r3}  = ...
     --    M.n{r29} = ...
     -- because they both get the same linker symbol
-    ext_dups = snd (removeDups ord_ext (map Var.varName binders))
-    ord_ext n1 n2 | Just m1 <- nameModule_maybe n1
-                  , Just m2 <- nameModule_maybe n2
-                  = compare (m1, nameOccName n1) (m2, nameOccName n2)
-                  | otherwise = LT
+    ext_dups = snd $ removeDups (comparing ord_ext) $
+               filter isExternalName $ map Var.varName binders
+    ord_ext n = (nameModule n, nameOccName n)
 
 {-
 ************************************************************************
