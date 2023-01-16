@@ -19,6 +19,8 @@
 module GHC.Tuple (
   module GHC.Tuple.Prim,
   Solo (Solo, MkSolo),
+  Tuple0,
+  Tuple1,
 ) where
 
 import GHC.CString ()  -- Make sure we do it first, so that the
@@ -27,6 +29,9 @@ import GHC.CString ()  -- Make sure we do it first, so that the
 import GHC.Tuple.Prim
 
 default () -- Double and Integer aren't available yet
+
+type Tuple0 = Unit
+type Tuple1 = Solo
 
 {-# DEPRECATED Solo "The Solo constructor has been renamed to MkSolo to avoid punning." #-}
 pattern Solo :: a -> Solo a

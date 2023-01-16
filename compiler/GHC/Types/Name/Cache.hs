@@ -1,4 +1,4 @@
-
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- | The Name Cache
@@ -20,6 +20,7 @@ where
 import GHC.Prelude
 
 import GHC.Unit.Module
+import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
@@ -30,6 +31,9 @@ import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Control.Monad
+import Control.Applicative
+
+import Text.Read (readMaybe)
 
 {-
 
@@ -100,10 +104,17 @@ type OrigNameCache   = ModuleEnv (OccEnv Name)
 takeUniqFromNameCache :: NameCache -> IO Unique
 takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 
+isTupleTyOcc_maybe :: OccName -> Maybe Name
+isTupleTyOcc_maybe occ =
+  case occNameString occ of
+    'T':'u':'p':'l':'e':str | Just n <- readMaybe @Int str
+      -> Just (tupleTyConName BoxedTuple n)
+    _ -> Nothing
+
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
   | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE_PRIM
-  , Just name <- isBuiltInOcc_maybe occ
+  , Just name <- isBuiltInOcc_maybe occ <|> isTupleTyOcc_maybe occ
   =     -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
         -- Special case for tuples; there are too many
         -- of them to pre-populate the original-name cache

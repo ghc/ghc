@@ -209,6 +209,7 @@ import qualified Data.ByteString.Char8 as BS
 
 import Data.Foldable
 import Data.List        ( elemIndex, intersperse )
+import Numeric          ( showInt )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -734,16 +735,16 @@ Basically it keeps everything uniform.
 
 However the /naming/ of the type/data constructors for one-tuples is a
 bit odd:
-  3-tuples:  (,,)   (,,)#
-  2-tuples:  (,)    (,)#
+  3-tuples:  Tuple3   (,,)#
+  2-tuples:  Tuple2   (,)#
   1-tuples:  ??
-  0-tuples:  ()     ()#
+  0-tuples:  Unit     ()#
 
 Zero-tuples have used up the logical name. So we use 'Solo' and 'Solo#'
 for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
-  data ()     = ()
+  data Unit = ()
   data Solo a = MkSolo a
-  data (a,b)  = (a,b)
+  data Tuple2 a b = (a,b)
 
 There is no way to write a boxed one-tuple in Haskell using tuple syntax.
 They can, however, be written using other methods:
@@ -852,7 +853,7 @@ isBuiltInOcc_maybe occ =
     choose_ns tc dc
       | isTcClsNameSpace ns   = tc
       | isDataConNameSpace ns = dc
-      | otherwise             = pprPanic "tup_name" (ppr occ)
+      | otherwise             = pprPanic "tup_name" (ppr occ <+> parens (pprNameSpace ns))
       where ns = occNameSpace occ
 
     tup_name boxity arity
@@ -887,10 +888,15 @@ mkTupleStr Boxed   = mkBoxedTupleStr
 mkTupleStr Unboxed = const mkUnboxedTupleStr
 
 mkBoxedTupleStr :: NameSpace -> Arity -> String
-mkBoxedTupleStr _ 0  = "()"
-mkBoxedTupleStr ns 1 | isDataConNameSpace ns = "MkSolo"  -- See Note [One-tuples]
-mkBoxedTupleStr _ 1 = "Solo"                             -- See Note [One-tuples]
-mkBoxedTupleStr _ ar = '(' : commas ar ++ ")"
+mkBoxedTupleStr ns 0
+  | isDataConNameSpace ns = "()"
+  | otherwise             = "Unit"
+mkBoxedTupleStr ns 1
+  | isDataConNameSpace ns = "MkSolo"  -- See Note [One-tuples]
+  | otherwise             = "Solo"
+mkBoxedTupleStr ns ar
+  | isDataConNameSpace ns = '(' : commas ar ++ ")"
+  | otherwise             = "Tuple" ++ showInt ar ""
 
 mkUnboxedTupleStr :: Arity -> String
 mkUnboxedTupleStr 0  = "(##)"
@@ -1052,7 +1058,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     boxity  = Boxed
     modu    = gHC_TUPLE_PRIM
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
+                         (ATyCon tycon) BuiltInSyntax -- TODO (int-index): UserSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
                             (AConLike (RealDataCon tuple_con)) BuiltInSyntax
     tc_uniq = mkTupleTyConUnique   boxity arity
