@@ -113,32 +113,24 @@ as ``-Wno-...`` for every individual warning in the group.
     :category:
 
     Turns on all warning options that indicate potentially suspicious
-    code. The warnings that are *not* enabled by :ghc-flag:`-Wall` are
+    code. They include all  warnings in :ghc-flag:`-Wextra`, plus:
 
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wmonomorphism-restriction`
-        * :ghc-flag:`-Wimplicit-prelude`
-        * :ghc-flag:`-Wmissing-local-signatures`
-        * :ghc-flag:`-Wmissing-exported-signatures`
-        * :ghc-flag:`-Wmissing-export-lists`
-        * :ghc-flag:`-Wmissing-import-lists`
-        * :ghc-flag:`-Wmissing-home-modules`
-        * :ghc-flag:`-Widentities`
-        * :ghc-flag:`-Wredundant-constraints`
-        * :ghc-flag:`-Wpartial-fields`
-        * :ghc-flag:`-Wmissed-specialisations`
-        * :ghc-flag:`-Wall-missed-specialisations`
-        * :ghc-flag:`-Wcpp-undef`
-        * :ghc-flag:`-Wduplicate-constraints`
-        * :ghc-flag:`-Wmissing-deriving-strategies`
-        * :ghc-flag:`-Wunused-packages`
-        * :ghc-flag:`-Wunused-type-patterns`
-        * :ghc-flag:`-Wsafe`
-        * :ghc-flag:`-Wimplicit-lift`
-        * :ghc-flag:`-Wmissing-kind-signatures`
-        * :ghc-flag:`-Wunticked-promoted-constructors`
+        * :ghc-flag:`-Whi-shadowing`
+        * :ghc-flag:`-Wincomplete-record-updates`
+        * :ghc-flag:`-Wincomplete-uni-patterns`
+        * :ghc-flag:`-Wmissing-pattern-synonym-signatures`
+        * :ghc-flag:`-Wmissing-signatures`
+        * :ghc-flag:`-Wname-shadowing`
+        * :ghc-flag:`-Worphans`
+        * :ghc-flag:`-Wredundant-record-wildcards`
+        * :ghc-flag:`-Wstar-is-type`
+        * :ghc-flag:`-Wtrustworthy-safe`
+        * :ghc-flag:`-Wtype-defaults`
+        * :ghc-flag:`-Wunused-do-bind`
+        * :ghc-flag:`-Wunused-record-wildcards`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
