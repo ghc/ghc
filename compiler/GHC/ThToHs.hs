@@ -1556,7 +1556,7 @@ cvtSigType = cvtSigTypeKind TypeLevel
 cvtSigTypeKind :: TypeOrKind -> TH.Type -> CvtM (LHsSigType GhcPs)
 cvtSigTypeKind typeOrKind ty = do
   ty' <- cvtTypeKind typeOrKind ty
-  pure $ hsTypeToHsSigType ty'
+  pure $ hsTypeToHsSigType $ parenthesizeHsType sigPrec ty'
 
 cvtTypeKind :: TypeOrKind -> TH.Type -> CvtM (LHsType GhcPs)
 cvtTypeKind typeOrKind ty
