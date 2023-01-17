@@ -250,11 +250,11 @@ dsFCall fn_id co fcall mDeclHeader = do
         (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 
-    let constQual -- provide 'const' qualifier (#22034)
+    let constQual -- provide 'const' qualifier (#22043)
           | (_, res_ty1) <- tcSplitFunTys ty1
           , newty <- maybe res_ty1 snd (tcSplitIOType_maybe res_ty1)
           , Just (ptr, _) <- splitTyConApp_maybe newty
-          , tyConName ptr `elem` [constPtrConName]
+          , tyConName ptr == constPtrConName
           = text "const"
           | otherwise = empty
 
