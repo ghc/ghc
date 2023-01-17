@@ -197,19 +197,23 @@ def main() -> None:
     parser_prepare.add_argument('--bindist', required=True, type=Path, help='extracted binary distribution')
 
     parser_upload = subparsers.add_parser('upload')
+    parser_upload.add_argument('--skip', nargs='*', type=str, help='skip uploading of the given package')
     parser_upload.add_argument('--docs', required = True, type=Path, help='folder created by --prepare')
     parser_upload.add_argument('--publish', action='store_true', help='Publish Hackage packages instead of just uploading candidates')
     args = parser.parse_args()
 
-    pkgs = args.pkg
+    pkgs = set(args.pkg)
     for pkg_name in pkgs:
         assert pkg_name in PACKAGES
 
-    if pkgs == []:
-        pkgs = PACKAGES.keys()
+    if not pkgs:
+        pkgs = set(PACKAGES.keys())
+
+    for pkg_name in args.skip:
+        assert pkg_name in PACKAGES
+    pkgs = pkgs - args.skip
 
     if args.command == "prepare":
-
         manifest = {}
         for pkg_name in pkgs:
             print(pkg_name)
