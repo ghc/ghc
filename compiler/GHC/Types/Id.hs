@@ -723,12 +723,14 @@ setIdCprSig id sig = modifyIdInfo (\info -> setCprSigInfo info sig) id
 zapIdDmdSig :: Id -> Id
 zapIdDmdSig id = modifyIdInfo (`setDmdSigInfo` nopSig) id
 
--- | This predicate says whether the 'Id' has a strict demand placed on it or
--- has a type such that it can always be evaluated strictly (i.e an
--- unlifted type, as of GHC 7.6).  We need to
--- check separately whether the 'Id' has a so-called \"strict type\" because if
--- the demand for the given @id@ hasn't been computed yet but @id@ has a strict
--- type, we still want @isStrictId id@ to be @True@.
+-- | `isStrictId` says whether either
+--   (a) the 'Id' has a strict demand placed on it or
+--   (b) definitely has a \"strict type\", such that it can always be
+--       evaluated strictly (i.e an unlifted type)
+-- We need to check (b) as well as (a), because when the demand for the
+-- given `id` hasn't been computed yet but `id` has a strict
+-- type, we still want `isStrictId id` to be `True`.
+-- Returns False if the type is levity polymorphic; False is always safe.
 isStrictId :: Id -> Bool
 isStrictId id
   | assertPpr (isId id) (text "isStrictId: not an id: " <+> ppr id) $
