@@ -471,5 +471,6 @@ test('T22611', [when(wordsize(32), skip), grep_errmsg(r'\$salterF') ], compile, 
 test('T22715_2', normal, multimod_compile, ['T22715_2', '-v0 -O -fspecialise-aggressively'])
 test('T22802', normal, compile, ['-O'])
 test('T15205', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
 
 test('RewriteHigherOrderPatterns', normal, compile, ['-O -ddump-rule-rewrites -dsuppress-all -dsuppress-uniques'])
