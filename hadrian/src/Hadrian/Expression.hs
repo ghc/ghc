@@ -34,10 +34,8 @@ newtype Expr c b a = Expr (ReaderT (Target c b) Action a)
 instance Semigroup a => Semigroup (Expr c b a) where
     Expr x <> Expr y = Expr $ (<>) <$> x <*> y
 
--- TODO: The 'Semigroup a' constraint will at some point become redundant.
-instance (Semigroup a, Monoid a) => Monoid (Expr c b a) where
+instance Monoid a => Monoid (Expr c b a) where
     mempty  = pure mempty
-    mappend = (<>)
 
 -- | Expressions that compute a Boolean value.
 type Predicate c b = Expr c b Bool

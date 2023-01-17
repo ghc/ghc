@@ -64,7 +64,6 @@ import Base
 import Builder
 import Context
 import Flavour
-import Packages
 import Settings
 import Distribution.Simple.LocalBuildInfo
 import qualified Distribution.Simple.Register as C
