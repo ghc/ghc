@@ -1,7 +1,7 @@
 T18612.hs:14:11-68: Splicing type
     conT ''Proxy `appT` (promotedTupleT 1 `appT` (tupleT 0))
   ======>
-    Proxy ('Solo ())
+    Proxy ('MkSolo ())
 T18612.hs:(10,7)-(11,75): Splicing type
     arrowT `appT` (conT ''Identity `appT` (tupleT 1 `appT` (tupleT 0)))
       `appT` (conT ''Identity `appT` (tupleT 1 `appT` (tupleT 0)))

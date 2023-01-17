@@ -72,6 +72,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  ( coercibleTyCon, heqTyCon
                                  , constraintKindTyConName
                                  , tupleTyConName
+                                 , tupleDataConName
                                  , manyDataConTyCon
                                  , liftedRepTyCon, liftedDataConTyCon )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, funTyFlagTyCon )
@@ -1750,9 +1751,12 @@ pprTuple ctxt_prec sort promoted args =
         -- `Solo x`, not `(x)`
       | [_] <- args_wo_runtime_reps
       , BoxedTuple <- sort
-      = let unit_tc_info = mkIfaceTyConInfo promoted IfaceNormalTyCon
-            unit_tc = IfaceTyCon (tupleTyConName sort 1) unit_tc_info in
-        pprPrecIfaceType ctxt_prec $ IfaceTyConApp unit_tc args
+      = let solo_tc_info = mkIfaceTyConInfo promoted IfaceNormalTyCon
+            tupleName = case promoted of
+              IsPromoted -> tupleDataConName (tupleSortBoxity sort)
+              NotPromoted -> tupleTyConName sort
+            solo_tc = IfaceTyCon (tupleName 1) solo_tc_info in
+        pprPrecIfaceType ctxt_prec $ IfaceTyConApp solo_tc args
       | otherwise
       = ppr_args_w_parens
 
