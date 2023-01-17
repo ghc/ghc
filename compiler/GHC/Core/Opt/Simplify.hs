@@ -4299,7 +4299,9 @@ simplRules env mb_new_id rules bind_cxt
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = fn_name'
                           , ru_args  = args'
-                          , ru_rhs   = rhs' }) }
+                          , ru_rhs   = occurAnalyseExpr rhs' }) }
+                            -- Remember to occ-analyse, to drop dead code.
+                            -- See Note [OccInfo in unfoldings and rules] in GHC.Core
 
 {- Note [Simplifying the RHS of a RULE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
