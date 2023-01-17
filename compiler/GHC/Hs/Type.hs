@@ -104,7 +104,7 @@ import GHC.Parser.Annotation
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
-import GHC.Types.Name( Name, NamedThing(getName), tcName )
+import GHC.Types.Name( Name, NamedThing(getName), tcName, dataName )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
@@ -1170,9 +1170,9 @@ ppr_mono_ty (HsExplicitListTy _ prom tys)
   | otherwise       = brackets (interpp'SP tys)
 ppr_mono_ty (HsExplicitTupleTy _ tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
-    -- `'Solo x`, not `'(x)`
+    -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys
-  = quote $ sep [text (mkTupleStr Boxed tcName 1), ppr_mono_lty ty]
+  = quote $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
   | otherwise
   = quote $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t
@@ -1235,7 +1235,7 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsSpliceTy{})           = False
     go_hs_ty (HsExplicitListTy{})     = False
     -- Special-case unary boxed tuple applications so that they are
-    -- parenthesized as `Proxy ('Solo x)`, not `Proxy 'Solo x` (#18612)
+    -- parenthesized as `Proxy ('MkSolo x)`, not `Proxy 'MkSolo x` (#18612)
     -- See Note [One-tuples] in GHC.Builtin.Types
     go_hs_ty (HsExplicitTupleTy _ [_])
                                       = p >= appPrec

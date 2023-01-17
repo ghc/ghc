@@ -64,7 +64,7 @@ unrestrictedFunTyCon :: TyCon
 multMulTyCon :: TyCon
 
 tupleTyConName :: TupleSort -> Arity -> Name
-
+tupleDataConName :: Boxity -> Arity -> Name
 
 integerTy, naturalTy :: Type
 
