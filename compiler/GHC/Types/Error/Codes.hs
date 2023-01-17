@@ -268,6 +268,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrInvalidCApiImport"                        = 72744
   GhcDiagnosticCode "PsErrMultipleConForNewtype"                    = 05380
   GhcDiagnosticCode "PsErrUnicodeCharLooksLike"                     = 31623
+  GhcDiagnosticCode "PsErrIllegalOrPat"                             = 29847
+  GhcDiagnosticCode "PsErrOrPatNeedsTwoAlternatives"                = 96152
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850
@@ -470,7 +472,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
-
+  GhcDiagnosticCode "TcRnOrPatBindsVariables"                       = 81303
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnBadGenericMethod"                          = 59794
   GhcDiagnosticCode "TcRnWarningMinimalDefIncomplete"               = 13511

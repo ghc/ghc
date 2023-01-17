@@ -238,6 +238,8 @@ desugarPat x pat = case pat of
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars : concat grdss
 
+  OrPat _tys pats -> concatMapM (desugarLPat x) (NE.toList pats)
+
   SumPat _ty p alt arity -> do
     (y, grds) <- desugarLPatV p
     let sum_con = sumDataCon alt arity

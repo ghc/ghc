@@ -6,6 +6,9 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -227,7 +230,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
     match_groups (g:gs) = mapM match_group $ g :| gs
 
     match_group :: NonEmpty (PatGroup,EquationInfo) -> DsM (MatchResult CoreExpr)
-    match_group eqns@((group,_) :| _)
+    match_group eqns@((group,eq) :| _)
         = case group of
             PgCon {}  -> matchConFamily  vars ty (ne $ subGroupUniq [(c,e) | (PgCon c, e) <- eqns'])
             PgSyn {}  -> matchPatSyn     vars ty (dropGroup eqns)
@@ -239,6 +242,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
+            PgOr      -> matchOr         vars ty eq -- every or-pattern makes up a single PgOr group
       where eqns' = NEL.toList eqns
             ne l = case NEL.nonEmpty l of
               Just nel -> nel
@@ -306,6 +310,18 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
         ; return (mkViewMatchResult var'
                     (mkCoreAppDs (text "matchView") viewExpr' (Var var))
                     match_result) }
+
+matchOr :: NonEmpty MatchId -> Type -> EquationInfo -> DsM (MatchResult CoreExpr)
+matchOr (var :| vars) ty eqn = do {
+      let OrPat _ pats = firstPat eqn
+     -- what to do *after* the OrPat matches
+    ; match_result <- match vars ty [eqn { eqn_pats = tail (eqn_pats eqn) }]
+     -- share match_result across the different cases of the OrPat match
+    ; shareSuccessHandler match_result ty (\expr -> do {
+      let or_eqns = map (singleEqn expr) (NEL.toList pats) in match [var] ty or_eqns
+    })
+  } where
+    singleEqn expr (L _ pat) = EqnInfo { eqn_pats = [pat], eqn_orig = FromSource, eqn_rhs = pure expr }
 
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
@@ -427,6 +443,11 @@ tidy1 v o (ParPat _ _ pat _)  = tidy1 v o (unLoc pat)
 tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
+
+tidy1 v o (OrPat x pats) = do
+  (wraps, pats) <- mapAndUnzipM (tidy1 v o . unLoc) (NEL.toList pats)
+  let wrap = foldr (.) id wraps in
+    return (wrap, OrPat x (NEL.fromList $ map (L noSrcSpanA) pats))
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
@@ -927,6 +948,7 @@ data PatGroup
   | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
+  | PgOr                -- Or pattern
 
 {- Note [Don't use Literal for PgN]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1197,6 +1219,7 @@ patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
 patGroup platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
   ExpansionPat _ p -> patGroup platform p
+patGroup _ (OrPat {}) = PgOr
 patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-

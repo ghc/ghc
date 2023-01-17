@@ -471,6 +471,12 @@ data PsMessage
       Char -- ^ the character it looks like
       String -- ^ the name of the character that it looks like
 
+    -- | Or pattern used without -XOrPatterns
+    | PsErrIllegalOrPat (LPat GhcPs)
+
+    -- | Or pattern with just a single alternative like (one of x)
+    | PsErrOrPatNeedsTwoAlternatives (LPat GhcPs)
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps

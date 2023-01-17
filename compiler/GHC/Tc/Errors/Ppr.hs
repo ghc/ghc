@@ -1155,6 +1155,9 @@ instance Diagnostic TcRnMessage where
                            False -> text (TH.pprint item))
     TcRnReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
     TcRnInterfaceLookupError _ sdoc -> mkSimpleDecorated sdoc
+    TcRnOrPatBindsVariables pat vars -> case vars of
+      True -> mkSimpleDecorated $ text "An or-pattern may not bind variables:" <+> ppr pat
+      False -> mkSimpleDecorated $ text "An or-pattern may not bind (type) variables nor type class or equality constraints:" <+> ppr pat
     TcRnUnsatisfiedMinimalDef mindef
       -> mkSimpleDecorated $
         vcat [text "No explicit implementation for"
@@ -1608,6 +1611,8 @@ instance Diagnostic TcRnMessage where
       -> if isError then ErrorWithoutFlag else WarningWithoutFlag
     TcRnInterfaceLookupError{}
       -> ErrorWithoutFlag
+    TcRnOrPatBindsVariables{}
+      -> ErrorWithoutFlag
     TcRnUnsatisfiedMinimalDef{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnMisplacedInstSig{}
@@ -2017,6 +2022,8 @@ instance Diagnostic TcRnMessage where
     TcRnReportCustomQuasiError{}
       -> noHints
     TcRnInterfaceLookupError{}
+      -> noHints
+    TcRnOrPatBindsVariables{}
       -> noHints
     TcRnUnsatisfiedMinimalDef{}
       -> noHints

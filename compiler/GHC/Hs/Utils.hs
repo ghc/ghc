@@ -1159,6 +1159,7 @@ collect_pat flag pat bndrs = case pat of
   ParPat _ _ pat _      -> collect_lpat flag pat bndrs
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
+  OrPat _ _             -> [] -- Don't collect binders recursively as we only want to get an error in the most specific or-pattern
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
   LitPat _ _            -> bndrs
   NPat {}               -> bndrs

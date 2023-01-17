@@ -56,6 +56,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
 
 import GHC.Core.TyCo.Ppr     ( pprTyVar )
 import GHC.Core.TyCon
@@ -91,6 +92,7 @@ import GHC.Data.Bag
 
 import Control.Monad
 import Data.List  ( partition )
+import qualified Data.List.NonEmpty as NE
 import Control.Arrow ( second )
 
 {- *********************************************************************
@@ -1341,6 +1343,18 @@ zonk_pat env (TuplePat tys pats boxed)
   = do  { tys' <- mapM (zonkTcTypeToTypeX env) tys
         ; (env', pats') <- zonkPats env pats
         ; return (env', TuplePat tys' pats' boxed) }
+
+zonk_pat env p@(OrPat ty pats)
+  = do  { ty' <- zonkTcTypeToTypeX env ty
+        ; (env', pats') <- zonkPats env (NE.toList pats)
+        ; checkNoVarsBound pats' p
+        ; return (env', OrPat ty' (NE.fromList pats')) }
+    where
+      checkNoVarsBound :: [LPat GhcTc] -> Pat GhcTc -> TcRn ()
+      checkNoVarsBound pats orpat = do
+        let bnds = collectPatsBinders CollWithDictBinders pats
+        let varBnds = collectPatsBinders CollNoDictBinders pats
+        unless (null bnds) $ addErr (TcRnOrPatBindsVariables orpat (varBnds `equalLength` bnds))
 
 zonk_pat env (SumPat tys pat alt arity )
   = do  { tys' <- mapM (zonkTcTypeToTypeX env) tys

@@ -1,0 +1,14 @@
+
+Or3.hs:12:6: error: [GHC-81303]
+    An or-pattern may not bind (type) variables nor type class or equality constraints: one of G2,
+                                                                                               G1
+
+Or3.hs:19:8: error: [GHC-81303]
+    An or-pattern may not bind (type) variables nor type class or equality constraints: one of IsInt1 {},
+                                                                                               IsInt2 {}
+
+Or3.hs:22:4: error: [GHC-81303]
+    An or-pattern may not bind variables: one of Left a, Right a
+
+Or3.hs:25:15: error: [GHC-81303]
+    An or-pattern may not bind variables: one of _, x

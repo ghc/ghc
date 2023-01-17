@@ -507,6 +507,22 @@ Ambiguity:
     empty activation and inlining '[0] Something'.
 -}
 
+{- Note [%shift: orpats -> pat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    orpats -> pat .
+    orpats -> pat . ',' orpats
+
+Example:
+
+    (one of a, b)
+
+Ambiguity:
+    We use ',' as a delimiter between options inside an or-pattern.
+    However, the ',' could also mean a tuple pattern.
+    If the user wants a tuple pattern, they have to put the or-pattern in parentheses.
+-}
+
 {- Note [Parser API Annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A lot of the productions are now cluttered with calls to
@@ -605,6 +621,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'interruptible' { L _ ITinterruptible }
  'unsafe'       { L _ ITunsafe }
  'family'       { L _ ITfamily }
+ 'one'          { L _ ITone }
  'role'         { L _ ITrole }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
@@ -3051,11 +3068,24 @@ texp :: { ECP }
                                 $1 >>= \ $1 ->
                                 pvA $ mkHsSectionR_PV (comb2 (reLocN $1) (reLoc $>)) (n2l $1) $2 }
 
+        | 'one' 'of' vocurly orpats close
+                             {% do {
+                                    let pat = sLLa $1 (reLoc (last $4)) (OrPat NoExtField (NE.fromList $4))
+                                    ; orPatsOn <- hintOrPats pat
+                                    ; when (orPatsOn && length $4 < 2) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrOrPatNeedsTwoAlternatives pat)
+                                    ; return $ ecpFromPat pat
+                             }  }
+
        -- View patterns get parenthesized above
         | exp '->' texp   { ECP $
                              unECP $1 >>= \ $1 ->
                              unECP $3 >>= \ $3 ->
                              mkHsViewPatPV (comb2 (reLoc $1) (reLoc $>)) $1 $3 [mu AnnRarrow $2] }
+
+orpats :: { [LPat GhcPs] }
+        : tpat %shift      { [$1] }
+
+        | tpat ',' orpats  { $1 : $3 }
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -3319,6 +3349,9 @@ gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (LocatedA b)) }
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
+
+tpat     :: { LPat GhcPs }
+tpat     :  texp          {% (checkPattern <=< runPV) (unECP $1) }
 
 -- 'pats1' does the same thing as 'pat', but returns it as a singleton
 -- list so that it can be used with a parameterized production rule
@@ -3786,6 +3819,7 @@ varid :: { LocatedN RdrName }
         | 'forall'         { sL1n $1 $! mkUnqual varName (fsLit "forall") }
         | 'family'         { sL1n $1 $! mkUnqual varName (fsLit "family") }
         | 'role'           { sL1n $1 $! mkUnqual varName (fsLit "role") }
+        | 'one'            { sL1n $1 $! mkUnqual varName (fsLit "one") }
         -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames'
         -- in GHC.Parser.PostProcess
         -- See Note [Parsing explicit foralls in Rules]
@@ -3812,8 +3846,8 @@ varsym_no_minus :: { LocatedN RdrName } -- varsym not including '-'
 
 -- These special_ids are treated as keywords in various places,
 -- but as ordinary ids elsewhere.   'special_id' collects all these
--- except 'unsafe', 'interruptible', 'forall', 'family', 'role', 'stock', and
--- 'anyclass', whose treatment differs depending on context
+-- except 'unsafe', 'interruptible', 'forall', 'family', 'role', 'stock', 'one'
+-- and 'anyclass', whose treatment differs depending on context
 special_id :: { Located FastString }
 special_id
         : 'as'                  { sL1 $1 (fsLit "as") }
@@ -4164,6 +4198,13 @@ looksLikeMult ty1 l_op ty2
   , bufSpanEnd pct_pos == bufSpanStart ty2_pos
   = True
   | otherwise = False
+
+-- Hint about or-patterns
+hintOrPats :: MonadP m => LPat GhcPs -> m Bool
+hintOrPats pat = do
+  orPatsEnabled <- getBit OrPatternsBit
+  unless orPatsEnabled $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) $ PsErrIllegalOrPat pat
+  return orPatsEnabled
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()

@@ -537,6 +537,7 @@ isOkNoBindPattern (L _ pat) =
   case pat of
     WildPat{}       -> True -- Exception (1)
     BangPat {}      -> True -- Exception (2) #9127, #13646
+    OrPat {}        -> True
     p -> patternContainsSplice p -- Exception (3)
 
     where
@@ -552,6 +553,7 @@ isOkNoBindPattern (L _ pat) =
           -- The base cases
           VarPat {} -> False
           WildPat {} -> False
+          OrPat {} -> False
           LitPat {} -> False
           NPat {} -> False
           NPlusKPat {} -> False

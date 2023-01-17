@@ -1,0 +1,6 @@
+
+Or1.hs:6:4: error: [GHC-29847]
+    Illegal or-pattern: one of 2, 3
+    Suggested fix: Perhaps you intended to use OrPatterns
+
+Or1.hs:9:7: error: [GHC-58481] parse error on input ‘of’

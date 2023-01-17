@@ -64,6 +64,7 @@ data Extension
    | RecordWildCards
    | NamedFieldPuns
    | ViewPatterns
+   | OrPatterns
    | GADTs
    | GADTSyntax
    | NPlusKPatterns

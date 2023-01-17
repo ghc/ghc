@@ -1,0 +1,3 @@
+
+Or2.hs:6:4: error: [GHC-96152]
+    An or-pattern needs at least two alternatives: one of 4

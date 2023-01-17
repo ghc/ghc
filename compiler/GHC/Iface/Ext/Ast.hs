@@ -970,6 +970,8 @@ instance HiePass p => ToHie (HsStmtContext (GhcPass p)) where
 instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
   toHie (PS rsp scope pscope lpat@(L ospan opat)) =
     concatM $ getTypeNode lpat : case opat of
+      OrPat _ pats ->
+        map (toHie . PS rsp scope pscope) (NE.toList pats)
       WildPat _ ->
         []
       VarPat _ lname ->
