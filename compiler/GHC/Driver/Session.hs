@@ -266,7 +266,7 @@ import Data.IORef
 import Control.Arrow ((&&&))
 import Control.Monad
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Writer.CPS
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State as State

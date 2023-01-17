@@ -38,7 +38,7 @@ import qualified GHC.Utils.Panic as Panic
 import GHC.Utils.Misc
 
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Writer.CPS
 import Control.Monad
 
 import qualified Data.Semigroup as Semigroup
