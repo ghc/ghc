@@ -1065,7 +1065,7 @@ subst_id_bndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
     -- See Note [Bangs in the Simplifier]
     !id1  = uniqAway in_scope old_id
     !id2  = substIdType env id1
-    !id3  = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
+    !id3  = zapFragileIdInfo id2      -- Zaps rules, worker-info, unfolding
                                       -- and fragile OccInfo
     !new_id = adjust_type id3
 

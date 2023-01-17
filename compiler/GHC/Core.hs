@@ -1301,16 +1301,19 @@ data Unfolding
         df_args  :: [CoreExpr]  -- Args of the data con: types, superclasses and methods,
     }                           -- in positional order
 
-  | CoreUnfolding {             -- An unfolding for an Id with no pragma,
-                                -- or perhaps a NOINLINE pragma
-                                -- (For NOINLINE, the phase, if any, is in the
-                                -- InlinePragInfo for this Id.)
-        uf_tmpl       :: CoreExpr,        -- Template; occurrence info is correct
-        uf_src        :: UnfoldingSource, -- Where the unfolding came from
-        uf_is_top     :: Bool,          -- True <=> top level binding
-        uf_cache      :: UnfoldingCache,        -- Cache of flags computable from the expr
-                                                -- See Note [Tying the 'CoreUnfolding' knot]
-        uf_guidance   :: UnfoldingGuidance      -- Tells about the *size* of the template.
+  | CoreUnfolding { -- An unfolding for an Id with no pragma,
+                    -- or perhaps a NOINLINE pragma
+                    -- (For NOINLINE, the phase, if any, is in the
+                    -- InlinePragInfo for this Id.)
+        uf_tmpl     :: CoreExpr,         -- The unfolding itself (aka "template")
+                                         -- Always occ-analysed;
+                                         -- See Note [OccInfo in unfoldings and rules]
+
+        uf_src      :: UnfoldingSource,  -- Where the unfolding came from
+        uf_is_top   :: Bool,             -- True <=> top level binding
+        uf_cache    :: UnfoldingCache,   -- Cache of flags computable from the expr
+                                         -- See Note [Tying the 'CoreUnfolding' knot]
+        uf_guidance :: UnfoldingGuidance -- Tells about the *size* of the template.
     }
   -- ^ An unfolding with redundant cached information. Parameters:
   --
@@ -1638,14 +1641,37 @@ change was requested by Roman, but it seems to make sense.
 
 Note [OccInfo in unfoldings and rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In unfoldings and rules, we guarantee that the template is occ-analysed,
-so that the occurrence info on the binders is correct.  This is important,
-because the Simplifier does not re-analyse the template when using it. If
-the occurrence info is wrong
-  - We may get more simplifier iterations than necessary, because
-    once-occ info isn't there
-  - More seriously, we may get an infinite loop if there's a Rec
-    without a loop breaker marked
+In unfoldings and rules, we guarantee that the template is occ-analysed, so
+that the occurrence info on the binders is correct. That way, when the
+Simplifier inlines an unfolding, it doesn't need to occ-analysis it first.
+(The Simplifier is designed to simplify occ-analysed expressions.)
+
+Given this decision it's vital that we do *always* do it.
+
+* If we don't, we may get more simplifier iterations than necessary,
+  because once-occ info isn't there
+
+* More seriously, we may get an infinite loop if there's a Rec without a
+  loop breaker marked.
+
+* Or we may get code that mentions variables not in scope: #22761
+  e.g. Suppose we have a stable unfolding : \y. let z = p+1 in 3
+  Then the pre-simplifier occ-anal will occ-anal the unfolding
+  (redundantly perhaps, but we need its free vars); this will not report
+  the use of `p`; so p's binding will be discarded, and yet `p` is still
+  mentioned.
+
+  Better to occ-anal the unfolding at birth, which will drop the
+  z-binding as dead code.  (Remember, it's the occurrence analyser that
+  drops dead code.)
+
+* Another example is #8892:
+    \x -> letrec { f = ...g...; g* = f } in body
+  where g* is (for some strange reason) the loop breaker.  If we don't
+  occ-anal it when reading it in, we won't mark g as a loop breaker, and we
+  may inline g entirely in body, dropping its binding, and leaving the
+  occurrence in f out of scope. This happened in #8892, where the unfolding
+  in question was a DFun unfolding.
 
 
 ************************************************************************

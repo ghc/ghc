@@ -2046,6 +2046,17 @@ So we have a fast-path that keeps the old tree if the occ_bs_env is
 empty.   This just saves a bit of allocation and reconstruction; not
 a big deal.
 
+This fast path exposes a tricky cornder, though (#22761). Supose we have
+    Unfolding = \x. let y = foo in x+1
+which includes a dead binding for `y`. In occAnalUnfolding we occ-anal
+the unfolding and produce /no/ occurrences of `foo` (since `y` is
+dead).  But if we discard the occ-analysed syntax tree (which we do on
+our fast path), and use the old one, we still /have/ an occurrence of
+`foo` -- and that can lead to out-of-scope variables (#22761).
+
+Solution: always keep occ-analysed trees in unfoldings and rules, so they
+have no dead code.  See Note [OccInfo in unfoldings and rules] in GHC.Core.
+
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 By default we use an rhsCtxt for the RHS of a binding.  This tells the

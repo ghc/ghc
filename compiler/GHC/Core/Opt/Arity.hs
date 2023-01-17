@@ -3085,8 +3085,15 @@ etaExpandToJoinPointRule join_arity rule@(Rule { ru_bndrs = bndrs, ru_rhs = rhs
   | need_args < 0
   = pprPanic "etaExpandToJoinPointRule" (ppr join_arity $$ ppr rule)
   | otherwise
-  = rule { ru_bndrs = bndrs ++ new_bndrs, ru_args = args ++ new_args
-         , ru_rhs = new_rhs }
+  = rule { ru_bndrs = bndrs ++ new_bndrs
+         , ru_args  = args ++ new_args
+         , ru_rhs   = new_rhs }
+  -- new_rhs really ought to be occ-analysed (see GHC.Core Note
+  -- [OccInfo in unfoldings and rules]), but it makes a module loop to
+  -- do so; it doesn't happen often; and it doesn't really matter if
+  -- the outer binders have bogus occurrence info; and new_rhs won't
+  -- have dead code if rhs didn't.
+
   where
     need_args = join_arity - length args
     (new_bndrs, new_rhs) = etaBodyForJoinPoint need_args rhs

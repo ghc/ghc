@@ -21,7 +21,7 @@ module GHC.Core.Opt.Simplify.Utils (
         BindContext(..), bindContextLevel,
 
         -- The continuation type
-        SimplCont(..), DupFlag(..), StaticEnv,
+        SimplCont(..), DupFlag(..), FromWhat(..), StaticEnv,
         isSimplified, contIsStop,
         contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs, contIsRhs,
@@ -191,6 +191,7 @@ data SimplCont
                         --       or, equivalently,  = K[ (\x.b) e ]
       { sc_dup   :: DupFlag        -- See Note [DupFlag invariants]
       , sc_bndr  :: InId
+      , sc_from  :: FromWhat
       , sc_body  :: InExpr
       , sc_env   :: StaticEnv      -- See Note [StaticEnv invariant]
       , sc_cont  :: SimplCont }
@@ -211,6 +212,8 @@ data SimplCont
         SimplCont
 
 type StaticEnv = SimplEnv       -- Just the static part is relevant
+
+data FromWhat = FromLet | FromBeta OutType
 
 -- See Note [DupFlag invariants]
 data DupFlag = NoDup       -- Unsimplified, might be big
