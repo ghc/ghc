@@ -86,11 +86,8 @@ module Foreign.C.Types
 
           -- Instances of: Eq and Storable
         , CFile,        CFpos,     CJmpBuf
-
-        , ConstPtr(..)
         ) where
 
-import Foreign.Ptr      ( Ptr )
 import Foreign.Storable
 import Data.Bits        ( Bits(..), FiniteBits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
@@ -226,9 +223,6 @@ INTEGRAL_TYPE(CUIntPtr,"uintptr_t",HTYPE_UINTPTR_T)
 INTEGRAL_TYPE(CIntMax,"intmax_t",HTYPE_INTMAX_T)
 INTEGRAL_TYPE(CUIntMax,"uintmax_t",HTYPE_UINTMAX_T)
 
--- | Used to produce 'const' qualifier in C code generator
-newtype ConstPtr a = ConstPtr { unConstPtr :: Ptr a } deriving newtype (Show, Eq, Storable)
-
 -- C99 types which are still missing include:
 -- wint_t, wctrans_t, wctype_t
 
@@ -274,3 +268,4 @@ representing a C type @t@:
   corresponding bitwise operation in C on @t@.
 
 -}
+
