@@ -1537,7 +1537,7 @@ cvtSigType = cvtSigTypeKind "type"
 cvtSigTypeKind :: String -> TH.Type -> CvtM (LHsSigType GhcPs)
 cvtSigTypeKind ty_str ty = do
   ty' <- cvtTypeKind ty_str ty
-  pure $ hsTypeToHsSigType ty'
+  pure $ hsTypeToHsSigType $ parenthesizeHsType sigPrec ty'
 
 cvtTypeKind :: String -> TH.Type -> CvtM (LHsType GhcPs)
 cvtTypeKind ty_str ty
