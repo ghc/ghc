@@ -220,7 +220,6 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
         # Check that this link exists
         , "viChangeLog": change_log
         , "viSourceDL": source
-        , "viPostRemove": "*ghc-post-remove"
         , "viArch": { "A_64": a64
                     , "A_32": a32
                     , "A_ARM64": arm64
