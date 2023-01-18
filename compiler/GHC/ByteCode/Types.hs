@@ -14,6 +14,7 @@ module GHC.ByteCode.Types
   , ByteOff(..), WordOff(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
+  , AddrEnv, AddrPtr(..)
   , CgBreakInfo(..)
   , ModBreaks (..), BreakIndex, emptyModBreaks
   , CCostCentre
@@ -51,7 +52,7 @@ data CompiledByteCode = CompiledByteCode
   { bc_bcos   :: [UnlinkedBCO]  -- Bunch of interpretable bindings
   , bc_itbls  :: ItblEnv        -- A mapping from DataCons to their itbls
   , bc_ffis   :: [FFIInfo]      -- ffi blocks we allocated
-  , bc_strs   :: [RemotePtr ()] -- malloc'd strings
+  , bc_strs   :: AddrEnv        -- malloc'd top-level strings
   , bc_breaks :: Maybe ModBreaks -- breakpoint info (Nothing if we're not
                                  -- creating breakpoints, for some reason)
   }
@@ -69,7 +70,7 @@ seqCompiledByteCode CompiledByteCode{..} =
   rnf bc_bcos `seq`
   seqEltsNameEnv rnf bc_itbls `seq`
   rnf bc_ffis `seq`
-  rnf bc_strs `seq`
+  seqEltsNameEnv rnf bc_strs `seq`
   rnf (fmap seqModBreaks bc_breaks)
 
 newtype ByteOff = ByteOff Int
@@ -131,11 +132,14 @@ voidPrimCallInfo :: NativeCallInfo
 voidPrimCallInfo = NativeCallInfo NativePrimCall 0 emptyRegSet 0
 
 type ItblEnv = NameEnv (Name, ItblPtr)
+type AddrEnv = NameEnv (Name, AddrPtr)
         -- We need the Name in the range so we know which
         -- elements to filter out when unloading a module
 
 newtype ItblPtr = ItblPtr (RemotePtr Heap.StgInfoTable)
   deriving (Show, NFData)
+newtype AddrPtr = AddrPtr (RemotePtr ())
+  deriving (NFData)
 
 data UnlinkedBCO
    = UnlinkedBCO {
@@ -166,6 +170,12 @@ data BCONPtr
   = BCONPtrWord  {-# UNPACK #-} !Word
   | BCONPtrLbl   !FastString
   | BCONPtrItbl  !Name
+  -- | A reference to a top-level string literal; see
+  -- Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
+  | BCONPtrAddr  !Name
+  -- | Only used internally in the assembler in an intermediate representation;
+  -- should never appear in a fully-assembled UnlinkedBCO.
+  -- Also see Note [Allocating string literals] in GHC.ByteCode.Asm.
   | BCONPtrStr   !ByteString
 
 instance NFData BCONPtr where
