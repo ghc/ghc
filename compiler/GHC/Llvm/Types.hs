@@ -82,11 +82,9 @@ ppLlvmType t = case t of
   LMFunction (LlvmFunctionDecl _ _ _ r varg p _)
     -> ppLlvmType r <+> lparen <> ppParams varg p <> rparen
 {-# SPECIALIZE ppLlvmType :: LlvmType -> SDoc #-}
-{-# SPECIALIZE ppLlvmType :: LlvmType -> HLine #-}
+{-# SPECIALIZE ppLlvmType :: LlvmType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
-{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc #-}
-{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> HLine #-}
 ppParams varg p
   = let varg' = case varg of
           VarArgs | null args -> text "..."
@@ -95,6 +93,8 @@ ppParams varg p
         -- by default we don't print param attributes
         args = map fst p
     in ppCommaJoin ppLlvmType args <> varg'
+{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc #-}
+{-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
@@ -341,14 +341,6 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
   }
   deriving (Eq)
 
-instance Outputable LlvmFunctionDecl where
-  ppr (LlvmFunctionDecl n l c r varg p a)
-    = let align = case a of
-                       Just a' -> text " align " <> ppr a'
-                       Nothing -> empty
-      in ppr l <+> ppr c <+> ppr r <+> char '@' <> ftext n <>
-             lparen <> ppParams varg p <> rparen <> align
-
 type LlvmFunctionDecls = [LlvmFunctionDecl]
 
 type LlvmParameter = (LlvmType, [LlvmParamAttr])
@@ -392,8 +384,6 @@ instance Outputable LlvmParamAttr where
   ppr = ppLlvmParamAttr
 
 ppLlvmParamAttr :: IsLine doc => LlvmParamAttr -> doc
-{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> SDoc #-}
-{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> HLine #-}
 ppLlvmParamAttr ZeroExt   = text "zeroext"
 ppLlvmParamAttr SignExt   = text "signext"
 ppLlvmParamAttr InReg     = text "inreg"
@@ -402,6 +392,8 @@ ppLlvmParamAttr SRet      = text "sret"
 ppLlvmParamAttr NoAlias   = text "noalias"
 ppLlvmParamAttr NoCapture = text "nocapture"
 ppLlvmParamAttr Nest      = text "nest"
+{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> SDoc #-}
+{-# SPECIALIZE ppLlvmParamAttr :: LlvmParamAttr -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Llvm Function Attributes.
 --
@@ -485,8 +477,6 @@ instance Outputable LlvmFuncAttr where
   ppr = ppLlvmFuncAttr
 
 ppLlvmFuncAttr :: IsLine doc => LlvmFuncAttr -> doc
-{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> SDoc #-}
-{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> HLine #-}
 ppLlvmFuncAttr AlwaysInline       = text "alwaysinline"
 ppLlvmFuncAttr InlineHint         = text "inlinehint"
 ppLlvmFuncAttr NoInline           = text "noinline"
@@ -500,6 +490,8 @@ ppLlvmFuncAttr SspReq             = text "ssqreq"
 ppLlvmFuncAttr NoRedZone          = text "noredzone"
 ppLlvmFuncAttr NoImplicitFloat    = text "noimplicitfloat"
 ppLlvmFuncAttr Naked              = text "naked"
+{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> SDoc #-}
+{-# SPECIALIZE ppLlvmFuncAttr :: LlvmFuncAttr -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Different types to call a function.
@@ -550,14 +542,14 @@ instance Outputable LlvmCallConvention where
   ppr = ppLlvmCallConvention
 
 ppLlvmCallConvention :: IsLine doc => LlvmCallConvention -> doc
-{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> SDoc #-}
-{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> HLine #-}
 ppLlvmCallConvention CC_Ccc       = text "ccc"
 ppLlvmCallConvention CC_Fastcc    = text "fastcc"
 ppLlvmCallConvention CC_Coldcc    = text "coldcc"
 ppLlvmCallConvention CC_Ghc       = text "ghccc"
 ppLlvmCallConvention (CC_Ncc i)   = text "cc " <> int i
 ppLlvmCallConvention CC_X86_Stdcc = text "x86_stdcallcc"
+{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> SDoc #-}
+{-# SPECIALIZE ppLlvmCallConvention :: LlvmCallConvention -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Functions can have a fixed amount of parameters, or a variable amount.
@@ -619,8 +611,6 @@ instance Outputable LlvmLinkageType where
   ppr = ppLlvmLinkageType
 
 ppLlvmLinkageType :: IsLine doc => LlvmLinkageType -> doc
-{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> SDoc #-}
-{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> HLine #-}
 ppLlvmLinkageType Internal          = text "internal"
 ppLlvmLinkageType LinkOnce          = text "linkonce"
 ppLlvmLinkageType Weak              = text "weak"
@@ -632,6 +622,8 @@ ppLlvmLinkageType ExternWeak        = text "extern_weak"
 ppLlvmLinkageType ExternallyVisible = empty
 ppLlvmLinkageType External          = text "external"
 ppLlvmLinkageType Private           = text "private"
+{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> SDoc #-}
+{-# SPECIALIZE ppLlvmLinkageType :: LlvmLinkageType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- -----------------------------------------------------------------------------
 -- * LLVM Operations
@@ -672,8 +664,6 @@ instance Outputable LlvmMachOp where
   ppr = ppLlvmMachOp
 
 ppLlvmMachOp :: IsLine doc => LlvmMachOp -> doc
-{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> SDoc #-}
-{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> HLine #-}
 ppLlvmMachOp LM_MO_Add  = text "add"
 ppLlvmMachOp LM_MO_Sub  = text "sub"
 ppLlvmMachOp LM_MO_Mul  = text "mul"
@@ -692,6 +682,8 @@ ppLlvmMachOp LM_MO_AShr = text "ashr"
 ppLlvmMachOp LM_MO_And  = text "and"
 ppLlvmMachOp LM_MO_Or   = text "or"
 ppLlvmMachOp LM_MO_Xor  = text "xor"
+{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmMachOp :: LlvmMachOp -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Llvm compare operations.
@@ -721,8 +713,6 @@ instance Outputable LlvmCmpOp where
   ppr = ppLlvmCmpOp
 
 ppLlvmCmpOp :: IsLine doc => LlvmCmpOp -> doc
-{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> SDoc #-}
-{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> HLine #-}
 ppLlvmCmpOp LM_CMP_Eq  = text "eq"
 ppLlvmCmpOp LM_CMP_Ne  = text "ne"
 ppLlvmCmpOp LM_CMP_Ugt = text "ugt"
@@ -739,6 +729,8 @@ ppLlvmCmpOp LM_CMP_Fgt = text "ogt"
 ppLlvmCmpOp LM_CMP_Fge = text "oge"
 ppLlvmCmpOp LM_CMP_Flt = text "olt"
 ppLlvmCmpOp LM_CMP_Fle = text "ole"
+{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmCmpOp :: LlvmCmpOp -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Llvm cast operations.
@@ -761,8 +753,6 @@ instance Outputable LlvmCastOp where
   ppr = ppLlvmCastOp
 
 ppLlvmCastOp :: IsLine doc => LlvmCastOp -> doc
-{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> SDoc #-}
-{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> HLine #-}
 ppLlvmCastOp LM_Trunc    = text "trunc"
 ppLlvmCastOp LM_Zext     = text "zext"
 ppLlvmCastOp LM_Sext     = text "sext"
@@ -775,6 +765,8 @@ ppLlvmCastOp LM_Sitofp   = text "sitofp"
 ppLlvmCastOp LM_Ptrtoint = text "ptrtoint"
 ppLlvmCastOp LM_Inttoptr = text "inttoptr"
 ppLlvmCastOp LM_Bitcast  = text "bitcast"
+{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> SDoc #-}
+{-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- -----------------------------------------------------------------------------
@@ -787,8 +779,6 @@ ppLlvmCastOp LM_Bitcast  = text "bitcast"
 --
 -- See Note [LLVM Float Types].
 ppDouble :: IsLine doc => Platform -> Double -> doc
-{-# SPECIALIZE ppDouble :: Platform -> Double -> SDoc #-}
-{-# SPECIALIZE ppDouble :: Platform -> Double -> HLine #-}
 ppDouble platform d
   = let bs     = doubleToBytes d
         hex d' = case showHex d' "" of
@@ -802,6 +792,8 @@ ppDouble platform d
             LittleEndian -> reverse
         str       = map toUpper $ concat $ fixEndian $ map hex bs
     in text "0x" <> text str
+{-# SPECIALIZE ppDouble :: Platform -> Double -> SDoc #-}
+{-# SPECIALIZE ppDouble :: Platform -> Double -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- Note [LLVM Float Types]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -829,9 +821,9 @@ widenFp :: Float -> Double
 widenFp = float2Double
 
 ppFloat :: IsLine doc => Platform -> Float -> doc
-{-# SPECIALIZE ppFloat :: Platform -> Float -> SDoc #-}
-{-# SPECIALIZE ppFloat :: Platform -> Float -> HLine #-}
 ppFloat platform = ppDouble platform . widenFp
+{-# SPECIALIZE ppFloat :: Platform -> Float -> SDoc #-}
+{-# SPECIALIZE ppFloat :: Platform -> Float -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 --------------------------------------------------------------------------------
@@ -839,11 +831,11 @@ ppFloat platform = ppDouble platform . widenFp
 --------------------------------------------------------------------------------
 
 ppCommaJoin :: IsLine doc => (a -> doc) -> [a] -> doc
-{-# SPECIALIZE ppCommaJoin :: (a -> SDoc) -> [a] -> SDoc #-}
-{-# SPECIALIZE ppCommaJoin :: (a -> HLine) -> [a] -> HLine #-}
 ppCommaJoin ppr strs = hsep $ punctuate comma (map ppr strs)
+{-# SPECIALIZE ppCommaJoin :: (a -> SDoc) -> [a] -> SDoc #-}
+{-# SPECIALIZE ppCommaJoin :: (a -> HLine) -> [a] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppSpaceJoin :: IsLine doc => (a -> doc) -> [a] -> doc
-{-# SPECIALIZE ppSpaceJoin :: (a -> SDoc) -> [a] -> SDoc #-}
-{-# SPECIALIZE ppSpaceJoin :: (a -> HLine) -> [a] -> HLine #-}
 ppSpaceJoin ppr strs = hsep (map ppr strs)
+{-# SPECIALIZE ppSpaceJoin :: (a -> SDoc) -> [a] -> SDoc #-}
+{-# SPECIALIZE ppSpaceJoin :: (a -> HLine) -> [a] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable

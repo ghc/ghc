@@ -27,8 +27,6 @@ import GHC.Types.Unique
 
 -- | Pretty print LLVM data code
 pprLlvmData :: IsDoc doc => LlvmCgConfig -> LlvmData -> doc
-{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc #-}
-{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> HDoc #-}
 pprLlvmData cfg (globals, types) =
     let ppLlvmTys (LMAlias    a) = line $ ppLlvmAlias a
         ppLlvmTys (LMFunction f) = ppLlvmFunctionDecl f
@@ -37,6 +35,8 @@ pprLlvmData cfg (globals, types) =
         types'   = vcat $ map ppLlvmTys types
         globals' = ppLlvmGlobals cfg globals
     in types' $$ globals'
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> SDoc #-}
+{-# SPECIALIZE pprLlvmData :: LlvmCgConfig -> LlvmData -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Pretty print LLVM code

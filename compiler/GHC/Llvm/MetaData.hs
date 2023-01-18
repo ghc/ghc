@@ -67,9 +67,9 @@ instance Outputable MetaId where
     ppr = ppMetaId
 
 ppMetaId :: IsLine doc => MetaId -> doc
-{-# SPECIALIZE ppMetaId :: MetaId -> SDoc #-}
-{-# SPECIALIZE ppMetaId :: MetaId -> HLine #-}
 ppMetaId (MetaId n) = char '!' <> int n
+{-# SPECIALIZE ppMetaId :: MetaId -> SDoc #-}
+{-# SPECIALIZE ppMetaId :: MetaId -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | LLVM metadata expressions
 data MetaExpr = MetaStr !LMString
