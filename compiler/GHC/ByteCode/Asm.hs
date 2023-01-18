@@ -98,7 +98,7 @@ assembleBCOs
   -> Profile
   -> [ProtoBCO Name]
   -> [TyCon]
-  -> [RemotePtr ()]
+  -> AddrEnv
   -> Maybe ModBreaks
   -> IO CompiledByteCode
 assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
@@ -106,27 +106,40 @@ assembleBCOs interp profile proto_bcos tycons top_strs modbreaks = do
   -- fixed for an interpreter
   itblenv <- mkITbls interp profile tycons
   bcos    <- mapM (assembleBCO (profilePlatform profile)) proto_bcos
-  (bcos',ptrs) <- mallocStrings interp bcos
+  bcos'   <- mallocStrings interp bcos
   return CompiledByteCode
     { bc_bcos = bcos'
     , bc_itbls =  itblenv
     , bc_ffis = concatMap protoBCOFFIs proto_bcos
-    , bc_strs = top_strs ++ ptrs
+    , bc_strs = top_strs
     , bc_breaks = modbreaks
     }
 
--- Find all the literal strings and malloc them together.  We want to
--- do this because:
+-- Note [Allocating string literals]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Our strategy for handling top-level string literal bindings is described in
+-- Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode,
+-- but not all Addr# literals in a program are guaranteed to be lifted to the
+-- top level. Our strategy for handling local Addr# literals is somewhat simpler:
+-- after assembling, we find all the BCONPtrStr arguments in the program, malloc
+-- memory for them, and bake the resulting addresses into the instruction stream
+-- in the form of BCONPtrWord arguments.
 --
---  a) It should be done when we compile the module, not each time we relink it
---  b) For -fexternal-interpreter It's more efficient to malloc the strings
---     as a single batch message, especially when compiling in parallel.
+-- Since we do this when assembling, we only allocate the memory when we compile
+-- the module, not each time we relink it. However, we do want to take care to
+-- malloc the memory all in one go, since that is more efficient with
+-- -fexternal-interpreter, especially when compiling in parallel.
 --
-mallocStrings :: Interp -> [UnlinkedBCO] -> IO ([UnlinkedBCO], [RemotePtr ()])
+-- Note that, as with top-level string literal bindings, this memory is never
+-- freed, so it just leaks if the BCO is unloaded. See Note [Generating code for
+-- top-level string literal bindings] in GHC.StgToByteCode for some discussion
+-- about why.
+--
+mallocStrings :: Interp -> [UnlinkedBCO] -> IO [UnlinkedBCO]
 mallocStrings interp ulbcos = do
   let bytestrings = reverse (execState (mapM_ collect ulbcos) [])
   ptrs <- interpCmd interp (MallocStrings bytestrings)
-  return (evalState (mapM splice ulbcos) ptrs, ptrs)
+  return (evalState (mapM splice ulbcos) ptrs)
  where
   splice bco@UnlinkedBCO{..} = do
     lits <- mapM spliceLit unlinkedBCOLits
@@ -163,7 +176,7 @@ assembleOneBCO interp profile pbco = do
   -- TODO: the profile should be bundled with the interpreter: the rts ways are
   -- fixed for an interpreter
   ubco <- assembleBCO (profilePlatform profile) pbco
-  ([ubco'], _ptrs) <- mallocStrings interp [ubco]
+  [ubco'] <- mallocStrings interp [ubco]
   return ubco'
 
 assembleBCO :: Platform -> ProtoBCO Name -> IO UnlinkedBCO
@@ -408,6 +421,10 @@ assembleI platform i = case i of
                                  emit bci_PUSH_UBX32 [Op np]
   PUSH_UBX lit nws         -> do np <- literal lit
                                  emit bci_PUSH_UBX [Op np, SmallOp nws]
+
+  -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
+  PUSH_ADDR nm             -> do np <- lit [BCONPtrAddr nm]
+                                 emit bci_PUSH_UBX [Op np, SmallOp 1]
 
   PUSH_APPLY_N             -> emit bci_PUSH_APPLY_N []
   PUSH_APPLY_V             -> emit bci_PUSH_APPLY_V []

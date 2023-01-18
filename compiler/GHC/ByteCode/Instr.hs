@@ -110,6 +110,10 @@ data BCInstr
         -- type, and it appears impossible to get hold of the bits of
         -- an addr, even though we need to assemble BCOs.
 
+   -- Push a top-level Addr#. This is a pseudo-instruction assembled to PUSH_UBX,
+   -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
+   | PUSH_ADDR Name
+
    -- various kinds of application
    | PUSH_APPLY_N
    | PUSH_APPLY_V
@@ -264,6 +268,7 @@ instance Outputable BCInstr where
    ppr (PUSH_UBX16 lit)      = text "PUSH_UBX16" <+> ppr lit
    ppr (PUSH_UBX32 lit)      = text "PUSH_UBX32" <+> ppr lit
    ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
+   ppr (PUSH_ADDR nm)        = text "PUSH_ADDR" <+> ppr nm
    ppr PUSH_APPLY_N          = text "PUSH_APPLY_N"
    ppr PUSH_APPLY_V          = text "PUSH_APPLY_V"
    ppr PUSH_APPLY_F          = text "PUSH_APPLY_F"
@@ -360,6 +365,7 @@ bciStackUse (PUSH_UBX8 _)         = 1  -- overapproximation
 bciStackUse (PUSH_UBX16 _)        = 1  -- overapproximation
 bciStackUse (PUSH_UBX32 _)        = 1  -- overapproximation on 64bit arch
 bciStackUse (PUSH_UBX _ nw)       = fromIntegral nw
+bciStackUse PUSH_ADDR{}           = 1
 bciStackUse PUSH_APPLY_N{}        = 1
 bciStackUse PUSH_APPLY_V{}        = 1
 bciStackUse PUSH_APPLY_F{}        = 1

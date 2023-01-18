@@ -10,6 +10,12 @@ module GHC.Linker.Types
    ( Loader (..)
    , LoaderState (..)
    , uninitializedLoader
+   , modifyClosureEnv
+   , LinkerEnv(..)
+   , filterLinkerEnv
+   , ClosureEnv
+   , emptyClosureEnv
+   , extendClosureEnv
    , Linkable(..)
    , LinkableSet
    , mkLinkableSet
@@ -32,12 +38,12 @@ where
 
 import GHC.Prelude
 import GHC.Unit                ( UnitId, Module )
-import GHC.ByteCode.Types      ( ItblEnv, CompiledByteCode )
+import GHC.ByteCode.Types      ( ItblEnv, AddrEnv, CompiledByteCode )
 import GHC.Fingerprint.Type    ( Fingerprint )
 import GHCi.RemoteTypes        ( ForeignHValue )
 
 import GHC.Types.Var           ( Id )
-import GHC.Types.Name.Env      ( NameEnv )
+import GHC.Types.Name.Env      ( NameEnv, emptyNameEnv, extendNameEnvList, filterNameEnv )
 import GHC.Types.Name          ( Name )
 
 import GHC.Utils.Outputable
@@ -66,22 +72,15 @@ serves to ensure mutual exclusion between multiple loaded copies of the GHC
 library. The Maybe may be Nothing to indicate that the linker has not yet been
 initialised.
 
-The LoaderState maps Names to actual closures (for interpreted code only), for
+The LinkerEnv maps Names to actual closures (for interpreted code only), for
 use during linking.
 -}
 
 newtype Loader = Loader { loader_state :: MVar (Maybe LoaderState) }
 
 data LoaderState = LoaderState
-    { closure_env :: ClosureEnv
+    { linker_env :: !LinkerEnv
         -- ^ Current global mapping from Names to their true values
-
-    , itbl_env    :: !ItblEnv
-        -- ^ The current global mapping from RdrNames of DataCons to
-        -- info table addresses.
-        -- When a new Unlinked is linked into the running image, or an existing
-        -- module in the image is replaced, the itbl_env must be updated
-        -- appropriately.
 
     , bcos_loaded :: !LinkableSet
         -- ^ The currently loaded interpreted modules (home package)
@@ -101,7 +100,44 @@ data LoaderState = LoaderState
 uninitializedLoader :: IO Loader
 uninitializedLoader = Loader <$> newMVar Nothing
 
+modifyClosureEnv :: LoaderState -> (ClosureEnv -> ClosureEnv) -> LoaderState
+modifyClosureEnv pls f =
+    let le = linker_env pls
+        ce = closure_env le
+    in pls { linker_env = le { closure_env = f ce } }
+
+data LinkerEnv = LinkerEnv
+  { closure_env :: !ClosureEnv
+      -- ^ Current global mapping from closure Names to their true values
+
+  , itbl_env    :: !ItblEnv
+      -- ^ The current global mapping from RdrNames of DataCons to
+      -- info table addresses.
+      -- When a new Unlinked is linked into the running image, or an existing
+      -- module in the image is replaced, the itbl_env must be updated
+      -- appropriately.
+
+  , addr_env    :: !AddrEnv
+      -- ^ Like 'closure_env' and 'itbl_env', but for top-level 'Addr#' literals,
+      -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode.
+  }
+
+filterLinkerEnv :: (Name -> Bool) -> LinkerEnv -> LinkerEnv
+filterLinkerEnv f le = LinkerEnv
+  { closure_env = filterNameEnv (f . fst) (closure_env le)
+  , itbl_env    = filterNameEnv (f . fst) (itbl_env le)
+  , addr_env    = filterNameEnv (f . fst) (addr_env le)
+  }
+
 type ClosureEnv = NameEnv (Name, ForeignHValue)
+
+emptyClosureEnv :: ClosureEnv
+emptyClosureEnv = emptyNameEnv
+
+extendClosureEnv :: ClosureEnv -> [(Name,ForeignHValue)] -> ClosureEnv
+extendClosureEnv cl_env pairs
+  = extendNameEnvList cl_env [ (n, (n,v)) | (n,v) <- pairs]
+
 type PkgsLoaded = UniqDFM UnitId LoadedPkgInfo
 
 data LoadedPkgInfo

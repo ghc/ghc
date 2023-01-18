@@ -140,8 +140,11 @@ getLoaderState interp = readMVar (loader_state (interpLoader interp))
 
 emptyLoaderState :: LoaderState
 emptyLoaderState = LoaderState
-   { closure_env = emptyNameEnv
-   , itbl_env    = emptyNameEnv
+   { linker_env = LinkerEnv
+     { closure_env = emptyNameEnv
+     , itbl_env    = emptyNameEnv
+     , addr_env    = emptyNameEnv
+     }
    , pkgs_loaded = init_pkgs
    , bcos_loaded = emptyModuleEnv
    , objs_loaded = emptyModuleEnv
@@ -156,17 +159,16 @@ emptyLoaderState = LoaderState
 
 extendLoadedEnv :: Interp -> [(Name,ForeignHValue)] -> IO ()
 extendLoadedEnv interp new_bindings =
-  modifyLoaderState_ interp $ \pls@LoaderState{..} -> do
-    let new_ce = extendClosureEnv closure_env new_bindings
-    return $! pls{ closure_env = new_ce }
+  modifyLoaderState_ interp $ \pls -> do
+    return $! modifyClosureEnv pls $ \ce ->
+      extendClosureEnv ce new_bindings
     -- strictness is important for not retaining old copies of the pls
 
 deleteFromLoadedEnv :: Interp -> [Name] -> IO ()
 deleteFromLoadedEnv interp to_remove =
   modifyLoaderState_ interp $ \pls -> do
-    let ce = closure_env pls
-    let new_ce = delListFromNameEnv ce to_remove
-    return pls{ closure_env = new_ce }
+    return $ modifyClosureEnv pls $ \ce ->
+      delListFromNameEnv ce to_remove
 
 -- | Load the module containing the given Name and get its associated 'HValue'.
 --
@@ -184,7 +186,7 @@ loadName interp hsc_env name = do
            then throwGhcExceptionIO (ProgramError "")
            else return (pls', links, pkgs)
 
-    case lookupNameEnv (closure_env pls) name of
+    case lookupNameEnv (closure_env (linker_env pls)) name of
       Just (_,aa) -> return (pls,(aa, links, pkgs))
       Nothing     -> assertPpr (isExternalName name) (ppr name) $
                      do let sym_to_find = nameToCLabel name "closure"
@@ -246,10 +248,7 @@ withExtendedLoadedEnv interp new_env action
         -- package), so the reset action only removes the names we
         -- added earlier.
           reset_old_env = liftIO $
-            modifyLoaderState_ interp $ \pls ->
-                let cur = closure_env pls
-                    new = delListFromNameEnv cur (map fst new_env)
-                in return pls{ closure_env = new }
+            deleteFromLoadedEnv interp (map fst new_env)
 
 
 -- | Display the loader state.
@@ -593,13 +592,11 @@ loadExpr interp hsc_env span root_ul_bco = do
       then throwGhcExceptionIO (ProgramError "")
       else do
         -- Load the expression itself
-        let ie = itbl_env pls
-            ce = closure_env pls
-
         -- Load the necessary packages and linkables
-        let nobreakarray = error "no break array"
+        let le = linker_env pls
+            nobreakarray = error "no break array"
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
-        resolved <- linkBCO interp ie ce bco_ix nobreakarray root_ul_bco
+        resolved <- linkBCO interp le bco_ix nobreakarray root_ul_bco
         bco_opts <- initBCOOpts (hsc_dflags hsc_env)
         [root_hvref] <- createBCOs interp bco_opts [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
@@ -910,15 +907,16 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
         then throwGhcExceptionIO (ProgramError "")
         else do
           -- Link the expression itself
-          let ie = plusNameEnv (itbl_env pls) bc_itbls
-              ce = closure_env pls
+          let le  = linker_env pls
+              le2 = le { itbl_env = plusNameEnv (itbl_env le) bc_itbls
+                       , addr_env = plusNameEnv (addr_env le) bc_strs }
 
           -- Link the necessary packages and linkables
           bco_opts <- initBCOOpts (hsc_dflags hsc_env)
-          new_bindings <- linkSomeBCOs bco_opts interp ie ce [cbc]
+          new_bindings <- linkSomeBCOs bco_opts interp le2 [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
-          let pls2 = pls { closure_env = extendClosureEnv ce nms_fhvs
-                         , itbl_env    = ie }
+          let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
+              !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
           return (pls2, (nms_fhvs, links_needed, units_needed))
   where
     free_names = uniqDSetToList $
@@ -1136,11 +1134,12 @@ dynLinkBCOs bco_opts interp pls bcos = do
             cbcs      = map byteCodeOfObject unlinkeds
 
 
-            ies        = map bc_itbls cbcs
-            gce       = closure_env pls
-            final_ie  = foldr plusNameEnv (itbl_env pls) ies
+            le1 = linker_env pls
+            ie2 = foldr plusNameEnv (itbl_env le1) (map bc_itbls cbcs)
+            ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
+            le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
-        names_and_refs <- linkSomeBCOs bco_opts interp final_ie gce cbcs
+        names_and_refs <- linkSomeBCOs bco_opts interp le2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -1150,21 +1149,20 @@ dynLinkBCOs bco_opts interp pls bcos = do
         -- Wrap finalizers on the ones we want to keep
         new_binds <- makeForeignNamedHValueRefs interp to_add
 
-        return pls1 { closure_env = extendClosureEnv gce new_binds,
-                      itbl_env    = final_ie }
+        let ce2 = extendClosureEnv (closure_env le2) new_binds
+        return $! pls1 { linker_env = le2 { closure_env = ce2 } }
 
 -- Link a bunch of BCOs and return references to their values
 linkSomeBCOs :: BCOOpts
              -> Interp
-             -> ItblEnv
-             -> ClosureEnv
+             -> LinkerEnv
              -> [CompiledByteCode]
              -> IO [(Name,HValueRef)]
                         -- The returned HValueRefs are associated 1-1 with
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs bco_opts interp ie ce mods = foldr fun do_link mods []
+linkSomeBCOs bco_opts interp le mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum =
     case bc_breaks of
@@ -1177,7 +1175,7 @@ linkSomeBCOs bco_opts interp ie ce mods = foldr fun do_link mods []
     let flat = [ (breakarray, bco) | (breakarray, bcos) <- mods, bco <- bcos ]
         names = map (unlinkedBCOName . snd) flat
         bco_ix = mkNameEnv (zip names [0..])
-    resolved <- sequence [ linkBCO interp ie ce bco_ix breakarray bco
+    resolved <- sequence [ linkBCO interp le bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
     hvrefs <- createBCOs interp bco_opts resolved
     return (zip names hvrefs)
@@ -1267,15 +1265,11 @@ unload_wkr interp keep_linkables pls@LoaderState{..}  = do
   let -- Note that we want to remove all *local*
       -- (i.e. non-isExternal) names too (these are the
       -- temporary bindings from the command line).
-      keep_name :: (Name, a) -> Bool
-      keep_name (n,_) = isExternalName n &&
-                        nameModule n `elemModuleEnv` remaining_bcos_loaded
+      keep_name :: Name -> Bool
+      keep_name n = isExternalName n &&
+                    nameModule n `elemModuleEnv` remaining_bcos_loaded
 
-      itbl_env'     = filterNameEnv keep_name itbl_env
-      closure_env'  = filterNameEnv keep_name closure_env
-
-      !new_pls = pls { itbl_env = itbl_env',
-                       closure_env = closure_env',
+      !new_pls = pls { linker_env = filterLinkerEnv keep_name linker_env,
                        bcos_loaded = remaining_bcos_loaded,
                        objs_loaded = remaining_objs_loaded }
 

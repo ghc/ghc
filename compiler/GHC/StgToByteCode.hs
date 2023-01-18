@@ -65,7 +65,7 @@ import GHC.Runtime.Heap.Layout hiding (WordOff, ByteOff, wordsToBytes)
 import GHC.Data.Bitmap
 import GHC.Data.OrdList
 import GHC.Data.Maybe
-import GHC.Types.Var.Env
+import GHC.Types.Name.Env (mkNameEnv)
 import GHC.Types.Tickish
 
 import Data.List ( genericReplicate, genericLength, intersperse
@@ -106,7 +106,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
                 (text "GHC.StgToByteCode"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
-        -- See Note [generating code for top-level string literal bindings].
+        -- See Note [Generating code for top-level string literal bindings].
         let (strings, lifted_binds) = partitionEithers $ do  -- list monad
                 bnd <- binds
                 case bnd of
@@ -117,7 +117,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         stringPtrs <- allocateTopStrings interp strings
 
         (BcM_State{..}, proto_bcos) <-
-           runBc hsc_env this_mod mb_modBreaks (mkVarEnv stringPtrs) $ do
+           runBc hsc_env this_mod mb_modBreaks $ do
              let flattened_binds = concatMap flattenBind (reverse lifted_binds)
              mapM schemeTopBind flattened_binds
 
@@ -128,7 +128,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
            "Proto-BCOs" FormatByteCode
            (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        cbc <- assembleBCOs interp profile proto_bcos tycs (map snd stringPtrs)
+        cbc <- assembleBCOs interp profile proto_bcos tycs stringPtrs
           (case modBreaks of
              Nothing -> Nothing
              Just mb -> Just mb{ modBreaks_breakInfo = breakInfo })
@@ -148,28 +148,49 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         interp  = hscInterp hsc_env
         profile = targetProfile dflags
 
+-- | see Note [Generating code for top-level string literal bindings]
 allocateTopStrings
   :: Interp
   -> [(Id, ByteString)]
-  -> IO [(Var, RemotePtr ())]
+  -> IO AddrEnv
 allocateTopStrings interp topStrings = do
   let !(bndrs, strings) = unzip topStrings
   ptrs <- interpCmd interp $ MallocStrings strings
-  return $ zip bndrs ptrs
+  return $ mkNameEnv (zipWith mk_entry bndrs ptrs)
+  where
+    mk_entry bndr ptr = let nm = getName bndr
+                        in (nm, (nm, AddrPtr ptr))
 
-{-
-Note [generating code for top-level string literal bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is a summary on how the byte code generator deals with top-level string
-literals:
+{- Note [Generating code for top-level string literal bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in Note [Compilation plan for top-level string literals]
+in GHC.Core, the core-to-core optimizer can introduce top-level Addr#
+bindings to represent string literals. The creates two challenges for
+the bytecode compiler: (1) compiling the bindings themselves, and
+(2) compiling references to such bindings. Here is a summary on how
+we deal with them:
 
-1. Top-level string literal bindings are separated from the rest of the module.
+  1. Top-level string literal bindings are separated from the rest of
+     the module. Memory for them is allocated immediately, via
+     interpCmd, in allocateTopStrings, and the resulting AddrEnv is
+     recorded in the bc_strs field of the CompiledByteCode result.
 
-2. The strings are allocated via interpCmd, in allocateTopStrings
+  2. When we encounter a reference to a top-level string literal, we
+     generate a PUSH_ADDR pseudo-instruction, which is assembled to
+     a PUSH_UBX instruction with a BCONPtrAddr argument.
 
-3. The mapping from binders to allocated strings (topStrings) are maintained in
-   BcM and used when generating code for variable references.
--}
+  3. The loader accumulates string literal bindings from loaded
+     bytecode in the addr_env field of the LinkerEnv.
+
+  4. The BCO linker resolves BCONPtrAddr references by searching both
+     the addr_env (to find literals defined in bytecode) and the native
+     symbol table (to find literals defined in native code).
+
+This strategy works alright, but it does have one significant problem:
+we never free the memory that we allocate for the top-level strings.
+In theory, we could explicitly free it when BCOs are unloaded, but
+this comes with its own complications; see #22400 for why. For now,
+we just accept the leak, but it would nice to find something better. -}
 
 -- -----------------------------------------------------------------------------
 -- Compilation schema for the bytecode generator
@@ -1663,26 +1684,25 @@ pushAtom d p (StgVarArg var)
         -- slots on to the top of the stack.
 
    | otherwise  -- var must be a global variable
-   = do topStrings <- getTopStrings
-        platform <- targetPlatform <$> getDynFlags
-        case lookupVarEnv topStrings var of
-            Just ptr -> pushAtom d p $ StgLitArg $ mkLitWord platform $
-              fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
-            Nothing
-              -- PUSH_G doesn't tag constructors. So we use PACK here
-              -- if we are dealing with nullary constructor.
-              | Just con <- isDataConWorkId_maybe var
-              -> do
-                  massert (sz == wordSize platform)
-                  massert (isNullaryRepDataCon con)
-                  return (unitOL (PACK con 0), sz)
-              | otherwise
-              -> do
-                  let
-                  massert (sz == wordSize platform)
-                  return (unitOL (PUSH_G (getName var)), sz)
-              where
-                !sz = idSizeCon platform var
+   = do platform <- targetPlatform <$> getDynFlags
+        let !szb = idSizeCon platform var
+        massert (szb == wordSize platform)
+
+        -- PUSH_G doesn't tag constructors. So we use PACK here
+        -- if we are dealing with nullary constructor.
+        case isDataConWorkId_maybe var of
+          Just con -> do
+            massert (isNullaryRepDataCon con)
+            return (unitOL (PACK con 0), szb)
+
+          Nothing
+            -- see Note [Generating code for top-level string literal bindings]
+            | isUnliftedType (idType var) -> do
+              massert (idType var `eqType` addrPrimTy)
+              return (unitOL (PUSH_ADDR (getName var)), szb)
+
+            | otherwise -> do
+              return (unitOL (PUSH_G (getName var)), szb)
 
 
 pushAtom _ _ (StgLitArg lit) = pushLiteral True lit
@@ -2012,8 +2032,6 @@ data BcM_State
                                          -- Should be free()d when it is GCd
         , modBreaks   :: Maybe ModBreaks -- info about breakpoints
         , breakInfo   :: IntMap CgBreakInfo
-        , topStrings  :: IdEnv (RemotePtr ()) -- top-level string literals
-          -- See Note [generating code for top-level string literal bindings].
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r)) deriving (Functor)
@@ -2024,11 +2042,10 @@ ioToBc io = BcM $ \st -> do
   return (st, x)
 
 runBc :: HscEnv -> Module -> Maybe ModBreaks
-      -> IdEnv (RemotePtr ())
       -> BcM r
       -> IO (BcM_State, r)
-runBc hsc_env this_mod modBreaks topStrings (BcM m)
-   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty topStrings)
+runBc hsc_env this_mod modBreaks (BcM m)
+   = m (BcM_State hsc_env this_mod 0 [] modBreaks IntMap.empty)
 
 thenBc :: BcM a -> (a -> BcM b) -> BcM b
 thenBc (BcM expr) cont = BcM $ \st0 -> do
@@ -2096,9 +2113,6 @@ newBreakInfo ix info = BcM $ \st ->
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)
-
-getTopStrings :: BcM (IdEnv (RemotePtr ()))
-getTopStrings = BcM $ \st -> return (st, topStrings st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

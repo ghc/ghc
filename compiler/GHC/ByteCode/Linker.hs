@@ -8,10 +8,7 @@
 
 -- | Bytecode assembler and linker
 module GHC.ByteCode.Linker
-  ( ClosureEnv
-  , emptyClosureEnv
-  , extendClosureEnv
-  , linkBCO
+  ( linkBCO
   , lookupStaticPtr
   , lookupIE
   , nameToCLabel
@@ -36,6 +33,8 @@ import GHC.Unit.Module.Name
 import GHC.Data.FastString
 import GHC.Data.SizedSeq
 
+import GHC.Linker.Types
+
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
@@ -52,45 +51,34 @@ import GHC.Exts
   Linking interpretables into something we can run
 -}
 
-type ClosureEnv = NameEnv (Name, ForeignHValue)
-
-emptyClosureEnv :: ClosureEnv
-emptyClosureEnv = emptyNameEnv
-
-extendClosureEnv :: ClosureEnv -> [(Name,ForeignHValue)] -> ClosureEnv
-extendClosureEnv cl_env pairs
-  = extendNameEnvList cl_env [ (n, (n,v)) | (n,v) <- pairs]
-
-{-
-  Linking interpretables into something we can run
--}
-
 linkBCO
   :: Interp
-  -> ItblEnv
-  -> ClosureEnv
+  -> LinkerEnv
   -> NameEnv Int
   -> RemoteRef BreakArray
   -> UnlinkedBCO
   -> IO ResolvedBCO
-linkBCO interp ie ce bco_ix breakarray
+linkBCO interp le bco_ix breakarray
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
-  lits <- mapM (fmap fromIntegral . lookupLiteral interp ie) (ssElts lits0)
-  ptrs <- mapM (resolvePtr interp ie ce bco_ix breakarray) (ssElts ptrs0)
+  lits <- mapM (fmap fromIntegral . lookupLiteral interp le) (ssElts lits0)
+  ptrs <- mapM (resolvePtr interp le bco_ix breakarray) (ssElts ptrs0)
   return (ResolvedBCO isLittleEndian arity insns bitmap
               (listArray (0, fromIntegral (sizeSS lits0)-1) lits)
               (addListToSS emptySS ptrs))
 
-lookupLiteral :: Interp -> ItblEnv -> BCONPtr -> IO Word
-lookupLiteral interp ie ptr = case ptr of
+lookupLiteral :: Interp -> LinkerEnv -> BCONPtr -> IO Word
+lookupLiteral interp le ptr = case ptr of
   BCONPtrWord lit -> return lit
   BCONPtrLbl  sym -> do
     Ptr a# <- lookupStaticPtr interp sym
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrItbl nm -> do
-    Ptr a# <- lookupIE interp ie nm
+    Ptr a# <- lookupIE interp (itbl_env le) nm
+    return (W# (int2Word# (addr2Int# a#)))
+  BCONPtrAddr nm -> do
+    Ptr a# <- lookupAddr interp (addr_env le) nm
     return (W# (int2Word# (addr2Int# a#)))
   BCONPtrStr _ ->
     -- should be eliminated during assembleBCOs
@@ -123,6 +111,20 @@ lookupIE interp ie con_nm =
                                       (unpackFS sym_to_find1 ++ " or " ++
                                        unpackFS sym_to_find2)
 
+-- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
+lookupAddr :: Interp -> AddrEnv -> Name -> IO (Ptr ())
+lookupAddr interp ae addr_nm = do
+  case lookupNameEnv ae addr_nm of
+    Just (_, AddrPtr ptr) -> return (fromRemotePtr ptr)
+    Nothing -> do -- try looking up in the object files.
+      let sym_to_find = nameToCLabel addr_nm "bytes"
+                          -- see Note [Bytes label] in GHC.Cmm.CLabel
+      m <- lookupSymbol interp sym_to_find
+      case m of
+        Just ptr -> return ptr
+        Nothing -> linkFail "GHC.ByteCode.Linker.lookupAddr"
+                     (unpackFS sym_to_find)
+
 lookupPrimOp :: Interp -> PrimOp -> IO (RemotePtr ())
 lookupPrimOp interp primop = do
   let sym_to_find = primopToCLabel primop "closure"
@@ -133,18 +135,17 @@ lookupPrimOp interp primop = do
 
 resolvePtr
   :: Interp
-  -> ItblEnv
-  -> ClosureEnv
+  -> LinkerEnv
   -> NameEnv Int
   -> RemoteRef BreakArray
   -> BCOPtr
   -> IO ResolvedBCOPtr
-resolvePtr interp ie ce bco_ix breakarray ptr = case ptr of
+resolvePtr interp le bco_ix breakarray ptr = case ptr of
   BCOPtrName nm
     | Just ix <- lookupNameEnv bco_ix nm
     -> return (ResolvedBCORef ix) -- ref to another BCO in this group
 
-    | Just (_, rhv) <- lookupNameEnv ce nm
+    | Just (_, rhv) <- lookupNameEnv (closure_env le) nm
     -> return (ResolvedBCOPtr (unsafeForeignRefToRemoteRef rhv))
 
     | otherwise
@@ -160,7 +161,7 @@ resolvePtr interp ie ce bco_ix breakarray ptr = case ptr of
     -> ResolvedBCOStaticPtr <$> lookupPrimOp interp op
 
   BCOPtrBCO bco
-    -> ResolvedBCOPtrBCO <$> linkBCO interp ie ce bco_ix breakarray bco
+    -> ResolvedBCOPtrBCO <$> linkBCO interp le bco_ix breakarray bco
 
   BCOPtrBreakArray
     -> return (ResolvedBCOPtrBreakArray breakarray)
