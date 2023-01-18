@@ -248,7 +248,7 @@ ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 
 
 -- | Print out an LLVM statement.
-ppLlvmStatement :: forall doc. IsDoc doc => LlvmCgConfig -> LlvmStatement -> doc
+ppLlvmStatement :: IsDoc doc => LlvmCgConfig -> LlvmStatement -> doc
 ppLlvmStatement opts stmt =
   let ind = line . (text "  " <>)
   in case stmt of
@@ -566,7 +566,7 @@ ppSwitch' opts scrut dflt targets lastLineMeta =
   in lines_ $ concat
       [ [text "switch" <+> ppVar opts scrut <> comma <+> ppVar opts dflt <+> char '[']
       , map ppTarget targets
-      , [char ']' <> lastLineMeta]
+      , [char ']' <+> lastLineMeta]
       ]
 {-# SPECIALIZE ppSwitch' :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> SDoc -> SDoc #-}
 {-# SPECIALIZE ppSwitch' :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -654,9 +654,7 @@ ppPlainName opts v = case v of
 -- | Print a literal value. No type.
 ppLit :: IsLine doc => LlvmCgConfig -> LlvmLit-> doc
 ppLit opts l = case l of
-   (LMIntLit i (LMInt 32))  -> integer (fromInteger i) -- TODO: ew
-   (LMIntLit i (LMInt 64))  -> integer (fromInteger i)
-   (LMIntLit   i _       )  -> integer (fromInteger i)
+   (LMIntLit   i _       )  -> integer i
    (LMFloatLit r LMFloat )  -> ppFloat (llvmCgPlatform opts) $ narrowFp r
    (LMFloatLit r LMDouble)  -> ppDouble (llvmCgPlatform opts) r
    f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppTypeLit opts f)
