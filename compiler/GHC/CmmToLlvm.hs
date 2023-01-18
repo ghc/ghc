@@ -91,7 +91,7 @@ llvmCodeGen logger cfg h cmm_stream
 llvmCodeGen' :: LlvmCgConfig -> Stream.Stream IO RawCmmGroup a -> LlvmM a
 llvmCodeGen' cfg cmm_stream
   = do  -- Preamble
-        renderLlvm headerH headerS
+        renderLlvm (llvmHeader cfg) (llvmHeader cfg)
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
@@ -107,23 +107,15 @@ llvmCodeGen' cfg cmm_stream
         cmmUsedLlvmGens
 
         return a
+
+llvmHeader :: IsDoc doc => LlvmCgConfig -> doc
+llvmHeader cfg =
+  let target  = llvmCgLlvmTarget cfg
+      llvmCfg = llvmCgLlvmConfig cfg
+  in lines_
+      [ text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\""
+      , text "target triple = \"" <> text target <> text "\"" ]
   where
-    headerS :: SDoc
-    headerS =
-      let target  = llvmCgLlvmTarget cfg
-          llvmCfg = llvmCgLlvmConfig cfg
-      in lines_
-          [ text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\""
-          , text "target triple = \"" <> text target <> text "\"" ]
-
-    headerH :: HDoc
-    headerH =
-      let target  = llvmCgLlvmTarget cfg
-          llvmCfg = llvmCgLlvmConfig cfg
-      in lines_
-          [ text "target datalayout = \"" <> text (getDataLayout llvmCfg target) <> text "\""
-          , text "target triple = \"" <> text target <> text "\"" ]
-
     getDataLayout :: LlvmConfig -> String -> String
     getDataLayout config target =
       case lookup target (llvmTargets config) of
@@ -132,6 +124,8 @@ llvmCodeGen' cfg cmm_stream
                    text "Target:" <+> text target $$
                    hang (text "Available targets:") 4
                         (vcat $ map (text . fst) $ llvmTargets config)
+{-# SPECIALIZE llvmHeader :: LlvmCgConfig -> SDoc #-}
+{-# SPECIALIZE llvmHeader :: LlvmCgConfig -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
 llvmGroupLlvmGens cmm = do
