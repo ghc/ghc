@@ -40,10 +40,9 @@ pprLlvmData cfg (globals, types) =
 
 
 -- | Pretty print LLVM code
--- pprLlvmCmmDecl :: IsDoc doc => LlvmCmmDecl -> LlvmM doc
+-- Both HDoc and SDoc are returned so that they can be dumped with
+-- @Opt_D_dump_llvm@ is set.
 pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
--- {-# SPECIALIZE pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM SDoc #-}
--- {-# SPECIALIZE pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM HDoc #-}
 pprLlvmCmmDecl (CmmData _ lmdata) = do
   opts <- getConfig
   return ( vcat $ map (pprLlvmData opts) lmdata
