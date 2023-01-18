@@ -246,17 +246,9 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsFCall fn_id co fcall mDeclHeader = do
     let
-        (ty,ty1)             = (coercionLKind co, coercionRKind co)
+        ty                   = coercionLKind co
         (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
-
-    let constQual -- provide 'const' qualifier (#22034)
-          | (_, res_ty1) <- tcSplitFunTys ty1
-          , newty <- maybe res_ty1 snd (tcSplitIOType_maybe res_ty1)
-          , Just (ptr, _) <- splitTyConApp_maybe newty
-          , tyConName ptr `elem` [constPtrConName]
-          = text "const"
-          | otherwise = empty
 
     args <- newSysLocalsDs arg_tys  -- no FFI representation polymorphism
     (val_args, arg_wrappers) <- mapAndUnzipM unboxArg (map Var args)
@@ -285,7 +277,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       includes = vcat [ text "#include \"" <> ftext h
                                         <> text "\""
                                       | Header _ h <- nub headers ]
-                      fun_proto = constQual <+> cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
+                      fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
                        | isVoidRes =                   cCall
                        | otherwise = text "return" <+> cCall
