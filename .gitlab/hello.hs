@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-missing-fields #-}
+{-# OPTIONS_GHC -Wall -Wno-missing-fields #-}
 
 import GHC hiding (parseModule)
 import GHC.Data.StringBuffer
@@ -9,6 +9,7 @@ import GHC.Platform
 import GHC.Plugins
 import GHC.Settings
 import GHC.Settings.Config
+import System.Mem.Weak
 
 fakeSettings :: Settings
 fakeSettings =
@@ -41,5 +42,6 @@ parse dflags src = do
 
 main :: IO ()
 main = do
+  _ <- mkWeak runGhc runGhc Nothing
   m <- parse fakeDynFlags "main = putStrLn \"hello world\""
   putStrLn $ showSDoc fakeDynFlags $ ppr m
