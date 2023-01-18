@@ -167,9 +167,6 @@ Runtime system
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
-- Add `Foreign.C.Types.ConstPtr` was added to encode ``const``-qualified pointer return
-  types in foreign declarations when using ``CApiFFI`` extension.
-
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
