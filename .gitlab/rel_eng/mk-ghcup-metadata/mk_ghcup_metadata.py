@@ -82,7 +82,7 @@ def darwin(arch):
                         , 'ghc-{version}-{arch}-apple-darwin'.format(arch=arch, version="{version}") )
 
 windowsArtifact = PlatformSpec ( 'x86_64-windows'
-                               , 'ghc-{version}-x86_64-unknown-mingw' )
+                               , 'ghc-{version}-x86_64-unknown-mingw32' )
 
 def centos(n):
     return linux_platform("x86_64", "x86_64-linux-centos{n}".format(n=n))
