@@ -568,3 +568,8 @@ test('decodeMyStack_emptyListForMissingFlag',
   , ignore_stderr
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
+
+# Skip for JS platform as the JS RTS is always single threaded
+test('T22795a', [js_skip], compile_and_run, ['-threaded'])
+test('T22795b', [js_skip], compile_and_run, ['-single-threaded'])
+test('T22795c', [js_skip], compile_and_run, ['-threaded -single-threaded'])

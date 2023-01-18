@@ -2081,6 +2081,7 @@ dynamic_flags_deps = [
          return d)
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWayDynP WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWayDynP WayThreaded))
+  , make_ord_flag defGhcFlag "single-threaded" (NoArg (removeWayDynP WayThreaded))
 
   , make_ord_flag defGhcFlag "ticky"
       (NoArg (setGeneralFlag Opt_Ticky >> addWayDynP WayDebug))
@@ -2089,7 +2090,7 @@ dynamic_flags_deps = [
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
-  , make_ord_flag defGhcFlag "static"         (NoArg removeWayDyn)
+  , make_ord_flag defGhcFlag "static"         (NoArg (removeWayDynP WayDyn))
   , make_ord_flag defGhcFlag "dynamic"        (NoArg (addWayDynP WayDyn))
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
@@ -4187,8 +4188,8 @@ addWay' w dflags0 =
                        (wayUnsetGeneralFlags platform w)
    in dflags3
 
-removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { targetWays_ = removeWay WayDyn (targetWays_ dfs) })
+removeWayDynP :: Way -> DynP ()
+removeWayDynP w = upd (\dfs -> dfs { targetWays_ = removeWay w (targetWays_ dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()

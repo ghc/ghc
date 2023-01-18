@@ -1076,6 +1076,7 @@ for example).
     :shortdesc: Use the threaded runtime
     :type: dynamic
     :category: linking
+    :reverse: -single-threaded
 
     Link the program with the "threaded" version of the runtime system.
     The threaded runtime system is so-called because it manages multiple
@@ -1098,6 +1099,16 @@ for example).
        Additionally, ``foreign export``\ ed Haskell functions may be
        called from multiple OS threads simultaneously. See
        :ref:`ffi-threads`.
+
+.. ghc-flag:: -single-threaded
+    :shortdesc: Use the single-threaded runtime
+    :type: dynamic
+    :category: linking
+    :reverse: -threaded
+
+    :since: 9.8
+
+    Switch to the single threaded (default) version of the runtime.
 
 .. ghc-flag:: -eventlog
     :shortdesc: Enable runtime event tracing
