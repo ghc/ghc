@@ -61,28 +61,28 @@ data LlvmType
   deriving (Eq)
 
 instance Outputable LlvmType where
-  ppr = ppType
+  ppr = ppLlvmType
 
-ppType :: IsLine doc => LlvmType -> doc
-{-# SPECIALIZE ppType :: LlvmType -> SDoc #-}
-{-# SPECIALIZE ppType :: LlvmType -> HLine #-}
-ppType t = case t of
+ppLlvmType :: IsLine doc => LlvmType -> doc
+ppLlvmType t = case t of
   LMInt size     -> char 'i' <> int size
   LMFloat        -> text "float"
   LMDouble       -> text "double"
   LMFloat80      -> text "x86_fp80"
   LMFloat128     -> text "fp128"
-  LMPointer x    -> ppType x <> char '*'
-  LMArray nr tp  -> char '[' <> int nr <> text " x " <> ppType tp <> char ']'
-  LMVector nr tp -> char '<' <> int nr <> text " x " <> ppType tp <> char '>'
+  LMPointer x    -> ppLlvmType x <> char '*'
+  LMArray nr tp  -> char '[' <> int nr <> text " x " <> ppLlvmType tp <> char ']'
+  LMVector nr tp -> char '<' <> int nr <> text " x " <> ppLlvmType tp <> char '>'
   LMLabel        -> text "label"
   LMVoid         -> text "void"
-  LMStruct tys   -> text "<{" <> ppCommaJoin ppType tys <> text "}>"
-  LMStructU tys  -> text "{" <> ppCommaJoin ppType tys <> text "}"
+  LMStruct tys   -> text "<{" <> ppCommaJoin ppLlvmType tys <> text "}>"
+  LMStructU tys  -> text "{" <> ppCommaJoin ppLlvmType tys <> text "}"
   LMMetadata     -> text "metadata"
   LMAlias (s,_)  -> char '%' <> ftext s
   LMFunction (LlvmFunctionDecl _ _ _ r varg p _)
-    -> ppType r <+> lparen <> ppParams varg p <> rparen
+    -> ppLlvmType r <+> lparen <> ppParams varg p <> rparen
+{-# SPECIALIZE ppLlvmType :: LlvmType -> SDoc #-}
+{-# SPECIALIZE ppLlvmType :: LlvmType -> HLine #-}
 
 ppParams :: IsLine doc => LlvmParameterListType -> [LlvmParameter] -> doc
 {-# SPECIALIZE ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc #-}
@@ -94,7 +94,7 @@ ppParams varg p
           _otherwise          -> text ""
         -- by default we don't print param attributes
         args = map fst p
-    in ppCommaJoin ppType args <> varg'
+    in ppCommaJoin ppLlvmType args <> varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString

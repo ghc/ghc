@@ -96,7 +96,7 @@ ppLlvmGlobal opts (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
 
         rhs = case dat of
             Just stat -> pprSpecialStatic opts stat
-            Nothing   -> ppType (pLower $ getVarType var)
+            Nothing   -> ppLlvmType (pLower $ getVarType var)
 
         -- Position of linkage is different for aliases.
         const = case c of
@@ -121,7 +121,9 @@ ppLlvmAlias :: IsLine doc => LlvmAlias-> doc
 {-# SPECIALIZE ppLlvmAlias :: LlvmAlias -> SDoc #-}
 {-# SPECIALIZE ppLlvmAlias :: LlvmAlias -> HLine #-}
 ppLlvmAlias (name, ty)
-  = char '%' <> ftext name <+> equals <+> text "type" <+> ppType ty
+  = char '%' <> ftext name <+> equals <+> text "type" <+> ppLlvmType ty
+{-# SPECIALIZE ppLlvmAlias :: LlvmAlias -> SDoc #-}
+{-# SPECIALIZE ppLlvmAlias :: LlvmAlias -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 -- | Print out a list of LLVM metadata.
@@ -182,11 +184,11 @@ ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
         align = case a of
                      Just a' -> text " align " <> int a'
                      Nothing -> empty
-        args' = zipWith (\(ty,p) n -> ppType ty <+> ppSpaceJoin ppLlvmParamAttr p <+> char '%'
+        args' = zipWith (\(ty,p) n -> ppLlvmType ty <+> ppSpaceJoin ppLlvmParamAttr p <+> char '%'
                                     <> ftext n)
                    p
                    args
-    in ppLlvmLinkageType l <+> ppLlvmCallConvention c <+> ppType r <+> char '@' <> ftext n <> lparen <>
+    in ppLlvmLinkageType l <+> ppLlvmCallConvention c <+> ppLlvmType r <+> char '@' <> ftext n <> lparen <>
         hsep (punctuate comma args') <> varg' <> rparen <> align
 
 -- | Print out a list of function declaration.
@@ -210,10 +212,10 @@ ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
                      Just a' -> text " align" <+> int a'
                      Nothing -> empty
         args = hcat $ intersperse (comma <> space) $
-                  map (\(t,a) -> ppType t <+> ppSpaceJoin ppLlvmParamAttr a) p
+                  map (\(t,a) -> ppLlvmType t <+> ppSpaceJoin ppLlvmParamAttr a) p
     in lines_
         [ text "declare" <+> ppLlvmLinkageType l <+> ppLlvmCallConvention c
-          <+> ppType r <+> char '@' <> ftext n <> lparen <> args <> varg' <> rparen <> align
+          <+> ppLlvmType r <+> char '@' <> ftext n <> lparen <> args <> varg' <> rparen <> align
         , empty]
 
 
@@ -355,13 +357,13 @@ ppCall opts ct fptr args attrs = case fptr of
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
                 ppValues = ppCallParams opts (map snd params) args
-                ppArgTy  = ppCommaJoin (ppType . fst) params <>
+                ppArgTy  = ppCommaJoin (ppLlvmType . fst) params <>
                            (case argTy of
                                VarArgs   -> text ", ..."
                                FixedArgs -> empty)
                 fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin ppLlvmFuncAttr attrs
-            in  tc <> text "call" <+> ppLlvmCallConvention cc <+> ppType ret
+            in  tc <> text "call" <+> ppLlvmCallConvention cc <+> ppLlvmType ret
                     <> fnty <+> ppName opts fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
@@ -378,7 +380,7 @@ ppMachOp :: IsLine doc => LlvmCgConfig -> LlvmMachOp -> LlvmVar -> LlvmVar-> doc
 {-# SPECIALIZE ppMachOp :: LlvmCgConfig -> LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc #-}
 {-# SPECIALIZE ppMachOp :: LlvmCgConfig -> LlvmMachOp -> LlvmVar -> LlvmVar -> HLine #-}
 ppMachOp opts op left right =
-  ppLlvmMachOp op <+> ppType (getVarType left) <+> ppName opts left
+  ppLlvmMachOp op <+> ppLlvmType (getVarType left) <+> ppName opts left
         <> comma <+> ppName opts right
 
 
@@ -395,7 +397,7 @@ ppCmpOp opts op left right =
                 ++ (show $ getVarType left) ++ ", right = "
                 ++ (show $ getVarType right))
         -}
-  in cmpOp <+> ppLlvmCmpOp op <+> ppType (getVarType left)
+  in cmpOp <+> ppLlvmCmpOp op <+> ppLlvmType (getVarType left)
         <+> ppName opts left <> comma <+> ppName opts right
 
 
@@ -457,7 +459,7 @@ ppLoad :: IsLine doc => LlvmCgConfig -> LlvmVar -> LMAlign-> doc
 {-# SPECIALIZE ppLoad :: LlvmCgConfig -> LlvmVar -> LMAlign -> SDoc #-}
 {-# SPECIALIZE ppLoad :: LlvmCgConfig -> LlvmVar -> LMAlign -> HLine #-}
 ppLoad opts var alignment =
-  text "load" <+> ppType derefType <> comma <+> ppVar opts var <> align
+  text "load" <+> ppLlvmType derefType <> comma <+> ppVar opts var <> align
   where
     derefType = pLower $ getVarType var
     align =
@@ -474,7 +476,7 @@ ppALoad opts ord st var =
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
       derefType = pLower $ getVarType var
-  in text "load atomic" <+> ppType derefType <> comma <+> ppVar opts var <> sThreaded
+  in text "load atomic" <+> ppLlvmType derefType <> comma <+> ppVar opts var <> sThreaded
             <+> ppSyncOrdering ord <> align
 
 ppStore :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> LMAlign-> doc
@@ -494,9 +496,11 @@ ppCast :: IsLine doc => LlvmCgConfig -> LlvmCastOp -> LlvmVar -> LlvmType-> doc
 {-# SPECIALIZE ppCast :: LlvmCgConfig -> LlvmCastOp -> LlvmVar -> LlvmType -> HLine #-}
 ppCast opts op from to
     =   ppLlvmCastOp op
-    <+> ppType (getVarType from) <+> ppName opts from
+    <+> ppLlvmType (getVarType from) <+> ppName opts from
     <+> text "to"
-    <+> ppType to
+    <+> ppLlvmType to
+{-# SPECIALIZE ppCast :: LlvmCgConfig -> LlvmCastOp -> LlvmVar -> LlvmType -> SDoc #-}
+{-# SPECIALIZE ppCast :: LlvmCgConfig -> LlvmCastOp -> LlvmVar -> LlvmType -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppMalloc :: IsLine doc => LlvmCgConfig -> LlvmType -> Int-> doc
@@ -504,7 +508,9 @@ ppMalloc :: IsLine doc => LlvmCgConfig -> LlvmType -> Int-> doc
 {-# SPECIALIZE ppMalloc :: LlvmCgConfig -> LlvmType -> Int -> HLine #-}
 ppMalloc opts tp amount =
   let amount' = LMLitVar $ LMIntLit (toInteger amount) i32
-  in text "malloc" <+> ppType tp <> comma <+> ppVar opts amount'
+  in text "malloc" <+> ppLlvmType tp <> comma <+> ppVar opts amount'
+{-# SPECIALIZE ppMalloc :: LlvmCgConfig -> LlvmType -> Int -> SDoc #-}
+{-# SPECIALIZE ppMalloc :: LlvmCgConfig -> LlvmType -> Int -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppAlloca :: IsLine doc => LlvmCgConfig -> LlvmType -> Int-> doc
@@ -512,7 +518,9 @@ ppAlloca :: IsLine doc => LlvmCgConfig -> LlvmType -> Int-> doc
 {-# SPECIALIZE ppAlloca :: LlvmCgConfig -> LlvmType -> Int -> HLine #-}
 ppAlloca opts tp amount =
   let amount' = LMLitVar $ LMIntLit (toInteger amount) i32
-  in text "alloca" <+> ppType tp <> comma <+> ppVar opts amount'
+  in text "alloca" <+> ppLlvmType tp <> comma <+> ppVar opts amount'
+{-# SPECIALIZE ppAlloca :: LlvmCgConfig -> LlvmType -> Int -> SDoc #-}
+{-# SPECIALIZE ppAlloca :: LlvmCgConfig -> LlvmType -> Int -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppGetElementPtr :: IsLine doc => LlvmCgConfig -> Bool -> LlvmVar -> [LlvmVar]-> doc
@@ -522,7 +530,7 @@ ppGetElementPtr opts inb ptr idx =
   let indexes = comma <+> ppCommaJoin (ppVar opts) idx
       inbound = if inb then text "inbounds" else empty
       derefType = pLower $ getVarType ptr
-  in text "getelementptr" <+> inbound <+> ppType derefType <> comma <+> ppVar opts ptr
+  in text "getelementptr" <+> inbound <+> ppLlvmType derefType <> comma <+> ppVar opts ptr
                             <> indexes
 
 
@@ -530,7 +538,9 @@ ppReturn :: IsLine doc => LlvmCgConfig -> Maybe LlvmVar-> doc
 {-# SPECIALIZE ppReturn :: LlvmCgConfig -> Maybe LlvmVar -> SDoc #-}
 {-# SPECIALIZE ppReturn :: LlvmCgConfig -> Maybe LlvmVar -> HLine #-}
 ppReturn opts (Just var) = text "ret" <+> ppVar opts var
-ppReturn _    Nothing    = text "ret" <+> ppType LMVoid
+ppReturn _    Nothing    = text "ret" <+> ppLlvmType LMVoid
+{-# SPECIALIZE ppReturn :: LlvmCgConfig -> Maybe LlvmVar -> SDoc #-}
+{-# SPECIALIZE ppReturn :: LlvmCgConfig -> Maybe LlvmVar -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppBranch :: IsLine doc => LlvmCgConfig -> LlvmVar-> doc
@@ -551,7 +561,9 @@ ppPhi :: IsLine doc => LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)]-> doc
 {-# SPECIALIZE ppPhi :: LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)] -> HLine #-}
 ppPhi opts tp preds =
   let ppPreds (val, label) = brackets $ ppName opts val <> comma <+> ppName opts label
-  in text "phi" <+> ppType tp <+> hsep (punctuate comma $ map ppPreds preds)
+  in text "phi" <+> ppLlvmType tp <+> hsep (punctuate comma $ map ppPreds preds)
+{-# SPECIALIZE ppPhi :: LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)] -> SDoc #-}
+{-# SPECIALIZE ppPhi :: LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppSwitch :: IsDoc doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> doc
@@ -583,7 +595,7 @@ ppAsm :: IsLine doc => LlvmCgConfig -> LMString -> LMString -> LlvmType -> [Llvm
 ppAsm opts asm constraints rty vars sideeffect alignstack =
   let asm'  = doubleQuotes $ ftext asm
       cons  = doubleQuotes $ ftext constraints
-      rty'  = ppType rty
+      rty'  = ppLlvmType rty
       vars' = lparen <+> ppCommaJoin (ppVar opts) vars <+> rparen
       side  = if sideeffect then text "sideeffect" else empty
       align = if alignstack then text "alignstack" else empty
@@ -595,7 +607,7 @@ ppExtract :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar-> doc
 {-# SPECIALIZE ppExtract :: LlvmCgConfig -> LlvmVar -> LlvmVar -> HLine #-}
 ppExtract opts vec idx =
     text "extractelement"
-    <+> ppType (getVarType vec) <+> ppName opts vec <> comma
+    <+> ppLlvmType (getVarType vec) <+> ppName opts vec <> comma
     <+> ppVar opts idx
 
 ppExtractV :: IsLine doc => LlvmCgConfig -> LlvmVar -> Int-> doc
@@ -603,7 +615,7 @@ ppExtractV :: IsLine doc => LlvmCgConfig -> LlvmVar -> Int-> doc
 {-# SPECIALIZE ppExtractV :: LlvmCgConfig -> LlvmVar -> Int -> HLine #-}
 ppExtractV opts struct idx =
     text "extractvalue"
-    <+> ppType (getVarType struct) <+> ppName opts struct <> comma
+    <+> ppLlvmType (getVarType struct) <+> ppName opts struct <> comma
     <+> int idx
 
 ppInsert :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> LlvmVar-> doc
@@ -611,8 +623,8 @@ ppInsert :: IsLine doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> LlvmVar-> doc
 {-# SPECIALIZE ppInsert :: LlvmCgConfig -> LlvmVar -> LlvmVar -> LlvmVar -> HLine #-}
 ppInsert opts vec elt idx =
     text "insertelement"
-    <+> ppType (getVarType vec) <+> ppName opts vec <> comma
-    <+> ppType (getVarType elt) <+> ppName opts elt <> comma
+    <+> ppLlvmType (getVarType vec) <+> ppName opts vec <> comma
+    <+> ppLlvmType (getVarType elt) <+> ppName opts elt <> comma
     <+> ppVar opts idx
 
 
@@ -696,7 +708,9 @@ ppVar' :: IsLine doc => [LlvmParamAttr] -> LlvmCgConfig -> LlvmVar -> doc
 {-# SPECIALIZE ppVar' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmVar -> HLine #-}
 ppVar' attrs opts v = case v of
   LMLitVar x -> ppTypeLit' attrs opts x
-  x          -> ppType (getVarType x) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppName opts x
+  x          -> ppLlvmType (getVarType x) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppName opts x
+{-# SPECIALIZE ppVar' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmVar -> SDoc #-}
+{-# SPECIALIZE ppVar' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmVar -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppTypeLit :: IsLine doc => LlvmCgConfig -> LlvmLit -> doc
 {-# SPECIALIZE ppTypeLit :: LlvmCgConfig -> LlvmLit -> SDoc #-}
@@ -708,7 +722,9 @@ ppTypeLit' :: IsLine doc => [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> doc
 {-# SPECIALIZE ppTypeLit' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> HLine #-}
 ppTypeLit' attrs opts l = case l of
   LMVectorLit {} -> ppLit opts l
-  _              -> ppType (getLitType l) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppLit opts l
+  _              -> ppLlvmType (getLitType l) <+> ppSpaceJoin ppLlvmParamAttr attrs <+> ppLit opts l
+{-# SPECIALIZE ppTypeLit' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> SDoc #-}
+{-# SPECIALIZE ppTypeLit' :: [LlvmParamAttr] -> LlvmCgConfig -> LlvmLit -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppStatic :: IsLine doc => LlvmCgConfig -> LlvmStatic-> doc
 {-# SPECIALIZE ppStatic :: LlvmCgConfig -> LlvmStatic -> SDoc #-}
@@ -716,15 +732,15 @@ ppStatic :: IsLine doc => LlvmCgConfig -> LlvmStatic-> doc
 ppStatic opts st = case st of
   LMComment       s -> text "; " <> ftext s
   LMStaticLit   l   -> ppTypeLit opts l
-  LMUninitType    t -> ppType t <> text " undef"
-  LMStaticStr   s t -> ppType t <> text " c\"" <> ftext s <> text "\\00\""
-  LMStaticArray d t -> ppType t <> text " [" <> ppCommaJoin (ppStatic opts) d <> char ']'
-  LMStaticStruc d t -> ppType t <> text "<{" <> ppCommaJoin (ppStatic opts) d <> text "}>"
-  LMStaticStrucU d t -> ppType t <> text "{" <> ppCommaJoin (ppStatic opts) d <> text "}"
+  LMUninitType    t -> ppLlvmType t <> text " undef"
+  LMStaticStr   s t -> ppLlvmType t <> text " c\"" <> ftext s <> text "\\00\""
+  LMStaticArray d t -> ppLlvmType t <> text " [" <> ppCommaJoin (ppStatic opts) d <> char ']'
+  LMStaticStruc d t -> ppLlvmType t <> text "<{" <> ppCommaJoin (ppStatic opts) d <> text "}>"
+  LMStaticStrucU d t -> ppLlvmType t <> text "{" <> ppCommaJoin (ppStatic opts) d <> text "}"
   LMStaticPointer v -> ppVar opts v
-  LMTrunc v t       -> ppType t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppType t <> char ')'
-  LMBitc v t        -> ppType t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppType t <> char ')'
-  LMPtoI v t        -> ppType t <> text " ptrtoint (" <> ppStatic opts v <> text " to " <> ppType t <> char ')'
+  LMTrunc v t       -> ppLlvmType t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppLlvmType t <> char ')'
+  LMBitc v t        -> ppLlvmType t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppLlvmType t <> char ')'
+  LMPtoI v t        -> ppLlvmType t <> text " ptrtoint (" <> ppStatic opts v <> text " to " <> ppLlvmType t <> char ')'
   LMAdd s1 s2       -> pprStaticArith opts s1 s2 (text "add") (text "fadd") (text "LMAdd")
   LMSub s1 s2       -> pprStaticArith opts s1 s2 (text "sub") (text "fsub") (text "LMSub")
 
@@ -733,11 +749,11 @@ pprSpecialStatic :: IsLine doc => LlvmCgConfig -> LlvmStatic-> doc
 {-# SPECIALIZE pprSpecialStatic :: LlvmCgConfig -> LlvmStatic -> SDoc #-}
 {-# SPECIALIZE pprSpecialStatic :: LlvmCgConfig -> LlvmStatic -> HLine #-}
 pprSpecialStatic opts stat = case stat of
-   LMBitc v t        -> ppType (pLower t)
+   LMBitc v t        -> ppLlvmType (pLower t)
                         <> text ", bitcast ("
-                        <> ppStatic opts v <> text " to " <> ppType t
+                        <> ppStatic opts v <> text " to " <> ppLlvmType t
                         <> char ')'
-   LMStaticPointer x -> ppType (pLower $ getVarType x)
+   LMStaticPointer x -> ppLlvmType (pLower $ getVarType x)
                         <> comma <+> ppStatic opts stat
    _                 -> ppStatic opts stat
 
@@ -749,7 +765,7 @@ pprStaticArith opts s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
       op  = if isFloat ty1 then float_op else int_op
   in if ty1 == getStatType s2
-     then ppType ty1 <+> op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
+     then ppLlvmType ty1 <+> op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
      else pprPanic "pprStaticArith" $
                  op_name <> text " with different types! s1: " <> ppStatic opts s1
                          <> text", s2: " <> ppStatic opts s2
