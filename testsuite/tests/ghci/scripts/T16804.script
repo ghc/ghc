@@ -1,3 +1,4 @@
+:set -Wno-x-partial
 :{
 annotate :: [String] -> Int -> Int -> Int -> String
 annotate content row startcol endcol =

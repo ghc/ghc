@@ -1,4 +1,5 @@
 -- Printing of lists
+:set -Wno-x-partial
 
 let li = map Just [0::Integer .. 5]
 :p li

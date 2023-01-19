@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module T17722B (setHelper) where
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- Tests SPECIAL CASE 2 in GHC.Tc.Gen.Bind.tcMonoBinds
 -- See Note [Special case for non-recursive pattern bindings]

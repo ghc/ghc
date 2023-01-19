@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 import qualified Data.IntSet as IntSet
 import Data.Array
 

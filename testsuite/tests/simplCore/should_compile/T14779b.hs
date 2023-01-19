@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -g -O #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 -- This used to fail with:
 --
 -- *** Core Lint errors : in result of Simplifier ***

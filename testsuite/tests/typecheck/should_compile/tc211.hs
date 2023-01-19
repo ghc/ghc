@@ -1,4 +1,5 @@
 {-# LANGUAGE ImpredicativeTypes, ScopedTypeVariables, GADTs #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- Nov 2014: impredicative types are very dodgy so I am
 --           FAR from confident that these tests give the right errors

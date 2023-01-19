@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -O -ddump-rules #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- #2486
 --

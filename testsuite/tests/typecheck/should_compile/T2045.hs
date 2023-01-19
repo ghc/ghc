@@ -1,5 +1,6 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- #2045
 -- ghc -fhpc --make Vhdl.hs -o gencirc -Wall

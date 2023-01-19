@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module M where
 
 import Control.Monad.ST

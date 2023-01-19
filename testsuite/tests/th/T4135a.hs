@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, TypeFamilies,
              FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module T4135a where
 

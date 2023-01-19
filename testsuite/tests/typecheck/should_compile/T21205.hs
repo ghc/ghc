@@ -5,6 +5,7 @@
            , ScopedTypeVariables
            , StandaloneKindSignatures
            , TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module T20855b where
 

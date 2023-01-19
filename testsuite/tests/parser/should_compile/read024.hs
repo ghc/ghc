@@ -1,4 +1,5 @@
 -- !!! checking that special ids are correctly handled.
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module ShouldCompile where
 
 as :: [as]

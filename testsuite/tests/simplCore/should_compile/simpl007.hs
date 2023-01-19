@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 {-# LANGUAGE UndecidableInstances,
              ExistentialQuantification, FlexibleInstances #-}
 

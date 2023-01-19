@@ -1,5 +1,6 @@
 
 -- Tests enhanced polymorphism
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module ShouldCompile where
 

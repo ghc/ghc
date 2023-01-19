@@ -1,3 +1,4 @@
+:set -Wno-x-partial
 :l Test6.hs
 :b 5
 main

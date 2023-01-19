@@ -1,4 +1,5 @@
 {-# LANGUAGE ImpredicativeTypes #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module PList1 where
 -- Polymorphic lists 1: requires smart-app-res

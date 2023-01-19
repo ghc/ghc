@@ -1,5 +1,6 @@
 --module Parse(Parse(..),whiteSpace,separatedBy) where
 --import StdLib
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module ShouldSucceed where
 
 import Data.Char

@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module T3286 (train) where
 

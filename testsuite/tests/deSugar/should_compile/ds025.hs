@@ -1,4 +1,5 @@
 -- !!! ds025 -- overloaded assoc -- AbsBinds
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module ShouldCompile where
 

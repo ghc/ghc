@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module ShouldSucceed where
 
 -- import TheUtils

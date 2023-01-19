@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module TH_tf1 where
 

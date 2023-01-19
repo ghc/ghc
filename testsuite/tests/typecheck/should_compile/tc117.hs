@@ -1,6 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleInstances, UndecidableInstances #-}
 -- UndecidableInstances now needed because the Coverage Condition fails
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 -- !!! Functional dependencies
 -- This one gave another fail in tcReadMutVar

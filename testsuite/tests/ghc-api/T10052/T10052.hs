@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module Main where
 
 import System.Environment

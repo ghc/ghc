@@ -1,6 +1,7 @@
 
 -- Test from Kirsten Chevalier
 -- Tests the "strict bindings getting floated to top" bug in the floater
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module B (bernoulli) where
 

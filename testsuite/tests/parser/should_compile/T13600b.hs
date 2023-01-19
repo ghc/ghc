@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module T13600b where
 
 f ! (Just x) = f !! x

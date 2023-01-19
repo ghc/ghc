@@ -1,6 +1,7 @@
 -- Nasty test for type signatures
 -- In both groups of declarations below, the type variables 'a' and 'b'
 -- end up being unified together.
+{-# OPTIONS_GHC -Wno-x-partial #-}
 
 module ShouldCompile where
 

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 import System.Environment
 
 -- This covers #11303, wherein the pattern checker would explode

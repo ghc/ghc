@@ -1,3 +1,4 @@
+:set -Wno-x-partial
 :m + Data.IORef
 
 let l = map Just [1::Integer .. 10]
