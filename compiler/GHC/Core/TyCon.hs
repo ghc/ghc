@@ -128,8 +128,8 @@ module GHC.Core.TyCon(
         PrimRep(..), PrimElemRep(..), Levity(..),
         primElemRepToPrimRep,
         isVoidRep, isGcPtrRep,
-        primRepSizeB,
-        primElemRepSizeB,
+        primRepSizeB, primRepSizeW64_B,
+        primElemRepSizeB, primElemRepSizeW64_B,
         primRepIsFloat,
         primRepsCompatible,
         primRepCompatible,
@@ -1679,8 +1679,38 @@ primRepSizeB platform = \case
    VoidRep          -> 0
    (VecRep len rep) -> len * primElemRepSizeB platform rep
 
+-- | Like primRepSizeB but assumes pointers/words are 8 words wide.
+--
+-- This can be useful to compute the size of a rep as if we were compiling
+-- for a 64bit platform.
+primRepSizeW64_B :: PrimRep -> Int
+primRepSizeW64_B = \case
+   IntRep           -> 8
+   WordRep          -> 8
+   Int8Rep          -> 1
+   Int16Rep         -> 2
+   Int32Rep         -> 4
+   Int64Rep         -> 8
+   Word8Rep         -> 1
+   Word16Rep        -> 2
+   Word32Rep        -> 4
+   Word64Rep        -> 8
+   FloatRep         -> fLOAT_SIZE
+   DoubleRep        -> dOUBLE_SIZE
+   AddrRep          -> 8
+   BoxedRep{}       -> 8
+   VoidRep          -> 0
+   (VecRep len rep) -> len * primElemRepSizeW64_B rep
+
 primElemRepSizeB :: Platform -> PrimElemRep -> Int
 primElemRepSizeB platform = primRepSizeB platform . primElemRepToPrimRep
+
+-- | Like primElemRepSizeB but assumes pointers/words are 8 words wide.
+--
+-- This can be useful to compute the size of a rep as if we were compiling
+-- for a 64bit platform.
+primElemRepSizeW64_B :: PrimElemRep -> Int
+primElemRepSizeW64_B = primRepSizeW64_B . primElemRepToPrimRep
 
 primElemRepToPrimRep :: PrimElemRep -> PrimRep
 primElemRepToPrimRep Int8ElemRep   = Int8Rep

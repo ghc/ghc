@@ -488,6 +488,7 @@ test('T23307', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress
 test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
 test('T23307b', normal, compile, ['-O'])
 test('T23307c', normal, compile, ['-O'])
+test('T22309', [grep_errmsg(r'MkW'), only_ways(['optasm']) ], compile, ['-O -ddump-stg-final -dsuppress-uniques -dsuppress-all -dno-typeable-binds -dno-suppress-type-signatures -dsuppress-module-prefixes'])
 test('T23426', normal, compile, ['-O'])
 test('T23491a', [extra_files(['T23491.hs']), grep_errmsg(r'Float out')], multimod_compile, ['T23491', '-ffull-laziness -ddump-full-laziness'])
 test('T23491b', [extra_files(['T23491.hs']), grep_errmsg(r'Float inwards')], multimod_compile, ['T23491', '-ffloat-in -ddump-float-in'])

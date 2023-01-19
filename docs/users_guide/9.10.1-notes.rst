@@ -73,6 +73,16 @@ Compiler
 - Defaulting plugins can now propose solutions to entangled sets of type variables. This allows defaulting
   of multi-parameter type classes. See :ghc-ticket:`23832`.
 
+- The flag `-funbox-small-strict-fields` will now properly recognize unboxed tuples
+  containing multiple elements as large. Constructors like `Foo (# Int64, Int64# )`
+  will no longer be considered small and therefore not unboxed by default under `-O`
+  even when used as strict field. :ghc-ticket:`22309`.
+
+- The flag `-funbox-small-strict-fields` will now always unpack things as if compiling
+  for a 64bit platform. Even when generating code for a 32bit platform.
+  This makes core optimizations more consistent between 32bit and 64bit platforms
+  at the cost of slightly worse 32bit performance in edge cases.
+
 GHCi
 ~~~~
 
