@@ -686,8 +686,8 @@ kindBoxedRepLevity_maybe ty
 --  * False of type variables, type family applications,
 --    and of other reps such as @IntRep :: RuntimeRep@.
 isLiftedRuntimeRep :: RuntimeRepType -> Bool
-isLiftedRuntimeRep rep =
-  runtimeRepLevity_maybe rep == Just Lifted
+isLiftedRuntimeRep rep
+  = runtimeRepLevity_maybe rep == Just Lifted
 
 -- | Check whether a type of kind 'RuntimeRep' is unlifted.
 --
@@ -779,7 +779,8 @@ isBoxedRuntimeRep_maybe rep
   | otherwise
   = Nothing
 
--- | Check whether a type of kind 'RuntimeRep' is lifted, unlifted, or unknown.
+-- | Check whether a type (usually of kind 'RuntimeRep') is lifted, unlifted,
+--   or unknown.  Returns Nothing if the type isn't of kind 'RuntimeRep'.
 --
 -- `runtimeRepLevity_maybe rr` returns:
 --
@@ -793,7 +794,9 @@ runtimeRepLevity_maybe rep
     if (rr_tc `hasKey` boxedRepDataConKey)
     then case args of
             [lev] -> levityType_maybe lev
-            _     -> pprPanic "runtimeRepLevity_maybe" (ppr rep)
+            _     -> Nothing  -- Type isn't of kind RuntimeRep
+                     -- The latter case happens via the call to isLiftedRuntimeRep
+                     -- in GHC.Tc.Errors.Ppr.pprMisMatchMsg (#22742)
     else Just Unlifted
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
