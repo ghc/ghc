@@ -67,7 +67,7 @@ import GHC.Core.DataCon
 
 import GHC.Types.Literal
 import GHC.Types.SourceText
-import GHC.Types.RepType ( countFunRepArgs )
+import GHC.Types.RepType ( countFunRepArgs, typePrimRep )
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -1517,15 +1517,28 @@ shouldUnpackArgTy bang_opts prag fam_envs arg_ty
           | otherwise   -- Wrinkle (W4) of Note [Recursive unboxing]
           -> bang_opt_unbox_strict bang_opts
              || (bang_opt_unbox_small bang_opts
-                 && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
+                 && is_small_rep)  -- See Note [Unpack one-wide fields]
       where
         (rep_tys, _) = dataConArgUnpack arg_ty
+
+        -- Takes in the list of reps used to represent the dataCon after it's unpacked
+        -- and tells us if they can fit into 8 bytes. See Note [Unpack one-wide fields]
+        is_small_rep =
+          let -- Neccesary to look through unboxed tuples.
+              prim_reps = concatMap (typePrimRep . scaledThing . fst) $ rep_tys
+              -- Void types are erased when unpacked so we
+              nv_prim_reps = filter (not . isVoidRep) prim_reps
+              -- And then get the actual size of the unpacked constructor.
+              rep_size = sum $ map primRepSizeW64_B nv_prim_reps
+          in rep_size <= 8
 
     is_sum :: [DataCon] -> Bool
     -- We never unpack sum types automatically
     -- (Product types, we do. Empty types are weeded out by unpackable_type_datacons.)
     is_sum (_:_:_) = True
     is_sum _       = False
+
+
 
 -- Given a type already assumed to have been normalized by topNormaliseType,
 -- unpackable_type_datacons ty = Just datacons
@@ -1584,6 +1597,14 @@ However
     data S = S !a
 
 Here we can represent T with an Int#.
+
+Special care has to be taken to make sure we don't mistake fields with unboxed
+tuple/sum rep or very large reps. See #22309
+
+For consistency we unpack anything that fits into 8 bytes on a 64-bit platform,
+even when compiling for 32bit platforms. This way unpacking decisions will be the
+same for 32bit and 64bit systems. To do so we use primRepSizeW64_B instead of
+primRepSizeB. See also the tests in test case T22309.
 
 Note [Recursive unboxing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
