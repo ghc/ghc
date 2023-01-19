@@ -56,6 +56,11 @@ static W_    countNonMovingHeap     ( struct NonmovingHeap *heap );
 // the HEAP_ALLOCED macro in function form. Useful for use in GDB or similar.
 int isHeapAlloced    ( StgPtr p) { return HEAP_ALLOCED(p); }
 
+static bool isNonmovingGen(generation *gen)
+{
+    return RtsFlags.GcFlags.useNonmoving && gen == oldest_gen;
+}
+
 /* -----------------------------------------------------------------------------
    Check stack sanity
    -------------------------------------------------------------------------- */
@@ -927,7 +932,12 @@ static void checkGeneration (generation *gen,
     uint32_t n;
     gen_workspace *ws;
 
-    ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    // N.B. the nonmoving collector's block list does not live on
+    // oldest_gen->blocks. See Note [Live data accounting in nonmoving
+    // collector]..
+    if (!isNonmovingGen(gen)) {
+        ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    }
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
 #if defined(THREADED_RTS)
@@ -944,7 +954,7 @@ static void checkGeneration (generation *gen,
     if (!after_major_gc) return;
 #endif
 
-    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+    if (isNonmovingGen(gen)) {
         ASSERT(countNonMovingSegments(nonmovingHeap.free) == (W_) nonmovingHeap.n_free * NONMOVING_SEGMENT_BLOCKS);
         ASSERT(countBlocks(nonmoving_large_objects) == n_nonmoving_large_blocks);
         ASSERT(countBlocks(nonmoving_marked_large_objects) == n_nonmoving_marked_large_blocks);
@@ -1145,7 +1155,7 @@ static W_
 genBlocks (generation *gen)
 {
     W_ ret = 0;
-    if (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen) {
+    if (isNonmovingGen(gen)) {
         // See Note [Live data accounting in nonmoving collector].
         ASSERT(countNonMovingHeap(&nonmovingHeap) == gen->n_blocks);
         ret += countAllocdBlocks(nonmoving_large_objects);
