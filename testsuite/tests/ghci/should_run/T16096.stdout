@@ -1,6 +1,6 @@
 
 ==================== Desugared ====================
-letrec {
+let {
   x :: [GHC.Types.Int]
   [LclId]
   x = let {
@@ -11,7 +11,7 @@ letrec {
         x :: [GHC.Types.Int]
         [LclId]
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
-      x; } in
+      x } in
 GHC.Base.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
@@ -27,7 +27,7 @@ GHC.Base.returnIO
 
 
 ==================== Desugared ====================
-letrec {
+let {
   x :: [GHC.Types.Int]
   [LclId]
   x = let {
@@ -38,7 +38,7 @@ letrec {
         x :: [GHC.Types.Int]
         [LclId]
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
-      x; } in
+      x } in
 GHC.Base.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
