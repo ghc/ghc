@@ -67,7 +67,7 @@ import GHC.Prelude
 import qualified GHC.Data.Strict as Strict
 
 import GHC.Types.Name.Reader
-import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS)
+import GHC.Types.Name.Occurrence ( varName, dataName, tcClsName, tvName, occNameFS, mkVarOccFS, mkTcOcc )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Error ( GhcHint(..) )
@@ -92,7 +92,7 @@ import GHC.Parser.Errors.Ppr ()
 import GHC.Builtin.Types ( unitTyCon, unitDataCon, sumTyCon,
                            tupleTyCon, tupleDataCon, nilDataCon,
                            unboxedUnitTyCon, unboxedUnitDataCon,
-                           listTyCon_RDR, consDataCon_RDR,
+                           listTyConName, consDataCon_RDR,
                            unrestrictedFunTyCon )
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -3616,7 +3616,7 @@ ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit
                                        (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(' '->' ')'          {% amsrn (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        (NameAnn NameParens (glAA $1) (glAA $2) (glAA $3) []) }
-        | '[' ']'               {% amsrn (sLL $1 $> $ listTyCon_RDR)
+        | '[' ']'               {% amsrn (sLL $1 $> $ punRdrName listTyConName)
                                        (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
 oqtycon :: { LocatedN RdrName }  -- An "ordinary" qualified tycon;

@@ -2963,6 +2963,7 @@ repRdrName rdr_name = do
       repNameQ mod occ
     Orig m n -> lift $ globalVarExternal m n
     Exact n -> lift $ globalVar n
+    ExactPun n _ -> lift $ globalVar n
 
 repNameS :: Core String -> MetaM (Core TH.Name)
 repNameS (MkC name) = rep2_nw mkNameSName [name]

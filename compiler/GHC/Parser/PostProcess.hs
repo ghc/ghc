@@ -822,6 +822,10 @@ setRdrNameSpace (Exact n)    ns
   = Exact (mkSystemNameAt (nameUnique n) occ (nameSrcSpan n))
   where
     occ = setOccNameSpace ns (nameOccName n)
+setRdrNameSpace name@(ExactPun n pun) ns
+  | isTcClsNameSpace   ns = name   -- No-op   (ExactPun is guaranteed to be a TcClsName)
+  | isDataConNameSpace ns = setRdrNameSpace (Exact n) ns   -- Data constructors are not puns, so treat this as an ordinary Exact name.
+  | otherwise             = pprPanic "setRdrNameSpace" (pprNameSpace ns <+> ppr (n, pun))
 
 setWiredInNameSpace :: TyThing -> NameSpace -> RdrName
 setWiredInNameSpace (ATyCon tc) ns

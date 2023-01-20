@@ -30,7 +30,7 @@ module GHC.Types.Name.Reader (
         -- ** Construction
         mkRdrUnqual, mkRdrQual,
         mkUnqual, mkVarUnqual, mkQual, mkOrig,
-        nameRdrName, getRdrName,
+        nameRdrName, getRdrName, punRdrName,
 
         -- ** Destruction
         rdrNameOcc, rdrNameSpace, demoteRdrName, demoteRdrNameTv, promoteRdrName,
@@ -91,6 +91,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain (assert)
 import GHC.Types.Name.Env
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -165,6 +166,17 @@ data RdrName
         --  (2) By Template Haskell, when TH has generated a unique name
         --
         -- Such a 'RdrName' can be created by using 'getRdrName' on a 'Name'
+
+  | ExactPun Name FastString
+        -- ^ A variant of 'Exact' used for punned type constructors
+        -- under @ListTuplePuns@.
+        --
+        -- Created by the parser from the @[]@ and @(,)@ syntax in types.
+        -- The corresponding data constructors are represented with 'Exact'.
+        --
+        -- Invariant 1: the 'FastString' is a cached result of 'namePun_maybe'.
+        -- Invariant 2: the 'NameSpace' is 'TcClsName'.
+
   deriving Data
 
 {-
@@ -183,6 +195,7 @@ rdrNameOcc (Qual _ occ) = occ
 rdrNameOcc (Unqual occ) = occ
 rdrNameOcc (Orig _ occ) = occ
 rdrNameOcc (Exact name) = nameOccName name
+rdrNameOcc (ExactPun _ pun) = mkTcOccFS pun
 
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
@@ -194,12 +207,14 @@ demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = Nothing
 demoteRdrName (Exact _) = Nothing
+demoteRdrName (ExactPun _ _) = Nothing
 
 demoteRdrNameTv :: RdrName -> Maybe RdrName
 demoteRdrNameTv (Unqual occ) = fmap Unqual (demoteOccTvName occ)
 demoteRdrNameTv (Qual m occ) = fmap (Qual m) (demoteOccTvName occ)
 demoteRdrNameTv (Orig _ _) = Nothing
 demoteRdrNameTv (Exact _) = Nothing
+demoteRdrNameTv (ExactPun _ _) = Nothing
 
 -- promoteRdrName promotes the NameSpace of RdrName.
 -- See Note [Promotion] in GHC.Rename.Env.
@@ -208,6 +223,7 @@ promoteRdrName (Unqual occ) = fmap Unqual (promoteOccName occ)
 promoteRdrName (Qual m occ) = fmap (Qual m) (promoteOccName occ)
 promoteRdrName (Orig _ _) = Nothing
 promoteRdrName (Exact _)  = Nothing
+promoteRdrName (ExactPun _ _)  = Nothing
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
@@ -241,6 +257,14 @@ nameRdrName name = Exact name
 -- Keep the Name even for Internal names, so that the
 -- unique is still there for debug printing, particularly
 -- of Types (which are converted to IfaceTypes before printing)
+
+punRdrName :: Name -> RdrName
+punRdrName name =
+  case namePun_maybe name of
+    Just pun ->
+      assert (isTcClsNameSpace (nameNameSpace name)) $    -- Only type constructors are punned
+      ExactPun name $! pun
+    Nothing  -> pprPanic "punRdrName" (ppr name)
 
 nukeExact :: Name -> RdrName
 nukeExact n
@@ -281,12 +305,14 @@ isOrig_maybe (Orig m n) = Just (m,n)
 isOrig_maybe _          = Nothing
 
 isExact :: RdrName -> Bool
-isExact (Exact _) = True
-isExact _         = False
+isExact (Exact _)      = True
+isExact (ExactPun _ _) = True
+isExact _              = False
 
 isExact_maybe :: RdrName -> Maybe Name
-isExact_maybe (Exact n) = Just n
-isExact_maybe _         = Nothing
+isExact_maybe (Exact n)      = Just n
+isExact_maybe (ExactPun n _) = Just n
+isExact_maybe _              = Nothing
 
 {-
 ************************************************************************
@@ -298,6 +324,7 @@ isExact_maybe _         = Nothing
 
 instance Outputable RdrName where
     ppr (Exact name)   = ppr name
+    ppr (ExactPun _ pun_occ) = ppr pun_occ
     ppr (Unqual occ)   = ppr occ
     ppr (Qual mod occ) = ppr mod <> dot <> ppr occ
     ppr (Orig mod occ) = getPprStyle (\sty -> pprModulePrefix sty mod occ <> ppr occ)
@@ -331,7 +358,7 @@ instance Ord RdrName where
     a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
     a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
 
-        -- Exact < Unqual < Qual < Orig
+        -- Exact < ExactPun < Unqual < Qual < Orig
         -- [Note: Apr 2004] We used to use nukeExact to convert Exact to Orig
         --      before comparing so that Prelude.map == the exact Prelude.map, but
         --      that meant that we reported duplicates when renaming bindings
@@ -342,11 +369,20 @@ instance Ord RdrName where
     compare (Exact n1) (Exact n2) = n1 `compare` n2
     compare (Exact _)  _          = LT
 
+    compare (ExactPun _ _)  (Exact _)       = GT
+    compare (ExactPun n1 _) (ExactPun n2 _) =
+      -- No need to compare the FastStrings,
+      -- they are just a cached invocation of namePun_maybe.
+      compare n1 n2
+    compare (ExactPun _ _)  _               = LT
+
     compare (Unqual _)   (Exact _)    = GT
+    compare (Unqual _)   (ExactPun _ _) = GT
     compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
     compare (Unqual _)   _            = LT
 
     compare (Qual _ _)   (Exact _)    = GT
+    compare (Qual _ _)   (ExactPun _ _) = GT
     compare (Qual _ _)   (Unqual _)   = GT
     compare (Qual m1 o1) (Qual m2 o2) = compare o1 o2 S.<> compare m1 m2
     compare (Qual _ _)   (Orig _ _)   = LT
@@ -431,6 +467,7 @@ elemLocalRdrEnv rdr_name (LRE { lre_env = env, lre_in_scope = ns })
   = case rdr_name of
       Unqual occ -> occ  `elemOccEnv` env
       Exact name -> name `elemNameSet` ns  -- See Note [Local bindings with Exact Names]
+      ExactPun {}  -> False
       Qual {} -> False
       Orig {} -> False
 

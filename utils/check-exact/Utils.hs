@@ -319,6 +319,7 @@ rdrName2String r =
                                 ++ occNameString occ
         Orig _ occ       -> occNameString occ
         Exact n          -> getOccString n
+        ExactPun _ pun   -> unpackFS pun
 
 name2String :: Name -> String
 name2String = showPprUnsafe

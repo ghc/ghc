@@ -57,7 +57,7 @@ module GHC.Builtin.Types (
         word8TyCon, word8DataCon, word8Ty,
 
         -- * List
-        listTyCon, listTyCon_RDR, listTyConName, listTyConKey,
+        listTyCon, listTyConName, listTyConKey,
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
@@ -513,7 +513,7 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 
 
 boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR, stringTyCon_RDR,
-    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR :: RdrName
+    intDataCon_RDR, consDataCon_RDR :: RdrName
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR       = nameRdrName falseDataConName
 true_RDR        = nameRdrName trueDataConName
@@ -521,7 +521,6 @@ intTyCon_RDR    = nameRdrName intTyConName
 charTyCon_RDR   = nameRdrName charTyConName
 stringTyCon_RDR = nameRdrName stringTyConName
 intDataCon_RDR  = nameRdrName intDataConName
-listTyCon_RDR   = nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
 
 {-
