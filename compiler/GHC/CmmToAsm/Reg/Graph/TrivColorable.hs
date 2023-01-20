@@ -109,10 +109,8 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchPPC       -> 16
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            -- We should be able to allocate *a lot* more in principle.
-                            -- essentially all 32 - SP, so 31, we'd trash the link reg
-                            -- as well as the platform and all others though.
-                            ArchAArch64   -> 18
+                            -- N.B. x18 is reserved by the platform on AArch64/Darwin
+                            ArchAArch64   -> 17
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
