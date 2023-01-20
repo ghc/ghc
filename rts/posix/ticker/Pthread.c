@@ -43,6 +43,7 @@
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "posix/Clock.h"
+#include <sys/poll.h>
 
 #include <time.h>
 #if HAVE_SYS_TIME_H
@@ -95,28 +96,53 @@ static OSThreadId thread;
 // file descriptor for the timer (Linux only)
 static int timerfd = -1;
 
+// pipe for signaling exit
+static int pipefds[2];
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
     uint64_t nticks;
+    ssize_t r = 0;
+    struct pollfd pollfds[2];
+
+#if USE_TIMERFD_FOR_ITIMER
+    pollfds[0].fd = pipefds[0];
+    pollfds[0].events = POLLIN;
+    pollfds[1].fd = timerfd;
+    pollfds[1].events = POLLIN;
+#endif
 
     // Relaxed is sufficient: If we don't see that exited was set in one iteration we will
     // see it next time.
     TSAN_ANNOTATE_BENIGN_RACE(&exited, "itimer_thread_func");
     while (!RELAXED_LOAD(&exited)) {
         if (USE_TIMERFD_FOR_ITIMER) {
-            ssize_t r = read(timerfd, &nticks, sizeof(nticks));
-            if ((r == 0) && (errno == 0)) {
-               /* r == 0 is expected only for non-blocking fd (in which case
-                * errno should be EAGAIN) but we use a blocking fd.
-                *
-                * Due to a kernel bug (cf https://lkml.org/lkml/2019/8/16/335)
-                * on some platforms we could see r == 0 and errno == 0.
-                */
-               IF_DEBUG(scheduler, debugBelch("read(timerfd) returned 0 with errno=0. This is a known kernel bug. We just ignore it."));
+            if (poll(pollfds, 2, -1) == -1) {
+                sysErrorBelch("Ticker: poll failed: %s", strerror(errno));
             }
-            else if (r != sizeof(nticks) && errno != EINTR) {
-               barf("Ticker: read(timerfd) failed with %s and returned %zd", strerror(errno), r);
+
+            // We check the pipe first, even though the timerfd may also have triggered.
+            if (pollfds[0].revents & POLLIN) {
+                // the pipe is ready for reading, the only possible reason is that we're exiting
+                exited = true; // set this again to make sure even RELAXED_LOAD will read the proper value
+                // no further action needed, skip ahead to handling the final tick and then stopping
+            }
+            else if (pollfds[1].revents & POLLIN) { // the timerfd is ready for reading
+                r = read(timerfd, &nticks, sizeof(nticks)); // this should never block now
+
+                if ((r == 0) && (errno == 0)) {
+                   /* r == 0 is expected only for non-blocking fd (in which case
+                    * errno should be EAGAIN) but we use a blocking fd.
+                    *
+                    * Due to a kernel bug (cf https://lkml.org/lkml/2019/8/16/335)
+                    * on some platforms we could see r == 0 and errno == 0.
+                    */
+                   IF_DEBUG(scheduler, debugBelch("read(timerfd) returned 0 with errno=0. This is a known kernel bug. We just ignore it."));
+                }
+                else if (r != sizeof(nticks) && errno != EINTR) {
+                   barf("Ticker: read(timerfd) failed with %s and returned %zd", strerror(errno), r);
+                }
             }
         } else {
             if (rtsSleep(itimer_interval) != 0) {
@@ -138,8 +164,10 @@ static void *itimer_thread_func(void *_handle_tick)
         }
     }
 
-    if (USE_TIMERFD_FOR_ITIMER)
+    if (USE_TIMERFD_FOR_ITIMER) {
         close(timerfd);
+    }
+
     return NULL;
 }
 
@@ -184,6 +212,10 @@ initTicker (Time interval, TickProc handle_tick)
     }
     if (timerfd_settime(timerfd, 0, &it, NULL)) {
         barf("timerfd_settime: %s", strerror(errno));
+    }
+
+    if (pipe(pipefds) < 0) {
+        barf("pipe: %s", strerror(errno));
     }
 #endif
 
@@ -237,9 +269,21 @@ exitTicker (bool wait)
 
     // wait for ticker to terminate if necessary
     if (wait) {
+#if USE_TIMERFD_FOR_ITIMER
+        // write anything to the pipe to trigger poll() in the ticker thread
+        if (write(pipefds[1], "stop", 5) < 0) {
+            sysErrorBelch("Ticker: Failed to write to pipe: %s", strerror(errno));
+        }
+#endif
         if (pthread_join(thread, NULL)) {
             sysErrorBelch("Ticker: Failed to join: %s", strerror(errno));
         }
+#if USE_TIMERFD_FOR_ITIMER
+        // These need to happen AFTER the ticker thread has finished to prevent a race condition
+        // where the ticker thread closes the read end of the pipe before we're done writing to it.
+        close(pipefds[0]);
+        close(pipefds[1]);
+#endif
         closeMutex(&mutex);
         closeCondition(&start_cond);
     } else {
