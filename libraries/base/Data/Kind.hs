@@ -1,4 +1,5 @@
-{-# LANGUAGE Trustworthy, ExplicitNamespaces #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
