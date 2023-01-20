@@ -137,7 +137,7 @@ regUsageOfInstr platform instr = case instr of
   FCVTZS dst src           -> usage (regOp src, regOp dst)
   FABS dst src             -> usage (regOp src, regOp dst)
 
-  _ -> panic "regUsageOfInstr"
+  _ -> panic $ "regUsageOfInstr: " ++ instrCon instr
 
   where
         -- filtering the usage is necessary, otherwise the register
@@ -269,8 +269,7 @@ patchRegsOfInstr instr env = case instr of
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
     FABS o1 o2     -> FABS (patchOp o1) (patchOp o2)
-
-    _ -> pprPanic "patchRegsOfInstr" (text $ show instr)
+    _              -> panic $ "patchRegsOfInstr: " ++ instrCon instr
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
@@ -326,7 +325,7 @@ patchJumpInstr instr patchF
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
-        _ -> pprPanic "patchJumpInstr" (text $ show instr)
+        _ -> panic $ "patchJumpInstr: " ++ instrCon instr
 
 -- -----------------------------------------------------------------------------
 -- Note [Spills and Reloads]
@@ -638,10 +637,69 @@ data Instr
     -- Float ABSolute value
     | FABS Operand Operand
 
-instance Show Instr where
-    show (LDR _f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2
-    show (MOV o1 o2) = "MOV " ++ show o1 ++ ", " ++ show o2
-    show _ = "missing"
+instrCon :: Instr -> String
+instrCon i =
+    case i of
+      COMMENT{} -> "COMMENT"
+      MULTILINE_COMMENT{} -> "COMMENT"
+      ANN{} -> "ANN"
+      LOCATION{} -> "LOCATION"
+      LDATA{} -> "LDATA"
+      NEWBLOCK{} -> "NEWBLOCK"
+      DELTA{} -> "DELTA"
+      SXTB{} -> "SXTB"
+      UXTB{} -> "UXTB"
+      SXTH{} -> "SXTH"
+      UXTH{} -> "UXTH"
+      PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
+      POP_STACK_FRAME{} -> "POP_STACK_FRAME"
+      ADD{} -> "ADD"
+      CMN{} -> "CMN"
+      CMP{} -> "CMP"
+      MSUB{} -> "MSUB"
+      MUL{} -> "MUL"
+      NEG{} -> "NEG"
+      SDIV{} -> "SDIV"
+      SMULH{} -> "SMULH"
+      SMULL{} -> "SMULL"
+      SUB{} -> "SUB"
+      UDIV{} -> "UDIV"
+      SBFM{} -> "SBFM"
+      UBFM{} -> "UBFM"
+      SBFX{} -> "SBFX"
+      UBFX{} -> "UBFX"
+      AND{} -> "AND"
+      ANDS{} -> "ANDS"
+      ASR{} -> "ASR"
+      BIC{} -> "BIC"
+      BICS{} -> "BICS"
+      EON{} -> "EON"
+      EOR{} -> "EOR"
+      LSL{} -> "LSL"
+      LSR{} -> "LSR"
+      MOV{} -> "MOV"
+      MOVK{} -> "MOVK"
+      MVN{} -> "MVN"
+      ORN{} -> "ORN"
+      ORR{} -> "ORR"
+      ROR{} -> "ROR"
+      TST{} -> "TST"
+      STR{} -> "STR"
+      LDR{} -> "LDR"
+      STP{} -> "STP"
+      LDP{} -> "LDP"
+      CSET{} -> "CSET"
+      CBZ{} -> "CBZ"
+      CBNZ{} -> "CBNZ"
+      J{} -> "J"
+      B{} -> "B"
+      BL{} -> "BL"
+      BCOND{} -> "BCOND"
+      DMBSY{} -> "DMBSY"
+      FCVT{} -> "FCVT"
+      SCVTF{} -> "SCVTF"
+      FCVTZS{} -> "FCVTZS"
+      FABS{} -> "FABS"
 
 data Target
     = TBlock BlockId
@@ -769,11 +827,11 @@ opRegUExt W64 r = OpRegExt W64 r EUXTX 0
 opRegUExt W32 r = OpRegExt W32 r EUXTW 0
 opRegUExt W16 r = OpRegExt W16 r EUXTH 0
 opRegUExt W8  r = OpRegExt W8  r EUXTB 0
-opRegUExt w  _r = pprPanic "opRegUExt" (text $ show w)
+opRegUExt w  _r = pprPanic "opRegUExt" (ppr w)
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
 opRegSExt W32 r = OpRegExt W32 r ESXTW 0
 opRegSExt W16 r = OpRegExt W16 r ESXTH 0
 opRegSExt W8  r = OpRegExt W8  r ESXTB 0
-opRegSExt w  _r = pprPanic "opRegSExt" (text $ show w)
+opRegSExt w  _r = pprPanic "opRegSExt" (ppr w)
