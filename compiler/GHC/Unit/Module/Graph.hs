@@ -22,6 +22,7 @@ module GHC.Unit.Module.Graph
    , showModMsg
    , moduleGraphNodeModule
    , moduleGraphNodeModSum
+   , moduleGraphModulesBelow
 
    , moduleGraphNodes
    , SummaryNode
@@ -62,12 +63,14 @@ import System.FilePath
 import qualified Data.Map as Map
 import GHC.Types.Unique.DSet
 import qualified Data.Set as Set
+import Data.Set (Set)
 import GHC.Unit.Module
 import GHC.Linker.Static.Utils
 
 import Data.Bifunctor
 import Data.Either
 import Data.Function
+import Data.List (sort)
 import GHC.Data.List.SetOps
 
 -- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
@@ -385,3 +388,30 @@ msKey ms = ModNodeKeyWithUid (ms_mnwib ms) (ms_unitid ms)
 
 type ModNodeKey = ModuleNameWithIsBoot
 
+
+-- | This function returns all the modules belonging to the home-unit that can
+-- be reached by following the given dependencies. Additionally, if both the
+-- boot module and the non-boot module can be reached, it only returns the
+-- non-boot one.
+moduleGraphModulesBelow :: ModuleGraph -> UnitId -> ModuleNameWithIsBoot -> Set ModNodeKeyWithUid
+moduleGraphModulesBelow mg uid mn = filtered_mods $ [ mn |  NodeKey_Module mn <- modules_below]
+  where
+    td_map = mgTransDeps mg
+
+    modules_below = maybe [] Set.toList $ Map.lookup (NodeKey_Module (ModNodeKeyWithUid mn uid)) td_map
+
+    filtered_mods = Set.fromDistinctAscList . filter_mods . sort
+
+    -- IsBoot and NotBoot modules are necessarily consecutive in the sorted list
+    -- (cf Ord instance of GenWithIsBoot). Hence we only have to perform a
+    -- linear sweep with a window of size 2 to remove boot modules for which we
+    -- have the corresponding non-boot.
+    filter_mods = \case
+      (r1@(ModNodeKeyWithUid (GWIB m1 b1) uid1) : r2@(ModNodeKeyWithUid (GWIB m2 _) uid2): rs)
+        | m1 == m2  && uid1 == uid2 ->
+                       let !r' = case b1 of
+                                  NotBoot -> r1
+                                  IsBoot  -> r2
+                       in r' : filter_mods rs
+        | otherwise -> r1 : filter_mods (r2:rs)
+      rs -> rs

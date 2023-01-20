@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 
 module GHC.Driver.Env
    ( Hsc(..)
@@ -84,10 +83,7 @@ import GHC.Utils.Logger
 
 import Data.IORef
 import qualified Data.Set as Set
-import Data.Set (Set)
 import GHC.Unit.Module.Graph
-import Data.List (sort)
-import qualified Data.Map as Map
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -267,35 +263,6 @@ hptAllThings :: (HomeModInfo -> [a]) -> HscEnv -> [a]
 hptAllThings extract hsc_env = concatMap (concatMap extract . eltsHpt . homeUnitEnv_hpt . snd)
                                 (hugElts (hsc_HUG hsc_env))
 
--- | This function returns all the modules belonging to the home-unit that can
--- be reached by following the given dependencies. Additionally, if both the
--- boot module and the non-boot module can be reached, it only returns the
--- non-boot one.
-hptModulesBelow :: HscEnv -> UnitId -> ModuleNameWithIsBoot -> Set ModNodeKeyWithUid
-hptModulesBelow hsc_env uid mn = filtered_mods $ [ mn |  NodeKey_Module mn <- modules_below]
-  where
-    td_map = mgTransDeps (hsc_mod_graph hsc_env)
-
-    modules_below = maybe [] Set.toList $ Map.lookup (NodeKey_Module (ModNodeKeyWithUid mn uid)) td_map
-
-    filtered_mods = Set.fromDistinctAscList . filter_mods . sort
-
-    -- IsBoot and NotBoot modules are necessarily consecutive in the sorted list
-    -- (cf Ord instance of GenWithIsBoot). Hence we only have to perform a
-    -- linear sweep with a window of size 2 to remove boot modules for which we
-    -- have the corresponding non-boot.
-    filter_mods = \case
-      (r1@(ModNodeKeyWithUid (GWIB m1 b1) uid1) : r2@(ModNodeKeyWithUid (GWIB m2 _) uid2): rs)
-        | m1 == m2  && uid1 == uid2 ->
-                       let !r' = case b1 of
-                                  NotBoot -> r1
-                                  IsBoot  -> r2
-                       in r' : filter_mods rs
-        | otherwise -> r1 : filter_mods (r2:rs)
-      rs -> rs
-
-
-
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
 hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> UnitId -> ModuleNameWithIsBoot -> [a]
@@ -304,11 +271,12 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
 
   | otherwise
   = let hug = hsc_HUG hsc_env
+        mg  = hsc_mod_graph hsc_env
     in
     [ thing
     |
     -- Find each non-hi-boot module below me
-      (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid) <- Set.toList (hptModulesBelow hsc_env uid mn)
+      (ModNodeKeyWithUid (GWIB { gwib_mod = mod, gwib_isBoot = is_boot }) mod_uid) <- Set.toList (moduleGraphModulesBelow mg uid mn)
     , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
@@ -324,7 +292,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env uid mn
                     Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg mempty
           msg = vcat [text "missing module" <+> ppr mod,
                      text "When starting from"  <+> ppr mn,
-                     text "below:" <+> ppr (hptModulesBelow hsc_env uid mn),
+                     text "below:" <+> ppr (moduleGraphModulesBelow mg uid mn),
                       text "Probable cause: out-of-date interface files"]
                         -- This really shouldn't happen, but see #962
     , thing <- things
