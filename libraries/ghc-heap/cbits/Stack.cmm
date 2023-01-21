@@ -4,12 +4,12 @@
 // Uncomment to enable assertions during development
 #define DEBUG 1
 
-advanceStackFrameIterzh (P_ stack, W_ index) {
+advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
-  (frameSize) = ccall stackFrameSize(stack, index);
+  (frameSize) = ccall stackFrameSize(stack, offsetWords);
 
   P_ nextClosurePtr;
-  nextClosurePtr = (StgStack_sp(stack) + WDS(index) + WDS(frameSize));
+  nextClosurePtr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(frameSize));
 
   P_ stackArrayPtr;
   stackArrayPtr = stack + SIZEOF_StgHeader + OFFSET_StgStack_stack;
@@ -21,21 +21,21 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
   stackBottom = stackSizeInBytes + stackArrayPtr;
 
   P_ newStack;
-  W_ newIndex, hasNext;
+  W_ newOffsetWords, hasNext;
   if(nextClosurePtr < stackBottom) (likely: True) {
     newStack = stack;
-    newIndex = index + frameSize;
+    newOffsetWords = offsetWords + frameSize;
     hasNext = 1;
   } else {
     P_ underflowFrameStack;
-    (underflowFrameStack) = ccall getUnderflowFrameStack(stack, index);
+    (underflowFrameStack) = ccall getUnderflowFrameStack(stack, offsetWords);
     if (underflowFrameStack == NULL) (likely: True) {
       newStack = NULL;
-      newIndex = NULL;
+      newOffsetWords = NULL;
       hasNext = NULL;
     } else {
       newStack = underflowFrameStack;
-      newIndex = NULL;
+      newOffsetWords = NULL;
       hasNext = 1;
     }
   }
@@ -44,24 +44,24 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
 #if DEBUG
   if(hasNext > 0) {
     P_ nextClosure;
-    nextClosure = StgStack_sp(stack) + WDS(index);
+    nextClosure = StgStack_sp(stack) + WDS(offsetWords);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
   }
 #endif
 
-  return (newStack, newIndex, hasNext);
+  return (newStack, newOffsetWords, hasNext);
 }
 
-derefStackWordzh (P_ stack, W_ index) {
+derefStackWordzh (P_ stack, W_ offsetWords) {
   P_ sp;
   sp = StgStack_sp(stack);
 
-  return (W_[sp + WDS(index)]);
+  return (W_[sp + WDS(offsetWords)]);
 }
 
-getInfoTableTypezh (P_ stack, W_ index) {
+getInfoTableTypezh (P_ stack, W_ offsetWords) {
     P_ p, info;
-    p = StgStack_sp(stack) + WDS(index);
+    p = StgStack_sp(stack) + WDS(offsetWords);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info  = %INFO_PTR(p);
 
@@ -70,9 +70,9 @@ getInfoTableTypezh (P_ stack, W_ index) {
     return (type);
 }
 
-getSmallBitmapzh(P_ stack, W_ index) {
+getSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ bitmap, size, specialType;
@@ -82,9 +82,9 @@ getSmallBitmapzh(P_ stack, W_ index) {
   return (bitmap, size);
 }
 
-getRetSmallSpecialTypezh(P_ stack, W_ index) {
+getRetSmallSpecialTypezh(P_ stack, W_ offsetWords) {
   P_ c;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ specialType;
@@ -93,9 +93,9 @@ getRetSmallSpecialTypezh(P_ stack, W_ index) {
   return (specialType);
 }
 
-getRetFunSmallBitmapzh(P_ stack, W_ index) {
+getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ bitmap, size, specialType;
@@ -105,10 +105,10 @@ getRetFunSmallBitmapzh(P_ stack, W_ index) {
   return (bitmap, size);
 }
 
-getLargeBitmapzh(P_ stack, W_ index){
+getLargeBitmapzh(P_ stack, W_ offsetWords){
   P_ c, stgArrBytes;
   W_ size;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
@@ -117,10 +117,10 @@ getLargeBitmapzh(P_ stack, W_ index){
   return (stgArrBytes, size);
 }
 
-getBCOLargeBitmapzh(P_ stack, W_ index){
+getBCOLargeBitmapzh(P_ stack, W_ offsetWords){
   P_ c, stgArrBytes;
   W_ size;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   (stgArrBytes) = ccall getBCOLargeBitmaps(MyCapability(), c);
@@ -129,10 +129,10 @@ getBCOLargeBitmapzh(P_ stack, W_ index){
   return (stgArrBytes, size);
 }
 
-getRetFunLargeBitmapzh(P_ stack, W_ index){
+getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   P_ c, stgArrBytes;
   W_ size;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   (stgArrBytes) = ccall getRetFunLargeBitmaps(MyCapability(), c);
@@ -142,18 +142,18 @@ getRetFunLargeBitmapzh(P_ stack, W_ index){
 }
 
 // TODO: Use generalized version unpackClosureReferencedByFramezh with offset=0
-unpackClosureFromStackFramezh(P_ stack, W_ index){
+unpackClosureFromStackFramezh(P_ stack, W_ offsetWords){
   P_ closurePtr, closurePtrPrime;
   // TODO: Rename closurePtr -> closurePtrAddr
-  closurePtr = (StgStack_sp(stack) + WDS(index));
+  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
   closurePtrPrime = P_[closurePtr];
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
   jump stg_unpackClosurezh(closurePtrPrime);
 }
 
-getUpdateFrameTypezh(P_ stack, W_ index){
+getUpdateFrameTypezh(P_ stack, W_ offsetWords){
   P_ c;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ type;
@@ -161,18 +161,18 @@ getUpdateFrameTypezh(P_ stack, W_ index){
   return (type);
 }
 
-unpackClosureReferencedByFramezh(W_ offset, P_ stack, W_ index){
+unpackClosureReferencedByFramezh(W_ offsetBytes, P_ stack, W_ offsetWords){
   P_ closurePtr, closurePtrPrime;
   // TODO: Rename closurePtr -> closurePtrAddr
-  closurePtr = (StgStack_sp(stack) + WDS(index) + offset);
+  closurePtr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
   closurePtrPrime = P_[closurePtr];
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
   jump stg_unpackClosurezh(closurePtrPrime);
 }
 
-getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
+getCatchFrameExceptionsBlockedzh(P_ stack, W_ offsetWords){
   P_ closurePtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
+  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
 
   W_ exceptions_blocked;
@@ -180,16 +180,15 @@ getCatchFrameExceptionsBlockedzh(P_ stack, W_ index){
   return (exceptions_blocked);
 }
 
-// TODO: Rename: index -> wordOffset, offset -> byteOffset
-getWordzh(P_ stack, W_ index, W_ offset){
+getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
   P_ wordAddr;
-  wordAddr = (StgStack_sp(stack) + WDS(index) + offset);
+  wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
   return (W_[wordAddr]);
 }
 
-getUnderflowFrameNextChunkzh(P_ stack, W_ index){
+getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords){
   P_ closurePtr, closurePtrPrime, updateePtr;
-  closurePtr = (StgStack_sp(stack) + WDS(index));
+  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
   ASSERT(LOOKS_LIKE_CLOURE_PTR(closurePtr));
 
   P_ next_chunk;
@@ -198,9 +197,9 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ index){
   return (next_chunk);
 }
 
-getRetFunTypezh(P_ stack, W_ index){
+getRetFunTypezh(P_ stack, W_ offsetWords){
   P_ c;
-  c = StgStack_sp(stack) + WDS(index);
+  c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ type;
