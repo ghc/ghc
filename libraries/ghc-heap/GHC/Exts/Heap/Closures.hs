@@ -331,47 +331,59 @@ data GenClosure b
                 }
  -- TODO: Add `info :: !StgInfoTable` fields
   | UpdateFrame
-      { knownUpdateFrameType :: !UpdateFrameType
+      { info            :: !StgInfoTable
+      , knownUpdateFrameType :: !UpdateFrameType
       , updatee :: !b
       }
 
   | CatchFrame
-      { exceptions_blocked :: Word
+      { info            :: !StgInfoTable
+      , exceptions_blocked :: Word
       , handler :: !b
       }
 
   | CatchStmFrame
-      { catchFrameCode :: !b
+      { info            :: !StgInfoTable
+      , catchFrameCode :: !b
       , handler :: !b
       }
 
   | CatchRetryFrame
-      { running_alt_code :: !Word
+      { info            :: !StgInfoTable
+      , running_alt_code :: !Word
       , first_code :: !b
       , alt_code :: !b
       }
 
   | AtomicallyFrame
-      { atomicallyFrameCode :: !b
+      { info            :: !StgInfoTable
+      , atomicallyFrameCode :: !b
       , result :: !b
       }
 
     -- TODO: nextChunk could be a CL.Closure, too! (StackClosure)
   | UnderflowFrame
-      { nextChunk:: !StackSnapshot }
+      { info            :: !StgInfoTable
+      , nextChunk:: !StackSnapshot
+      }
 
   | StopFrame
+      { info            :: !StgInfoTable }
 
   | RetSmall
-      { knownRetSmallType :: !SpecialRetSmall
+      { info            :: !StgInfoTable
+      , knownRetSmallType :: !SpecialRetSmall
       , payload :: ![b]
       }
 
   | RetBig
-      { payload :: ![b] }
+      { info            :: !StgInfoTable
+      , payload :: ![b]
+      }
 
   | RetFun
-      { retFunType :: RetFunType
+      { info            :: !StgInfoTable
+      , retFunType :: RetFunType
       , retFunSize :: Word
       , retFunFun :: !b
       , retFunPayload :: ![b]
@@ -379,9 +391,9 @@ data GenClosure b
 
   |  RetBCO
     -- TODO: Add pre-defined BCO closures (like knownUpdateFrameType)
-      {
-        bco :: !b, -- must be a BCOClosure
-        bcoArgs :: ![b]
+      { info            :: !StgInfoTable
+      , bco :: !b -- must be a BCOClosure
+      , bcoArgs :: ![b]
       }
 #endif
     ------------------------------------------------------------

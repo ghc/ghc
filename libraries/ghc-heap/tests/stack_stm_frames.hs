@@ -1,10 +1,14 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Main where
 
 import Control.Concurrent.STM
 import Control.Exception
 import GHC.Conc
-import GHC.Exts.Heap.Closures
 import GHC.Exts.DecodeStack
+import GHC.Exts.Heap.ClosureTypes
+import GHC.Exts.Heap.Closures
+import GHC.Exts.Heap.InfoTable.Types
 import GHC.Stack.CloneStack
 import TestUtils
 
@@ -26,14 +30,14 @@ main = do
 
 getDecodedStack :: IO (StackSnapshot, [Closure])
 getDecodedStack = do
-  s <-cloneMyStack
+  s <- cloneMyStack
   fs <- decodeStack' s
   pure (s, fs)
 
 isCatchStmFrame :: Closure -> Bool
-isCatchStmFrame (CatchStmFrame _ _) = True
+isCatchStmFrame (CatchStmFrame {..}) = tipe info == CATCH_STM_FRAME
 isCatchStmFrame _ = False
 
 isAtomicallyFrame :: Closure -> Bool
-isAtomicallyFrame (AtomicallyFrame _ _) = True
+isAtomicallyFrame (AtomicallyFrame {..}) = tipe info == ATOMICALLY_FRAME
 isAtomicallyFrame _ = False

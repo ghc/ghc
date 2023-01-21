@@ -36,7 +36,7 @@ assertStackInvariants stack decodedStack = do
   assertThat
     "Last frame is stop frame"
     ( \case
-        StopFrame -> True
+        StopFrame info -> tipe info == STOP_FRAME
         _ -> False
     )
     (last decodedStack)
@@ -91,18 +91,18 @@ stackFrameToClosureTypes = getClosureTypes
   where
     getClosureTypes :: Closure -> [ClosureType]
     -- Stack frame closures
-    getClosureTypes (UpdateFrame {updatee, ..}) = UPDATE_FRAME : getClosureTypes (unbox updatee)
-    getClosureTypes (CatchFrame {handler, ..}) = CATCH_FRAME : getClosureTypes (unbox handler)
-    getClosureTypes (CatchStmFrame {catchFrameCode, handler}) = CATCH_STM_FRAME : getClosureTypes (unbox catchFrameCode) ++ getClosureTypes (unbox handler)
-    getClosureTypes (CatchRetryFrame {first_code, alt_code, ..}) = CATCH_RETRY_FRAME : getClosureTypes (unbox first_code) ++ getClosureTypes (unbox alt_code)
-    getClosureTypes (AtomicallyFrame {atomicallyFrameCode, result}) = ATOMICALLY_FRAME : getClosureTypes (unbox atomicallyFrameCode) ++ getClosureTypes (unbox result)
-    getClosureTypes (UnderflowFrame {..}) = [UNDERFLOW_FRAME]
-    getClosureTypes StopFrame = [STOP_FRAME]
-    getClosureTypes (RetSmall {payload, ..}) = RET_SMALL : getBitmapClosureTypes payload
-    getClosureTypes (RetBig {payload}) = RET_BIG : getBitmapClosureTypes payload
-    getClosureTypes (RetFun {retFunFun, retFunPayload, ..}) = RET_FUN : getClosureTypes (unbox retFunFun) ++ getBitmapClosureTypes retFunPayload
-    getClosureTypes (RetBCO {bco, bcoArgs, ..}) =
-      RET_BCO : getClosureTypes (unbox bco) ++ getBitmapClosureTypes bcoArgs
+    getClosureTypes (UpdateFrame {info, updatee, ..}) = tipe info : getClosureTypes (unbox updatee)
+    getClosureTypes (CatchFrame {info, handler, ..}) = tipe info : getClosureTypes (unbox handler)
+    getClosureTypes (CatchStmFrame {info, catchFrameCode, handler}) = tipe info : getClosureTypes (unbox catchFrameCode) ++ getClosureTypes (unbox handler)
+    getClosureTypes (CatchRetryFrame {info, first_code, alt_code, ..}) = tipe info : getClosureTypes (unbox first_code) ++ getClosureTypes (unbox alt_code)
+    getClosureTypes (AtomicallyFrame {info, atomicallyFrameCode, result}) = tipe info : getClosureTypes (unbox atomicallyFrameCode) ++ getClosureTypes (unbox result)
+    getClosureTypes (UnderflowFrame {..}) = [tipe info]
+    getClosureTypes (StopFrame info) = [tipe info]
+    getClosureTypes (RetSmall {info, payload, ..}) = tipe info : getBitmapClosureTypes payload
+    getClosureTypes (RetBig {info, payload}) = tipe info : getBitmapClosureTypes payload
+    getClosureTypes (RetFun {info, retFunFun, retFunPayload, ..}) = tipe info : getClosureTypes (unbox retFunFun) ++ getBitmapClosureTypes retFunPayload
+    getClosureTypes (RetBCO {info, bco, bcoArgs, ..}) =
+      tipe info : getClosureTypes (unbox bco) ++ getBitmapClosureTypes bcoArgs
     -- Other closures
     getClosureTypes (ConstrClosure {info, ..}) = [tipe info]
     getClosureTypes (FunClosure {info, ..}) = [tipe info]

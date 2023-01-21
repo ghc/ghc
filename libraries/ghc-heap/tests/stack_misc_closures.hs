@@ -94,24 +94,28 @@ main = do
   test any_update_frame# $
     \case
       UpdateFrame {..} -> do
+        assertEqual (tipe info) UPDATE_FRAME
         assertEqual knownUpdateFrameType NormalUpdateFrame
         assertEqual 1 =<< (getWordFromBlackhole =<< getBoxedClosureData updatee)
       e -> error $ "Wrong closure type: " ++ show e
   test any_catch_frame# $
     \case
       CatchFrame {..} -> do
+        assertEqual (tipe info) CATCH_FRAME
         assertEqual exceptions_blocked 1
         assertConstrClosure 1 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
   test any_catch_stm_frame# $
     \case
       CatchStmFrame {..} -> do
+        assertEqual (tipe info) CATCH_STM_FRAME
         assertConstrClosure 1 =<< getBoxedClosureData catchFrameCode
         assertConstrClosure 2 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
   test any_catch_retry_frame# $
     \case
       CatchRetryFrame {..} -> do
+        assertEqual (tipe info) CATCH_RETRY_FRAME
         assertEqual running_alt_code 1
         assertConstrClosure 1 =<< getBoxedClosureData first_code
         assertConstrClosure 2 =<< getBoxedClosureData alt_code
@@ -119,6 +123,7 @@ main = do
   test any_atomically_frame# $
     \case
       AtomicallyFrame {..} -> do
+        assertEqual (tipe info) ATOMICALLY_FRAME
         assertConstrClosure 1 =<< getBoxedClosureData atomicallyFrameCode
         assertConstrClosure 2 =<< getBoxedClosureData result
       e -> error $ "Wrong closure type: " ++ show e
@@ -126,6 +131,7 @@ main = do
   test any_ret_small_prim_frame# $
     \case
       RetSmall {..} -> do
+        assertEqual (tipe info) RET_SMALL
         assertEqual knownRetSmallType RetN
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 1
@@ -134,6 +140,7 @@ main = do
   test any_ret_small_closure_frame# $
     \case
       RetSmall {..} -> do
+        assertEqual (tipe info) RET_SMALL
         assertEqual knownRetSmallType RetP
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 1
@@ -142,6 +149,7 @@ main = do
   test any_ret_small_closures_frame# $
     \case
       RetSmall {..} -> do
+        assertEqual (tipe info) RET_SMALL
         assertEqual knownRetSmallType None
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
@@ -151,6 +159,7 @@ main = do
   test any_ret_small_prims_frame# $
     \case
       RetSmall {..} -> do
+        assertEqual (tipe info) RET_SMALL
         assertEqual knownRetSmallType None
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) (fromIntegral maxSmallBitmapBits_c)
@@ -160,6 +169,7 @@ main = do
   test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
+        assertEqual (tipe info) RET_BIG
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
@@ -168,6 +178,7 @@ main = do
   test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
+        assertEqual (tipe info) RET_BIG
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
@@ -176,6 +187,7 @@ main = do
   test any_ret_big_closures_min_frame# $
     \case
       RetBig {..} -> do
+        assertEqual (tipe info) RET_BIG
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
@@ -184,6 +196,7 @@ main = do
   test any_ret_big_closures_two_words_frame# $
     \case
       RetBig {..} -> do
+        assertEqual (tipe info) RET_BIG
         pCs <- mapM getBoxedClosureData payload
         assertEqual (length pCs) 65
         let wds = map getWordFromConstr01 pCs
@@ -192,6 +205,7 @@ main = do
   test any_ret_fun_arg_n_prim_framezh# $
     \case
       RetFun {..} -> do
+        assertEqual (tipe info) RET_FUN
         assertEqual retFunType ARG_N
         assertEqual retFunSize 1
         assertFun01Closure 1 =<< getBoxedClosureData retFunFun
@@ -203,6 +217,7 @@ main = do
   test any_ret_fun_arg_gen_framezh# $
     \case
       RetFun {..} -> do
+        assertEqual (tipe info) RET_FUN
         assertEqual retFunType ARG_GEN
         assertEqual retFunSize 9
         fc <- getBoxedClosureData retFunFun
@@ -220,6 +235,7 @@ main = do
   test any_ret_fun_arg_gen_big_framezh# $
     \case
       RetFun {..} -> do
+        assertEqual (tipe info) RET_FUN
         assertEqual retFunType ARG_GEN_BIG
         assertEqual retFunSize 59
         fc <- getBoxedClosureData retFunFun
@@ -236,6 +252,7 @@ main = do
   test any_bco_frame# $
     \case
       RetBCO {..} -> do
+        assertEqual (tipe info) RET_BCO
         pCs <- mapM getBoxedClosureData bcoArgs
         assertEqual (length pCs) 1
         let wds = map getWordFromConstr01 pCs
@@ -283,7 +300,7 @@ test setup assertion = do
       assertThat
         "Last frame is stop frame"
         ( \case
-            StopFrame -> True
+            StopFrame info -> tipe info == STOP_FRAME
             _ -> False
         )
         (last stack)

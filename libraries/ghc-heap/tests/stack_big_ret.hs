@@ -59,7 +59,7 @@ checkArg w bp =
       assertEqual [w] (dataArgs c)
       pure ()
 
-isBigReturnFrame (RetBig _) = True
+isBigReturnFrame (RetBig info _) = tipe info == RET_BIG
 isBigReturnFrame _ = False
 
 {-# NOINLINE bigFun #-}

@@ -1,10 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
 import Data.Bool (Bool (True))
-import GHC.Exts.Heap.Closures
 import GHC.Exts.DecodeStack
+import GHC.Exts.Heap.ClosureTypes
+import GHC.Exts.Heap.Closures
+import GHC.Exts.Heap.InfoTable.Types
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
 import TestUtils
@@ -29,7 +32,7 @@ getStack = do
   assertStackChunksAreDecodable decodedStack
   return ()
 
-isUnderflowFrame (UnderflowFrame _) = True
+isUnderflowFrame (UnderflowFrame {..}) = tipe info == UNDERFLOW_FRAME
 isUnderflowFrame _ = False
 
 assertStackChunksAreDecodable :: HasCallStack => [Closure] -> IO ()

@@ -175,3 +175,13 @@ getRetFunTypezh(P_ stack, W_ offsetWords){
   (type) = ccall getRetFunType(c);
   return (type);
 }
+
+getInfoTableAddrzh(P_ stack, W_ offsetWords){
+  P_ c;
+  c = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  W_ info;
+  (info)  = ccall getInfo(UNTAG(c));
+  return (info);
+}
