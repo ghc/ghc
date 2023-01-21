@@ -9,7 +9,7 @@ module TestUtils
   ( assertEqual,
     assertThat,
     assertStackInvariants,
-    unbox
+    unbox,
   )
 where
 
@@ -61,19 +61,20 @@ foreign import ccall "foldStackToArrayClosure" foldStackToArrayClosure# :: Stack
 foldStackToArrayClosure :: StackSnapshot -> ByteArray
 foldStackToArrayClosure (StackSnapshot s#) = ByteArray (foldStackToArrayClosure# s#)
 
+foreign import ccall "bytesInWord" bytesInWord# :: Word
+
 stackSnapshotToClosureTypes :: ByteArray -> [ClosureType]
 stackSnapshotToClosureTypes = wordsToClosureTypes . toWords
   where
     toWords :: ByteArray -> [Word]
     toWords ba@(ByteArray b#) =
       let s = I# (sizeofByteArray# b#)
-       in -- TODO: Adjust 8 to machine word size
-          [W# (indexWordArray# b# (toInt# i)) | i <- [0 .. maxWordIndex (ba)]]
+       in [W# (indexWordArray# b# (toInt# i)) | i <- [0 .. maxWordIndex (ba)]]
       where
         maxWordIndex :: ByteArray -> Int
         maxWordIndex (ByteArray ba#) =
           let s = I# (sizeofByteArray# ba#)
-              words = s `div` 8
+              words = s `div` fromIntegral bytesInWord#
            in case words of
                 w | w == 0 -> error "ByteArray contains no content!"
                 w -> w - 1

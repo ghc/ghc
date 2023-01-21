@@ -240,3 +240,7 @@ StgArrBytes *foldStackToArrayClosure(StgStack *stack) {
   freeList(cl);
   return arrayClosure;
 }
+
+StgWord bytesInWord() {
+  return SIZEOF_W;
+}
