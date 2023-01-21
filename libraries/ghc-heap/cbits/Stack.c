@@ -124,9 +124,7 @@ StgWord getBitmapWord(StgClosure *c) {
 
   const StgInfoTable *info = get_itbl(c);
   StgWord bitmap = info->layout.bitmap;
-  // debugBelch("getBitmapWord - bitmap : %lu \n", bitmap);
   StgWord bitmapWord = BITMAP_BITS(bitmap);
-  // debugBelch("getBitmapWord - bitmapWord : %lu \n", bitmapWord);
   return bitmapWord;
 }
 
@@ -185,11 +183,7 @@ StgWord getBCOLargeBitmapSize(StgClosure *c) {
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
-StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
-
-  const StgInfoTable *info = get_itbl(c);
-  StgLargeBitmap *bitmap = GET_LARGE_BITMAP(info);
+StgArrBytes *largeBitmapToStgArrBytes(Capability *cap, StgLargeBitmap *bitmap) {
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
@@ -201,6 +195,15 @@ StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
   }
 
   return array;
+}
+
+StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+
+  const StgInfoTable *info = get_itbl(c);
+  StgLargeBitmap *bitmap = GET_LARGE_BITMAP(info);
+
+  return largeBitmapToStgArrBytes(cap, bitmap);
 }
 
 StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
@@ -208,37 +211,17 @@ StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   StgLargeBitmap *bitmap = GET_FUN_LARGE_BITMAP(fun_info);
-  StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
-  StgArrBytes *array =
-      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
-  array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 
-  for (int i = 0; i < neededWords; i++) {
-    array->payload[i] = bitmap->bitmap[i];
-  }
-
-  return array;
+  return largeBitmapToStgArrBytes(cap, bitmap);
 }
 
-// TODO: Much duplication between: getBCOLargeBitmaps, getRetFunLargeBitmaps,
-// getLargeBitmaps
 StgArrBytes *getBCOLargeBitmaps(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   StgBCO *bco = (StgBCO *)*c->payload;
   StgLargeBitmap *bitmap = BCO_BITMAP(bco);
-  StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
-  StgArrBytes *array =
-      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
-  array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 
-  for (int i = 0; i < neededWords; i++) {
-    array->payload[i] = bitmap->bitmap[i];
-  }
-
-  return array;
+  return largeBitmapToStgArrBytes(cap, bitmap);
 }
 
 #if defined(DEBUG)

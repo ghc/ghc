@@ -34,12 +34,11 @@ import GHC.Exts.Heap.Closures as CL
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.DecodeHeap
 
-foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
 
+-- TODO: This can be simplified if the offset is always full words
 foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
@@ -122,7 +121,7 @@ toBitmapPayload :: BitmapEntry -> IO Box
 toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . toWord . closureFrame $ e
       where
         toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
-toBitmapPayload e = toClosure unpackClosureFromStackFrame# (closureFrame e)
+toBitmapPayload e = toClosure (unpackClosureReferencedByFrame# 0##) (closureFrame e)
 
 -- TODO: Offset should be in Words. That's the smallest reasonable unit.
 -- TODO: Negative offsets won't work! Consider using Word

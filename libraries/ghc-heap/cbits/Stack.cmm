@@ -141,10 +141,6 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-unpackClosureFromStackFramezh(P_ stack, W_ offsetWords){
-  jump unpackClosureReferencedByFramezh(0, stack, offsetWords);
-}
-
 unpackClosureReferencedByFramezh(W_ offsetBytes, P_ stack, W_ offsetWords){
   P_ closurePtrAddr, closurePtr;
   closurePtrAddr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
