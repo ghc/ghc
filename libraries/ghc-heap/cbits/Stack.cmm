@@ -111,7 +111,7 @@ getLargeBitmapzh(P_ stack, W_ offsetWords){
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getLargeBitmaps(MyCapability(), c);
+  (stgArrBytes) = ccall getLargeBitmap(MyCapability(), c);
   (size) = ccall getLargeBitmapSize(c);
 
   return (stgArrBytes, size);
@@ -123,7 +123,7 @@ getBCOLargeBitmapzh(P_ stack, W_ offsetWords){
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getBCOLargeBitmaps(MyCapability(), c);
+  (stgArrBytes) = ccall getBCOLargeBitmap(MyCapability(), c);
   (size) = ccall getBCOLargeBitmapSize(c);
 
   return (stgArrBytes, size);
@@ -135,7 +135,7 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getRetFunLargeBitmaps(MyCapability(), c);
+  (stgArrBytes) = ccall getRetFunLargeBitmap(MyCapability(), c);
   (size) = ccall getRetFunSize(c);
 
   return (stgArrBytes, size);

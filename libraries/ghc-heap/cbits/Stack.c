@@ -183,7 +183,7 @@ StgWord getBCOLargeBitmapSize(StgClosure *c) {
 #define SIZEOF_W SIZEOF_VOID_P
 #define WDS(n) ((n)*SIZEOF_W)
 
-StgArrBytes *largeBitmapToStgArrBytes(Capability *cap, StgLargeBitmap *bitmap) {
+static StgArrBytes *largeBitmapToStgArrBytes(Capability *cap, StgLargeBitmap *bitmap) {
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
@@ -197,7 +197,7 @@ StgArrBytes *largeBitmapToStgArrBytes(Capability *cap, StgLargeBitmap *bitmap) {
   return array;
 }
 
-StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
+StgArrBytes *getLargeBitmap(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   const StgInfoTable *info = get_itbl(c);
@@ -206,7 +206,7 @@ StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
   return largeBitmapToStgArrBytes(cap, bitmap);
 }
 
-StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
+StgArrBytes *getRetFunLargeBitmap(Capability *cap, StgRetFun *ret_fun) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(ret_fun));
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
@@ -215,7 +215,7 @@ StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
   return largeBitmapToStgArrBytes(cap, bitmap);
 }
 
-StgArrBytes *getBCOLargeBitmaps(Capability *cap, StgClosure *c) {
+StgArrBytes *getBCOLargeBitmap(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   StgBCO *bco = (StgBCO *)*c->payload;
