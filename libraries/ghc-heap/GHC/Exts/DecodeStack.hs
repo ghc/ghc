@@ -34,6 +34,36 @@ import GHC.Exts.Heap.Closures as CL
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.DecodeHeap
 
+foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
+
+foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
+
+foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
+
+foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
+
+foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
+
+foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
+
+foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
+
+foreign import prim "getRetSmallSpecialTypezh" getRetSmallSpecialType# :: StackSnapshot# -> Word# -> Word#
+
+foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
+
 type StackFrameIter# = (#
                           -- | StgStack
                           StackSnapshot#,
@@ -58,20 +88,6 @@ advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
 advanceStackFrameIter (StackFrameIter (# s, i #)) = let !(# s', i', hasNext #) = advanceStackFrameIter# s i in
   if (I# hasNext) > 0 then Just $ StackFrameIter (# s', i' #)
   else Nothing
-
-foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
-
-foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
-
-foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
-
-foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
-
-foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
-
-foreign import prim "getRetSmallSpecialTypezh" getRetSmallSpecialType# :: StackSnapshot# -> Word# -> Word#
-
-foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
 data BitmapEntry = BitmapEntry {
     closureFrame :: StackFrameIter,
@@ -224,22 +240,6 @@ toInt# (I# i) = i
 
 intToWord# :: Int -> Word#
 intToWord# i = int2Word# (toInt# i)
-
-foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
-foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
-
-foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
-
-foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
-foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
-
-foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
-
-foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
-
-foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 
 decodeStack :: StackSnapshot -> IO CL.Closure
 decodeStack s = do
