@@ -18,15 +18,16 @@
 
 module System.Environment.ExecutablePath
   ( getExecutablePath
-##if !defined(javascript_HOST_ARCH)
   , executablePath
-##endif
   ) where
 
 ##if defined(javascript_HOST_ARCH)
 
 getExecutablePath :: IO FilePath
 getExecutablePath = return "a.jsexe"
+
+executablePath :: Maybe (IO (Maybe FilePath))
+executablePath = Nothing
 
 ##else
 
@@ -46,6 +47,12 @@ import System.Posix.Internals
 import Data.List (isSuffixOf)
 import Foreign.C
 import Foreign.Marshal.Array
+import System.Posix.Internals
+#elif defined(solaris2_HOST_OS)
+import Control.Exception (catch, throw)
+import Foreign.C
+import Foreign.Marshal.Array
+import System.IO.Error (isDoesNotExistError)
 import System.Posix.Internals
 #elif defined(freebsd_HOST_OS) || defined(netbsd_HOST_OS)
 import Control.Exception (catch, throw)
@@ -101,7 +108,7 @@ getExecutablePath :: IO FilePath
 --
 -- If the operating system provides a reliable way to determine the current
 -- executable, return the query action, otherwise return @Nothing@.  The action
--- is defined on FreeBSD, Linux, MacOS, NetBSD, and Windows.
+-- is defined on FreeBSD, Linux, MacOS, NetBSD, Solaris, and Windows.
 --
 -- Even where the query action is defined, there may be situations where no
 -- result is available, e.g. if the executable file was deleted while the
@@ -171,9 +178,9 @@ executablePath = Just (fmap Just getExecutablePath `catch` f)
       | otherwise             = throw e
 
 --------------------------------------------------------------------------------
--- Linux
+-- Linux / Solaris
 
-#elif defined(linux_HOST_OS)
+#elif defined(linux_HOST_OS) || defined(solaris2_HOST_OS)
 
 foreign import ccall unsafe "readlink"
     c_readlink :: CString -> CString -> CSize -> IO CInt
@@ -190,6 +197,7 @@ readSymbolicLink file =
                    c_readlink s buf 4096
             peekFilePathLen (buf,fromIntegral len)
 
+#  if defined(linux_HOST_OS)
 getExecutablePath = readSymbolicLink $ "/proc/self/exe"
 
 executablePath = Just (check <$> getExecutablePath) where
@@ -199,6 +207,18 @@ executablePath = Just (check <$> getExecutablePath) where
   -- See also https://gitlab.haskell.org/ghc/ghc/-/issues/10957
   check s | "(deleted)" `isSuffixOf` s = Nothing
           | otherwise = Just s
+
+#  elif defined(solaris2_HOST_OS)
+getExecutablePath = readSymbolicLink "/proc/self/path/a.out"
+
+executablePath = Just ((Just <$> getExecutablePath) `catch` f)
+  where
+    -- readlink(2) fails with ENOENT when the executable has been deleted,
+    -- even though the symlink itself still exists according to readdir(3).
+    f e | isDoesNotExistError e = pure Nothing
+        | otherwise             = throw e
+
+#endif
 
 --------------------------------------------------------------------------------
 -- FreeBSD / NetBSD
