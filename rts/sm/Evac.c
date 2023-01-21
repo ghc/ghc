@@ -122,7 +122,7 @@ alloc_in_moving_heap (uint32_t size, uint32_t gen_no)
 static StgPtr
 alloc_for_copy_nonmoving (uint32_t size, uint32_t gen_no)
 {
-    /* See Note [Deadlock detection under nonmoving collector]. */
+    /* See Note [Deadlock detection under the nonmoving collector]. */
     if (deadlock_detect_gc) {
         return alloc_in_nonmoving_heap(size);
     }
@@ -424,7 +424,7 @@ evacuate_large(StgPtr p)
   new_gen_no = bd->dest_no;
 
   if (RTS_UNLIKELY(deadlock_detect_gc)) {
-      /* See Note [Deadlock detection under nonmoving collector]. */
+      /* See Note [Deadlock detection under the nonmoving collector]. */
       new_gen_no = oldest_gen->no;
   } else if (new_gen_no < gct->evac_gen_no) {
       if (gct->eager_promotion) {
