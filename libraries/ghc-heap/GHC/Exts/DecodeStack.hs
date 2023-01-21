@@ -60,10 +60,8 @@ getUnderflowFrameNextChunk (StackFrameIter {..}) = StackSnapshot s#
 
 foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> Word# -> Word#
 
--- Use WordOffset - The access will likely be aligned to words
--- TODO: Negative offsets won't work! Consider using Word
-getWord :: StackFrameIter -> ByteOffset -> Word
-getWord (StackFrameIter {..}) relativeOffset = W# (getWord# stackSnapshot# (wordOffsetToWord# index) (byteOffsetToWord# relativeOffset))
+getWord :: StackFrameIter -> WordOffset -> Word
+getWord (StackFrameIter {..}) relativeOffset = W# (getWord# stackSnapshot# (wordOffsetToWord# index) (wordOffsetToWord# relativeOffset))
 
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 

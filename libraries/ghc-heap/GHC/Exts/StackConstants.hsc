@@ -23,8 +23,8 @@ newtype WordOffset = WordOffset { offsetInWords :: Int }
 offsetStgCatchFrameHandler :: WordOffset
 offsetStgCatchFrameHandler = byteOffsetToWordOffset $ (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
 
-offsetStgCatchFrameExceptionsBlocked :: ByteOffset
-offsetStgCatchFrameExceptionsBlocked = (#const OFFSET_StgCatchFrame_exceptions_blocked) + (#size StgHeader)
+offsetStgCatchFrameExceptionsBlocked :: WordOffset
+offsetStgCatchFrameExceptionsBlocked = byteOffsetToWordOffset $ (#const OFFSET_StgCatchFrame_exceptions_blocked) + (#size StgHeader)
 
 offsetStgCatchSTMFrameCode :: WordOffset
 offsetStgCatchSTMFrameCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
@@ -41,8 +41,8 @@ offsetStgAtomicallyFrameCode = byteOffsetToWordOffset $ (#const OFFSET_StgAtomic
 offsetStgAtomicallyFrameResult :: WordOffset
 offsetStgAtomicallyFrameResult = byteOffsetToWordOffset $ (#const OFFSET_StgAtomicallyFrame_result) + (#size StgHeader)
 
-offsetStgCatchRetryFrameRunningAltCode :: ByteOffset
-offsetStgCatchRetryFrameRunningAltCode = (#const OFFSET_StgCatchRetryFrame_running_alt_code) + (#size StgHeader)
+offsetStgCatchRetryFrameRunningAltCode :: WordOffset
+offsetStgCatchRetryFrameRunningAltCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchRetryFrame_running_alt_code) + (#size StgHeader)
 
 offsetStgCatchRetryFrameRunningFirstCode :: WordOffset
 offsetStgCatchRetryFrameRunningFirstCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchRetryFrame_first_code) + (#size StgHeader)
@@ -50,9 +50,9 @@ offsetStgCatchRetryFrameRunningFirstCode = byteOffsetToWordOffset $ (#const OFFS
 offsetStgCatchRetryFrameAltCode :: WordOffset
 offsetStgCatchRetryFrameAltCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
 
-offsetStgRetFunFrameSize :: ByteOffset
+offsetStgRetFunFrameSize :: WordOffset
 -- StgRetFun has no header, but only a pointer to the info table at the beginning.
-offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size)
+offsetStgRetFunFrameSize = byteOffsetToWordOffset $ (#const OFFSET_StgRetFun_size)
 
 offsetStgRetFunFrameFun :: WordOffset
 offsetStgRetFunFrameFun = byteOffsetToWordOffset $ (#const OFFSET_StgRetFun_fun)

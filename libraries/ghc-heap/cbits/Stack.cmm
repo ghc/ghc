@@ -151,7 +151,7 @@ getUpdateFrameTypezh(P_ stack, W_ offsetWords){
 
 getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
   P_ wordAddr;
-  wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
+  wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(offsetBytes));
   return (W_[wordAddr]);
 }
 
