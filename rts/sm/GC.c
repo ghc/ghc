@@ -352,7 +352,7 @@ GarbageCollect (uint32_t collect_gen,
   N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
-  /* See Note [Deadlock detection under nonmoving collector]. */
+  /* See Note [Deadlock detection under the nonmoving collector]. */
   deadlock_detect_gc = deadlock_detect;
 
 #if defined(THREADED_RTS)

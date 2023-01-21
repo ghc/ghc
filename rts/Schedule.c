@@ -1579,7 +1579,7 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
  * Perform a garbage collection if necessary
  * -------------------------------------------------------------------------- */
 
-// N.B. See Note [Deadlock detection under nonmoving collector] for rationale
+// N.B. See Note [Deadlock detection under the nonmoving collector] for rationale
 // behind deadlock_detect argument.
 static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
