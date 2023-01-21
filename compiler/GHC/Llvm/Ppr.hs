@@ -235,7 +235,7 @@ ppLlvmBlock opts (LlvmBlock blockId stmts) =
         _             -> empty
   in vcat $
       line (ppLlvmBlockLabel blockId)
-      : map (ppLlvmStatement opts) block
+      : map (ppLlvmStatement opts []) block
       ++ [ empty , ppRest ]
 {-# SPECIALIZE ppLlvmBlock :: LlvmCgConfig -> LlvmBlock -> SDoc #-}
 {-# SPECIALIZE ppLlvmBlock :: LlvmCgConfig -> LlvmBlock -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -247,10 +247,10 @@ ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 {-# SPECIALIZE ppLlvmBlockLabel :: LlvmBlockId -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
--- | Print out an LLVM statement.
-ppLlvmStatement :: IsDoc doc => LlvmCgConfig -> LlvmStatement -> doc
-ppLlvmStatement opts stmt =
-  let ind = line . (text "  " <>)
+-- | Print out an LLVM statement, with any metadata to append to the statement.
+ppLlvmStatement :: IsDoc doc => LlvmCgConfig -> [MetaAnnot] -> LlvmStatement -> doc
+ppLlvmStatement opts lastLineMeta stmt =
+  let ind = line . (<+> ppMetaAnnots opts lastLineMeta) . (text "  " <>)
   in case stmt of
         Assignment  dst expr      -> ind $ ppAssignment opts dst (ppLlvmExpression opts expr)
         Fence       st ord        -> ind $ ppFence st ord
@@ -260,36 +260,19 @@ ppLlvmStatement opts stmt =
         MkLabel     label         -> line $ ppLlvmBlockLabel label
         Store       value ptr align
                                   -> ind $ ppStore opts value ptr align
-        Switch      scrut def tgs -> ppSwitch opts scrut def tgs
+        Switch      scrut def tgs -> ppSwitch opts scrut def tgs lastLineMeta
         Return      result        -> ind $ ppReturn opts result
         Expr        expr          -> ind $ ppLlvmExpression opts expr
         Unreachable               -> ind $ text "unreachable"
-        Nop                       -> empty
-        MetaStmt    meta s        -> ppLlvmStatement' opts s (ppMetaAnnots opts meta)
-{-# SPECIALIZE ppLlvmStatement :: LlvmCgConfig -> LlvmStatement -> SDoc #-}
-{-# SPECIALIZE ppLlvmStatement :: LlvmCgConfig -> LlvmStatement -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
-
-
-ppLlvmStatement' :: IsDoc doc => LlvmCgConfig -> LlvmStatement -> Line doc -> doc
-ppLlvmStatement' opts stmt lastLineMeta =
-  let ind = line . (<+> lastLineMeta) . (text "  " <>)
-  in case stmt of
-        Assignment  dst expr      -> ind $ ppAssignment opts dst (ppLlvmExpression opts expr) <> lastLineMeta
-        Fence       st ord        -> ind $ ppFence st ord
-        Branch      target        -> ind $ ppBranch opts target
-        BranchIf    cond ifT ifF  -> ind $ ppBranchIf opts cond ifT ifF
-        Comment     comments      -> ppLlvmComments comments -- Ignore metadata?
-        MkLabel     label         -> line $ ppLlvmBlockLabel label
-        Store       value ptr align
-                                  -> ind $ ppStore opts value ptr align
-        Switch      scrut def tgs -> ppSwitch' opts scrut def tgs lastLineMeta
-        Return      result        -> ind $ ppReturn opts result
-        Expr        expr          -> ind $ ppLlvmExpression opts expr
-        Unreachable               -> ind $ text "unreachable"
-        Nop                       -> line $ empty <> lastLineMeta
-        MetaStmt    meta s        -> ppLlvmStatement' opts s (lastLineMeta <+> ppMetaAnnots opts meta)
-{-# SPECIALIZE ppLlvmStatement' :: LlvmCgConfig -> LlvmStatement -> SDoc -> SDoc #-}
-{-# SPECIALIZE ppLlvmStatement' :: LlvmCgConfig -> LlvmStatement -> HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+        Nop                       -> line empty
+        -- Meta annotations need to be collected so they can be appended to the end of the
+        -- statement @s@; this statement may be several lines, so we pass the annotations
+        -- down to be appended to the last line - see @ppSwitch@.
+        -- It's not clear if it should be allowed for a MetaStmt to contain another MetaStmt,
+        -- but currently it is supported so we should collect all annotations.
+        MetaStmt    meta s        -> ppLlvmStatement opts (meta ++ lastLineMeta) s
+{-# SPECIALIZE ppLlvmStatement :: LlvmCgConfig -> [MetaAnnot] -> LlvmStatement -> SDoc #-}
+{-# SPECIALIZE ppLlvmStatement :: LlvmCgConfig -> [MetaAnnot] -> LlvmStatement -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 -- | Print out an LLVM expression.
 ppLlvmExpression :: IsLine doc => LlvmCgConfig -> LlvmExpression-> doc
@@ -549,27 +532,17 @@ ppPhi opts tp preds =
 {-# SPECIALIZE ppPhi :: LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)] -> SDoc #-}
 {-# SPECIALIZE ppPhi :: LlvmCgConfig -> LlvmType -> [(LlvmVar,LlvmVar)] -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-ppSwitch :: IsDoc doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> doc
-ppSwitch opts scrut dflt targets =
-  let ppTarget  (val, lab) = text "  " <> ppVar opts val <> comma <+> ppVar opts lab
-  in lines_ $ concat
-      [ [text "switch" <+> ppVar opts scrut <> comma <+> ppVar opts dflt <+> char '[']
-      , map ppTarget targets
-      , [char ']']
-      ]
-{-# SPECIALIZE ppSwitch :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> SDoc #-}
-{-# SPECIALIZE ppSwitch :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-ppSwitch' :: IsDoc doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> Line doc -> doc
-ppSwitch' opts scrut dflt targets lastLineMeta =
+ppSwitch :: IsDoc doc => LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> [MetaAnnot] -> doc
+ppSwitch opts scrut dflt targets lastLineMeta =
   let ppTarget  (val, lab) = text "  " <> ppVar opts val <> comma <+> ppVar opts lab
   in lines_ $ concat
       [ [text "switch" <+> ppVar opts scrut <> comma <+> ppVar opts dflt <+> char '[']
       , map ppTarget targets
-      , [char ']' <+> lastLineMeta]
+      , [char ']' <> ppMetaAnnots opts lastLineMeta]
       ]
-{-# SPECIALIZE ppSwitch' :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> SDoc -> SDoc #-}
-{-# SPECIALIZE ppSwitch' :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> HLine -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
+{-# SPECIALIZE ppSwitch :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> [MetaAnnot] -> SDoc #-}
+{-# SPECIALIZE ppSwitch :: LlvmCgConfig -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> [MetaAnnot] -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 
 ppAsm :: IsLine doc => LlvmCgConfig -> LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool-> doc
