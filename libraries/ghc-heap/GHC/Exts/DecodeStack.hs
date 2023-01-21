@@ -146,7 +146,6 @@ toBitmapPayload :: BitmapEntry -> IO Box
 toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame $ e
 toBitmapPayload e = toClosure (unpackClosureReferencedByFrame 0) (closureFrame e)
 
--- TODO: Negative offsets won't work! Consider using Word
 getClosure :: StackFrameIter ->  WordOffset-> IO Box
 getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame relativeOffset) sfi
 
@@ -162,24 +161,35 @@ toClosure f# (StackFrameIter {..}) =
           in
             DecodedClosureBox <$> (getClosureDataFromHeapRep heapRep infoTablePtr ptrList)
 
--- TODO: Make function more readable: No IO in let bindings
 decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
-decodeLargeBitmap getterFun# (StackFrameIter {..}) relativePayloadOffset =
+decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
       let !(# bitmapArray#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
-          bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-          bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) bitmapWords (W# size#)
-          payloads = mapM toBitmapPayload bes
+          bitmapWords :: [Word] = byteArrayToList bitmapArray#
       in
-        payloads
+        decodeBitmaps sfi relativePayloadOffset bitmapWords (W# size#)
 
--- TODO: Make function more readable: No IO in let bindings
-decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
-decodeSmallBitmap getterFun# (StackFrameIter {..}) relativePayloadOffset =
-      let !(# bitmap#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
-          bes = toBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) (W# bitmap#) (W# size#)
-          payloads = mapM toBitmapPayload bes
+decodeBitmaps :: StackFrameIter -> WordOffset -> [Word] -> Word -> IO [Box]
+decodeBitmaps (StackFrameIter {..}) relativePayloadOffset bitmapWords size =
+      let
+          bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) bitmapWords size
       in
-        payloads
+        mapM toBitmapPayload bes
+
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
+decodeSmallBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
+      let !(# bitmap#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
+          size = W# size#
+          bitmapWords = if size > 0 then [(W# bitmap#)] else []
+      in
+        decodeBitmaps sfi relativePayloadOffset bitmapWords size
+
+byteArrayToList :: ByteArray# -> [Word]
+byteArrayToList bArray = go 0
+  where
+    go i
+      | i < maxIndex  = (W# (indexWordArray# bArray (toInt# i))) : (go (i + 1))
+      | otherwise = []
+    maxIndex = sizeofByteArray bArray `quot` sizeOf (undefined :: Word)
 
 byteOffsetToWord# :: ByteOffset -> Word#
 byteOffsetToWord# bo = intToWord# (fromIntegral bo)
@@ -237,17 +247,6 @@ unpackStackFrameIter sfi =
           <$> getClosure sfi offsetStgCatchSTMFrameCode
           <*> getClosure sfi offsetStgCatchSTMFrameHandler
      x -> error $ "Unexpected closure type on stack: " ++ show x
-
--- | Right-fold over the elements of a 'ByteArray'.
--- Copied from `primitive`
-foldrByteArray :: forall b. (Word# -> b -> b) -> b -> ByteArray# -> b
-{-# INLINE foldrByteArray #-}
-foldrByteArray f z arr = go 0
-  where
-    go i
-      | i < maxI  = f (indexWordArray# arr (toInt# i)) (go (i + 1))
-      | otherwise = z
-    maxI = sizeofByteArray arr `quot` sizeOf (undefined :: Word)
 
 -- | Size of the byte array in bytes.
 -- Copied from `primitive`
