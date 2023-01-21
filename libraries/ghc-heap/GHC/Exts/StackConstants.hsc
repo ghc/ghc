@@ -54,8 +54,8 @@ offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size)
 offsetStgRetFunFrameFun :: WordOffset
 offsetStgRetFunFrameFun = byteOffsetToWordOffset $ (#const OFFSET_StgRetFun_fun)
 
-offsetStgRetFunFramePayload :: ByteOffset
-offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload)
+offsetStgRetFunFramePayload :: WordOffset
+offsetStgRetFunFramePayload = byteOffsetToWordOffset $ (#const OFFSET_StgRetFun_payload)
 
 offsetStgBCOFrameInstrs :: ByteOffset
 offsetStgBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)

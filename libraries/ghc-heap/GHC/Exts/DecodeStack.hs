@@ -199,23 +199,24 @@ unpackStackFrameIter sfi =
   case getInfoTableType sfi of
      RET_BCO -> do
         bco' <- getClosure sfi offsetStgClosurePayload
-        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2
+        -- The arguments begin directly after the payload's one element
+        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
         pure $ CL.RetBCO bco' args'
      RET_SMALL -> do
-                    payloads <- decodeSmallBitmap getSmallBitmap# sfi 1
+                    payloads <- decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
                     let special = getRetSmallSpecialType sfi
                     pure $ CL.RetSmall special payloads
-     RET_BIG -> CL.RetBig <$> decodeLargeBitmap getLargeBitmap# sfi 1
+     RET_BIG -> CL.RetBig <$> decodeLargeBitmap getLargeBitmap# sfi offsetStgClosurePayload
      RET_FUN -> do
         let t = getRetFunType sfi
             size' = getWord sfi offsetStgRetFunFrameSize
         fun' <- getClosure sfi offsetStgRetFunFrameFun
         payload' <-
           if t == CL.ARG_GEN_BIG then
-            decodeLargeBitmap getRetFunLargeBitmap# sfi 3
+            decodeLargeBitmap getRetFunLargeBitmap# sfi offsetStgRetFunFramePayload
           else
             -- TODO: The offsets should be based on DerivedConstants.h
-            decodeSmallBitmap getRetFunSmallBitmap# sfi 3
+            decodeSmallBitmap getRetFunSmallBitmap# sfi offsetStgRetFunFramePayload
         pure $ CL.RetFun t size' fun' payload'
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
