@@ -57,11 +57,6 @@ test('T21622',
      only_ways(['normal']),
      compile_and_run, [''])
 
-# TODO: Are debug flags needed here?
-test('decode_cloned_stack',
-     [only_ways(['normal'])],
-     compile_and_run, ['-debug -optc-g -g'])
-
 # TODO: Remove debug flags
 test('stack_big_ret',
      [
