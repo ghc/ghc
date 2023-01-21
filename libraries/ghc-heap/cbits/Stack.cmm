@@ -202,15 +202,6 @@ getWordzh(P_ stack, W_ index, W_ offset){
   return (W_[wordAddr]);
 }
 
-// TODO: Rename: index -> wordOffset, offset -> byteOffset
-getHalfWordzh(P_ stack, W_ index, W_ offset){
-  P_ wordAddr;
-  wordAddr = (StgStack_sp(stack) + WDS(index) + offset);
-  bits32 result;
-  result = bits32[wordAddr];
-  return (result);
-}
-
 getUnderflowFrameNextChunkzh(P_ stack, W_ index){
   P_ closurePtr, closurePtrPrime, updateePtr;
   closurePtr = (StgStack_sp(stack) + WDS(index));

@@ -97,10 +97,10 @@ wordsToBitmapEntries sfi (b:bs) bitmapSize =
 
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
-toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmap bSize = BitmapEntry {
+toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmapWord bSize = BitmapEntry {
     closureFrame = sfi,
-    isPrimitive = (bitmap .&. 1) /= 0
-  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmap `shiftR` 1) (bSize - 1)
+    isPrimitive = (bitmapWord .&. 1) /= 0
+  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> IO Box
 toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . toWord . closureFrame $ e
@@ -145,15 +145,8 @@ decodeSmallBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) 
         payloads
 
 -- TODO: Negative offsets won't work! Consider using Word
-getHalfWord :: StackFrameIter -> Int -> Word
-getHalfWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getHalfWord# s# i# (intToWord# relativeOffset))
-
--- TODO: Negative offsets won't work! Consider using Word
 getWord :: StackFrameIter -> Int -> Word
 getWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getWord# s# i# (intToWord# relativeOffset))
-
-bytesToWords :: Int -> Int
-bytesToWords b = b `div` bytesInWord
 
 unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " ++ show @ClosureType ((toEnum . fromIntegral) (W# (getInfoTableType# s# i#))) ++ "\n") $
@@ -245,8 +238,6 @@ foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBl
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
 foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
-
-foreign import prim "getHalfWordzh" getHalfWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
 
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 

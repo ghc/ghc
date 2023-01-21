@@ -30,7 +30,6 @@ import GHC.Exts (Int (I#), RealWorld, StackSnapshot#, ThreadId#, Array#, sizeofA
 import GHC.IO (IO (..))
 import GHC.InfoProv (InfoProv (..), InfoProvEnt, ipLoc, ipeProv, peekInfoProv)
 import GHC.Stable
-import qualified GHC.Generics
 
 -- | A frozen snapshot of the state of an execution stack.
 --

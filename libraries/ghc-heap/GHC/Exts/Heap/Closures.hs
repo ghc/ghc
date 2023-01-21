@@ -97,7 +97,7 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
     _  -> pure True
 #if MIN_VERSION_base(4,17,0)
 -- TODO: Implement
-areBoxesEqual (DecodedClosureBox a) (DecodedClosureBox b) = error "Not implemented, yet!"
+areBoxesEqual (DecodedClosureBox _) (DecodedClosureBox _) = error "Not implemented, yet!"
 areBoxesEqual _ _ = pure $ False
 #endif
 

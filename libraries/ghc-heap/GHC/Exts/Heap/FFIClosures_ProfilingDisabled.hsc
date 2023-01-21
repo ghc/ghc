@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Exts.Heap.FFIClosures_ProfilingDisabled where
 
@@ -14,7 +15,6 @@ import GHC.Exts
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
-import Debug.Trace
 import Numeric
 
 data TSOFields = TSOFields {
@@ -117,8 +117,7 @@ peekStackFields ptr = do
     marking' <- (#peek struct StgStack_, marking) ptr
 #endif
     Ptr sp' <- (#peek struct StgStack_, sp) ptr
-    let Ptr stack' = (#ptr struct StgStack_, stack) ptr
-    traceM $ "stack' " ++ showAddr## stack'
+    let !(Ptr stack') = (#ptr struct StgStack_, stack) ptr
 
     return StackFields {
         stack_size = stack_size',
