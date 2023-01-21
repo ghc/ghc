@@ -193,7 +193,7 @@ StgArrBytes *getLargeBitmaps(Capability *cap, StgClosure *c) {
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
   array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 
   for (int i = 0; i < neededWords; i++) {
@@ -211,7 +211,7 @@ StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
   array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 
   for (int i = 0; i < neededWords; i++) {
@@ -231,7 +231,7 @@ StgArrBytes *getBCOLargeBitmaps(Capability *cap, StgClosure *c) {
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
   array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
 
   for (int i = 0; i < neededWords; i++) {

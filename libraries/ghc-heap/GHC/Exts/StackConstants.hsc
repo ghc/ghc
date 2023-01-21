@@ -67,6 +67,7 @@ offsetStgBCOFrameSize = (#const OFFSET_StgBCO_size) + (#size StgHeader)
 offsetStgClosurePayload :: Int
 offsetStgClosurePayload = (#const OFFSET_StgClosure_payload) + (#size StgHeader)
 
+-- TODO: Should be SIZEOF_VOID_P
 bytesInWord :: Int
 bytesInWord = (#const SIZEOF_UNSIGNED_LONG)
 #endif
