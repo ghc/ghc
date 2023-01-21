@@ -13,6 +13,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack (
@@ -36,20 +37,34 @@ import GHC.Exts.DecodeHeap
 
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
+derefStackWord :: StackFrameIter -> Word
+derefStackWord (StackFrameIter {..}) = W# (derefStackWord# stackSnapshot# (wordOffsetToWord# index))
+
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
 
 -- TODO: This can be simplified if the offset is always full words
 foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
+unpackClosureReferencedByFrame :: ByteOffset -> StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# b #)
+unpackClosureReferencedByFrame bo ss# wo = unpackClosureReferencedByFrame# (byteOffsetToWord# bo) ss# (wordOffsetToWord# wo)
+
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
-foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# -> Word#
+foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> Word# -> Word#
+
+-- Use WordOffset - The access will likely be aligned to words
+-- TODO: Negative offsets won't work! Consider using Word
+getWord :: StackFrameIter -> ByteOffset -> Word
+getWord (StackFrameIter {..}) relativeOffset = W# (getWord# stackSnapshot# (wordOffsetToWord# index) (byteOffsetToWord# relativeOffset))
 
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 
 foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
+
+getInfoTableType :: StackFrameIter -> ClosureType
+getInfoTableType (StackFrameIter {..}) = (toEnum . fromIntegral) (W# (getInfoTableType# stackSnapshot# (wordOffsetToWord# index)))
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
@@ -72,21 +87,26 @@ type StackFrameIter# = (#
                           Word#
                         #)
 
-data StackFrameIter = StackFrameIter StackFrameIter#
-
+data StackFrameIter = StackFrameIter {
+  stackSnapshot# :: StackSnapshot#,
+  index :: WordOffset
+                                     }
 -- TODO: Remove this instance (debug only)
 instance Show StackFrameIter where
-  show (StackFrameIter (# _, i# #)) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show (W# i#)
+  show (StackFrameIter { .. }) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show index
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
-stackHead (StackSnapshot s) = StackFrameIter (# s , 0## #) -- GHC stacks are never empty
+stackHead (StackSnapshot s) = StackFrameIter s 0 -- GHC stacks are never empty
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
-advanceStackFrameIter (StackFrameIter (# s, i #)) = let !(# s', i', hasNext #) = advanceStackFrameIter# s i in
-  if (I# hasNext) > 0 then Just $ StackFrameIter (# s', i' #)
+advanceStackFrameIter (StackFrameIter {..}) = let !(# s', i', hasNext #) = advanceStackFrameIter# stackSnapshot# (wordOffsetToWord# index) in
+  if (I# hasNext) > 0 then Just $ StackFrameIter s' (primWordToWordOffset i')
   else Nothing
+
+primWordToWordOffset :: Word# -> WordOffset
+primWordToWordOffset w# = fromIntegral (W# w#)
 
 data BitmapEntry = BitmapEntry {
     closureFrame :: StackFrameIter,
@@ -103,8 +123,8 @@ wordsToBitmapEntries sfi (b:bs) bitmapSize =
          mbLastFrame = fmap closureFrame mbLastEntry
       in
         case mbLastFrame of
-          Just (StackFrameIter (# s'#, i'# #)) ->
-            entries ++ wordsToBitmapEntries (StackFrameIter (# s'#, plusWord# i'# 1## #)) bs (subtractDecodedBitmapWord bitmapSize)
+          Just (StackFrameIter {..} ) ->
+            entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) bs (subtractDecodedBitmapWord bitmapSize)
           Nothing -> error "This should never happen! Recursion ended not in base case."
   where
     subtractDecodedBitmapWord :: Word -> Word
@@ -112,25 +132,23 @@ wordsToBitmapEntries sfi (b:bs) bitmapSize =
 
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
-toBitmapEntries sfi@(StackFrameIter(# s, i #)) bitmapWord bSize = BitmapEntry {
+toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize = BitmapEntry {
     closureFrame = sfi,
     isPrimitive = (bitmapWord .&. 1) /= 0
-  } : toBitmapEntries (StackFrameIter (# s , plusWord# i 1## #)) (bitmapWord `shiftR` 1) (bSize - 1)
+  } : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> IO Box
-toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . toWord . closureFrame $ e
-      where
-        toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
-toBitmapPayload e = toClosure (unpackClosureReferencedByFrame# 0##) (closureFrame e)
+toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame $ e
+toBitmapPayload e = toClosure (unpackClosureReferencedByFrame 0) (closureFrame e)
 
 -- TODO: Offset should be in Words. That's the smallest reasonable unit.
 -- TODO: Negative offsets won't work! Consider using Word
-getClosure :: StackFrameIter -> Int -> IO Box
-getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
+getClosure :: StackFrameIter ->  ByteOffset-> IO Box
+getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame relativeOffset) sfi
 
-toClosure :: (StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO Box
-toClosure f# (StackFrameIter (# s#, i# #)) =
-  case f# s# i# of
+toClosure :: (StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO Box
+toClosure f# (StackFrameIter {..}) =
+  case f# stackSnapshot# index of
       (# infoTableAddr, heapRep, pointersArray #) ->
           let infoTablePtr = Ptr infoTableAddr
               ptrList = [case indexArray# pointersArray i of
@@ -141,67 +159,87 @@ toClosure f# (StackFrameIter (# s#, i# #)) =
             DecodedClosureBox <$> (getClosureDataFromHeapRep heapRep infoTablePtr ptrList)
 
 -- TODO: Make function more readable: No IO in let bindings
-decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> Word# -> IO [Box]
-decodeLargeBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
-      let !(# bitmapArray#, size# #) = getterFun# stackFrame# closureOffset#
+decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
+decodeLargeBitmap getterFun# (StackFrameIter {..}) relativePayloadOffset =
+      let !(# bitmapArray#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
           bitmapWords :: [Word] = foldrByteArray (\w acc -> W# w : acc) [] bitmapArray#
-          bes = wordsToBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #)) bitmapWords (W# size#)
+          bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) bitmapWords (W# size#)
           payloads = mapM toBitmapPayload bes
       in
         payloads
 
 -- TODO: Make function more readable: No IO in let bindings
-decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> Word# -> IO [Box]
-decodeSmallBitmap getterFun# (StackFrameIter (# stackFrame#, closureOffset# #)) relativePayloadOffset# =
-      let !(# bitmap#, size# #) = getterFun# stackFrame# closureOffset#
-          bes = toBitmapEntries (StackFrameIter (# stackFrame#, plusWord# closureOffset# relativePayloadOffset# #))(W# bitmap#) (W# size#)
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
+decodeSmallBitmap getterFun# (StackFrameIter {..}) relativePayloadOffset =
+      let !(# bitmap#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
+          bes = toBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) (W# bitmap#) (W# size#)
           payloads = mapM toBitmapPayload bes
       in
         payloads
 
--- TODO: Negative offsets won't work! Consider using Word
-getWord :: StackFrameIter -> Int -> Word
-getWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getWord# s# i# (intToWord# relativeOffset))
+byteOffsetToWord# :: ByteOffset -> Word#
+byteOffsetToWord# bo = intToWord# (fromIntegral bo)
+
+wordOffsetToWord# :: WordOffset -> Word#
+wordOffsetToWord# wo = intToWord# (fromIntegral wo)
+
+getRetSmallSpecialType :: StackFrameIter -> SpecialRetSmall
+getRetSmallSpecialType (StackFrameIter {..}) = let special# = getRetSmallSpecialType# stackSnapshot# (wordOffsetToWord# index)
+                         in
+                           (toEnum . fromInteger . toInteger) (W# special#)
+
+getRetFunType :: StackFrameIter -> RetFunType
+getRetFunType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index)))
+
+getUpdateFrameType :: StackFrameIter -> UpdateFrameType
+getUpdateFrameType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# stackSnapshot# (wordOffsetToWord# index)))
+
+getCatchFrameExceptionsBlocked :: StackFrameIter -> Word
+getCatchFrameExceptionsBlocked (StackFrameIter {..}) = W# (getCatchFrameExceptionsBlocked# stackSnapshot# (wordOffsetToWord# index))
+
+getUnderflowFrameNextChunk :: StackFrameIter -> StackSnapshot
+getUnderflowFrameNextChunk (StackFrameIter {..}) = StackSnapshot s#
+  where
+   s# = getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index)
 
 unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
-unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " ++ show @ClosureType ((toEnum . fromIntegral) (W# (getInfoTableType# s# i#))) ++ "\n") $
-  case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
+unpackStackFrameIter sfi =
+  case getInfoTableType sfi of
      RET_BCO -> do
         bco' <- getClosure sfi offsetStgClosurePayload
-        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2##
+        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2
         pure $ CL.RetBCO bco' args'
      RET_SMALL -> do
-                    payloads <- decodeSmallBitmap getSmallBitmap# sfi 1##
-                    let special# = getRetSmallSpecialType# s# i#
-                        special = (toEnum . fromInteger . toInteger) (W# special#)
+                    payloads <- decodeSmallBitmap getSmallBitmap# sfi 1
+                    let special = getRetSmallSpecialType sfi
                     pure $ CL.RetSmall special payloads
-     RET_BIG -> CL.RetBig <$> decodeLargeBitmap getLargeBitmap# sfi 1##
+     RET_BIG -> CL.RetBig <$> decodeLargeBitmap getLargeBitmap# sfi 1
      RET_FUN -> do
-        let t = (toEnum . fromInteger . toInteger) (W# (getRetFunType# s# i#))
+        let t = getRetFunType sfi
             size' = getWord sfi offsetStgRetFunFrameSize
         fun' <- getClosure sfi offsetStgRetFunFrameFun
         payload' <-
           if t == CL.ARG_GEN_BIG then
-            decodeLargeBitmap getRetFunLargeBitmap# sfi 3##
+            decodeLargeBitmap getRetFunLargeBitmap# sfi 3
           else
             -- TODO: The offsets should be based on DerivedConstants.h
-            decodeSmallBitmap getRetFunSmallBitmap# sfi 3##
+            decodeSmallBitmap getRetFunSmallBitmap# sfi 3
         pure $ CL.RetFun t size' fun' payload'
      -- TODO: Decode update frame type
      UPDATE_FRAME -> let
-        !t = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# s# i#))
+        !t = getUpdateFrameType sfi
         c = getClosure sfi offsetStgUpdateFrameUpdatee
       in
         (CL.UpdateFrame t ) <$> c
      CATCH_FRAME -> do
         -- TODO: Replace with getWord# expression
-        let exceptionsBlocked = W# (getCatchFrameExceptionsBlocked# s# i#)
+        let exceptionsBlocked = getCatchFrameExceptionsBlocked sfi
         c <- getClosure sfi offsetStgCatchFrameHandler
         pure $ CL.CatchFrame exceptionsBlocked c
      UNDERFLOW_FRAME -> let
-          nextChunk# = getUnderflowFrameNextChunk# s# i#
+          nextChunk = getUnderflowFrameNextChunk sfi
         in
-          pure $ CL.UnderflowFrame (StackSnapshot nextChunk#)
+          pure $ CL.UnderflowFrame nextChunk
      STOP_FRAME -> pure CL.StopFrame
      ATOMICALLY_FRAME -> CL.AtomicallyFrame
             <$> getClosure sfi offsetStgAtomicallyFrameCode
