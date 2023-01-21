@@ -482,7 +482,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     }
 
     /* We should not make it here if we are doing a deadlock detect GC.
-     * See Note [Deadlock detection under nonmoving collector].
+     * See Note [Deadlock detection under the nonmoving collector].
      * This is actually no longer true due to call in nonmovingScavengeOne
      * introduced due to Note [Dirty flags in the non-moving collector]
      * (see NonMoving.c).
