@@ -65,7 +65,7 @@ ClosureTypeList *foldSmallBitmapToList(StgPtr spBottom, StgPtr payload,
     if ((bitmap & 1) == 0) {
       const StgClosure *c = (StgClosure *)payload[i];
       c = UNTAG_CONST_CLOSURE(c);
-      StgInfoTable *info = get_itbl(c);
+      const StgInfoTable *info = get_itbl(c);
       list = add(list, info->type);
     }
     // TODO: Primitives are ignored here.
@@ -87,7 +87,7 @@ ClosureTypeList *foldLargeBitmapToList(StgPtr spBottom, StgPtr payload,
     j = 0;
     for (; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1) {
       if ((bitmap & 1) == 0) {
-        StgClosure *c = (StgClosure *)payload[i];
+        const StgClosure *c = (StgClosure *)payload[i];
         c = UNTAG_CONST_CLOSURE(c);
         list = add(list, get_itbl(c)->type);
       }
@@ -221,7 +221,7 @@ StgArrBytes *createArrayClosure(ClosureTypeList *list) {
   StgWord neededWords = listSize(list);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCCS);
+  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
   array->bytes = WDS(listSize(list));
 
   for (int i = 0; list != NULL; i++) {
