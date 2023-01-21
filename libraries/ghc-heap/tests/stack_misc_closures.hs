@@ -233,7 +233,6 @@ main = do
         assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 59]
-  -- TODO: Test ret_fun bco
   test any_bco_frame# $
     \case
       RetBCO {..} -> do

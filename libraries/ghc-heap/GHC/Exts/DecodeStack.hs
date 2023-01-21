@@ -173,7 +173,6 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " 
             size' = getWord sfi offsetStgRetFunFrameSize
         fun' <- getClosure sfi offsetStgRetFunFrameFun
         payload' <-
-          -- TODO: ARG_BCO is likely very special...
           if t == CL.ARG_GEN_BIG then
             decodeLargeBitmap getRetFunLargeBitmap# sfi 3##
           else
