@@ -51,11 +51,6 @@ foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedBy
 unpackClosureReferencedByFrame :: WordOffset -> StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# b #)
 unpackClosureReferencedByFrame wo1 ss# wo2 = unpackClosureReferencedByFrame# (wordOffsetToWord# wo1) ss# (wordOffsetToWord# wo2)
 
-foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
-
-getCatchFrameExceptionsBlocked :: StackFrameIter -> Word
-getCatchFrameExceptionsBlocked (StackFrameIter {..}) = W# (getCatchFrameExceptionsBlocked# stackSnapshot# (wordOffsetToWord# index))
-
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
 getUnderflowFrameNextChunk :: StackFrameIter -> StackSnapshot
@@ -215,7 +210,6 @@ unpackStackFrameIter sfi =
           if t == CL.ARG_GEN_BIG then
             decodeLargeBitmap getRetFunLargeBitmap# sfi offsetStgRetFunFramePayload
           else
-            -- TODO: The offsets should be based on DerivedConstants.h
             decodeSmallBitmap getRetFunSmallBitmap# sfi offsetStgRetFunFramePayload
         pure $ CL.RetFun t size' fun' payload'
      -- TODO: Decode update frame type
@@ -225,8 +219,7 @@ unpackStackFrameIter sfi =
       in
         (CL.UpdateFrame t ) <$> c
      CATCH_FRAME -> do
-        -- TODO: Replace with getWord# expression
-        let exceptionsBlocked = getCatchFrameExceptionsBlocked sfi
+        let exceptionsBlocked = getWord sfi offsetStgCatchFrameExceptionsBlocked
         c <- getClosure sfi offsetStgCatchFrameHandler
         pure $ CL.CatchFrame exceptionsBlocked c
      UNDERFLOW_FRAME -> let

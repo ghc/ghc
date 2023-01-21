@@ -23,6 +23,9 @@ newtype WordOffset = WordOffset { offsetInWords :: Int }
 offsetStgCatchFrameHandler :: WordOffset
 offsetStgCatchFrameHandler = byteOffsetToWordOffset $ (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
 
+offsetStgCatchFrameExceptionsBlocked :: ByteOffset
+offsetStgCatchFrameExceptionsBlocked = (#const OFFSET_StgCatchFrame_exceptions_blocked) + (#size StgHeader)
+
 offsetStgCatchSTMFrameCode :: WordOffset
 offsetStgCatchSTMFrameCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
 

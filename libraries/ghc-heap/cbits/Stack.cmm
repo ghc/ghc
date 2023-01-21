@@ -149,16 +149,6 @@ getUpdateFrameTypezh(P_ stack, W_ offsetWords){
   return (type);
 }
 
-getCatchFrameExceptionsBlockedzh(P_ stack, W_ offsetWords){
-  P_ closurePtr;
-  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-
-  W_ exceptions_blocked;
-  exceptions_blocked = StgCatchFrame_exceptions_blocked(closurePtr);
-  return (exceptions_blocked);
-}
-
 getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
   P_ wordAddr;
   wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
