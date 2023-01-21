@@ -241,18 +241,8 @@ foreign import prim "getWordzh" getWord# ::  StackSnapshot# -> Word# -> Word# ->
 
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 
-#if defined(DEBUG)
-foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
-
-belchStack :: StackSnapshot -> IO ()
-belchStack (StackSnapshot s#) = belchStack# s#
-#endif
-
 decodeStack :: StackSnapshot -> IO CL.Closure
 decodeStack s = do
-#if defined(DEBUG)
-  belchStack s
-#endif
   stack <- decodeStack' s
   let boxed = map DecodedClosureBox stack
   pure $ SimpleStack boxed
