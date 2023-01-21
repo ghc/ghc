@@ -46,7 +46,6 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     P_ nextClosure;
     nextClosure = StgStack_sp(stack) + WDS(index);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
-//    ccall checkSTACK(stack);
   }
 #endif
 
@@ -68,7 +67,6 @@ getInfoTableTypezh (P_ stack, W_ index) {
 
     W_ type;
     type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
-    // ccall debugBelch("getInfoTableTypezh - stack %p , index %ul, closure ptr p %p, info ptr %p, itbl type %ul\n", stack, index, p, info, type);
     return (type);
 }
 
