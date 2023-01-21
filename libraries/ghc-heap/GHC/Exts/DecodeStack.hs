@@ -42,6 +42,9 @@ derefStackWord (StackFrameIter {..}) = W# (derefStackWord# stackSnapshot# (wordO
 
 foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot# -> Word# -> Word#
 
+getUpdateFrameType :: StackFrameIter -> UpdateFrameType
+getUpdateFrameType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# stackSnapshot# (wordOffsetToWord# index)))
+
 -- TODO: This can be simplified if the offset is always full words
 foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
@@ -50,7 +53,15 @@ unpackClosureReferencedByFrame bo ss# wo = unpackClosureReferencedByFrame# (byte
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 
+getCatchFrameExceptionsBlocked :: StackFrameIter -> Word
+getCatchFrameExceptionsBlocked (StackFrameIter {..}) = W# (getCatchFrameExceptionsBlocked# stackSnapshot# (wordOffsetToWord# index))
+
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
+
+getUnderflowFrameNextChunk :: StackFrameIter -> StackSnapshot
+getUnderflowFrameNextChunk (StackFrameIter {..}) = StackSnapshot s#
+  where
+   s# = getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index)
 
 foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> Word# -> Word#
 
@@ -60,6 +71,9 @@ getWord :: StackFrameIter -> ByteOffset -> Word
 getWord (StackFrameIter {..}) relativeOffset = W# (getWord# stackSnapshot# (wordOffsetToWord# index) (byteOffsetToWord# relativeOffset))
 
 foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
+
+getRetFunType :: StackFrameIter -> RetFunType
+getRetFunType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index)))
 
 foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
 
@@ -75,6 +89,11 @@ foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: StackSnaps
 foreign import prim "getSmallBitmapzh" getSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
 foreign import prim "getRetSmallSpecialTypezh" getRetSmallSpecialType# :: StackSnapshot# -> Word# -> Word#
+
+getRetSmallSpecialType :: StackFrameIter -> SpecialRetSmall
+getRetSmallSpecialType (StackFrameIter {..}) = let special# = getRetSmallSpecialType# stackSnapshot# (wordOffsetToWord# index)
+                         in
+                           (toEnum . fromInteger . toInteger) (W# special#)
 
 foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
@@ -182,25 +201,6 @@ byteOffsetToWord# bo = intToWord# (fromIntegral bo)
 
 wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
-
-getRetSmallSpecialType :: StackFrameIter -> SpecialRetSmall
-getRetSmallSpecialType (StackFrameIter {..}) = let special# = getRetSmallSpecialType# stackSnapshot# (wordOffsetToWord# index)
-                         in
-                           (toEnum . fromInteger . toInteger) (W# special#)
-
-getRetFunType :: StackFrameIter -> RetFunType
-getRetFunType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index)))
-
-getUpdateFrameType :: StackFrameIter -> UpdateFrameType
-getUpdateFrameType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# stackSnapshot# (wordOffsetToWord# index)))
-
-getCatchFrameExceptionsBlocked :: StackFrameIter -> Word
-getCatchFrameExceptionsBlocked (StackFrameIter {..}) = W# (getCatchFrameExceptionsBlocked# stackSnapshot# (wordOffsetToWord# index))
-
-getUnderflowFrameNextChunk :: StackFrameIter -> StackSnapshot
-getUnderflowFrameNextChunk (StackFrameIter {..}) = StackSnapshot s#
-  where
-   s# = getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index)
 
 unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
 unpackStackFrameIter sfi =
