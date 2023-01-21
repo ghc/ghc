@@ -1,3 +1,6 @@
+nix build nixpkgs#jq.bin -o jq
+PATH+=:$PWD/jq-bin/bin
+
 ghcs_nix="https://gitlab.haskell.org/bgamari/ghcs-nix/-/archive/master/ghcs-nix-master.tar.gz"
 
 nix build -f "$ghcs_nix" ghc-8_10_7 -o boot_ghc
@@ -9,7 +12,7 @@ run() {
   nix build -f "$ghcs_nix" $drv
   (cd ../; rm -r dist-newstyle; cabal configure hadrian -w bootstrap/result/bin/ghc)
   cp ../dist-newstyle/cache/plan.json "plan-$ver.json"
-  cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | tee "plan-bootstrap-$ver.json"
+  cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | tee | jq --sort-keys | "plan-bootstrap-$ver.json"
 }
 
 run "9_2_1"
