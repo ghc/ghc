@@ -48,8 +48,8 @@ getUpdateFrameType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W
 -- TODO: This can be simplified if the offset is always full words
 foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
-unpackClosureReferencedByFrame :: ByteOffset -> StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# b #)
-unpackClosureReferencedByFrame bo ss# wo = unpackClosureReferencedByFrame# (byteOffsetToWord# bo) ss# (wordOffsetToWord# wo)
+unpackClosureReferencedByFrame :: WordOffset -> StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# b #)
+unpackClosureReferencedByFrame wo1 ss# wo2 = unpackClosureReferencedByFrame# (wordOffsetToWord# wo1) ss# (wordOffsetToWord# wo2)
 
 foreign import prim "getCatchFrameExceptionsBlockedzh" getCatchFrameExceptionsBlocked#  :: StackSnapshot# -> Word# -> Word#
 
@@ -153,9 +153,8 @@ toBitmapPayload :: BitmapEntry -> IO Box
 toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame $ e
 toBitmapPayload e = toClosure (unpackClosureReferencedByFrame 0) (closureFrame e)
 
--- TODO: Offset should be in Words. That's the smallest reasonable unit.
 -- TODO: Negative offsets won't work! Consider using Word
-getClosure :: StackFrameIter ->  ByteOffset-> IO Box
+getClosure :: StackFrameIter ->  WordOffset-> IO Box
 getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame relativeOffset) sfi
 
 toClosure :: (StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO Box

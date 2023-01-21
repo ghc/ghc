@@ -20,39 +20,39 @@ newtype ByteOffset = ByteOffset { offsetInBytes :: Int }
 newtype WordOffset = WordOffset { offsetInWords :: Int }
   deriving newtype (Eq, Show, Integral, Real, Num, Enum, Ord)
 
-offsetStgCatchFrameHandler :: ByteOffset
-offsetStgCatchFrameHandler = (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
+offsetStgCatchFrameHandler :: WordOffset
+offsetStgCatchFrameHandler = byteOffsetToWordOffset $ (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
 
-offsetStgCatchSTMFrameCode :: ByteOffset
-offsetStgCatchSTMFrameCode = (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
+offsetStgCatchSTMFrameCode :: WordOffset
+offsetStgCatchSTMFrameCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchSTMFrame_code) + (#size StgHeader)
 
-offsetStgCatchSTMFrameHandler :: ByteOffset
-offsetStgCatchSTMFrameHandler = (#const OFFSET_StgCatchSTMFrame_handler) + (#size StgHeader)
+offsetStgCatchSTMFrameHandler :: WordOffset
+offsetStgCatchSTMFrameHandler = byteOffsetToWordOffset $ (#const OFFSET_StgCatchSTMFrame_handler) + (#size StgHeader)
 
-offsetStgUpdateFrameUpdatee :: ByteOffset
-offsetStgUpdateFrameUpdatee = (#const OFFSET_StgUpdateFrame_updatee) + (#size StgHeader)
+offsetStgUpdateFrameUpdatee :: WordOffset
+offsetStgUpdateFrameUpdatee = byteOffsetToWordOffset $ (#const OFFSET_StgUpdateFrame_updatee) + (#size StgHeader)
 
-offsetStgAtomicallyFrameCode :: ByteOffset
-offsetStgAtomicallyFrameCode = (#const OFFSET_StgAtomicallyFrame_code) + (#size StgHeader)
+offsetStgAtomicallyFrameCode :: WordOffset
+offsetStgAtomicallyFrameCode = byteOffsetToWordOffset $ (#const OFFSET_StgAtomicallyFrame_code) + (#size StgHeader)
 
-offsetStgAtomicallyFrameResult :: ByteOffset
-offsetStgAtomicallyFrameResult = (#const OFFSET_StgAtomicallyFrame_result) + (#size StgHeader)
+offsetStgAtomicallyFrameResult :: WordOffset
+offsetStgAtomicallyFrameResult = byteOffsetToWordOffset $ (#const OFFSET_StgAtomicallyFrame_result) + (#size StgHeader)
 
 offsetStgCatchRetryFrameRunningAltCode :: ByteOffset
 offsetStgCatchRetryFrameRunningAltCode = (#const OFFSET_StgCatchRetryFrame_running_alt_code) + (#size StgHeader)
 
-offsetStgCatchRetryFrameRunningFirstCode :: ByteOffset
-offsetStgCatchRetryFrameRunningFirstCode = (#const OFFSET_StgCatchRetryFrame_first_code) + (#size StgHeader)
+offsetStgCatchRetryFrameRunningFirstCode :: WordOffset
+offsetStgCatchRetryFrameRunningFirstCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchRetryFrame_first_code) + (#size StgHeader)
 
-offsetStgCatchRetryFrameAltCode :: ByteOffset
-offsetStgCatchRetryFrameAltCode = (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
+offsetStgCatchRetryFrameAltCode :: WordOffset
+offsetStgCatchRetryFrameAltCode = byteOffsetToWordOffset $ (#const OFFSET_StgCatchRetryFrame_alt_code) + (#size StgHeader)
 
 offsetStgRetFunFrameSize :: ByteOffset
 -- StgRetFun has no header, but only a pointer to the info table at the beginning.
 offsetStgRetFunFrameSize = (#const OFFSET_StgRetFun_size)
 
-offsetStgRetFunFrameFun :: ByteOffset
-offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun)
+offsetStgRetFunFrameFun :: WordOffset
+offsetStgRetFunFrameFun = byteOffsetToWordOffset $ (#const OFFSET_StgRetFun_fun)
 
 offsetStgRetFunFramePayload :: ByteOffset
 offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload)
@@ -72,10 +72,15 @@ offsetStgBCOFrameArity = (#const OFFSET_StgBCO_arity) + (#size StgHeader)
 offsetStgBCOFrameSize :: ByteOffset
 offsetStgBCOFrameSize = (#const OFFSET_StgBCO_size) + (#size StgHeader)
 
-offsetStgClosurePayload :: ByteOffset
-offsetStgClosurePayload = (#const OFFSET_StgClosure_payload) + (#size StgHeader)
+offsetStgClosurePayload :: WordOffset
+offsetStgClosurePayload = byteOffsetToWordOffset $ (#const OFFSET_StgClosure_payload) + (#size StgHeader)
 
--- TODO: Should be SIZEOF_VOID_P
-bytesInWord :: Int
-bytesInWord = (#const SIZEOF_UNSIGNED_LONG)
+byteOffsetToWordOffset :: ByteOffset -> WordOffset
+byteOffsetToWordOffset bo = if bo `mod` bytesInWord == 0 then
+                              fromIntegral $ bo `div` bytesInWord
+                            else
+                              error "Unexpected struct alignment!"
+  where
+        bytesInWord = (#const SIZEOF_VOID_P)
+
 #endif
