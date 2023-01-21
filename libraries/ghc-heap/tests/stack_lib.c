@@ -155,6 +155,7 @@ ClosureTypeList *foldStackToList(StgStack *stack) {
     case RET_BCO: {
       StgWord c = *sp;
       StgBCO *bco = ((StgBCO *)sp[1]);
+      result = add(result, get_itbl((StgClosure*) bco)->type);
       ClosureTypeList *bitmapList = foldLargeBitmapToList(
           spBottom, sp + 2, BCO_BITMAP(bco), BCO_BITMAP_SIZE(bco));
       result = concat(result, bitmapList);

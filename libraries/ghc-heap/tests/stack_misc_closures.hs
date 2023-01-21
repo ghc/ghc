@@ -56,6 +56,8 @@ foreign import prim "any_ret_fun_arg_gen_framezh" any_ret_fun_arg_gen_framezh# :
 
 foreign import prim "any_ret_fun_arg_gen_big_framezh" any_ret_fun_arg_gen_big_framezh# :: SetupFunction
 
+foreign import prim "any_bco_framezh" any_bco_frame# :: SetupFunction
+
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
@@ -231,6 +233,28 @@ main = do
         assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 59]
+  -- TODO: Test ret_fun bco
+  test any_bco_frame# $
+    \case
+      RetBCO {..} -> do
+        pCs <- mapM getBoxedClosureData bcoArgs
+        assertEqual (length pCs) 1
+        let wds = map getWordFromConstr01 pCs
+        assertEqual wds [3]
+        bco <- getBoxedClosureData bco
+        case bco of
+          BCOClosure {..} -> do
+            assertEqual (tipe info) BCO
+            assertEqual arity 3
+            assertArrWordsClosure [1] =<< getBoxedClosureData instrs
+            assertArrWordsClosure [2] =<< getBoxedClosureData literals
+            assertMutArrClosure [3] =<< getBoxedClosureData bcoptrs
+            assertEqual [
+                1, -- StgLargeBitmap size in words
+                0 -- StgLargeBitmap first words
+              ] bitmap
+          e -> error $ "Wrong closure type: " ++ show e
+      e -> error $ "Wrong closure type: " ++ show e
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -280,6 +304,21 @@ assertConstrClosure w c = case c of
     assertEqual (tipe info) CONSTR_0_1
     assertEqual dataArgs [w]
     assertEqual (null ptrArgs) True
+  e -> error $ "Wrong closure type: " ++ show e
+
+assertArrWordsClosure :: HasCallStack => [Word] -> Closure -> IO ()
+assertArrWordsClosure wds c = case c of
+  ArrWordsClosure {..} -> do
+    assertEqual (tipe info) ARR_WORDS
+    assertEqual arrWords wds
+  e -> error $ "Wrong closure type: " ++ show e
+
+assertMutArrClosure :: HasCallStack => [Word] -> Closure -> IO ()
+assertMutArrClosure wds c = case c of
+  MutArrClosure {..} -> do
+    assertEqual (tipe info) MUT_ARR_PTRS_FROZEN_CLEAN
+    xs <-mapM getBoxedClosureData mccPayload
+    assertEqual wds $ map getWordFromConstr01 xs
   e -> error $ "Wrong closure type: " ++ show e
 
 assertFun01Closure :: HasCallStack => Word -> Closure -> IO ()
@@ -382,14 +421,14 @@ argGenBigFun ::
   Word ->
   Word
 argGenBigFun a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32 a33 a34 a35 a36 a37 a38 a39 a40 a41 a42 a43 a44 a45 a46 a47 a48 a49 a50 a51 a52 a53 a54 a55 a56 a57 a58 a59 =
-    a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47 + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 + a59
+  a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 + a16 + a17 + a18 + a19 + a20 + a21 + a22 + a23 + a24 + a25 + a26 + a27 + a28 + a29 + a30 + a31 + a32 + a33 + a34 + a35 + a36 + a37 + a38 + a39 + a40 + a41 + a42 + a43 + a44 + a45 + a46 + a47 + a48 + a49 + a50 + a51 + a52 + a53 + a54 + a55 + a56 + a57 + a58 + a59
 
 -- | A function with more arguments than the pre-generated (@ARG_PPPPPPPP -> 8@) ones
 -- have
 --
 -- This results in a @ARG_GEN@ function (the number of arguments still fits in a
 -- small bitmap).
-{-# NOINLINE  argGenFun #-}
+{-# NOINLINE argGenFun #-}
 argGenFun ::
   Word ->
   Word ->

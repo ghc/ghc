@@ -182,10 +182,7 @@ void create_any_ret_fun_arg_gen_frame(Capability *cap, StgStack *stack,
   c->info = &test_ret_fun_info;
   c->fun = &Main_argGenFun_closure;
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(c->fun));
-  debugBelch("type %ul", fun_info->i.type);
-  debugBelch("fun type %ul", fun_info->f.fun_type);
   c->size = BITMAP_SIZE(fun_info->f.b.bitmap);
-  debugBelch("size %lu", c->size);
   for (int i = 0; i < c->size; i++) {
     c->payload[i] = rts_mkWord(cap, w++);
   }
@@ -202,6 +199,47 @@ void create_any_ret_fun_arg_gen_big_frame(Capability *cap, StgStack *stack,
   for (int i = 0; i < c->size; i++) {
     c->payload[i] = rts_mkWord(cap, w++);
   }
+}
+
+RTS_RET(test_ret_bco);
+void create_any_bco_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgClosure *c = (StgClosure *)stack->sp;
+  SET_HDR(c, &test_ret_bco_info, CCS_SYSTEM);
+  StgWord bcoSizeWords = sizeofW(StgBCO) + sizeofW(StgLargeBitmap) + sizeofW(StgWord);
+  StgBCO *bco = allocate(cap, bcoSizeWords);
+  SET_HDR(bco, &stg_BCO_info, CCS_MAIN);
+  c->payload[0] = (StgClosure *)bco;
+
+  bco->size = bcoSizeWords;
+  bco->arity = 3;
+
+  StgArrBytes *instrs =
+      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + sizeofW(StgWord));
+  SET_HDR(instrs, &stg_ARR_WORDS_info, CCCS);
+  instrs->bytes = WDS(1);
+  instrs->payload[0] = w++;
+  bco->instrs = instrs;
+
+  StgArrBytes *literals =
+      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + sizeofW(StgWord));
+  SET_HDR(literals, &stg_ARR_WORDS_info, CCCS);
+  bco->literals = literals;
+  literals->bytes = WDS(1);
+  literals->payload[0] = w++;
+  bco->literals = literals;
+
+  StgWord ptrsSize = 1 + mutArrPtrsCardTableSize(1);
+  StgMutArrPtrs *ptrs = allocate(cap, sizeofW(StgMutArrPtrs) + ptrsSize);
+  SET_HDR(ptrs, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, ccs);
+  ptrs->ptrs = 1;
+  ptrs->size = ptrsSize;
+  ptrs->payload[0] = rts_mkWord(cap, w);
+  bco->ptrs = ptrs;
+
+  StgLargeBitmap *bitmap = (StgLargeBitmap *)bco->bitmap;
+  bitmap->size = 1;
+  bitmap->bitmap[0] = 0; // set bit 0 to 0 indicating a closure
+  c->payload[1] = (StgClosure *)rts_mkWord(cap, w);
 }
 
 // Import from Sanity.c
@@ -302,15 +340,18 @@ StgStack *any_ret_fun_arg_n_prim_frame(Capability *cap) {
 }
 
 StgStack *any_ret_fun_arg_gen_frame(Capability *cap) {
-  return setup(
-      cap, sizeofW(StgRetFun) + 9 * sizeofW(StgClosure),
-      &create_any_ret_fun_arg_gen_frame);
+  return setup(cap, sizeofW(StgRetFun) + 9 * sizeofW(StgClosure),
+               &create_any_ret_fun_arg_gen_frame);
 }
 
 StgStack *any_ret_fun_arg_gen_big_frame(Capability *cap) {
-  return setup(
-      cap, sizeofW(StgRetFun) + 59 * sizeofW(StgWord),
-      &create_any_ret_fun_arg_gen_big_frame);
+  return setup(cap, sizeofW(StgRetFun) + 59 * sizeofW(StgWord),
+               &create_any_ret_fun_arg_gen_big_frame);
+}
+
+StgStack *any_bco_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgClosure) + 2 * sizeofW(StgWord),
+               &create_any_bco_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }

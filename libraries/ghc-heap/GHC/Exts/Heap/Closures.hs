@@ -379,12 +379,9 @@ data GenClosure b
 
   |  RetBCO
     -- TODO: Add pre-defined BCO closures (like knownUpdateFrameType)
-      { bcoInstrs :: !b
-      , bcoLiterals :: !b
-      , bcoPtrs :: !b
-      , bcoArity :: !Word
-      , bcoSize :: !Word
-      , bcoPayload :: ![b]
+      {
+        bco :: !b, -- must be a BCOClosure
+        bcoArgs :: ![b]
       }
 #endif
     ------------------------------------------------------------
@@ -583,7 +580,7 @@ allClosures (AtomicallyFrame {..}) = [atomicallyFrameCode, result]
 allClosures (RetSmall {..}) = payload
 allClosures (RetBig {..}) = payload
 allClosures (RetFun {..}) = retFunFun : retFunPayload
-allClosures (RetBCO {..}) = bcoInstrs : bcoLiterals : bcoPtrs : bcoPayload
+allClosures (RetBCO {..}) = bco : bcoArgs
 #endif
 allClosures _ = []
 

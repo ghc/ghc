@@ -108,6 +108,7 @@ toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWord
         toWord (StackFrameIter (# s#, i# #)) = W# (derefStackWord# s# i#)
 toBitmapPayload e = toClosure unpackClosureFromStackFrame# (closureFrame e)
 
+-- TODO: Offset should be in Words. That's the smallest reasonable unit.
 -- TODO: Negative offsets won't work! Consider using Word
 getClosure :: StackFrameIter -> Int -> IO Box
 getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame# (intToWord# relativeOffset)) sfi
@@ -151,24 +152,16 @@ getHalfWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getHalfWord# s# i
 getWord :: StackFrameIter -> Int -> Word
 getWord (StackFrameIter (# s#, i# #)) relativeOffset = W# (getWord# s# i# (intToWord# relativeOffset))
 
+bytesToWords :: Int -> Int
+bytesToWords b = b `div` bytesInWord
+
 unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
 unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " ++ show @ClosureType ((toEnum . fromIntegral) (W# (getInfoTableType# s# i#))) ++ "\n") $
   case (toEnum . fromIntegral) (W# (getInfoTableType# s# i#)) of
      RET_BCO -> do
-        instrs' <- getClosure sfi offsetStgRetBCOFrameInstrs
-        literals'<- getClosure sfi offsetStgRetBCOFrameLiterals
-        ptrs' <- getClosure sfi offsetStgRetBCOFramePtrs
-        let arity' = getHalfWord sfi offsetStgRetBCOFrameArity
-            size' = getHalfWord sfi offsetStgRetBCOFrameSize
-        payload' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2##
-        pure $ CL.RetBCO {
-                bcoInstrs = instrs',
-                bcoLiterals  = literals',
-                bcoPtrs = ptrs',
-                bcoArity = arity',
-                bcoSize = size',
-                bcoPayload = payload'
-              }
+        bco' <- getClosure sfi offsetStgClosurePayload
+        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi 2##
+        pure $ CL.RetBCO bco' args'
      RET_SMALL -> do
                     payloads <- decodeSmallBitmap getSmallBitmap# sfi 1##
                     let special# = getRetSmallSpecialType# s# i#
@@ -180,6 +173,7 @@ unpackStackFrameIter sfi@(StackFrameIter (# s#, i# #)) = trace ("decoding ... " 
             size' = getWord sfi offsetStgRetFunFrameSize
         fun' <- getClosure sfi offsetStgRetFunFrameFun
         payload' <-
+          -- TODO: ARG_BCO is likely very special...
           if t == CL.ARG_GEN_BIG then
             decodeLargeBitmap getRetFunLargeBitmap# sfi 3##
           else

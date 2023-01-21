@@ -110,14 +110,14 @@ StgWord getRetFunBitmapSize(StgRetFun *ret_fun) {
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   switch (fun_info->f.fun_type) {
-    case ARG_GEN:
-        return BITMAP_SIZE(fun_info->f.b.bitmap);
-    case ARG_GEN_BIG:
-        return GET_FUN_LARGE_BITMAP(fun_info)->size;
-    default:
-        return BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+  case ARG_GEN:
+    return BITMAP_SIZE(fun_info->f.b.bitmap);
+  case ARG_GEN_BIG:
+    return GET_FUN_LARGE_BITMAP(fun_info)->size;
+  default:
+    return BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
   }
- }
+}
 
 StgWord getBitmapWord(StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
@@ -136,14 +136,14 @@ StgWord getRetFunBitmapWord(StgRetFun *ret_fun) {
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   switch (fun_info->f.fun_type) {
-    case ARG_GEN:
-      return BITMAP_BITS(fun_info->f.b.bitmap);
-    case ARG_GEN_BIG:
-      // Cannot do more than warn and exit.
-      errorBelch("Unexpected ARG_GEN_BIG StgRetFun closure %p", ret_fun);
-      stg_exit(EXIT_INTERNAL_ERROR);
-    default:
-      return BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
+  case ARG_GEN:
+    return BITMAP_BITS(fun_info->f.b.bitmap);
+  case ARG_GEN_BIG:
+    // Cannot do more than warn and exit.
+    errorBelch("Unexpected ARG_GEN_BIG StgRetFun closure %p", ret_fun);
+    stg_exit(EXIT_INTERNAL_ERROR);
+  default:
+    return BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
   }
 }
 
@@ -161,19 +161,21 @@ StgWord getRetFunSize(StgRetFun *ret_fun) {
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   switch (fun_info->f.fun_type) {
-    case ARG_GEN:
-      return BITMAP_SIZE(fun_info->f.b.bitmap);
-    case ARG_GEN_BIG:
-      return GET_FUN_LARGE_BITMAP(fun_info)->size;
-    default:
-      return BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
+  case ARG_GEN:
+    return BITMAP_SIZE(fun_info->f.b.bitmap);
+  case ARG_GEN_BIG:
+    return GET_FUN_LARGE_BITMAP(fun_info)->size;
+  default:
+    return BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
   }
 }
 
 StgWord getBCOLargeBitmapSize(StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  return BCO_BITMAP_SIZE(c);
+  StgBCO *bco = (StgBCO *)*c->payload;
+
+  return BCO_BITMAP_SIZE(bco);
 }
 
 #define ROUNDUP_BITS_TO_WDS(n)                                                 \
@@ -219,13 +221,13 @@ StgArrBytes *getRetFunLargeBitmaps(Capability *cap, StgRetFun *ret_fun) {
   return array;
 }
 
-// TODO: Much duplication between: getBCOLargeBitmaps, getRetFunLargeBitmaps, getLargeBitmaps
+// TODO: Much duplication between: getBCOLargeBitmaps, getRetFunLargeBitmaps,
+// getLargeBitmaps
 StgArrBytes *getBCOLargeBitmaps(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  const StgInfoTable *info = get_itbl(c);
-  StgLargeBitmap *bitmap = BCO_BITMAP(info);
-  // TODO: Use BCO_BITMAP_SIZEW?
+  StgBCO *bco = (StgBCO *)*c->payload;
+  StgLargeBitmap *bitmap = BCO_BITMAP(bco);
   StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
   StgArrBytes *array =
       (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);

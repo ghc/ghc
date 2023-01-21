@@ -49,18 +49,24 @@ offsetStgRetFunFrameFun = (#const OFFSET_StgRetFun_fun)
 offsetStgRetFunFramePayload :: Int
 offsetStgRetFunFramePayload = (#const OFFSET_StgRetFun_payload)
 
-offsetStgRetBCOFrameInstrs :: Int
-offsetStgRetBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)
+offsetStgBCOFrameInstrs :: Int
+offsetStgBCOFrameInstrs = (#const OFFSET_StgBCO_instrs) + (#size StgHeader)
 
-offsetStgRetBCOFrameLiterals :: Int
-offsetStgRetBCOFrameLiterals = (#const OFFSET_StgBCO_literals) + (#size StgHeader)
+offsetStgBCOFrameLiterals :: Int
+offsetStgBCOFrameLiterals = (#const OFFSET_StgBCO_literals) + (#size StgHeader)
 
-offsetStgRetBCOFramePtrs :: Int
-offsetStgRetBCOFramePtrs = (#const OFFSET_StgBCO_ptrs) + (#size StgHeader)
+offsetStgBCOFramePtrs :: Int
+offsetStgBCOFramePtrs = (#const OFFSET_StgBCO_ptrs) + (#size StgHeader)
 
-offsetStgRetBCOFrameArity :: Int
-offsetStgRetBCOFrameArity = (#const OFFSET_StgBCO_arity) + (#size StgHeader)
+offsetStgBCOFrameArity :: Int
+offsetStgBCOFrameArity = (#const OFFSET_StgBCO_arity) + (#size StgHeader)
 
-offsetStgRetBCOFrameSize :: Int
-offsetStgRetBCOFrameSize = (#const OFFSET_StgBCO_size) + (#size StgHeader)
+offsetStgBCOFrameSize :: Int
+offsetStgBCOFrameSize = (#const OFFSET_StgBCO_size) + (#size StgHeader)
+
+offsetStgClosurePayload :: Int
+offsetStgClosurePayload = (#const OFFSET_StgClosure_payload) + (#size StgHeader)
+
+bytesInWord :: Int
+bytesInWord = (#const SIZEOF_UNSIGNED_LONG)
 #endif

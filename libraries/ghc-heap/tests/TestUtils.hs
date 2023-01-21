@@ -100,8 +100,8 @@ stackFrameToClosureTypes = getClosureTypes
     getClosureTypes (RetSmall {payload, ..}) = RET_SMALL : getBitmapClosureTypes payload
     getClosureTypes (RetBig {payload}) = RET_BIG : getBitmapClosureTypes payload
     getClosureTypes (RetFun {retFunFun, retFunPayload, ..}) = RET_FUN : getClosureTypes (unbox retFunFun) ++ getBitmapClosureTypes retFunPayload
-    getClosureTypes (RetBCO {bcoInstrs, bcoLiterals, bcoPtrs, bcoPayload, ..}) =
-      RET_BCO : getClosureTypes (unbox bcoInstrs) ++ getClosureTypes (unbox bcoLiterals) ++ getClosureTypes (unbox bcoPtrs) ++ getBitmapClosureTypes bcoPayload
+    getClosureTypes (RetBCO {bco, bcoArgs, ..}) =
+      RET_BCO : getClosureTypes (unbox bco) ++ getBitmapClosureTypes bcoArgs
     -- Other closures
     getClosureTypes (ConstrClosure {info, ..}) = [tipe info]
     getClosureTypes (FunClosure {info, ..}) = [tipe info]
