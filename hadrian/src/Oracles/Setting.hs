@@ -272,12 +272,20 @@ anyTargetArch = matchSetting TargetArch
 anyHostOs :: [String] -> Action Bool
 anyHostOs = matchSetting HostOs
 
--- | Check whether the target OS uses the ELF object format.
-isElfTarget :: Action Bool
-isElfTarget = anyTargetOs
+-- | List of OSes that use the ELF object format.
+elfOSes :: [String]
+elfOSes =
     [ "linux", "freebsd", "dragonfly", "openbsd", "netbsd", "solaris2", "kfreebsdgnu"
     , "haiku", "linux-android"
     ]
+
+-- | List of OSes that use the Mach-O object format.
+machoOSes :: [String]
+machoOSes = [ "darwin" ]
+
+-- | Check whether the target OS uses the ELF object format.
+isElfTarget :: Action Bool
+isElfTarget = anyTargetOs elfOSes
 
 -- | Check whether the host OS supports the @-rpath@ linker option when
 -- using dynamic linking.
@@ -285,7 +293,7 @@ isElfTarget = anyTargetOs
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
 hostSupportsRPaths :: Action Bool
-hostSupportsRPaths = anyHostOs ["linux", "darwin", "freebsd"]
+hostSupportsRPaths = anyHostOs (elfOSes ++ machoOSes)
 
 -- | Check whether the target supports GHCi.
 ghcWithInterpreter :: Action Bool
