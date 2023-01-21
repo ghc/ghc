@@ -34,7 +34,7 @@ bool doIdleGCWork(Capability *cap, bool all);
 
 extern uint32_t N;
 extern bool major_gc;
-/* See Note [Deadlock detection under nonmoving collector]. */
+/* See Note [Deadlock detection under the nonmoving collector]. */
 extern bool deadlock_detect_gc;
 extern bool unload_mark_needed;
 

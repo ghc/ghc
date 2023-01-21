@@ -346,7 +346,7 @@ Mutex concurrent_coll_finished_lock;
  * Marking evacuated objects] in Evac.c.
  *
  *
- * Note [Deadlock detection under the non-moving collector]
+ * Note [Deadlock detection under the nonmoving collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * In GHC the garbage collector is responsible for identifying deadlocked
  * programs. Providing for this responsibility is slightly tricky in the

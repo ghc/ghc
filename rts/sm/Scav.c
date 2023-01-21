@@ -458,7 +458,7 @@ scavenge_block (bdescr *bd)
 
   p = bd->u.scan;
 
-  // Sanity check: See Note [Deadlock detection under nonmoving collector].
+  // Sanity check: See Note [Deadlock detection under the nonmoving collector].
 #if defined(DEBUG)
   if (RtsFlags.GcFlags.useNonmoving && deadlock_detect_gc) {
       ASSERT(bd->gen == oldest_gen);
