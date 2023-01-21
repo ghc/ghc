@@ -1,8 +1,7 @@
-#include "Cmm.h"
-
-// TODO: comment out
 // Uncomment to enable assertions during development
-#define DEBUG 1
+// #define DEBUG 1
+
+#include "Cmm.h"
 
 advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
@@ -39,15 +38,6 @@ advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
       hasNext = 1;
     }
   }
-
-  // TODO: Execute this block only in -DDEBUG
-#if DEBUG
-  if(hasNext > 0) {
-    P_ nextClosure;
-    nextClosure = StgStack_sp(stack) + WDS(offsetWords);
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(nextClosure));
-  }
-#endif
 
   return (newStack, newOffsetWords, hasNext);
 }
