@@ -63,6 +63,8 @@ foreign import prim "getRetSmallSpecialTypezh" getRetSmallSpecialType# :: StackS
 
 foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnapshot# -> Word# -> (# Word#, Word# #)
 
+foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
+
 type StackFrameIter# = (#
                           -- | StgStack
                           StackSnapshot#,
@@ -79,8 +81,6 @@ instance Show StackFrameIter where
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
 stackHead (StackSnapshot s) = StackFrameIter (# s , 0## #) -- GHC stacks are never empty
-
-foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
