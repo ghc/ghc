@@ -1,13 +1,5 @@
 #include "Cmm.h"
 
-#if SIZEOF_VOID_P == 4
-#define HALF_WORD_ bits16
-#elif SIZEOF_VOID_P == 8
-#define HALF_WORD_ bits32
-#else
-#error Unknown word size
-#endif
-
 // TODO: comment out
 // Uncomment to enable assertions during development
 #define DEBUG 1
@@ -25,14 +17,14 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
 
   P_ stackBottom, stackArrayPtr;
   stackArrayPtr = stack + SIZEOF_StgHeader + OFFSET_StgStack_stack;
-  HALF_WORD_ stackSize;
+
+  W_ stackSize;
   W_ stackSizeInBytes;
-  stackSize = StgStack_stack_size(stack);
-  stackSizeInBytes = WDS(TO_W_(stackSize));
+  stackSize = TO_W_(StgStack_stack_size(stack));
+  stackSizeInBytes = WDS(stackSize);
   stackBottom = stackSizeInBytes + stackArrayPtr;
 
   if(nextClosurePtr < stackBottom) (likely: True) {
-    // ccall debugBelch("advanceStackFrameIterzh - ordinary frame \n");
     newStack = stack;
     newIndex = index + frameSize;
     hasNext = 1;
@@ -40,12 +32,10 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
     P_ underflowFrameStack;
     (underflowFrameStack) = ccall getUnderflowFrameStack(stack, index);
     if (underflowFrameStack == NULL) (likely: True) {
-      // ccall debugBelch("advanceStackFrameIterzh - last frame \n");
       newStack = NULL;
       newIndex = NULL;
       hasNext = NULL;
     } else {
-      // ccall debugBelch("advanceStackFrameIterzh - underflow frame \n");
       newStack = underflowFrameStack;
       newIndex = NULL;
       hasNext = 1;
@@ -62,7 +52,6 @@ advanceStackFrameIterzh (P_ stack, W_ index) {
   }
 #endif
 
-  // ccall debugBelch("advanceStackFrameIterzh - stack %p,  newStack %p, frameSize %ul, newIdex %ul, hasNext %ul, stackBottom %p\n", stack, newStack, frameSize, newIndex, hasNext, stackBottom);
   return (newStack, newIndex, hasNext);
 }
 
