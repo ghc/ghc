@@ -99,13 +99,6 @@ foreign import prim "getRetFunSmallBitmapzh" getRetFunSmallBitmap# :: StackSnaps
 
 foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
 
-type StackFrameIter# = (#
-                          -- | StgStack
-                          StackSnapshot#,
-                          -- | offset in machine words
-                          Word#
-                        #)
-
 data StackFrameIter = StackFrameIter {
   stackSnapshot# :: StackSnapshot#,
   index :: WordOffset
