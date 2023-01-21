@@ -2057,10 +2057,13 @@ of ``-W(no-)*``.
 
     :since: 8.4
 
-    The option :ghc-flag:`-Wpartial-fields` warns about record fields that could
-    fail when accessed via a lacking constructor. The function ``f`` below will
-    fail when applied to ``Bar``, so the compiler will emit a warning at its
-    definition when :ghc-flag:`-Wpartial-fields` is enabled.
+    The option :ghc-flag:`-Wpartial-fields` warns about a record field
+    `f` that is defined in some, but not all, the contructors of a
+    data type, because `f`'s record selector function may fail.  For
+    exampe, the record selector function `f`, defined in the `Foo`
+    constructor record below, will fail when applied to ``Bar``, so
+    the compiler will emit a warning at its definition when
+    :ghc-flag:`-Wpartial-fields` is enabled.
 
     The warning is suppressed if the field name begins with an underscore. ::
 
