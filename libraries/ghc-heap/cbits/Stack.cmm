@@ -141,14 +141,16 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-// TODO: Use generalized version unpackClosureReferencedByFramezh with offset=0
 unpackClosureFromStackFramezh(P_ stack, W_ offsetWords){
-  P_ closurePtr, closurePtrPrime;
-  // TODO: Rename closurePtr -> closurePtrAddr
-  closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
-  closurePtrPrime = P_[closurePtr];
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
-  jump stg_unpackClosurezh(closurePtrPrime);
+  jump unpackClosureReferencedByFramezh(0, stack, offsetWords);
+}
+
+unpackClosureReferencedByFramezh(W_ offsetBytes, P_ stack, W_ offsetWords){
+  P_ closurePtrAddr, closurePtr;
+  closurePtrAddr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
+  closurePtr = P_[closurePtrAddr];
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
+  jump stg_unpackClosurezh(closurePtr);
 }
 
 getUpdateFrameTypezh(P_ stack, W_ offsetWords){
@@ -159,15 +161,6 @@ getUpdateFrameTypezh(P_ stack, W_ offsetWords){
   W_ type;
   (type) = ccall getUpdateFrameType(c);
   return (type);
-}
-
-unpackClosureReferencedByFramezh(W_ offsetBytes, P_ stack, W_ offsetWords){
-  P_ closurePtr, closurePtrPrime;
-  // TODO: Rename closurePtr -> closurePtrAddr
-  closurePtr = (StgStack_sp(stack) + WDS(offsetWords) + offsetBytes);
-  closurePtrPrime = P_[closurePtr];
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtrPrime));
-  jump stg_unpackClosurezh(closurePtrPrime);
 }
 
 getCatchFrameExceptionsBlockedzh(P_ stack, W_ offsetWords){
