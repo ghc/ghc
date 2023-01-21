@@ -5,25 +5,23 @@
 #define DEBUG 1
 
 advanceStackFrameIterzh (P_ stack, W_ index) {
-  P_ newStack;
-  W_ newIndex;
-  W_ hasNext;
-
   W_ frameSize;
   (frameSize) = ccall stackFrameSize(stack, index);
 
   P_ nextClosurePtr;
   nextClosurePtr = (StgStack_sp(stack) + WDS(index) + WDS(frameSize));
 
-  P_ stackBottom, stackArrayPtr;
+  P_ stackArrayPtr;
   stackArrayPtr = stack + SIZEOF_StgHeader + OFFSET_StgStack_stack;
 
-  W_ stackSize;
-  W_ stackSizeInBytes;
+  P_ stackBottom;
+  W_ stackSize, stackSizeInBytes;
   stackSize = TO_W_(StgStack_stack_size(stack));
   stackSizeInBytes = WDS(stackSize);
   stackBottom = stackSizeInBytes + stackArrayPtr;
 
+  P_ newStack;
+  W_ newIndex, hasNext;
   if(nextClosurePtr < stackBottom) (likely: True) {
     newStack = stack;
     newIndex = index + frameSize;
