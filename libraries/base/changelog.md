@@ -16,10 +16,11 @@
       ([CLC proposal #57](https://github.com/haskell/core-libraries-committee/issues/57))
 
 ## 4.18.0.0 *TBA*
-
+  * Shipped with GHC 9.6.1
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
+  * Add `forall a. Functor (p a)` superclass for `Bifunctor p`.
   * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
     `(,,,,,) a b c d e f`.
   * Exceptions thrown by weak pointer finalizers can now be reported by setting
@@ -90,6 +91,8 @@
     [CLC proposal #36](https://github.com/haskell/core-libraries-committee/issues/36).
 
 ## 4.17.0.0 *August 2022*
+
+  * Shipped with GHC 9.4.1
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.
 
@@ -200,6 +203,8 @@
 
 ## 4.16.0.0 *Nov 2021*
 
+  * Shipped with GHC 9.2.1
+
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
 
   * Add a `Typeable` constraint to `fromStaticPtr` in the class `GHC.StaticPtr.IsStatic`.
@@ -259,6 +264,8 @@
     - `oneBits :: FiniteBits a => a`, `oneBits = complement zeroBits`.
 
 ## 4.15.0.0 *Feb 2021*
+
+  * Shipped with GHC 9.0.1
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
     call, ensuring that the call can be interrupted with `SIGINT` on POSIX
