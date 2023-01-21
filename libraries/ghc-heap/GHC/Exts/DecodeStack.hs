@@ -232,9 +232,6 @@ toInt# (I# i) = i
 intToWord# :: Int -> Word#
 intToWord# i = int2Word# (toInt# i)
 
--- TODO: Is the function type below needed? (Was proposed by Ben)
--- derefStackPtr :: StackSnapshot# -> Int# -> a
-
 foreign import prim "unpackClosureFromStackFramezh" unpackClosureFromStackFrame# :: StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
 
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
