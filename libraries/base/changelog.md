@@ -77,6 +77,10 @@
     `Word64#` and `Int64#`, respectively. Previously on 32-bit platforms these
     were rather represented by `Word#` and `Int#`. See GHC #11953.
 
+  * Add `GHC.TypeError` module to contain functionality related to custom type
+    errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
+    compatibility.
+
 ## 4.16.3.0 *May 2022*
 
   * Shipped with GHC 9.2.4
@@ -153,10 +157,6 @@
 
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
-
-  * Add `GHC.TypeError` module to contain functionality related to custom type
-    errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
-    compatibility.
 
   * Comparison constraints in `Data.Type.Ord` (e.g. `<=`) now use the new
     `GHC.TypeError.Assert` type family instead of type equality with `~`.
