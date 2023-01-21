@@ -46,6 +46,8 @@ static const char *memoryAccessDescription(MemoryAccess mode)
   case MEM_NO_ACCESS:    return "no-access";
   case MEM_READ_ONLY:    return "read-only";
   case MEM_READ_WRITE:   return "read-write";
+  case MEM_READ_WRITE_THEN_READ_EXECUTE:
+                         return "read-write-then-read-execute";
   case MEM_READ_EXECUTE: return "read-execute";
   case MEM_READ_WRITE_EXECUTE:
                          return "read-write-execute";
@@ -61,13 +63,6 @@ struct MemoryRegion {
       /* the end of the last mapping which we made into this region.
        * this is where we will start searching next time we need to allocate.
        */
-};
-
-#define LOW_ADDR 0x01000000
-static struct MemoryRegion allMemory = {
-    .start = (void *) LOW_ADDR,
-    .end = (void *) -1,
-    .last = (void *) LOW_ADDR
 };
 
 #if defined(mingw32_HOST_OS)
@@ -196,6 +191,8 @@ memoryAccessToProt(MemoryAccess access)
   case MEM_NO_ACCESS:    return PAGE_NOACCESS;
   case MEM_READ_ONLY:    return PAGE_READONLY;
   case MEM_READ_WRITE:   return PAGE_READWRITE;
+  case MEM_READ_WRITE_THEN_READ_EXECUTE:
+                         return PAGE_READWRITE;
   case MEM_READ_EXECUTE: return PAGE_EXECUTE_READ;
   case MEM_READ_WRITE_EXECUTE:
                          return PAGE_EXECUTE_READWRITE;
@@ -258,6 +255,17 @@ memoryAccessToProt(MemoryAccess access)
     case MEM_NO_ACCESS:    return 0;
     case MEM_READ_ONLY:    return PROT_READ;
     case MEM_READ_WRITE:   return PROT_READ | PROT_WRITE;
+    case MEM_READ_WRITE_THEN_READ_EXECUTE:
+#  if defined(netbsd_HOST_OS)
+        /* PROT_MPROTECT(PROT_EXEC) means that the pages are going to be
+         * marked as executable in the future. On NetBSD requesting
+         * additional permissions with mprotect(2) only succeeds when
+         * permissions were initially requested in this manner.
+         */
+                           return PROT_READ | PROT_WRITE | PROT_MPROTECT(PROT_EXEC);
+#  else
+                           return PROT_READ | PROT_WRITE;
+#  endif
     case MEM_READ_EXECUTE: return PROT_READ | PROT_EXEC;
     case MEM_READ_WRITE_EXECUTE:
                            return PROT_READ | PROT_WRITE | PROT_EXEC;
@@ -299,6 +307,18 @@ nearImage(void) {
         region.last = region.start;
     }
     return &region;
+}
+
+static void *
+mmapAnywhere (
+        size_t bytes,
+        MemoryAccess access,
+        uint32_t flags,
+        int fd,
+        int offset)
+{
+    int prot = memoryAccessToProt(access);
+    return doMmap(NULL, bytes, prot, flags, fd, offset);
 }
 
 static void *
@@ -358,17 +378,23 @@ mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int of
     IF_DEBUG(linker_verbose, debugBelch("mmapForLinker: start\n"));
     if (RtsFlags.MiscFlags.linkerAlwaysPic) {
         /* make no attempt at mapping low memory if we are assuming PIC */
-        region = &allMemory;
+        region = NULL;
     } else {
         region = nearImage();
     }
 
     /* Use MAP_32BIT if appropriate */
-    if (region->end <= (void *) 0xffffffff) {
+    if (region && region->end <= (void *) 0xffffffff) {
         flags |= TRY_MAP_32BIT;
     }
 
-    void *result = mmapInRegion(region, bytes, access, flags, fd, offset);
+    void *result;
+    if (region) {
+        result = mmapInRegion(region, bytes, access, flags, fd, offset);
+    }
+    else {
+        result = mmapAnywhere(bytes, access, flags, fd, offset);
+    }
     IF_DEBUG(linker_verbose,
              debugBelch("mmapForLinker: mapped %zd bytes starting at %p\n",
                         bytes, result));
@@ -383,7 +409,7 @@ mmapForLinker (size_t bytes, MemoryAccess access, uint32_t flags, int fd, int of
 void *
 mmapAnonForLinker (size_t bytes)
 {
-    return mmapForLinker (bytes, MEM_READ_WRITE, MAP_ANONYMOUS, -1, 0);
+    return mmapForLinker (bytes, MEM_READ_WRITE_THEN_READ_EXECUTE, MAP_ANONYMOUS, -1, 0);
 }
 
 void munmapForLinker (void *addr, size_t bytes, const char *caller)

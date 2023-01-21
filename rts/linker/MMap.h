@@ -54,6 +54,8 @@ typedef enum {
     MEM_NO_ACCESS,
     MEM_READ_ONLY,
     MEM_READ_WRITE,
+    // Initially map pages as rw- and then switch to r-x later.
+    MEM_READ_WRITE_THEN_READ_EXECUTE,
     MEM_READ_EXECUTE,
     MEM_READ_WRITE_EXECUTE,
 } MemoryAccess;
