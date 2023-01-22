@@ -812,6 +812,19 @@ generateJumpTables ncgImpl xs = concatMap f xs
 -- -----------------------------------------------------------------------------
 -- Shortcut branches
 
+-- Note [No asm-shortcutting on Darwin]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Asm-shortcutting may produce relative references to symbols defined in
+-- other compilation units. This is not something that MachO relocations
+-- support (see #21972). For this reason we disable the optimisation on Darwin.
+-- We do so in the backend without a warning since this flag is enabled by
+-- `-O2`.
+--
+-- Another way to address this issue would be to rather implement a
+-- PLT-relocatable jump-table strategy. However, this would only benefit Darwin
+-- and does not seem worth the effort as this optimisation generally doesn't
+-- offer terribly great benefits.
+
 shortcutBranches
         :: forall statics instr jumpDest. (Outputable jumpDest)
         => NCGConfig
@@ -822,6 +835,8 @@ shortcutBranches
 
 shortcutBranches config ncgImpl tops weights
   | ncgEnableShortcutting config
+    -- See Note [No asm-shortcutting on Darwin]
+  , not $ osMachOTarget $ platformOS $ ncgPlatform config
   = ( map (apply_mapping ncgImpl mapping) tops'
     , shortcutWeightMap mappingBid <$!> weights )
   | otherwise
