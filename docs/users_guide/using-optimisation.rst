@@ -262,8 +262,10 @@ by saying ``-fno-wombat``.
     of a unconditionally jump, we replace all jumps to A by jumps to the successor
     of A.
 
-    This is mostly done during Cmm passes. However this can miss corner cases. So at -O2
-    we run the pass again at the asm stage to catch these.
+    This is mostly done during Cmm passes. However this can miss corner cases.
+    So at ``-O2`` this flag runs the pass again at the assembly stage to catch
+    these. Note that due to platform limitations (:ghc-ticket:`21972`) this flag
+    does nothing on macOS.
 
 .. ghc-flag:: -fblock-layout-cfg
     :shortdesc: Use the new cfg based block layout algorithm.
