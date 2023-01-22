@@ -282,7 +282,3 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
 
     return arr;
 }
-
-const StgInfoTable* getInfo(StgClosure* c) {
-  return get_itbl(c);
-}

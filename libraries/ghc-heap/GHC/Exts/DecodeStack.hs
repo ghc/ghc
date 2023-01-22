@@ -69,11 +69,6 @@ foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# 
 getRetFunType :: StackFrameIter -> RetFunType
 getRetFunType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index)))
 
-foreign import prim "getInfoTableTypezh" getInfoTableType# :: StackSnapshot# -> Word# -> Word#
-
-getInfoTableType :: StackFrameIter -> ClosureType
-getInfoTableType (StackFrameIter {..}) = (toEnum . fromIntegral) (W# (getInfoTableType# stackSnapshot# (wordOffsetToWord# index)))
-
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)
 
 foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: StackSnapshot# -> Word# -> (# ByteArray#, Word# #)

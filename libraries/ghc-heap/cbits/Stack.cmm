@@ -49,17 +49,6 @@ derefStackWordzh (P_ stack, W_ offsetWords) {
   return (W_[sp + WDS(offsetWords)]);
 }
 
-getInfoTableTypezh (P_ stack, W_ offsetWords) {
-    P_ p, info;
-    p = StgStack_sp(stack) + WDS(offsetWords);
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-    info  = %INFO_PTR(p);
-
-    W_ type;
-    type = TO_W_(%INFO_TYPE(%STD_INFO(info)));
-    return (type);
-}
-
 getSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -177,11 +166,10 @@ getRetFunTypezh(P_ stack, W_ offsetWords){
 }
 
 getInfoTableAddrzh(P_ stack, W_ offsetWords){
-  P_ c;
-  c = StgStack_sp(stack) + WDS(offsetWords);
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
+  P_ p, info;
+  p = StgStack_sp(stack) + WDS(offsetWords);
+  ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+  info = %GET_STD_INFO(UNTAG(p));
 
-  W_ info;
-  (info)  = ccall getInfo(UNTAG(c));
   return (info);
 }
