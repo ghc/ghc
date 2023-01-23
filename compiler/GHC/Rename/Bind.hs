@@ -72,8 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
-import Data.Foldable      ( toList )
-import Data.List          ( partition, sortBy )
+import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
@@ -690,15 +689,9 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
          Nothing -> return $ extendFsEnv env fs fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $
-             addErrAt name_loc (dupFixityDecl loc' name)
+             addErrAt name_loc (TcRnMultipleFixityDecls loc' name)
            ; return env}
      }
-
-dupFixityDecl :: SrcSpan -> RdrName -> TcRnMessage
-dupFixityDecl loc rdr_name
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [text "Multiple fixity declarations for" <+> quotes (ppr rdr_name),
-          text "also at " <+> ppr loc]
 
 
 {- *********************************************************************
@@ -716,7 +709,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                               , psb_dir = dir })
        -- invariant: no free vars here when it's a FunBind
   = do  { pattern_synonym_ok <- xoptM LangExt.PatternSynonyms
-        ; unless pattern_synonym_ok (addErr patternSynonymErr)
+        ; unless pattern_synonym_ok (addErr TcRnIllegalPatternSynonymDecl)
         ; let scoped_tvs = sig_fn name
 
         ; ((pat', details'), fvs1) <- bindSigTyVarsFV scoped_tvs $
@@ -785,11 +778,6 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
     -- See Note [Renaming pattern synonym variables]
     lookupPatSynBndr = wrapLocMA lookupLocalOccRn
 
-    patternSynonymErr :: TcRnMessage
-    patternSynonymErr
-      = mkTcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Illegal pattern synonym declaration")
-           2 (text "Use -XPatternSynonyms to enable this extension")
 
 {-
 Note [Renaming pattern synonym variables]
@@ -943,18 +931,11 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
 -- Report error for all other forms of bindings
 -- This is why we use a fold rather than map
 rnMethodBindLHS is_cls_decl _ (L loc bind) rest
-  = do { addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-         vcat [ what <+> text "not allowed in" <+> decl_sort
-              , nest 2 (ppr bind) ]
+  = do { addErrAt (locA loc) $ TcRnIllegalClassBinding decl_sort bind
        ; return rest }
   where
-    decl_sort | is_cls_decl = text "class declaration:"
-              | otherwise   = text "instance declaration:"
-    what = case bind of
-              PatBind {}    -> text "Pattern bindings (except simple variables)"
-              PatSynBind {} -> text "Pattern synonyms"
-                               -- Associated pattern synonyms are not implemented yet
-              _ -> pprPanic "rnMethodBind" (ppr bind)
+    decl_sort | is_cls_decl = ClassDeclSort
+              | otherwise   = InstanceDeclSort
 
 {-
 ************************************************************************
@@ -1009,7 +990,7 @@ renameSig ctxt sig@(TypeSig _ vs ty)
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
-          addErr (defaultSigErr sig)
+          addErr (TcRnUnexpectedDefaultSig sig)
         ; mapM_ warnForallIdentifier vs
         ; new_v <- mapM (lookupSigOccRnN ctxt sig) vs
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
@@ -1083,15 +1064,10 @@ renameSig _ctxt sig@(CompleteMatchSig (_, s) (L l bf) mty)
        this_mod <- fmap tcg_mod getGblEnv
        unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
-         addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
+         addErrCtxt (text "In" <+> ppr sig) $ failWithTc TcRnOrphanCompletePragma
 
        return (CompleteMatchSig (noAnn, s) (L l new_bf) new_mty, emptyFVs)
-  where
-    orphanError :: TcRnMessage
-    orphanError = mkTcRnUnknownMessage $ mkPlainError noHints $
-      text "Orphan COMPLETE pragmas not supported" $$
-      text "A COMPLETE pragma must mention at least one data constructor" $$
-      text "or pattern synonym defined in the same module."
+
 
 {-
 Note [Orphan COMPLETE pragmas]
@@ -1196,7 +1172,7 @@ findDupSigs sigs
 checkDupMinimalSigs :: [LSig GhcPs] -> RnM ()
 checkDupMinimalSigs sigs
   = case filter isMinimalLSig sigs of
-      minSigs@(_:_:_) -> dupMinimalSigErr minSigs
+      sig1 : sig2 : otherSigs -> dupMinimalSigErr sig1 sig2 otherSigs
       _ -> return ()
 
 {-
@@ -1246,7 +1222,7 @@ rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext GhcRn
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_ext = origin })
          -- see Note [Empty MatchGroups]
-  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (emptyCaseErr ctxt))
+  = do { whenM ((null ms &&) <$> mustn't_be_empty) (addErr (TcRnEmptyCase ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
   where
@@ -1277,29 +1253,6 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
         ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }
 
-emptyCaseErr :: HsMatchContext GhcRn -> TcRnMessage
-emptyCaseErr ctxt = mkTcRnUnknownMessage $ mkPlainError noHints $ message ctxt
-  where
-    pp_ctxt :: HsMatchContext GhcRn -> SDoc
-    pp_ctxt c = case c of
-      CaseAlt                                  -> text "case expression"
-      LamCaseAlt LamCase                       -> text "\\case expression"
-      ArrowMatchCtxt (ArrowLamCaseAlt LamCase) -> text "\\case command"
-      ArrowMatchCtxt ArrowCaseAlt              -> text "case command"
-      ArrowMatchCtxt KappaExpr                 -> text "kappa abstraction"
-      _                                        -> text "(unexpected)"
-                                                  <+> pprMatchContextNoun c
-
-    message :: HsMatchContext GhcRn -> SDoc
-    message (LamCaseAlt LamCases) = lcases_msg <+> text "expression"
-    message (ArrowMatchCtxt (ArrowLamCaseAlt LamCases)) =
-      lcases_msg <+> text "command"
-    message ctxt =
-      hang (text "Empty list of alternatives in" <+> pp_ctxt ctxt)
-           2 (text "Use EmptyCase to allow this")
-
-    lcases_msg =
-      text "Empty list of alternatives is not allowed in \\cases"
 
 {-
 ************************************************************************
@@ -1336,9 +1289,7 @@ rnGRHS' ctxt rnBody (GRHS _ guards rhs)
                                     rnBody rhs
 
         ; unless (pattern_guards_allowed || is_standard_guard guards') $
-            let diag = mkTcRnUnknownMessage $
-                  mkPlainDiagnostic WarningWithoutFlag noHints (nonStdGuardErr guards')
-            in addDiagnostic diag
+            addDiagnostic (nonStdGuardErr guards')
 
         ; return (GRHS noAnn guards' rhs', fvs) }
   where
@@ -1390,44 +1341,21 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 -}
 
 dupSigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> RnM ()
-dupSigDeclErr pairs@((L loc name, sig) :| _)
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Duplicate" <+> what_it_is
-           <> text "s for" <+> quotes (ppr name)
-         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest
-                                       $ map (getLocA . fst)
-                                       $ toList pairs)
-         ]
-  where
-    what_it_is = hsSigDoc sig
+dupSigDeclErr pairs@((L loc _, _) :| _)
+  = addErrAt (locA loc) $ TcRnDuplicateSigDecl pairs
 
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [text "Misplaced" <+> hsSigDoc sig <> colon, ppr sig]
-
-defaultSigErr :: Sig GhcPs -> TcRnMessage
-defaultSigErr sig = mkTcRnUnknownMessage $ mkPlainError noHints $
-  vcat [ hang (text "Unexpected default signature:")
-         2 (ppr sig)
-       , text "Use DefaultSignatures to enable default signatures" ]
+  = addErrAt (locA loc) $ TcRnMisplacedSigDecl sig
 
 bindInHsBootFileErr :: LHsBindLR GhcRn GhcPs -> RnM ()
-bindInHsBootFileErr (L loc _)
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-      vcat [ text "Bindings in hs-boot files are not allowed" ]
+bindInHsBootFileErr (L loc _) = addErrAt (locA loc) TcRnBindInBootFile
 
 nonStdGuardErr :: (Outputable body,
                    Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
-               => [LStmtLR GhcRn GhcRn body] -> SDoc
-nonStdGuardErr guards
-  = hang (text "accepting non-standard pattern guards (use PatternGuards to suppress this message)")
-       4 (interpp'SP guards)
+               => [LStmtLR GhcRn GhcRn body] -> TcRnMessage
+nonStdGuardErr guards = TcRnNonStdGuards (NonStandardGuards guards)
 
-dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
-dupMinimalSigErr sigs@(L loc _ : _)
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Multiple minimal complete definitions"
-         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest $ map getLocA sigs)
-         , text "Combine alternative minimal complete definitions with `|'" ]
-dupMinimalSigErr [] = panic "dupMinimalSigErr"
+dupMinimalSigErr :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> RnM ()
+dupMinimalSigErr sig1 sig2 otherSigs
+  = addErrAt (getLocA sig1) $ TcRnDuplicateMinimalSig sig1 sig2 otherSigs

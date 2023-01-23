@@ -88,6 +88,8 @@ module GHC.Tc.Errors.Types (
   , IllegalDecls(..)
   , EmptyStatementGroupErrReason(..)
   , UnexpectedStatement(..)
+  , DeclSort(..)
+  , NonStandardGuards(..)
   ) where
 
 import GHC.Prelude
@@ -2762,6 +2764,165 @@ data TcRnMessage where
                  th/T13968
   -}
   TcRnBindingOfExistingName :: RdrName -> TcRnMessage
+  {-| TcRnMultipleFixityDecls is an error triggered by multiple
+      fixity declarations for the same operator.
+
+     Example(s):
+
+       infixr 6 $$
+       infixl 4 $$
+
+     Test cases: rename/should_fail/RnMultipleFixityFail
+  -}
+  TcRnMultipleFixityDecls :: SrcSpan -> RdrName -> TcRnMessage
+
+  {-| TcRnIllegalPatternSynonymDecl is an error thrown when a user
+      defines a pattern synonyms without enabling the PatternSynonyms extension.
+
+     Example:
+
+       pattern O :: Int
+       pattern O = 0
+
+     Test cases: rename/should_fail/RnPatternSynonymFail
+  -}
+  TcRnIllegalPatternSynonymDecl :: TcRnMessage
+
+  {-| TcRnIllegalClassBinding is an error triggered by a binding
+      in a class or instance declaration of an illegal form.
+
+     Examples:
+
+        class ZeroOne a where
+          zero :: a
+          one :: a
+        instance ZeroOne Int where
+          (zero,one) = (0,1)
+
+        class C a where
+           pattern P = ()
+
+     Test cases: module/mod48
+                 patsyn/should_fail/T9705-1
+                 patsyn/should_fail/T9705-2
+                 typecheck/should_fail/tcfail021
+
+  -}
+  TcRnIllegalClassBinding :: DeclSort -> HsBindLR GhcPs GhcPs -> TcRnMessage
+
+  {-| TcRnOrphanCompletePragma is an error triggered by a {-# COMPLETE #-}
+      pragma which does not mention any data constructors or pattern synonyms
+      defined in the current module.
+
+     Test cases: patsyn/should_fail/T13349
+  -}
+  TcRnOrphanCompletePragma :: TcRnMessage
+
+  {-| TcRnEmptyCase is an error thrown when a user uses
+      a case expression with an empty list of alternatives without
+      enabling the EmptyCase extension.
+
+     Example(s):
+
+       case () of
+
+     Test cases: rename/should_fail/RnEmptyCaseFail
+  -}
+  TcRnEmptyCase :: HsMatchContext GhcRn -> TcRnMessage
+
+  {-| TcRnNonStdGuards is a warning thrown when a user uses
+      non-standard guards (e.g. patterns in guards) without
+      enabling the PatternGuards extension.
+      More realistically: the user has explicitly disabled PatternGuards,
+      as it is enabled by default with `-XHaskell2010`.
+
+     Example(s):
+
+       f | 5 <- 2 + 3 = ...
+
+     Test cases: rename/should_compile/rn049
+  -}
+  TcRnNonStdGuards :: NonStandardGuards -> TcRnMessage
+
+  {-| TcRnDuplicateSigDecl is an error triggered by two or more
+      signatures for one entity.
+
+     Examples:
+
+       f :: Int -> Bool
+       f :: Int -> Bool
+       f _ = True
+
+       g x = x
+       {-# INLINE g #-}
+       {-# NOINLINE g #-}
+
+       pattern P = ()
+       {-# COMPLETE P #-}
+       {-# COMPLETE P #-}
+
+     Test cases: module/mod68
+                 parser/should_fail/OpaqueParseFail4
+                 patsyn/should_fail/T12165
+                 rename/should_fail/rnfail048
+                 rename/should_fail/T5589
+                 rename/should_fail/T7338
+                 rename/should_fail/T7338a
+  -}
+  TcRnDuplicateSigDecl :: NE.NonEmpty (LocatedN RdrName, Sig GhcPs) -> TcRnMessage
+
+  {-| TcRnMisplacedSigDecl is an error triggered by the pragma application
+      in the wrong context, like `MINIMAL` applied to a function or
+      `SPECIALIZE` to an instance.
+
+     Example:
+
+       f x = x
+       {-# MINIMAL f #-}
+
+     Test cases: rename/should_fail/T18138
+                 warnings/minimal/WarnMinimalFail1
+  -}
+  TcRnMisplacedSigDecl :: Sig GhcRn -> TcRnMessage
+
+  {-| TcRnUnexpectedDefaultSig is an error thrown when a user uses
+      default signatures without enabling the DefaultSignatures extension.
+
+     Example:
+
+       class C a where
+         m :: a
+         default m :: Num a => a
+         m = 0
+
+     Test cases: rename/should_fail/RnDefaultSigFail
+  -}
+  TcRnUnexpectedDefaultSig :: Sig GhcPs -> TcRnMessage
+
+  {-| TcRnBindInBootFile is an error triggered by a binding in hs-boot file.
+
+     Example:
+
+       -- in an .hs-boot file:
+       x = 3
+
+     Test cases: rename/should_fail/T19781
+  -}
+  TcRnBindInBootFile :: TcRnMessage
+
+  {-| TcRnDuplicateMinimalSig is an error triggered by two or more minimal
+      signatures for one type class.
+
+     Example:
+
+       class C where
+         f :: ()
+         {-# MINIMAL f #-}
+         {-# MINIMAL f #-}
+
+     Test cases: rename/should_fail/RnMultipleMinimalPragmaFail
+  -}
+  TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
 
   deriving Generic
 
@@ -3991,3 +4152,12 @@ data UnexpectedStatement where
     :: Outputable (StmtLR GhcPs GhcPs body)
     => StmtLR GhcPs GhcPs body
     -> UnexpectedStatement
+
+data DeclSort = ClassDeclSort | InstanceDeclSort
+
+data NonStandardGuards where
+  NonStandardGuards
+    :: (Outputable body,
+        Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
+    => [LStmtLR GhcRn GhcRn body]
+    -> NonStandardGuards

@@ -1241,6 +1241,71 @@ instance Diagnostic TcRnMessage where
                 <+> ppr (nameSrcLoc lcl_name)
     TcRnBindingOfExistingName name -> mkSimpleDecorated $
       text "Illegal binding of an existing name:" <+> ppr (filterCTuple name)
+    TcRnMultipleFixityDecls loc rdr_name -> mkSimpleDecorated $
+      vcat [text "Multiple fixity declarations for" <+> quotes (ppr rdr_name),
+            text "also at " <+> ppr loc]
+    TcRnIllegalPatternSynonymDecl -> mkSimpleDecorated $
+      text "Illegal pattern synonym declaration"
+    TcRnIllegalClassBinding dsort bind -> mkSimpleDecorated $
+      vcat [ what <+> text "not allowed in" <+> decl_sort
+              , nest 2 (ppr bind) ]
+      where
+        decl_sort = case dsort of
+          ClassDeclSort -> text "class declaration:"
+          InstanceDeclSort -> text "instance declaration:"
+        what = case bind of
+                  PatBind {}    -> text "Pattern bindings (except simple variables)"
+                  PatSynBind {} -> text "Pattern synonyms"
+                                   -- Associated pattern synonyms are not implemented yet
+                  _ -> pprPanic "rnMethodBind" (ppr bind)
+    TcRnOrphanCompletePragma -> mkSimpleDecorated $
+      text "Orphan COMPLETE pragmas not supported" $$
+      text "A COMPLETE pragma must mention at least one data constructor" $$
+      text "or pattern synonym defined in the same module."
+    TcRnEmptyCase ctxt -> mkSimpleDecorated message
+      where
+        pp_ctxt = case ctxt of
+          CaseAlt                                  -> text "case expression"
+          LamCaseAlt LamCase                       -> text "\\case expression"
+          ArrowMatchCtxt (ArrowLamCaseAlt LamCase) -> text "\\case command"
+          ArrowMatchCtxt ArrowCaseAlt              -> text "case command"
+          ArrowMatchCtxt KappaExpr                 -> text "kappa abstraction"
+          _                                        -> text "(unexpected)"
+                                                      <+> pprMatchContextNoun ctxt
+
+        message = case ctxt of
+          LamCaseAlt LamCases -> lcases_msg <+> text "expression"
+          ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> lcases_msg <+> text "command"
+          _ -> text "Empty list of alternatives in" <+> pp_ctxt
+
+        lcases_msg =
+          text "Empty list of alternatives is not allowed in \\cases"
+    TcRnNonStdGuards (NonStandardGuards guards) -> mkSimpleDecorated $
+      text "accepting non-standard pattern guards" $$
+      nest 4 (interpp'SP guards)
+    TcRnDuplicateSigDecl pairs@((L _ name, sig) :| _) -> mkSimpleDecorated $
+      vcat [ text "Duplicate" <+> what_it_is
+            <> text "s for" <+> quotes (ppr name)
+          , text "at" <+> vcat (map ppr $ sortBy leftmost_smallest
+                                        $ map (getLocA . fst)
+                                        $ NE.toList pairs)
+          ]
+      where
+        what_it_is = hsSigDoc sig
+    TcRnMisplacedSigDecl sig -> mkSimpleDecorated $
+      sep [text "Misplaced" <+> hsSigDoc sig <> colon, ppr sig]
+    TcRnUnexpectedDefaultSig sig -> mkSimpleDecorated $
+      hang (text "Unexpected default signature:")
+         2 (ppr sig)
+    TcRnBindInBootFile -> mkSimpleDecorated $
+      text "Bindings in hs-boot files are not allowed"
+    TcRnDuplicateMinimalSig sig1 sig2 otherSigs -> mkSimpleDecorated $
+      vcat [ text "Multiple minimal complete definitions"
+           , text "at" <+> vcat (map ppr $ sortBy leftmost_smallest $ map getLocA sigs)
+           , text "Combine alternative minimal complete definitions with `|'" ]
+      where
+        sigs = sig1 : sig2 : otherSigs
+
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1646,6 +1711,28 @@ instance Diagnostic TcRnMessage where
     TcRnCapturedTermName{}
       -> WarningWithFlag Opt_WarnTermVariableCapture
     TcRnBindingOfExistingName{}
+      -> ErrorWithoutFlag
+    TcRnMultipleFixityDecls{}
+      -> ErrorWithoutFlag
+    TcRnIllegalPatternSynonymDecl{}
+      -> ErrorWithoutFlag
+    TcRnIllegalClassBinding{}
+      -> ErrorWithoutFlag
+    TcRnOrphanCompletePragma{}
+      -> ErrorWithoutFlag
+    TcRnEmptyCase{}
+      -> ErrorWithoutFlag
+    TcRnNonStdGuards{}
+      -> WarningWithoutFlag
+    TcRnDuplicateSigDecl{}
+      -> ErrorWithoutFlag
+    TcRnMisplacedSigDecl{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedDefaultSig{}
+      -> ErrorWithoutFlag
+    TcRnBindInBootFile{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateMinimalSig{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2061,6 +2148,30 @@ instance Diagnostic TcRnMessage where
     TcRnCapturedTermName{}
       -> [SuggestRenameTypeVariable]
     TcRnBindingOfExistingName{}
+      -> noHints
+    TcRnMultipleFixityDecls{}
+      -> noHints
+    TcRnIllegalPatternSynonymDecl{}
+      -> [suggestExtension LangExt.PatternSynonyms]
+    TcRnIllegalClassBinding{}
+      -> noHints
+    TcRnOrphanCompletePragma{}
+      -> noHints
+    TcRnEmptyCase ctxt -> case ctxt of
+      LamCaseAlt LamCases -> noHints -- cases syntax doesn't support empty case.
+      ArrowMatchCtxt (ArrowLamCaseAlt LamCases) -> noHints
+      _ -> [suggestExtension LangExt.EmptyCase]
+    TcRnNonStdGuards{}
+      -> [suggestExtension LangExt.PatternGuards]
+    TcRnDuplicateSigDecl{}
+      -> noHints
+    TcRnMisplacedSigDecl{}
+      -> noHints
+    TcRnUnexpectedDefaultSig{}
+      -> [suggestExtension LangExt.DefaultSignatures]
+    TcRnBindInBootFile{}
+      -> noHints
+    TcRnDuplicateMinimalSig{}
       -> noHints
 
   diagnosticCode = constructorCode

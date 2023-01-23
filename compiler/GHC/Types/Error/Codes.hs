@@ -501,6 +501,17 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
   GhcDiagnosticCode "TcRnCapturedTermName"                          = 54201
   GhcDiagnosticCode "TcRnBindingOfExistingName"                     = 58805
+  GhcDiagnosticCode "TcRnMultipleFixityDecls"                       = 50419
+  GhcDiagnosticCode "TcRnIllegalPatternSynonymDecl"                 = 41507
+  GhcDiagnosticCode "TcRnIllegalClassBinding"                       = 69248
+  GhcDiagnosticCode "TcRnOrphanCompletePragma"                      = 93961
+  GhcDiagnosticCode "TcRnEmptyCase"                                 = 48010
+  GhcDiagnosticCode "TcRnNonStdGuards"                              = 59119
+  GhcDiagnosticCode "TcRnDuplicateSigDecl"                          = 31744
+  GhcDiagnosticCode "TcRnMisplacedSigDecl"                          = 87866
+  GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
+  GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
+  GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
