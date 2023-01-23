@@ -538,7 +538,7 @@ ds_prag_expr (HsPragSCC _ cc) expr = do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
         let nm = sl_fs cc
-        flavour <- ExprCC <$> getCCIndexDsM nm
+        flavour <- mkExprCCFlavour <$> getCCIndexDsM nm
         Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr

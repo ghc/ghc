@@ -142,7 +142,7 @@ initLateCCState :: LateCCState
 initLateCCState = LateCCState newCostCentreState mempty
 
 getCCFlavour :: FastString -> M CCFlavour
-getCCFlavour name = LateCC <$> getCCIndex' name
+getCCFlavour name = mkLateCCFlavour <$> getCCIndex' name
 
 getCCIndex' :: FastString -> M CostCentreIndex
 getCCIndex' name = do
