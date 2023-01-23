@@ -32,6 +32,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup
        (Dual (..), First (..), Last (..), Max (..), Min (..), Product (..),
        Semigroup (..), Sum (..))
+import GHC.Tuple          (Solo (..))
 import Prelude
        (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
        (=<<), flip, const, error)
@@ -387,6 +388,14 @@ instance Foldable1 Complex where
 -------------------------------------------------------------------------------
 
 -- 3+ tuples are not Foldable/Traversable
+
+instance Foldable1 Solo where
+    foldMap1 f (MkSolo y) = f y
+    toNonEmpty (MkSolo x) = x :| []
+    minimum (MkSolo x) = x
+    maximum (MkSolo x) = x
+    head (MkSolo x) = x
+    last (MkSolo x) = x
 
 instance Foldable1 ((,) a) where
     foldMap1 f (_, y) = f y
