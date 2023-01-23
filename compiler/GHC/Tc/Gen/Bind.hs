@@ -28,7 +28,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcCheckMonoExpr )
 import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
-import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
+import GHC.Types.CostCentre (mkUserCC, mkDeclCCFlavour)
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
@@ -677,7 +677,7 @@ funBindTicks loc fun_id mod sigs
           = getOccFS (Var.varName fun_id)
         cc_name = concatFS [moduleNameFS (moduleName mod), fsLit ".", cc_str]
   = do
-      flavour <- DeclCC <$> getCCIndexTcM cc_name
+      flavour <- mkDeclCCFlavour <$> getCCIndexTcM cc_name
       let cc = mkUserCC cc_name mod loc flavour
       return [ProfNote cc True True]
   | otherwise

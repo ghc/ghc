@@ -84,7 +84,7 @@ doExpr env e@(Var v)
         span = case revParents env of
           top:_ -> nameSrcSpan $ varName top
           _     -> noSrcSpan
-        cc = NormalCC (ExprCC ccIdx) ccName (thisModule env) span
+        cc = NormalCC (mkExprCCFlavour ccIdx) ccName (thisModule env) span
         tick :: CoreTickish
         tick = ProfNote cc count True
     pure $ Tick tick e
