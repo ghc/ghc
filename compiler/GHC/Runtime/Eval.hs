@@ -136,6 +136,7 @@ import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Monad
 import GHC.Core.Class (classTyCon)
 import GHC.Unit.Env
+import GHC.IfaceToCore
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -562,11 +563,18 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
                      IntMap.lookup breakInfo_number (modBreaks_breakInfo breaks)
-       mbVars    = cgb_vars info
-       result_ty = cgb_resty info
        occs      = modBreaks_vars breaks ! breakInfo_number
        span      = modBreaks_locs breaks ! breakInfo_number
        decl      = intercalate "." $ modBreaks_decls breaks ! breakInfo_number
+
+  -- Rehydrate to understand the breakpoint info relative to the current environment.
+  -- This design is critical to preventing leaks (#22530)
+   (mbVars, result_ty) <- initIfaceLoad hsc_env
+                            $ initIfaceLcl breakInfo_module (text "debugger") NotBoot
+                            $ hydrateCgBreakInfo info
+
+
+   let
 
            -- Filter out any unboxed ids by changing them to Nothings;
            -- we can't bind these at the prompt
