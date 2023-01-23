@@ -1189,7 +1189,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
 
     ProfNotes -> do
       let nm = mkFastString cc_name
-      flavour <- HpcCC <$> getCCIndexM nm
+      flavour <- mkHpcCCFlavour <$> getCCIndexM nm
       let cc = mkUserCC nm (this_mod env) pos flavour
           count = countEntries && tte_countEntries env
       return $ ProfNote cc count True{-scopes-}
