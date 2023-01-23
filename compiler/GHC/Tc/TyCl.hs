@@ -4447,9 +4447,6 @@ checkValidDataCon dflags existential_ok tc con
           checkTc (all isEqPred (dataConOtherTheta con))
                   (TcRnConstraintInKind (dataConRepType con))
 
-          -- Check that UNPACK pragmas and bangs work out
-          -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
-          --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
         ; hsc_env <- getTopEnv
         ; let check_bang :: Type -> HsSrcBang -> HsImplBang -> Int -> TcM ()
               check_bang orig_arg_ty bang rep_bang n
@@ -4458,6 +4455,8 @@ checkValidDataCon dflags existential_ok tc con
                = addErrTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
                  (bad_bang n (text "Lazy annotation (~) without StrictData"))
 
+               -- Warn about UNPACK without "!"
+               -- e.g.   data T = MkT {-# UNPACK #-} Int
                | HsSrcBang _ want_unpack strict_mark <- bang
                , isSrcUnpacked want_unpack, not (is_strict strict_mark)
                , not (isUnliftedType orig_arg_ty)
@@ -4476,13 +4475,14 @@ checkValidDataCon dflags existential_ok tc con
                , isUnliftedType orig_arg_ty
                = addDiagnosticTc $ TcRnLazyBangOnUnliftedType orig_arg_ty
 
+               -- Warn about unusable UNPACK pragmas
+               -- e.g.   data T a = MkT {-# UNPACK #-} !a      -- Can't unpack
                | HsSrcBang _ want_unpack _ <- bang
-               , isSrcUnpacked want_unpack
-               , case rep_bang of { HsUnpack {} -> False; _ -> True }
-               -- If not optimising, we don't unpack (rep_bang is never
-               -- HsUnpack), so don't complain!  This happens, e.g., in Haddock.
-               -- See dataConSrcToImplBang.
-               , not (bang_opt_unbox_disable bang_opts)
+
+               -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon.
+               , isSrcUnpacked want_unpack  -- this means the user wrote {-# UNPACK #-}
+               , case rep_bang of { HsUnpack {} -> False; HsStrict True -> False; _ -> True }
+
                -- When typechecking an indefinite package in Backpack, we
                -- may attempt to UNPACK an abstract type.  The test here will
                -- conclude that this is unusable, but it might become usable

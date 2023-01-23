@@ -212,7 +212,7 @@ test('T3102', normal, compile, [''])
 test('T3613', normal, compile_fail, [''])
 test('fd-loop', normal, compile_fail, [''])
 test('T3950', normal, compile_fail, [''])
-test('T3966', normal, compile_fail, ['-O'])
+test('T3966', normal, compile_fail, [''])
 test('IPFail', normal, compile_fail, [''])
 
 test('T3468', [], multimod_compile_fail, ['T3468', '-v0'])

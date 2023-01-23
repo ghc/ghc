@@ -859,7 +859,10 @@ data HsSrcBang =
 -- after consulting HsSrcBang, flags, etc.
 data HsImplBang
   = HsLazy    -- ^ Lazy field, or one with an unlifted type
-  | HsStrict  -- ^ Strict but not unpacked field
+  | HsStrict Bool -- ^ Strict but not unpacked field
+                  -- True <=> we could have unpacked, but opted not to
+                  -- because of -O0.
+                  -- See Note [Detecting useless UNPACK pragmas]
   | HsUnpack (Maybe Coercion)
     -- ^ Strict and unpacked field
     -- co :: arg-ty ~ product-ty HsBang
@@ -961,13 +964,48 @@ Terminology:
 
 * The dcr_bangs field of the dcRep field records the [HsImplBang]
   If T was defined in this module, Without -O the dcr_bangs might be
-    [HsStrict, HsStrict, HsLazy]
+    [HsStrict _, HsStrict _, HsLazy]
   With -O it might be
-    [HsStrict, HsUnpack _, HsLazy]
+    [HsStrict _, HsUnpack _, HsLazy]
   With -funbox-small-strict-fields it might be
     [HsUnpack, HsUnpack _, HsLazy]
   With -XStrictData it might be
-    [HsStrict, HsUnpack _, HsStrict]
+    [HsStrict _, HsUnpack _, HsStrict _]
+
+Note [Detecting useless UNPACK pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to issue a warning when there's an UNPACK pragma in the source code,
+but we decided not to unpack.
+However, when compiling with -O0, we never unpack, and that'd generate
+spurious warnings.
+Therefore, we remember in HsStrict a boolean flag, whether we _could_
+have unpacked. This flag is set in GHC.Types.Id.Make.dataConSrcToImplBang.
+Then, in GHC.Tc.TyCl.checkValidDataCon (sub-function check_bang),
+if the user wrote an `{-# UNPACK #-}` pragma (i.e. HsSrcBang contains SrcUnpack)
+we consult HsImplBang:
+
+  HsUnpack _     => field unpacked, no warning
+                    Example: data T = MkT {-# UNPACK #-} !Int   [with -O]
+  HsStrict True  => field not unpacked because -O0, no warning
+                    Example: data T = MkT {-# UNPACK #-} !Int   [with -O0]
+  HsStrict False => field not unpacked, warning
+                    Example: data T = MkT {-# UNPACK #-} !(Int -> Int)
+  HsLazy         => field not unpacked, warning
+                    This can happen in two scenarios:
+
+                    1) UNPACK without a bang
+                    Example: data T = MkT {-# UNPACK #-} Int
+                    This will produce a warning about missing ! before UNPACK.
+
+                    2) UNPACK of an unlifted datatype
+                    Because of bug #20204, we currently do not unpack type T,
+                    and therefore issue a warning:
+                    type IntU :: UnliftedType
+                    data IntU = IntU Int#
+                    data T = Test {-# UNPACK #-} IntU
+
+The boolean flag is used only for this warning.
+See #11270 for motivation.
 
 Note [Data con representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1052,7 +1090,7 @@ instance Outputable HsImplBang where
     ppr HsLazy                  = text "Lazy"
     ppr (HsUnpack Nothing)      = text "Unpacked"
     ppr (HsUnpack (Just co))    = text "Unpacked" <> parens (ppr co)
-    ppr HsStrict                = text "StrictNotUnpacked"
+    ppr (HsStrict b)            = text "StrictNotUnpacked" <> parens (ppr b)
 
 instance Outputable SrcStrictness where
     ppr SrcLazy     = char '~'
@@ -1105,7 +1143,7 @@ instance Binary SrcUnpackedness where
 -- | Compare strictness annotations
 eqHsBang :: HsImplBang -> HsImplBang -> Bool
 eqHsBang HsLazy               HsLazy              = True
-eqHsBang HsStrict             HsStrict            = True
+eqHsBang (HsStrict _)         (HsStrict _)        = True
 eqHsBang (HsUnpack Nothing)   (HsUnpack Nothing)  = True
 eqHsBang (HsUnpack (Just c1)) (HsUnpack (Just c2))
   = eqType (coercionType c1) (coercionType c2)

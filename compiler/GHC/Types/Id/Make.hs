@@ -1023,20 +1023,22 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
-  | not (bang_opt_unbox_disable bang_opts) -- Don't unpack if disabled
-  , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
+  | let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of
                     { Just redn -> scaledSet arg_ty (reductionReducedType redn)
                     ; Nothing   -> arg_ty }
   , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
   , shouldUnpackTy bang_opts unpk_prag fam_envs arg_ty'
-  = case mb_co of
-      Nothing   -> HsUnpack Nothing
-      Just redn -> HsUnpack (Just $ reductionCoercion redn)
+  = if bang_opt_unbox_disable bang_opts
+    then HsStrict True -- Not unpacking because of -O0
+                       -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon
+    else case mb_co of
+           Nothing   -> HsUnpack Nothing
+           Just redn -> HsUnpack (Just $ reductionCoercion redn)
 
   | otherwise -- Record the strict-but-no-unpack decision
-  = HsStrict
+  = HsStrict False
 
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
@@ -1049,7 +1051,7 @@ dataConArgRep
 dataConArgRep arg_ty HsLazy
   = ([(arg_ty, NotMarkedStrict)], (unitUnboxer, unitBoxer))
 
-dataConArgRep arg_ty HsStrict
+dataConArgRep arg_ty (HsStrict _)
   = ([(arg_ty, MarkedStrict)], (seqUnboxer, unitBoxer))
 
 dataConArgRep arg_ty (HsUnpack Nothing)

@@ -686,7 +686,7 @@ tc_mkRepTy gk get_fixity dit@(DerivInstTys{ dit_rep_tc = tycon
 
             pDStrness = mkTyConTy $ case ib of
                                          HsLazy      -> pDLzy
-                                         HsStrict    -> pDStr
+                                         HsStrict _  -> pDStr
                                          HsUnpack{}  -> pDUpk
 
     return (mkD tycon)
