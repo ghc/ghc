@@ -22,12 +22,10 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Data.SizedSeq
-import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Builtin.PrimOps
-import GHC.Core.Type
 import GHC.Types.SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes
@@ -40,10 +38,10 @@ import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.Maybe (catMaybes)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS
 import GHC.Cmm.Expr ( GlobalRegSet, emptyRegSet, regSetToList )
+import GHC.Iface.Syntax
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code
@@ -163,18 +161,22 @@ instance NFData BCONPtr where
   rnf x = x `seq` ()
 
 -- | Information about a breakpoint that we know at code-generation time
+-- In order to be used, this needs to be hydrated relative to the current HscEnv by
+-- 'hydrateCgBreakInfo'. Everything here can be fully forced and that's critical for
+-- preventing space leaks (see #22530)
 data CgBreakInfo
    = CgBreakInfo
-   { cgb_vars   :: [Maybe (Id,Word16)]
-   , cgb_resty  :: Type
+   { cgb_tyvars :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
+   , cgb_vars   :: ![Maybe (IfaceIdBndr, Word16)]
+   , cgb_resty  :: !IfaceType
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
--- Not a real NFData instance because we can't rnf Id or Type
 seqCgBreakInfo :: CgBreakInfo -> ()
 seqCgBreakInfo CgBreakInfo{..} =
-  rnf (map snd (catMaybes (cgb_vars))) `seq`
-  seqType cgb_resty
+    rnf cgb_tyvars `seq`
+    rnf cgb_vars `seq`
+    rnf cgb_resty
 
 instance Outputable UnlinkedBCO where
    ppr (UnlinkedBCO nm _arity _insns _bitmap lits ptrs)

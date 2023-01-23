@@ -11,6 +11,8 @@ Type checking of type signatures in interface files
 {-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.IfaceToCore (
         tcLookupImported_maybe,
@@ -22,10 +24,15 @@ module GHC.IfaceToCore (
         tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
-        tcIfaceOneShot
+        tcIfaceOneShot,
+        hydrateCgBreakInfo
  ) where
 
 import GHC.Prelude
+
+import GHC.ByteCode.Types
+
+import Data.Word
 
 import GHC.Driver.Env
 import GHC.Driver.Session
@@ -2069,3 +2076,12 @@ bindIfaceTyConBinderX :: (IfaceBndr -> (TyCoVar -> IfL a) -> IfL a)
 bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
   = bind_tv tv $ \tv' ->
     thing_inside (Bndr tv' vis)
+
+-- CgBreakInfo
+
+hydrateCgBreakInfo :: CgBreakInfo -> IfL ([Maybe (Id, Word16)], Type)
+hydrateCgBreakInfo CgBreakInfo{..} = do
+  bindIfaceTyVars cgb_tyvars $ \_ -> do
+    result_ty <- tcIfaceType cgb_resty
+    mbVars <- mapM (traverse (\(if_gbl, offset) -> (,offset) <$> bindIfaceId if_gbl return)) cgb_vars
+    return (mbVars, result_ty)

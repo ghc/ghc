@@ -90,6 +90,7 @@ import Data.Either ( partitionEithers )
 
 import GHC.Stg.Syntax
 import qualified Data.IntSet as IntSet
+import GHC.CoreToIface
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module
@@ -371,10 +372,8 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
         this_mod <- moduleName <$> getCurrentModule
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
-        let breakInfo = CgBreakInfo
-                        { cgb_vars = idOffSets
-                        , cgb_resty = tick_ty
-                        }
+            ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+        let breakInfo = dehydrateCgBreakInfo ty_vars idOffSets tick_ty
         newBreakInfo tick_no breakInfo
         hsc_env <- getHscEnv
         let cc | Just interp <- hsc_interp hsc_env

@@ -42,11 +42,17 @@ module GHC.CoreToIface
     , toIfaceVar
       -- * Other stuff
     , toIfaceLFInfo
+      -- * CgBreakInfo
+    , dehydrateCgBreakInfo
     ) where
 
 import GHC.Prelude
 
+import Data.Word
+
 import GHC.StgToCmm.Types
+
+import GHC.ByteCode.Types
 
 import GHC.Core
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
@@ -657,6 +663,16 @@ toIfaceLFInfo nm lfi = case lfi of
       IfLFUnlifted
     LFLetNoEscape ->
       panic "toIfaceLFInfo: LFLetNoEscape"
+
+-- Dehydrating CgBreakInfo
+
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word16)] -> Type -> CgBreakInfo
+dehydrateCgBreakInfo ty_vars idOffSets tick_ty =
+          CgBreakInfo
+            { cgb_tyvars = map toIfaceTvBndr ty_vars
+            , cgb_vars = map (fmap (\(i, offset) -> (toIfaceIdBndr i, offset))) idOffSets
+            , cgb_resty = toIfaceType tick_ty
+            }
 
 {- Note [Inlining and hs-boot files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
