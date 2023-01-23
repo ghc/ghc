@@ -1191,7 +1191,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
 
     tc_strict :: IfaceBang -> IfL HsImplBang
     tc_strict IfNoBang = return (HsLazy)
-    tc_strict IfStrict = return (HsStrict)
+    tc_strict IfStrict = return (HsStrict True)
     tc_strict IfUnpack = return (HsUnpack Nothing)
     tc_strict (IfUnpackCo if_co) = do { co <- tcIfaceCo if_co
                                       ; return (HsUnpack (Just co)) }
