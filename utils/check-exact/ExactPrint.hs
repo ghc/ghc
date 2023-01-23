@@ -3696,12 +3696,13 @@ exactVanillaDeclHead :: (Monad m, Monoid w)
 exactVanillaDeclHead thing tvs@(HsQTvs { hsq_explicit = tyvars }) fixity context = do
   let
     exact_tyvars (varl:varsr)
-      | fixity == Infix && length varsr > 1 = do
+      | hvarsr : tvarsr@(_ : _) <- varsr
+      , fixity == Infix = do
           varl' <- markAnnotated varl
           thing' <- markAnnotated thing
-          hvarsr <- markAnnotated (head varsr)
-          tvarsr <- markAnnotated (tail varsr)
-          return (thing', varl':hvarsr:tvarsr)
+          hvarsr' <- markAnnotated hvarsr
+          tvarsr' <- markAnnotated tvarsr
+          return (thing', varl':hvarsr':tvarsr')
       | fixity == Infix = do
           varl' <- markAnnotated varl
           thing' <- markAnnotated thing

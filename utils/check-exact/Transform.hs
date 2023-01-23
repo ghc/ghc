@@ -322,7 +322,7 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                l) a
               where
                 cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
-                lc = head $ reverse $ (L ca c:cs')
+                lc = last $ (L ca c:cs')
                 delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
                 line = getDeltaLine delta
                 col = deltaColumn delta

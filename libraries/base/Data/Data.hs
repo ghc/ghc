@@ -704,10 +704,9 @@ readConstr dt str =
 
     -- Traverse list of algebraic datatype constructors
     idx :: [Constr] -> Maybe Constr
-    idx cons = let fit = filter ((==) str . showConstr) cons
-                in if fit == []
-                     then Nothing
-                     else Just (head fit)
+    idx cons = case filter ((==) str . showConstr) cons of
+                [] -> Nothing
+                hd : _ -> Just hd
 
     ffloat :: Double -> Constr
     ffloat =  mkPrimCon dt str . FloatConstr . toRational
@@ -850,17 +849,17 @@ isNorepType dt = case datarep dt of
 -- drop *.*.*... before name
 --
 tyconUQname :: String -> String
-tyconUQname x = let x' = dropWhile (not . (==) '.') x
-                 in if x' == [] then x else tyconUQname (tail x')
+tyconUQname x = case dropWhile (not . (==) '.') x of
+                  [] -> x
+                  _ : tl -> tyconUQname tl
 
 
 -- | Gets the module of a type constructor:
 -- take *.*.*... before name
 tyconModule :: String -> String
-tyconModule x = let (a,b) = break ((==) '.') x
-                 in if b == ""
-                      then b
-                      else a ++ tyconModule' (tail b)
+tyconModule x = case break ((==) '.') x of
+                  (_, "") -> ""
+                  (a, _ : tl) -> a ++ tyconModule' tl
   where
     tyconModule' y = let y' = tyconModule y
                       in if y' == "" then "" else ('.':y')

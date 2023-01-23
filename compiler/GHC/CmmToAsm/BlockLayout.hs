@@ -14,6 +14,7 @@ module GHC.CmmToAsm.BlockLayout
 where
 
 import GHC.Prelude hiding (head, init, last, tail)
+import qualified GHC.Prelude as Partial (head, tail)
 
 import GHC.Platform
 
@@ -41,7 +42,6 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import Data.List (sortOn, sortBy, nub)
-import qualified Data.List as Partial (head, tail)
 import Data.List.NonEmpty (nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Foldable (toList)

@@ -458,8 +458,8 @@ glast  info []    = error $ "glast " ++ info ++ " []"
 glast _info h     = last h
 
 gtail :: String -> [a] -> [a]
-gtail  info []   = error $ "gtail " ++ info ++ " []"
-gtail _info h    = tail h
+gtail  info []    = error $ "gtail " ++ info ++ " []"
+gtail _info (_:t) = t
 
 gfromJust :: String -> Maybe a -> a
 gfromJust _info (Just h) = h

@@ -84,9 +84,10 @@ import Data.Function            (on)
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
 import Data.IORef
-import Data.List  ( partition, nub, intercalate, group, sort
+import Data.List  ( partition, nub, intercalate, sort
                   , groupBy, intersperse,
                   )
+import qualified Data.List.NonEmpty       as NE
 import Data.Map.Strict          (Map)
 import qualified Data.Map.Strict          as M
 import Data.Maybe
@@ -228,7 +229,7 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
   (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
 
   let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
-      rootMods = map (moduleNameString . moduleName . head) . group . sort . map funModule . S.toList $ roots
+      rootMods = map (moduleNameString . moduleName . NE.head) . NE.group . sort . map funModule . S.toList $ roots
       objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
 
   when (logVerbAtLeast logger 2) $ void $ do

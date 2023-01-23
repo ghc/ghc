@@ -192,7 +192,7 @@ stripPreprocessorDirectives :: GHC.StringBuffer -> GHC.StringBuffer
 stripPreprocessorDirectives buf = buf'
   where
     srcByLine = lines $ sbufToString buf
-    noDirectivesLines = map (\line -> if line /= [] && head line == '#' then "" else line) srcByLine
+    noDirectivesLines = map (\line -> case line of '#' : _ -> ""; _ -> line) srcByLine
     buf' = GHC.stringToStringBuffer $ unlines noDirectivesLines
 
 -- ---------------------------------------------------------------------
@@ -259,7 +259,7 @@ fingerprintStrings ss = GHC.fingerprintFingerprints $ map GHC.fingerprintString 
 getPreprocessorAsComments :: FilePath -> IO [(GHC.Located GHC.Token, String)]
 getPreprocessorAsComments srcFile = do
   fcontents <- readFileGhc srcFile
-  let directives = filter (\(_lineNum,line) -> line /= [] && head line == '#')
+  let directives = filter (\(_lineNum,line) -> case line of '#' : _ -> True; _ -> False)
                     $ zip [1..] (lines fcontents)
 
   let mkTok (lineNum,line) = (GHC.L l (GHC.ITlineComment line (makeBufSpan l)),line)

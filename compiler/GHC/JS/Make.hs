@@ -141,7 +141,6 @@ import Control.Arrow ((***))
 
 import Data.Array
 import qualified Data.Map as M
-import qualified Data.List as List
 
 import GHC.Utils.Outputable (Outputable (..))
 import GHC.Data.FastString
@@ -277,21 +276,21 @@ jVar f = UnsatBlock . IS $ do
 jForIn :: ToSat a => JExpr -> (JExpr -> a)  -> JStat
 jForIn e f = UnsatBlock . IS $ do
                (block, is) <- runIdentSupply $ toSat_ f []
-               let i = List.head is
+               let i = head is
                return $ decl i `mappend` ForInStat False i e block
 
 -- | As with "jForIn" but creating a \"for each in\" statement.
 jForEachIn :: ToSat a => JExpr -> (JExpr -> a) -> JStat
 jForEachIn e f = UnsatBlock . IS $ do
                (block, is) <- runIdentSupply $ toSat_ f []
-               let i = List.head is
+               let i = head is
                return $ decl i `mappend` ForInStat True i e block
 
 -- | As with "jForIn" but creating a \"for each in\" statement.
 jTryCatchFinally :: (ToSat a) => JStat -> a -> JStat -> JStat
 jTryCatchFinally s f s2 = UnsatBlock . IS $ do
                      (block, is) <- runIdentSupply $ toSat_ f []
-                     let i = List.head is
+                     let i = head is
                      return $ TryStat s i block s2
 
 -- | construct a JS variable reference

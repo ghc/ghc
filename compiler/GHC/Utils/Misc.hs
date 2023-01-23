@@ -121,6 +121,7 @@ module GHC.Utils.Misc (
     ) where
 
 import GHC.Prelude.Basic hiding ( head, init, last, tail )
+import qualified GHC.Prelude.Basic as Partial ( head )
 
 import GHC.Utils.Exception
 import GHC.Utils.Panic.Plain
@@ -129,7 +130,6 @@ import GHC.Utils.Fingerprint
 
 import Data.Data
 import qualified Data.List as List
-import qualified Data.List as Partial ( head )
 import Data.List.NonEmpty  ( NonEmpty(..), last, nonEmpty )
 import qualified Data.List.NonEmpty as NE
 

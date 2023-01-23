@@ -577,11 +577,11 @@ changeWhereIn3b :: Changer
 changeWhereIn3b _libdir (L l p) = do
   let decls0 = hsmodDecls p
       (decls,_,w) = runTransform (balanceCommentsList decls0)
-      (de0:_:de1:d2:_) = decls
+      (de0:tdecls@(_:de1:d2:_)) = decls
       de0' = setEntryDP de0 (DifferentLine 2 0)
       de1' = setEntryDP de1 (DifferentLine 2 0)
       d2' = setEntryDP d2 (DifferentLine 2 0)
-      decls' = d2':de1':de0':(tail decls)
+      decls' = d2':de1':de0':tdecls
   debugM $ unlines w
   debugM $ "changeWhereIn3b:de1':" ++ showAst de1'
   let p2 = p { hsmodDecls = decls'}
@@ -799,8 +799,9 @@ rmDecl5 _libdir lp = do
           go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
           go (HsLet a tkLet lb tkIn expr) = do
             decs <- hsDeclsValBinds lb
+            let hdecs : _ = decs
             let dec = last decs
-            _ <- transferEntryDP (head decs) dec
+            _ <- transferEntryDP hdecs dec
             lb' <- replaceDeclsValbinds WithoutWhere lb [dec]
             return (HsLet a tkLet lb' tkIn expr)
           go x = return x

@@ -43,6 +43,7 @@ module GHC.Core.Opt.Simplify.Utils (
     ) where
 
 import GHC.Prelude hiding (head, init, last, tail)
+import qualified GHC.Prelude as Partial (head)
 
 import GHC.Core
 import GHC.Types.Literal ( isLitRubbish )
@@ -84,7 +85,6 @@ import GHC.Utils.Panic.Plain
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
-import qualified Data.List as Partial ( head )
 
 {- *********************************************************************
 *                                                                      *
