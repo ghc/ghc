@@ -2765,9 +2765,9 @@ reifySourceBang :: DataCon.HsSrcBang
 reifySourceBang (HsSrcBang _ u s) = (reifyUnpackedness u, reifyStrictness s)
 
 reifyDecidedStrictness :: DataCon.HsImplBang -> TH.DecidedStrictness
-reifyDecidedStrictness HsLazy     = TH.DecidedLazy
-reifyDecidedStrictness HsStrict   = TH.DecidedStrict
-reifyDecidedStrictness HsUnpack{} = TH.DecidedUnpack
+reifyDecidedStrictness HsLazy       = TH.DecidedLazy
+reifyDecidedStrictness (HsStrict _) = TH.DecidedStrict
+reifyDecidedStrictness HsUnpack{}   = TH.DecidedUnpack
 
 reifyTypeOfThing :: TH.Name -> TcM TH.Type
 reifyTypeOfThing th_name = do
