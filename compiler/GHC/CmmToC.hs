@@ -382,8 +382,8 @@ pprExpr platform e = case e of
     CmmRegOff reg 0    -> pprCastReg reg
 
     -- CmmRegOff is an alias of MO_Add
-    CmmRegOff reg i -> pprCastReg reg <> char '+' <>
-                       pprHexVal platform (fromIntegral i) (wordWidth platform)
+    CmmRegOff reg i    -> pprExpr platform $ CmmMachOp (MO_Add w) [CmmReg reg, CmmLit $ CmmInt (toInteger i) w]
+      where w = cmmRegWidth platform reg
 
     CmmMachOp mop args -> pprMachOpApp platform mop args
 
