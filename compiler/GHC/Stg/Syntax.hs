@@ -68,27 +68,36 @@ module GHC.Stg.Syntax (
 
 import GHC.Prelude
 
-import GHC.Core     ( AltCon )
+import GHC.Stg.InferTags.TagSig( TagSig )
+import GHC.Stg.Lift.Types
+  -- To avoid having an orphan instances for BinderP, XLet etc
+
 import GHC.Types.CostCentre ( CostCentreStack )
-import Data.ByteString ( ByteString )
-import Data.Data   ( Data )
-import Data.List   ( intersperse )
+
+import GHC.Core     ( AltCon )
 import GHC.Core.DataCon
+import GHC.Core.TyCon    ( PrimRep(..), TyCon )
+import GHC.Core.Type     ( Type )
+import GHC.Core.Ppr( {- instances -} )
+
 import GHC.Types.ForeignCall ( ForeignCall )
 import GHC.Types.Id
 import GHC.Types.Name        ( isDynLinkName )
 import GHC.Types.Tickish     ( StgTickish )
 import GHC.Types.Var.Set
 import GHC.Types.Literal     ( Literal, literalType )
+import GHC.Types.RepType ( typePrimRep1, typePrimRep )
+
 import GHC.Unit.Module       ( Module )
 import GHC.Utils.Outputable
-import GHC.Platform
-import GHC.Core.Ppr( {- instances -} )
-import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
-import GHC.Core.TyCon    ( PrimRep(..), TyCon )
-import GHC.Core.Type     ( Type )
-import GHC.Types.RepType ( typePrimRep1, typePrimRep )
 import GHC.Utils.Panic.Plain
+
+import GHC.Platform
+import GHC.Builtin.PrimOps ( PrimOp, PrimCall )
+
+import Data.ByteString ( ByteString )
+import Data.Data   ( Data )
+import Data.List   ( intersperse )
 
 {-
 ************************************************************************
@@ -600,25 +609,34 @@ data StgPass
   | CodeGen
 
 type family BinderP (pass :: StgPass)
-type instance BinderP 'Vanilla = Id
-type instance BinderP 'CodeGen = Id
-type instance BinderP 'InferTagged = Id
+type instance BinderP 'Vanilla            = Id
+type instance BinderP 'CodeGen            = Id
+type instance BinderP 'InferTagged        = Id
+type instance BinderP 'InferTaggedBinders = (Id, TagSig)
+type instance BinderP 'LiftLams           = BinderInfo
 
 type family XRhsClosure (pass :: StgPass)
-type instance XRhsClosure 'Vanilla = NoExtFieldSilent
-type instance XRhsClosure 'InferTagged = NoExtFieldSilent
+type instance XRhsClosure 'Vanilla            = NoExtFieldSilent
+type instance XRhsClosure  'LiftLams          = DIdSet
+type instance XRhsClosure 'InferTagged        = NoExtFieldSilent
+type instance XRhsClosure 'InferTaggedBinders = XRhsClosure  'CodeGen
 -- | Code gen needs to track non-global free vars
 type instance XRhsClosure 'CodeGen = DIdSet
 
+
 type family XLet (pass :: StgPass)
-type instance XLet 'Vanilla = NoExtFieldSilent
-type instance XLet 'InferTagged = NoExtFieldSilent
-type instance XLet 'CodeGen = NoExtFieldSilent
+type instance XLet 'Vanilla            = NoExtFieldSilent
+type instance XLet 'LiftLams           = Skeleton
+type instance XLet 'InferTagged        = NoExtFieldSilent
+type instance XLet 'InferTaggedBinders = XLet 'CodeGen
+type instance XLet 'CodeGen            = NoExtFieldSilent
 
 type family XLetNoEscape (pass :: StgPass)
-type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
-type instance XLetNoEscape 'InferTagged = NoExtFieldSilent
-type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
+type instance XLetNoEscape 'Vanilla            = NoExtFieldSilent
+type instance XLetNoEscape 'LiftLams           = Skeleton
+type instance XLetNoEscape 'InferTagged        = NoExtFieldSilent
+type instance XLetNoEscape 'InferTaggedBinders = XLetNoEscape 'CodeGen
+type instance XLetNoEscape 'CodeGen            = NoExtFieldSilent
 
 {-
 

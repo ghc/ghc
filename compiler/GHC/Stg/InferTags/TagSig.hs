@@ -13,10 +13,20 @@ where
 import GHC.Prelude
 
 import GHC.Types.Var
+import GHC.Types.Name.Env( NameEnv )
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Utils.Panic.Plain
 import Data.Coerce
+
+-- | Information to be exposed in interface files which is produced
+-- by the stg2stg passes.
+type StgCgInfos = NameEnv TagSig
+
+newtype TagSig  -- The signature for each binding, this is a newtype as we might
+                -- want to track more information in the future.
+  = TagSig TagInfo
+  deriving (Eq)
 
 data TagInfo
   = TagDunno            -- We don't know anything about the tag.
@@ -45,11 +55,6 @@ instance Binary TagInfo where
                           3 -> return TagProper
                           4 -> return TagTagged
                           _ -> panic ("get TagInfo " ++ show tag)
-
-newtype TagSig  -- The signature for each binding, this is a newtype as we might
-                -- want to track more information in the future.
-  = TagSig TagInfo
-  deriving (Eq)
 
 instance Outputable TagSig where
   ppr (TagSig ti) = char '<' <> ppr ti <> char '>'

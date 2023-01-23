@@ -606,6 +606,7 @@ Library
         GHC.Stg.Lift.Analysis
         GHC.Stg.Lift.Config
         GHC.Stg.Lift.Monad
+        GHC.Stg.Lift.Types
         GHC.Stg.Lint
         GHC.Stg.InferTags
         GHC.Stg.InferTags.Rewrite
