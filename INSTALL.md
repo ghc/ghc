@@ -20,15 +20,14 @@ Quick start:  the following gives you a default build:
 
     $ ./boot
     $ ./configure
-    $ make
-    $ make install
+    $ ./hadrian/build
 
   On Windows, you need an extra repository containing some build tools.
   These can be downloaded for you by configure. This only needs to be done once by running:
 
     $ ./configure --enable-tarballs-autodownload
 
-You can use Make's `-jN` option to parallelize the build. It's generally best
+You can use `-jN` option to parallelize the build. It's generally best
 to set `N` somewhere around the core count of the build machine.
 
 The `./boot` step is only necessary if this is a tree checked out from
