@@ -30,11 +30,6 @@ import GHC.StgToCmm.Types
 *                                                                      *
 ********************************************************************* -}
 
-type instance BinderP      'InferTaggedBinders = (Id, TagSig)
-type instance XLet         'InferTaggedBinders = XLet         'CodeGen
-type instance XLetNoEscape 'InferTaggedBinders = XLetNoEscape 'CodeGen
-type instance XRhsClosure  'InferTaggedBinders = XRhsClosure  'CodeGen
-
 type InferStgTopBinding = GenStgTopBinding 'InferTaggedBinders
 type InferStgBinding    = GenStgBinding    'InferTaggedBinders
 type InferStgExpr       = GenStgExpr       'InferTaggedBinders

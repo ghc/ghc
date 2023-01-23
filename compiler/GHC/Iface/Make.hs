@@ -98,7 +98,7 @@ import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Stg.Pipeline (StgCgInfos)
+import GHC.Stg.InferTags.TagSig (StgCgInfos)
 
 
 {-

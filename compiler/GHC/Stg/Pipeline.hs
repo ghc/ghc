@@ -41,8 +41,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import GHC.Settings (Platform)
 import GHC.Stg.InferTags (inferTags)
-import GHC.Types.Name.Env (NameEnv)
-import GHC.Stg.InferTags.TagSig (TagSig)
+import GHC.Stg.InferTags.TagSig ( StgCgInfos )
 
 data StgPipelineOpts = StgPipelineOpts
   { stgPipeline_phases      :: ![StgToDo]
@@ -55,10 +54,6 @@ data StgPipelineOpts = StgPipelineOpts
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
   deriving (Functor, Applicative, Monad, MonadIO)
-
--- | Information to be exposed in interface files which is produced
--- by the stg2stg passes.
-type StgCgInfos = NameEnv TagSig
 
 instance MonadUnique StgM where
   getUniqueSupplyM = StgM $ do { mask <- ask

@@ -27,9 +27,13 @@ import GHC.Platform.Profile
 import GHC.Types.Basic
 import GHC.Types.Demand
 import GHC.Types.Id
+
 import GHC.Runtime.Heap.Layout ( WordOff )
+
 import GHC.Stg.Lift.Config
+import GHC.Stg.Lift.Types
 import GHC.Stg.Syntax
+
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
@@ -109,80 +113,6 @@ import Data.Maybe ( mapMaybe )
 llTrace :: String -> SDoc -> a -> a
 llTrace _ _ c = c
 -- llTrace a b c = pprTrace a b c
-
-type instance BinderP      'LiftLams = BinderInfo
-type instance XRhsClosure  'LiftLams = DIdSet
-type instance XLet         'LiftLams = Skeleton
-type instance XLetNoEscape 'LiftLams = Skeleton
-
-
--- | Captures details of the syntax tree relevant to the cost model, such as
--- closures, multi-shot lambdas and case expressions.
-data Skeleton
-  = ClosureSk !Id !DIdSet {- ^ free vars -} !Skeleton
-  | RhsSk !Card {- ^ how often the RHS was entered -} !Skeleton
-  | AltSk !Skeleton !Skeleton
-  | BothSk !Skeleton !Skeleton
-  | NilSk
-
-bothSk :: Skeleton -> Skeleton -> Skeleton
-bothSk NilSk b = b
-bothSk a NilSk = a
-bothSk a b     = BothSk a b
-
-altSk :: Skeleton -> Skeleton -> Skeleton
-altSk NilSk b = b
-altSk a NilSk = a
-altSk a b     = AltSk a b
-
-rhsSk :: Card -> Skeleton -> Skeleton
-rhsSk _        NilSk = NilSk
-rhsSk body_dmd skel  = RhsSk body_dmd skel
-
--- | The type used in binder positions in 'GenStgExpr's.
-data BinderInfo
-  = BindsClosure !Id !Bool -- ^ Let(-no-escape)-bound thing with a flag
-                           --   indicating whether it occurs as an argument
-                           --   or in a nullary application
-                           --   (see "GHC.Stg.Lift.Analysis#arg_occs").
-  | BoringBinder !Id       -- ^ Every other kind of binder
-
--- | Gets the bound 'Id' out a 'BinderInfo'.
-binderInfoBndr :: BinderInfo -> Id
-binderInfoBndr (BoringBinder bndr)   = bndr
-binderInfoBndr (BindsClosure bndr _) = bndr
-
--- | Returns 'Nothing' for 'BoringBinder's and 'Just' the flag indicating
--- occurrences as argument or in a nullary applications otherwise.
-binderInfoOccursAsArg :: BinderInfo -> Maybe Bool
-binderInfoOccursAsArg BoringBinder{}     = Nothing
-binderInfoOccursAsArg (BindsClosure _ b) = Just b
-
-instance Outputable Skeleton where
-  ppr NilSk = text ""
-  ppr (AltSk l r) = vcat
-    [ text "{ " <+> ppr l
-    , text "ALT"
-    , text "  " <+> ppr r
-    , text "}"
-    ]
-  ppr (BothSk l r) = ppr l $$ ppr r
-  ppr (ClosureSk f fvs body) = ppr f <+> ppr fvs $$ nest 2 (ppr body)
-  ppr (RhsSk card body) = hcat
-    [ lambda
-    , ppr card
-    , dot
-    , ppr body
-    ]
-
-instance Outputable BinderInfo where
-  ppr = ppr . binderInfoBndr
-
-instance OutputableBndr BinderInfo where
-  pprBndr b = pprBndr b . binderInfoBndr
-  pprPrefixOcc = pprPrefixOcc . binderInfoBndr
-  pprInfixOcc = pprInfixOcc . binderInfoBndr
-  bndrIsJoin_maybe = bndrIsJoin_maybe . binderInfoBndr
 
 mkArgOccs :: [StgArg] -> IdSet
 mkArgOccs = mkVarSet . mapMaybe stg_arg_var

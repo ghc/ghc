@@ -179,6 +179,7 @@ GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
 GHC.Stg.InferTags.TagSig
+GHC.Stg.Lift.Types
 GHC.Stg.Syntax
 GHC.StgToCmm.Config
 GHC.StgToCmm.Types
