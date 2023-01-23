@@ -90,6 +90,10 @@ AC_PATH_PROG(SedCmd,gsed sed,sed)
 dnl ** check for Python for testsuite driver
 FIND_PYTHON
 FP_PROG_FIND
+if test -z "$FindCmd"
+then
+    AC_MSG_ERROR([find is required.])
+fi
 
 XCODE_VERSION()
 
