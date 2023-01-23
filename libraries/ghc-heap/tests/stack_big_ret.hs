@@ -43,7 +43,8 @@ main = do
     "Stack contains one big return frame"
     (== 1)
     (length $ filter isBigReturnFrame decodedStack)
-  let  xs = zip [1 ..] $ (map unbox . payload . head) $ filter isBigReturnFrame decodedStack
+  cs <- (mapM unbox . payload . head) $ filter isBigReturnFrame decodedStack
+  let  xs = zip [1 ..] cs
   mapM_ (uncurry checkArg) xs
 
 checkArg :: Word -> Closure -> IO ()

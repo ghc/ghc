@@ -61,6 +61,8 @@ getUnderflowFrameNextChunk (StackFrameIter {..}) = StackSnapshot s#
 
 foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> Word# -> Word#
 
+foreign import prim "getAddrzh" getAddr# :: StackSnapshot# -> Word# -> Addr#
+
 getWord :: StackFrameIter -> WordOffset -> Word
 getWord (StackFrameIter {..}) relativeOffset = W# (getWord# stackSnapshot# (wordOffsetToWord# index) (wordOffsetToWord# relativeOffset))
 
@@ -145,40 +147,32 @@ toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize = BitmapEntry {
     isPrimitive = (bitmapWord .&. 1) /= 0
   } : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) (bitmapWord `shiftR` 1) (bSize - 1)
 
-toBitmapPayload :: BitmapEntry -> IO Box
-toBitmapPayload e | isPrimitive e = pure $ DecodedClosureBox. CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame $ e
-toBitmapPayload e = toClosure (unpackClosureReferencedByFrame 0) (closureFrame e)
+toBitmapPayload :: BitmapEntry -> Box
+toBitmapPayload e | isPrimitive e = DecodedClosureBox $ (CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame) e
+toBitmapPayload e = getClosure (closureFrame e) 0
 
-getClosure :: StackFrameIter ->  WordOffset-> IO Box
-getClosure sfi relativeOffset = toClosure (unpackClosureReferencedByFrame relativeOffset) sfi
+getClosure :: StackFrameIter ->  WordOffset-> Box
+getClosure StackFrameIter {..} relativeOffset =
+  let offset = wordOffsetToWord# (index + relativeOffset)
+      !ptr = (getAddr# stackSnapshot# offset)
+      !a :: Any = unsafeCoerce# ptr
+  in Box a
 
-toClosure :: (StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# Any #)) -> StackFrameIter -> IO Box
-toClosure f# (StackFrameIter {..}) =
-  case f# stackSnapshot# index of
-      (# infoTableAddr, heapRep, pointersArray #) ->
-          let infoTablePtr = Ptr infoTableAddr
-              ptrList = [case indexArray# pointersArray i of
-                              (# ptr #) -> CL.Box ptr
-                          | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
-                          ]
-          in
-            DecodedClosureBox <$> (getClosureDataFromHeapRep heapRep infoTablePtr ptrList)
-
-decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
+decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> [Box]
 decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
       let !(# bitmapArray#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
           bitmapWords :: [Word] = byteArrayToList bitmapArray#
       in
         decodeBitmaps sfi relativePayloadOffset bitmapWords (W# size#)
 
-decodeBitmaps :: StackFrameIter -> WordOffset -> [Word] -> Word -> IO [Box]
+decodeBitmaps :: StackFrameIter -> WordOffset -> [Word] -> Word -> [Box]
 decodeBitmaps (StackFrameIter {..}) relativePayloadOffset bitmapWords size =
       let
           bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) bitmapWords size
       in
-        mapM toBitmapPayload bes
+        map toBitmapPayload bes
 
-decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
+decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> [Box]
 decodeSmallBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
       let !(# bitmap#, size# #) = getterFun# stackSnapshot# (wordOffsetToWord# index)
           size = W# size#
@@ -200,54 +194,59 @@ wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
 unpackStackFrameIter sfi = do
   info <- getInfoTable sfi
-  case tipe info of
-     RET_BCO -> do
-        bco' <- getClosure sfi offsetStgClosurePayload
-        -- The arguments begin directly after the payload's one element
-        args' <- decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
-        pure $ CL.RetBCO info bco' args'
-     RET_SMALL -> do
-                    payloads <- decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
-                    let special = getRetSmallSpecialType sfi
-                    pure $ CL.RetSmall info special payloads
-     RET_BIG -> CL.RetBig info <$> decodeLargeBitmap getLargeBitmap# sfi offsetStgClosurePayload
-     RET_FUN -> do
-        let t = getRetFunType sfi
-            size' = getWord sfi offsetStgRetFunFrameSize
-        fun' <- getClosure sfi offsetStgRetFunFrameFun
-        payload' <-
-          if t == CL.ARG_GEN_BIG then
-            decodeLargeBitmap getRetFunLargeBitmap# sfi offsetStgRetFunFramePayload
-          else
-            decodeSmallBitmap getRetFunSmallBitmap# sfi offsetStgRetFunFramePayload
-        pure $ CL.RetFun info t size' fun' payload'
-     -- TODO: Decode update frame type
-     UPDATE_FRAME -> let
-        !t = getUpdateFrameType sfi
-        c = getClosure sfi offsetStgUpdateFrameUpdatee
-      in
-        (CL.UpdateFrame info t ) <$> c
-     CATCH_FRAME -> do
-        let exceptionsBlocked = getWord sfi offsetStgCatchFrameExceptionsBlocked
-        c <- getClosure sfi offsetStgCatchFrameHandler
-        pure $ CL.CatchFrame info exceptionsBlocked c
-     UNDERFLOW_FRAME -> let
-          nextChunk = getUnderflowFrameNextChunk sfi
-        in
-          pure $ CL.UnderflowFrame info nextChunk
-     STOP_FRAME -> pure $ CL.StopFrame info
-     ATOMICALLY_FRAME -> CL.AtomicallyFrame info
-            <$> getClosure sfi offsetStgAtomicallyFrameCode
-            <*> getClosure sfi offsetStgAtomicallyFrameResult
-     CATCH_RETRY_FRAME -> do
-        let running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
-        first_code' <- getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
-        alt_code' <- getClosure sfi offsetStgCatchRetryFrameAltCode
-        pure $ CL.CatchRetryFrame info running_alt_code' first_code' alt_code'
-     CATCH_STM_FRAME -> CL.CatchStmFrame info
-          <$> getClosure sfi offsetStgCatchSTMFrameCode
-          <*> getClosure sfi offsetStgCatchSTMFrameHandler
-     x -> error $ "Unexpected closure type on stack: " ++ show x
+  pure $ unpackStackFrameIter' info
+  where
+    -- TODO: Check all (missing?) bang patterns
+    unpackStackFrameIter' :: StgInfoTable -> CL.Closure
+    unpackStackFrameIter' info = do
+      case tipe info of
+        RET_BCO -> do
+            let !bco' = getClosure sfi offsetStgClosurePayload
+                -- The arguments begin directly after the payload's one element
+                !args' = decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
+            CL.RetBCO info bco' args'
+        RET_SMALL -> do
+                        let !special = getRetSmallSpecialType sfi
+                            !payloads = decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
+                        CL.RetSmall info special payloads
+        RET_BIG -> CL.RetBig info $ decodeLargeBitmap getLargeBitmap# sfi offsetStgClosurePayload
+        RET_FUN -> do
+            let t = getRetFunType sfi
+                size' = getWord sfi offsetStgRetFunFrameSize
+                fun' = getClosure sfi offsetStgRetFunFrameFun
+                payload' =
+                  if t == CL.ARG_GEN_BIG then
+                    decodeLargeBitmap getRetFunLargeBitmap# sfi offsetStgRetFunFramePayload
+                  else
+                    decodeSmallBitmap getRetFunSmallBitmap# sfi offsetStgRetFunFramePayload
+            CL.RetFun info t size' fun' payload'
+        -- TODO: Decode update frame type
+        UPDATE_FRAME -> let
+            !t = getUpdateFrameType sfi
+            c = getClosure sfi offsetStgUpdateFrameUpdatee
+          in
+            CL.UpdateFrame info t c
+        CATCH_FRAME -> do
+            let exceptionsBlocked = getWord sfi offsetStgCatchFrameExceptionsBlocked
+                c = getClosure sfi offsetStgCatchFrameHandler
+            CL.CatchFrame info exceptionsBlocked c
+        UNDERFLOW_FRAME -> let
+              nextChunk = getUnderflowFrameNextChunk sfi
+            in
+              CL.UnderflowFrame info nextChunk
+        STOP_FRAME -> CL.StopFrame info
+        ATOMICALLY_FRAME -> CL.AtomicallyFrame info
+                (getClosure sfi offsetStgAtomicallyFrameCode)
+                (getClosure sfi offsetStgAtomicallyFrameResult)
+        CATCH_RETRY_FRAME -> do
+            let running_alt_code' = getWord sfi offsetStgCatchRetryFrameRunningAltCode
+                first_code' = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode
+                alt_code' = getClosure sfi offsetStgCatchRetryFrameAltCode
+            CL.CatchRetryFrame info running_alt_code' first_code' alt_code'
+        CATCH_STM_FRAME -> CL.CatchStmFrame info
+              (getClosure sfi offsetStgCatchSTMFrameCode)
+              (getClosure sfi offsetStgCatchSTMFrameHandler)
+        x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- | Size of the byte array in bytes.
 -- Copied from `primitive`

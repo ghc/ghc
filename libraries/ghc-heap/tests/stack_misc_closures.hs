@@ -282,6 +282,7 @@ test setup assertion = do
   -- Better fail early, here.
   performGC
   stack <- decodeStack' sn
+  performGC
   assert sn stack
   -- The result of HasHeapRep should be similar (wrapped in the closure for
   -- StgStack itself.)

@@ -22,6 +22,9 @@ import GHC.Records
 import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
 import Unsafe.Coerce (unsafeCoerce)
+import Debug.Trace
+import Data.Foldable
+import Control.Monad.IO.Class
 
 assertEqual :: (HasCallStack, Monad m, Show a, Eq a) => a -> a -> m ()
 assertEqual a b
@@ -31,7 +34,7 @@ assertEqual a b
 assertThat :: (HasCallStack, Monad m) => String -> (a -> Bool) -> a -> m ()
 assertThat s f a = if f a then pure () else error s
 
-assertStackInvariants :: (HasCallStack, Monad m) => StackSnapshot -> [Closure] -> m ()
+assertStackInvariants :: (HasCallStack, MonadIO m) => StackSnapshot -> [Closure] -> m ()
 assertStackInvariants stack decodedStack = do
   assertThat
     "Last frame is stop frame"
@@ -40,21 +43,21 @@ assertStackInvariants stack decodedStack = do
         _ -> False
     )
     (last decodedStack)
-  assertEqual
-    (toClosureTypes decodedStack)
-    (toClosureTypes stack)
+  ts1 <- liftIO $ toClosureTypes decodedStack
+  ts2 <- liftIO $ toClosureTypes stack
+  assertEqual ts1 ts2
 
 class ToClosureTypes a where
-  toClosureTypes :: a -> [ClosureType]
+  toClosureTypes ::  a -> IO [ClosureType]
 
 instance ToClosureTypes StackSnapshot where
-  toClosureTypes = stackSnapshotToClosureTypes . foldStackToArrayClosure
+  toClosureTypes = pure . stackSnapshotToClosureTypes . foldStackToArrayClosure
 
 instance ToClosureTypes Closure where
   toClosureTypes = stackFrameToClosureTypes
 
 instance ToClosureTypes a => ToClosureTypes [a] where
-  toClosureTypes = concatMap toClosureTypes
+  toClosureTypes cs = concat <$> mapM toClosureTypes cs
 
 foreign import ccall "foldStackToArrayClosure" foldStackToArrayClosure# :: StackSnapshot# -> ByteArray#
 
@@ -86,59 +89,95 @@ toInt# :: Int -> Int#
 toInt# (I# i#) = i#
 
 -- TODO: Can probably be simplified once all stack closures have into tables attached.
-stackFrameToClosureTypes :: Closure -> [ClosureType]
+stackFrameToClosureTypes :: Closure -> IO [ClosureType]
 stackFrameToClosureTypes = getClosureTypes
   where
-    getClosureTypes :: Closure -> [ClosureType]
+    getClosureTypes :: Closure -> IO [ClosureType]
     -- Stack frame closures
-    getClosureTypes (UpdateFrame {info, updatee, ..}) = tipe info : getClosureTypes (unbox updatee)
-    getClosureTypes (CatchFrame {info, handler, ..}) = tipe info : getClosureTypes (unbox handler)
-    getClosureTypes (CatchStmFrame {info, catchFrameCode, handler}) = tipe info : getClosureTypes (unbox catchFrameCode) ++ getClosureTypes (unbox handler)
-    getClosureTypes (CatchRetryFrame {info, first_code, alt_code, ..}) = tipe info : getClosureTypes (unbox first_code) ++ getClosureTypes (unbox alt_code)
-    getClosureTypes (AtomicallyFrame {info, atomicallyFrameCode, result}) = tipe info : getClosureTypes (unbox atomicallyFrameCode) ++ getClosureTypes (unbox result)
-    getClosureTypes (UnderflowFrame {..}) = [tipe info]
-    getClosureTypes (StopFrame info) = [tipe info]
-    getClosureTypes (RetSmall {info, payload, ..}) = tipe info : getBitmapClosureTypes payload
-    getClosureTypes (RetBig {info, payload}) = tipe info : getBitmapClosureTypes payload
-    getClosureTypes (RetFun {info, retFunFun, retFunPayload, ..}) = tipe info : getClosureTypes (unbox retFunFun) ++ getBitmapClosureTypes retFunPayload
-    getClosureTypes (RetBCO {info, bco, bcoArgs, ..}) =
-      tipe info : getClosureTypes (unbox bco) ++ getBitmapClosureTypes bcoArgs
+    getClosureTypes (UpdateFrame {info, updatee, ..}) = do
+      u <- unbox updatee
+      ts <- getClosureTypes u
+      pure $ tipe info : ts
+    getClosureTypes (CatchFrame {info, handler, ..}) = do
+      h <- unbox handler
+      ts <- getClosureTypes h
+      pure $ tipe info : ts
+    getClosureTypes (CatchStmFrame {info, catchFrameCode, handler}) = do
+      c <- unbox catchFrameCode
+      h <- unbox handler
+      ts1 <- getClosureTypes c
+      ts2 <- getClosureTypes h
+      pure $ tipe info : ts1 ++ ts2
+    getClosureTypes (CatchRetryFrame {info, first_code, alt_code, ..}) = do
+      a <- unbox alt_code
+      f <- unbox first_code
+      ts1 <- getClosureTypes f
+      ts2 <- getClosureTypes a
+      pure $ tipe info : ts1 ++ ts2
+    getClosureTypes (AtomicallyFrame {info, atomicallyFrameCode, result}) = do
+      r <- unbox result
+      a <- unbox atomicallyFrameCode
+      ts1 <- getClosureTypes a
+      ts2 <- getClosureTypes r
+      pure $ tipe info : ts1 ++ ts2
+    getClosureTypes (UnderflowFrame {..}) = pure [tipe info]
+    getClosureTypes (StopFrame info) = pure [tipe info]
+    getClosureTypes (RetSmall {info, payload, ..}) = do
+      ts <- getBitmapClosureTypes payload
+      pure $ tipe info : ts
+    getClosureTypes (RetBig {info, payload}) = do
+      ts <- getBitmapClosureTypes payload
+      pure $ tipe info : ts
+    getClosureTypes (RetFun {info, retFunFun, retFunPayload, ..}) = do
+      rf <- unbox retFunFun
+      ts1 <- getClosureTypes rf
+      ts2 <- getBitmapClosureTypes retFunPayload
+      pure $ tipe info : ts1  ++ ts2
+    getClosureTypes (RetBCO {info, bco, bcoArgs, ..}) = do
+      bco <- unbox bco
+      bcoCls <- getClosureTypes bco
+      bcoArgsCls <- getBitmapClosureTypes bcoArgs
+      pure $ tipe info : bcoCls  ++ bcoArgsCls
     -- Other closures
-    getClosureTypes (ConstrClosure {info, ..}) = [tipe info]
-    getClosureTypes (FunClosure {info, ..}) = [tipe info]
-    getClosureTypes (ThunkClosure {info, ..}) = [tipe info]
-    getClosureTypes (SelectorClosure {info, ..}) = [tipe info]
-    getClosureTypes (PAPClosure {info, ..}) = [tipe info]
-    getClosureTypes (APClosure {info, ..}) = [tipe info]
-    getClosureTypes (APStackClosure {info, ..}) = [tipe info]
-    getClosureTypes (IndClosure {info, ..}) = [tipe info]
-    getClosureTypes (BCOClosure {info, ..}) = [tipe info]
-    getClosureTypes (BlackholeClosure {info, ..}) = [tipe info]
-    getClosureTypes (ArrWordsClosure {info, ..}) = [tipe info]
-    getClosureTypes (MutArrClosure {info, ..}) = [tipe info]
-    getClosureTypes (SmallMutArrClosure {info, ..}) = [tipe info]
-    getClosureTypes (MVarClosure {info, ..}) = [tipe info]
-    getClosureTypes (IOPortClosure {info, ..}) = [tipe info]
-    getClosureTypes (MutVarClosure {info, ..}) = [tipe info]
-    getClosureTypes (BlockingQueueClosure {info, ..}) = [tipe info]
-    getClosureTypes (WeakClosure {info, ..}) = [tipe info]
-    getClosureTypes (TSOClosure {info, ..}) = [tipe info]
-    getClosureTypes (StackClosure {info, ..}) = [tipe info]
-    getClosureTypes (OtherClosure {info, ..}) = [tipe info]
-    getClosureTypes (UnsupportedClosure {info, ..}) = [tipe info]
-    getClosureTypes _ = []
+    getClosureTypes (ConstrClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (FunClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (ThunkClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (SelectorClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (PAPClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (APClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (APStackClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (IndClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (BCOClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (BlackholeClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (ArrWordsClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (MutArrClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (SmallMutArrClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (MVarClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (IOPortClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (MutVarClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (BlockingQueueClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (WeakClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (TSOClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (StackClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (OtherClosure {info, ..}) = pure [tipe info]
+    getClosureTypes (UnsupportedClosure {info, ..}) = pure [tipe info]
+    getClosureTypes _ = pure []
 
-    getBitmapClosureTypes :: [Box] -> [ClosureType]
+    getBitmapClosureTypes :: [Box] -> IO [ClosureType]
     getBitmapClosureTypes bps =
-      reverse $
-        foldl
-          ( \acc p -> case unbox p of
-              UnknownTypeWordSizedPrimitive _ -> acc
-              c -> getClosureTypes c ++ acc
+      reverse <$>
+        foldlM
+          ( \acc p -> do
+              c <- unbox p
+              case c of
+                UnknownTypeWordSizedPrimitive _ -> pure acc
+                c -> do
+                  cls <- getClosureTypes c
+                  pure $ cls ++ acc
           )
           []
           bps
 
-unbox :: Box -> Closure
-unbox (Box c) = unsafeCoerce c
-unbox (DecodedClosureBox c) = c
+unbox :: Box -> IO Closure
+unbox (DecodedClosureBox c) = pure c
+unbox box = getBoxedClosureData box

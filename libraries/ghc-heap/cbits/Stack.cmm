@@ -144,6 +144,15 @@ getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
   return (W_[wordAddr]);
 }
 
+getAddrzh(P_ stack, W_ offsetWords){
+  P_ addr;
+  addr = (StgStack_sp(stack) + WDS(offsetWords));
+  P_ ptr;
+  ptr = P_[addr];
+//  ccall printObj(ptr);
+  return (ptr);
+}
+
 getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords){
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
