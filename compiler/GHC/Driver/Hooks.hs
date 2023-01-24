@@ -121,6 +121,9 @@ In doing so, the Hooks module (which is an hs-boot dependency of DynFlags) can
 be decoupled from its use of the DsM definition in GHC.HsToCore.Types. Since
 both DsM and the definition of @ForeignsHook@ live in the same module, there is
 virtually no difference for plugin authors that want to write a foreign hook.
+
+An awkward consequences is that the `type instance DsForeignsHook`, in
+GHC.HsToCore.Types is an orphan instance.
 -}
 
 -- See Note [The Decoupling Abstract Data Hack]
