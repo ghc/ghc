@@ -33,7 +33,7 @@ import Data.Coerce (coerce)
 import Data.Data (Data)
 import Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
-import Text.Read ()
+import Text.Read (Read(..), ReadPrec, readListDefault, readListPrecDefault)
 
 infixr 9 `Compose`
 
@@ -55,9 +55,14 @@ deriving instance Eq (f (g a)) => Eq (Compose f g a)
 -- | @since 4.18.0.0
 deriving instance Ord (f (g a)) => Ord (Compose f g a)
 -- | @since 4.18.0.0
-deriving instance Read (f (g a)) => Read (Compose f g a)
+instance Read (f (g a)) => Read (Compose f g a) where
+    readPrec = liftReadPrecCompose readPrec
+
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
 -- | @since 4.18.0.0
-deriving instance Show (f (g a)) => Show (Compose f g a)
+instance Show (f (g a)) => Show (Compose f g a) where
+    showsPrec = liftShowsPrecCompose showsPrec
 
 -- Instances of lifted Prelude classes
 
@@ -72,8 +77,8 @@ instance (Ord1 f, Ord1 g) => Ord1 (Compose f g) where
 
 -- | @since 4.9.0.0
 instance (Read1 f, Read1 g) => Read1 (Compose f g) where
-    liftReadPrec rp rl = readData $
-        readUnaryWith (liftReadPrec rp' rl') "Compose" Compose
+    liftReadPrec rp rl =
+        liftReadPrecCompose (liftReadPrec rp' rl')
       where
         rp' = liftReadPrec     rp rl
         rl' = liftReadListPrec rp rl
@@ -83,11 +88,19 @@ instance (Read1 f, Read1 g) => Read1 (Compose f g) where
 
 -- | @since 4.9.0.0
 instance (Show1 f, Show1 g) => Show1 (Compose f g) where
-    liftShowsPrec sp sl d (Compose x) =
-        showsUnaryWith (liftShowsPrec sp' sl') "Compose" d x
+    liftShowsPrec sp sl =
+        liftShowsPrecCompose (liftShowsPrec sp' sl')
       where
         sp' = liftShowsPrec sp sl
         sl' = liftShowList sp sl
+
+-- The workhorse for Compose's Read and Read1 instances.
+liftReadPrecCompose :: ReadPrec (f (g a)) -> ReadPrec (Compose f g a)
+liftReadPrecCompose rp = readData $ readUnaryWith rp "Compose" Compose
+
+-- The workhorse for Compose's Show and Show1 instances.
+liftShowsPrecCompose :: (Int -> f (g a) -> ShowS) -> Int -> Compose f g a -> ShowS
+liftShowsPrecCompose sp d (Compose x) = showsUnaryWith sp "Compose" d x
 
 -- Functor instances
 

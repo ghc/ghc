@@ -286,6 +286,7 @@ test('T18642',
 test('T19288', exit_code(1), compile_and_run, [''])
 test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
+test('T22816', normal, compile_and_run, [''])
 test('trace', normal, compile_and_run, [''])
 test('listThreads', js_broken(22261), compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
