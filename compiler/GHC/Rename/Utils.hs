@@ -57,7 +57,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated) )
-import GHC.Data.List.SetOps ( removeDups )
+import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.Session
 import GHC.Data.FastString
@@ -114,14 +114,14 @@ checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
 checkDupRdrNames rdr_names_w_loc
   = mapM_ (dupNamesErr getLocA) dups
   where
-    (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
+    (_, dups) = removeDupsOn unLoc rdr_names_w_loc
 
 checkDupRdrNamesN :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNamesN rdr_names_w_loc
   = mapM_ (dupNamesErr getLocA) dups
   where
-    (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
+    (_, dups) = removeDupsOn unLoc rdr_names_w_loc
 
 checkDupNames :: [Name] -> RnM ()
 -- Check for duplicated names in a binding group
@@ -132,7 +132,7 @@ check_dup_names :: [Name] -> RnM ()
 check_dup_names names
   = mapM_ (dupNamesErr nameSrcSpan) dups
   where
-    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
+    (_, dups) = removeDupsOn nameOccName names
 
 ---------------------
 checkShadowedRdrNames :: [LocatedN RdrName] -> RnM ()

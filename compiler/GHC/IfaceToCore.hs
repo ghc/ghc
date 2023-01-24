@@ -1674,8 +1674,7 @@ tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceAlt (IfaceDataAlt data_occ) arg_st
 tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
                -> IfL CoreAlt
 tcIfaceDataAlt mult con inst_tys arg_strs rhs
-  = do  { us <- newUniqueSupply
-        ; let uniqs = uniqsFromSupply us
+  = do  { uniqs <- getUniquesM
         ; let (ex_tvs, arg_ids)
                       = dataConRepFSInstPat arg_strs uniqs mult con inst_tys
 

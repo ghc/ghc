@@ -640,8 +640,7 @@ nameTyCt :: PredType -> DsM EvVar
 nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
-      idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalIdOrCoVar idname ManyTy pred_ty)
+  return (mkUserLocalOrCoVar occname unique ManyTy pred_ty noSrcSpan)
 
 -----------------------------
 -- ** Adding term constraints

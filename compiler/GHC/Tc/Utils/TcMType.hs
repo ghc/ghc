@@ -770,13 +770,11 @@ newMetaTyVarName :: FastString -> TcM Name
 -- the unifier; see GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
 -- GHC.Tc.Solver.Canonical.canEqTyVarTyVar (nicer_to_update_tv2)
 newMetaTyVarName str
-  = do { uniq <- newUnique
-       ; return (mkSystemName uniq (mkTyVarOccFS str)) }
+  = newSysName (mkTyVarOccFS str)
 
 cloneMetaTyVarName :: Name -> TcM Name
 cloneMetaTyVarName name
-  = do { uniq <- newUnique
-       ; return (mkSystemName uniq (nameOccName name)) }
+  = newSysName (nameOccName name)
          -- See Note [Name of an instantiated type variable]
 
 {- Note [Name of an instantiated type variable]

@@ -62,7 +62,7 @@ import GHC.Driver.Session
 import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
-import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
+import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
@@ -1604,7 +1604,7 @@ rnStandaloneKindSignatures
   -> [LStandaloneKindSig GhcPs]
   -> RnM [(LStandaloneKindSig GhcRn, FreeVars)]
 rnStandaloneKindSignatures tc_names kisigs
-  = do { let (no_dups, dup_kisigs) = removeDups (compare `on` get_name) kisigs
+  = do { let (no_dups, dup_kisigs) = removeDupsOn get_name kisigs
              get_name = standaloneKindSigName . unLoc
        ; mapM_ dupKindSig_Err dup_kisigs
        ; mapM (wrapLocFstMA (rnStandaloneKindSignature tc_names)) no_dups
@@ -1682,7 +1682,7 @@ rnRoleAnnots :: NameSet
 rnRoleAnnots tc_names role_annots
   = do {  -- Check for duplicates *before* renaming, to avoid
           -- lumping together all the unboundNames
-         let (no_dups, dup_annots) = removeDups (compare `on` get_name) role_annots
+         let (no_dups, dup_annots) = removeDupsOn get_name role_annots
              get_name = roleAnnotDeclName . unLoc
        ; mapM_ dupRoleAnnotErr dup_annots
        ; mapM (wrapLocMA rn_role_annot1) no_dups }
