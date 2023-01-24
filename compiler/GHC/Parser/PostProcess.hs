@@ -1817,11 +1817,6 @@ instance DisambECP (HsExpr GhcPs) where
 hsHoleExpr :: EpAnn EpAnnUnboundVar -> HsExpr GhcPs
 hsHoleExpr anns = HsUnboundVar anns (mkRdrUnqual (mkVarOccFS (fsLit "_")))
 
-type instance Anno (GRHS GhcPs (LocatedA (PatBuilder GhcPs))) = SrcAnn NoEpAnns
-type instance Anno [LocatedA (Match GhcPs (LocatedA (PatBuilder GhcPs)))] = SrcSpanAnnL
-type instance Anno (Match GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpanAnnA
-type instance Anno (StmtLR GhcPs GhcPs (LocatedA (PatBuilder GhcPs))) = SrcSpanAnnA
-
 instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (L l c)    = addFatalError $ mkPlainErrorMsgEnvelope (locA l) $ PsErrArrowCmdInPat c
