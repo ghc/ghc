@@ -224,6 +224,28 @@ extendSubword W32 TagI64 (WasmExpr instr) =
   WasmExpr $ instr `WasmConcat` WasmI64Extend32S
 extendSubword _ _ expr = expr
 
+-- | Lower an unary homogeneous operation.
+lower_MO_Un_Homo ::
+  ( forall pre t.
+    WasmTypeTag t ->
+    WasmInstr
+      w
+      (t : pre)
+      (t : pre)
+  ) ->
+  CLabel ->
+  CmmType ->
+  [CmmExpr] ->
+  WasmCodeGenM w (SomeWasmExpr w)
+lower_MO_Un_Homo op lbl t0 [x] = case someWasmTypeFromCmmType t0 of
+  SomeWasmType ty -> do
+    WasmExpr x_instr <- lower_CmmExpr_Typed lbl ty x
+    pure $
+      SomeWasmExpr ty $
+        WasmExpr $
+          x_instr `WasmConcat` op ty
+lower_MO_Un_Homo _ _ _ _ = panic "lower_MO_Un_Homo: unreachable"
+
 -- | Lower a binary homogeneous operation. Homogeneous: result type is
 -- the same with operand types.
 lower_MO_Bin_Homo ::
@@ -699,11 +721,12 @@ lower_CmmMachOp lbl (MO_F_Sub w0) xs =
     lbl
     (cmmFloat w0)
     xs
-lower_CmmMachOp lbl (MO_F_Neg w0) [x] =
-  lower_CmmMachOp
+lower_CmmMachOp lbl (MO_F_Neg w0) xs =
+  lower_MO_Un_Homo
+    WasmNeg
     lbl
-    (MO_F_Sub w0)
-    [CmmLit $ CmmFloat 0 w0, x]
+    (cmmFloat w0)
+    xs
 lower_CmmMachOp lbl (MO_F_Mul w0) xs =
   lower_MO_Bin_Homo
     WasmMul

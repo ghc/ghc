@@ -359,6 +359,7 @@ asmTellWasmInstr ty_word instr = case instr of
   WasmF32DemoteF64 -> asmTellLine "f32.demote_f64"
   WasmF64PromoteF32 -> asmTellLine "f64.promote_f32"
   WasmAbs ty -> asmTellLine $ asmFromWasmType ty <> ".abs"
+  WasmNeg ty -> asmTellLine $ asmFromWasmType ty <> ".neg"
   WasmCond t -> do
     asmTellLine "if"
     asmWithTab $ asmTellWasmInstr ty_word t
