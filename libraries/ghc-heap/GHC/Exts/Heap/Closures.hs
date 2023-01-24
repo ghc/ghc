@@ -333,7 +333,6 @@ data GenClosure b
   | SimpleStack {
       stackClosures :: ![b]
                 }
- -- TODO: Add `info :: !StgInfoTable` fields
   | UpdateFrame
       { info            :: !StgInfoTable
       , knownUpdateFrameType :: !UpdateFrameType
