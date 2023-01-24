@@ -1,5 +1,10 @@
 {-# LANGUAGE TypeFamilies, UndecidableInstances #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+  -- Don't warn that `type instance DsForeignsHooks = ...`
+  -- is an orphan; see Note [The Decoupling Abstract Data Hack]
+  -- in GHC.Driver.Hooks
+
 -- | Various types used during desugaring.
 module GHC.HsToCore.Types (
         DsM, DsLclEnv(..), DsGblEnv(..),
