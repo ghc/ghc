@@ -18,7 +18,7 @@ module GHC.Data.List.SetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, removeDups, nubOrdBy, findDupsEq,
+        hasNoDups, removeDups, removeDupsOn, nubOrdBy, findDupsEq,
         equivClasses,
 
         -- Indexing
@@ -37,6 +37,7 @@ import GHC.Utils.Misc
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Ord (comparing)
 import qualified Data.Set as S
 
 getNth :: Outputable a => [a] -> Int -> a
@@ -192,6 +193,9 @@ removeDups cmp xs
     collect_dups :: [NonEmpty a] -> NonEmpty a -> ([NonEmpty a], a)
     collect_dups dups_so_far (x :| [])     = (dups_so_far,      x)
     collect_dups dups_so_far dups@(x :| _) = (dups:dups_so_far, x)
+
+removeDupsOn :: Ord b => (a -> b) -> [a] -> ([a], [NonEmpty a])
+removeDupsOn f x = removeDups (comparing f) x
 
 -- | Remove the duplicates from a list using the provided
 -- comparison function.

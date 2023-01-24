@@ -158,9 +158,9 @@ because the list of variables is typically not yet defined.
 --      = case v of v { (x1, .., xn) -> body }
 -- But the matching may be nested if the tuple is very big
 
-coreCaseTuple :: UniqSupply -> Id -> [Id] -> CoreExpr -> CoreExpr
-coreCaseTuple uniqs scrut_var vars body
-  = mkBigTupleCase uniqs vars body (Var scrut_var)
+coreCaseTuple :: Id -> [Id] -> CoreExpr -> DsM CoreExpr
+coreCaseTuple scrut_var vars body
+  = mkBigTupleCase vars body (Var scrut_var)
 
 coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
@@ -231,9 +231,8 @@ matchEnvStack   :: [Id]         -- x1..xn
                 -> CoreExpr     -- e
                 -> DsM CoreExpr
 matchEnvStack env_ids stack_id body = do
-    uniqs <- newUniqueSupply
     tup_var <- newSysLocalDs ManyTy (mkBigCoreVarTupTy env_ids)
-    let match_env = coreCaseTuple uniqs tup_var env_ids body
+    match_env <- coreCaseTuple tup_var env_ids body
     pair_id <- newSysLocalDs ManyTy (mkCorePairTy (idType tup_var) (idType stack_id))
     return (Lam pair_id (coreCasePair pair_id tup_var stack_id match_env))
 
@@ -250,9 +249,9 @@ matchEnv :: [Id]        -- x1..xn
          -> CoreExpr    -- e
          -> DsM CoreExpr
 matchEnv env_ids body = do
-    uniqs <- newUniqueSupply
     tup_id <- newSysLocalDs ManyTy (mkBigCoreVarTupTy env_ids)
-    return (Lam tup_id (coreCaseTuple uniqs tup_id env_ids body))
+    tup_case <- coreCaseTuple tup_id env_ids body
+    return (Lam tup_id tup_case)
 
 ----------------------------------------------
 --              matchVarStack
@@ -957,11 +956,10 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     --          \ (p, (xs2)) -> (zs)
 
     env_id <- newSysLocalDs ManyTy env_ty2
-    uniqs <- newUniqueSupply
     let
        after_c_ty = mkCorePairTy pat_ty env_ty2
        out_ty = mkBigCoreVarTupTy out_ids
-       body_expr = coreCaseTuple uniqs env_id env_ids2 (mkBigCoreVarTup out_ids)
+    body_expr <- coreCaseTuple env_id env_ids2 (mkBigCoreVarTup out_ids)
 
     fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt (DoExpr Nothing))) out_ty
     pat_id    <- selectSimpleMatchVarL ManyTy pat
@@ -1029,12 +1027,11 @@ dsCmdStmt ids local_vars out_ids
 
     -- post_loop_fn = \((later_ids),(env2_ids)) -> (out_ids)
 
-    uniqs <- newUniqueSupply
     env2_id <- newSysLocalDs ManyTy env2_ty
     let
         later_ty = mkBigCoreVarTupTy later_ids
         post_pair_ty = mkCorePairTy later_ty env2_ty
-        post_loop_body = coreCaseTuple uniqs env2_id env2_ids (mkBigCoreVarTup out_ids)
+    post_loop_body <- coreCaseTuple env2_id env2_ids (mkBigCoreVarTup out_ids)
 
     post_loop_fn <- matchEnvStack later_ids env2_id post_loop_body
 

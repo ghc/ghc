@@ -648,12 +648,12 @@ mkSmallTupleSelector1 vars the_var scrut_var scrut
 -- To avoid shadowing, we use uniques to invent new variables.
 --
 -- If necessary we pattern match on a "big" tuple.
-mkBigTupleCase :: UniqSupply       -- ^ For inventing names of intermediate variables
-               -> [Id]             -- ^ The tuple identifiers to pattern match on;
+mkBigTupleCase :: MonadUnique m    --   For inventing names of intermediate variables
+               => [Id]             -- ^ The tuple identifiers to pattern match on;
                                    --   Bring these into scope in the body
                -> CoreExpr         -- ^ Body of the case
                -> CoreExpr         -- ^ Scrutinee
-               -> CoreExpr
+               -> m CoreExpr
 -- ToDo: eliminate cases where none of the variables are needed.
 --
 --         mkBigTupleCase uniqs [a,b,c,d] body v e
@@ -661,11 +661,11 @@ mkBigTupleCase :: UniqSupply       -- ^ For inventing names of intermediate vari
 --             case p of p { (a,b) ->
 --             case q of q { (c,d) ->
 --             body }}}
-mkBigTupleCase us vars body scrut
-  = mk_tuple_case wrapped_us (chunkify wrapped_vars) wrapped_body
+mkBigTupleCase vars body scrut
+  = do us <- getUniqueSupplyM
+       let (wrapped_us, wrapped_vars, wrapped_body) = foldr unwrap (us,[],body) vars
+       return $ mk_tuple_case wrapped_us (chunkify wrapped_vars) wrapped_body
   where
-    (wrapped_us, wrapped_vars, wrapped_body) = foldr unwrap (us,[],body) vars
-
     scrut_ty = exprType scrut
 
     unwrap var (us,vars,body)

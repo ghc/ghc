@@ -96,7 +96,6 @@ import Data.Foldable      ( for_, toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
-import Data.Ord           ( comparing )
 import GHC.Data.Pair
 import GHC.Base (oneShot)
 import GHC.Data.Unboxed
@@ -478,7 +477,7 @@ lintCoreBindings' cfg binds
     --    M.n{r3}  = ...
     --    M.n{r29} = ...
     -- because they both get the same linker symbol
-    ext_dups = snd $ removeDups (comparing ord_ext) $
+    ext_dups = snd $ removeDupsOn ord_ext $
                filter isExternalName $ map Var.varName binders
     ord_ext n = (nameModule n, nameOccName n)
 

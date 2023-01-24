@@ -64,7 +64,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
 import GHC.Utils.Misc
-import GHC.Data.List.SetOps ( removeDups )
+import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
@@ -1305,7 +1305,7 @@ rnParallelStmts ctxt return_op segs thing_inside
             -> [Name] -> [ParStmtBlock GhcPs GhcPs]
             -> RnM (([ParStmtBlock GhcRn GhcRn], thing), FreeVars)
     rn_segs _ bndrs_so_far []
-      = do { let (bndrs', dups) = removeDups cmpByOcc bndrs_so_far
+      = do { let (bndrs', dups) = removeDupsOn nameOccName bndrs_so_far
            ; mapM_ dupErr dups
            ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
            ; return (([], thing), fvs) }
@@ -1321,7 +1321,6 @@ rnParallelStmts ctxt return_op segs thing_inside
            ; let seg' = ParStmtBlock x stmts' used_bndrs return_op
            ; return ((seg':segs', thing), fvs) }
 
-    cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
     dupErr vs = addErr $ TcRnListComprehensionDuplicateBinding (NE.head vs)
 
 lookupQualifiedDoStmtName :: HsStmtContext GhcRn -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)

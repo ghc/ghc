@@ -444,15 +444,13 @@ mkUnzipBind _ elt_tys
 
        ; unzip_fn <- newSysLocalDs ManyTy unzip_fn_ty
 
-       ; [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
-
        ; let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
              concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
              tupled_concat_expression = mkBigCoreTup concat_expressions
 
-             folder_body_inner_case = mkBigTupleCase us1 xss tupled_concat_expression (Var axs)
-             folder_body_outer_case = mkBigTupleCase us2 xs folder_body_inner_case (Var ax)
-             folder_body = mkLams [ax, axs] folder_body_outer_case
+       ; folder_body_inner_case <- mkBigTupleCase xss tupled_concat_expression (Var axs)
+       ; folder_body_outer_case <- mkBigTupleCase xs folder_body_inner_case (Var ax)
+       ; let folder_body = mkLams [ax, axs] folder_body_outer_case
 
        ; unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
        ; return (Just (unzip_fn, mkLams [ys] unzip_body)) }
@@ -546,9 +544,8 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        ; body        <- dsMcStmts stmts_rest
        ; n_tup_var'  <- newSysLocalDs ManyTy n_tup_ty'
        ; tup_n_expr' <- mkMcUnzipM form fmap_op n_tup_var' from_bndr_tys
-       ; us          <- newUniqueSupply
        ; let rhs'  = mkApps usingExpr' usingArgs'
-             body' = mkBigTupleCase us to_bndrs body tup_n_expr'
+       ; body'       <- mkBigTupleCase to_bndrs body tup_n_expr'
 
        ; dsSyntaxExpr bind_op [rhs', Lam n_tup_var' body'] }
 
@@ -592,9 +589,9 @@ matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 --       returns the Core term
 --  \x. case x of (a,b,c) -> body
 matchTuple ids body
-  = do { us <- newUniqueSupply
-       ; tup_id <- newSysLocalDs ManyTy (mkBigCoreVarTupTy ids)
-       ; return (Lam tup_id $ mkBigTupleCase us ids body (Var tup_id)) }
+  = do { tup_id <- newSysLocalDs ManyTy (mkBigCoreVarTupTy ids)
+       ; tup_case <- mkBigTupleCase ids body (Var tup_id)
+       ; return (Lam tup_id tup_case) }
 
 -- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
 -- desugared `CoreExpr`

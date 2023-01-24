@@ -275,15 +275,13 @@ withSubstBndrs = runContT . traverse (ContT . withSubstBndr)
 -- binder and fresh name generation.
 withLiftedBndr :: DIdSet -> Id -> (Id -> LiftM a) -> LiftM a
 withLiftedBndr abs_ids bndr inner = do
-  uniq <- getUniqueM
   let str = fsLit "$l" `appendFS` occNameFS (getOccName bndr)
   let ty = mkLamTypes (dVarSetElems abs_ids) (idType bndr)
-  let bndr'
+  bndr' <-
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
-        = transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        . mkSysLocal str uniq ManyTy
-        $ ty
+            transferPolyIdInfo bndr (dVarSetElems abs_ids)
+        <$> mkSysLocalM str ManyTy ty
   LiftM $ RWS.local
     (\e -> e
       { e_subst = extendSubst bndr bndr' $ extendInScope bndr' $ e_subst e

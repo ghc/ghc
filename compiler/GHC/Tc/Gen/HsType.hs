@@ -3692,14 +3692,13 @@ splitTyConKind :: SkolemInfo
 -- See also Note [Datatype return kinds] in GHC.Tc.TyCl
 splitTyConKind skol_info in_scope avoid_occs kind
   = do  { loc     <- getSrcSpanM
-        ; uniqs   <- newUniqueSupply
+        ; new_uniqs <- getUniquesM
         ; rdr_env <- getLocalRdrEnv
         ; lvl     <- getTcLevel
         ; let new_occs = Inf.filter (\ occ ->
                   isNothing (lookupLocalRdrOcc rdr_env occ) &&
                   -- Note [Avoid name clashes for associated data types]
                   not (occ `elem` avoid_occs)) $ mkOccName tvName <$> allNameStrings
-              new_uniqs = uniqsFromSupply uniqs
               subst = mkEmptySubst in_scope
               details = SkolemTv skol_info (pushTcLevel lvl) False
                         -- As always, allocate skolems one level in

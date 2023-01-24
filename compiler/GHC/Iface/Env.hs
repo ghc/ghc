@@ -262,9 +262,9 @@ newIfaceName occ
 
 newIfaceNames :: [OccName] -> IfL [Name]
 newIfaceNames occs
-  = do  { uniqs <- newUniqueSupply
+  = do  { uniqs <- getUniquesM
         ; return [ mkInternalName uniq occ noSrcSpan
-                 | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
+                 | (occ,uniq) <- occs `zip` uniqs] }
 
 trace_if :: Logger -> SDoc -> IO ()
 {-# INLINE trace_if #-}
