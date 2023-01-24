@@ -2,7 +2,7 @@ module Rules.Generate (
     isGeneratedCmmFile, compilerDependencies, generatePackageCode,
     generateRules, copyRules, generatedDependencies,
     ghcPrimDependencies,
-    templateRules
+    templateRules, generateTemplateResults
     ) where
 
 import qualified Data.Set as Set
@@ -243,7 +243,6 @@ templateResults =
     , "driver/ghci/ghci-wrapper.cabal"
     , "ghc/ghc-bin.cabal"
     , "utils/iserv/iserv.cabal"
-    , "utils/iserv-proxy/iserv-proxy.cabal"
     , "utils/remote-iserv/remote-iserv.cabal"
     , "utils/runghc/runghc.cabal"
     , "libraries/ghc-boot/ghc-boot.cabal"
@@ -255,6 +254,10 @@ templateResults =
     , "libraries/template-haskell/template-haskell.cabal"
     , "libraries/prologue.txt"
     ]
+
+-- | Generate all the files we know we have a template for
+generateTemplateResults :: Action ()
+generateTemplateResults = need templateResults
 
 templateRules :: Rules ()
 templateRules = do

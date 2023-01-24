@@ -12,7 +12,7 @@ import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
-import Rules.Generate (ghcPrimDependencies)
+import Rules.Generate (ghcPrimDependencies, generateTemplateResults)
 import Base
 import Context
 import Expression (getContextData, interpretInContext, (?), package)
@@ -67,6 +67,12 @@ pathPath "GHCUsersGuide" = "docs/users_guide"
 pathPath "users_guide" = "docs/users_guide"
 pathPath "Haddock" = "utils/haddock/doc"
 pathPath _ = ""
+
+-- Generate files required to build the docs (e.g. ghc.cabal)
+needDocDeps :: Action ()
+needDocDeps = do
+  -- build .cabal files used by the doc engine to list package versions
+  generateTemplateResults
 
 -- | Build all documentation
 documentationRules :: Rules ()
@@ -188,6 +194,9 @@ buildSphinxHtml :: FilePath -> Rules ()
 buildSphinxHtml path = do
     root <- buildRootRules
     root -/- htmlRoot -/- path -/- "index.html" %> \file -> do
+
+        needDocDeps
+
         let dest = takeDirectory file
             rstFilesDir = pathPath path
         rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
@@ -301,6 +310,9 @@ buildSphinxPdf :: FilePath -> Rules ()
 buildSphinxPdf path = do
     root <- buildRootRules
     root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
+
+        needDocDeps
+
         withTempDir $ \dir -> do
             let rstFilesDir = pathPath path
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
