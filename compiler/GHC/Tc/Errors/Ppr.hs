@@ -3321,8 +3321,8 @@ missingSignatureWarningFlags (MissingTopLevelBindingSig {}) exported
 missingSignatureWarningFlags (MissingPatSynSig {}) exported
   = Opt_WarnMissingPatternSynonymSignatures :|
     [ Opt_WarnMissingExportedPatternSynonymSignatures | IsExported  == exported ]
-missingSignatureWarningFlags (MissingTyConKindSig {}) _
-  = Opt_WarnMissingKindSignatures :| []
+missingSignatureWarningFlags (MissingTyConKindSig ty_con _) _
+  = Opt_WarnMissingKindSignatures :| [Opt_WarnMissingPolyKindSignatures | isForAllTy_invis_ty (tyConKind ty_con) ]
 
 useDerivingStrategies :: GhcHint
 useDerivingStrategies =

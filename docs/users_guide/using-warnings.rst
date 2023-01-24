@@ -1324,6 +1324,31 @@ of ``-W(no-)*``.
     the parent class a standalone kind signature or CUSK is sufficient to fix
     the warning for the class's associated type families as well.
 
+.. ghc-flag:: -Wmissing-poly-kind-signatures
+    :shortdesc: warn when inferred polykinded type or class declaration don't have kind signatures nor CUSKs
+    :type: dynamic
+    :reverse: -Wno-missing-poly-kind-signatures
+    :category:
+
+    :since: 9.8
+    :default: off
+
+    .. index::
+         single: kind signatures, missing
+
+    This is a restricted version of :ghc-flag:`-Wmissing-kind-signatures`.
+
+    It warns when a declaration defines a type constructor that lacks a :ref:`standalone kind signature <standalone-kind-signatures>`
+    and whose inferred kind is polymorphic (which happens with `-PolyKinds`.  For example ::
+
+        data T a = MkT (a -> Int)    -- T :: Type -> Type
+                                     -- Not polymorphic, hence no warning
+        data W f a = MkW (f a)       -- W :: forall k. (k->Type) -> k -> Type
+                                     -- Polymorphic, hence warning!
+
+    It is useful to catch accidentally polykinded types, or to make that polymorphism explicit,
+    without requiring a kind signature for every type.
+
 .. ghc-flag:: -Wmissing-exported-pattern-synonym-signatures
     :shortdesc: warn about pattern synonyms without signatures, only if they
         are exported

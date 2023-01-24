@@ -936,6 +936,7 @@ data TcRnMessage where
         -Wmissing-pattern-synonym-signatures
         -Wmissing-exported-pattern-synonym-signatures
         -Wmissing-kind-signatures
+        -Wmissing-poly-kind-signatures
 
       Test cases:
         T11077 (top-level bindings)

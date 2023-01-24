@@ -1543,6 +1543,17 @@ tryTcDiscardingErrs recover thing_inside
     tidy up the message; we then use it to tidy the context messages
 -}
 
+{-
+
+Note [Reporting warning diagnostics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use functions below to report warnings.  For the most part,
+we do /not/ need to check any warning flags before doing so.
+See https://gitlab.haskell.org/ghc/ghc/-/wikis/Errors-as-(structured)-values
+for the design.
+
+-}
+
 addErrTc :: TcRnMessage -> TcM ()
 addErrTc err_msg = do { env0 <- liftZonkM tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }

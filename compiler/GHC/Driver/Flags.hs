@@ -631,6 +631,7 @@ data WarningFlag =
    | Opt_WarnAmbiguousFields                         -- Since 9.2
    | Opt_WarnImplicitLift                            -- Since 9.2
    | Opt_WarnMissingKindSignatures                   -- Since 9.2
+   | Opt_WarnMissingPolyKindSignatures               -- Since 9.8
    | Opt_WarnMissingExportedPatternSynonymSignatures -- since 9.2
    | Opt_WarnRedundantStrictnessFlags                -- Since 9.4
    | Opt_WarnForallIdentifier                        -- Since 9.4
@@ -685,6 +686,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnSemigroup                               -> "semigroup" :| []
   Opt_WarnMissingSignatures                       -> "missing-signatures" :| []
   Opt_WarnMissingKindSignatures                   -> "missing-kind-signatures" :| []
+  Opt_WarnMissingPolyKindSignatures               -> "missing-poly-kind-signatures" :| []
   Opt_WarnMissingExportedSignatures               -> "missing-exported-signatures" :| []
   Opt_WarnMonomorphism                            -> "monomorphism-restriction" :| []
   Opt_WarnNameShadowing                           -> "name-shadowing" :| []

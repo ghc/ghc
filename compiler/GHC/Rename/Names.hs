@@ -1689,12 +1689,13 @@ warnMissingKindSignatures gbl_env
     tcs = tcg_tcs gbl_env
     ksig_ns = tcg_ksigs gbl_env
     exports = availsToNameSet (tcg_exports gbl_env)
-    not_ghc_generated :: Name -> Bool
-    not_ghc_generated name = name `elemNameSet` ksig_ns
+
+    has_kind_signature :: Name -> Bool
+    has_kind_signature name = name `elemNameSet` ksig_ns
 
     add_ty_warn :: Bool -> TyCon -> RnM ()
     add_ty_warn cusks_enabled tyCon =
-      when (not_ghc_generated name) $
+      when (has_kind_signature name) $
         addDiagnosticAt (getSrcSpan name) diag
       where
         name = tyConName tyCon

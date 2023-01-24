@@ -111,6 +111,7 @@ module GHC.Core.Type (
         isTyVarTy, isFunTy, isCoercionTy,
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
+        isForAllTy_invis_ty,
         isPiTy, isTauTy, isFamFreeTy,
         isCoVarType, isAtomicTy,
 
@@ -1886,6 +1887,15 @@ isForAllTy ty
 isForAllTy_ty :: Type -> Bool
 isForAllTy_ty ty
   | ForAllTy (Bndr tv _) _ <- coreFullView ty
+  , isTyVar tv
+  = True
+
+  | otherwise = False
+
+-- | Like `isForAllTy`, but returns True only if it is an inferred tyvar binder
+isForAllTy_invis_ty :: Type -> Bool
+isForAllTy_invis_ty  ty
+  | ForAllTy (Bndr tv (Invisible InferredSpec)) _ <- coreFullView ty
   , isTyVar tv
   = True
 

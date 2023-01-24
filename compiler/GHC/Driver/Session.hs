@@ -2192,6 +2192,7 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnSemigroup,
   warnSpec    Opt_WarnMissingSignatures,
   warnSpec    Opt_WarnMissingKindSignatures,
+  warnSpec    Opt_WarnMissingPolyKindSignatures,
   subWarnSpec "missing-exported-sigs"
               Opt_WarnMissingExportedSignatures
               "it is replaced by -Wmissing-exported-signatures",
