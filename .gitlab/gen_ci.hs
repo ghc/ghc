@@ -112,6 +112,7 @@ data LinuxDistro
   = Debian11 | Debian10 | Debian9
   | Fedora33
   | Ubuntu2004
+  | Ubuntu1804
   | Centos7
   | Alpine
   | Rocky8
@@ -270,6 +271,7 @@ distroName Debian11  = "deb11"
 distroName Debian10   = "deb10"
 distroName Debian9   = "deb9"
 distroName Fedora33  = "fedora33"
+distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
 distroName Alpine     = "alpine3_12"
@@ -860,6 +862,7 @@ job_groups =
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
+     , disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
      , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
      , disableValidate (standardBuilds Amd64 (Linux Rocky8))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
