@@ -60,40 +60,40 @@ test('T21622',
 # TODO: Remove debug flags
 test('stack_big_ret',
      [
-        extra_files(['stack_lib.c', 'TestUtils.hs']),
+        extra_files(['TestUtils.hs']),
         ignore_stdout,
         ignore_stderr
      ],
-     multi_compile_and_run,
-     ['stack_big_ret', [('stack_lib.c','')], '-debug -optc-g -g'])
+     compile_and_run,
+     ['-debug -optc-g -g'])
 
 # TODO: Remove debug flags
 # Options:
 #   - `-kc512B -kb64B`: Make stack chunk size small to provoke underflow stack frames.
 test('stack_underflow',
      [
-        extra_files(['stack_lib.c', 'TestUtils.hs']),
+        extra_files(['TestUtils.hs']),
         extra_run_opts('+RTS -kc512B -kb64B -RTS'),
         ignore_stdout,
         ignore_stderr
      ],
-     multi_compile_and_run,
-     ['stack_underflow', [('stack_lib.c','')], '-debug -optc-g -g'])
+     compile_and_run,
+     ['-debug -optc-g -g'])
 
 # TODO: Remove debug flags
 test('stack_stm_frames',
      [
-        extra_files(['stack_lib.c', 'TestUtils.hs']),
+        extra_files(['TestUtils.hs']),
         ignore_stdout,
         ignore_stderr
       ],
-     multi_compile_and_run,
-     ['stack_stm_frames', [('stack_lib.c','')], '-debug -optc-g -g'])
+     compile_and_run,
+     ['-debug -optc-g -g'])
 
 # TODO: Remove debug flags
 test('stack_misc_closures',
      [
-        extra_files(['stack_misc_closures_c.c', 'stack_misc_closures_prim.cmm','stack_lib.c', 'TestUtils.hs']),
+        extra_files(['stack_misc_closures_c.c', 'stack_misc_closures_prim.cmm', 'TestUtils.hs']),
         ignore_stdout,
         ignore_stderr
       ],
@@ -101,7 +101,6 @@ test('stack_misc_closures',
      ['stack_misc_closures',
         [ ('stack_misc_closures_c.c', '')
          ,('stack_misc_closures_prim.cmm', '')
-         ,('stack_lib.c', '')
          ]
-      , '-debug -optc-g -g -ddump-to-file -dlint -dppr-debug -ddump-cmm'
+      , '-debug -optc-g -optc-O0 -g -ddump-to-file -dlint -ddump-cmm'
       ])

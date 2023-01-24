@@ -18,6 +18,7 @@ import GHC.Stack.CloneStack
 import System.IO (hPutStrLn, stderr)
 import System.Mem
 import TestUtils
+import GHC.Exts.Heap
 
 cloneStackReturnInt :: IORef (Maybe StackSnapshot) -> Int
 cloneStackReturnInt ioRef = unsafePerformIO $ do
@@ -36,14 +37,15 @@ main = do
 
   mbStackSnapshot <- readIORef stackRef
   let stackSnapshot = fromJust mbStackSnapshot
-  !decodedStack <- decodeStack' stackSnapshot
+  (SimpleStack boxedFrames) <- decodeStack stackSnapshot
+  stackFrames <- mapM getBoxedClosureData boxedFrames
 
-  assertStackInvariants stackSnapshot decodedStack
+  assertStackInvariants stackSnapshot stackFrames
   assertThat
     "Stack contains one big return frame"
     (== 1)
-    (length $ filter isBigReturnFrame decodedStack)
-  cs <- (mapM unbox . payload . head) $ filter isBigReturnFrame decodedStack
+    (length $ filter isBigReturnFrame stackFrames)
+  cs <- (mapM unbox . payload . head) $ filter isBigReturnFrame stackFrames
   let  xs = zip [1 ..] cs
   mapM_ (uncurry checkArg) xs
 

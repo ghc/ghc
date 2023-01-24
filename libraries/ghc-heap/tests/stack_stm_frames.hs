@@ -11,6 +11,7 @@ import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.InfoTable.Types
 import GHC.Stack.CloneStack
 import TestUtils
+import GHC.Exts.Heap
 
 main :: IO ()
 main = do
@@ -27,12 +28,6 @@ main = do
     "Stack contains one atomically frame"
     (== 1)
     (length $ filter isAtomicallyFrame decodedStack)
-
-getDecodedStack :: IO (StackSnapshot, [Closure])
-getDecodedStack = do
-  s <- cloneMyStack
-  fs <- decodeStack' s
-  pure (s, fs)
 
 isCatchStmFrame :: Closure -> Bool
 isCatchStmFrame (CatchStmFrame {..}) = tipe info == CATCH_STM_FRAME

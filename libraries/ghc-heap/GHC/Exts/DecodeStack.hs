@@ -17,8 +17,7 @@
 
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack (
-  decodeStack,
-  decodeStack'
+  decodeStack
                             ) where
 
 import GHC.Exts.StackConstants
@@ -148,11 +147,13 @@ toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize = BitmapEntry {
   } : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> Box
-toBitmapPayload e | isPrimitive e = DecodedClosureBox $ (CL.UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame) e
+toBitmapPayload e | isPrimitive e = let !b = (UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame) e
+                                    in DecodedBox b
 toBitmapPayload e = getClosure (closureFrame e) 0
 
 getClosure :: StackFrameIter ->  WordOffset-> Box
 getClosure StackFrameIter {..} relativeOffset =
+-- TODO: What happens if the GC kicks in here?
   let offset = wordOffsetToWord# (index + relativeOffset)
       !ptr = (getAddr# stackSnapshot# offset)
       !a :: Any = unsafeCoerce# ptr
@@ -191,10 +192,11 @@ byteArrayToList bArray = go 0
 wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 
-unpackStackFrameIter :: StackFrameIter -> IO CL.Closure
+unpackStackFrameIter :: StackFrameIter -> IO Box
 unpackStackFrameIter sfi = do
   info <- getInfoTable sfi
-  pure $ unpackStackFrameIter' info
+  let !c = unpackStackFrameIter' info
+  pure $ DecodedBox c
   where
     -- TODO: Check all (missing?) bang patterns
     unpackStackFrameIter' :: StgInfoTable -> CL.Closure
@@ -264,13 +266,12 @@ intToWord# i = int2Word# (toInt# i)
 decodeStack :: StackSnapshot -> IO CL.Closure
 decodeStack s = do
   stack <- decodeStack' s
-  let boxed = map DecodedClosureBox stack
-  pure $ SimpleStack boxed
+  pure $ SimpleStack stack
 
-decodeStack' :: StackSnapshot -> IO [CL.Closure]
+decodeStack' :: StackSnapshot -> IO [Box]
 decodeStack' s = unpackStackFrameIter (stackHead s) >>= \frame -> (frame :) <$> go (advanceStackFrameIter (stackHead s))
   where
-    go :: Maybe StackFrameIter -> IO [CL.Closure]
+    go :: Maybe StackFrameIter -> IO [Box]
     go Nothing = pure []
     go (Just sfi) = (trace "decode\n" (unpackStackFrameIter sfi)) >>= \frame -> (frame :) <$> go (advanceStackFrameIter sfi)
 

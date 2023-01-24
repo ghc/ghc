@@ -161,6 +161,7 @@ getClosureDataFromHeapObject x = do
         (# infoTableAddr, heapRep, pointersArray #) -> do
             let infoTablePtr = Ptr infoTableAddr
                 ptrList = [case indexArray# pointersArray i of
+-- TODO: What happens if the GC kicks in here? Is that possible? check Cmm.
                                 (# ptr #) -> Box ptr
                             | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
                             ]
@@ -175,5 +176,5 @@ getClosureDataFromHeapObject x = do
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
 #if MIN_TOOL_VERSION_ghc(9,5,0)
-getBoxedClosureData (DecodedClosureBox a) = pure a
+getBoxedClosureData (DecodedBox a) = pure a
 #endif

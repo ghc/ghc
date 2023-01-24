@@ -20,8 +20,7 @@ loop n = print "x" >> loop (n - 1) >> print "x"
 
 getStack :: HasCallStack => IO ()
 getStack = do
-  !s <- cloneMyStack
-  !decodedStack <- decodeStack' s
+  (s, decodedStack) <- getDecodedStack
   -- Uncomment to see the frames (for debugging purposes)
   -- hPutStrLn stderr $ "Stack frames : " ++ show decodedStack
   assertStackInvariants s decodedStack

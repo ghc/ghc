@@ -281,7 +281,9 @@ test setup assertion = do
   -- when the GC suddenly does it's work and there were bad closures or pointers.
   -- Better fail early, here.
   performGC
-  stack <- decodeStack' sn
+  (SimpleStack boxedFrames) <- decodeStack sn
+  performGC
+  stack <- mapM getBoxedClosureData boxedFrames
   performGC
   assert sn stack
   -- The result of HasHeapRep should be similar (wrapped in the closure for
@@ -354,6 +356,9 @@ getWordFromConstr01 c = case c of
 getWordFromBlackhole :: HasCallStack => Closure -> IO Word
 getWordFromBlackhole c = case c of
   BlackholeClosure {..} -> getWordFromConstr01 <$> getBoxedClosureData indirectee
+  -- For test stability reasons: Expect that the blackhole might have been
+  -- resolved.
+  ConstrClosure {..} -> pure $ head dataArgs
   e -> error $ "Wrong closure type: " ++ show e
 
 getWordFromUnknownTypeWordSizedPrimitive :: HasCallStack => Closure -> Word

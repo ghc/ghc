@@ -53,6 +53,7 @@ import Numeric
 
 #if MIN_VERSION_base(4,17,0)
 import GHC.Stack.CloneStack (StackSnapshot(..))
+import Unsafe.Coerce (unsafeCoerce)
 #endif
 
 ------------------------------------------------------------------------
@@ -68,13 +69,14 @@ foreign import prim "reallyUnsafePtrEqualityUpToTag"
 -- required, e.g. in 'getBoxedClosureData', the function knows how far it has
 -- to evaluate the argument.
 #if MIN_VERSION_base(4,17,0)
-data Box = Box Any | DecodedClosureBox Closure
+data Box = Box Any | DecodedBox Closure
 
 
 #else
 data Box = Box Any
 #endif
 
+-- TODO: Handle PrimitiveWordHolder
 instance Show Box where
 -- From libraries/base/GHC/Ptr.lhs
    showsPrec _ (Box a) rs =
@@ -86,19 +88,21 @@ instance Show Box where
        addr = ptr - tag
        pad_out ls = '0':'x':ls
 #if MIN_VERSION_base(4,17,0)
-   showsPrec _ (DecodedClosureBox a) rs = "(DecodedClosureBox " ++ show a ++ ")" ++ rs
+   showsPrec _ (DecodedBox a) rs = "(DecodedBox " ++ show a ++ ")" ++ rs
 #endif
 
 -- | Boxes can be compared, but this is not pure, as different heap objects can,
 -- after garbage collection, become the same object.
+-- TODO: Handle PrimitiveWordHolder
 areBoxesEqual :: Box -> Box -> IO Bool
 areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
     0# -> pure False
     _  -> pure True
 #if MIN_VERSION_base(4,17,0)
--- TODO: Implement
-areBoxesEqual (DecodedClosureBox _) (DecodedClosureBox _) = error "Not implemented, yet!"
-areBoxesEqual _ _ = pure $ False
+areBoxesEqual (DecodedBox a) (DecodedBox b) = areBoxesEqual
+  (Box (unsafeCoerce a))
+  (Box (unsafeCoerce b))
+areBoxesEqual _ _ = pure False
 #endif
 
 -- |This takes an arbitrary value and puts it into a box.
@@ -600,10 +604,6 @@ allClosures _ = []
 -- Includes header and payload. Does not follow pointers.
 --
 -- @since 8.10.1
+-- TODO: Handle PrimitiveWordHolder
 closureSize :: Box -> Int
 closureSize (Box x) = I# (closureSize# x)
-#if MIN_VERSION_base(4,17,0)
--- TODO: Add comment to explain. This is a bit weird because it returns the size
--- of the representation, not the closure itself.
-closureSize (DecodedClosureBox dc) = closureSize $ asBox dc
-#endif
