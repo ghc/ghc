@@ -1,5 +1,12 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.19.0.0 *TBA*
+
+  * Add `Data.List.!?` per
+    [CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110).
+  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
+    types significantly.
+
 ## 4.18.0.0 *TBA*
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p`.
   * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
@@ -58,10 +65,6 @@
     freeing a `Pool`. (#14762) (#18338)
   * `Type.Reflection.Unsafe` is now marked as unsafe.
   * Add `Data.Typeable.heqT`, a kind-heterogeneous version of `Data.Typeable.eqT`.
-  * Add `Data.List.!?` per
-    [CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110).
-  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
-    types significantly.
 
 ## 4.17.0.0 *August 2022*
 
