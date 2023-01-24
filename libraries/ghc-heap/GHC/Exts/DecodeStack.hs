@@ -29,7 +29,7 @@ import Foreign
 import GHC.Exts
 import GHC.Exts.DecodeHeap
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Closures as CL
+import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.StackConstants
@@ -202,71 +202,71 @@ unpackStackFrameIter sfi = do
   let c = unpackStackFrameIter' info
   pure $ DecodedBox c
   where
-    unpackStackFrameIter' :: StgInfoTable -> CL.Closure
+    unpackStackFrameIter' :: StgInfoTable -> Closure
     unpackStackFrameIter' info =
       case tipe info of
         RET_BCO ->
-          CL.RetBCO
+          RetBCO
             { info = info,
               bco = getClosure sfi offsetStgClosurePayload,
               -- The arguments begin directly after the payload's one element
               bcoArgs = decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
             }
         RET_SMALL ->
-          CL.RetSmall
+          RetSmall
             { info = info,
               knownRetSmallType = getRetSmallSpecialType sfi,
               payload = decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
             }
         RET_BIG ->
-          CL.RetBig
+          RetBig
             { info = info,
               payload = decodeLargeBitmap getLargeBitmap# sfi offsetStgClosurePayload
             }
         RET_FUN ->
-          CL.RetFun
+          RetFun
             { info = info,
               retFunType = getRetFunType sfi,
               retFunSize = getWord sfi offsetStgRetFunFrameSize,
               retFunFun = getClosure sfi offsetStgRetFunFrameFun,
               retFunPayload =
-                if getRetFunType sfi == CL.ARG_GEN_BIG
+                if getRetFunType sfi == ARG_GEN_BIG
                   then decodeLargeBitmap getRetFunLargeBitmap# sfi offsetStgRetFunFramePayload
                   else decodeSmallBitmap getRetFunSmallBitmap# sfi offsetStgRetFunFramePayload
             }
         UPDATE_FRAME ->
-          CL.UpdateFrame
+          UpdateFrame
             { info = info,
               knownUpdateFrameType = getUpdateFrameType sfi,
               updatee = getClosure sfi offsetStgUpdateFrameUpdatee
             }
         CATCH_FRAME ->
-          CL.CatchFrame
+          CatchFrame
             { info = info,
               exceptions_blocked = getWord sfi offsetStgCatchFrameExceptionsBlocked,
               handler = getClosure sfi offsetStgCatchFrameHandler
             }
         UNDERFLOW_FRAME ->
-          CL.UnderflowFrame
+          UnderflowFrame
             { info = info,
               nextChunk = getUnderflowFrameNextChunk sfi
             }
-        STOP_FRAME -> CL.StopFrame {info = info}
+        STOP_FRAME -> StopFrame {info = info}
         ATOMICALLY_FRAME ->
-          CL.AtomicallyFrame
+          AtomicallyFrame
             { info = info,
               atomicallyFrameCode = getClosure sfi offsetStgAtomicallyFrameCode,
               result = getClosure sfi offsetStgAtomicallyFrameResult
             }
         CATCH_RETRY_FRAME ->
-          CL.CatchRetryFrame
+          CatchRetryFrame
             { info = info,
               running_alt_code = getWord sfi offsetStgCatchRetryFrameRunningAltCode,
               first_code = getClosure sfi offsetStgCatchRetryFrameRunningFirstCode,
               alt_code = getClosure sfi offsetStgCatchRetryFrameAltCode
             }
         CATCH_STM_FRAME ->
-          CL.CatchStmFrame
+          CatchStmFrame
             { info = info,
               catchFrameCode = getClosure sfi offsetStgCatchSTMFrameCode,
               handler = getClosure sfi offsetStgCatchSTMFrameHandler
@@ -286,7 +286,7 @@ toInt# (I# i) = i
 intToWord# :: Int -> Word#
 intToWord# i = int2Word# (toInt# i)
 
-decodeStack :: StackSnapshot -> IO CL.Closure
+decodeStack :: StackSnapshot -> IO Closure
 decodeStack s = do
   stack <- decodeStack' s
   pure $ SimpleStack stack
