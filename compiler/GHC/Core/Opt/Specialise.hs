@@ -33,6 +33,7 @@ import GHC.Core.Utils     ( exprIsTrivial
 import GHC.Core.FVs
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Core.Opt.Arity( collectBindersPushingCo )
+-- import GHC.Core.Ppr( pprIds )
 
 import GHC.Builtin.Types  ( unboxedUnitTy )
 
@@ -736,7 +737,8 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
   = return ([], wrapDictBinds dict_binds [])
 
   | otherwise
-  = do { (_env, spec_rules, spec_binds) <- spec_imports top_env [] dict_binds calls
+  = do { let env_w_dict_bndrs = top_env `bringFloatedDictsIntoScope` dict_binds
+       ; (_env, spec_rules, spec_binds) <- spec_imports env_w_dict_bndrs [] dict_binds calls
 
              -- Don't forget to wrap the specialized bindings with
              -- bindings for the needed dictionaries.
@@ -752,6 +754,7 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
 
 -- | Specialise a set of calls to imported bindings
 spec_imports :: SpecEnv          -- Passed in so that all top-level Ids are in scope
+                                 ---In-scope set includes the FloatedDictBinds
              -> [Id]             -- Stack of imported functions being specialised
                                  -- See Note [specImport call stack]
              -> FloatedDictBinds -- Dict bindings, used /only/ for filterCalls
@@ -781,6 +784,7 @@ spec_imports env callers dict_binds calls
            ; return (env, rules1 ++ rules2, spec_binds1 ++ spec_binds2) }
 
 spec_import :: SpecEnv               -- Passed in so that all top-level Ids are in scope
+                                     ---In-scope set includes the FloatedDictBinds
             -> [Id]                  -- Stack of imported functions being specialised
                                      -- See Note [specImport call stack]
             -> FloatedDictBinds      -- Dict bindings, used /only/ for filterCalls
@@ -806,23 +810,35 @@ spec_import env callers dict_binds cis@(CIS fn _)
        ; eps_rules <- getExternalRuleBase
        ; let rule_env = se_rules env `updExternalPackageRules` eps_rules
 
---       ; debugTraceMsg (text "specImport1" <+> vcat [ppr fn, ppr good_calls
---                                                    , ppr (getRules rule_env fn), ppr rhs])
+--       ; debugTraceMsg (text "specImport1" <+> vcat
+--           [ text "function:" <+> ppr fn
+--           , text "good calls:" <+> ppr good_calls
+--           , text "existing rules:" <+> ppr (getRules rule_env fn)
+--           , text "rhs:" <+> ppr rhs
+--           , text "dict_binds:" <+> ppr dict_binds ])
+
        ; (rules1, spec_pairs, MkUD { ud_binds = dict_binds1, ud_calls = new_calls })
-            <- runSpecM $ specCalls True env dict_binds
-                                    (getRules rule_env fn) good_calls fn rhs
+            <- runSpecM $ specCalls True env (getRules rule_env fn) good_calls fn rhs
 
        ; let spec_binds1 = [NonRec b r | (b,r) <- spec_pairs]
-             -- After the rules kick in we may get recursion, but
-             -- we rely on a global GlomBinds to sort that out later
+             -- After the rules kick in, via fireRewriteRules, we may get recursion,
+             -- but we rely on a global GlomBinds to sort that out later
              -- See Note [Glom the bindings if imported functions are specialised]
+             -- Meanwhile, though, bring the binders into scope
 
              new_subst = se_subst env `Core.extendSubstInScopeList` map fst spec_pairs
              new_env   = env { se_rules = rule_env `addLocalRules` rules1
                              , se_subst = new_subst }
+                         `bringFloatedDictsIntoScope` dict_binds1
 
-              -- Now specialise any cascaded calls
---       ; debugTraceMsg (text "specImport 2" <+> (ppr fn $$ ppr rules1 $$ ppr spec_binds1))
+       -- Now specialise any cascaded calls
+--       ; debugTraceMsg (text "specImport 2" <+> vcat
+--           [ text "function:" <+> ppr fn
+--           , text "rules1:" <+> ppr rules1
+--           , text "spec_binds1" <+> ppr spec_binds1
+--           , text "dict_binds1" <+> ppr dict_binds1
+--           , text "new_calls" <+> ppr new_calls ])
+
        ; (env, rules2, spec_binds2)
             <- spec_imports new_env (fn:callers)
                                     (dict_binds `thenFDBs` dict_binds1)
@@ -1561,10 +1577,11 @@ specDefn :: SpecEnv
 specDefn env body_uds fn rhs
   = do { let (body_uds_without_me, calls_for_me) = callsForMe fn body_uds
              rules_for_me = idCoreRules fn
-             dict_binds   = ud_binds body_uds
+             -- Bring into scope the binders from the floated dicts
+             env_w_dict_bndrs = bringFloatedDictsIntoScope env (ud_binds body_uds)
 
-       ; (rules, spec_defns, spec_uds) <- specCalls False env dict_binds
-                                               rules_for_me calls_for_me fn rhs
+       ; (rules, spec_defns, spec_uds) <- specCalls False env_w_dict_bndrs
+                                                    rules_for_me calls_for_me fn rhs
 
        ; return ( fn `addIdSpecialisations` rules
                 , spec_defns
@@ -1580,7 +1597,6 @@ specDefn env body_uds fn rhs
 specCalls :: Bool              -- True  =>  specialising imported fn
                                -- False =>  specialising local fn
           -> SpecEnv
-          -> FloatedDictBinds  -- Just so that we can extend the in-scope set
           -> [CoreRule]        -- Existing RULES for the fn
           -> [CallInfo]
           -> OutId -> InExpr
@@ -1594,7 +1610,7 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
                 , [(Id,CoreExpr)]  -- Specialised definition
                 , UsageDetails )   -- Usage details from specialised RHSs
 
-specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
+specCalls spec_imp env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
   |  notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
@@ -1610,8 +1626,11 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 --      See Note [Inline specialisations] for why we do not
 --      switch off specialisation for inline functions
 
-  = -- pprTrace "specCalls: some" (ppr fn $$ ppr calls_for_me $$ ppr existing_rules) $
-    foldlM spec_call ([], [], emptyUDs) calls_for_me
+  = do { -- debugTraceMsg (text "specCalls: some" <+> vcat
+         --   [ text "function" <+> ppr fn
+         --   , text "calls:" <+> ppr calls_for_me
+         --   , text "subst" <+> ppr (se_subst env) ])
+       ; foldlM spec_call ([], [], emptyUDs) calls_for_me }
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
   = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me && not (isClassOpId fn))
@@ -1639,9 +1658,6 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
     (rhs_bndrs, rhs_body) = collectBindersPushingCo rhs
                             -- See Note [Account for casts in binding]
 
-    -- Bring into scope the binders from the floated dicts
-    env_with_dict_bndrs = bringFloatedDictsIntoScope env dict_binds
-
     already_covered :: SpecEnv -> [CoreRule] -> [CoreExpr] -> Bool
     already_covered env new_rules args      -- Note [Specialisations already covered]
        = isJust (specLookupRule env fn args (beginPhase inl_act)
@@ -1667,22 +1683,22 @@ specCalls spec_imp env dict_binds existing_rules calls_for_me fn rhs
 
            ; ( useful, rhs_env2, leftover_bndrs
              , rule_bndrs, rule_lhs_args
-             , spec_bndrs1, dx_binds, spec_args) <- specHeader env_with_dict_bndrs
-                                                               rhs_bndrs all_call_args
+             , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
---           ; pprTrace "spec_call" (vcat [ text "fun:       "  <+> ppr fn
---                                        , text "call info: "  <+> ppr _ci
---                                        , text "useful:    "  <+> ppr useful
---                                        , text "rule_bndrs:"  <+> ppr rule_bndrs
---                                        , text "lhs_args:  "  <+> ppr rule_lhs_args
---                                        , text "spec_bndrs1:" <+> ppr spec_bndrs1
---                                        , text "leftover_bndrs:" <+> pprIds leftover_bndrs
---                                        , text "spec_args: "  <+> ppr spec_args
---                                        , text "dx_binds:  "  <+> ppr dx_binds
---                                        , text "rhs_body"     <+> ppr rhs_body
---                                        , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
---                                        , ppr dx_binds ]) $
---             return ()
+--           ; debugTraceMsg (text "spec_call" <+> vcat
+--                [ text "fun:       "  <+> ppr fn
+--                , text "call info: "  <+> ppr _ci
+--                , text "useful:    "  <+> ppr useful
+--                , text "rule_bndrs:"  <+> ppr rule_bndrs
+--                , text "lhs_args:  "  <+> ppr rule_lhs_args
+--                , text "spec_bndrs1:" <+> ppr spec_bndrs1
+--                , text "leftover_bndrs:" <+> pprIds leftover_bndrs
+--                , text "spec_args: "  <+> ppr spec_args
+--                , text "dx_binds:  "  <+> ppr dx_binds
+--                , text "rhs_bndrs"     <+> ppr rhs_bndrs
+--                , text "rhs_body"     <+> ppr rhs_body
+--                , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
+--                , ppr dx_binds ]
 
            ; if not useful  -- No useful specialisation
                 || already_covered rhs_env2 rules_acc rule_lhs_args

@@ -469,4 +469,4 @@ test('T22662', normal, compile, [''])
 test('T22725', normal, compile, ['-O'])
 test('T22502', normal, compile, ['-O'])
 test('T22611', [when(wordsize(32), skip), grep_errmsg(r'\$salterF') ], compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all'])
-
+test('T22715_2', normal, multimod_compile, ['T22715_2', '-v0 -O -fspecialise-aggressively'])
