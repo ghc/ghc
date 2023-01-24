@@ -199,21 +199,20 @@ wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 unpackStackFrameIter :: StackFrameIter -> IO Box
 unpackStackFrameIter sfi = do
   info <- getInfoTable sfi
-  let !c = unpackStackFrameIter' info
+  let c = unpackStackFrameIter' info
   pure $ DecodedBox c
   where
-    -- TODO: Check all (missing?) bang patterns
     unpackStackFrameIter' :: StgInfoTable -> CL.Closure
     unpackStackFrameIter' info = do
       case tipe info of
         RET_BCO -> do
-          let !bco' = getClosure sfi offsetStgClosurePayload
+          let bco' = getClosure sfi offsetStgClosurePayload
               -- The arguments begin directly after the payload's one element
-              !args' = decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
+              args' = decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
           CL.RetBCO info bco' args'
         RET_SMALL -> do
-          let !special = getRetSmallSpecialType sfi
-              !payloads = decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
+          let special = getRetSmallSpecialType sfi
+              payloads = decodeSmallBitmap getSmallBitmap# sfi offsetStgClosurePayload
           CL.RetSmall info special payloads
         RET_BIG -> CL.RetBig info $ decodeLargeBitmap getLargeBitmap# sfi offsetStgClosurePayload
         RET_FUN -> do
@@ -227,7 +226,7 @@ unpackStackFrameIter sfi = do
           CL.RetFun info t size' fun' payload'
         -- TODO: Decode update frame type
         UPDATE_FRAME ->
-          let !t = getUpdateFrameType sfi
+          let t = getUpdateFrameType sfi
               c = getClosure sfi offsetStgUpdateFrameUpdatee
            in CL.UpdateFrame info t c
         CATCH_FRAME -> do
