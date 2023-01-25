@@ -65,6 +65,7 @@ flavourTransformers = M.fromList
     , "haddock"          =: enableHaddock
     , "hi_core"          =: enableHiCore
     , "late_ccs"         =: enableLateCCS
+    , "boot_nonmoving_gc" =: enableBootNonmovingGc
     ]
   where (=:) = (,)
 
@@ -282,6 +283,13 @@ enableAssertions flav = flav { ghcDebugAssertions = f }
   where
     f Stage2 = True
     f st = ghcDebugAssertions flav st
+
+-- | Build the stage3 compiler using the non-moving GC.
+enableBootNonmovingGc :: Flavour -> Flavour
+enableBootNonmovingGc = addArgs $ mconcat
+    [ stage Stage2 ? builder Ghc
+      ? pure ["+RTS", "--nonmoving-gc", "-RTS"]
+    ]
 
 -- | Produce fully statically-linked executables and build libraries suitable
 -- for static linking.
