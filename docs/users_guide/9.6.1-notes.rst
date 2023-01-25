@@ -90,6 +90,22 @@ Language
 Compiler
 ~~~~~~~~
 
+- The `WebAssembly backend
+  <https://www.tweag.io/blog/2022-11-22-wasm-backend-merged-in-ghc>`_
+  has been merged. This allows GHC to be built as a cross-compiler
+  that targets ``wasm32-wasi`` and compiles Haskell code to
+  self-contained WebAssembly modules that can be executed on a variety
+  of different runtimes. There are a few caveats to be aware of:
+  
+  - To use the WebAssembly backend, one would need to follow the
+    instructions on `ghc-wasm-meta
+    <https://gitlab.haskell.org/ghc/ghc-wasm-meta>`_. The WebAssembly
+    backend is not included in the GHC release bindists for the time
+    being, nor is it supported by ``ghcup`` or ``stack`` yet.
+  - The WebAssembly backend is still under active development. It's
+    presented in this GHC version as a technology preview, bugs and
+    missing features are expected.
+
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
