@@ -2065,11 +2065,7 @@ reifyThing (AGlobal (AnId id))
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
 reifyThing (AGlobal (AConLike (RealDataCon dc)))
-  = do  { let name = dataConName dc
-        ; ty <- reifyType (idType (dataConWrapId dc))
-        ; return (TH.DataConI (reifyName name) ty
-                              (reifyName (dataConOrigTyCon dc)))
-        }
+  = mkDataConI dc
 
 reifyThing (AGlobal (AConLike (PatSynCon ps)))
   = do { let name = reifyName ps
@@ -2173,6 +2169,13 @@ reifyTyCon tc
                    (TH.TySynD (reifyName tc) tvs' rhs'))
        }
 
+  -- Special case for `type data` data constructors, which are reified as
+  -- `ATyCon`s rather than `ADataCon`s (#22818).
+  -- See Note [Type data declarations] in GHC.Rename.Module.
+  | Just dc <- isPromotedDataCon_maybe tc
+  , isTypeDataCon dc
+  = mkDataConI dc
+
   | otherwise
   = do  { cxt <- reifyCxt (tyConStupidTheta tc)
         ; let tvs      = tyConTyVars tc
@@ -2182,7 +2185,12 @@ reifyTyCon tc
         ; r_tvs <- reifyTyVars (tyConVisibleTyVars tc)
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
-              decl | isNewTyCon tc =
+              decl | isTypeDataTyCon tc =
+                       -- `type data` declarations have a special `Dec`,
+                       -- separate from other `DataD`s. See
+                       -- [Type data declarations] in GHC.Rename.Module.
+                       TH.TypeDataD name r_tvs Nothing cons
+                   | isNewTyCon tc =
                        TH.NewtypeD cxt name r_tvs Nothing (head cons) deriv
                    | otherwise     =
                        TH.DataD    cxt name r_tvs Nothing       cons  deriv
@@ -2260,6 +2268,14 @@ reifyDataCon isGadtDataCon tys dc
           (subst', tvs') = substTyVarBndrs subst tvs
           tv_bndrs'      = map (\(tv,fl) -> Bndr tv fl) (zip tvs' flags)
       in (subst', tv_bndrs')
+
+mkDataConI :: DataCon -> TcM TH.Info
+mkDataConI dc
+  = do  { let name = dataConName dc
+        ; ty <- reifyType (idType (dataConWrapId dc))
+        ; return (TH.DataConI (reifyName name) ty
+                              (reifyName (dataConOrigTyCon dc)))
+        }
 
 {-
 Note [Freshen reified GADT constructors' universal tyvars]
