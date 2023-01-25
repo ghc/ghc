@@ -40,6 +40,12 @@ countDepsSourcePath = "utils/count-deps/Main.hs"
 countDepsExtra :: [String]
 countDepsExtra = ["-iutils/count-deps"]
 
+dumpDeclsProgPath, dumpDeclsSourcePath :: FilePath
+dumpDeclsProgPath = "test/bin/dump-decls" <.> exe
+dumpDeclsSourcePath = "utils/dump-decls/Main.hs"
+dumpDeclsExtra :: [String]
+dumpDeclsExtra = []
+
 noteLinterProgPath, noteLinterSourcePath :: FilePath
 noteLinterProgPath = "test/bin/lint-notes" <.> exe
 noteLinterSourcePath = "linters/lint-notes/Main.hs"
@@ -67,6 +73,7 @@ checkPrograms =
     [ CheckProgram "test:check-ppr" checkPprProgPath checkPprSourcePath checkPprExtra checkPpr id id
     , CheckProgram "test:check-exact" checkExactProgPath checkExactSourcePath checkExactExtra checkExact id id
     , CheckProgram "test:count-deps" countDepsProgPath countDepsSourcePath countDepsExtra countDeps id id
+    , CheckProgram "test:dump-decls" dumpDeclsProgPath dumpDeclsSourcePath dumpDeclsExtra dumpDecls id id
     , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
     , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
     ]
@@ -260,6 +267,7 @@ testRules = do
 
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
             setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
+            setEnv "DUMP_DECLS" (top -/- root -/- dumpDeclsProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
             setEnv "LINT_NOTES" (top -/- root -/- noteLinterProgPath)
             setEnv "LINT_WHITESPACE" (top -/- root -/- whitespaceLinterProgPath)

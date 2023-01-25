@@ -227,6 +227,10 @@ ifeq "$(CHECK_EXACT)" ""
 CHECK_EXACT := $(abspath $(TOP)/../inplace/bin/check-exact)
 endif
 
+ifeq "$(DUMP_DECLS)" ""
+DUMP_DECLS := $(abspath $(TOP)/../inplace/bin/dump-decls)
+endif
+
 ifeq "$(COUNT_DEPS)" ""
 COUNT_DEPS := $(abspath $(TOP)/../inplace/bin/count-deps)
 endif

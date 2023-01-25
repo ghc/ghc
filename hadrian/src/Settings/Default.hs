@@ -167,7 +167,7 @@ stage2Packages = stage1Packages
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
-testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact, countDeps, ghcConfig ])
+testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact, countDeps, ghcConfig, dumpDecls ])
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
