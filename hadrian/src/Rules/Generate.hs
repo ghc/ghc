@@ -13,6 +13,8 @@ import Hadrian.Oracles.TextFile (lookupSystemConfig)
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
+import Hadrian.Haskell.Cabal.Type (PackageData(version))
+import Hadrian.Oracles.Cabal (readPackageData)
 import Packages
 import Rules.Libffi
 import Settings
@@ -303,6 +305,13 @@ rtsCabalFlags = mconcat
   where
     flag = interpolateCabalFlag
 
+packageVersions :: Interpolations
+packageVersions = foldMap f [ base, ghcPrim, ghc, cabal, templateHaskell, ghcCompact, array ]
+  where
+    f :: Package -> Interpolations
+    f pkg = interpolateVar var $ show . version <$> readPackageData pkg
+      where var = "LIBRARY_" <> pkgName pkg <> "_VERSION"
+
 templateRule :: FilePath -> Interpolations -> Rules ()
 templateRule outPath interps = do
     outPath %> \_ -> do
@@ -328,6 +337,7 @@ templateRules = do
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/libiserv/libiserv.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
+  templateRule "libraries/prologue.txt" $ packageVersions
 
 
 -- Generators
