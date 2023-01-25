@@ -147,6 +147,7 @@ data BuildConfig
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
                 , noSplitSections :: Bool
+                , validateNonmovingGc :: Bool
                 }
 
 -- Extra arguments to pass to ./configure due to the BuildConfig
@@ -165,11 +166,14 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [Dwarf | withDwarf] ++
            [FullyStatic | fullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
-           [NoSplitSections | noSplitSections, buildFlavour == Release ]
+           [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
+           [BootNonmovingGc | validateNonmovingGc ]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
-data FlavourTrans = Llvm | Dwarf | FullyStatic | ThreadSanitiser | NoSplitSections
+data FlavourTrans
+    = Llvm | Dwarf | FullyStatic | ThreadSanitiser | NoSplitSections
+    | BootNonmovingGc
 
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
@@ -194,6 +198,7 @@ vanilla = BuildConfig
   , tablesNextToCode = True
   , threadSanitiser = False
   , noSplitSections = False
+  , validateNonmovingGc = False
   }
 
 splitSectionsBroken :: BuildConfig -> BuildConfig
@@ -317,6 +322,7 @@ flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . fl
     flavourString FullyStatic = "fully_static"
     flavourString ThreadSanitiser = "thread_sanitizer"
     flavourString NoSplitSections = "no_split_sections"
+    flavourString BootNonmovingGc = "boot_nonmoving_gc"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -544,6 +550,7 @@ data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
           | Nightly      -- ^ Only run this job in the nightly pipeline
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
           | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
+          | NonmovingGc  -- ^ Only run this job when the "non-moving GC" label is set.
           | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
@@ -564,6 +571,8 @@ ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
 ruleString Off LLVMBackend = true
 ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
 ruleString Off FreeBSDLabel = true
+ruleString On NonmovingGc = "$CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/"
+ruleString Off NonmovingGc = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
@@ -660,7 +669,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
     jobDependencies = []
     jobVariables = mconcat
       [ opsysVariables arch opsys
-      ,"TEST_ENV" =: testEnv arch opsys buildConfig
+      , "TEST_ENV" =: testEnv arch opsys buildConfig
       , "BIN_DIST_NAME" =: binDistName arch opsys buildConfig
       , "BUILD_FLAVOUR" =: flavourString jobFlavour
       , "BIGNUM_BACKEND" =: bignumString (bignumBackend buildConfig)
@@ -674,6 +683,9 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
+      , if validateNonmovingGc buildConfig
+           then "RUNTEST_ARGS" =: "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"
+           else mempty
       ]
 
     jobArtifacts = Artifacts
@@ -888,10 +900,12 @@ job_groups =
      , make_wasm_jobs wasm_build_config
      , disableValidate $ make_wasm_jobs wasm_build_config { bignumBackend = Native }
      , disableValidate $ make_wasm_jobs wasm_build_config { unregisterised = True }
+     , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
      ]
 
   where
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
+
     tsan_jobs =
       modifyJobs
         ( addVariable "TSAN_OPTIONS" "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
@@ -934,6 +948,7 @@ platform_mapping = Map.map go $
   where
     whitelist = [ "x86_64-linux-alpine3_12-int_native-validate+fully_static"
                 , "x86_64-linux-deb10-validate"
+                , "x86_64-linux-deb11-validate"
                 , "x86_64-linux-fedora33-release"
                 , "x86_64-windows-validate"
                 ]
