@@ -7,6 +7,7 @@
 
 module Main where
 
+import Control.Monad
 import Data.Kind
 import GHC.Exts
 import GHC.IO
@@ -28,7 +29,12 @@ main = do
                     case readTVarIO# tvar s4 of
                       (# s5, U res #) ->
                         (# s5, ( I# r, I# res ) #)
-  print (x == y, x > 100000)
+  unless (x > 100000) $ do
+      print (x,y)
+      fail "not enough iterations"
+  unless (x <= y) $ do
+      print (x,y)
+      fail "mismatch"
 
 increment :: TVar# RealWorld U -> State# RealWorld -> (# State# RealWorld, Int #)
 increment tvar = go
