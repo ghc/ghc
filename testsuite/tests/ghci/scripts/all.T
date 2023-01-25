@@ -371,3 +371,4 @@ test('T17830', [filter_stdout_lines(r'======.*')], ghci_script, ['T17830.script'
 test('T21294a', normal, ghci_script, ['T21294a.script'])
 test('T21507', normal, ghci_script, ['T21507.script'])
 test('T22695', normal, ghci_script, ['T22695.script'])
+test('T22817', normal, ghci_script, ['T22817.script'])
