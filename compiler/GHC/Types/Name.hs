@@ -151,7 +151,7 @@ instance Outputable NameSort where
   ppr  System         = text "system"
 
 instance NFData Name where
-  rnf Name{..} = rnf n_sort
+  rnf Name{..} = rnf n_sort `seq` rnf n_occ `seq` n_uniq `seq` rnf n_loc
 
 instance NFData NameSort where
   rnf (External m) = rnf m
