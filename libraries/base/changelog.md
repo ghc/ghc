@@ -1,20 +1,23 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.18.0.0 *TBA*
-  * Add `forall a. Functor (p a)` superclass for `Bifunctor p`.
-  * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
-    `(,,,,,) a b c d e f`.
+  * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
+  * Add `Functor` instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
+    `(,,,,,) a b c d e f`
   * Exceptions thrown by weak pointer finalizers are now reported via a global
     exception handler.
-  * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which the user to
-    override the above-mentioned handler.
-  * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`.
-  * Add `Data.Foldable1` and `Data.Bifoldable1`.
-  * Add `applyWhen` to `Data.Function`.
-  * Add functions `mapAccumM` and `forAccumM` to `Data.Traversable`, per the
-    [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/65).
+  * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which allows the
+    user to override the above-mentioned handler.
+  * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`
+    ([CLC proposal #45](https://github.com/haskell/core-libraries-committee/issues/45))
+  * Add `Data.Foldable1` and `Data.Bifoldable1`
+    ([CLC proposal #9](https://github.com/haskell/core-libraries-committee/issues/9))
+  * Add `applyWhen` to `Data.Function`
+    ([CLC proposal #71](https://github.com/haskell/core-libraries-committee/issues/71))
+  * Add functions `mapAccumM` and `forAccumM` to `Data.Traversable`
+    ([CLC proposal #65](https://github.com/haskell/core-libraries-committee/issues/65))
   * Add default implementation of `(<>)` in terms of `sconcat` and `mempty` in
-    terms of `mconcat`.
+    terms of `mconcat` ([CLC proposal #61](https://github.com/haskell/core-libraries-committee/issues/61)).
   * `GHC.Conc.Sync.listThreads` was added, allowing the user to list the threads
     (both running and blocked) of the program.
   * `GHC.Conc.Sync.labelThreadByteArray#` was added, allowing the user to specify
@@ -23,25 +26,24 @@
     function.
   * `GHC.Conc.Sync.threadLabel` was added, allowing the user to query the label
     of a given `ThreadId`.
-  * Add `inits1` and `tails1` to `Data.List.NonEmpty`.
+  * Add `inits1` and `tails1` to `Data.List.NonEmpty`
+    ([CLC proposal #67](https://github.com/haskell/core-libraries-committee/issues/67))
   * Change default `Ord` implementation of `(>=)`, `(>)`, and `(<)` to use
-    `(<=)` instead of `compare` per
-    [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/24).
+    `(<=)` instead of `compare` ([CLC proposal #24](https://github.com/haskell/core-libraries-committee/issues/24)).
   * Export `liftA2` from `Prelude`. This means that the entirety of `Applicative`
-    is now exported from `Prelude`. See [CLC #50](https://github.com/haskell/core-libraries-committee/issues/50)
-    for the related discussion,
-    as well as [the migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md)
+    is now exported from `Prelude`
+    ([CLC proposal #50](https://github.com/haskell/core-libraries-committee/issues/50),
+    [the migration
+    guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md))
   * Update to [Unicode 15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
   * Add standard Unicode case predicates `isUpperCase` and `isLowerCase` to
     `GHC.Unicode` and `Data.Char`. These predicates use the standard Unicode
-    case properties and are more intuitive than `isUpper` and `isLower`. See
-    [CLC proposal #90](https://github.com/haskell/core-libraries-committee/issues/90).
+    case properties and are more intuitive than `isUpper` and `isLower`
+    ([CLC proposal #90](https://github.com/haskell/core-libraries-committee/issues/90))
   * Add `Eq` and `Ord` instances for `Generically1`.
   * Relax instances for Functor combinators; put superclass on Class1 and Class2
-    to make non-breaking. See [CLC
-    #10](https://github.com/haskell/core-libraries-committee/issues/10) for the
-    related discussion, as well as [the migration
-    guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md).
+    to make non-breaking ([CLC proposal #10](https://github.com/haskell/core-libraries-committee/issues/10), 
+    [migration guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/functor-combinator-instances-and-class1s.md))
   * Add `gcdetails_block_fragmentation_bytes` to `GHC.Stats.GCDetails` to track heap fragmentation.
   * `GHC.TypeLits` and `GHC.TypeNats` now export the `natSing`, `symbolSing`,
     and `charSing` methods of `KnownNat`, `KnownSymbol`, and `KnownChar`,
@@ -50,14 +52,15 @@
     types, per
     [CLC proposal #85](https://github.com/haskell/core-libraries-committee/issues/85).
   * The `Enum` instance of `Down a` now enumerates values in the opposite
-    order as the `Enum a` instance, per
-    [CLC proposal #51](https://github.com/haskell/core-libraries-committee/issues/51).
+    order as the `Enum a` instance ([CLC proposal #51](https://github.com/haskell/core-libraries-committee/issues/51))
   * `Foreign.Marshal.Pool` now uses the RTS internal arena instead of libc
     `malloc` for allocation. It avoids the O(n) overhead of maintaining a list
     of individually allocated pointers as well as freeing each one of them when
-    freeing a `Pool`. (#14762) (#18338)
+    freeing a `Pool` (#14762, #18338)
   * `Type.Reflection.Unsafe` is now marked as unsafe.
-  * Add `Data.Typeable.heqT`, a kind-heterogeneous version of `Data.Typeable.eqT`.
+  * Add `Data.Typeable.heqT`, a kind-heterogeneous version of
+    `Data.Typeable.eqT`
+    ([CLC proposal #99](https://github.com/haskell/core-libraries-committee/issues/99))
 
 ## 4.17.0.0 *August 2022*
 
