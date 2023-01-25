@@ -258,6 +258,7 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
+    | AnnOne
     | AnnOpen    -- ^ '{-\# DEPRECATED' etc. Opening of pragmas where
                  -- the capitalisation of the string can be changed by
                  -- the user. The actual text used is stored in a

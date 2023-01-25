@@ -3070,7 +3070,10 @@ texp :: { ECP }
 
         | 'one' 'of' vocurly orpats close
                              {% do {
-                                    let pat = sLLa $1 (reLoc (last $4)) (OrPat NoExtField (NE.fromList $4))
+                                    let srcSpan = comb2 $1 (reLoc (last $4))
+                                    ; cs <- getCommentsFor srcSpan
+                                    ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) (NE.fromList $4)
+                                    ; let pat = sL (noAnnSrcSpan srcSpan) pat'
                                     ; orPatsOn <- hintOrPats pat
                                     ; when (orPatsOn && length $4 < 2) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrOrPatNeedsTwoAlternatives pat)
                                     ; return $ ecpFromPat pat
@@ -3085,7 +3088,10 @@ texp :: { ECP }
 orpats :: { [LPat GhcPs] }
         : tpat %shift      { [$1] }
 
-        | tpat ',' orpats  { $1 : $3 }
+        | tpat ',' orpats  {% do {
+                                  a <- addTrailingCommaA $1 (getLoc $2)
+                                  ; return (a:$3)
+                           } }
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't

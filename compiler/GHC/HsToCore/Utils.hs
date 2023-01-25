@@ -81,6 +81,7 @@ import GHC.Types.Tickish
 import GHC.Utils.Misc
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Tc.Types.Evidence

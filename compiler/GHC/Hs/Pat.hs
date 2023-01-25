@@ -122,7 +122,7 @@ type instance XTuplePat GhcPs = EpAnn [AddEpAnn]
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XOrPat GhcPs = NoExtField
+type instance XOrPat GhcPs = EpAnn [AddEpAnn]
 type instance XOrPat GhcRn = NoExtField
 type instance XOrPat GhcTc = Type
 
