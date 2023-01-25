@@ -329,7 +329,8 @@ lint-submods-branch:
     paths:
       - cabal-cache
 
-hlint-ghc-and-base:
+# Disabled due to #22830
+.hlint-ghc-and-base:
   extends: .lint-params
   image: "registry.gitlab.haskell.org/ghc/ci-images/linters:$DOCKER_REV"
   variables:
