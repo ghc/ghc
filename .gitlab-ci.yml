@@ -954,9 +954,6 @@ pages:
 #############################################################
 
 
-# TODO: MP: This way of determining the project version is sadly very slow.
-# It seems overkill to have to setup a complete environment, and build hadrian to get
-# it to generate a single file containing the version information.
 project-version:
   stage: packaging
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
@@ -969,7 +966,6 @@ project-version:
     - sudo chown ghc:ghc -R .
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
-    - .gitlab/ci.sh run_hadrian VERSION
     - echo "ProjectVersion=$(cat VERSION)" > version.sh
 
   needs: []
