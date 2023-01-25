@@ -1214,6 +1214,9 @@ AC_CONFIG_FILES(
   distrib/configure.ac
 ])
 
+dnl Create the VERSION file, satisfying #22322.
+printf "$ProjectVersion" > VERSION
+
 AC_OUTPUT
 [
 if test "$print_make_warning" = "true"; then

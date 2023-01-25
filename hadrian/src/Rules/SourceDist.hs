@@ -29,8 +29,6 @@ sourceDistRules = alternatives $ do
       archiveSourceTree prepareTree
     "GIT_COMMIT_ID" %> \fname ->
         writeFileChanged fname =<< setting ProjectGitCommitId
-    "VERSION" %> \fname ->
-        writeFileChanged fname =<< setting ProjectVersion
 
     -- Rules to download mingw tarballs
     let mingw_tarballs_stamp = "ghc-tarballs/mingw-w64/.mingw-w64.download.stamp"
@@ -120,7 +118,7 @@ prepareTree dest = do
     out <- askWithResources [] (target (vanillaContext Stage1 compiler) (Git ListFiles) [] [])
     top <- topDirectory
     let files = ["GIT_COMMIT_ID", "VERSION"] ++ getFiles out
-    need ["GIT_COMMIT_ID", "VERSION"]
+    need ["GIT_COMMIT_ID"]
     forM_ files $ \source -> do
       let target = dest -/- source
       copyFileSourceDist (top -/- source) target
