@@ -78,6 +78,8 @@ needDocDeps = do
             , ghci
             , libiserv
             , compiler
+            , ghcHeap
+            , templateHaskell
             ]
 
     need templatedCabalFiles
@@ -101,8 +103,6 @@ documentationRules = do
     -- Haddock's manual, and builds man pages
     "docs" ~> do
         root <- buildRoot
-
-        needDocDeps
 
         doctargets <- ghcDocs =<< flavour
         let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
@@ -203,6 +203,9 @@ buildSphinxHtml path = do
     root -/- htmlRoot -/- path -/- "index.html" %> \file -> do
         let dest = takeDirectory file
             rstFilesDir = pathPath path
+
+        needDocDeps
+
         rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
         need (map (rstFilesDir -/-) rstFiles)
         build $ target docContext (Sphinx HtmlMode) [pathPath path] [dest]
@@ -314,6 +317,9 @@ buildSphinxPdf :: FilePath -> Rules ()
 buildSphinxPdf path = do
     root <- buildRootRules
     root -/- pdfRoot -/- path <.> "pdf" %> \file -> do
+
+        needDocDeps
+
         withTempDir $ \dir -> do
             let rstFilesDir = pathPath path
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
