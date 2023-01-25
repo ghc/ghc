@@ -3,7 +3,7 @@ module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, cabalSyntax, checkPpr,
     checkExact, countDeps,
-    compareSizes, compiler, containers, deepseq, deriveConstants, directory,
+    compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
@@ -35,7 +35,7 @@ import Oracles.Setting
 ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
-    , compareSizes, compiler, containers, deepseq, deriveConstants, directory
+    , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh
     , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl
@@ -51,7 +51,7 @@ isGhcPackage = (`elem` ghcPackages)
 
 -- | Package definitions, see 'Package'.
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
-  compareSizes, compiler, containers, deepseq, deriveConstants, directory,
+  compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
   ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
@@ -75,6 +75,7 @@ containers          = lib  "containers"      `setPath` "libraries/containers/con
 deepseq             = lib  "deepseq"
 deriveConstants     = util "deriveConstants"
 directory           = lib  "directory"
+dumpDecls           = util "dump-decls"
 exceptions          = lib  "exceptions"
 filepath            = lib  "filepath"
 genapply            = util "genapply"
