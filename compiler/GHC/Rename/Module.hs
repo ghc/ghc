@@ -2055,6 +2055,9 @@ Type data declarations have the syntax of `data` declarations (but not
 `newtype` declarations), either ordinary algebraic data types or GADTs,
 preceded by `type`, with the following restrictions:
 
+(R0) 'data' decls only, not 'newtype' decls.  This is checked by
+     the parser.
+
 (R1) There are no data type contexts (even with the DatatypeContexts
      extension).
 
@@ -2070,7 +2073,7 @@ preceded by `type`, with the following restrictions:
 
 The main parts of the implementation are:
 
-* The parser recognizes `type data` (but not `type newtype`).
+* (R0): The parser recognizes `type data` (but not `type newtype`).
 
 * During the initial construction of the AST,
   GHC.Parser.PostProcess.checkNewOrData sets the `Bool` argument of the
@@ -2105,10 +2108,13 @@ The main parts of the implementation are:
   `dcPromotedField` is a `TyCon` (for `Zero`, say) that you can use
   in a type.
 
-* After a `type data` declaration has been type-checked, the type-checker
-  environment entry for each constructor (`Zero` and `Succ` in our
-  example) is just the promoted type constructor, not the bundle required
-  for a data constructor.  (GHC.Types.TyThing.implicitTyConThings)
+* After a `type data` declaration has been type-checked, the
+  type-checker environment entry (a `TyThing`) for each constructor
+  (`Zero` and `Succ` in our example) is
+  - just an `ATyCon` for the promoted type constructor,
+  - not the bundle (`ADataCon` for the data con, `AnId` for the work id,
+    wrap id) required for a normal data constructor
+  See GHC.Types.TyThing.implicitTyConThings.
 
 * GHC.Core.TyCon.isDataKindsPromotedDataCon ignores promoted constructors
   from `type data`, which do not use the distinguishing quote mark added

@@ -239,9 +239,19 @@ tyThingParent_maybe :: TyThing -> Maybe TyThing
 tyThingParent_maybe (AConLike cl) = case cl of
     RealDataCon dc  -> Just (ATyCon (dataConTyCon dc))
     PatSynCon{}     -> Nothing
-tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
-                                      Just tc -> Just (ATyCon tc)
-                                      Nothing -> Nothing
+tyThingParent_maybe (ATyCon tc)
+  | -- Special case for `type data` data constructors.  They appear as an
+    -- ATyCon (not ADataCon) but we want to display them here as if they were
+    -- a DataCon (i.e. with the parent declaration) (#22817).
+    -- See Note [Type data declarations] in GHC.Rename.Module.
+    Just dc <- isPromotedDataCon_maybe tc
+  , let parent_tc = dataConTyCon dc
+  , isTypeDataTyCon parent_tc
+  = Just (ATyCon parent_tc)
+  | Just tc <- tyConAssoc_maybe tc
+  = Just (ATyCon tc)
+  | otherwise
+  = Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
                                       RecSelId { sel_tycon = RecSelData tc } ->
                                           Just (ATyCon tc)
