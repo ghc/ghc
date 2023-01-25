@@ -1,0 +1,13 @@
+cabal-version:      2.4
+name:               dump-decls
+version:            0.1.0.0
+synopsis:           Dump the declarations of a package.
+license:            BSD-3-Clause
+author:             Ben Gamari
+maintainer:         ben@smart-cactus.org
+copyright:          (c) 2023 Ben Gamari
+
+executable dump-decls
+    main-is:          Main.hs
+    build-depends:    base, ghc
+    default-language: Haskell2010

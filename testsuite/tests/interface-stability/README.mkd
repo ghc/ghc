@@ -1,0 +1,11 @@
+# Interface stability testing
+
+The tests in this directory verify that the interfaces of exposed by GHC's
+core libraries do not inadvertently change. They use the `utils/dump-decls`
+utility to dump all exported declarations of all exposed modules for the
+following packages:
+
+  * base
+
+These are compared against the expected exports in the test's corresponding
+`.stdout` file.
