@@ -95,6 +95,36 @@ was built this way. If it has then the native code generator probably
 won't be available. You can check this information by calling
 ``ghc --info`` (see :ghc-flag:`--info`).
 
+.. _javascript-code-gen:
+
+JavaScript Code Generator
+------------------------------
+
+.. index::
+   single: JavaScript code generator
+
+This is an alternative code generator included in GHC 9.6 and above. It
+generates `ECMA-262 <https://tc39.es/ecma262/>`_ compliant JavaScript and is
+included as a technical preview. At time of writing, it is being actively
+developed but is not suitable for serious projects and production environments.
+The JavaScript backend is not distributed in the GHC bindist and requires a
+manual build. See `building the JavaScript backend
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/javascript-backend/building>`_ page
+on the GHC wiki for build instructions.
+
+A JavaScript cross-compiling GHC produces an executable script, and a directory
+of the same name suffixed with ``.jsexe``. For example, compiling a file named
+``Foo.hs`` will produce an executable script ``Foo`` and a ``Foo.jsexe``
+directory. The script is a thin wrapper that calls `Node.js
+<https://nodejs.org/en/>`_ on the payload of the compiled Haskell code and can
+be run in the usual way, e.g., ``./Foo``, as long as ``node`` is in your
+environment . The actual payload is in ``<ModuleName>.jsexe/all.js``, for
+example ``Foo.jsexe/all.js``. This file is the Haskell program cross-compiled to
+JavaScript *concrete syntax* and can be wrapped in a ``<script>`` HTML tag. For
+a breakdown of the rest of the build artifacts see the `compiler output
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/javascript-backend/building#compiler-output-and-build-artifacts>`_
+section in the wiki.
+
 .. _unreg:
 
 Unregisterised compilation

@@ -132,6 +132,15 @@ Compiler
     presented in this GHC version as a technology preview, bugs and
     missing features are expected.
 
+- The JavaScript backend has been merged. GHC is now able to be built as a
+  cross-compiler targeting the JavaScript platform. The backend should be
+  considered a technology preview. As such it is not ready for use in
+  production, is not distributed in the GHC release bindists and requires the
+  user to manually build GHC as a cross-compiler. See the JavaScript backend
+  `wiki <https://gitlab.haskell.org/ghc/ghc/-/wikis/javascript-backend>`_ page
+  on the GHC wiki for the current status, project roadmap, build instructions
+  and demos.
+
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
