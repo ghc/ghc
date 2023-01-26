@@ -34,7 +34,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.Coercion.Axiom (coAxiomTyCon, coAxiomSingleBranch)
 import GHC.Core.ConLike
-import GHC.Core.FamInstEnv (famInstAxiom)
+import GHC.Core.FamInstEnv ( famInstAxiom )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
@@ -53,6 +53,7 @@ import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
+
 import GHC.Types.Error
 import GHC.Types.FieldLabel (flIsOverloaded)
 import GHC.Types.Hint (UntickedPromotedThing(..), pprUntickedConstructor, isBareSymbol)

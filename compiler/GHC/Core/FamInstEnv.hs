@@ -10,7 +10,7 @@
 module GHC.Core.FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
-        pprFamInst, pprFamInsts,
+        pprFamInst, pprFamInsts, orphNamesOfFamInst,
         mkImportedFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
@@ -47,6 +47,7 @@ import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Reduction
 import GHC.Core.RoughMap
+import GHC.Core.FVs( orphNamesOfAxiomLHS )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
@@ -62,6 +63,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
+import GHC.Types.Name.Set
 import GHC.Data.Bag
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
@@ -206,6 +209,10 @@ dataFamInstRepTyCon fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
+
+orphNamesOfFamInst :: FamInst -> NameSet
+orphNamesOfFamInst (FamInst { fi_axiom = ax }) = orphNamesOfAxiomLHS ax
+
 
 {-
 ************************************************************************

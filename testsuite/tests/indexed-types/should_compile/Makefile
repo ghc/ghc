@@ -41,3 +41,11 @@ T8500:
 	$(RM) T8500a.o T8500a.hi T8500.o T8500.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8500a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T8500.hs
+
+# T22717 must be done in one-shot mode, one file at a time
+T22717:
+	$(RM) T22717*.o T22717*.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T22717d.hs -Wall
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T22717c.hs -Wall
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T22717b.hs -Wall
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T22717.hs  -Wall

@@ -112,7 +112,6 @@ import GHC.Hs.Dump
 
 import GHC.Core.PatSyn    ( pprPatSynType )
 import GHC.Core.Predicate ( classMethodTy )
-import GHC.Core.FVs         ( orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
 import GHC.Core.ConLike
@@ -124,7 +123,7 @@ import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.RoughMap( RoughMatchTc(..) )
 import GHC.Core.TyCo.Ppr( debugPprType )
 import GHC.Core.FamInstEnv
-   ( FamInst, pprFamInst, famInstsRepTyCons
+   ( FamInst, pprFamInst, famInstsRepTyCons, orphNamesOfFamInst
    , famInstEnvElts, extendFamInstEnvList, normaliseType )
 
 import GHC.Parser.Header       ( mkPrelImports )

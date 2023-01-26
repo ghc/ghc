@@ -39,9 +39,9 @@ module GHC.Core.FVs (
         exprFVs,
 
         -- * Orphan names
-        orphNamesOfType, orphNamesOfCo, orphNamesOfAxiom,
-        orphNamesOfTypes, orphNamesOfCoCon,
-        exprsOrphNames, orphNamesOfFamInst,
+        orphNamesOfType, orphNamesOfTypes,
+        orphNamesOfCo,  orphNamesOfCoCon, orphNamesOfAxiomLHS,
+        exprsOrphNames,
 
         -- * Core syntax tree annotation with free variables
         FVAnn,                  -- annotation, abstract
@@ -70,7 +70,6 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
-import GHC.Core.FamInstEnv
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( fUNTyCon )
 import GHC.Data.Maybe( orElse )
@@ -420,11 +419,6 @@ orphNamesOfCoCon :: CoAxiom br -> NameSet
 orphNamesOfCoCon (CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
   = orphNamesOfTyCon tc `unionNameSet` orphNamesOfCoAxBranches branches
 
-orphNamesOfAxiom :: CoAxiom br -> NameSet
-orphNamesOfAxiom axiom
-  = orphNamesOfTypes (concatMap coAxBranchLHS $ fromBranches $ coAxiomBranches axiom)
-    `extendNameSet` getName (coAxiomTyCon axiom)
-
 orphNamesOfCoAxBranches :: Branches br -> NameSet
 orphNamesOfCoAxBranches
   = foldr (unionNameSet . orphNamesOfCoAxBranch) emptyNameSet . fromBranches
@@ -433,16 +427,19 @@ orphNamesOfCoAxBranch :: CoAxBranch -> NameSet
 orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
   = orphNamesOfTypes lhs `unionNameSet` orphNamesOfType rhs
 
--- | orphNamesOfAxiom collects the names of the concrete types and
+-- | `orphNamesOfAxiomLHS` collects the names of the concrete types and
 -- type constructors that make up the LHS of a type family instance,
 -- including the family name itself.
 --
 -- For instance, given `type family Foo a b`:
 -- `type instance Foo (F (G (H a))) b = ...` would yield [Foo,F,G,H]
 --
--- Used in the implementation of ":info" in GHCi.
-orphNamesOfFamInst :: FamInst -> NameSet
-orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
+-- Used (via orphNamesOfFamInst) in the implementation of ":info" in GHCi.
+-- and when determining orphan-hood for a FamInst or module
+orphNamesOfAxiomLHS :: CoAxiom br -> NameSet
+orphNamesOfAxiomLHS axiom
+  = (orphNamesOfTypes $ concatMap coAxBranchLHS $ fromBranches $ coAxiomBranches axiom)
+    `extendNameSet` getName (coAxiomTyCon axiom)
 
 -- Detect FUN 'Many as an application of (->), so that :i (->) works as expected
 -- (see #8535) Issue #16475 describes a more robust solution

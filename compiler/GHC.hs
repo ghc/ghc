@@ -366,8 +366,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr   ( pprForAll )
 import GHC.Core.Class
 import GHC.Core.DataCon
-import GHC.Core.FVs        ( orphNamesOfFamInst )
-import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts )
+import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts, orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core
 
