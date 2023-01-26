@@ -11,7 +11,7 @@ module GHC.Core.FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
         pprFamInst, pprFamInsts, orphNamesOfFamInst,
-        mkImportedFamInst,
+        mkImportedFamInst, mkLocalFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         unionFamInstEnv, extendFamInstEnv, extendFamInstEnvList,
@@ -38,6 +38,7 @@ module GHC.Core.FamInstEnv (
 
 import GHC.Prelude
 
+import GHC.Core( IsOrphan, chooseOrphanAnchor )
 import GHC.Core.Unify
 import GHC.Core.Type as Type
 import GHC.Core.TyCo.Rep
@@ -126,6 +127,8 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
             -- in GHC.Core.Coercion.Axiom
 
             , fi_rhs :: Type         --   the RHS, with its freshened vars
+
+            , fi_orphan :: IsOrphan
             }
 
 data FamFlavor
@@ -254,6 +257,36 @@ pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
 pprFamInsts :: [FamInst] -> SDoc
 pprFamInsts finsts = vcat (map pprFamInst finsts)
 
+{- *********************************************************************
+*                                                                      *
+                 Making FamInsts
+*                                                                      *
+********************************************************************* -}
+
+mkLocalFamInst :: FamFlavor -> CoAxiom Unbranched
+               -> [TyVar] -> [CoVar] -> [Type] -> Type
+               -> FamInst
+mkLocalFamInst flavor axiom tvs cvs lhs rhs
+  = FamInst { fi_fam      = fam_tc_name
+            , fi_flavor   = flavor
+            , fi_tcs      = roughMatchTcs lhs
+            , fi_tvs      = tvs
+            , fi_cvs      = cvs
+            , fi_tys      = lhs
+            , fi_rhs      = rhs
+            , fi_axiom    = axiom
+            , fi_orphan   = chooseOrphanAnchor orph_names }
+  where
+    mod = assert (isExternalName (coAxiomName axiom)) $
+          nameModule (coAxiomName axiom)
+    is_local name = nameIsLocalOrFrom mod name
+
+    orph_names = filterNameSet is_local $
+                 orphNamesOfAxiomLHS axiom `extendNameSet` fam_tc_name
+
+    fam_tc_name = tyConName (coAxiomTyCon axiom)
+
+
 {-
 Note [Lazy axiom match]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -277,8 +310,9 @@ also.
 mkImportedFamInst :: Name               -- Name of the family
                   -> [RoughMatchTc]     -- Rough match info
                   -> CoAxiom Unbranched -- Axiom introduced
+                  -> IsOrphan
                   -> FamInst            -- Resulting family instance
-mkImportedFamInst fam mb_tcs axiom
+mkImportedFamInst fam mb_tcs axiom orphan
   = FamInst {
       fi_fam    = fam,
       fi_tcs    = mb_tcs,
@@ -287,7 +321,8 @@ mkImportedFamInst fam mb_tcs axiom
       fi_tys    = tys,
       fi_rhs    = rhs,
       fi_axiom  = axiom,
-      fi_flavor = flavor }
+      fi_flavor = flavor,
+      fi_orphan = orphan }
   where
      -- See Note [Lazy axiom match]
      ~(CoAxBranch { cab_lhs = tys

@@ -6,7 +6,6 @@ module GHC.Tc.Instance.Family (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
-        newFamInst,
 
         -- * Injectivity
         reportInjectivityErrors, reportConflictingInjectivityErrs
@@ -18,7 +17,6 @@ import GHC.Driver.Session
 import GHC.Driver.Env
 
 import GHC.Core.FamInstEnv
-import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
@@ -31,7 +29,6 @@ import GHC.Iface.Load
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
 import GHC.Tc.Utils.TcType
 
 import GHC.Unit.External
@@ -157,44 +154,6 @@ addressed yet.
   instances use type declared in the module being compiled.
   See Note [Loading your own hi-boot file] in GHC.Iface.Load.
 -}
-
-{-
-************************************************************************
-*                                                                      *
-                 Making a FamInst
-*                                                                      *
-************************************************************************
--}
-
--- All type variables in a FamInst must be fresh. This function
--- creates the fresh variables and applies the necessary substitution
--- It is defined here to avoid a dependency from FamInstEnv on the monad
--- code.
-
-newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
--- Freshen the type variables of the FamInst branches
-newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
-  = do {
-         -- Freshen the type variables
-         (subst, tvs') <- freshenTyVarBndrs tvs
-       ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
-       ; let lhs'     = substTys subst lhs
-             rhs'     = substTy  subst rhs
-
-       ; return (FamInst { fi_fam      = tyConName fam_tc
-                         , fi_flavor   = flavor
-                         , fi_tcs      = roughMatchTcs lhs
-                         , fi_tvs      = tvs'
-                         , fi_cvs      = cvs'
-                         , fi_tys      = lhs'
-                         , fi_rhs      = rhs'
-                         , fi_axiom    = axiom }) }
-  where
-    CoAxBranch { cab_tvs = tvs
-               , cab_cvs = cvs
-               , cab_lhs = lhs
-               , cab_rhs = rhs } = coAxiomSingleBranch axiom
-
 
 {-
 ************************************************************************

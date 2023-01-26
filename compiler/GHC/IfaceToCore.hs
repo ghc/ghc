@@ -1238,17 +1238,18 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
                     fmap tyThingId (tcIfaceImplicit dfun_name)
        ; let mb_tcs' = map tcRoughTyCon mb_tcs
-       ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
+       ; return (mkImportedClsInst cls mb_tcs' dfun_name dfun oflag orph) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
-                             , ifFamInstAxiom = axiom_name } )
+                             , ifFamInstAxiom = axiom_name
+                             , ifFamInstOrph = orphan } )
     = do { axiom' <- forkM (text "Axiom" <+> ppr axiom_name) $
                      tcIfaceCoAxiom axiom_name
              -- will panic if branched, but that's OK
          ; let axiom'' = toUnbranchedAxiom axiom'
                mb_tcs' = map tcRoughTyCon mb_tcs
-         ; return (mkImportedFamInst fam mb_tcs' axiom'') }
+         ; return (mkImportedFamInst fam mb_tcs' axiom'' orphan) }
 
 {-
 ************************************************************************

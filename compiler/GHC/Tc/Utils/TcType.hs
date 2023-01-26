@@ -97,8 +97,6 @@ module GHC.Tc.Utils.TcType (
   -- Misc type manipulators
 
   deNoteType,
-  orphNamesOfType, orphNamesOfCo,
-  orphNamesOfTypes, orphNamesOfCoCon,
   getDFunTyKey, evVarPred,
   ambigTkvsOfTy,
 
@@ -235,7 +233,6 @@ import {-# SOURCE #-} GHC.Tc.Types.Origin
 
 -- others:
 import GHC.Driver.Session
-import GHC.Core.FVs
 import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?

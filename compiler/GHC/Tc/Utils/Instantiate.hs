@@ -27,7 +27,7 @@ module GHC.Tc.Utils.Instantiate (
 
      newOverloadedLit, mkOverLit,
 
-     newClsInst,
+     newClsInst, newFamInst,
      tcGetInsts, tcGetInstEnvs, getOverlapFlag,
      tcExtendLocalInstEnv,
      instCallConstraints, newMethodFromName,
@@ -50,12 +50,14 @@ import GHC.Hs
 import GHC.Hs.Syn.Type   ( hsLitType )
 
 import GHC.Core.InstEnv
+import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 import GHC.Core ( Expr(..), isOrphan ) -- For the Coercion constructor
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Core.Class( Class )
 import GHC.Core.DataCon
+import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType )
@@ -99,7 +101,7 @@ import Data.Function ( on )
 {-
 ************************************************************************
 *                                                                      *
-                Creating and emittind constraints
+                Creating and emitting constraints
 *                                                                      *
 ************************************************************************
 -}
@@ -807,7 +809,7 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
 {-
 ************************************************************************
 *                                                                      *
-                Instances
+                Class instances
 *                                                                      *
 ************************************************************************
 -}
@@ -849,10 +851,12 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
              --     helpful to use the same names
 
        ; oflag <- getOverlapFlag overlap_mode
-       ; let inst = mkLocalInstance dfun oflag tvs' clas tys'
-       ; when (isOrphan (is_orphan inst)) $
-          addDiagnostic (TcRnOrphanInstance inst)
-       ; return inst }
+       ; let cls_inst = mkLocalClsInst dfun oflag tvs' clas tys'
+
+       ; when (isOrphan (is_orphan cls_inst)) $
+         addDiagnostic (TcRnOrphanInstance $ Left cls_inst)
+
+       ; return cls_inst }
 
 tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances
@@ -915,9 +919,9 @@ addLocalInst (home_ie, my_insts) ispec
 
          ; return (extendInstEnv home_ie' ispec, ispec : my_insts) }
 
-{-
-Note [Signature files and type class instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+{- Note [Signature files and type class instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Instances in signature files do not have an effect when compiling:
 when you compile a signature against an implementation, you will
 see the instances WHETHER OR NOT the instance is declared in
@@ -963,10 +967,41 @@ type class instances in the EPS, see #9422 (sigof02dm)
 
 ************************************************************************
 *                                                                      *
-        Errors and tracing
+                Family instances
 *                                                                      *
 ************************************************************************
 -}
+
+-- All type variables in a FamInst must be fresh. This function
+-- creates the fresh variables and applies the necessary substitution
+-- It is defined here to avoid a dependency from FamInstEnv on the monad
+-- code.
+
+newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
+-- Freshen the type variables of the FamInst branches
+newFamInst flavor axiom
+  | CoAxBranch { cab_tvs = tvs
+               , cab_cvs = cvs
+               , cab_lhs = lhs
+               , cab_rhs = rhs } <- coAxiomSingleBranch axiom
+  = do { -- Freshen the type variables
+         (subst, tvs') <- freshenTyVarBndrs tvs
+       ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
+       ; let lhs'     = substTys subst lhs
+             rhs'     = substTy  subst rhs
+
+       ; let fam_inst = mkLocalFamInst flavor axiom tvs' cvs' lhs' rhs'
+       ; when (isOrphan (fi_orphan fam_inst)) $
+         addDiagnostic (TcRnOrphanInstance $ Right fam_inst)
+
+       ; return fam_inst }
+
+
+{- *********************************************************************
+*                                                                      *
+        Errors and tracing
+*                                                                      *
+********************************************************************* -}
 
 traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs

@@ -31,6 +31,7 @@ import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc)
 import GHC.Core.Coercion
+import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
@@ -302,13 +303,18 @@ data GhcHint
     -}
   | SuggestTypeSignatureForm
 
-    {-| Suggests to move an orphan instance or to newtype-wrap it.
+    {-| Suggests to move an orphan instance (for a typeclass or a type or data
+        family), or to newtype-wrap it.
 
         Triggered by: 'GHC.Tc.Errors.Types.TcRnOrphanInstance'
         Test cases(s): warnings/should_compile/T9178
                        typecheck/should_compile/T4912
+                       indexed-types/should_compile/T22717_fam_orph
     -}
-  | SuggestFixOrphanInstance
+  | SuggestFixOrphanInst
+    { isFamilyInstance :: Maybe FamFlavor }
+      -- ^ Whether this is a family instance (of the given 'FamFlavor'),
+      -- or a class instance ('Nothing').
 
     {-| Suggests to use a standalone deriving declaration when GHC
         can't derive a typeclass instance in a trivial way.

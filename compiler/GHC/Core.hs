@@ -1077,7 +1077,7 @@ has two major consequences
 
 Orphan-hood is computed
   * For class instances:
-    when we make a ClsInst in GHC.Core.InstEnv.mkLocalInstance
+    when we make a ClsInst in GHC.Core.InstEnv.mkLocalClsInst
       (because it is needed during instance lookup)
     See Note [When exactly is an instance decl an orphan?]
         in GHC.Core.InstEnv

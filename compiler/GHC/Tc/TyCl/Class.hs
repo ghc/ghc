@@ -34,21 +34,24 @@ import GHC.Tc.Types.Evidence ( idHsWrapper )
 import GHC.Tc.Gen.Bind
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify
-import GHC.Tc.Utils.Instantiate( tcSuperSkolTyVars )
+import GHC.Tc.Utils.Instantiate( newFamInst, tcSuperSkolTyVars )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
-import GHC.Core.Type     ( piResultTys )
-import GHC.Core.Predicate
-import GHC.Core.Multiplicity
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Build( TcMethInfo )
+
+import GHC.Core.Type     ( piResultTys )
+import GHC.Core.Predicate
+import GHC.Core.Multiplicity
 import GHC.Core.Class
 import GHC.Core.Coercion ( pprCoAxiom )
-import GHC.Driver.Session
-import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
+import GHC.Core.TyCon
+
+import GHC.Driver.Session
+
 import GHC.Types.Error
 import GHC.Types.Id
 import GHC.Types.Name
@@ -57,13 +60,14 @@ import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.SourceFile (HscSource(..))
+import GHC.Types.SrcLoc
+import GHC.Types.Basic
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Types.SrcLoc
-import GHC.Core.TyCon
+
 import GHC.Data.Maybe
-import GHC.Types.Basic
 import GHC.Data.Bag
 import GHC.Data.BooleanFormula
 

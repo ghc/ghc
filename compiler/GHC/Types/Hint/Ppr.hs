@@ -12,6 +12,7 @@ import GHC.Prelude
 import GHC.Parser.Errors.Basic
 import GHC.Types.Hint
 
+import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Types.Id
 import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace, nameModule)
@@ -131,10 +132,15 @@ instance Outputable GhcHint where
          in case mb_mod of
               Nothing -> header <+> text "the hsig file."
               Just mod -> header <+> ppr (moduleName mod) <> text "'s hsig file."
-    SuggestFixOrphanInstance
-      -> vcat [ text "Move the instance declaration to the module of the class or of the type, or"
+    SuggestFixOrphanInst { isFamilyInstance = mbFamFlavor }
+      -> vcat [ text "Move the instance declaration to the module of the" <+> what <+> text "or of the type, or"
               , text "wrap the type with a newtype and declare the instance on the new type."
               ]
+      where
+        what = case mbFamFlavor of
+          Nothing                  -> text "class"
+          Just  SynFamilyInst      -> text "type family"
+          Just (DataFamilyInst {}) -> text "data family"
     SuggestAddStandaloneDerivation
       -> text "Use a standalone deriving declaration instead"
     SuggestFillInWildcardConstraint

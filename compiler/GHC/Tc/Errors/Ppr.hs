@@ -34,7 +34,7 @@ import GHC.Core.Class
 import GHC.Core.DataCon
 import GHC.Core.Coercion.Axiom (coAxiomTyCon, coAxiomSingleBranch)
 import GHC.Core.ConLike
-import GHC.Core.FamInstEnv ( famInstAxiom )
+import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
@@ -42,6 +42,7 @@ import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
+import GHC.Core.FVs( orphNamesOfTypes )
 
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -417,11 +418,14 @@ instance Diagnostic TcRnMessage where
               sep [ text "The Monomorphism Restriction applies to the binding"
                   <> plural bindings
                   , text "for" <+> pp_bndrs ]
-    TcRnOrphanInstance inst
+    TcRnOrphanInstance (Left cls_inst)
       -> mkSimpleDecorated $
-           hsep [ text "Orphan instance:"
-                , pprInstanceHdr inst
-                ]
+           hang (text "Orphan class instance:")
+              2 (pprInstanceHdr cls_inst)
+    TcRnOrphanInstance (Right fam_inst)
+      -> mkSimpleDecorated $
+           hang (text "Orphan family instance:")
+              2 (pprFamInst fam_inst)
     TcRnFunDepConflict unit_state sorted
       -> let herald = text "Functional dependencies conflict between instance declarations:"
          in mkSimpleDecorated $
@@ -1782,8 +1786,12 @@ instance Diagnostic TcRnMessage where
       -> case bindings of
           []     -> noHints
           (x:xs) -> [SuggestAddTypeSignatures $ NamedBindings (x NE.:| xs)]
-    TcRnOrphanInstance{}
-      -> [SuggestFixOrphanInstance]
+    TcRnOrphanInstance clsOrFamInst
+      -> [SuggestFixOrphanInst { isFamilyInstance = isFam }]
+        where
+          isFam = case clsOrFamInst :: Either ClsInst FamInst of
+            Left  _clsInst -> Nothing
+            Right famInst  -> Just $ fi_flavor famInst
     TcRnFunDepConflict{}
       -> noHints
     TcRnDupInstanceDecls{}

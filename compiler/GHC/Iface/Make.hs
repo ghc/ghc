@@ -42,7 +42,6 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Core.FVs ( orphNamesOfAxiomLHS )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
@@ -723,30 +722,19 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                  , ifInstCls  = cls_name
                  , ifInstTys  = ifaceRoughMatchTcs $ tail rough_tcs
                    -- N.B. Drop the class name from the rough match template
-                   --      It is put back by GHC.Core.InstEnv.mkImportedInstance
+                   --      It is put back by GHC.Core.InstEnv.mkImportedClsInst
                  , ifInstOrph = orph }
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
-famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
-                                 fi_fam      = fam,
-                                 fi_tcs      = rough_tcs })
+famInstToIfaceFamInst (FamInst { fi_axiom    = axiom
+                               , fi_fam      = fam
+                               , fi_tcs      = rough_tcs
+                               , fi_orphan   = orphan })
   = IfaceFamInst { ifFamInstAxiom    = coAxiomName axiom
                  , ifFamInstFam      = fam
                  , ifFamInstTys      = ifaceRoughMatchTcs rough_tcs
-                 , ifFamInstOrph     = orph }
-  where
-    fam_decl = tyConName $ coAxiomTyCon axiom
-    mod = assert (isExternalName (coAxiomName axiom)) $
-          nameModule (coAxiomName axiom)
-    is_local name = nameIsLocalOrFrom mod name
-
-    lhs_names = filterNameSet is_local (orphNamesOfAxiomLHS axiom)
-
-    orph | is_local fam_decl
-         = NotOrphan (nameOccName fam_decl)
-         | otherwise
-         = chooseOrphanAnchor lhs_names
+                 , ifFamInstOrph     = orphan }
 
 ifaceRoughMatchTcs :: [RoughMatchTc] -> [Maybe IfaceTyCon]
 ifaceRoughMatchTcs tcs = map do_rough tcs
