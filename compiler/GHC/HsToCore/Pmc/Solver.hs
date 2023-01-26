@@ -881,7 +881,7 @@ addCoreCt nabla x e = do
       where
         expr_ty       = exprType e
         expr_in_scope = mkInScopeSet (exprFreeVars e)
-        in_scope_env  = (expr_in_scope, const NoUnfolding)
+        in_scope_env  = ISE expr_in_scope noUnfoldingFun
         -- It's inconvenient to get hold of a global in-scope set
         -- here, but it'll only be needed if exprIsConApp_maybe ends
         -- up substituting inside a forall or lambda (i.e. seldom)

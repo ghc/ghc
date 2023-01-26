@@ -83,7 +83,7 @@ module GHC.Core (
 
         -- * Core rule data types
         CoreRule(..),
-        RuleName, RuleFun, IdUnfoldingFun, InScopeEnv, RuleOpts,
+        RuleName, RuleFun, IdUnfoldingFun, InScopeEnv(..), RuleOpts,
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
@@ -1171,10 +1171,11 @@ data CoreRule
     }
                 -- See Note [Extra args in the target] in GHC.Core.Rules
 
+type RuleFun = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
+
 -- | The 'InScopeSet' in the 'InScopeEnv' is a /superset/ of variables that are
 -- currently in scope. See Note [The InScopeSet invariant].
-type RuleFun = RuleOpts -> InScopeEnv -> Id -> [CoreExpr] -> Maybe CoreExpr
-type InScopeEnv = (InScopeSet, IdUnfoldingFun)
+data InScopeEnv = ISE InScopeSet IdUnfoldingFun
 
 type IdUnfoldingFun = Id -> Unfolding
 -- A function that embodies how to unfold an Id if you need

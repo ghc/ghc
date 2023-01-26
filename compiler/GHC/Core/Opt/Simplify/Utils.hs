@@ -1240,14 +1240,13 @@ getUnfoldingInRuleMatch :: SimplEnv -> InScopeEnv
 -- is 'otherwise' which we want exprIsConApp_maybe to be able to
 -- see very early on
 getUnfoldingInRuleMatch env
-  = (in_scope, id_unf)
+  = ISE in_scope id_unf
   where
     in_scope = seInScope env
-    id_unf id | unf_is_active id = idUnfolding id
-              | otherwise        = NoUnfolding
-    unf_is_active id = isActive (sePhase env) (idInlineActivation id)
-       -- When sm_rules was off we used to test for a /stable/ unfolding,
-       -- but that seems wrong (#20941)
+    phase    = sePhase env
+    id_unf   = whenActiveUnfoldingFun (isActive phase)
+     -- When sm_rules was off we used to test for a /stable/ unfolding,
+     -- but that seems wrong (#20941)
 
 ----------------------
 activeRule :: SimplMode -> Activation -> Bool

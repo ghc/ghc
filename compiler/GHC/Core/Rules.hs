@@ -514,7 +514,7 @@ lookupRule :: RuleOpts -> InScopeEnv
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule
-lookupRule opts rule_env@(in_scope,_) is_active fn args rules
+lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
   = -- pprTrace "lookupRule" (ppr fn <+> ppr args $$ ppr rules $$ ppr in_scope) $
     case go [] rules of
         []     -> Nothing
@@ -574,11 +574,12 @@ isMoreSpecific _        (Rule {})        (BuiltinRule {}) = True
 isMoreSpecific in_scope (Rule { ru_bndrs = bndrs1, ru_args = args1 })
                         (Rule { ru_bndrs = bndrs2, ru_args = args2
                               , ru_name = rule_name2, ru_rhs = rhs2 })
-  = isJust (matchN (full_in_scope, id_unfolding_fun)
+  = isJust (matchN in_scope_env
                    rule_name2 bndrs2 args2 args1 rhs2)
   where
-   id_unfolding_fun _ = NoUnfolding     -- Don't expand in templates
    full_in_scope = in_scope `extendInScopeSetList` bndrs1
+   in_scope_env  = ISE full_in_scope noUnfoldingFun
+                   -- noUnfoldingFun: don't expand in templates
 
 noBlackList :: Activation -> Bool
 noBlackList _ = False           -- Nothing is black listed
@@ -687,7 +688,7 @@ matchN  :: InScopeEnv
 -- trailing ones, returning the result of applying the rule to a prefix
 -- of the actual arguments.
 
-matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es rhs
+matchN (ISE in_scope id_unf) rule_name tmpl_vars tmpl_es target_es rhs
   = do  { rule_subst <- match_exprs init_menv emptyRuleSubst tmpl_es target_es
         ; let (_, matched_es) = mapAccumL (lookup_tmpl rule_subst)
                                           (mkEmptySubst in_scope) $
@@ -872,7 +873,7 @@ see `init_menv` in `matchN`.
 -}
 
 rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
-rvInScopeEnv renv = (rnInScopeSet (rv_lcl renv), rv_unf renv)
+rvInScopeEnv renv = ISE (rnInScopeSet (rv_lcl renv)) (rv_unf renv)
 
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
@@ -1686,7 +1687,7 @@ ruleAppCheck_help env fn args rules
         = text "Rule" <+> doubleQuotes (ftext name)
 
     rule_info opts rule
-        | Just _ <- matchRule opts (emptyInScopeSet, rc_id_unf env)
+        | Just _ <- matchRule opts (ISE emptyInScopeSet (rc_id_unf env))
                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 

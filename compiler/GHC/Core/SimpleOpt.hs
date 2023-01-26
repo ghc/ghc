@@ -242,7 +242,7 @@ simple_opt_expr env expr
     rec_ids      = soe_rec_ids env
     subst        = soe_subst env
     in_scope     = getSubstInScope subst
-    in_scope_env = (in_scope, simpleUnfoldingFun)
+    in_scope_env = ISE in_scope alwaysActiveUnfoldingFun
 
     ---------------
     go (Var v)
@@ -761,11 +761,6 @@ add_info env old_bndr top_level new_rhs new_bndr
                                     False -- may be bottom or not
                                     new_rhs Nothing
 
-simpleUnfoldingFun :: IdUnfoldingFun
-simpleUnfoldingFun id
-  | isAlwaysActive (idInlineActivation id) = idUnfolding id
-  | otherwise                              = noUnfolding
-
 wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
 wrapLet (Just (b,r)) body = Let (NonRec b r) body
@@ -1184,7 +1179,7 @@ data ConCont = CC [CoreExpr] Coercion
 exprIsConApp_maybe :: HasDebugCallStack
                    => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
-exprIsConApp_maybe (in_scope, id_unf) expr
+exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
   = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
   where
     go :: Either InScopeSet Subst
@@ -1304,7 +1299,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         | (fun `hasKey` unpackCStringIdKey) ||
           (fun `hasKey` unpackCStringUtf8IdKey)
         , [arg]              <- args
-        , Just (LitString str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
+        , Just (LitString str) <- exprIsLiteral_maybe ise arg
         = succeedWith in_scope floats $
           dealWithStringLiteral fun str co
         where
@@ -1400,7 +1395,7 @@ exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
 -- Nevertheless we do need to look through unfoldings for
 -- string literals, which are vigorously hoisted to top level
 -- and not subsequently inlined
-exprIsLiteral_maybe env@(_, id_unf) e
+exprIsLiteral_maybe env@(ISE _ id_unf) e
   = case e of
       Lit l     -> Just l
       Tick _ e' -> exprIsLiteral_maybe env e' -- dubious?
@@ -1430,14 +1425,14 @@ exprIsLambda_maybe _ (Lam x e)
     = Just (x, e, [])
 
 -- Still straightforward: Ticks that we can float out of the way
-exprIsLambda_maybe (in_scope_set, id_unf) (Tick t e)
+exprIsLambda_maybe ise (Tick t e)
     | tickishFloatable t
-    , Just (x, e, ts) <- exprIsLambda_maybe (in_scope_set, id_unf) e
+    , Just (x, e, ts) <- exprIsLambda_maybe ise e
     = Just (x, e, t:ts)
 
 -- Also possible: A casted lambda. Push the coercion inside
-exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
-    | Just (x, e,ts) <- exprIsLambda_maybe (in_scope_set, id_unf) casted_e
+exprIsLambda_maybe ise@(ISE in_scope_set _) (Cast casted_e co)
+    | Just (x, e,ts) <- exprIsLambda_maybe ise casted_e
     -- Only do value lambdas.
     -- this implies that x is not in scope in gamma (makes this code simpler)
     , not (isTyVar x) && not (isCoVar x)
@@ -1448,7 +1443,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) (Cast casted_e co)
       res
 
 -- Another attempt: See if we find a partial unfolding
-exprIsLambda_maybe (in_scope_set, id_unf) e
+exprIsLambda_maybe ise@(ISE in_scope_set id_unf) e
     | (Var f, as, ts) <- collectArgsTicks tickishFloatable e
     , idArity f > count isValArg as
     -- Make sure there is hope to get a lambda
@@ -1456,7 +1451,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) e
     -- Optimize, for beta-reduction
     , let e' = simpleOptExprWith defaultSimpleOpts (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts
-    , Just (x', e'', ts') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
+    , Just (x', e'', ts') <- exprIsLambda_maybe ise e'
     , let res = Just (x', e'', ts++ts')
     = -- pprTrace "exprIsLambda_maybe:Unfold" (vcat [ppr e, ppr (x',e'')])
       res
