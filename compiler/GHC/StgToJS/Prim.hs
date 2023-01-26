@@ -59,7 +59,7 @@ genPrim prof bound ty op = case op of
 
   IntAddOp        -> \[r] [x,y] -> PrimInline $ r |= toI32 (Add x y)
   IntSubOp        -> \[r] [x,y] -> PrimInline $ r |= toI32 (Sub x y)
-  IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "h$mulInt32" [x, y]
+  IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "Math.imul" [x, y]
   IntMul2Op       -> \[c,hr,lr] [x,y] -> PrimInline $ appT [c,hr,lr] "h$hs_timesInt2" [x, y]
   IntMulMayOfloOp -> \[r] [x,y] -> PrimInline $ jVar \tmp -> mconcat
                                             [ tmp |= Mul x y
@@ -374,7 +374,7 @@ genPrim prof bound ty op = case op of
         ]
   WordAdd2Op    -> \[h,l] [x,y] -> PrimInline $ appT [h,l] "h$wordAdd2" [x,y]
   WordSubOp     -> \  [r] [x,y] -> PrimInline $ r |= toU32 (Sub x y)
-  WordMulOp     -> \  [r] [x,y] -> PrimInline $ r |= app "h$mulWord32" [x, y]
+  WordMulOp     -> \  [r] [x,y] -> PrimInline $ r |= toU32 (app "Math.imul" [x, y])
   WordMul2Op    -> \[h,l] [x,y] -> PrimInline $ appT [h,l] "h$mul2Word32" [x,y]
   WordQuotOp    -> \  [q] [x,y] -> PrimInline $ q |= app "h$quotWord32" [x,y]
   WordRemOp     -> \  [r] [x,y] -> PrimInline $ r |= app "h$remWord32" [x,y]

@@ -203,38 +203,73 @@ function h$hs_uncheckedShiftRLInt64(h,l,n) {
   RETURN_UBX_TUP2(rh,rl);
 }
 
-var h$mulInt32 = Math.imul;
-
 // Compute product of two Ints. Returns (nh,ch,cl)
 // where (ch,cl) are the two parts of the 64-bit result
 // and nh is 0 if ch can be safely dropped (i.e. it's a sign-extension of cl).
 function h$hs_timesInt2(l1,l2) {
-  var a = I32(l1);
-  var b = I32(l2);
-  var r = BigInt.asIntN(64, a * b);
-  TRACE_ARITH("Int32: " + a + " * " + b + " ==> " + r + " (Int64)")
+  var ah = l1 >> 16;
+  var al = l1 & 0xFFFF;
+  var bh = l2 >> 16;
+  var bl = l2 & 0xFFFF;
 
-  var rh = I64h(r);
-  var rl = I64l(r)|0;
-  var nh = ((rh === 0 && rl >= 0) || (rh === -1 && rl < 0)) ? 0 : 1;
-  RETURN_UBX_TUP3(nh, rh, rl);
+  var r0 = al * bl;
+  var r1 = r0 >>> 16;
+  r0 &= 0xFFFF;
+
+  r1 += al * bh;
+  var r2 = r1 >> 16;
+  r1 &= 0xFFFF;
+
+  r1 += ah * bl;
+  r2 += r1 >> 16;
+  r1 &= 0xFFFF;
+
+  r2 += ah * bh;
+  var r3 = (r2 >> 16) & 0xFFFF;
+  r2 &= 0xFFFF;
+
+  const rh = r3 << 16 | r2;
+  const rl = r1 << 16 | r0;
+
+  var s = rl >> 31;
+  if (rh === s) {
+    TRACE_ARITH("Int32: " + l1 + " * " + l2 + " ==> " + rl + " (Int64)")
+    RETURN_UBX_TUP3(0, s, rl);
+  }
+  else {
+    TRACE_ARITH("Int32: " + l1 + " * " + l2 + " ==> " + rh + " " + rl + " (Int64)")
+    RETURN_UBX_TUP3(1, rh, rl);
+  }
 }
 
-
-function h$mulWord32(l1,l2) {
-  var a = W32(l1);
-  var b = W32(l2);
-  var r = BigInt.asUintN(32, a * b);
-  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r)
-  RETURN_W32(r);
-}
 
 function h$mul2Word32(l1,l2) {
-  var a = W32(l1);
-  var b = W32(l2);
-  var r = BigInt.asUintN(64, a * b);
-  TRACE_ARITH("Word32: " + a + " * " + b + " ==> " + r + " (Word64)")
-  RETURN_W64(r);
+  var ah = l1 >>> 16;
+  var al = l1 & 0xFFFF;
+  var bh = l2 >>> 16;
+  var bl = l2 & 0xFFFF;
+
+  var r0 = al * bl;
+  var r1 = r0 >>> 16;
+  r0 &= 0xFFFF;
+
+  r1 += al * bh;
+  var r2 = r1 >>> 16;
+  r1 &= 0xFFFF;
+
+  r1 += ah * bl;
+  r2 += r1 >>> 16;
+  r1 &= 0xFFFF;
+
+  r2 += ah * bh;
+  var r3 = (r2 >>> 16) & 0xFFFF;
+  r2 &= 0xFFFF;
+
+  const rh = (r3 << 16 | r2) >>> 0;
+  const rl = (r1 << 16 | r0) >>> 0;
+
+  TRACE_ARITH("Word32: " + l1 + " * " + l2 + " ==> " + rh + " " + rl + " (Word64)")
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$quotWord32(n,d) {
@@ -272,11 +307,11 @@ function h$quotRem2Word32(nh,nl,d) {
 }
 
 function h$wordAdd2(l1,l2) {
-  var a = W32(l1);
-  var b = W32(l2);
-  var r = BigInt.asUintN(64, a + b);
-  TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + r + " (Word64)")
-  RETURN_W64(r);
+  var r = (l1 >>> 1) + (l2 >>> 1) + (1 & l1 & l2);
+  var h = r >>> 31;
+  var l = (l1 + l2) >>> 0;
+  TRACE_ARITH("Word32: " + a + " + " + b + " ==> " + h + " " + l + " (Word64)")
+  RETURN_UBX_TUP2(h,l);
 }
 
 function h$isDoubleNegativeZero(d) {
