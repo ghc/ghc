@@ -145,7 +145,7 @@ outOfTreeCompilerArgs = do
     withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
     withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
-    tables_next_to_code <- getBooleanSetting TestGhcUnregisterised
+    tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
     debugAssertions     <- getBooleanSetting TestGhcDebugged
 
