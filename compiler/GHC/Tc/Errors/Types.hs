@@ -2193,32 +2193,6 @@ data TcRnMessage where
   -}
   TcRnSpecialiseNotVisible :: !Name -> TcRnMessage
 
-  {- TcRnNameByTemplateHaskellQuote is an error that occurs when one tries
-     to use a Template Haskell splice to define a top-level identifier with
-     an already existing name.
-
-     (See issue #13968 (closed) on GHC's issue tracker for more details)
-
-     Example(s):
-
-       $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
-
-     Test cases:
-      T13968
-  -}
-  TcRnNameByTemplateHaskellQuote :: !RdrName -> TcRnMessage
-
-  {- TcRnIllegalBindingOfBuiltIn is an error that occurs when one uses built-in
-     syntax for data constructors or class names.
-
-     Use an OccName here because we don't want to print Prelude.(,)
-
-     Test cases:
-      rename/should_fail/T14907b
-      rename/should_fail/rnfail042
-  -}
-  TcRnIllegalBindingOfBuiltIn :: !OccName -> TcRnMessage
-
   {- TcRnPragmaWarning is a warning that can happen when usage of something
      is warned or deprecated by pragma.
 
@@ -2772,6 +2746,22 @@ data TcRnMessage where
                  rename/should_fail/T5657
   -}
   TcRnSectionWithoutParentheses :: HsExpr GhcPs -> TcRnMessage
+
+  {- TcRnBindingOfExistingName is an error triggered by an attempt to rebind
+     built-in syntax, punned list or tuple syntax, or a name quoted via Template Haskell.
+
+     Examples:
+
+       data []
+       data (->)
+       $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
+
+     Test cases: rename/should_fail/T14907b
+                 rename/should_fail/T22839
+                 rename/should_fail/rnfail042
+                 th/T13968
+  -}
+  TcRnBindingOfExistingName :: RdrName -> TcRnMessage
 
   deriving Generic
 

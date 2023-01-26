@@ -468,8 +468,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNonOverloadedSpecialisePragma"             = 35827
   GhcDiagnosticCode "TcRnSpecialiseNotVisible"                      = 85337
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
-  GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
-  GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnBadGenericMethod"                          = 59794
@@ -502,6 +500,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBadFamInstDecl"                            = 06206
   GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
   GhcDiagnosticCode "TcRnCapturedTermName"                          = 54201
+  GhcDiagnosticCode "TcRnBindingOfExistingName"                     = 58805
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
@@ -607,6 +606,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- no longer reports. These are collected below.
 
   GhcDiagnosticCode "Example outdated error"                        = 00000
+  GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
+  GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
 
 {- *********************************************************************
 *                                                                      *

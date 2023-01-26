@@ -25,7 +25,7 @@ module GHC.Tc.Errors.Ppr
 import GHC.Prelude
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon )
+import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple )
 
 import GHC.Core.Coercion
 import GHC.Core.Unify     ( tcMatchTys )
@@ -968,10 +968,6 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
          text "You cannot SPECIALISE" <+> quotes (ppr name)
            <+> text "because its definition is not visible in this module"
-    TcRnNameByTemplateHaskellQuote name -> mkSimpleDecorated $
-      text "Cannot redefine a Name retrieved by a Template Haskell quote:" <+> ppr name
-    TcRnIllegalBindingOfBuiltIn name -> mkSimpleDecorated $
-       text "Illegal binding of built-in syntax:" <+> ppr name
     TcRnPragmaWarning {pragma_warning_occ, pragma_warning_msg, pragma_warning_import_mod, pragma_warning_defined_mod}
       -> mkSimpleDecorated $
         sep [ sep [ text "In the use of"
@@ -1238,6 +1234,8 @@ instance Diagnostic TcRnMessage where
               Left gbl_names -> vcat (map (\name -> quotes (ppr $ grePrintableName name) <+> pprNameProvenance name) gbl_names)
               Right lcl_name -> quotes (ppr lcl_name) <+> text "defined at"
                 <+> ppr (nameSrcLoc lcl_name)
+    TcRnBindingOfExistingName name -> mkSimpleDecorated $
+      text "Illegal binding of an existing name:" <+> ppr (filterCTuple name)
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1552,10 +1550,6 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnSpecialiseNotVisible{}
       -> WarningWithoutFlag
-    TcRnNameByTemplateHaskellQuote{}
-      -> ErrorWithoutFlag
-    TcRnIllegalBindingOfBuiltIn{}
-      -> ErrorWithoutFlag
     TcRnPragmaWarning{}
       -> WarningWithFlag Opt_WarnWarningsDeprecations
     TcRnIllegalHsigDefaultMethods{}
@@ -1646,6 +1640,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnCapturedTermName{}
       -> WarningWithFlag Opt_WarnTermVariableCapture
+    TcRnBindingOfExistingName{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1962,10 +1958,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnSpecialiseNotVisible name
       -> [SuggestSpecialiseVisibilityHints name]
-    TcRnNameByTemplateHaskellQuote{}
-      -> noHints
-    TcRnIllegalBindingOfBuiltIn{}
-      -> noHints
     TcRnPragmaWarning{}
       -> noHints
     TcRnIllegalHsigDefaultMethods{}
@@ -2059,6 +2051,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.TupleSections]
     TcRnCapturedTermName{}
       -> [SuggestRenameTypeVariable]
+    TcRnBindingOfExistingName{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

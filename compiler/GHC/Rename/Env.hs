@@ -187,7 +187,7 @@ newTopSrcBinder (L loc rdr_name)
     if isExternalName name then
       do { this_mod <- getModule
          ; unless (this_mod == nameModule name)
-                  (addErrAt (locA loc) (badOrigBinding rdr_name))
+                  (addErrAt (locA loc) (TcRnBindingOfExistingName rdr_name))
          ; return name }
     else   -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
       do { this_mod <- getModule
@@ -196,7 +196,7 @@ newTopSrcBinder (L loc rdr_name)
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do  { this_mod <- getModule
         ; unless (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
-                 (addErrAt (locA loc) (badOrigBinding rdr_name))
+                 (addErrAt (locA loc) (TcRnBindingOfExistingName rdr_name))
         -- When reading External Core we get Orig names as binders,
         -- but they should agree with the module gotten from the monad
         --
@@ -205,7 +205,7 @@ newTopSrcBinder (L loc rdr_name)
         -- the constructor is parsed as a type, and then GHC.Parser.PostProcess.tyConToDataCon
         -- uses setRdrNameSpace to make it into a data constructors.  At that point
         -- the nice Exact name for the TyCon gets swizzled to an Orig name.
-        -- Hence the badOrigBinding error message.
+        -- Hence the TcRnBindingOfExistingName error message.
         --
 
         -- MP 2022: I suspect this code path is never called for `rOOT_MAIN` anymore
@@ -2118,13 +2118,3 @@ lookupQualifiedDoName ctxt std_name
   = case qualifiedDoModuleName_maybe ctxt of
       Nothing -> lookupSyntaxName std_name
       Just modName -> lookupNameWithQualifier std_name modName
-
-
--- Error messages
-
-badOrigBinding :: RdrName -> TcRnMessage
-badOrigBinding name
-  | Just _ <- isBuiltInOcc_maybe occ = TcRnIllegalBindingOfBuiltIn occ
-  | otherwise = TcRnNameByTemplateHaskellQuote name
-  where
-    occ = rdrNameOcc $ filterCTuple name
