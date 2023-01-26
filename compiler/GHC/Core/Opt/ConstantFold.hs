@@ -2402,7 +2402,7 @@ match_cstring_foldr_lit _ _ _ _ _ = Nothing
 -- Also, look into variable's unfolding just in case the expression we look for
 -- is in a top-level thunk.
 stripStrTopTicks :: InScopeEnv -> CoreExpr -> ([CoreTickish], CoreExpr)
-stripStrTopTicks (_,id_unf) e = case e of
+stripStrTopTicks (ISE _ id_unf) e = case e of
   Var v
     | Just rhs <- expandUnfolding_maybe (id_unf v)
     -> stripTicksTop tickishFloatable rhs

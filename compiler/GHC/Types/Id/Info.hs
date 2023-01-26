@@ -469,7 +469,7 @@ setOccInfo        info oc = oc `seq` info { occInfo = oc }
 unfoldingInfo :: IdInfo -> Unfolding
 unfoldingInfo info
   | isStrongLoopBreaker (occInfo info) = trimUnfolding $ realUnfoldingInfo info
-  | otherwise                          =                realUnfoldingInfo info
+  | otherwise                          =                 realUnfoldingInfo info
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf
