@@ -44,52 +44,55 @@ module GHC.Tc.Deriv.Generate (
 
 import GHC.Prelude
 
-import GHC.Tc.Utils.Monad
 import GHC.Hs
-import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader
-import GHC.Types.Basic
-import GHC.Types.Fixity
-import GHC.Core.DataCon
-import GHC.Types.Name
-import GHC.Types.SourceText
 
-import GHC.Tc.Instance.Family
-import GHC.Core.FamInstEnv
-import GHC.Builtin.Names
-import GHC.Builtin.Names.TH
-import GHC.Types.Id.Make ( coerceId )
-import GHC.Builtin.PrimOps
-import GHC.Builtin.PrimOps.Ids (primOpId)
-import GHC.Types.SrcLoc
-import GHC.Core.TyCon
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate( newFamInst )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Validity ( checkValidCoAxBranch )
+
+import GHC.Core.DataCon
+import GHC.Core.FamInstEnv
+import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
-import GHC.Builtin.Types.Prim
-import GHC.Builtin.Types
 import GHC.Core.Type
 import GHC.Core.Class
 
+import GHC.Types.Name.Reader
+import GHC.Types.Basic
+import GHC.Types.Fixity
+import GHC.Types.Name
+import GHC.Types.SourceText
+import GHC.Types.Id.Make ( coerceId )
+import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Env
-import GHC.Utils.Misc
 import GHC.Types.Var
+
+import GHC.Builtin.Names
+import GHC.Builtin.Names.TH
+import GHC.Builtin.PrimOps
+import GHC.Builtin.PrimOps.Ids (primOpId)
+import GHC.Builtin.Types.Prim
+import GHC.Builtin.Types
+
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Lexeme
+
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Data.Bag
+import GHC.Data.Maybe ( expectJust )
+import GHC.Unit.Module
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List  ( find, partition, intersperse )
-import GHC.Data.Maybe ( expectJust )
-import GHC.Unit.Module
 
 -- | A declarative description of an auxiliary binding that should be
 -- generated. See @Note [Auxiliary binders]@ for a more detailed description

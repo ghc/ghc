@@ -28,7 +28,9 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Deriv.Generate
 import GHC.Tc.Deriv.Functor
 import GHC.Tc.Errors.Types
-import GHC.Tc.Instance.Family
+import GHC.Tc.Utils.Instantiate( newFamInst )
+import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Monad
 
 import GHC.Core.Type
 import GHC.Core.DataCon
@@ -45,22 +47,23 @@ import GHC.Types.Name.Reader
 import GHC.Types.SourceText
 import GHC.Types.Fixity
 import GHC.Types.Basic
+import GHC.Types.SrcLoc
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set (elemVarSet)
+
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Builtin.Names
-import GHC.Tc.Utils.Env
-import GHC.Tc.Utils.Monad
-import GHC.Driver.Session
+
 import GHC.Utils.Error( Validity'(..), andValid )
-import GHC.Types.SrcLoc
-import GHC.Data.Bag
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Data.FastString
 import GHC.Utils.Misc
+
+import GHC.Driver.Session
+import GHC.Data.Bag
+import GHC.Data.FastString
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 

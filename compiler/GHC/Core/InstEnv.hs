@@ -14,7 +14,7 @@ module GHC.Core.InstEnv (
         PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
-        instanceHead, instanceSig, mkLocalInstance, mkImportedInstance,
+        instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
         instanceDFunId, updateClsInstDFuns, updateClsInstDFun,
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
@@ -40,6 +40,7 @@ import GHC.Core ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import GHC.Core.RoughMap
 import GHC.Core.Class
 import GHC.Core.Unify
+import GHC.Core.FVs( orphNamesOfTypes, orphNamesOfType )
 
 import GHC.Unit.Module.Env
 import GHC.Unit.Types
@@ -255,13 +256,13 @@ instanceSig :: ClsInst -> ([TyVar], [Type], Class, [Type])
 -- Decomposes the DFunId
 instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 
-mkLocalInstance :: DFunId -> OverlapFlag
-                -> [TyVar] -> Class -> [Type]
-                -> ClsInst
+mkLocalClsInst :: DFunId -> OverlapFlag
+               -> [TyVar] -> Class -> [Type]
+               -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId.
 -- Consider using newClsInst instead; this will also warn if
 -- the instance is an orphan.
-mkLocalInstance dfun oflag tvs cls tys
+mkLocalClsInst dfun oflag tvs cls tys
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs
             , is_dfun_name = dfun_name
@@ -298,18 +299,18 @@ mkLocalInstance dfun oflag tvs cls tys
 
     choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
-mkImportedInstance :: Name           -- ^ the name of the class
-                   -> [RoughMatchTc] -- ^ the rough match signature of the instance
-                   -> Name           -- ^ the 'Name' of the dictionary binding
-                   -> DFunId         -- ^ the 'Id' of the dictionary.
-                   -> OverlapFlag    -- ^ may this instance overlap?
-                   -> IsOrphan       -- ^ is this instance an orphan?
-                   -> ClsInst
+mkImportedClsInst :: Name           -- ^ the name of the class
+                  -> [RoughMatchTc] -- ^ the rough match signature of the instance
+                  -> Name           -- ^ the 'Name' of the dictionary binding
+                  -> DFunId         -- ^ the 'Id' of the dictionary.
+                  -> OverlapFlag    -- ^ may this instance overlap?
+                  -> IsOrphan       -- ^ is this instance an orphan?
+                  -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
 -- The bound tyvars of the dfun are guaranteed fresh, because
 -- the dfun has been typechecked out of the same interface file
-mkImportedInstance cls_nm mb_tcs dfun_name dfun oflag orphan
+mkImportedClsInst cls_nm mb_tcs dfun_name dfun oflag orphan
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs, is_tys = tys
             , is_dfun_name = dfun_name

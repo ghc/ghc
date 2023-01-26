@@ -1079,17 +1079,17 @@ data TcRnMessage where
   -}
   TcRnMonomorphicBindings :: [Name] -> TcRnMessage
 
-  {-| TcRnOrphanInstance is a warning (controlled by -Wwarn-orphans)
-      that arises when a typeclass instance is an \"orphan\", i.e. if it appears
-      in a module in which neither the class nor the type being instanced are
-      declared in the same module.
+  {-| TcRnOrphanInstance is a warning (controlled by -Worphans) that arises when
+      a typeclass instance or family instance is an \"orphan\", i.e. if it
+      appears in a module in which neither the class/family nor the type being
+      instanced are declared in the same module.
 
       Examples(s): None
 
       Test cases: warnings/should_compile/T9178
                   typecheck/should_compile/T4912
   -}
-  TcRnOrphanInstance :: ClsInst -> TcRnMessage
+  TcRnOrphanInstance :: Either ClsInst FamInst -> TcRnMessage
 
   {-| TcRnFunDepConflict is an error that occurs when there are functional dependencies
       conflicts between instance declarations.
