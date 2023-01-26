@@ -92,11 +92,13 @@ module GHC.Types.Id (
         -- ** Reading 'IdInfo' fields
         idArity,
         idCallArity, idFunRepArity,
-        idUnfolding, realIdUnfolding,
         idSpecialisation, idCoreRules, idHasRules,
         idCafInfo, idLFInfo_maybe,
         idOneShotInfo,
         idOccInfo,
+
+        IdUnfoldingFun, idUnfolding, realIdUnfolding,
+        alwaysActiveUnfoldingFun, whenActiveUnfoldingFun, noUnfoldingFun,
 
         -- ** Writing 'IdInfo' fields
         setIdUnfolding, zapIdUnfolding, setCaseBndrEvald,
@@ -126,8 +128,9 @@ module GHC.Types.Id (
 
 import GHC.Prelude
 
-import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding,
-                 isCompulsoryUnfolding, Unfolding( NoUnfolding ), isEvaldUnfolding, hasSomeUnfolding, noUnfolding )
+import GHC.Core ( CoreRule, isStableUnfolding, evaldUnfolding
+                , isCompulsoryUnfolding, Unfolding( NoUnfolding )
+                , IdUnfoldingFun, isEvaldUnfolding, hasSomeUnfolding, noUnfolding )
 
 import GHC.Types.Id.Info
 import GHC.Types.Basic
@@ -744,8 +747,27 @@ idTagSig_maybe = tagSig . idInfo
 -- loop breaker. See 'unfoldingInfo'.
 --
 -- If you really want the unfolding of a strong loopbreaker, call 'realIdUnfolding'.
-idUnfolding :: Id -> Unfolding
+idUnfolding :: IdUnfoldingFun
 idUnfolding id = unfoldingInfo (idInfo id)
+
+noUnfoldingFun :: IdUnfoldingFun
+noUnfoldingFun _id = noUnfolding
+
+-- | Returns an unfolding only if
+--   (a) not a strong loop breaker and
+--   (b) always active
+alwaysActiveUnfoldingFun :: IdUnfoldingFun
+alwaysActiveUnfoldingFun id
+  | isAlwaysActive (idInlineActivation id) = idUnfolding id
+  | otherwise                              = noUnfolding
+
+-- | Returns an unfolding only if
+--   (a) not a strong loop breaker and
+--   (b) active in according to is_active
+whenActiveUnfoldingFun :: (Activation -> Bool) -> IdUnfoldingFun
+whenActiveUnfoldingFun is_active id
+  | is_active (idInlineActivation id) = idUnfolding id
+  | otherwise                         = NoUnfolding
 
 realIdUnfolding :: Id -> Unfolding
 -- ^ Expose the unfolding if there is one, including for loop breakers

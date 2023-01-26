@@ -1626,11 +1626,11 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --      See Note [Inline specialisations] for why we do not
 --      switch off specialisation for inline functions
 
-  = do { -- debugTraceMsg (text "specCalls: some" <+> vcat
-         --   [ text "function" <+> ppr fn
-         --   , text "calls:" <+> ppr calls_for_me
-         --   , text "subst" <+> ppr (se_subst env) ])
-       ; foldlM spec_call ([], [], emptyUDs) calls_for_me }
+  = -- pprTrace "specCalls: some" (vcat
+    --   [ text "function" <+> ppr fn
+    --   , text "calls:" <+> ppr calls_for_me
+    --   , text "subst" <+> ppr (se_subst env) ]) $
+    foldlM spec_call ([], [], emptyUDs) calls_for_me
 
   | otherwise   -- No calls or RHS doesn't fit our preconceptions
   = warnPprTrace (not (exprIsTrivial rhs) && notNull calls_for_me && not (isClassOpId fn))
@@ -1685,7 +1685,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
              , rule_bndrs, rule_lhs_args
              , spec_bndrs1, dx_binds, spec_args) <- specHeader env rhs_bndrs all_call_args
 
---           ; debugTraceMsg (text "spec_call" <+> vcat
+--           ; pprTrace "spec_call" (vcat
 --                [ text "fun:       "  <+> ppr fn
 --                , text "call info: "  <+> ppr _ci
 --                , text "useful:    "  <+> ppr useful
@@ -1698,7 +1698,8 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 --                , text "rhs_bndrs"     <+> ppr rhs_bndrs
 --                , text "rhs_body"     <+> ppr rhs_body
 --                , text "rhs_env2:  "  <+> ppr (se_subst rhs_env2)
---                , ppr dx_binds ]
+--                , ppr dx_binds ]) $
+--             return ()
 
            ; if not useful  -- No useful specialisation
                 || already_covered rhs_env2 rules_acc rule_lhs_args
@@ -1795,12 +1796,13 @@ specLookupRule :: SpecEnv -> Id -> [CoreExpr]
                -> CompilerPhase  -- Look up rules as if we were in this phase
                -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args phase rules
-  = lookupRule ropts (in_scope, realIdUnfolding) is_active fn args rules
+  = lookupRule ropts in_scope_env is_active fn args rules
   where
-    dflags    = se_dflags env
-    in_scope  = getSubstInScope (se_subst env)
-    ropts     = initRuleOpts dflags
-    is_active = isActive phase
+    dflags       = se_dflags env
+    in_scope     = getSubstInScope (se_subst env)
+    in_scope_env = ISE in_scope (whenActiveUnfoldingFun is_active)
+    ropts        = initRuleOpts dflags
+    is_active    = isActive phase
 
 {- Note [Specialising DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
