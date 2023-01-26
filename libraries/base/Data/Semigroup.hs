@@ -357,6 +357,13 @@ instance Bifoldable Arg where
 instance Bitraversable Arg where
   bitraverse f g (Arg a b) = Arg <$> f a <*> g b
 
+-- |
+-- Beware that @Data.Semigroup.@'First' is different from
+-- @Data.Monoid.@'Data.Monoid.First'. The former simply returns the first value,
+-- so @Data.Semigroup.First Nothing <> x = Data.Semigroup.First Nothing@.
+-- The latter returns the first non-'Nothing',
+-- thus @Data.Monoid.First Nothing <> x = x@.
+--
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -413,6 +420,13 @@ instance Monad First where
 instance MonadFix First where
   mfix f = fix (f . getFirst)
 
+-- |
+-- Beware that @Data.Semigroup.@'Last' is different from
+-- @Data.Monoid.@'Data.Monoid.Last'. The former simply returns the last value,
+-- so @x <> Data.Semigroup.Last Nothing = Data.Semigroup.Last Nothing@.
+-- The latter returns the last non-'Nothing',
+-- thus @x <> Data.Monoid.Last Nothing = x@.
+--
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0

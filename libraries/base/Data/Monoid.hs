@@ -122,13 +122,19 @@ import Data.Semigroup.Internal
 -- @
 
 
--- | Maybe monoid returning the leftmost non-Nothing value.
+-- | Maybe monoid returning the leftmost non-'Nothing' value.
 --
 -- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
 -- historically.
 --
 -- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
 -- Just "hello"
+--
+-- Beware that @Data.Monoid.@'First' is different from
+-- @Data.Semigroup.@'Data.Semigroup.First'. The former returns the first non-'Nothing',
+-- so @Data.Monoid.First Nothing <> x = x@. The latter simply returns the first value,
+-- thus @Data.Semigroup.First Nothing <> x = Data.Semigroup.First Nothing@.
+--
 newtype First a = First { getFirst :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -151,13 +157,19 @@ instance Semigroup (First a) where
 instance Monoid (First a) where
         mempty = First Nothing
 
--- | Maybe monoid returning the rightmost non-Nothing value.
+-- | Maybe monoid returning the rightmost non-'Nothing' value.
 --
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
 -- @'Dual' ('Alt' 'Maybe' a)@
 --
 -- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
 -- Just "world"
+--
+-- Beware that @Data.Monoid.@'Last' is different from
+-- @Data.Semigroup.@'Data.Semigroup.Last'. The former returns the last non-'Nothing',
+-- so @x <> Data.Monoid.Last Nothing = x@. The latter simply returns the last value,
+-- thus @x <> Data.Semigroup.Last Nothing = Data.Semigroup.Last Nothing@.
+--
 newtype Last a = Last { getLast :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
