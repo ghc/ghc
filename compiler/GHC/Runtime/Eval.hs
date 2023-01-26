@@ -68,8 +68,7 @@ import GHC.Hs
 
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
-import GHC.Core.FamInstEnv ( FamInst )
-import GHC.Core.FVs        ( orphNamesOfFamInst )
+import GHC.Core.FamInstEnv ( FamInst, orphNamesOfFamInst )
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
 import GHC.Core.TyCo.Ppr
