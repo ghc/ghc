@@ -68,6 +68,20 @@ pathPath "users_guide" = "docs/users_guide"
 pathPath "Haddock" = "utils/haddock/doc"
 pathPath _ = ""
 
+needDocDeps :: Action ()
+needDocDeps = do
+    -- These cabal files are needed by the docs/users_guide/ghc_packages.py
+    -- logic to determine the versions of packages shipped with GHC.
+    let templatedCabalFiles = map pkgCabalFile
+            [ ghcBoot
+            , ghcBootTh
+            , ghci
+            , libiserv
+            , compiler
+            ]
+
+    need templatedCabalFiles
+
 -- | Build all documentation
 documentationRules :: Rules ()
 documentationRules = do
@@ -88,8 +102,7 @@ documentationRules = do
     "docs" ~> do
         root <- buildRoot
 
-        -- we need to ensure that `configure` has been run (#17840)
-        need [configFile]
+        needDocDeps
 
         doctargets <- ghcDocs =<< flavour
         let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
