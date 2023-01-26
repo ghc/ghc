@@ -42,6 +42,7 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
+import GHC.Core.FVs ( orphNamesOfAxiomLHS )
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
@@ -740,7 +741,7 @@ famInstToIfaceFamInst (FamInst { fi_axiom    = axiom,
           nameModule (coAxiomName axiom)
     is_local name = nameIsLocalOrFrom mod name
 
-    lhs_names = filterNameSet is_local (orphNamesOfCoCon axiom)
+    lhs_names = filterNameSet is_local (orphNamesOfAxiomLHS axiom)
 
     orph | is_local fam_decl
          = NotOrphan (nameOccName fam_decl)
