@@ -65,17 +65,25 @@
  * On Linux we can use timerfd_* (introduced in Linux
  * 2.6.25) and a thread instead of alarm signals. It avoids the risk of
  * interrupting syscalls (see #10840) and the risk of being accidentally
- * modified in user code using signals.
+ * modified in user code using signals. NetBSD has also added timerfd
+ * support since version 10.
+ *
+ * For older version of linux/netbsd without timerfd we fall back to the
+ * pthread based implementation.
  */
-#if defined(linux_HOST_OS) && HAVE_SYS_TIMERFD_H
-#define USE_PTHREAD_FOR_ITIMER
+#if HAVE_SYS_TIMERFD_H
+#define USE_TIMERFD_FOR_ITIMER
 #endif
 
-#if defined(freebsd_HOST_OS)
+#if defined(linux_HOST_OS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
 #if defined(netbsd_HOST_OS)
+#define USE_PTHREAD_FOR_ITIMER
+#endif
+
+#if defined(freebsd_HOST_OS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
@@ -98,7 +106,9 @@ ghc-stage2: timer_create: Not owner
 #endif /* solaris2_HOST_OS */
 
 // Select the variant to use
-#if defined(USE_PTHREAD_FOR_ITIMER)
+#if defined(USE_TIMERFD_FOR_ITIMER)
+#include "ticker/TimerFd.c"
+#elif defined(USE_PTHREAD_FOR_ITIMER)
 #include "ticker/Pthread.c"
 #elif defined(USE_TIMER_CREATE)
 #include "ticker/TimerCreate.c"
