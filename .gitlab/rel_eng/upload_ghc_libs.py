@@ -209,9 +209,10 @@ def main() -> None:
     if not pkgs:
         pkgs = set(PACKAGES.keys())
 
-    for pkg_name in args.skip:
-        assert pkg_name in PACKAGES
-    pkgs = pkgs - args.skip
+    if args.command == "upload":
+        for pkg_name in args.skip:
+            assert pkg_name in PACKAGES
+        pkgs = pkgs - args.skip
 
     if args.command == "prepare":
         manifest = {}
