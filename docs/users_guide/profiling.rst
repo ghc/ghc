@@ -310,6 +310,33 @@ and become CAFs. You will probably need to consult the Core
 .. index::
    single: -fprof-cafs
 
+Profiling and foreign calls
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The one sentence summary is, the profiler includes time spent in unsafe foreign
+calls but ignores time taken in safe foreign calls.
+
+The profiler estimates CPU time and only CPU time for the Haskell portion of the
+program. In particular, time "taken" by the program by blocking foreign calls
+is not accounted for in time profiles. The runtime has the notion of a virtual
+processor which is known as a "capability". Haskell code is run on capabilities,
+and the profiler samples the capabilities in order to determine what is being
+executed at a certain time. When a safe foreign call is executed it's run outside
+the context of a capability and hence the sampling does not account for the time
+taken. Whilst the safe call is executed, other
+Haskell threads are free to run on the capability, and their cost will be attributed
+to the profiler. When the safe call is finished, the blocked, descheduled thread can
+be resumed and rescheduled.
+
+However, the time taken by blocking on unsafe foreign calls is accounted for in the profile.
+This can be explained because an unsafe foreign call is executed directly in the
+same capability as the Haskell code is being executed. Therefore, an unsafe foreign
+call will block the entire capability whilst it is running, and any time that
+capability is sampled then the "cost" of the foreign call will be attributed to the
+calling cost-centre stack.
+
+
+
 .. _prof-compiler-options:
 
 Compiler options for profiling
