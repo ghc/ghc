@@ -33,6 +33,9 @@ Time profiling a program is a three-step process:
 3. Examine the generated profiling information, use the information to
    optimise your program, and repeat as necessary.
 
+The time profiler measures the CPU time taken by the Haskell code in your application.
+In particular time taken by safe foreign calls is not tracked by the profiler (see :ref:`prof-foreign-calls`).
+
 .. _cost-centres:
 
 Cost centres and cost-centre stacks
@@ -309,6 +312,39 @@ and become CAFs. You will probably need to consult the Core
 
 .. index::
    single: -fprof-cafs
+
+.. _prof-foreign-calls:
+
+Profiling and foreign calls
+---------------------------
+
+Simply put, the profiler includes time spent in unsafe foreign
+calls but ignores time taken in safe foreign calls. For example, time spent blocked on IO
+operations (e.g. ``getLine``) is not accounted for in the profile as ``getLine`` is implemented
+using a safe foreign call.
+
+The profiler estimates CPU time, for Haskell threads within the program only.
+In particular, time "taken" by the program in blocking safe foreign calls
+is not accounted for in time profiles. The runtime has the notion of a virtual
+processor which is known as a "capability". Haskell threads are run on capabilities,
+and the profiler samples the capabilities in order to determine what is being
+executed at a certain time. When a safe foreign call is executed, it's run outside
+the context of a capability; hence the sampling does not account for the time
+taken. Whilst the safe call is executed, other
+Haskell threads are free to run on the capability, and their cost will be attributed
+to the profiler. When the safe call is finished, the blocked, descheduled thread can
+be resumed and rescheduled.
+
+However, the time taken by blocking on unsafe foreign calls is accounted for in the profile.
+This happens because unsafe foreign calls are executed by the same capability
+their calling Haskell thread is running on. Therefore, an unsafe foreign call will
+block the entire capability whilst it is running, and any time the capability is
+sampled the "cost" of the foreign call will be attributed to the calling cost-centre stack.
+
+However, do note that you are not supposed to use unsafe foreign calls for any
+operations which do block! Do not be tempted to replace your safe foreign calls
+with unsafe calls just so they appear in the profile. This prevents GC from
+happening until the foreign call returns, which can be catastrophic for performance.
 
 .. _prof-compiler-options:
 
