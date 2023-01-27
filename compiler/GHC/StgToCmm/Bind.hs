@@ -424,7 +424,7 @@ mkRhsClosure profile _use_ap _check_tags bndr cc fvs upd_flag args body
 
         -- BUILD THE OBJECT
 --      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
-        ; let use_cc = cccsExpr; blame_cc = cccsExpr
+        ; let use_cc = cccsExpr platform; blame_cc = cccsExpr platform
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info bndr currentCCS
@@ -465,7 +465,7 @@ cgRhsStdThunk bndr lf_info payload
                                      descr
 
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
-  ; let use_cc = cccsExpr; blame_cc = cccsExpr
+  ; let use_cc = cccsExpr platform; blame_cc = cccsExpr platform
 
 
         -- BUILD THE OBJECT
@@ -634,6 +634,7 @@ thunkCode :: ClosureInfo -> [(NonVoid Id, ByteOff)] -> CostCentreStack
           -> LocalReg -> CgStgExpr -> FCode ()
 thunkCode cl_info fv_details _cc node body
   = do { profile <- getProfile
+       ; platform <- getPlatform
        ; let node_points = nodeMustPointToIt profile (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
         ; ldvEnterClosure cl_info (CmmLocal node) -- NB: Node always points when profiling
@@ -652,7 +653,7 @@ thunkCode cl_info fv_details _cc node body
             -- that cc of enclosing scope will be recorded
             -- in update frame CAF/DICT functions will be
             -- subsumed by this enclosing cc
-            do { enterCostCentreThunk (CmmReg nodeReg)
+            do { enterCostCentreThunk (CmmReg $ nodeReg platform)
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings
@@ -701,10 +702,11 @@ emitBlackHoleCode node = do
 
   when eager_blackholing $ do
     whenUpdRemSetEnabled $ emitUpdRemSetPushThunk node
-    emitStore (cmmOffsetW platform node (fixedHdrSizeW profile)) currentTSOExpr
+    emitStore (cmmOffsetW platform node (fixedHdrSizeW profile)) (currentTSOExpr platform)
     -- See Note [Heap memory barriers] in SMP.h.
     let w = wordWidth platform
-    emitPrimCall [] (MO_AtomicWrite w MemOrderRelease) [node, CmmReg (CmmGlobal EagerBlackholeInfo)]
+    emitPrimCall [] (MO_AtomicWrite w MemOrderRelease)
+        [node, CmmReg (CmmGlobal $ GlobalRegUse EagerBlackholeInfo $ bWord platform)]
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
         -- Nota Bene: this function does not change Node (even if it's a CAF),
@@ -790,7 +792,7 @@ link_caf node = do
   ; let platform = profilePlatform profile
   ; bh <- newTemp (bWord platform)
   ; emitRtsCallGen [(bh,AddrHint)] newCAF_lbl
-      [ (baseExpr,  AddrHint),
+      [ (baseExpr platform,  AddrHint),
         (CmmReg (CmmLocal node), AddrHint) ]
       False
 

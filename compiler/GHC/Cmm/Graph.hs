@@ -38,8 +38,8 @@ import GHC.Types.ForeignCall
 import GHC.Data.OrdList
 import GHC.Runtime.Heap.Layout (ByteOff)
 import GHC.Types.Unique.Supply
-import GHC.Utils.Panic
 import GHC.Utils.Constants (debugIsOn)
+import GHC.Utils.Panic
 
 
 -----------------------------------------------------------------------------
@@ -313,30 +313,36 @@ copyIn profile conv area formals extra_stk
   = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
     platform = profilePlatform profile
-    -- See Note [Width of parameters]
+
+    ci :: (LocalReg, ParamLocation) -> CmmNode O O
     ci (reg, RegisterParam r@(VanillaReg {})) =
         let local = CmmLocal reg
-            global = CmmReg (CmmGlobal r)
-            width = cmmRegWidth platform local
-            expr
-                | width == wordWidth platform = global
-                | width < wordWidth platform =
-                    CmmMachOp (MO_XX_Conv (wordWidth platform) width) [global]
-                | otherwise = panic "Parameter width greater than word width"
+            width = cmmRegWidth local
+            (expr, ty)
+              -- See Note [Width of parameters]
+                | width == wordWidth platform
+                = (global, localRegType reg)
+                | width < wordWidth platform
+                = (CmmMachOp (MO_XX_Conv (wordWidth platform) width) [global]
+                  ,setCmmTypeWidth (wordWidth platform) (localRegType reg))
+                | otherwise
+                = panic "Parameter width greater than word width"
+            global = CmmReg (CmmGlobal $ GlobalRegUse r ty)
 
         in CmmAssign local expr
 
     -- Non VanillaRegs
     ci (reg, RegisterParam r) =
-        CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal r))
+        CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal $ GlobalRegUse r (localRegType reg)))
 
     ci (reg, StackParam off)
       | isBitsType $ localRegType reg
+      -- See Note [Width of parameters]
       , typeWidth (localRegType reg) < wordWidth platform =
         let
           stack_slot = CmmLoad (CmmStackSlot area off) (cmmBits $ wordWidth platform) NaturallyAligned
           local = CmmLocal reg
-          width = cmmRegWidth platform local
+          width = cmmRegWidth local
           expr  = CmmMachOp (MO_XX_Conv (wordWidth platform) width) [stack_slot]
         in CmmAssign local expr
 
@@ -376,25 +382,28 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
     platform = profilePlatform profile
     (regs, graph) = foldr co ([], mkNop) (setRA ++ args ++ stack_params)
 
-    -- See Note [Width of parameters]
+    co :: (CmmExpr, ParamLocation)
+       -> ([GlobalReg], CmmAGraph)
+       -> ([GlobalReg], CmmAGraph)
     co (v, RegisterParam r@(VanillaReg {})) (rs, ms) =
         let width = cmmExprWidth platform v
             value
+              -- See Note [Width of parameters]
                 | width == wordWidth platform = v
                 | width < wordWidth platform =
                     CmmMachOp (MO_XX_Conv width (wordWidth platform)) [v]
                 | otherwise = panic "Parameter width greater than word width"
 
-        in (r:rs, mkAssign (CmmGlobal r) value <*> ms)
+        in (r:rs, mkAssign (CmmGlobal $ GlobalRegUse r (cmmExprType platform value)) value <*> ms)
 
     -- Non VanillaRegs
     co (v, RegisterParam r) (rs, ms) =
-        (r:rs, mkAssign (CmmGlobal r) v <*> ms)
+        (r:rs, mkAssign (CmmGlobal $ GlobalRegUse r (cmmExprType platform v)) v <*> ms)
 
-    -- See Note [Width of parameters]
     co (v, StackParam off)  (rs, ms)
       = (rs, mkStore (CmmStackSlot area off) (value v) <*> ms)
 
+    -- See Note [Width of parameters]
     width v = cmmExprWidth platform v
     value v
       | isBitsType $ cmmExprType platform v
@@ -427,19 +436,18 @@ copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
 
 -- Note [Width of parameters]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
 -- Consider passing a small (< word width) primitive like Int8# to a function.
 -- It's actually non-trivial to do this without extending/narrowing:
--- * Global registers are considered to have native word width (i.e., 64-bits on
---   x86-64), so CmmLint would complain if we assigned an 8-bit parameter to a
---   global register.
--- * Same problem exists with LLVM IR.
--- * Lowering gets harder since on x86-32 not every register exposes its lower
+-- * Lowering gets harder, since on x86-32 not every register exposes its lower
 --   8 bits (e.g., for %eax we can use %al, but there isn't a corresponding
 --   8-bit register for %edi). So we would either need to extend/narrow anyway,
 --   or complicate the calling convention.
 -- * Passing a small integer in a stack slot, which has native word width,
 --   requires extending to word width when writing to the stack and narrowing
 --   when reading off the stack (see #16258).
+--   This is because the generated Cmm application functions (such as stg_ap_n)
+--   always load the full width from the stack.
 -- So instead, we always extend every parameter smaller than native word width
 -- in copyOutOflow and then truncate it back to the expected width in copyIn.
 -- Note that we do this in cmm using MO_XX_Conv to avoid requiring

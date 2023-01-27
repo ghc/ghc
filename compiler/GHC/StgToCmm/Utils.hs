@@ -240,15 +240,17 @@ callerSaveVolatileRegs platform = (caller_save, caller_load)
 
 callerSaveGlobalReg :: Platform -> GlobalReg -> CmmAGraph
 callerSaveGlobalReg platform reg
-    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal reg))
+    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal (GlobalRegUse reg spill_ty)))
+    where
+      spill_ty = globalRegSpillType platform reg
 
 callerRestoreGlobalReg :: Platform -> GlobalReg -> CmmAGraph
 callerRestoreGlobalReg platform reg
-    = mkAssign (CmmGlobal reg)
+    = mkAssign (CmmGlobal (GlobalRegUse reg spill_ty))
                (CmmLoad (get_GlobalReg_addr platform reg)
-                        (globalRegType platform reg)
-                        NaturallyAligned)
-
+                        spill_ty NaturallyAligned)
+    where
+      spill_ty = globalRegSpillType platform reg
 
 -------------------------------------------------------------------------
 --
@@ -578,21 +580,23 @@ whenUpdRemSetEnabled code = do
 -- remembered set.
 emitUpdRemSetPush :: CmmExpr   -- ^ value of pointer which was overwritten
                   -> FCode ()
-emitUpdRemSetPush ptr =
+emitUpdRemSetPush ptr = do
+    platform <- getPlatform
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushClosure_")
-      [(CmmReg (CmmGlobal BaseReg), AddrHint),
+      [(CmmReg $ baseReg platform, AddrHint),
        (ptr, AddrHint)]
       False
 
 emitUpdRemSetPushThunk :: CmmExpr -- ^ the thunk
                        -> FCode ()
-emitUpdRemSetPushThunk ptr =
+emitUpdRemSetPushThunk ptr = do
+    platform <- getPlatform
     emitRtsCall
       rtsUnitId
       (fsLit "updateRemembSetPushThunk_")
-      [(CmmReg (CmmGlobal BaseReg), AddrHint),
+      [(CmmReg $ baseReg platform, AddrHint),
        (ptr, AddrHint)]
       False
 

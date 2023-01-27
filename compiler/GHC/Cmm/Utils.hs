@@ -50,7 +50,7 @@ module GHC.Cmm.Utils(
         cmmConstrTag1, mAX_PTR_TAG, tAG_MASK,
 
         -- Overlap and usage
-        regsOverlap, regUsedIn,
+        regsOverlap, globalRegsOverlap, regUsedIn, globalRegUsedIn,
 
         -- Liveness and bitmaps
         mkLiveness,
@@ -437,12 +437,18 @@ cmmConstrTag1 platform e = cmmAndWord platform e (cmmTagMask platform)
 -- other. This includes the case that the two registers are the same
 -- STG register. See Note [Overlapping global registers] for details.
 regsOverlap :: Platform -> CmmReg -> CmmReg -> Bool
-regsOverlap platform (CmmGlobal g) (CmmGlobal g')
-  | Just real  <- globalRegMaybe platform g,
-    Just real' <- globalRegMaybe platform g',
-    real == real'
-    = True
+regsOverlap platform (CmmGlobal (GlobalRegUse g1 _)) (CmmGlobal (GlobalRegUse g2 _))
+  = globalRegsOverlap platform g1 g2
 regsOverlap _ reg reg' = reg == reg'
+
+globalRegsOverlap :: Platform -> GlobalReg -> GlobalReg -> Bool
+globalRegsOverlap platform g1 g2
+  | Just real  <- globalRegMaybe platform g1
+  , Just real' <- globalRegMaybe platform g2
+  , real == real'
+  = True
+  | otherwise
+  = g1 == g2
 
 -- | Returns True if the STG register is used by the expression, in
 -- the sense that a store to the register might affect the value of
@@ -460,6 +466,27 @@ regUsedIn platform = regUsedIn_ where
   reg `regUsedIn_` CmmRegOff reg' _ = regsOverlap platform reg reg'
   reg `regUsedIn_` CmmMachOp _ es   = any (reg `regUsedIn_`) es
   _   `regUsedIn_` CmmStackSlot _ _ = False
+
+globalRegUsedIn :: Platform -> GlobalReg -> CmmExpr -> Bool
+globalRegUsedIn platform = globalRegUsedIn_ where
+  _   `globalRegUsedIn_` CmmLit _
+    = False
+  reg `globalRegUsedIn_` CmmLoad e _ _
+    = reg `globalRegUsedIn_` e
+  reg `globalRegUsedIn_` CmmReg reg'
+    | CmmGlobal (GlobalRegUse reg' _) <- reg'
+    = globalRegsOverlap platform reg reg'
+    | otherwise
+    = False
+  reg `globalRegUsedIn_` CmmRegOff reg' _
+    | CmmGlobal (GlobalRegUse reg' _) <- reg'
+    = globalRegsOverlap platform reg reg'
+    | otherwise
+    = False
+  reg `globalRegUsedIn_` CmmMachOp _ es
+    = any (reg `globalRegUsedIn_`) es
+  _   `globalRegUsedIn_` CmmStackSlot _ _
+    = False
 
 --------------------------------------------
 --
@@ -571,12 +598,12 @@ blockTicks b = reverse $ foldBlockNodesF goStmt b []
 -- Access to common global registers
 
 baseExpr, spExpr, hpExpr, currentTSOExpr, currentNurseryExpr,
-  spLimExpr, hpLimExpr, cccsExpr :: CmmExpr
-baseExpr = CmmReg baseReg
-spExpr = CmmReg spReg
-spLimExpr = CmmReg spLimReg
-hpExpr = CmmReg hpReg
-hpLimExpr = CmmReg hpLimReg
-currentTSOExpr = CmmReg currentTSOReg
-currentNurseryExpr = CmmReg currentNurseryReg
-cccsExpr = CmmReg cccsReg
+  spLimExpr, hpLimExpr, cccsExpr :: Platform -> CmmExpr
+baseExpr           p = CmmReg $ baseReg           p
+spExpr             p = CmmReg $ spReg             p
+spLimExpr          p = CmmReg $ spLimReg          p
+hpExpr             p = CmmReg $ hpReg             p
+hpLimExpr          p = CmmReg $ hpLimReg          p
+currentTSOExpr     p = CmmReg $ currentTSOReg     p
+currentNurseryExpr p = CmmReg $ currentNurseryReg p
+cccsExpr           p = CmmReg $ cccsReg           p

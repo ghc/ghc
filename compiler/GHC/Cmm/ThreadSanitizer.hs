@@ -156,17 +156,23 @@ saveRestoreCallerRegs platform =
     regs = filter (callerSaves platform) (activeStgRegs platform)
 
     save = blockFromList (map saveReg regs)
+
+    saveReg :: GlobalReg -> CmmNode O O
     saveReg reg =
       CmmStore (get_GlobalReg_addr platform reg)
-               (CmmReg (CmmGlobal reg))
+               (CmmReg (CmmGlobal (GlobalRegUse reg ty)))
                NaturallyAligned
+      where ty = globalRegSpillType platform reg
 
     restore = blockFromList (map restoreReg regs)
+
+    restoreReg :: GlobalReg -> CmmNode O O
     restoreReg reg =
-      CmmAssign (CmmGlobal reg)
+      CmmAssign (CmmGlobal (GlobalRegUse reg ty))
                 (CmmLoad (get_GlobalReg_addr platform reg)
-                         (globalRegType platform reg)
+                         ty
                          NaturallyAligned)
+      where ty = globalRegSpillType platform reg
 
 -- | Mirrors __tsan_memory_order
 -- <https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface_atomic.h#L32>

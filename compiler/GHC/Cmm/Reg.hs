@@ -11,12 +11,11 @@ module GHC.Cmm.Reg
     , LocalReg(..)
     , localRegType
       -- * Global registers
-    , GlobalReg(..), isArgReg, globalRegType
-    , pprGlobalReg
+    , GlobalReg(..), isArgReg, globalRegSpillType, pprGlobalReg
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
     , node, baseReg
-    , VGcPtr(..)
+    , GlobalRegUse(..), pprGlobalRegUse
     ) where
 
 import GHC.Prelude
@@ -30,10 +29,66 @@ import GHC.Cmm.Type
 --              Cmm registers
 -----------------------------------------------------------------------------
 
+{- Note [GlobalReg vs GlobalRegUse]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We distinguish GlobalReg, which describes registers in the STG abstract machine,
+with GlobalRegUse, which describes an usage of such a register to store values
+of a particular CmmType.
+
+For example, we might want to load/store an 8-bit integer in a register that
+can store 32-bit integers.
+
+The width of the type must fit in the register, i.e. for a usage
+@GlobalRegUse reg ty@ we must have that
+
+  > typeWidth ty <= typeWidth (globalRegSpillType reg)
+
+The restrictions about what categories of types can be stored in a given
+register are less easily stated. Some examples are:
+
+  - Vanilla registers can contain both pointers (gcWord) and non-pointers (bWord),
+    as well as sub-word sized values (e.g. b16).
+  - On x86_64, SIMD registers can be used to hold vectors of both floating
+    and integral values (e.g. XmmReg may store 2 Double values or 4 Int32 values).
+-}
+
+-- | A use of a global register at a particular type.
+--
+-- While a 'GlobalReg' identifies a global register in the STG machine,
+-- a 'GlobalRegUse' also contains information about the type we are storing
+-- in the register.
+--
+-- See Note [GlobalReg vs GlobalRegUse] for more information.
+data GlobalRegUse
+  = GlobalRegUse
+    { globalRegUseGlobalReg :: !GlobalReg
+      -- ^ The underlying 'GlobalReg'
+    , globalRegUseType      :: !CmmType
+      -- ^ The 'CmmType' at which we are using the 'GlobalReg'.
+      --
+      -- Its width must be less than the width of the 'GlobalReg':
+      --
+      -- > typeWidth ty <= typeWidth (globalRegSpillType reg)
+    }
+  deriving Show
+
+instance Outputable GlobalRegUse where
+  ppr (GlobalRegUse reg _) = ppr reg
+
+pprGlobalRegUse :: IsLine doc => GlobalRegUse -> doc
+pprGlobalRegUse (GlobalRegUse reg _) = pprGlobalReg reg
+
+-- TODO: these instances should be removed in favour
+-- of more surgical uses of equality.
+instance Eq GlobalRegUse where
+  GlobalRegUse r1 _ == GlobalRegUse r2 _ = r1 == r2
+instance Ord GlobalRegUse where
+  GlobalRegUse r1 _ `compare` GlobalRegUse r2 _ = compare r1 r2
+
 data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
-  | CmmGlobal GlobalReg
-  deriving( Eq, Ord, Show )
+  | CmmGlobal GlobalRegUse
+  deriving ( Eq, Ord, Show )
 
 instance Outputable CmmReg where
     ppr e = pprReg e
@@ -41,16 +96,15 @@ instance Outputable CmmReg where
 pprReg :: CmmReg -> SDoc
 pprReg r
    = case r of
-        CmmLocal  local  -> pprLocalReg  local
-        CmmGlobal global -> pprGlobalReg global
+        CmmLocal  local                   -> pprLocalReg  local
+        CmmGlobal (GlobalRegUse global _) -> pprGlobalReg global
 
-cmmRegType :: Platform -> CmmReg -> CmmType
-cmmRegType _        (CmmLocal  reg) = localRegType reg
-cmmRegType platform (CmmGlobal reg) = globalRegType platform reg
+cmmRegType :: CmmReg -> CmmType
+cmmRegType (CmmLocal  reg) = localRegType reg
+cmmRegType (CmmGlobal reg) = globalRegUseType reg
 
-cmmRegWidth :: Platform -> CmmReg -> Width
-cmmRegWidth platform = typeWidth . cmmRegType platform
-
+cmmRegWidth :: CmmReg -> Width
+cmmRegWidth = typeWidth . cmmRegType
 
 -----------------------------------------------------------------------------
 --              Local registers
@@ -129,13 +183,15 @@ account. However it is still used in UserOfRegs/DefinerOfRegs and
 there are likely still bugs there, beware!
 -}
 
-data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
-
+-- | An abstract global register for the STG machine.
+--
+-- See also 'GlobalRegUse', which denotes a usage of a register at a particular
+-- type (e.g. using a 32-bit wide register to store an 8-bit wide value), as per
+-- Note [GlobalReg vs GlobalRegUse].
 data GlobalReg
   -- Argument and return registers
   = VanillaReg                  -- pointers, unboxed ints and chars
         {-# UNPACK #-} !Int     -- its number
-        VGcPtr
 
   | FloatReg            -- single-precision floating-point registers
         {-# UNPACK #-} !Int     -- its number
@@ -192,104 +248,9 @@ data GlobalReg
   -- from platform to platform (see module PositionIndependentCode).
   | PicBaseReg
 
-  deriving( Show )
-
-instance Eq GlobalReg where
-   VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes
-   FloatReg i == FloatReg j = i==j
-   DoubleReg i == DoubleReg j = i==j
-   LongReg i == LongReg j = i==j
-   -- NOTE: XMM, YMM, ZMM registers actually are the same registers
-   -- at least with respect to store at YMM i and then read from XMM i
-   -- and similarly for ZMM etc.
-   XmmReg i == XmmReg j = i==j
-   YmmReg i == YmmReg j = i==j
-   ZmmReg i == ZmmReg j = i==j
-   Sp == Sp = True
-   SpLim == SpLim = True
-   Hp == Hp = True
-   HpLim == HpLim = True
-   CCCS == CCCS = True
-   CurrentTSO == CurrentTSO = True
-   CurrentNursery == CurrentNursery = True
-   HpAlloc == HpAlloc = True
-   EagerBlackholeInfo == EagerBlackholeInfo = True
-   GCEnter1 == GCEnter1 = True
-   GCFun == GCFun = True
-   BaseReg == BaseReg = True
-   MachSp == MachSp = True
-   UnwindReturnReg == UnwindReturnReg = True
-   PicBaseReg == PicBaseReg = True
-   _r1 == _r2 = False
-
--- NOTE: this Ord instance affects the tuple layout in GHCi, see
---       Note [GHCi and native call registers]
-instance Ord GlobalReg where
-   compare (VanillaReg i _) (VanillaReg j _) = compare i j
-     -- Ignore type when seeking clashes
-   compare (FloatReg i)  (FloatReg  j) = compare i j
-   compare (DoubleReg i) (DoubleReg j) = compare i j
-   compare (LongReg i)   (LongReg   j) = compare i j
-   compare (XmmReg i)    (XmmReg    j) = compare i j
-   compare (YmmReg i)    (YmmReg    j) = compare i j
-   compare (ZmmReg i)    (ZmmReg    j) = compare i j
-   compare Sp Sp = EQ
-   compare SpLim SpLim = EQ
-   compare Hp Hp = EQ
-   compare HpLim HpLim = EQ
-   compare CCCS CCCS = EQ
-   compare CurrentTSO CurrentTSO = EQ
-   compare CurrentNursery CurrentNursery = EQ
-   compare HpAlloc HpAlloc = EQ
-   compare EagerBlackholeInfo EagerBlackholeInfo = EQ
-   compare GCEnter1 GCEnter1 = EQ
-   compare GCFun GCFun = EQ
-   compare BaseReg BaseReg = EQ
-   compare MachSp MachSp = EQ
-   compare UnwindReturnReg UnwindReturnReg = EQ
-   compare PicBaseReg PicBaseReg = EQ
-   compare (VanillaReg _ _) _ = LT
-   compare _ (VanillaReg _ _) = GT
-   compare (FloatReg _) _     = LT
-   compare _ (FloatReg _)     = GT
-   compare (DoubleReg _) _    = LT
-   compare _ (DoubleReg _)    = GT
-   compare (LongReg _) _      = LT
-   compare _ (LongReg _)      = GT
-   compare (XmmReg _) _       = LT
-   compare _ (XmmReg _)       = GT
-   compare (YmmReg _) _       = LT
-   compare _ (YmmReg _)       = GT
-   compare (ZmmReg _) _       = LT
-   compare _ (ZmmReg _)       = GT
-   compare Sp _ = LT
-   compare _ Sp = GT
-   compare SpLim _ = LT
-   compare _ SpLim = GT
-   compare Hp _ = LT
-   compare _ Hp = GT
-   compare HpLim _ = LT
-   compare _ HpLim = GT
-   compare CCCS _ = LT
-   compare _ CCCS = GT
-   compare CurrentTSO _ = LT
-   compare _ CurrentTSO = GT
-   compare CurrentNursery _ = LT
-   compare _ CurrentNursery = GT
-   compare HpAlloc _ = LT
-   compare _ HpAlloc = GT
-   compare GCEnter1 _ = LT
-   compare _ GCEnter1 = GT
-   compare GCFun _ = LT
-   compare _ GCFun = GT
-   compare BaseReg _ = LT
-   compare _ BaseReg = GT
-   compare MachSp _ = LT
-   compare _ MachSp = GT
-   compare UnwindReturnReg _ = LT
-   compare _ UnwindReturnReg = GT
-   compare EagerBlackholeInfo _ = LT
-   compare _ EagerBlackholeInfo = GT
+  deriving( Eq, Ord, Show )
+    -- NOTE: the Ord instance affects the tuple layout in GHCi, see
+    --       Note [GHCi and native call registers]
 
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
@@ -300,10 +261,7 @@ instance OutputableP env GlobalReg where
 pprGlobalReg :: IsLine doc => GlobalReg -> doc
 pprGlobalReg gr
     = case gr of
-        VanillaReg n _ -> char 'R' <> int n
--- Temp Jan08
---        VanillaReg n VNonGcPtr -> char 'R' <> int n
---        VanillaReg n VGcPtr    -> char 'P' <> int n
+        VanillaReg n   -> char 'R' <> int n
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
@@ -331,38 +289,38 @@ pprGlobalReg gr
 
 -- convenient aliases
 baseReg, spReg, hpReg, spLimReg, hpLimReg, nodeReg,
-  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg  :: CmmReg
-baseReg = CmmGlobal BaseReg
-spReg = CmmGlobal Sp
-hpReg = CmmGlobal Hp
-hpLimReg = CmmGlobal HpLim
-spLimReg = CmmGlobal SpLim
-nodeReg = CmmGlobal node
-currentTSOReg = CmmGlobal CurrentTSO
-currentNurseryReg = CmmGlobal CurrentNursery
-hpAllocReg = CmmGlobal HpAlloc
-cccsReg = CmmGlobal CCCS
+  currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg :: Platform -> CmmReg
+baseReg           p = CmmGlobal (GlobalRegUse BaseReg        $ bWord p)
+spReg             p = CmmGlobal (GlobalRegUse Sp             $ bWord p)
+hpReg             p = CmmGlobal (GlobalRegUse Hp             $ gcWord p)
+hpLimReg          p = CmmGlobal (GlobalRegUse HpLim          $ bWord p)
+spLimReg          p = CmmGlobal (GlobalRegUse SpLim          $ bWord p)
+nodeReg           p = CmmGlobal (GlobalRegUse (VanillaReg 1) $ gcWord p)
+currentTSOReg     p = CmmGlobal (GlobalRegUse CurrentTSO     $ bWord p)
+currentNurseryReg p = CmmGlobal (GlobalRegUse CurrentNursery $ bWord p)
+hpAllocReg        p = CmmGlobal (GlobalRegUse HpAlloc        $ bWord p)
+cccsReg           p = CmmGlobal (GlobalRegUse CCCS           $ bWord p)
 
 node :: GlobalReg
-node = VanillaReg 1 VGcPtr
+node = VanillaReg 1
 
-globalRegType :: Platform -> GlobalReg -> CmmType
-globalRegType platform = \case
-   (VanillaReg _ VGcPtr)    -> gcWord platform
-   (VanillaReg _ VNonGcPtr) -> bWord platform
-   (FloatReg _)             -> cmmFloat W32
-   (DoubleReg _)            -> cmmFloat W64
-   (LongReg _)              -> cmmBits W64
+globalRegSpillType :: Platform -> GlobalReg -> CmmType
+globalRegSpillType platform = \case
+   VanillaReg _ -> gcWord platform
+   FloatReg   _ -> cmmFloat W32
+   DoubleReg  _ -> cmmFloat W64
+   LongReg    _ -> cmmBits  W64
+
    -- TODO: improve the internal model of SIMD/vectorized registers
-   -- the right design SHOULd improve handling of float and double code too.
+   -- the right design SHOULD improve handling of float and double code too.
    -- see remarks in Note [SIMD Design for the future] in GHC.StgToCmm.Prim
-   (XmmReg _) -> cmmVec 4 (cmmBits W32)
-   (YmmReg _) -> cmmVec 8 (cmmBits W32)
-   (ZmmReg _) -> cmmVec 16 (cmmBits W32)
+   XmmReg    _ -> cmmVec  4 (cmmBits W32)
+   YmmReg    _ -> cmmVec  8 (cmmBits W32)
+   ZmmReg    _ -> cmmVec 16 (cmmBits W32)
 
-   Hp         -> gcWord platform -- The initialiser for all
-                                 -- dynamically allocated closures
-   _          -> bWord platform
+   Hp          -> gcWord platform -- The initialiser for all
+                                  -- dynamically allocated closures
+   _           -> bWord platform
 
 isArgReg :: GlobalReg -> Bool
 isArgReg (VanillaReg {}) = True

@@ -565,7 +565,6 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     where fold :: forall a b.  UserOfRegs GlobalReg a
                => (b -> GlobalReg -> b) -> b -> a -> b
           fold f z n = foldRegsUsed platform f z n
-
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r ForeignTarget where
   -- The (Ord r) in the context is necessary here
   -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance

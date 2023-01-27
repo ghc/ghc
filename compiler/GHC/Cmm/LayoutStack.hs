@@ -350,7 +350,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
 
 -- Not foolproof, but GCFun is the culprit we most want to catch
 isGcJump :: CmmNode O C -> Bool
-isGcJump (CmmCall { cml_target = CmmReg (CmmGlobal l) })
+isGcJump (CmmCall { cml_target = CmmReg (CmmGlobal (GlobalRegUse l _)) })
   = l == GCFun || l == GCEnter1
 isGcJump _something_else = False
 
@@ -875,7 +875,7 @@ maybeAddSpAdj cfg sp0 sp_off block =
     do_stk_unwinding_gen = cmmGenStackUnwindInstr cfg
     adj block
       | sp_off /= 0
-      = block `blockSnoc` CmmAssign spReg (cmmOffset platform spExpr sp_off)
+      = block `blockSnoc` CmmAssign (spReg platform) (cmmOffset platform (spExpr platform) sp_off)
       | otherwise = block
     -- Add unwind pseudo-instruction at the beginning of each block to
     -- document Sp level for debugging
@@ -884,7 +884,7 @@ maybeAddSpAdj cfg sp0 sp_off block =
       = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
       | otherwise
       = block
-      where sp_unwind = CmmRegOff spReg (sp0 - platformWordSizeInBytes platform)
+      where sp_unwind = CmmRegOff (spReg platform) (sp0 - platformWordSizeInBytes platform)
 
     -- Add unwind pseudo-instruction right after the Sp adjustment
     -- if there is one.
@@ -894,7 +894,7 @@ maybeAddSpAdj cfg sp0 sp_off block =
       = block `blockSnoc` CmmUnwind [(Sp, Just sp_unwind)]
       | otherwise
       = block
-      where sp_unwind = CmmRegOff spReg (sp0 - platformWordSizeInBytes platform - sp_off)
+      where sp_unwind = CmmRegOff (spReg platform) (sp0 - platformWordSizeInBytes platform - sp_off)
 
 {- Note [SP old/young offsets]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -917,7 +917,7 @@ arguments.
 areaToSp :: Platform -> ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
 
 areaToSp platform sp_old _sp_hwm area_off (CmmStackSlot area n)
-  = cmmOffset platform spExpr (sp_old - area_off area - n)
+  = cmmOffset platform (spExpr platform) (sp_old - area_off area - n)
     -- Replace (CmmStackSlot area n) with an offset from Sp
 
 areaToSp platform _ sp_hwm _ (CmmLit CmmHighStackMark)
@@ -939,9 +939,9 @@ areaToSp _ _ _ _ other = other
 -- | Determine whether a stack check cannot fail.
 falseStackCheck :: [CmmExpr] -> Bool
 falseStackCheck [ CmmMachOp (MO_Sub _)
-                      [ CmmRegOff (CmmGlobal Sp) x_off
+                      [ CmmRegOff (CmmGlobal (GlobalRegUse Sp _)) x_off
                       , CmmLit (CmmInt y_lit _)]
-                , CmmReg (CmmGlobal SpLim)]
+                , CmmReg (CmmGlobal (GlobalRegUse SpLim _))]
   = fromIntegral x_off >= y_lit
 falseStackCheck _ = False
 
@@ -1087,7 +1087,7 @@ insertReloads platform stackmap live =
      [ CmmAssign (CmmLocal reg)
                  -- This cmmOffset basically corresponds to manifesting
                  -- @CmmStackSlot Old sp_off@, see Note [SP old/young offsets]
-                 (CmmLoad (cmmOffset platform spExpr (sp_off - reg_off))
+                 (CmmLoad (cmmOffset platform (spExpr platform) (sp_off - reg_off))
                           (localRegType reg)
                           NaturallyAligned)
      | (reg, reg_off) <- stackSlotRegs stackmap
@@ -1142,7 +1142,7 @@ lowerSafeForeignCall profile block
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
     id <- newTemp (bWord platform)
-    new_base <- newTemp (cmmRegType platform baseReg)
+    new_base <- newTemp (cmmRegType $ baseReg platform)
     let (caller_save, caller_load) = callerSaveVolatileRegs platform
     save_state_code <- saveThreadState profile
     load_state_code <- loadThreadState profile
@@ -1153,7 +1153,7 @@ lowerSafeForeignCall profile block
         resume  = mkMiddle (callResumeThread new_base id) <*>
                   -- Assign the result to BaseReg: we
                   -- might now have a different Capability!
-                  mkAssign baseReg (CmmReg (CmmLocal new_base)) <*>
+                  mkAssign (baseReg platform) (CmmReg (CmmLocal new_base)) <*>
                   caller_load <*>
                   load_state_code
 
@@ -1168,7 +1168,7 @@ lowerSafeForeignCall profile block
         -- different.  Hence we continue by jumping to the top stack frame,
         -- not by jumping to succ.
         jump = CmmCall { cml_target    = entryCode platform $
-                                         cmmLoadBWord platform spExpr
+                                         cmmLoadBWord platform (spExpr platform)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
                        , cml_args      = widthInBytes (wordWidth platform)
@@ -1193,7 +1193,7 @@ lowerSafeForeignCall profile block
 callSuspendThread :: Platform -> LocalReg -> Bool -> CmmNode O O
 callSuspendThread platform id intrbl =
   CmmUnsafeForeignCall (PrimTarget MO_SuspendThread)
-       [id] [baseExpr, mkIntExpr platform (fromEnum intrbl)]
+       [id] [baseExpr platform, mkIntExpr platform (fromEnum intrbl)]
 
 callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
 callResumeThread new_base id =

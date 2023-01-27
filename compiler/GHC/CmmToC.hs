@@ -383,7 +383,7 @@ pprExpr platform e = case e of
 
     -- CmmRegOff is an alias of MO_Add
     CmmRegOff reg i    -> pprExpr platform $ CmmMachOp (MO_Add w) [CmmReg reg, CmmLit $ CmmInt (toInteger i) w]
-      where w = cmmRegWidth platform reg
+      where w = cmmRegWidth reg
 
     CmmMachOp mop args -> pprMachOpApp platform mop args
 
@@ -1044,9 +1044,11 @@ pprAssign platform r1 r2
   | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 platform r2)
   | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 platform r2)
   | otherwise                    = mkAssign (pprExpr platform r2)
-    where mkAssign x = if r1 == CmmGlobal BaseReg
-                       then text "ASSIGN_BaseReg" <> parens x <> semi
-                       else pprReg r1 <> text " = " <> x <> semi
+    where mkAssign x =
+            case r1 of
+              CmmGlobal (GlobalRegUse BaseReg _) ->
+                text "ASSIGN_BaseReg" <> parens x <> semi
+              _ -> pprReg r1 <> text " = " <> x <> semi
 
 -- ---------------------------------------------------------------------
 -- Registers
@@ -1061,17 +1063,16 @@ pprCastReg reg
 -- StgPtr.
 isFixedPtrReg :: CmmReg -> Bool
 isFixedPtrReg (CmmLocal _) = False
-isFixedPtrReg (CmmGlobal r) = isFixedPtrGlobalReg r
+isFixedPtrReg (CmmGlobal (GlobalRegUse r _)) = isFixedPtrGlobalReg r
 
 -- True if (pprAsPtrReg reg) will give an expression with type StgPtr
 -- JD: THIS IS HORRIBLE AND SHOULD BE RENAMED, AT THE VERY LEAST.
 -- THE GARBAGE WITH THE VNonGcPtr HELPS MATCH THE OLD CODE GENERATOR'S OUTPUT;
 -- I'M NOT SURE IF IT SHOULD REALLY STAY THAT WAY.
 isPtrReg :: CmmReg -> Bool
-isPtrReg (CmmLocal _)                         = False
-isPtrReg (CmmGlobal (VanillaReg _ VGcPtr))    = True  -- if we print via pprAsPtrReg
-isPtrReg (CmmGlobal (VanillaReg _ VNonGcPtr)) = False -- if we print via pprAsPtrReg
-isPtrReg (CmmGlobal reg)                      = isFixedPtrGlobalReg reg
+isPtrReg (CmmLocal _)                                 = False
+isPtrReg (CmmGlobal (GlobalRegUse (VanillaReg _) ty)) = isGcPtrType ty -- if we print via pprAsPtrReg
+isPtrReg (CmmGlobal (GlobalRegUse reg _))             = isFixedPtrGlobalReg reg
 
 -- True if this global reg has type StgPtr
 isFixedPtrGlobalReg :: GlobalReg -> Bool
@@ -1085,7 +1086,7 @@ isFixedPtrGlobalReg _     = False
 -- (machRepCType (cmmRegType reg)), so it has to be cast.
 isStrangeTypeReg :: CmmReg -> Bool
 isStrangeTypeReg (CmmLocal _)   = False
-isStrangeTypeReg (CmmGlobal g)  = isStrangeTypeGlobal g
+isStrangeTypeReg (CmmGlobal (GlobalRegUse g _)) = isStrangeTypeGlobal g
 
 isStrangeTypeGlobal :: GlobalReg -> Bool
 isStrangeTypeGlobal CCCS                = True
@@ -1095,10 +1096,10 @@ isStrangeTypeGlobal BaseReg             = True
 isStrangeTypeGlobal r                   = isFixedPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
-strangeRegType (CmmGlobal CCCS) = Just (text "struct CostCentreStack_ *")
-strangeRegType (CmmGlobal CurrentTSO) = Just (text "struct StgTSO_ *")
-strangeRegType (CmmGlobal CurrentNursery) = Just (text "struct bdescr_ *")
-strangeRegType (CmmGlobal BaseReg) = Just (text "struct StgRegTable_ *")
+strangeRegType (CmmGlobal (GlobalRegUse CCCS _)) = Just (text "struct CostCentreStack_ *")
+strangeRegType (CmmGlobal (GlobalRegUse CurrentTSO _)) = Just (text "struct StgTSO_ *")
+strangeRegType (CmmGlobal (GlobalRegUse CurrentNursery _)) = Just (text "struct bdescr_ *")
+strangeRegType (CmmGlobal (GlobalRegUse BaseReg _)) = Just (text "struct StgRegTable_ *")
 strangeRegType _ = Nothing
 
 -- pprReg just prints the register name.
@@ -1106,16 +1107,16 @@ strangeRegType _ = Nothing
 pprReg :: CmmReg -> SDoc
 pprReg r = case r of
         CmmLocal  local  -> pprLocalReg local
-        CmmGlobal global -> pprGlobalReg global
+        CmmGlobal (GlobalRegUse global _ ) -> pprGlobalReg global
 
 pprAsPtrReg :: CmmReg -> SDoc
-pprAsPtrReg (CmmGlobal (VanillaReg n gcp))
-  = warnPprTrace (gcp /= VGcPtr) "pprAsPtrReg" (ppr n) $ char 'R' <> int n <> text ".p"
+pprAsPtrReg (CmmGlobal (GlobalRegUse (VanillaReg n) ty))
+  = warnPprTrace (not $ isGcPtrType ty) "pprAsPtrReg" (ppr n) $ char 'R' <> int n <> text ".p"
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr = case gr of
-    VanillaReg n _ -> char 'R' <> int n  <> text ".w"
+    VanillaReg n   -> char 'R' <> int n  <> text ".w"
         -- pprGlobalReg prints a VanillaReg as a .w regardless
         -- Example:     R1.w = R1.w & (-0x8UL);
         --              JMP_(*R1.p);

@@ -255,7 +255,7 @@ emitPrimOp cfg primop =
     emitCCall
         [(res,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(baseExpr, AddrHint), (arg,AddrHint)]
+        [(baseExpr platform, AddrHint), (arg,AddrHint)]
 
   SparkOp -> \[arg] -> opIntoRegs $ \[res] -> do
     -- returns the value of arg in res.  We're going to therefore
@@ -266,7 +266,7 @@ emitPrimOp cfg primop =
     emitCCall
         [(tmp2,NoHint)]
         (CmmLit (CmmLabel (mkForeignLabel (fsLit "newSpark") Nothing ForeignLabelInExternalPackage IsFunction)))
-        [(baseExpr, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
+        [(baseExpr platform, AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
     emitAssign (CmmLocal res) (CmmReg (CmmLocal tmp))
 
   GetCCSOfOp -> \[arg] -> opIntoRegs $ \[res] -> do
@@ -277,10 +277,10 @@ emitPrimOp cfg primop =
     emitAssign (CmmLocal res) val
 
   GetCurrentCCSOp -> \[_] -> opIntoRegs $ \[res] ->
-    emitAssign (CmmLocal res) cccsExpr
+    emitAssign (CmmLocal res) (cccsExpr platform)
 
   MyThreadIdOp -> \[] -> opIntoRegs $ \[res] ->
-    emitAssign (CmmLocal res) currentTSOExpr
+    emitAssign (CmmLocal res) (currentTSOExpr platform)
 
   ReadMutVarOp -> \[mutv] -> opIntoRegs $ \[res] ->
     emitPrimCall [res] (MO_AtomicRead (wordWidth platform) MemOrderAcquire)
@@ -302,7 +302,7 @@ emitPrimOp cfg primop =
     mkdirtyMutVarCCall <- getCode $! emitCCall
       [{-no results-}]
       (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-      [(baseExpr, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
+      [(baseExpr platform, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
     emit =<< mkCmmIfThen
       (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel)
        (closureInfoPtr platform (stgToCmmAlignCheck cfg) mutv))
@@ -2437,7 +2437,7 @@ doNewByteArrayOp res_r n = do
 
     let hdr_size = fixedHdrSize profile
 
-    base <- allocHeapClosure rep info_ptr cccsExpr
+    base <- allocHeapClosure rep info_ptr (cccsExpr platform)
                      [ (mkIntExpr platform n,
                         hdr_size + pc_OFFSET_StgArrBytes_bytes (platformConstants platform))
                      ]
@@ -2646,7 +2646,7 @@ doNewArrayOp res_r rep info payload n init = do
         (mkIntExpr platform (nonHdrSize platform rep))
         (zeroExpr platform)
 
-    base <- allocHeapClosure rep info_ptr cccsExpr payload
+    base <- allocHeapClosure rep info_ptr (cccsExpr platform) payload
 
     arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
@@ -2836,7 +2836,7 @@ emitCloneArray info_p res_r src src_off n = do
     let hdr_size = fixedHdrSize profile
         constants = platformConstants platform
 
-    base <- allocHeapClosure rep info_ptr cccsExpr
+    base <- allocHeapClosure rep info_ptr (cccsExpr platform)
                      [ (mkIntExpr platform n,
                         hdr_size + pc_OFFSET_StgMutArrPtrs_ptrs constants)
                      , (mkIntExpr platform (nonHdrSizeW rep),
@@ -2876,7 +2876,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
 
     let hdr_size = fixedHdrSize profile
 
-    base <- allocHeapClosure rep info_ptr cccsExpr
+    base <- allocHeapClosure rep info_ptr (cccsExpr platform)
                      [ (mkIntExpr platform n,
                         hdr_size + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform))
                      ]

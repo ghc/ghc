@@ -222,12 +222,11 @@ cgLetNoEscapeClosure
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
   = do platform <- getPlatform
+       let code = forkLneBody $ withNewTickyCounterLNE bndr args $ do
+                { restoreCurrentCostCentre platform cc_slot
+                ; arg_regs <- bindArgsToRegs args
+                ; void $ noEscapeHeapCheck arg_regs (tickyEnterLNE >> cgExpr body) }
        return ( lneIdInfo platform bndr args, code )
-  where
-   code = forkLneBody $ withNewTickyCounterLNE bndr args $ do
-            { restoreCurrentCostCentre cc_slot
-            ; arg_regs <- bindArgsToRegs args
-            ; void $ noEscapeHeapCheck arg_regs (tickyEnterLNE >> cgExpr body) }
 
 
 ------------------------------------------------------------------------
@@ -519,7 +518,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel
                   (AssignTo [idToReg platform (NonVoid v)] False) (cgExpr scrut)
-       ; restoreCurrentCostCentre mb_cc
+       ; restoreCurrentCostCentre platform mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
        ; l <- newBlockId
        ; emitLabel l
@@ -568,7 +567,7 @@ cgCase scrut bndr alt_type alts
 
        ; let sequel = AssignTo alt_regs do_gc{- Note [scrut sequel] -}
        ; ret_kind <- withSequel sequel (cgExpr scrut)
-       ; restoreCurrentCostCentre mb_cc
+       ; restoreCurrentCostCentre platform mb_cc
        ; _ <- bindArgsToRegs ret_bndrs
        ; cgAlts (gc_plan,ret_kind) (NonVoid bndr) alt_type alts
        }
@@ -1179,7 +1178,7 @@ emitEnter fun = do
       Return -> do
         { let entry = entryCode platform
                 $ closureInfoPtr platform align_check
-                $ CmmReg nodeReg
+                $ CmmReg (nodeReg platform)
         ; emit $ mkJump profile NativeNodeCall entry
                         [cmmUntag platform fun] updfr_off
         ; return AssignedDirectly
@@ -1222,12 +1221,13 @@ emitEnter fun = do
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode platform (closureInfoPtr platform align_check (CmmReg nodeReg))
+       ; let node = CmmReg $ nodeReg platform
+             entry = entryCode platform (closureInfoPtr platform align_check node)
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged platform (CmmReg nodeReg))
+           mkCbranch (cmmIsTagged platform node)
                      lret lcall Nothing <*>
            outOfLine lcall (the_call,tscope) <*>
            mkLabel lret tscope <*>

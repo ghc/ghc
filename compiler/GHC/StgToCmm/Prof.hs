@@ -71,8 +71,8 @@ ccsType = bWord
 ccType :: Platform -> CmmType -- Type of a cost centre
 ccType = bWord
 
-storeCurCCS :: CmmExpr -> CmmAGraph
-storeCurCCS = mkAssign cccsReg
+storeCurCCS :: Platform -> CmmExpr -> CmmAGraph
+storeCurCCS platform = mkAssign (cccsReg platform)
 
 mkCCostCentre :: CostCentre -> CmmLit
 mkCCostCentre cc = CmmLabel (mkCCLabel cc)
@@ -103,7 +103,7 @@ initUpdFrameProf :: CmmExpr -> FCode ()
 initUpdFrameProf frame
   = ifProfiling $        -- frame->header.prof.ccs = CCCS
     do platform <- getPlatform
-       emitStore (cmmOffset platform frame (pc_OFFSET_StgHeader_ccs (platformConstants platform))) cccsExpr
+       emitStore (cmmOffset platform frame (pc_OFFSET_StgHeader_ccs (platformConstants platform))) (cccsExpr platform)
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 
@@ -144,14 +144,14 @@ saveCurrentCostCentre
        if not sccProfilingEnabled
            then return Nothing
            else do local_cc <- newTemp (ccType platform)
-                   emitAssign (CmmLocal local_cc) cccsExpr
+                   emitAssign (CmmLocal local_cc) (cccsExpr platform)
                    return (Just local_cc)
 
-restoreCurrentCostCentre :: Maybe LocalReg -> FCode ()
-restoreCurrentCostCentre Nothing
+restoreCurrentCostCentre :: Platform -> Maybe LocalReg -> FCode ()
+restoreCurrentCostCentre _ Nothing
   = return ()
-restoreCurrentCostCentre (Just local_cc)
-  = emit (storeCurCCS (CmmReg (CmmLocal local_cc)))
+restoreCurrentCostCentre platform (Just local_cc)
+  = emit (storeCurCCS platform (CmmReg (CmmLocal local_cc)))
 
 
 -------------------------------------------------------------------------------
@@ -191,7 +191,7 @@ enterCostCentreThunk :: CmmExpr -> FCode ()
 enterCostCentreThunk closure =
   ifProfiling $ do
       platform <- getPlatform
-      emit $ storeCurCCS (costCentreFrom platform closure)
+      emit $ storeCurCCS platform (costCentreFrom platform closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
 enterCostCentreFun ccs closure = ifProfiling $
@@ -200,7 +200,7 @@ enterCostCentreFun ccs closure = ifProfiling $
        emitRtsCall
          rtsUnitId
          (fsLit "enterFunCCS")
-         [(baseExpr, AddrHint), (costCentreFrom platform closure, AddrHint)]
+         [(baseExpr platform, AddrHint), (costCentreFrom platform closure, AddrHint)]
          False
        -- otherwise we have a top-level function, nothing to do
 
@@ -300,9 +300,9 @@ emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push = ifProfiling $
   do platform <- getPlatform
      tmp      <- newTemp (ccsType platform)
-     pushCostCentre tmp cccsExpr cc
+     pushCostCentre tmp (cccsExpr platform) cc
      when tick $ emit (bumpSccCount platform (CmmReg (CmmLocal tmp)))
-     when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
+     when push $ emit (storeCurCCS platform (CmmReg (CmmLocal tmp)))
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc

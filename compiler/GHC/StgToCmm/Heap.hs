@@ -353,11 +353,12 @@ entryHeapCheck' :: Bool           -- is a known function pattern
                 -> FCode ()
 entryHeapCheck' is_fastf node arity args code
   = do profile <- getProfile
-       let is_thunk = arity == 0
+       let platform = profilePlatform profile
+           is_thunk = arity == 0
 
            args' = map (CmmReg . CmmLocal) args
-           stg_gc_fun    = CmmReg (CmmGlobal GCFun)
-           stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
+           stg_gc_fun    = CmmReg (CmmGlobal $ GlobalRegUse GCFun $ bWord platform)
+           stg_gc_enter1 = CmmReg (CmmGlobal $ GlobalRegUse GCEnter1 $ bWord platform)
 
            {- Thunks:          jump stg_gc_enter_1
 
@@ -615,14 +616,14 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
     -- See Note [Single stack check]
     sp_oflo sp_hwm =
          CmmMachOp (mo_wordULt platform)
-                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType platform spReg)))
+                  [CmmMachOp (MO_Sub (typeWidth (cmmRegType $ spReg platform)))
                              [CmmStackSlot Old 0, sp_hwm],
-                   CmmReg spLimReg]
+                   CmmReg $ spLimReg platform]
 
     -- Hp overflow if (Hp > HpLim)
     -- (Hp has been incremented by now)
     -- HpLim points to the LAST WORD of valid allocation space.
-    hp_oflo = CmmMachOp (mo_wordUGt platform) [hpExpr, hpLimExpr]
+    hp_oflo = CmmMachOp (mo_wordUGt platform) [hpExpr platform, hpLimExpr platform]
 
   case mb_stk_hwm of
     Nothing -> return ()
@@ -640,16 +641,16 @@ do_checks mb_stk_hwm checkYield mb_alloc_lit do_gc = do
 
   case mb_alloc_lit of
     Just alloc_lit -> do
-     let bump_hp   = cmmOffsetExprB platform hpExpr alloc_lit
-         alloc_n = mkAssign hpAllocReg alloc_lit
+     let bump_hp   = cmmOffsetExprB platform (hpExpr platform) alloc_lit
+         alloc_n = mkAssign (hpAllocReg platform) alloc_lit
      tickyHeapCheck
-     emitAssign hpReg bump_hp
+     emitAssign (hpReg platform) bump_hp
      emit =<< mkCmmIfThen' hp_oflo (alloc_n <*> mkBranch gc_id) (Just False)
     Nothing ->
       when (checkYield && not omit_yields) $ do
          -- Yielding if HpLim == 0
          let yielding = CmmMachOp (mo_wordEq platform)
-                                  [CmmReg hpLimReg,
+                                  [CmmReg $ hpLimReg platform,
                                    CmmLit (zeroCLit platform)]
          emit =<< mkCmmIfGoto' yielding gc_id (Just False)
 

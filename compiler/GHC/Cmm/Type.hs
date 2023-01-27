@@ -3,7 +3,8 @@ module GHC.Cmm.Type
     , b8, b16, b32, b64, b128, b256, b512, f32, f64, bWord, bHalfWord, gcWord
     , cInt
     , cmmBits, cmmFloat
-    , typeWidth, cmmEqType, cmmEqType_ignoring_ptrhood
+    , typeWidth, setCmmTypeWidth
+    , cmmEqType, cmmEqType_ignoring_ptrhood
     , isFloatType, isGcPtrType, isBitsType
     , isWordAny, isWord32, isWord64
     , isFloat64, isFloat32
@@ -105,6 +106,9 @@ cmmEqType_ignoring_ptrhood (CmmType c1 w1) (CmmType c2 w2)
 --- Simple operations on CmmType -----
 typeWidth :: CmmType -> Width
 typeWidth (CmmType _ w) = w
+
+setCmmTypeWidth :: Width -> CmmType -> CmmType
+setCmmTypeWidth w (CmmType c _) = CmmType c w
 
 cmmBits, cmmFloat :: Width -> CmmType
 cmmBits  = CmmType BitsCat

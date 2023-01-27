@@ -299,7 +299,7 @@ saveThreadState profile = do
   close_nursery <- closeNursery profile tso
   pure $ catAGraphs
    [ -- tso = CurrentTSO;
-     mkAssign (CmmLocal tso) currentTSOExpr
+     mkAssign (CmmLocal tso) (currentTSOExpr platform)
 
    , -- tso->stackobj->sp = Sp;
      mkStore (cmmOffset platform
@@ -307,13 +307,14 @@ saveThreadState profile = do
                                             (CmmReg (CmmLocal tso))
                                             (tso_stackobj profile)))
                         (stack_SP profile))
-             spExpr
+             (spExpr platform)
 
     , close_nursery
 
     , -- and save the current cost centre stack in the TSO when profiling:
       if profileIsProfiling profile
-         then mkStore (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS profile)) cccsExpr
+         then mkStore (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS profile))
+                      (cccsExpr platform)
          else mkNop
     ]
 
@@ -372,14 +373,14 @@ emitPushArgRegs regs_live = do
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
             cond     = cmmNeWord platform live (zeroExpr platform)
-            reg_ty   = cmmRegType platform (CmmGlobal reg)
+            reg_ty   = globalRegSpillType platform reg
             width    = roundUpToWords platform
                                       (widthInBytes $ typeWidth reg_ty)
-            adj_sp   = mkAssign spReg
-                                (cmmOffset platform spExpr (negate width))
-            save_reg = mkStore spExpr (CmmReg $ CmmGlobal reg)
+            adj_sp   = mkAssign (spReg platform)
+                                (cmmOffset platform (spExpr platform) (negate width))
+            save_reg = mkStore (spExpr platform) (CmmReg $ CmmGlobal $ GlobalRegUse reg reg_ty)
         in mkCmmIfThen cond $ catAGraphs [adj_sp, save_reg]
-  emit . catAGraphs =<< mapM save_arg (reverse regs)
+  emit . catAGraphs =<< mapM save_arg (reverse $ regs)
 
 -- | Pop a subset of STG registers from the stack (see 'emitPushArgRegs')
 emitPopArgRegs :: CmmExpr -> FCode ()
@@ -390,12 +391,13 @@ emitPopArgRegs regs_live = do
         let mask     = CmmLit (CmmInt (1 `shiftL` n) (wordWidth platform))
             live     = cmmAndWord platform regs_live mask
             cond     = cmmNeWord platform live (zeroExpr platform)
-            reg_ty   = cmmRegType platform (CmmGlobal reg)
+            reg_ty   = globalRegSpillType platform reg
             width    = roundUpToWords platform
                                       (widthInBytes $ typeWidth reg_ty)
-            adj_sp   = mkAssign spReg
-                                (cmmOffset platform spExpr width)
-            restore_reg = mkAssign (CmmGlobal reg) (CmmLoad spExpr reg_ty NaturallyAligned)
+            adj_sp   = mkAssign (spReg platform)
+                                (cmmOffset platform (spExpr platform) width)
+            restore_reg = mkAssign (CmmGlobal $ GlobalRegUse reg reg_ty)
+                                   (CmmLoad (spExpr platform) reg_ty NaturallyAligned)
         in mkCmmIfThen cond $ catAGraphs [restore_reg, adj_sp]
   emit . catAGraphs =<< mapM save_arg regs
 
@@ -406,7 +408,7 @@ emitCloseNursery = do
   let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
   code <- closeNursery profile tso
-  emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
+  emit $ mkAssign (CmmLocal tso) (currentTSOExpr platform) <*> code
 
 {- |
 @closeNursery dflags tso@ produces code to close the nursery.
@@ -435,14 +437,14 @@ closeNursery profile tso = do
       platform = profilePlatform profile
   cnreg      <- CmmLocal <$> newTemp (bWord platform)
   pure $ catAGraphs [
-    mkAssign cnreg currentNurseryExpr,
+    mkAssign cnreg (currentNurseryExpr platform),
 
     -- CurrentNursery->free = Hp+1;
-    mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform hpExpr 1),
+    mkStore (nursery_bdescr_free platform cnreg) (cmmOffsetW platform (hpExpr platform) 1),
 
     let alloc =
            CmmMachOp (mo_wordSub platform)
-              [ cmmOffsetW platform hpExpr 1
+              [ cmmOffsetW platform (hpExpr platform) 1
               , cmmLoadBWord platform (nursery_bdescr_start platform cnreg)
               ]
 
@@ -470,23 +472,23 @@ loadThreadState profile = do
   open_nursery <- openNursery profile tso
   pure $ catAGraphs [
     -- tso = CurrentTSO;
-    mkAssign (CmmLocal tso) currentTSOExpr,
+    mkAssign (CmmLocal tso) (currentTSOExpr platform),
     -- stack = tso->stackobj;
     mkAssign (CmmLocal stack) (cmmLoadBWord platform (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_stackobj profile))),
     -- Sp = stack->sp;
-    mkAssign spReg (cmmLoadBWord platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile))),
+    mkAssign (spReg platform) (cmmLoadBWord platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_SP profile))),
     -- SpLim = stack->stack + RESERVED_STACK_WORDS;
-    mkAssign spLimReg (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
+    mkAssign (spLimReg platform) (cmmOffsetW platform (cmmOffset platform (CmmReg (CmmLocal stack)) (stack_STACK profile))
                                 (pc_RESERVED_STACK_WORDS (platformConstants platform))),
     -- HpAlloc = 0;
     --   HpAlloc is assumed to be set to non-zero only by a failed
     --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
-    mkAssign hpAllocReg (zeroExpr platform),
+    mkAssign (hpAllocReg platform) (zeroExpr platform),
     open_nursery,
     -- and load the current cost centre stack from the TSO when profiling:
     if profileIsProfiling profile
        then let ccs_ptr = cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS profile)
-            in storeCurCCS (CmmLoad ccs_ptr (ccsType platform) NaturallyAligned)
+            in storeCurCCS platform (CmmLoad ccs_ptr (ccsType platform) NaturallyAligned)
        else mkNop
    ]
 
@@ -497,7 +499,7 @@ emitOpenNursery = do
   let platform = profilePlatform profile
   tso <- newTemp (bWord platform)
   code <- openNursery profile tso
-  emit $ mkAssign (CmmLocal tso) currentTSOExpr <*> code
+  emit $ mkAssign (CmmLocal tso) (currentTSOExpr platform) <*> code
 
 {- |
 @openNursery profile tso@ produces code to open the nursery. A local register
@@ -540,17 +542,17 @@ openNursery profile tso = do
   -- what code we generate, look at the assembly for
   -- stg_returnToStackTop in rts/StgStartup.cmm.
   pure $ catAGraphs [
-     mkAssign cnreg currentNurseryExpr,
+     mkAssign cnreg (currentNurseryExpr platform),
      mkAssign bdfreereg  (cmmLoadBWord platform (nursery_bdescr_free platform cnreg)),
 
      -- Hp = CurrentNursery->free - 1;
-     mkAssign hpReg (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
+     mkAssign (hpReg platform) (cmmOffsetW platform (CmmReg bdfreereg) (-1)),
 
      mkAssign bdstartreg (cmmLoadBWord platform (nursery_bdescr_start platform cnreg)),
 
      -- HpLim = CurrentNursery->start +
      --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
-     mkAssign hpLimReg
+     mkAssign (hpLimReg platform)
          (cmmOffsetExpr platform
              (CmmReg bdstartreg)
              (cmmOffset platform

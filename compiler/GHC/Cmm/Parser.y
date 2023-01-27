@@ -375,11 +375,11 @@ import qualified Data.ByteString.Char8 as BS8
         'float64'       { L _ (CmmT_float64) }
         'gcptr'         { L _ (CmmT_gcptr) }
 
-        GLOBALREG       { L _ (CmmT_GlobalReg   $$) }
-        NAME            { L _ (CmmT_Name        $$) }
-        STRING          { L _ (CmmT_String      $$) }
-        INT             { L _ (CmmT_Int         $$) }
-        FLOAT           { L _ (CmmT_Float       $$) }
+        GLOBALREG       { L _ (CmmT_GlobalReg $$) }
+        NAME            { L _ (CmmT_Name      $$) }
+        STRING          { L _ (CmmT_String    $$) }
+        INT             { L _ (CmmT_Int       $$) }
+        FLOAT           { L _ (CmmT_Float     $$) }
 
 %monad { PD } { >>= } { return }
 %lexer { cmmlex } { L _ CmmT_EOF }
@@ -714,9 +714,9 @@ stmt    :: { CmmParse () }
 unwind_regs
         :: { CmmParse [(GlobalReg, Maybe CmmExpr)] }
         : GLOBALREG '=' expr_or_unknown ',' unwind_regs
-                { do e <- $3; rest <- $5; return (($1, e) : rest) }
+                { do e <- $3; rest <- $5; return ((globalRegUseGlobalReg $1, e) : rest) }
         | GLOBALREG '=' expr_or_unknown
-                { do e <- $3; return [($1, e)] }
+                { do e <- $3; return [(globalRegUseGlobalReg $1, e)] }
 
 -- | A memory ordering
 mem_ordering :: { CmmParse MemoryOrdering }
@@ -763,9 +763,9 @@ vols    :: { [GlobalReg] }
                                          ; return (realArgRegsCover platform) }
                                            -- All of them. See comment attached
                                            -- to realArgRegsCover
-        | '[' globals ']'               { $2 }
+        | '[' globals ']'               { map globalRegUseGlobalReg $2 }
 
-globals :: { [GlobalReg] }
+globals :: { [GlobalRegUse] }
         : GLOBALREG                     { [$1] }
         | GLOBALREG ',' globals         { $1 : $3 }
 
@@ -1177,19 +1177,30 @@ parseCmmHint str      = failMsgPD $ \span -> mkPlainErrorMsgEnvelope span $
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
-inferCmmHint (CmmLit (CmmLabel _)) = AddrHint
-inferCmmHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = AddrHint
-inferCmmHint _ = NoHint
+inferCmmHint (CmmLit (CmmLabel _))
+  = AddrHint
+inferCmmHint (CmmReg (CmmGlobal reg))
+  | isPtrGlobalRegUse reg
+  = AddrHint
+inferCmmHint _
+  = NoHint
 
-isPtrGlobalReg Sp                    = True
-isPtrGlobalReg SpLim                 = True
-isPtrGlobalReg Hp                    = True
-isPtrGlobalReg HpLim                 = True
-isPtrGlobalReg CCCS                  = True
-isPtrGlobalReg CurrentTSO            = True
-isPtrGlobalReg CurrentNursery        = True
-isPtrGlobalReg (VanillaReg _ VGcPtr) = True
-isPtrGlobalReg _                     = False
+isPtrGlobalRegUse :: GlobalRegUse -> Bool
+isPtrGlobalRegUse (GlobalRegUse reg ty)
+  | VanillaReg {} <- reg
+  , isGcPtrType ty
+  = True
+  | otherwise
+  = go reg
+  where
+    go Sp             = True
+    go SpLim          = True
+    go Hp             = True
+    go HpLim          = True
+    go CCCS           = True
+    go CurrentTSO     = True
+    go CurrentNursery = True
+    go _              = False
 
 happyError :: PD a
 happyError = PD $ \_ _ s -> unP srcParseFail s

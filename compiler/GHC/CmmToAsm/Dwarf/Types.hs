@@ -31,7 +31,7 @@ import GHC.Prelude
 
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.CLabel
-import GHC.Cmm.Expr         ( GlobalReg(..) )
+import GHC.Cmm.Expr
 import GHC.Utils.Encoding
 import GHC.Data.FastString
 import GHC.Utils.Outputable
@@ -469,7 +469,7 @@ pprSetUnwind _    Sp (Just (UwReg s _), Just (UwReg s' o')) | s == s'
   = if o' >= 0
     then pprByte dW_CFA_def_cfa_offset $$ pprLEBWord (fromIntegral o')
     else pprByte dW_CFA_def_cfa_offset_sf $$ pprLEBInt o'
-pprSetUnwind plat Sp (_, Just (UwReg s' o'))
+pprSetUnwind plat Sp (_, Just (UwReg (GlobalRegUse s' _) o'))
   = if o' >= 0
     then pprByte dW_CFA_def_cfa $$
          pprLEBRegNo plat s' $$
@@ -479,7 +479,7 @@ pprSetUnwind plat Sp (_, Just (UwReg s' o'))
          pprLEBInt o'
 pprSetUnwind plat Sp (_, Just uw)
   = pprByte dW_CFA_def_cfa_expression $$ pprUnwindExpr plat False uw
-pprSetUnwind plat g  (_, Just (UwDeref (UwReg Sp o)))
+pprSetUnwind plat g  (_, Just (UwDeref (UwReg (GlobalRegUse Sp _) o)))
   | o < 0 && ((-o) `mod` platformWordSizeInBytes plat) == 0 -- expected case
   = pprByte (dW_CFA_offset + dwarfGlobalRegNo plat g) $$
     pprLEBWord (fromIntegral ((-o) `div` platformWordSizeInBytes plat))
@@ -491,7 +491,7 @@ pprSetUnwind plat g  (_, Just (UwDeref uw))
   = pprByte dW_CFA_expression $$
     pprLEBRegNo plat g $$
     pprUnwindExpr plat True uw
-pprSetUnwind plat g  (_, Just (UwReg g' 0))
+pprSetUnwind plat g  (_, Just (UwReg (GlobalRegUse g' _) 0))
   | g == g'
   = pprByte dW_CFA_same_value $$
     pprLEBRegNo plat g
@@ -513,12 +513,14 @@ pprUnwindExpr platform spIsCFA expr
   = let pprE (UwConst i)
           | i >= 0 && i < 32 = pprByte (dW_OP_lit0 + fromIntegral i)
           | otherwise        = pprByte dW_OP_consts $$ pprLEBInt i -- lazy...
-        pprE (UwReg Sp i) | spIsCFA
-                             = if i == 0
-                               then pprByte dW_OP_call_frame_cfa
-                               else pprE (UwPlus (UwReg Sp 0) (UwConst i))
-        pprE (UwReg g i)      = pprByte (dW_OP_breg0+dwarfGlobalRegNo platform g) $$
-                               pprLEBInt i
+        pprE (UwReg r@(GlobalRegUse Sp _) i)
+          | spIsCFA
+                              = if i == 0
+                                then pprByte dW_OP_call_frame_cfa
+                                else pprE (UwPlus (UwReg r 0) (UwConst i))
+        pprE (UwReg (GlobalRegUse g _) i)
+                              = pprByte (dW_OP_breg0+dwarfGlobalRegNo platform g) $$
+                                pprLEBInt i
         pprE (UwDeref u)      = pprE u $$ pprByte dW_OP_deref
         pprE (UwLabel l)      = pprByte dW_OP_addr $$ pprWord platform (pprAsmLabel platform l)
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus

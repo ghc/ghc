@@ -177,7 +177,7 @@ trouble.
 -}
 globalInfoFromCmmGlobalReg :: WasmTypeTag w -> GlobalReg -> Maybe GlobalInfo
 globalInfoFromCmmGlobalReg t reg = case reg of
-  VanillaReg i _
+  VanillaReg i
     | i >= 1 && i <= 10 -> Just (fromString $ "__R" <> show i, ty_word)
   FloatReg i
     | i >= 1 && i <= 6 ->
@@ -198,7 +198,7 @@ globalInfoFromCmmGlobalReg t reg = case reg of
 
 supportedCmmGlobalRegs :: [GlobalReg]
 supportedCmmGlobalRegs =
-  [VanillaReg i VGcPtr | i <- [1 .. 10]]
+  [VanillaReg i | i <- [1 .. 10]]
     <> [FloatReg i | i <- [1 .. 6]]
     <> [DoubleReg i | i <- [1 .. 6]]
     <> [LongReg i | i <- [1 .. 1]]
@@ -873,38 +873,35 @@ lower_CmmReg :: CLabel -> CmmReg -> WasmCodeGenM w (SomeWasmExpr w)
 lower_CmmReg _ (CmmLocal reg) = do
   (reg_i, SomeWasmType ty) <- onCmmLocalReg reg
   pure $ SomeWasmExpr ty $ WasmExpr $ WasmLocalGet ty reg_i
-lower_CmmReg _ (CmmGlobal EagerBlackholeInfo) = do
-  ty_word <- wasmWordTypeM
-  pure $
-    SomeWasmExpr ty_word $
-      WasmExpr $
-        WasmSymConst "stg_EAGER_BLACKHOLE_info"
-lower_CmmReg _ (CmmGlobal GCEnter1) = do
+lower_CmmReg lbl (CmmGlobal (GlobalRegUse greg reg_use_ty)) = do
   ty_word <- wasmWordTypeM
   ty_word_cmm <- wasmWordCmmTypeM
-  onFuncSym "__stg_gc_enter_1" [] [ty_word_cmm]
-  pure $ SomeWasmExpr ty_word $ WasmExpr $ WasmSymConst "__stg_gc_enter_1"
-lower_CmmReg _ (CmmGlobal GCFun) = do
-  ty_word <- wasmWordTypeM
-  ty_word_cmm <- wasmWordCmmTypeM
-  onFuncSym "__stg_gc_fun" [] [ty_word_cmm]
-  pure $ SomeWasmExpr ty_word $ WasmExpr $ WasmSymConst "__stg_gc_fun"
-lower_CmmReg lbl (CmmGlobal BaseReg) = do
-  platform <- wasmPlatformM
-  lower_CmmExpr lbl $ regTableOffset platform 0
-lower_CmmReg lbl (CmmGlobal reg) = do
-  ty_word <- wasmWordTypeM
-  if
+  case greg of
+    EagerBlackholeInfo ->
+      pure $
+        SomeWasmExpr ty_word $
+          WasmExpr $
+            WasmSymConst "stg_EAGER_BLACKHOLE_info"
+    GCEnter1 -> do
+      onFuncSym "__stg_gc_enter_1" [] [ty_word_cmm]
+      pure $ SomeWasmExpr ty_word $ WasmExpr $ WasmSymConst "__stg_gc_enter_1"
+    GCFun -> do
+      onFuncSym "__stg_gc_fun" [] [ty_word_cmm]
+      pure $ SomeWasmExpr ty_word $ WasmExpr $ WasmSymConst "__stg_gc_fun"
+    BaseReg -> do
+      platform <- wasmPlatformM
+      lower_CmmExpr lbl $ regTableOffset platform 0
+    _other
       | Just (sym_global, SomeWasmType ty) <-
-          globalInfoFromCmmGlobalReg ty_word reg ->
+          globalInfoFromCmmGlobalReg ty_word greg ->
           pure $ SomeWasmExpr ty $ WasmExpr $ WasmGlobalGet ty sym_global
       | otherwise -> do
           platform <- wasmPlatformM
-          case someWasmTypeFromCmmType $ globalRegType platform reg of
+          case someWasmTypeFromCmmType reg_use_ty of
             SomeWasmType ty -> do
               (WasmExpr ptr_instr, o) <-
                 lower_CmmExpr_Ptr lbl $
-                  get_GlobalReg_addr platform reg
+                  get_GlobalReg_addr platform greg
               pure $
                 SomeWasmExpr ty $
                   WasmExpr $
@@ -1380,7 +1377,7 @@ lower_CmmUnsafeForeignCall lbl target mb_hints ret_info ret_locals arg_exprs = d
           (reg_i, SomeWasmType reg_ty) <- onCmmLocalReg reg
           pure $
             SomeWasmPostCCall (reg_ty `TypeListCons` acc_tys) $
-              case (# ret_hint, cmmRegWidth platform $ CmmLocal reg #) of
+              case (# ret_hint, cmmRegWidth $ CmmLocal reg #) of
                 (# SignedHint, W8 #) ->
                   acc_instr
                     `WasmConcat` WasmConst reg_ty 0xFF
@@ -1459,7 +1456,7 @@ lower_CmmAction lbl act = do
       (i, SomeWasmType ty_reg) <- onCmmLocalReg reg
       WasmExpr instrs <- lower_CmmExpr_Typed lbl ty_reg e
       pure $ WasmStatements $ instrs `WasmConcat` WasmLocalSet ty_reg i
-    CmmAssign (CmmGlobal reg) e
+    CmmAssign (CmmGlobal (GlobalRegUse reg _)) e
       | BaseReg <- reg -> pure $ WasmStatements WasmNop
       | Just (sym_global, SomeWasmType ty_reg) <-
           globalInfoFromCmmGlobalReg ty_word reg -> do

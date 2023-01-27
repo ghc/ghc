@@ -39,7 +39,7 @@ import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
-import GHC.Cmm.Reg ( pprGlobalReg )
+import GHC.Cmm.Reg ( pprGlobalReg, pprGlobalRegUse )
 import GHC.Cmm.Utils
 import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Unit.Module
@@ -513,7 +513,7 @@ type UnwindTable = Map.Map GlobalReg (Maybe UnwindExpr)
 
 -- | Expressions, used for unwind information
 data UnwindExpr = UwConst !Int                  -- ^ literal value
-                | UwReg !GlobalReg !Int         -- ^ register plus offset
+                | UwReg !GlobalRegUse !Int      -- ^ register plus offset
                 | UwDeref UnwindExpr            -- ^ pointer dereferencing
                 | UwLabel CLabel
                 | UwPlus UnwindExpr UnwindExpr
@@ -535,7 +535,7 @@ pprUnwindTable platform u = brackets (fsep (punctuate comma (map print_entry (Ma
 pprUnwindExpr :: IsLine doc => Rational -> Platform -> UnwindExpr -> doc
 pprUnwindExpr p env = \case
   UwConst i     -> int i
-  UwReg g 0     -> pprGlobalReg g
+  UwReg g 0     -> pprGlobalRegUse g
   UwReg g x     -> pprUnwindExpr p env (UwPlus (UwReg g 0) (UwConst x))
   UwDeref e     -> char '*' <> pprUnwindExpr 3 env e
   UwLabel l     -> pprAsmLabel env l

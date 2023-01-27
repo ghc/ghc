@@ -272,9 +272,10 @@ cgDataCon mn data_con
             -- return it.
             -- NB 2: We don't set CC when entering data (WDP 94/06)
             do { tickyEnterDynCon
-               ; ldvEnter (CmmReg nodeReg)
+               ; let node = CmmReg $ nodeReg platform
+               ; ldvEnter node
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon platform data_con)]
+               ; void $ emitReturn [cmmOffsetB platform node (tagForCon platform data_con)]
                }
                     -- The case continuation code expects a tagged pointer
         }

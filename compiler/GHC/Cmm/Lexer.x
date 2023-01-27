@@ -28,6 +28,7 @@ import GHC.Data.FastString
 import GHC.Parser.CharClass
 import GHC.Parser.Errors.Types
 import GHC.Parser.Errors.Ppr ()
+import GHC.Platform
 import GHC.Utils.Error
 import GHC.Utils.Misc
 --import TRACE
@@ -103,22 +104,22 @@ $white_no_nl+           ;
   "False"               { kw CmmT_False }
   "likely"              { kw CmmT_likely}
 
-  P@decimal             { global_regN (\n -> VanillaReg n VGcPtr) }
-  R@decimal             { global_regN (\n -> VanillaReg n VNonGcPtr) }
-  F@decimal             { global_regN FloatReg }
-  D@decimal             { global_regN DoubleReg }
-  L@decimal             { global_regN LongReg }
-  Sp                    { global_reg Sp }
-  SpLim                 { global_reg SpLim }
-  Hp                    { global_reg Hp }
-  HpLim                 { global_reg HpLim }
-  CCCS                  { global_reg CCCS }
-  CurrentTSO            { global_reg CurrentTSO }
-  CurrentNursery        { global_reg CurrentNursery }
-  HpAlloc               { global_reg HpAlloc }
-  BaseReg               { global_reg BaseReg }
-  MachSp                { global_reg MachSp }
-  UnwindReturnReg       { global_reg UnwindReturnReg }
+  P@decimal             { global_regN VanillaReg      gcWord }
+  R@decimal             { global_regN VanillaReg       bWord }
+  F@decimal             { global_regN FloatReg  (const $ cmmFloat W32) }
+  D@decimal             { global_regN DoubleReg (const $ cmmFloat W64) }
+  L@decimal             { global_regN LongReg   (const $ cmmBits  W64) }
+  Sp                    { global_reg  Sp               bWord }
+  SpLim                 { global_reg  SpLim            bWord }
+  Hp                    { global_reg  Hp              gcWord }
+  HpLim                 { global_reg  HpLim            bWord }
+  CCCS                  { global_reg  CCCS             bWord }
+  CurrentTSO            { global_reg  CurrentTSO       bWord }
+  CurrentNursery        { global_reg  CurrentNursery   bWord }
+  HpAlloc               { global_reg  HpAlloc          bWord }
+  BaseReg               { global_reg  BaseReg          bWord }
+  MachSp                { global_reg  MachSp           bWord }
+  UnwindReturnReg       { global_reg  UnwindReturnReg  bWord }
 
   $namebegin $namechar* { name }
 
@@ -178,7 +179,7 @@ data CmmToken
   | CmmT_float32
   | CmmT_float64
   | CmmT_gcptr
-  | CmmT_GlobalReg GlobalReg
+  | CmmT_GlobalReg GlobalRegUse
   | CmmT_Name      FastString
   | CmmT_String    String
   | CmmT_Int       Integer
@@ -210,14 +211,20 @@ special_char span buf _len = return (L span (CmmT_SpecChar (currentChar buf)))
 kw :: CmmToken -> Action
 kw tok span _buf _len = return (L span tok)
 
-global_regN :: (Int -> GlobalReg) -> Action
-global_regN con span buf len
-  = return (L span (CmmT_GlobalReg (con (fromIntegral n))))
+global_regN :: (Int -> GlobalReg) -> (Platform -> CmmType) -> Action
+global_regN con ty_fn span buf len
+  = do { platform <- getPlatform
+       ; let reg = con (fromIntegral n)
+             ty = ty_fn platform
+       ; return (L span (CmmT_GlobalReg (GlobalRegUse reg ty))) }
   where buf' = stepOn buf
         n = parseUnsignedInteger buf' (len-1) 10 octDecDigit
 
-global_reg :: GlobalReg -> Action
-global_reg r span _buf _len = return (L span (CmmT_GlobalReg r))
+global_reg :: GlobalReg -> (Platform -> CmmType) -> Action
+global_reg reg ty_fn span _buf _len
+  = do { platform <- getPlatform
+       ; let ty = ty_fn platform
+       ; return (L span (CmmT_GlobalReg (GlobalRegUse reg ty))) }
 
 strtoken :: (String -> CmmToken) -> Action
 strtoken f span buf len =

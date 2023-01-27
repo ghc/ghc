@@ -1143,12 +1143,12 @@ genStore addr val alignment
 -- | CmmStore operation
 -- This is a special case for storing to a global register pointer
 -- offset such as I32[Sp+8].
-genStore_fast :: CmmExpr -> GlobalReg -> Int -> CmmExpr -> AlignmentSpec
+genStore_fast :: CmmExpr -> GlobalRegUse -> Int -> CmmExpr -> AlignmentSpec
               -> LlvmM StmtData
 genStore_fast addr r n val alignment
   = do platform <- getPlatform
        (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
-       meta          <- getTBAARegMeta r
+       meta          <- getTBAARegMeta (globalRegUseGlobalReg r)
        let (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
        case isPointer grt && rem == 0 of
             True -> do
@@ -1388,8 +1388,7 @@ exprToVarOpt opt e = case e of
         -> genMachOp opt op exprs
 
     CmmRegOff r i
-        -> do platform <- getPlatform
-              exprToVar $ expandCmmReg platform (r, i)
+        -> exprToVar $ expandCmmReg (r, i)
 
     CmmStackSlot _ _
         -> panic "exprToVar: CmmStackSlot not supported!"
@@ -1554,7 +1553,7 @@ genMachOp opt op e = genMachOp_slow opt op e
 -- | Handle CmmMachOp expressions
 -- This is a specialised method that handles Global register manipulations like
 -- 'Sp - 16', using the getelementptr instruction.
-genMachOp_fast :: EOption -> MachOp -> GlobalReg -> Int -> [CmmExpr]
+genMachOp_fast :: EOption -> MachOp -> GlobalRegUse -> Int -> [CmmExpr]
                -> LlvmM ExprData
 genMachOp_fast opt op r n e
   = do (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
@@ -1822,12 +1821,12 @@ genLoad atomic e ty align
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
 -- offset such as I32[Sp+8].
-genLoad_fast :: Atomic -> CmmExpr -> GlobalReg -> Int -> CmmType
+genLoad_fast :: Atomic -> CmmExpr -> GlobalRegUse -> Int -> CmmType
              -> AlignmentSpec -> LlvmM ExprData
 genLoad_fast atomic e r n ty align = do
     platform <- getPlatform
     (gv, grt, s1) <- getCmmRegVal (CmmGlobal r)
-    meta          <- getTBAARegMeta r
+    meta          <- getTBAARegMeta (globalRegUseGlobalReg r)
     let ty'      = cmmToLlvmType ty
         (ix,rem) = n `divMod` ((llvmWidthInBits platform . pLower) grt  `div` 8)
     case isPointer grt && rem == 0 of
@@ -1917,10 +1916,11 @@ getCmmReg (CmmLocal (LocalReg un _))
            -- "funPrologue" to allocate it on the stack.
 
 getCmmReg (CmmGlobal g)
-  = do onStack  <- checkStackReg g
+  = do let r = globalRegUseGlobalReg g
+       onStack  <- checkStackReg r
        platform <- getPlatform
        if onStack
-         then return (lmGlobalRegVar platform g)
+         then return (lmGlobalRegVar platform r)
          else pprPanic "getCmmReg: Cmm register " $
                 ppr g <> text " not stack-allocated!"
 
@@ -1930,10 +1930,10 @@ getCmmRegVal :: CmmReg -> LlvmM (LlvmVar, LlvmType, LlvmStatements)
 getCmmRegVal reg =
   case reg of
     CmmGlobal g -> do
-      onStack <- checkStackReg g
+      onStack <- checkStackReg (globalRegUseGlobalReg g)
       platform <- getPlatform
       if onStack then loadFromStack else do
-        let r = lmGlobalRegArg platform g
+        let r = lmGlobalRegArg platform (globalRegUseGlobalReg g)
         return (r, getVarType r, nilOL)
     _ -> loadFromStack
  where loadFromStack = do
@@ -2064,7 +2064,7 @@ funPrologue live cmmBlocks = do
         let (newv, stmts) = allocReg reg
         varInsert un (pLower $ getVarType newv)
         return stmts
-      CmmGlobal r -> do
+      CmmGlobal (GlobalRegUse r _) -> do
         let reg   = lmGlobalRegVar platform r
             arg   = lmGlobalRegArg platform r
             ty    = (pLower . getVarType) reg
@@ -2107,8 +2107,8 @@ funEpilogue live = do
     let allRegs = activeStgRegs platform
     loads <- forM allRegs $ \r -> if
       -- load live registers
-      | r `elem` alwaysLive  -> loadExpr r
-      | r `elem` live        -> loadExpr r
+      | r `elem` alwaysLive  -> loadExpr (GlobalRegUse r (globalRegSpillType platform r))
+      | r `elem` live        -> loadExpr (GlobalRegUse r (globalRegSpillType platform r))
       -- load all non Floating-Point Registers
       | not (isFPR r)        -> loadUndef r
       -- load padding Floating-Point Registers
@@ -2152,9 +2152,9 @@ doExpr ty expr = do
 
 
 -- | Expand CmmRegOff
-expandCmmReg :: Platform -> (CmmReg, Int) -> CmmExpr
-expandCmmReg platform (reg, off)
-  = let width = typeWidth (cmmRegType platform reg)
+expandCmmReg :: (CmmReg, Int) -> CmmExpr
+expandCmmReg (reg, off)
+  = let width = typeWidth (cmmRegType reg)
         voff  = CmmLit $ CmmInt (fromIntegral off) width
     in CmmMachOp (MO_Add width) [CmmReg reg, voff]
 

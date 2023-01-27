@@ -37,16 +37,16 @@ lmGlobalReg platform suf reg
         BaseReg        -> ptrGlobal $ "Base" ++ suf
         Sp             -> ptrGlobal $ "Sp" ++ suf
         Hp             -> ptrGlobal $ "Hp" ++ suf
-        VanillaReg 1 _ -> wordGlobal $ "R1" ++ suf
-        VanillaReg 2 _ -> wordGlobal $ "R2" ++ suf
-        VanillaReg 3 _ -> wordGlobal $ "R3" ++ suf
-        VanillaReg 4 _ -> wordGlobal $ "R4" ++ suf
-        VanillaReg 5 _ -> wordGlobal $ "R5" ++ suf
-        VanillaReg 6 _ -> wordGlobal $ "R6" ++ suf
-        VanillaReg 7 _ -> wordGlobal $ "R7" ++ suf
-        VanillaReg 8 _ -> wordGlobal $ "R8" ++ suf
-        VanillaReg 9 _ -> wordGlobal $ "R9" ++ suf
-        VanillaReg 10 _ -> wordGlobal $ "R10" ++ suf
+        VanillaReg 1   -> wordGlobal $ "R1" ++ suf
+        VanillaReg 2   -> wordGlobal $ "R2" ++ suf
+        VanillaReg 3   -> wordGlobal $ "R3" ++ suf
+        VanillaReg 4   -> wordGlobal $ "R4" ++ suf
+        VanillaReg 5   -> wordGlobal $ "R5" ++ suf
+        VanillaReg 6   -> wordGlobal $ "R6" ++ suf
+        VanillaReg 7   -> wordGlobal $ "R7" ++ suf
+        VanillaReg 8   -> wordGlobal $ "R8" ++ suf
+        VanillaReg 9   -> wordGlobal $ "R9" ++ suf
+        VanillaReg 10  -> wordGlobal $ "R10" ++ suf
         SpLim          -> wordGlobal $ "SpLim" ++ suf
         FloatReg 1     -> floatGlobal $ "F1" ++ suf
         FloatReg 2     -> floatGlobal $ "F2" ++ suf
@@ -129,8 +129,8 @@ tbaa = fsLit "tbaa"
 
 -- | Get the correct TBAA metadata information for this register type
 getTBAA :: GlobalReg -> Unique
-getTBAA BaseReg          = baseN
-getTBAA Sp               = stackN
-getTBAA Hp               = heapN
-getTBAA (VanillaReg _ _) = rxN
-getTBAA _                = topN
+getTBAA BaseReg        = baseN
+getTBAA Sp             = stackN
+getTBAA Hp             = heapN
+getTBAA (VanillaReg _) = rxN
+getTBAA _              = topN

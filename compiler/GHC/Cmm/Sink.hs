@@ -244,7 +244,7 @@ isSmall _ = False
 --
 isTrivial :: Platform -> CmmExpr -> Bool
 isTrivial _ (CmmReg (CmmLocal _)) = True
-isTrivial platform (CmmReg (CmmGlobal r)) = -- see Note [Inline GlobalRegs?]
+isTrivial platform (CmmReg (CmmGlobal (GlobalRegUse r _))) = -- see Note [Inline GlobalRegs?]
   if isARM (platformArch platform)
   then True -- CodeGen.Platform.ARM does not have globalRegMaybe
   else isJust (globalRegMaybe platform r)
@@ -667,9 +667,9 @@ conflicts platform (r, rhs, addr) node
   , memConflicts addr (loadAddr platform addr' (cmmExprWidth platform e)) = True
 
   -- (4) an assignment to Hp/Sp conflicts with a heap/stack read respectively
-  | HeapMem    <- addr, CmmAssign (CmmGlobal Hp) _ <- node        = True
-  | StackMem   <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
-  | SpMem{}    <- addr, CmmAssign (CmmGlobal Sp) _ <- node        = True
+  | HeapMem    <- addr, CmmAssign (CmmGlobal (GlobalRegUse Hp _)) _ <- node        = True
+  | StackMem   <- addr, CmmAssign (CmmGlobal (GlobalRegUse Sp _)) _ <- node        = True
+  | SpMem{}    <- addr, CmmAssign (CmmGlobal (GlobalRegUse Sp _)) _ <- node        = True
 
   -- (5) foreign calls clobber heap: see Note [Foreign calls clobber heap]
   | CmmUnsafeForeignCall{} <- node, memConflicts addr AnyMem      = True
@@ -703,9 +703,9 @@ conflicts platform (r, rhs, addr) node
 -- Cmm expression
 globalRegistersConflict :: Platform -> CmmExpr -> CmmNode e x -> Bool
 globalRegistersConflict platform expr node =
-    -- See Note [Inlining foldRegsDefd]
-    inline foldRegsDefd platform (\b r -> b || regUsedIn platform (CmmGlobal r) expr)
-                 False node
+   -- See Note [Inlining foldRegsDefd]
+   inline foldRegsDefd platform (\b r -> b || globalRegUsedIn platform r expr)
+                False node
 
 -- Returns True if node defines any local registers that are used in the
 -- Cmm expression
@@ -852,17 +852,17 @@ exprMem _        _                   = NoMem
 loadAddr :: Platform -> CmmExpr -> Width -> AbsMem
 loadAddr platform e w =
   case e of
-   CmmReg r       -> regAddr platform r 0 w
-   CmmRegOff r i  -> regAddr platform r i w
-   _other | regUsedIn platform spReg e -> StackMem
-          | otherwise                  -> AnyMem
+   CmmReg r       -> regAddr r 0 w
+   CmmRegOff r i  -> regAddr r i w
+   _other | regUsedIn platform (spReg platform) e -> StackMem
+          | otherwise                             -> AnyMem
 
-regAddr :: Platform -> CmmReg -> Int -> Width -> AbsMem
-regAddr _      (CmmGlobal Sp) i w = SpMem i (widthInBytes w)
-regAddr _      (CmmGlobal Hp) _ _ = HeapMem
-regAddr _      (CmmGlobal CurrentTSO) _ _ = HeapMem -- important for PrimOps
-regAddr platform r _ _ | isGcPtrType (cmmRegType platform r) = HeapMem -- yay! GCPtr pays for itself
-regAddr _      _ _ _ = AnyMem
+regAddr :: CmmReg -> Int -> Width -> AbsMem
+regAddr (CmmGlobal (GlobalRegUse Sp _)) i w = SpMem i (widthInBytes w)
+regAddr (CmmGlobal (GlobalRegUse Hp _)) _ _ = HeapMem
+regAddr (CmmGlobal (GlobalRegUse CurrentTSO _)) _ _ = HeapMem -- important for PrimOps
+regAddr r _ _ | isGcPtrType (cmmRegType r) = HeapMem -- yay! GCPtr pays for itself
+regAddr _ _ _ = AnyMem
 
 {-
 Note [Inline GlobalRegs?]

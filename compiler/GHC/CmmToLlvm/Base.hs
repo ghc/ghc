@@ -47,7 +47,7 @@ import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Cmm              hiding ( succ )
-import GHC.Cmm.Utils (regsOverlap)
+import GHC.Cmm.Utils (globalRegsOverlap)
 import GHC.Utils.Outputable as Outp
 import GHC.Platform
 import GHC.Types.Unique.FM
@@ -194,8 +194,8 @@ padLiveArgs platform live =
     -- all use the same real regs on X86-64 (XMM registers).
     --
     classes         = NE.groupBy sharesClass fprLive
-    sharesClass a b = regsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
-    norm x          = CmmGlobal ((fpr_ctor x) 1)             -- get the first register of the family
+    sharesClass a b = globalRegsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
+    norm x          = fpr_ctor x 1                                 -- get the first register of the family
 
     -- For each class, we just have to fill missing registers numbers. We use
     -- the constructor of the greatest register to build padding registers.

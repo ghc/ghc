@@ -5,7 +5,7 @@ module GHC.CmmToAsm.Dwarf (
 import GHC.Prelude
 
 import GHC.Cmm.CLabel
-import GHC.Cmm.Expr        ( GlobalReg(..) )
+import GHC.Cmm.Expr
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
 import GHC.Types.Tickish   ( CmmTickish, GenTickish(..) )
 import GHC.Cmm.DebugBlock
@@ -82,7 +82,7 @@ dwarfGen compPath config modLoc us blocks =
       (framesU, us'') = takeUniqFromSupply us'
       frameSct = dwarfFrameSection platform $$
                  line (dwarfFrameLabel <> colon) $$
-                 pprDwarfFrame platform (debugFrame framesU procs)
+                 pprDwarfFrame platform (debugFrame platform framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
       aranges' | ncgSplitSections config = map mkDwarfARange procs
@@ -215,15 +215,15 @@ tickToDwarf _ = []
 
 -- | Generates the data for the debug frame section, which encodes the
 -- desired stack unwind behaviour for the debugger
-debugFrame :: Unique -> [DebugBlock] -> DwarfFrame
-debugFrame u procs
+debugFrame :: Platform -> Unique -> [DebugBlock] -> DwarfFrame
+debugFrame p u procs
   = DwarfFrame { dwCieLabel = mkAsmTempLabel u
                , dwCieInit  = initUws
                , dwCieProcs = map (procToFrame initUws) procs
                }
   where
     initUws :: UnwindTable
-    initUws = Map.fromList [(Sp, Just (UwReg Sp 0))]
+    initUws = Map.fromList [(Sp, Just (UwReg (GlobalRegUse Sp $ bWord p) 0))]
 
 -- | Generates unwind information for a procedure debug block
 procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc

@@ -1079,9 +1079,6 @@ layoutNativeCall profile call_type start_off arg_ty reps =
 
       reg_order :: GlobalReg -> (Int, GlobalReg)
       reg_order reg | Just n <- Map.lookup reg regs_order = (n, reg)
-      -- a VanillaReg goes to the same place regardless of whether it
-      -- contains a pointer
-      reg_order (VanillaReg n VNonGcPtr) = reg_order (VanillaReg n VGcPtr)
       -- if we don't have a position for a FloatReg then they must be passed
       -- in the equivalent DoubleReg
       reg_order (FloatReg n) = reg_order (DoubleReg n)

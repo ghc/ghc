@@ -215,11 +215,12 @@ buildDynCon' binder mn actually_bound ccs con args
           ; checkConArgsDyn (hang (text "TagCheck failed on constructor application.") 4 $
                                    text "On binder:" <> ppr binder $$ text "Constructor:" <> ppr con) con (map fromNonVoid args)
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
-                                          use_cc blame_cc args_w_offsets
+                                          (use_cc platform) (blame_cc platform)
+                                          args_w_offsets
           ; return (mkRhsInit platform reg lf_info hp_plus_n) }
     where
-      use_cc      -- cost-centre to stick in the object
-        | isCurrentCCS ccs = cccsExpr
+      use_cc platform     -- cost-centre to stick in the object
+        | isCurrentCCS ccs = cccsExpr platform
         | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)

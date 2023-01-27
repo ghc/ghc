@@ -107,8 +107,7 @@ lintCmmExpr expr@(CmmMachOp op args) = do
         then cmmCheckMachOp op args tys
         else cmmLintMachOpErr expr (map (cmmExprType platform) args) (machOpArgReps platform op)
 lintCmmExpr (CmmRegOff reg offset)
-  = do platform <- getPlatform
-       let rep = typeWidth (cmmRegType platform reg)
+  = do let rep = typeWidth (cmmRegType reg)
        lintCmmExpr (CmmMachOp (MO_Add rep)
                 [CmmReg reg, CmmLit (CmmInt (fromIntegral offset) rep)])
 lintCmmExpr expr =
@@ -171,9 +170,8 @@ lintCmmMiddle node = case node of
   CmmUnwind{}  -> return ()
 
   CmmAssign reg expr -> do
-            platform <- getPlatform
             erep <- lintCmmExpr expr
-            let reg_ty = cmmRegType platform reg
+            let reg_ty = cmmRegType reg
             unless (compat_regs erep reg_ty) $
               cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
     where

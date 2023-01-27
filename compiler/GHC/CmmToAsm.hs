@@ -1125,15 +1125,15 @@ cmmExprNative referenceKind expr = do
         -- On powerpc (non-PIC), it's easier to jump directly to a label than
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
-        CmmReg (CmmGlobal EagerBlackholeInfo)
+        CmmReg (CmmGlobal (GlobalRegUse EagerBlackholeInfo _))
           | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_EAGER_BLACKHOLE_info")))
-        CmmReg (CmmGlobal GCEnter1)
+        CmmReg (CmmGlobal (GlobalRegUse GCEnter1 _))
           | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_enter_1")))
-        CmmReg (CmmGlobal GCFun)
+        CmmReg (CmmGlobal (GlobalRegUse GCFun _))
           | arch == ArchPPC && not (ncgPIC config)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_fun")))

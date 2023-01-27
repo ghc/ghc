@@ -452,34 +452,34 @@ callerSaves :: GlobalReg -> Bool
 callerSaves BaseReg           = True
 #endif
 #if defined(CALLER_SAVES_R1)
-callerSaves (VanillaReg 1 _)  = True
+callerSaves (VanillaReg 1)    = True
 #endif
 #if defined(CALLER_SAVES_R2)
-callerSaves (VanillaReg 2 _)  = True
+callerSaves (VanillaReg 2)    = True
 #endif
 #if defined(CALLER_SAVES_R3)
-callerSaves (VanillaReg 3 _)  = True
+callerSaves (VanillaReg 3)    = True
 #endif
 #if defined(CALLER_SAVES_R4)
-callerSaves (VanillaReg 4 _)  = True
+callerSaves (VanillaReg 4)    = True
 #endif
 #if defined(CALLER_SAVES_R5)
-callerSaves (VanillaReg 5 _)  = True
+callerSaves (VanillaReg 5)    = True
 #endif
 #if defined(CALLER_SAVES_R6)
-callerSaves (VanillaReg 6 _)  = True
+callerSaves (VanillaReg 6)    = True
 #endif
 #if defined(CALLER_SAVES_R7)
-callerSaves (VanillaReg 7 _)  = True
+callerSaves (VanillaReg 7)    = True
 #endif
 #if defined(CALLER_SAVES_R8)
-callerSaves (VanillaReg 8 _)  = True
+callerSaves (VanillaReg 8)    = True
 #endif
 #if defined(CALLER_SAVES_R9)
-callerSaves (VanillaReg 9 _)  = True
+callerSaves (VanillaReg 9)    = True
 #endif
 #if defined(CALLER_SAVES_R10)
-callerSaves (VanillaReg 10 _) = True
+callerSaves (VanillaReg 10)   = True
 #endif
 #if defined(CALLER_SAVES_F1)
 callerSaves (FloatReg 1)      = True
@@ -555,34 +555,34 @@ activeStgRegs = [
     ,Hp
 #endif
 #if defined(REG_R1)
-    ,VanillaReg 1 VGcPtr
+    ,VanillaReg 1
 #endif
 #if defined(REG_R2)
-    ,VanillaReg 2 VGcPtr
+    ,VanillaReg 2
 #endif
 #if defined(REG_R3)
-    ,VanillaReg 3 VGcPtr
+    ,VanillaReg 3
 #endif
 #if defined(REG_R4)
-    ,VanillaReg 4 VGcPtr
+    ,VanillaReg 4
 #endif
 #if defined(REG_R5)
-    ,VanillaReg 5 VGcPtr
+    ,VanillaReg 5
 #endif
 #if defined(REG_R6)
-    ,VanillaReg 6 VGcPtr
+    ,VanillaReg 6
 #endif
 #if defined(REG_R7)
-    ,VanillaReg 7 VGcPtr
+    ,VanillaReg 7
 #endif
 #if defined(REG_R8)
-    ,VanillaReg 8 VGcPtr
+    ,VanillaReg 8
 #endif
 #if defined(REG_R9)
-    ,VanillaReg 9 VGcPtr
+    ,VanillaReg 9
 #endif
 #if defined(REG_R10)
-    ,VanillaReg 10 VGcPtr
+    ,VanillaReg 10
 #endif
 #if defined(REG_SpLim)
     ,SpLim
@@ -740,34 +740,34 @@ globalRegMaybe :: GlobalReg -> Maybe RealReg
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif
 # if defined(REG_R1)
-globalRegMaybe (VanillaReg 1 _)         = Just (RealRegSingle REG_R1)
+globalRegMaybe (VanillaReg 1)           = Just (RealRegSingle REG_R1)
 # endif
 # if defined(REG_R2)
-globalRegMaybe (VanillaReg 2 _)         = Just (RealRegSingle REG_R2)
+globalRegMaybe (VanillaReg 2)           = Just (RealRegSingle REG_R2)
 # endif
 # if defined(REG_R3)
-globalRegMaybe (VanillaReg 3 _)         = Just (RealRegSingle REG_R3)
+globalRegMaybe (VanillaReg 3)           = Just (RealRegSingle REG_R3)
 # endif
 # if defined(REG_R4)
-globalRegMaybe (VanillaReg 4 _)         = Just (RealRegSingle REG_R4)
+globalRegMaybe (VanillaReg 4)           = Just (RealRegSingle REG_R4)
 # endif
 # if defined(REG_R5)
-globalRegMaybe (VanillaReg 5 _)         = Just (RealRegSingle REG_R5)
+globalRegMaybe (VanillaReg 5)           = Just (RealRegSingle REG_R5)
 # endif
 # if defined(REG_R6)
-globalRegMaybe (VanillaReg 6 _)         = Just (RealRegSingle REG_R6)
+globalRegMaybe (VanillaReg 6)           = Just (RealRegSingle REG_R6)
 # endif
 # if defined(REG_R7)
-globalRegMaybe (VanillaReg 7 _)         = Just (RealRegSingle REG_R7)
+globalRegMaybe (VanillaReg 7)           = Just (RealRegSingle REG_R7)
 # endif
 # if defined(REG_R8)
-globalRegMaybe (VanillaReg 8 _)         = Just (RealRegSingle REG_R8)
+globalRegMaybe (VanillaReg 8)           = Just (RealRegSingle REG_R8)
 # endif
 # if defined(REG_R9)
-globalRegMaybe (VanillaReg 9 _)         = Just (RealRegSingle REG_R9)
+globalRegMaybe (VanillaReg 9)           = Just (RealRegSingle REG_R9)
 # endif
 # if defined(REG_R10)
-globalRegMaybe (VanillaReg 10 _)        = Just (RealRegSingle REG_R10)
+globalRegMaybe (VanillaReg 10)          = Just (RealRegSingle REG_R10)
 # endif
 # if defined(REG_F1)
 globalRegMaybe (FloatReg 1)             = Just (RealRegSingle REG_F1)

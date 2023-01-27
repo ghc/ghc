@@ -228,9 +228,10 @@ basicBlockCodeGen block = do
 addSpUnwindings :: Instr -> NatM (OrdList Instr)
 addSpUnwindings instr@(DELTA d) = do
     config <- getConfig
+    let platform = ncgPlatform config
     if ncgDwarfUnwindings config
         then do lbl <- mkAsmTempLabel <$> getUniqueM
-                let unwind = M.singleton MachSp (Just $ UwReg MachSp $ negate d)
+                let unwind = M.singleton MachSp (Just $ UwReg (GlobalRegUse MachSp (bWord platform)) $ negate d)
                 return $ toOL [ instr, UNWIND lbl unwind ]
         else return (unitOL instr)
 addSpUnwindings instr = return $ unitOL instr
@@ -342,7 +343,7 @@ stmtToInstrs bid stmt = do
         | isFloatType ty         -> assignReg_FltCode format reg src
         | is32Bit && isWord64 ty -> assignReg_I64Code      reg src
         | otherwise              -> assignReg_IntCode format reg src
-          where ty = cmmRegType platform reg
+          where ty = cmmRegType reg
                 format = cmmTypeFormat ty
 
       CmmStore addr src _alignment
@@ -407,7 +408,7 @@ getRegisterReg :: Platform  -> CmmReg -> Reg
 getRegisterReg _   (CmmLocal lreg) = getLocalRegReg lreg
 
 getRegisterReg platform  (CmmGlobal mid)
-  = case globalRegMaybe platform mid of
+  = case globalRegMaybe platform $ globalRegUseGlobalReg mid of
         Just reg -> RegReal $ reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal mid)
         -- By this stage, the only MagicIds remaining should be the
@@ -480,10 +481,10 @@ jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
 
 -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
 -- CmmExprs into CmmRegOff?
-mangleIndexTree :: Platform -> CmmReg -> Int -> CmmExpr
-mangleIndexTree platform reg off
+mangleIndexTree :: CmmReg -> Int -> CmmExpr
+mangleIndexTree reg off
   = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-  where width = typeWidth (cmmRegType platform reg)
+  where width = typeWidth (cmmRegType reg)
 
 -- | The dual to getAnyReg: compute an expression into a register, but
 --      we don't mind which one it is.
@@ -623,9 +624,9 @@ getRegister e = do platform <- getPlatform
 
 getRegister' :: Platform -> Bool -> CmmExpr -> NatM Register
 
-getRegister' platform is32Bit (CmmReg reg)
+getRegister' _ is32Bit (CmmReg reg)
   = case reg of
-        CmmGlobal PicBaseReg
+        CmmGlobal (GlobalRegUse PicBaseReg _)
          | is32Bit ->
             -- on x86_64, we have %rip for PicBaseReg, but it's not
             -- a full-featured register, it can only be used for
@@ -635,7 +636,7 @@ getRegister' platform is32Bit (CmmReg reg)
         _ ->
             do
                let
-                 fmt = cmmTypeFormat (cmmRegType platform reg)
+                 fmt = cmmTypeFormat (cmmRegType reg)
                  format  = fmt
                --
                platform <- ncgPlatform <$> getConfig
@@ -645,7 +646,7 @@ getRegister' platform is32Bit (CmmReg reg)
 
 
 getRegister' platform is32Bit (CmmRegOff r n)
-  = getRegister' platform is32Bit $ mangleIndexTree platform r n
+  = getRegister' platform is32Bit $ mangleIndexTree r n
 
 getRegister' platform is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
   = addAlignmentCheck align <$> getRegister' platform is32Bit e
@@ -738,7 +739,7 @@ getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _ _])
   code <- intLoadCode (MOVSxL II32) addr
   return (Any II64 code)
 
-getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
+getRegister' _ is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)),
                                      CmmLit displacement])
  | not is32Bit =
       return $ Any II64 (\dst -> unitOL $
@@ -1279,9 +1280,9 @@ getAmode e = do
 
    case e of
       CmmRegOff r n
-         -> getAmode $ mangleIndexTree platform r n
+         -> getAmode $ mangleIndexTree r n
 
-      CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg), CmmLit displacement]
+      CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _)), CmmLit displacement]
          | not is32Bit
          -> return $ Amode (ripRel (litToImm displacement)) nilOL
 

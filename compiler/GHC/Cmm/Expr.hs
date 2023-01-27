@@ -12,11 +12,11 @@ module GHC.Cmm.Expr
     , AlignmentSpec(..)
       -- TODO: Remove:
     , LocalReg(..), localRegType
-    , GlobalReg(..), isArgReg, globalRegType
+    , GlobalReg(..), isArgReg, globalRegSpillType
+    , GlobalRegUse(..)
     , spReg, hpReg, spLimReg, hpLimReg, nodeReg
     , currentTSOReg, currentNurseryReg, hpAllocReg, cccsReg
     , node, baseReg
-    , VGcPtr(..)
 
     , DefinerOfRegs, UserOfRegs
     , foldRegsDefd, foldRegsUsed
@@ -248,9 +248,9 @@ cmmExprType :: Platform -> CmmExpr -> CmmType
 cmmExprType platform = \case
    (CmmLit lit)        -> cmmLitType platform lit
    (CmmLoad _ rep _)   -> rep
-   (CmmReg reg)        -> cmmRegType platform reg
+   (CmmReg reg)        -> cmmRegType reg
    (CmmMachOp op args) -> machOpResultType platform op (map (cmmExprType platform) args)
-   (CmmRegOff reg _)   -> cmmRegType platform reg
+   (CmmRegOff reg _)   -> cmmRegType reg
    (CmmStackSlot _ _)  -> bWord platform -- an address
    -- Careful though: what is stored at the stack slot may be bigger than
    -- an address
@@ -385,9 +385,17 @@ instance DefinerOfRegs LocalReg CmmReg where
 instance UserOfRegs GlobalReg CmmReg where
     {-# INLINEABLE foldRegsUsed #-}
     foldRegsUsed _ _ z (CmmLocal _)    = z
-    foldRegsUsed _ f z (CmmGlobal reg) = f z reg
+    foldRegsUsed _ f z (CmmGlobal (GlobalRegUse reg _)) = f z reg
 
+instance UserOfRegs GlobalRegUse CmmReg where
+    {-# INLINEABLE foldRegsUsed #-}
+    foldRegsUsed _ _ z (CmmLocal _)    = z
+    foldRegsUsed _ f z (CmmGlobal reg) = f z reg
 instance DefinerOfRegs GlobalReg CmmReg where
+    foldRegsDefd _ _ z (CmmLocal _)    = z
+    foldRegsDefd _ f z (CmmGlobal (GlobalRegUse reg _)) = f z reg
+
+instance DefinerOfRegs GlobalRegUse CmmReg where
     foldRegsDefd _ _ z (CmmLocal _)    = z
     foldRegsDefd _ f z (CmmGlobal reg) = f z reg
 
@@ -427,7 +435,7 @@ pprExpr platform e
         CmmRegOff reg i ->
                 pprExpr platform (CmmMachOp (MO_Add rep)
                            [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-                where rep = typeWidth (cmmRegType platform reg)
+                where rep = typeWidth (cmmRegType reg)
         CmmLit lit -> pprLit platform lit
         _other     -> pprExpr1 platform e
 
