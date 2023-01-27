@@ -680,6 +680,7 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
       { junitReport = "junit.xml"
       , expireIn = "2 weeks"
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
+                        ,"metadata.json"
                         ,"junit.xml"]
       , artifactsWhen = ArtifactsAlways
       }

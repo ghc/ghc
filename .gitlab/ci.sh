@@ -478,6 +478,7 @@ function check_msys2_deps() {
   # Ensure that GHC on Windows doesn't have any dynamic dependencies on msys2
   case "$(uname)" in
     MSYS_*|MINGW*)
+      info "Checking for unwanted msys2 dependencies..."
       sysroot="$(cygpath "$SYSTEMROOT")"
       PATH="$sysroot/System32:$sysroot;$sysroot/Wbem" $@ \
           || fail "'$@' failed; there may be unwanted dynamic dependencies."
@@ -583,6 +584,9 @@ function install_bindist() {
 function test_hadrian() {
   check_msys2_deps _build/stage1/bin/ghc --version
   check_release_build
+
+  info "Collecting binary distribution metadata..."
+  run "$TOP/.gitlab/bindist_metadata.py" > metadata.json
 
   # Ensure that statically-linked builds are actually static
   if [[ "${BUILD_FLAVOUR}" = *static* ]]; then

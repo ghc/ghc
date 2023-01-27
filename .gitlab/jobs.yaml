@@ -11,6 +11,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-aarch64-darwin-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -73,6 +74,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -131,6 +133,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-i386-linux-deb9-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -189,6 +192,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-darwin-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -252,6 +256,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -311,6 +316,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate+llvm.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -370,6 +376,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-i386-linux-deb9-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -429,6 +436,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-darwin-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -494,6 +502,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-freebsd13-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -555,6 +564,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -616,6 +626,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -677,6 +688,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -740,6 +752,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -801,6 +814,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -864,6 +878,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-centos7-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -924,6 +939,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -983,6 +999,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1042,6 +1059,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1102,6 +1120,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1161,6 +1180,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1220,6 +1240,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1279,6 +1300,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1338,6 +1360,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1399,6 +1422,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1460,6 +1484,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1522,6 +1547,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1581,6 +1607,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb9-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1640,6 +1667,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1701,6 +1729,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1763,6 +1792,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1824,6 +1854,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-rocky8-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1884,6 +1915,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-ubuntu18_04-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -1943,6 +1975,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-ubuntu20_04-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2001,6 +2034,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-windows-int_native-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2060,6 +2094,7 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-windows-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2120,6 +2155,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-aarch64-darwin-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2184,6 +2220,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-aarch64-linux-deb10-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2244,6 +2281,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-i386-linux-deb9-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2304,6 +2342,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-darwin-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2370,6 +2409,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2434,6 +2474,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2498,6 +2539,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-centos7-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2559,6 +2601,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb10-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2619,6 +2662,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb10-release+debug_info.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2679,6 +2723,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb11-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2739,6 +2784,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb9-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2799,6 +2845,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2861,6 +2908,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release+debug_info.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2923,6 +2971,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -2986,6 +3035,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-rocky8-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3047,6 +3097,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-ubuntu18_04-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3107,6 +3158,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-ubuntu20_04-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3166,6 +3218,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-windows-int_native-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3226,6 +3279,7 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-windows-release+no_split_sections.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3287,6 +3341,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-darwin-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3351,6 +3406,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-freebsd13-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3411,6 +3467,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3471,6 +3528,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3533,6 +3591,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3591,6 +3650,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3650,6 +3710,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3709,6 +3770,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3767,6 +3829,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3825,6 +3888,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3883,6 +3947,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -3944,6 +4009,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -4004,6 +4070,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -4065,6 +4132,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
@@ -4124,6 +4192,7 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-windows-validate.tar.xz",
+        "metadata.json",
         "junit.xml"
       ],
       "reports": {
