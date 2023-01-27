@@ -31,6 +31,7 @@ import Data.String
 import Data.Traversable
 import Data.Type.Equality
 import GHC.Cmm
+import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Label
@@ -861,6 +862,7 @@ lower_CmmLit lit = do
             WasmSymConst sym
               `WasmConcat` WasmConst ty_word (toInteger o)
               `WasmConcat` WasmAdd ty_word
+    CmmBlock bid -> lower_CmmLit $ CmmLabel $ infoTblLbl bid
     _ -> panic "lower_CmmLit: unreachable"
 
 --  | Lower a 'CmmReg'. Some of the logic here wouldn't be needed if
