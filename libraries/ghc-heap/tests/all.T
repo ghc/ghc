@@ -5,7 +5,8 @@ test('heap_all',
       # These ways produce slightly different heap representations.
       # Currently we don't test them.
       omit_ways(['ghci', 'hpc',
-                 'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
+                 'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc',
+                 'nonmoving_thr_sanity']),
       # The debug RTS initializes some fields with 0xaa and so
       # this test spuriously fails.
       when(compiler_debugged(), skip)

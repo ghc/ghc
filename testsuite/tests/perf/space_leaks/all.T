@@ -6,7 +6,8 @@ test('space_leak_001',
      # 5% possible deviation.
      [ collect_stats('bytes allocated',5),
       collect_runtime_residency(15),
-      omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr'])
+      omit_ways(['profasm','profthreaded','threaded1','threaded2',
+                 'nonmoving_thr', 'nonmoving_thr_sanity'])
       ],
      compile_and_run,
      [''])
@@ -17,7 +18,7 @@ test('T4334',
       collect_runtime_residency(2),
       # prof ways don't work well with +RTS -V0, nonmoving way residency is
       # highly variable.
-      omit_ways(['profasm','profthreaded','nonmoving_thr'])
+      omit_ways(['profasm','profthreaded','nonmoving_thr', 'nonmoving_thr_sanity'])
       ],
      compile_and_run, [''])
 
