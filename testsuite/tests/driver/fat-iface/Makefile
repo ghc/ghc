@@ -49,4 +49,11 @@ fat010: clean
 	echo >> "THB.hs"
 	"$(TEST_HC)" $(TEST_HC_OPTS) THC.hs -fhide-source-paths -fwrite-if-simplified-core -fprefer-byte-code
 
+T22807: clean
+	"$(TEST_HC)" $(TEST_HC_OPTS) T22807A.hs -fhide-source-paths -fwrite-if-simplified-core -fbyte-code-and-object-code -fno-omit-interface-pragmas -fprefer-byte-code
+	"$(TEST_HC)" $(TEST_HC_OPTS) T22807B.hs -fhide-source-paths -fwrite-if-simplified-core -fprefer-byte-code -fbyte-code-and-object-code -fno-omit-interface-pragmas
+
+T22807_ghci: clean
+	"$(TEST_HC)" $(TEST_HC_OPTS) T22807_ghci.hs -fno-full-laziness -fhide-source-paths -fwrite-if-simplified-core -O2 -dynamic -v0
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --interactive -fhide-source-paths -fno-full-laziness < T22807_ghci.script
 

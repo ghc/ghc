@@ -933,7 +933,13 @@ tc_iface_bindings (IfaceRec bs) = do
 
 -- | See Note [Interface File with Core: Sharing RHSs]
 tc_iface_binding :: Id -> IfaceMaybeRhs -> IfL CoreExpr
-tc_iface_binding i IfUseUnfoldingRhs = return (unfoldingTemplate $ realIdUnfolding i)
+tc_iface_binding i IfUseUnfoldingRhs =
+  case maybeUnfoldingTemplate $ realIdUnfolding i of
+    Just e -> return e
+    Nothing -> pprPanic "tc_iface_binding" (vcat [text "Binding" <+> quotes (ppr i) <+> text "had an unfolding when the interface file was created"
+                                                 , text "which has now gone missing, something has badly gone wrong."
+                                                 , text "Unfolding:" <+> ppr (realIdUnfolding i)])
+
 tc_iface_binding _ (IfRhs rhs) = tcIfaceExpr rhs
 
 mk_top_id :: IfaceTopBndrInfo -> IfL Id
