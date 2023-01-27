@@ -172,21 +172,8 @@ lintCmmMiddle node = case node of
   CmmAssign reg expr -> do
             erep <- lintCmmExpr expr
             let reg_ty = cmmRegType reg
-            unless (compat_regs erep reg_ty) $
+            unless (erep `cmmEqType_ignoring_ptrhood` reg_ty) $
               cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
-    where
-      compat_regs :: CmmType -> CmmType -> Bool
-      compat_regs ty1 ty2
-        -- As noted in #22297, SIMD vector registers can be used for
-        -- multiple different purposes, e.g. xmm1 can be used to hold 4 Floats,
-        -- or 4 Int32s, or 2 Word64s, ...
-        -- To allow this, we relax the check: we only ensure that the widths
-        -- match, until we can find a more robust solution.
-        | isVecType ty1
-        , isVecType ty2
-        = typeWidth ty1 == typeWidth ty2
-        | otherwise
-        = cmmEqType_ignoring_ptrhood ty1 ty2
 
   CmmStore l r _alignment -> do
             _ <- lintCmmExpr l
