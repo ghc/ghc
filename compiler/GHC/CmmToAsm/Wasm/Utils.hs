@@ -2,8 +2,7 @@
 {-# LANGUAGE Strict #-}
 
 module GHC.CmmToAsm.Wasm.Utils
-  ( naturalNarrowing,
-    widthMax,
+  ( widthMax,
     detEltsUFM,
     detEltsUniqMap,
     builderCommas,
@@ -16,11 +15,6 @@ import GHC.Cmm
 import GHC.Prelude
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
-
-naturalNarrowing :: Width -> Integer -> Integer
-naturalNarrowing w i
-  | i < 0 = narrowS w i
-  | otherwise = narrowU w i
 
 widthMax :: Width -> Integer
 widthMax w = (1 `shiftL` widthInBits w) - 1

@@ -134,10 +134,10 @@ alignmentFromCmmSection t lbl
 -- | Lower a 'CmmStatic'.
 lower_CmmStatic :: CmmStatic -> WasmCodeGenM w DataSectionContent
 lower_CmmStatic s = case s of
-  CmmStaticLit (CmmInt i W8) -> pure $ DataI8 $ naturalNarrowing W8 i
-  CmmStaticLit (CmmInt i W16) -> pure $ DataI16 $ naturalNarrowing W16 i
-  CmmStaticLit (CmmInt i W32) -> pure $ DataI32 $ naturalNarrowing W32 i
-  CmmStaticLit (CmmInt i W64) -> pure $ DataI64 $ naturalNarrowing W64 i
+  CmmStaticLit (CmmInt i W8) -> pure $ DataI8 $ fromInteger $ narrowU W8 i
+  CmmStaticLit (CmmInt i W16) -> pure $ DataI16 $ fromInteger $ narrowU W16 i
+  CmmStaticLit (CmmInt i W32) -> pure $ DataI32 $ fromInteger $ narrowU W32 i
+  CmmStaticLit (CmmInt i W64) -> pure $ DataI64 $ fromInteger $ narrowU W64 i
   CmmStaticLit (CmmFloat f W32) -> pure $ DataF32 $ fromRational f
   CmmStaticLit (CmmFloat d W64) -> pure $ DataF64 $ fromRational d
   CmmStaticLit (CmmLabel lbl) ->
@@ -831,7 +831,7 @@ lower_CmmLit lit = do
           SomeWasmExpr ty $
             WasmExpr $
               WasmConst ty $
-                naturalNarrowing w i
+                narrowU w i
     CmmFloat f W32 ->
       pure $
         SomeWasmExpr TagF32 $
