@@ -12,7 +12,7 @@ packages: ./compiler
           -- ./libraries/deepseq/
           ./libraries/directory/
           ./libraries/exceptions/
-          -- ./libraries/filepath/
+          ./libraries/filepath/
           -- ./libraries/ghc-bignum/
            ./libraries/ghc-boot/
           -- ./libraries/ghc-boot-th/
@@ -55,7 +55,6 @@ constraints: ghc +internal-interpreter +dynamic-system-linke,
              any.array installed,
              any.base installed,
              any.deepseq installed,
-             any.filepath installed,
              any.ghc-bignum installed,
              any.ghc-boot-th installed,
              any.integer-gmp installed,
