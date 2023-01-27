@@ -20,7 +20,7 @@ executable lint-whitespace
   build-depends:
     linters-common,
     mtl
-      >=2.1 && <2.3,
+      >=2.1 && <2.4,
     process
       ^>= 1.6,
     containers

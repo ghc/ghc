@@ -11,6 +11,7 @@ import qualified System.Directory.Extra as IO
 import Data.Either
 import Rules.BinaryDist
 import Hadrian.Haskell.Cabal (pkgIdentifier)
+import Oracles.Setting
 
 {-
 Note [Testing reinstallable GHC]
@@ -26,18 +27,11 @@ The libdir of the reinstalled GHC points to the libdir of the stage 2 compiler (
 cabalExcludedPackages :: [Package]
 cabalExcludedPackages = [array, base, deepseq, filepath, ghcBignum, ghcBootTh, ghcPrim, integerGmp, integerSimple, pretty, templateHaskell]
 
-findCabalPackageDb :: String -> FilePath
-findCabalPackageDb env = go $ map (\l -> (words l, l)) (lines env)
-  where
-    go [] = error $ "Couldn't find installed package db in " ++ show env
-    go (("package-db":_, l):_) = drop 11 l
-    go (_:xs) = go xs
-
 
 cabalBuildRules :: Rules ()
 cabalBuildRules = do
     root <- buildRootRules
-    root -/- "stage-cabal" -/- "cabal-packages" %> \_ -> do
+    root -/- "stage-cabal" -/- "cabal-packages" %> \outpath -> do
       -- Always rerun to pass onto cabal's own recompilation logic
       alwaysRerun
       all_pkgs <- stagePackages Stage1
@@ -45,6 +39,7 @@ cabalBuildRules = do
         withVerbosity Diagnostic $
           buildWithCmdOptions [] $
             target (vanillaContext Stage2 pkg) (Cabal Install Stage2) [] []
+      liftIO $ writeFile outpath "done"
 
     phony "build-cabal" $ need [root -/- "stage-cabal" -/- "bin" -/- ".stamp"]
 
@@ -73,8 +68,11 @@ cabalBuildRules = do
         createDirectory outputDir
 
         need [root -/- "stage-cabal" -/- "cabal-packages"]
-        env <- liftIO $ readFile $ root -/- "stage-cabal" -/- "cabal-packages"
-        let cabal_package_db = findCabalPackageDb env
+
+        cwd <- liftIO $ IO.getCurrentDirectory
+        version        <- setting ProjectVersion
+
+        let cabal_package_db = cwd -/- root -/- "stage-cabal" -/- "dist-newstyle" -/- "packagedb" -/- "ghc-" ++ version
 
         forM_ (filter ((/= iserv) . fst) bin_targets) $ \(bin_pkg,_bin_path) -> do
             let pgmName pkg

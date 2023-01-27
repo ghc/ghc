@@ -27,9 +27,10 @@ cabalInstallArgs = builder (Cabal Install) ?  do
         | otherwise     = pkgName pkg
   assertNoBuildRootLeak $
     mconcat [ arg $ "--store-dir="   ++ (root -/- "stage-cabal" -/- "cabal-store")
-            , arg "install"
-            , if isProgram pkg then arg $ "exe:" ++ pgmName else mconcat [arg "--lib", arg $ pkgName pkg]
+            , if isProgram pkg then arg "install" else arg "build"
+            , if isProgram pkg then (arg $ "exe:" ++ pgmName) else (arg $ pkgName pkg)
             , commonReinstallCabalArgs
+            , if isProgram pkg then extraInstallArgs else mempty
             ]
 
 -- | Checks that _build/stageN/lib/* doesn't leak into the arguments for
@@ -45,6 +46,13 @@ assertNoBuildRootLeak args = do
                                        | libPath <- libPaths]) xs)
                 xs
 
+extraInstallArgs :: Args
+extraInstallArgs = do
+    root      <- getBuildRoot
+    mconcat [ arg $ "--install-method=copy"
+            , arg $ "--overwrite-policy=always"
+            , arg $ "--installdir="  ++ (root -/- "stage-cabal" -/- "cabal-bin") ]
+
 commonReinstallCabalArgs :: Args
 commonReinstallCabalArgs = do
     top       <- expr topDirectory
@@ -56,12 +64,7 @@ commonReinstallCabalArgs = do
             , arg $ top -/- "cabal.project-reinstall"
             , arg "--distdir"
             , arg $ root -/- "stage-cabal" -/- "dist-newstyle"
-            , arg ("--ghc-option=-j" ++ show threads)
-            , arg $ "--install-method=copy"
-            , arg $ "--overwrite-policy=always"
             , arg $ "--with-compiler=" ++ top -/- compiler
-            , arg $ "--installdir="  ++ (root -/- "stage-cabal" -/- "cabal-bin")
-            , arg $ "--package-env=" ++ (root -/- "stage-cabal" -/- "cabal-packages")
             , arg "--enable-executable-dynamic"
             , arg "--enable-library-vanilla"
             ]
