@@ -441,6 +441,7 @@ data DataCon
         -- INVARIANT(dataConTyVars): the set of tyvars in dcUserTyVarBinders is
         --    exactly the set of tyvars (*not* covars) of dcExTyCoVars unioned
         --    with the set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
+        -- So dcUserTyVarBinders is a subset of (dcUnivTyVars ++ dcExTyCoVars)
         -- See Note [DataCon user type variable binders]
         dcUserTyVarBinders :: [InvisTVBinder],
 
