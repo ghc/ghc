@@ -493,13 +493,13 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
         // allocate a fresh block.
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        ACQUIRE_ALLOC_BLOCK_SPIN_LOCK();
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
         q->blocks = bd;
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        RELEASE_ALLOC_BLOCK_SPIN_LOCK();
     }
 
     MarkQueueEnt ent = {
