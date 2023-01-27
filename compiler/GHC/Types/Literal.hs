@@ -32,7 +32,7 @@ module GHC.Types.Literal
         , mkLitFloat, mkLitDouble
         , mkLitChar, mkLitString
         , mkLitBigNat
-        , mkLitNumber, mkLitNumberWrap
+        , mkLitNumber, mkLitNumberWrap, mkLitNumberMaybe
 
         -- ** Operations on Literals
         , literalType
@@ -410,6 +410,12 @@ mkLitNumber :: Platform -> LitNumType -> Integer -> Literal
 mkLitNumber platform nt i =
   assertPpr (litNumCheckRange platform nt i) (integer i)
   (LitNumber nt i)
+
+-- | Create a numeric 'Literal' of the given type if it is in range
+mkLitNumberMaybe :: Platform -> LitNumType -> Integer -> Maybe Literal
+mkLitNumberMaybe platform nt i
+  | litNumCheckRange platform nt i = Just (LitNumber nt i)
+  | otherwise                      = Nothing
 
 -- | Creates a 'Literal' of type @Int#@
 mkLitInt :: Platform -> Integer -> Literal
