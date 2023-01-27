@@ -72,8 +72,11 @@ import Control.Arrow  ( second )
 import Control.Monad
 import GHC.Data.FastString
 import qualified Data.List.NonEmpty as NE
+
 import GHC.Data.List.SetOps ( getNth )
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
+import Data.List( partition )
 
 {-
 ************************************************************************
@@ -314,6 +317,11 @@ type Checker inp out =  forall r.
                        -> TcM ( out
                               , r    -- Result of thing inside
                               )
+
+tcMultiple_ :: Checker inp () -> PatEnv -> [inp] -> TcM r -> TcM r
+tcMultiple_ tc_pat penv args thing_inside
+  = do { (_, res) <- tcMultiple tc_pat penv args thing_inside
+       ; return res }
 
 tcMultiple :: Checker inp out -> Checker [inp] [out]
 tcMultiple tc_pat penv args thing_inside
@@ -861,10 +869,10 @@ tcConPat :: PatEnv -> LocatedN Name
 tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
-            RealDataCon data_con -> tcDataConPat penv con_lname data_con
-                                                 pat_ty arg_pats thing_inside
-            PatSynCon pat_syn -> tcPatSynPat penv con_lname pat_syn
-                                             pat_ty arg_pats thing_inside
+            RealDataCon data_con -> tcDataConPat con_lname data_con pat_ty
+                                                 penv arg_pats thing_inside
+            PatSynCon pat_syn -> tcPatSynPat con_lname pat_syn pat_ty
+                                             penv arg_pats thing_inside
         }
 
 -- Warn when pattern matching on a GADT or a pattern synonym
@@ -880,12 +888,11 @@ warnMonoLocalBinds
            -- In #20485 this was made into a warning.
        }
 
-tcDataConPat :: PatEnv -> LocatedN Name -> DataCon
+tcDataConPat :: LocatedN Name -> DataCon
              -> Scaled ExpSigmaTypeFRR        -- Type of the pattern
-             -> HsConPatDetails GhcRn -> TcM a
-             -> TcM (Pat GhcTc, a)
-tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
-             arg_pats thing_inside
+             -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcDataConPat (L con_span con_name) data_con pat_ty_scaled
+             penv arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
@@ -921,21 +928,15 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
                      -- Why "super"? See Note [Binding when looking up instances]
                      -- in GHC.Core.InstEnv.
 
-        ; let arg_tys' = substScaledTys tenv arg_tys
-              pat_mult = scaledMult pat_ty_scaled
+        ; let arg_tys'       = substScaledTys tenv arg_tys
+              pat_mult       = scaledMult pat_ty_scaled
               arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
+              con_like       = RealDataCon data_con
 
         -- This check is necessary to uphold the invariant that 'tcConArgs'
         -- is given argument types with a fixed runtime representation.
         -- See test case T20363.
-        ; zipWithM_
-            ( \ i arg_sty ->
-              hasFixedRuntimeRep_syntactic
-                (FRRDataConPatArg data_con i)
-                (scaledThing arg_sty)
-            )
-            [1..]
-            arg_tys'
+        ; checkFixedRuntimeRep data_con arg_tys'
 
         ; traceTc "tcConPat" (vcat [ text "con_name:" <+> ppr con_name
                                    , text "univ_tvs:" <+> pprTyVars univ_tvs
@@ -947,11 +948,15 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
                                    , text "pat_ty:" <+> ppr pat_ty
                                    , text "arg_tys':" <+> ppr arg_tys'
                                    , text "arg_pats" <+> ppr arg_pats ])
+
+        ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats
+
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
-                    (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys_scaled
-                                                  tenv penv arg_pats thing_inside
+                    (arg_pats', res) <- tcConTyArgs tenv penv univ_ty_args $
+                                        tcConValArgs con_like arg_tys_scaled
+                                                     penv arg_pats thing_inside
                   ; let res_pat = ConPat { pat_con = header
                                          , pat_args = arg_pats'
                                          , pat_con_ext = ConPatTc
@@ -974,8 +979,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
 
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
-             <- checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
-                tcConArgs (RealDataCon data_con) arg_tys_scaled tenv penv arg_pats thing_inside
+             <- -- See Note [Type applications in patterns] (W4)
+                tcConTyArgs tenv penv univ_ty_args                       $
+                checkConstraints (getSkolemInfo skol_info) ex_tvs' given $
+                tcConTyArgs tenv penv ex_ty_args                         $
+                tcConValArgs con_like arg_tys_scaled penv arg_pats thing_inside
 
         ; let res_pat = ConPat
                 { pat_con   = header
@@ -991,11 +999,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
 
-tcPatSynPat :: PatEnv -> LocatedN Name -> PatSyn
+tcPatSynPat :: LocatedN Name -> PatSyn
             -> Scaled ExpSigmaType         -- ^ Type of the pattern
-            -> HsConPatDetails GhcRn -> TcM a
-            -> TcM (Pat GhcTc, a)
-tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
+            -> Checker (HsConPatDetails GhcRn) (Pat GhcTc)
+tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
@@ -1018,23 +1025,27 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
               arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
+              con_like    = PatSynCon pat_syn
 
         ; when (any isEqPred prov_theta) warnMonoLocalBinds
 
         ; mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 
+        ; (univ_ty_args, ex_ty_args) <- splitConTyArgs con_like arg_pats
+
         ; wrap <- tc_sub_type penv (scaledThing pat_ty) ty'
-        ; traceTc "tcPatSynPat" (ppr pat_syn $$
-                                 ppr pat_ty $$
-                                 ppr ty' $$
-                                 ppr ex_tvs' $$
-                                 ppr prov_theta' $$
-                                 ppr req_theta' $$
-                                 ppr arg_tys')
 
-        ; prov_dicts' <- newEvVars prov_theta'
-
+        ; traceTc "tcPatSynPat" $
+          vcat [ text "Pat syn:" <+> ppr pat_syn
+               , text "Expected type:" <+> ppr pat_ty
+               , text "Pat res ty:" <+> ppr ty'
+               , text "ex_tvs':" <+> pprTyVars ex_tvs'
+               , text "prov_theta':" <+> ppr prov_theta'
+               , text "req_theta':" <+> ppr req_theta'
+               , text "arg_tys':" <+> ppr arg_tys'
+               , text "univ_ty_args:" <+> ppr univ_ty_args
+               , text "ex_ty_args:" <+> ppr ex_ty_args ]
 
         ; req_wrap <- instCall (OccurrenceOf con_name) (mkTyVarTys univ_tvs') req_theta'
                       -- Origin (OccurrenceOf con_name):
@@ -1055,11 +1066,16 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
                  , text "bad_arg_tys:" <+> ppr bad_arg_tys ]
 
         ; traceTc "checkConstraints {" Outputable.empty
+        ; prov_dicts' <- newEvVars prov_theta'
         ; (ev_binds, (arg_pats', res))
-             <- checkConstraints (getSkolemInfo skol_info) ex_tvs' prov_dicts' $
-                tcConArgs (PatSynCon pat_syn) arg_tys_scaled tenv penv arg_pats thing_inside
-
+             <- -- See Note [Type applications in patterns] (W4)
+                tcConTyArgs tenv penv univ_ty_args                             $
+                checkConstraints (getSkolemInfo skol_info) ex_tvs' prov_dicts' $
+                tcConTyArgs tenv penv ex_ty_args                               $
+                tcConValArgs con_like arg_tys_scaled penv arg_pats             $
+                thing_inside
         ; traceTc "checkConstraints }" (ppr ev_binds)
+
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
                                , pat_args  = arg_pats'
                                , pat_con_ext = ConPatTc
@@ -1072,6 +1088,14 @@ tcPatSynPat penv (L con_span con_name) pat_syn pat_ty arg_pats thing_inside
                                }
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) res_pat pat_ty, res) }
+
+checkFixedRuntimeRep :: DataCon -> [Scaled TcSigmaTypeFRR] -> TcM ()
+checkFixedRuntimeRep data_con arg_tys
+  = zipWithM_ check_one [1..] arg_tys
+  where
+    check_one i arg_ty = hasFixedRuntimeRep_syntactic
+                            (FRRDataConPatArg data_con i)
+                            (scaledThing arg_ty)
 
 {- Note [Call-stack tracing of pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1187,84 +1211,128 @@ Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
    error messages; it's a purely internal thing
 -}
 
-{-
-Note [Typechecking type applications in patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-How should we typecheck type applications in patterns, such as
+{- Note [Type applications in patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Type applications in patterns are enabled by -XTypeAbstractions.
+For example:
    f :: Either (Maybe a) [b] -> blah
    f (Left @x @[y] (v::Maybe x)) = blah
 
-It's quite straightforward, and very similar to the treatment of
-pattern signatures.
+How should we typecheck them?  The basic plan is pretty simple, and is
+all done in tcConTyArgs. For each type argument:
 
-* Step 1: bind the newly-in-scope type variables x and y to fresh
-  unification variables, say x0 and y0.
+* Step 1:
+    * bind the newly-in-scope type variables (here `x` or `y`) to
+      unification variables, say `x0` or `y0`
 
-* Step 2: typecheck those type arguments, @x and @[y], to get the
-  types x0 and [y0].
+    * typecheck the type argument, `@x` or `@[y]` to get the
+      types `x0` or `[y0]`.
 
-* Step 3: Unify those types with the type arguments we expect,
-  in this case (Maybe a) and [b].  These unifications will
-  (perhaps after the constraint solver has done its work)
+    This step is done by `tcHsPatSigType`, similar to the way we
+    deal with pattern signatures.
+
+* Step 2: Unify those types with the type arguments we expect from
+  the context, in this case (Maybe a) and [b].  These unifications
+  will (perhaps after the constraint solver has done its work)
   unify   x0 := Maybe a
           y0 := b
   Thus we learn that x stands for (Maybe a) and y for b.
 
-Wrinkles:
+* Step 3: Extend the lexical context to bind `x` to `x0` and
+  `y` to `y0`, and typecheck the body of the pattern match.
 
-* Surprisingly, we can discard the coercions arising from
-  these unifications.  The *only* thing the unification does is
-  to side-effect those unification variables, so that we know
-  what type x and y stand for; and cause an error if the equality
-  is not soluble.  It's a bit like a constraint arising
-  from a functional dependency, where we don't use the evidence.
+However there are several quite tricky wrinkles.
 
-* Exactly the same works for existential arguments
-     data T where
-        MkT :: a -> a -> T
-     f :: T -> blah
-     f (MkT @x v w) = ...
-   Here we create a fresh unification variable x0 for x, and
-   unify it with the fresh existential variable bound by the pattern.
+(W1) Surprisingly, we can discard the coercions arising from
+     these unifications.  The *only* thing the unification does is
+     to side-effect those unification variables, so that we know
+     what type x and y stand for; and cause an error if the equality
+     is not soluble.  It's a bit like a constraint arising
+     from a functional dependency, where we don't use the evidence.
 
-* Note that both here and in pattern signatures the unification may
-  not even end up unifying the variable.  For example
-     type S a b = a
-     f :: Maybe a -> Bool
-     f (Just @(S a b) x) = True :: b
-   In Step 3 we will unify (S a0 b0 ~ a), which succeeds, but has no
-   effect on the unification variable b0, to which 'b' is bound.
-   Later, in the RHS, we find that b0 must be Bool, and unify it there.
-   All is fine.
+(W2) Note that both here and in pattern signatures the unification may
+     not even end up unifying the variable.  For example
+       type S a b = a
+       f :: Maybe a -> Bool
+       f (Just @(S a b) x) = True :: b
+     In Step 2 we will unify (S a0 b0 ~ a), which succeeds, but has no
+     effect on the unification variable b0, to which 'b' is bound.
+     Later, in the RHS, we find that b0 must be Bool, and unify it there.
+     All is fine.
+
+(W3) The order of the arguments to the /data constructor/ may differ from
+     the order of the arguments to the /type constructor/. Example
+         data T a b where { MkT :: forall c d. (c,d) -> T d c }
+         f :: T Int Bool -> blah
+         f (MkT @x @y p) = ...
+     The /first/ type argument to `MkT`, namely `@x` corresponds to the
+     /second/ argument to `T` in the type `T Int Bool`.  So `x` is bound
+     to `Bool` -- not to `Int`!.  That is why splitConTyArgs uses
+     conLikeUserTyVarBinders to match up with the user-supplied type arguments
+     in the pattern, not dataConUnivTyVars/dataConExTyVars.
+
+(W4) A similar story works for existentials, but it is subtly different
+     (#19847).  Consider
+         data T a where { MkT :: forall a b. a -> b -> T a }
+         f :: T Int -> blah
+         f (MkT @x @y v w) = blah
+     Here we create a fresh unification variables x0,y0 for x,y and
+     unify x0~Int, y0~b, where b is the fresh existential variable bound by
+     the pattern. But
+       * (x0~Int) must be /outside/ the implication constraint
+       * (y0~b)   must be /inside/ it
+     (and hence x0 and y0 themselves must have different levels).
+     Thus:
+         x0[1]~Int,  (forall[2] b. (y0[2]~b, ...constraints-from-blah...))
+
+     We need (x0~Int) /outside/ so that it can influence the type of the
+     pattern in an inferred setting, e.g.
+         g :: T _ -> blah
+         g (MkT @Int @y v w) = blah
+     Here we want to infer `g` to have type `T Int -> blah`. If the
+     (x0~Int) was inside the implication, and the the constructor bound
+     equality constraints, `x0` would be untouchable. This was the root
+     cause of #19847.
+
+     We need (y0~b) to be /inside/ the implication, so that `b` is in
+     scope.  In fact, we may actually /need/ equalities bound by the
+     implication to prove the equality constraint we generate.
+     Example   data T a where
+                 MkT :: forall p q. T (p,q)
+               f :: T (Int,Bool) -> blah
+               f (MkT @Int @Bool) = ...
+     We get the implication
+        forall[2] p q. (p,q)~(Int,Bool) => (p ~ Int, q ~ Bool, ...)
+     where the Given comes from the GADT match, while (p~Int, q~Bool)
+     comes from matching the type arguments.
+
+     Wow.  That's all quite subtle! See the long discussion on #19847.  We
+     must treat universal and existential arguments separately, even though
+     they are all mixed up (W3).  The function splitConTyArgs separates the
+     universals from existentials; and we build the implication between
+     typechecking the two sets:
+           tcConTyArgs ... univ_ty_args    $
+           checkConstraints ...            $
+           tcConTyArgs ... ex_ty_args      $
+           ..typecheck body..
+     You can see this code shape in tcDataConPat and tcPatSynPat.
+
+     Where pattern synonyms are involved, this two-level split may not be
+     enough.  See #22328 for the story.
 -}
 
-tcConArgs :: ConLike
-          -> [Scaled TcSigmaTypeFRR]
-          -> Subst            -- Instantiating substitution for constructor type
-          -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
-tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
+tcConValArgs :: ConLike
+             -> [Scaled TcSigmaTypeFRR]
+             -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
+tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
   PrefixCon type_args arg_pats -> do
+        -- NB: type_args already dealt with
+        -- See Note [Type applications in patterns]
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (arityErr (text "constructor") con_like con_arity no_of_args)
 
-              -- forgetting to filter out inferred binders led to #20443
-        ; let con_spec_binders = filter ((== SpecifiedSpec) . binderFlag) $
-                                 conLikeUserTyVarBinders con_like
-        ; checkTc (type_args `leLength` con_spec_binders)
-                  (TcRnTooManyTyArgsInConPattern con_like (length con_spec_binders) (length type_args))
-
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
-        ; (type_args', (arg_pats', res))
-            <- tcMultiple tcConTyArg penv type_args $
-               tcMultiple tcConArg penv pats_w_tys thing_inside
-
-          -- This unification is straight from Figure 7 of
-          -- "Type Variables in Patterns", Haskell'18
-        ; _ <- zipWithM (unifyType Nothing) type_args' (substTyVars tenv $
-                                                        binderVars con_spec_binders)
-          -- OK to drop coercions here. These unifications are all about
-          -- guiding inference based on a user-written type annotation
-          -- See Note [Typechecking type applications in patterns]
+        ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
 
         ; return (PrefixCon type_args arg_pats', res) }
     where
@@ -1321,23 +1389,72 @@ tcConArgs con_like arg_tys tenv penv con_args thing_inside = case con_args of
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
-tcConTyArg :: Checker (HsConPatTyArg GhcRn) TcType
-tcConTyArg penv (HsConPatTyArg _ rn_ty) thing_inside
+
+splitConTyArgs :: ConLike -> HsConPatDetails GhcRn
+               -> TcM ( [(HsConPatTyArg GhcRn, TyVar)]    -- Universals
+                      , [(HsConPatTyArg GhcRn, TyVar)] )  -- Existentials
+-- See Note [Type applications in patterns] (W4)
+-- This function is monadic only because of the error check
+-- for too many type arguments
+splitConTyArgs con_like (PrefixCon type_args _)
+  = do { checkTc (type_args `leLength` con_spec_bndrs)
+                 (TcRnTooManyTyArgsInConPattern con_like
+                          (length con_spec_bndrs) (length type_args))
+       ; if null ex_tvs  -- Short cut common case
+         then return (bndr_ty_arg_prs, [])
+         else return (partition is_universal bndr_ty_arg_prs) }
+  where
+    ex_tvs = conLikeExTyCoVars con_like
+    con_spec_bndrs = [ tv | Bndr tv SpecifiedSpec <- conLikeUserTyVarBinders con_like ]
+        -- conLikeUserTyVarBinders: see (W3) in
+        --    Note [Type applications in patterns]
+        -- SpecifiedSpec: forgetting to filter out inferred binders led to #20443
+
+    bndr_ty_arg_prs = type_args `zip` con_spec_bndrs
+                      -- The zip truncates to length(type_args)
+
+    is_universal (_, tv) = not (tv `elem` ex_tvs)
+         -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
+         -- especially INVARIANT(dataConTyVars).
+
+splitConTyArgs _ (RecCon {})   = return ([], []) -- No type args in RecCon
+splitConTyArgs _ (InfixCon {}) = return ([], []) -- No type args in InfixCon
+
+tcConTyArgs :: Subst -> PatEnv -> [(HsConPatTyArg GhcRn, TyVar)]
+            -> TcM a -> TcM a
+tcConTyArgs tenv penv prs thing_inside
+  = tcMultiple_ (tcConTyArg tenv) penv prs thing_inside
+
+tcConTyArg :: Subst -> Checker (HsConPatTyArg GhcRn, TyVar) ()
+tcConTyArg tenv penv (HsConPatTyArg _ rn_ty, con_tv) thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt HM_TyAppPat rn_ty AnyKind
                -- AnyKind is a bit suspect: it really should be the kind gotten
                -- from instantiating the constructor type. But this would be
                -- hard to get right, because earlier type patterns might influence
                -- the kinds of later patterns. In any case, it all gets checked
-               -- by the calls to unifyType in tcConArgs, which will also unify
-               -- kinds.
+               -- by the calls to unifyType below which unifies kinds
+
        ; case NE.nonEmpty sig_ibs of
            Just sig_ibs_ne | inPatBind penv ->
              addErr (TcRnCannotBindTyVarsInPatBind sig_ibs_ne)
            _ -> pure ()
+
+          -- This unification is straight from Figure 7 of
+          -- "Type Variables in Patterns", Haskell'18
+          -- OK to drop coercions here. These unifications are all about
+          -- guiding inference based on a user-written type annotation
+          -- See Note [Type applications in patterns] (W1)
+       ; _ <- unifyType Nothing arg_ty (substTyVar tenv con_tv)
+
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $
                    thing_inside
-       ; return (arg_ty, result) }
+             -- NB: Because we call tConTyArgs twice, once for universals and
+             --     once for existentials; so this brings things into scope
+             --     "out of left-right order". But it doesn't matter; the renamer
+             --     has dealt with all that.
+
+       ; return ((), result) }
 
 tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
 tcConArg penv (arg_pat, Scaled arg_mult arg_ty)
