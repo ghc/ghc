@@ -12,6 +12,8 @@ def strip_prefix(s, prefix):
     else:
         return None
 
+do_not_distribute = set(["release-x86_64-linux-fedora33-release-hackage"])
+
 def job_triple(job_name):
     bindists = {
         'release-x86_64-windows-release': 'x86_64-unknown-mingw32',
@@ -54,6 +56,12 @@ def job_triple(job_name):
         #return strip_prefix(job.name, 'validate-')
         return None
 
+class UnhandledJobException(Exception):
+    # Raised when there is a release job in the pipeline but we don't explicitly handle it.
+    def __init__(self, name):
+        self.message = f"{name} is a release job but not downloaded"
+        super().__init__(self.message)
+
 def fetch_artifacts(release: str, pipeline_id: int,
                     dest_dir: Path, gl: gitlab.Gitlab):
     dest_dir.mkdir(exist_ok=True)
@@ -72,6 +80,8 @@ def fetch_artifacts(release: str, pipeline_id: int,
         job = proj.jobs.get(pipeline_job.id)
         triple = job_triple(job.name)
         if triple is None:
+            if job.name.startswith("release") and not (job.name in do_not_distribute):
+                raise(UnhandledJobException(job.name))
             logging.info(f'ignoring {job.name}')
             continue
 
