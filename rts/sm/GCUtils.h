@@ -17,6 +17,9 @@
 
 #include "BeginPrivate.h"
 
+#define ACQUIRE_ALLOC_BLOCK_SPIN_LOCK() ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync)
+#define RELEASE_ALLOC_BLOCK_SPIN_LOCK() RELEASE_SPIN_LOCK(&gc_alloc_block_sync)
+
 bdescr* allocGroup_sync(uint32_t n);
 bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n);
 
