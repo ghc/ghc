@@ -551,7 +551,6 @@ primOpIsCheap op = primOpOkForSpeculation op
 primOpIsDiv :: PrimOp -> Bool
 primOpIsDiv op = case op of
 
-  -- TODO: quotRemWord2
   IntQuotOp       -> True
   Int8QuotOp      -> True
   Int16QuotOp     -> True
@@ -587,6 +586,8 @@ primOpIsDiv op = case op of
   Word16QuotRemOp -> True
   Word32QuotRemOp -> True
   -- Word64QuotRemOp doesn't exist (yet)
+
+  WordQuotRem2Op  -> True
 
   FloatDivOp      -> True
   DoubleDivOp     -> True
