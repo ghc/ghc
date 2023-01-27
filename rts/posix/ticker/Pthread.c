@@ -43,7 +43,7 @@
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "posix/Clock.h"
-#include <sys/poll.h>
+#include <poll.h>
 
 #include <time.h>
 #if HAVE_SYS_TIME_H
