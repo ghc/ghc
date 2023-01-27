@@ -1615,8 +1615,10 @@ app_ok fun_ok primop_ok fun args
 
       PrimOpId op _
         | primOpIsDiv op
-        , [arg1, Lit lit] <- args
-        -> not (isZeroLit lit) && expr_ok fun_ok primop_ok arg1
+        , Lit divisor <- last args
+            -- there can be 2 args (most div primops) or 3 args
+            -- (WordQuotRem2Op), hence the use of last/init
+        -> not (isZeroLit divisor) && all (expr_ok fun_ok primop_ok) (init args)
               -- Special case for dividing operations that fail
               -- In general they are NOT ok-for-speculation
               -- (which primop_ok will catch), but they ARE OK
