@@ -713,6 +713,10 @@ modifyJobs = fmap
 modifyValidateJobs :: (a -> a) -> JobGroup a -> JobGroup a
 modifyValidateJobs f jg = jg { v = f <$> v jg }
 
+-- | Modify just the nightly jobs in a 'JobGroup'
+modifyNightlyJobs :: (a -> a) -> JobGroup a -> JobGroup a
+modifyNightlyJobs f jg = jg { n = f <$> n jg }
+
 -- Generic helpers
 
 addJobRule :: Rule -> Job -> Job
@@ -854,7 +858,9 @@ job_groups =
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
      , modifyValidateJobs manual tsan_jobs
-     , modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc)
+     , -- Nightly allowed to fail: #22343
+       modifyNightlyJobs allowFailure
+        (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
 
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
