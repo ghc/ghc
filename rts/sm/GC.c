@@ -376,7 +376,8 @@ GarbageCollect (uint32_t collect_gen,
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
   }
 
-  if (major_gc) {
+  /* N.B. We currently don't unload code with the non-moving collector. */
+  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       unload_mark_needed = prepareUnloadCheck();
   } else {
       unload_mark_needed = false;
