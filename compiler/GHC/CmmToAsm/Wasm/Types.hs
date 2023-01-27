@@ -57,6 +57,7 @@ import qualified Data.IntSet as IS
 import Data.Kind
 import Data.String
 import Data.Type.Equality
+import Data.Word
 import GHC.Cmm
 import GHC.Data.FastString
 import GHC.Float
@@ -174,10 +175,10 @@ data DataSectionKind = SectionData | SectionROData
 -- account, therefore we always round up a 'CmmLit' to the right width
 -- and handle it as an untyped integer.
 data DataSectionContent
-  = DataI8 Integer
-  | DataI16 Integer
-  | DataI32 Integer
-  | DataI64 Integer
+  = DataI8 Word8
+  | DataI16 Word16
+  | DataI32 Word32
+  | DataI64 Word64
   | DataF32 Float
   | DataF64 Double
   | DataSym SymName Int

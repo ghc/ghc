@@ -118,10 +118,10 @@ asmTellDefSym sym = do
 
 asmTellDataSectionContent :: WasmTypeTag w -> DataSectionContent -> WasmAsmM ()
 asmTellDataSectionContent ty_word c = asmTellTabLine $ case c of
-  DataI8 i -> ".int8 " <> integerDec i
-  DataI16 i -> ".int16 " <> integerDec i
-  DataI32 i -> ".int32 " <> integerDec i
-  DataI64 i -> ".int64 " <> integerDec i
+  DataI8 i -> ".int8 0x" <> word8Hex i
+  DataI16 i -> ".int16 0x" <> word16Hex i
+  DataI32 i -> ".int32 0x" <> word32Hex i
+  DataI64 i -> ".int64 0x" <> word64Hex i
   DataF32 f -> ".int32 0x" <> word32Hex (castFloatToWord32 f)
   DataF64 d -> ".int64 0x" <> word64Hex (castDoubleToWord64 d)
   DataSym sym o ->
