@@ -1,0 +1,6 @@
+:l T22807_ghci.hs
+
+import T22807_ghci
+import Data.Either
+
+isLeft (foo True)

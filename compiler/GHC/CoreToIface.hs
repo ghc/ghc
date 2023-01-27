@@ -604,8 +604,12 @@ toIfaceTopBind b =
                       IfLclTopBndr {} -> IfRhs (toIfaceExpr rhs)
           in (top_bndr, rhs')
 
-        already_has_unfolding b =
-                                -- The identifier has an unfolding, which we are going to serialise anyway
+        -- The sharing behaviour is currently disabled due to #22807, and relies on
+        -- finished #220056 to be re-enabled.
+        disabledDueTo22807 = True
+
+        already_has_unfolding b = not disabledDueTo22807
+                                && -- The identifier has an unfolding, which we are going to serialise anyway
                                 hasCoreUnfolding (realIdUnfolding b)
                                 -- But not a stable unfolding, we want the optimised unfoldings.
                                 && not (isStableUnfolding (realIdUnfolding b))
@@ -771,7 +775,10 @@ is that these NOINLINE'd functions now can't be profitably inlined
 outside of the hs-boot loop.
 
 Note [Interface File with Core: Sharing RHSs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+IMPORTANT: This optimisation is currently disabled due to #22027, it can be
+           re-enabled once #220056 is implemented.
 
 In order to avoid duplicating definitions for bindings which already have unfoldings
 we do some minor headstands to avoid serialising the RHS of a definition if it has

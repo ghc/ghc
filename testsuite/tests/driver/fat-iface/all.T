@@ -15,5 +15,9 @@ test('fat013', [req_th, extra_files(['FatTH.hs', 'FatQuote.hs'])], multimod_comp
 # When using interpreter should not produce objects
 test('fat014', [req_th, extra_files(['FatTH.hs', 'FatQuote.hs']), extra_run_opts('-fno-code')], ghci_script, ['fat014.script'])
 test('fat015', [req_th, unless(ghc_dynamic(), skip), extra_files(['FatQuote.hs', 'FatQuote1.hs', 'FatQuote2.hs', 'FatTH1.hs', 'FatTH2.hs', 'FatTHTop.hs'])], multimod_compile, ['FatTHTop', '-fno-code -fwrite-interface'])
+test('T22807', [req_th, unless(ghc_dynamic(), skip), extra_files(['T22807A.hs', 'T22807B.hs'])]
+             , makefile_test, ['T22807'])
+test('T22807_ghci', [req_th, unless(ghc_dynamic(), skip), extra_files(['T22807_ghci.hs'])]
+             , makefile_test, ['T22807_ghci'])
 
 
