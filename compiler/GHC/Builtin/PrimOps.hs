@@ -551,36 +551,42 @@ primOpIsCheap op = primOpOkForSpeculation op
 primOpIsDiv :: PrimOp -> Bool
 primOpIsDiv op = case op of
 
-  -- TODO: quotRemWord2, Int64, Word64
+  -- TODO: quotRemWord2
   IntQuotOp       -> True
   Int8QuotOp      -> True
   Int16QuotOp     -> True
   Int32QuotOp     -> True
+  Int64QuotOp     -> True
 
   IntRemOp        -> True
   Int8RemOp       -> True
   Int16RemOp      -> True
   Int32RemOp      -> True
+  Int64RemOp      -> True
 
   IntQuotRemOp    -> True
   Int8QuotRemOp   -> True
   Int16QuotRemOp  -> True
   Int32QuotRemOp  -> True
+  -- Int64QuotRemOp doesn't exist (yet)
 
   WordQuotOp      -> True
   Word8QuotOp     -> True
   Word16QuotOp    -> True
   Word32QuotOp    -> True
+  Word64QuotOp    -> True
 
   WordRemOp       -> True
   Word8RemOp      -> True
   Word16RemOp     -> True
   Word32RemOp     -> True
+  Word64RemOp     -> True
 
   WordQuotRemOp   -> True
   Word8QuotRemOp  -> True
   Word16QuotRemOp -> True
   Word32QuotRemOp -> True
+  -- Word64QuotRemOp doesn't exist (yet)
 
   FloatDivOp      -> True
   DoubleDivOp     -> True

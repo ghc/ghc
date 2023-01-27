@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 119, types: 59, coercions: 0, joins: 0/0}
+  = {terms: 103, types: 55, coercions: 0, joins: 0/0}
 
 b = \ x -> case x of { I# x1 -> I# (quotInt# x1 200#) }
 
@@ -16,11 +16,7 @@ f = \ x ->
       case x of { W32# x# -> W32# (quotWord32# x# 200#Word32) }
 
 g = \ x ->
-      case x of { W64# x# ->
-      case quotWord64# x# 10#Word64 of ds1 { __DEFAULT ->
-      case quotWord64# ds1 20#Word64 of ds2 { __DEFAULT -> W64# ds2 }
-      }
-      }
+      case x of { W64# x# -> W64# (quotWord64# x# 200#Word64) }
 
 h = \ x ->
       case x of { I8# x# ->
@@ -36,12 +32,7 @@ a = \ x ->
       I32# (quotInt32# (quotInt32# x# 2147483647#Int32) 2147483647#Int32)
       }
 
-k = \ x ->
-      case x of { I64# x# ->
-      case quotInt64# x# 10#Int64 of ds { __DEFAULT ->
-      case quotInt64# ds 20#Int64 of ds1 { __DEFAULT -> I64# ds1 }
-      }
-      }
+k = \ x -> case x of { I64# x# -> I64# (quotInt64# x# 200#Int64) }
 
 
 
