@@ -64,7 +64,7 @@ module GHC.Types.Name (
         isSystemName, isInternalName, isExternalName,
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName, isDynLinkName,
-        isWiredInName, isWiredIn, isBuiltInSyntax,
+        isWiredInName, isWiredIn, isBuiltInSyntax, isTupleTyConName,
         isHoleName,
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsExternalOrFrom, nameIsHomePackage,
@@ -103,6 +103,8 @@ import GHC.Utils.Panic
 import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
+import GHC.Types.Basic (Boxity(Boxed))
+import GHC.Builtin.Uniques (isTupleTyConUnique)
 
 {-
 ************************************************************************
@@ -282,6 +284,9 @@ isBuiltInSyntax :: Name -> Bool
 isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
 isBuiltInSyntax _                                           = False
 
+isTupleTyConName :: Name -> Bool
+isTupleTyConName = isJust . isTupleTyConUnique . getUnique
+
 isExternalName (Name {n_sort = External _})    = True
 isExternalName (Name {n_sort = WiredIn _ _ _}) = True
 isExternalName _                               = False
@@ -339,7 +344,14 @@ is_interactive_or_from from mod = from == mod || isInteractiveModule mod
 -- Return the pun for a name if available.
 -- Used for pretty-printing under ListTuplePuns.
 namePun_maybe :: Name -> Maybe FastString
-namePun_maybe name | getUnique name == getUnique listTyCon = Just (fsLit "[]")
+namePun_maybe name
+  | getUnique name == getUnique listTyCon = Just (fsLit "[]")
+
+  | Just (Boxed, ar) <- isTupleTyConUnique (getUnique name)
+  , ar /= 1 = Just (fsLit $ '(' : commas ar ++ ")")
+  where
+    commas ar = replicate (ar-1) ','
+
 namePun_maybe _ = Nothing
 
 nameIsLocalOrFrom :: Module -> Name -> Bool

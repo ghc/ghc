@@ -23,6 +23,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Builtin.Types.Prim ( fUNTyConName )
 import GHC.Builtin.Types
+import Data.Maybe (isJust)
 
 
 {-
@@ -120,7 +121,9 @@ mkQualName env = qual_name where
             , tYPETyConName
             , fUNTyConName, unrestrictedFunTyConName
             , oneDataConName
+            , listTyConName
             , manyDataConName ]
+          || isJust (isTupleTyOcc_maybe mod occ)
 
         right_name gre = greDefinitionModule gre == Just mod
 

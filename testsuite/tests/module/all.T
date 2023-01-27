@@ -295,3 +295,5 @@ test('T13704b', [], multimod_compile, ['T13704b1.hs T13704b2.hs', '-main-is T137
 test('T20562', normal, compile, [''])
 
 test('T21752', [extra_files(['T21752A.hs', 'T21752.hs'])], multimod_compile, ['T21752', '-v0'])
+
+test('TupleTyConUserSyntax', [extra_files(['TupleTyConUserSyntaxA.hs', 'TupleTyConUserSyntax.hs'])], multimod_compile, ['TupleTyConUserSyntax', '-v0'])

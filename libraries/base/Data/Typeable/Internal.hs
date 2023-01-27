@@ -91,7 +91,9 @@ import GHC.Base
 import qualified GHC.Arr as A
 import Data.Either (Either (..))
 import Data.Type.Equality
-import GHC.List ( splitAt, foldl', elem )
+import GHC.List ( splitAt, foldl', elem, replicate )
+import GHC.Unicode (isDigit)
+import GHC.Num ((-), (+), (*))
 import GHC.Word
 import GHC.Show
 import GHC.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal'
@@ -879,9 +881,12 @@ showTypeable _ rep
 
     -- Take care only to render saturated tuple tycon applications
     -- with tuple notation (#14341).
-  | isTupleTyCon tc,
+  | Just _ <- isTupleTyCon tc,
     Just _ <- TrType `eqTypeRep` typeRepKind rep =
     showChar '(' . showArgs (showChar ',') tys . showChar ')'
+    -- Print (,,,) instead of Tuple4
+  | Just n <- isTupleTyCon tc, [] <- tys =
+      showChar '(' . showString (replicate (n-1) ',') . showChar ')'
   where (tc, tys) = splitApps rep
 showTypeable _ (TrTyCon {trTyCon = tycon, trKindVars = []})
   = showTyCon tycon
@@ -970,10 +975,26 @@ funTyCon = typeRepTyCon (typeRep @(->))
 isListTyCon :: TyCon -> Bool
 isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [])
 
-isTupleTyCon :: TyCon -> Bool
+isTupleTyCon :: TyCon -> Maybe Int
 isTupleTyCon tc
-  | ('(':',':_) <- tyConName tc = True
-  | otherwise                   = False
+  | tyConPackage tc == "ghc-prim"
+  , tyConModule  tc == "GHC.Tuple.Prim"
+  = case tyConName tc of
+      "Unit" -> Just 0
+      'T' : 'u' : 'p' : 'l' : 'e' : arity -> readTwoDigits arity
+      _ -> Nothing
+  | otherwise                   = Nothing
+
+-- | See Note [Small Ints parsing] in GHC.Builtin.Types
+readTwoDigits :: String -> Maybe Int
+readTwoDigits s = case s of
+  [c] | isDigit c -> Just (digit_to_int c)
+  [c1, c2] | isDigit c1, isDigit c2
+    -> Just (digit_to_int c1 * 10 + digit_to_int c2)
+  _ -> Nothing
+  where
+    digit_to_int :: Char -> Int
+    digit_to_int c = ord c - ord '0'
 
 -- This is only an approximation. We don't have the general
 -- character-classification machinery here, so we just do our best.

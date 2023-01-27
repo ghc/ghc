@@ -19,6 +19,7 @@ module GHC.Builtin.Uniques
       -- *** Vanilla
     , mkTupleTyConUnique
     , mkTupleDataConUnique
+    , isTupleTyConUnique
       -- *** Constraint
     , mkCTupleTyConUnique
     , mkCTupleDataConUnique
@@ -265,6 +266,17 @@ mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
 mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
+
+-- | This function is an inverse of `mkTupleTyConUnique`
+isTupleTyConUnique :: Unique -> Maybe (Boxity, Arity)
+isTupleTyConUnique u =
+  case (tag, i) of
+    ('4', 0) -> Just (Boxed,   arity)
+    ('5', 0) -> Just (Unboxed, arity)
+    _        -> Nothing
+  where
+    (tag,   n) = unpkUnique u
+    (arity, i) = quotRem n 2
 
 getTupleTyConName :: Boxity -> Int -> Name
 getTupleTyConName boxity n =

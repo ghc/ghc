@@ -1,4 +1,3 @@
-
 {-# LANGUAGE RankNTypes #-}
 
 -- | The Name Cache
@@ -30,6 +29,8 @@ import GHC.Utils.Panic
 
 import Control.Concurrent.MVar
 import Control.Monad
+import Control.Applicative
+
 
 {-
 
@@ -58,8 +59,8 @@ site, we fix it up.
 Note [Built-in syntax and the OrigNameCache]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Built-in syntax like tuples and unboxed sums are quite ubiquitous. To lower
-their cost we use two tricks,
+Built-in syntax like unboxed sums and punned syntax like tuples are quite
+ubiquitous. To lower their cost we use two tricks,
 
   a. We specially encode tuple and sum Names in interface files' symbol tables
      to avoid having to look up their names while loading interface files.
@@ -69,13 +70,14 @@ their cost we use two tricks,
      in GHC.Iface.Binary and for details.
 
   b. We don't include them in the Orig name cache but instead parse their
-     OccNames (in isBuiltInOcc_maybe) to avoid bloating the name cache with
-     them.
+     OccNames (in isBuiltInOcc_maybe and isPunOcc_maybe) to avoid bloating
+     the name cache with them.
 
 Why is the second measure necessary? Good question; afterall, 1) the parser
-emits built-in syntax directly as Exact RdrNames, and 2) built-in syntax never
-needs to looked-up during interface loading due to (a). It turns out that there
-are two reasons why we might look up an Orig RdrName for built-in syntax,
+emits built-in and punned syntax directly as Exact RdrNames, and 2) built-in
+and punned syntax never needs to looked-up during interface loading due to (a).
+It turns out that there are two reasons why we might look up an Orig RdrName
+for built-in and punned syntax,
 
   * If you use setRdrNameSpace on an Exact RdrName it may be
     turned into an Orig RdrName.
@@ -103,7 +105,7 @@ takeUniqFromNameCache (NameCache c _) = uniqFromMask c
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
   | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_TUPLE_PRIM
-  , Just name <- isBuiltInOcc_maybe occ
+  , Just name <- isBuiltInOcc_maybe occ <|> isPunOcc_maybe mod occ
   =     -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
         -- Special case for tuples; there are too many
         -- of them to pre-populate the original-name cache

@@ -2796,6 +2796,7 @@ Situations in which we apply this special logic:
 pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = isBuiltInSyntax n
+  || isTupleTyConName n
   || any (n `hasKey`)
     [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
     , liftedDataConKey, unliftedDataConKey

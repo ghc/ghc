@@ -6,7 +6,7 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Bug.N:C :: forall a b. C a b = a -> b -> ()
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [base-4.18.0.0]
 
 ==================== Typechecker ====================
 Bug.$tcC
@@ -32,7 +32,7 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
-      GHC.Tuple.Prim.$tc() [] @GHC.Types.KindRep
+      GHC.Tuple.Prim.$tcUnit [] @GHC.Types.KindRep
 Bug.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Bug"#)
