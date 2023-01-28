@@ -40,7 +40,7 @@ pprLlvmData cfg (globals, types) =
 
 
 -- | Pretty print LLVM code
--- Both HDoc and SDoc are returned so that they can be dumped with
+-- Both HDoc and SDoc are returned so that they can be dumped when
 -- @Opt_D_dump_llvm@ is set.
 pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
 pprLlvmCmmDecl (CmmData _ lmdata) = do

@@ -1,5 +1,4 @@
 
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -723,7 +722,11 @@ pprStaticArith opts s1 s2 int_op float_op op_name =
 -- | Blank line.
 newLine :: IsDoc doc => doc
 newLine = empty
+{-# SPECIALIZE newLine :: SDoc #-}
+{-# SPECIALIZE newLine :: HDoc #-}
 
 -- | Exclamation point.
 exclamation :: IsLine doc => doc
 exclamation = char '!'
+{-# SPECIALIZE exclamation :: SDoc #-}
+{-# SPECIALIZE exclamation :: HLine #-}

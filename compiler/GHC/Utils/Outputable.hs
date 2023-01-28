@@ -1650,8 +1650,8 @@ before these opportunities can be exposed. Therefore, we want to explicitly
 request that GHC generate HDoc (or HLine) specializations of any polymorphic
 printing functions used by the code generator.
 
-In code generators (CmmTo{Asm,Llvm}.{AArch64,PPC,X86,Llvm}.Ppr) we add a
-specialize pragma just to the entry point pprNatCmmDecl, to avoid cluttering
+In code generators (CmmToAsm.{AArch64,PPC,X86}.Ppr) we add a specialize
+pragma just to the entry point pprNatCmmDecl, to avoid cluttering
 the entire module. Because specialization is transitive, this makes sure
 that other functions in that module are specialized too.
 
