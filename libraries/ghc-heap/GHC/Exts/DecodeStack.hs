@@ -27,7 +27,6 @@ import Data.Maybe
 import Debug.Trace
 import Foreign
 import GHC.Exts
-import GHC.Exts.DecodeHeap
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
@@ -106,12 +105,6 @@ foreign import prim "getUpdateFrameTypezh" getUpdateFrameType# :: StackSnapshot#
 getUpdateFrameType :: StackFrameIter -> UpdateFrameType
 getUpdateFrameType (StackFrameIter {..}) = (toEnum . fromInteger . toInteger) (W# (getUpdateFrameType# stackSnapshot# (wordOffsetToWord# index)))
 
--- TODO: This can be simplified if the offset is always full words
-foreign import prim "unpackClosureReferencedByFramezh" unpackClosureReferencedByFrame# :: Word# -> StackSnapshot# -> Word# -> (# Addr#, ByteArray#, Array# b #)
-
-unpackClosureReferencedByFrame :: WordOffset -> StackSnapshot# -> WordOffset -> (# Addr#, ByteArray#, Array# b #)
-unpackClosureReferencedByFrame wo1 ss# wo2 = unpackClosureReferencedByFrame# (wordOffsetToWord# wo1) ss# (wordOffsetToWord# wo2)
-
 foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> StackSnapshot#
 
 getUnderflowFrameNextChunk :: StackFrameIter -> StackSnapshot
@@ -162,9 +155,9 @@ data StackFrameIter = StackFrameIter
     index :: WordOffset
   }
 
--- TODO: Remove this instance (debug only)
-instance Show StackFrameIter where
-  show (StackFrameIter {..}) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show index
+-- -- TODO: Remove this instance (debug only)
+-- instance Show StackFrameIter where
+--   show (StackFrameIter {..}) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show index
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
@@ -185,7 +178,6 @@ data BitmapEntry = BitmapEntry
   { closureFrame :: StackFrameIter,
     isPrimitive :: Bool
   }
-  deriving (Show)
 
 wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [BitmapEntry]
 wordsToBitmapEntries _ [] 0 = []

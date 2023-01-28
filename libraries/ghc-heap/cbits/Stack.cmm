@@ -120,14 +120,6 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-unpackClosureReferencedByFramezh(W_ offsetWordsInFrame, P_ stack, W_ offsetWordsBase){
-  P_ closurePtrAddr, closurePtr;
-  closurePtrAddr = (StgStack_sp(stack) + WDS(offsetWordsBase) + WDS(offsetWordsInFrame));
-  closurePtr = P_[closurePtrAddr];
-  ASSERT(LOOKS_LIKE_CLOSURE_PTR(closurePtr));
-  jump stg_unpackClosurezh(closurePtr);
-}
-
 getUpdateFrameTypezh(P_ stack, W_ offsetWords){
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
