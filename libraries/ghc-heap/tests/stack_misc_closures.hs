@@ -17,7 +17,6 @@ import Debug.Trace
 import GHC.Exts
 import GHC.Exts.DecodeStack
 import GHC.Exts.Heap
-import GHC.Exts.Heap (GenClosure (wordVal), HasHeapRep (getClosureData))
 import GHC.Exts.Heap.Closures
 import GHC.IO (IO (..))
 import GHC.Stack (HasCallStack)
@@ -271,10 +270,11 @@ main = do
             assertArrWordsClosure [1] =<< getBoxedClosureData instrs
             assertArrWordsClosure [2] =<< getBoxedClosureData literals
             assertMutArrClosure [3] =<< getBoxedClosureData bcoptrs
-            assertEqual [
-                1, -- StgLargeBitmap size in words
+            assertEqual
+              [ 1, -- StgLargeBitmap size in words
                 0 -- StgLargeBitmap first words
-              ] bitmap
+              ]
+              bitmap
           e -> error $ "Wrong closure type: " ++ show e
       e -> error $ "Wrong closure type: " ++ show e
   testSize any_bco_frame# 3
@@ -350,7 +350,7 @@ assertMutArrClosure :: HasCallStack => [Word] -> Closure -> IO ()
 assertMutArrClosure wds c = case c of
   MutArrClosure {..} -> do
     assertEqual (tipe info) MUT_ARR_PTRS_FROZEN_CLEAN
-    xs <-mapM getBoxedClosureData mccPayload
+    xs <- mapM getBoxedClosureData mccPayload
     assertEqual wds $ map getWordFromConstr01 xs
   e -> error $ "Wrong closure type: " ++ show e
 
