@@ -453,7 +453,7 @@ test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeab
 test('T21851_2', [grep_errmsg(r'wwombat') ], multimod_compile, ['T21851_2', '-O -dno-typeable-binds -dsuppress-uniques'])
 # Should not inline m, so there shouldn't be a single YES
 test('T22317', [grep_errmsg(r'ANSWER = YES') ], compile, ['-O -dinline-check m -ddebug-output'])
-
+test('T22849', normal, compile, ['-O'])
 test('T22634', normal, compile, ['-O -fcatch-nonexhaustive-cases'])
 test('T22494', [grep_errmsg(r'case') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T22491', normal, compile, ['-O2'])
@@ -472,3 +472,4 @@ test('T22611', [when(wordsize(32), skip), grep_errmsg(r'\$salterF') ], compile, 
 test('T22715_2', normal, multimod_compile, ['T22715_2', '-v0 -O -fspecialise-aggressively'])
 test('T22802', normal, compile, ['-O'])
 test('T15205', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+

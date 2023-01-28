@@ -707,7 +707,7 @@ Worker/wrapper will unbox
        * is an algebraic data type (not a newtype)
        * is not recursive (as per 'isRecDataCon')
        * has a single constructor (thus is a "product")
-       * that may bind existentials
+       * that may bind existentials (#18982)
      We can transform
      > data D a = forall b. D a b
      > f (D @ex a b) = e
@@ -1272,16 +1272,25 @@ also unbox its components. That is governed by the `usefulSplit` mechanism.
 -}
 
 -- | Exactly 'dataConInstArgTys', but lacks the (ASSERT'ed) precondition that
--- the 'DataCon' may not have existentials. The lack of cloning the existentials
--- compared to 'dataConInstExAndArgVars' makes this function \"dubious\";
--- only use it where type variables aren't substituted for!
+-- the 'DataCon' may not have existentials. The lack of cloning the
+-- existentials this function \"dubious\"; only use it where type variables
+-- aren't substituted for!  Why may the data con bind existentials?
+--    See Note [Which types are unboxed?]
 dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
 dubiousDataConInstArgTys dc tc_args = arg_tys
   where
-    univ_tvs = dataConUnivTyVars dc
-    ex_tvs   = dataConExTyCoVars dc
-    subst    = extendSubstInScopeList (zipTvSubst univ_tvs tc_args) ex_tvs
-    arg_tys  = map (GHC.Core.Type.substTy subst . scaledThing) (dataConRepArgTys dc)
+    univ_tvs        = dataConUnivTyVars dc
+    ex_tvs          = dataConExTyCoVars dc
+    univ_subst      = zipTvSubst univ_tvs tc_args
+    (full_subst, _) = substTyVarBndrs univ_subst ex_tvs
+    arg_tys         = map (substTy full_subst . scaledThing) $
+                      dataConRepArgTys dc
+    -- NB: use substTyVarBndrs on ex_tvs to ensure that we
+    --     substitute in their kinds.  For example (#22849)
+    -- Consider data T a where
+    --            MkT :: forall k (t::k->*) (ix::k). t ix -> T @k a
+    -- Then dubiousDataConInstArgTys MkT [Type, Foo] should return
+    --        [Foo (ix::Type)], not [Foo (ix::k)]!
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
