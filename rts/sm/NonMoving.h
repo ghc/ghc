@@ -340,10 +340,14 @@ INLINE_HEADER bool nonmovingClosureBeingSwept(StgClosure *p)
     }
 }
 
+// N.B. RtsFlags is defined as a pointer in STG code consequently this code
+// doesn't typecheck.
+#if !IN_STG_CODE
 INLINE_HEADER bool isNonmovingClosure(StgClosure *p)
 {
     return RtsFlags.GcFlags.useNonmoving && (!HEAP_ALLOCED_GC(p) || Bdescr((P_)p)->flags & BF_NONMOVING);
 }
+#endif
 
 #if defined(DEBUG)
 
