@@ -486,8 +486,8 @@ like this:
    -  :math:`IY` is strictly more specific than :math:`IX`.  That
       is, :math:`IY` is a substitution instance of :math:`IX` but not vice versa.
 
-   -  Either :math:`IX` is *overlappable*, or :math:`IY` is *overlapping*. (This
-      "either/or" design, rather than a "both/and" design, allow a
+   -  :math:`IX` is *overlappable* or :math:`IY` is *overlapping*. (This
+      "or" design, rather than an "and" design, allows a
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
