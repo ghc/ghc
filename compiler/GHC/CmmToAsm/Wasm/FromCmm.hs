@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Strict #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -1203,6 +1204,7 @@ lower_CallishMachOp lbl (MO_Memcmp {}) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left "memcmp")
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1210,6 +1212,7 @@ lower_CallishMachOp lbl (MO_PopCnt w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_popcnt" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1217,6 +1220,7 @@ lower_CallishMachOp lbl (MO_Pdep w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_pdep" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1224,6 +1228,7 @@ lower_CallishMachOp lbl (MO_Pext w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_pext" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1231,6 +1236,7 @@ lower_CallishMachOp lbl (MO_Clz w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_clz" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1238,6 +1244,7 @@ lower_CallishMachOp lbl (MO_Ctz w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_ctz" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1245,6 +1252,7 @@ lower_CallishMachOp lbl (MO_BSwap w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_bswap" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1252,6 +1260,7 @@ lower_CallishMachOp lbl (MO_BRev w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_bitrev" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1270,6 +1279,7 @@ lower_CallishMachOp lbl (MO_AtomicRMW w0 op) rs xs =
           )
             <> show (widthInBits w0)
     )
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1289,6 +1299,7 @@ lower_CallishMachOp lbl (MO_Xchg w0) rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left $ fromString $ "hs_xchg" <> show (widthInBits w0))
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1296,6 +1307,7 @@ lower_CallishMachOp lbl MO_SuspendThread rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left "suspendThread")
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1303,6 +1315,7 @@ lower_CallishMachOp lbl MO_ResumeThread rs xs =
   lower_CmmUnsafeForeignCall
     lbl
     (Left "resumeThread")
+    Nothing
     CmmMayReturn
     rs
     xs
@@ -1324,6 +1337,7 @@ lower_CmmUnsafeForeignCall_Drop lbl sym_callee ret_cmm_ty arg_exprs = do
   lower_CmmUnsafeForeignCall
     lbl
     (Left sym_callee)
+    Nothing
     CmmMayReturn
     [ret_local]
     arg_exprs
@@ -1335,34 +1349,52 @@ lower_CmmUnsafeForeignCall_Drop lbl sym_callee ret_cmm_ty arg_exprs = do
 lower_CmmUnsafeForeignCall ::
   CLabel ->
   (Either SymName CmmExpr) ->
+  Maybe
+    ([ForeignHint], [ForeignHint]) ->
   CmmReturnInfo ->
   [CmmFormal] ->
   [CmmActual] ->
-  WasmCodeGenM
-    w
-    (WasmStatements w)
-lower_CmmUnsafeForeignCall lbl target ret_info ret_locals arg_exprs = do
+  WasmCodeGenM w (WasmStatements w)
+lower_CmmUnsafeForeignCall lbl target mb_hints ret_info ret_locals arg_exprs = do
+  platform <- wasmPlatformM
   SomeWasmPreCCall arg_tys args_instr <-
     foldrM
-      ( \arg_expr (SomeWasmPreCCall acc_tys acc_instr) -> do
-          SomeWasmExpr arg_ty (WasmExpr arg_instr) <-
-            lower_CmmExpr lbl arg_expr
+      ( \(arg_expr, arg_hint) (SomeWasmPreCCall acc_tys acc_instr) -> do
+          SomeWasmExpr arg_ty arg_wasm_expr <- lower_CmmExpr lbl arg_expr
+          let WasmExpr arg_instr = case arg_hint of
+                SignedHint ->
+                  extendSubword
+                    (cmmExprWidth platform arg_expr)
+                    arg_ty
+                    arg_wasm_expr
+                _ -> arg_wasm_expr
           pure $
             SomeWasmPreCCall (arg_ty `TypeListCons` acc_tys) $
               arg_instr `WasmConcat` acc_instr
       )
       (SomeWasmPreCCall TypeListNil WasmNop)
-      arg_exprs
+      arg_exprs_hints
   SomeWasmPostCCall ret_tys ret_instr <-
     foldrM
-      ( \reg (SomeWasmPostCCall acc_tys acc_instr) -> do
+      ( \(reg, ret_hint) (SomeWasmPostCCall acc_tys acc_instr) -> do
           (reg_i, SomeWasmType reg_ty) <- onCmmLocalReg reg
           pure $
             SomeWasmPostCCall (reg_ty `TypeListCons` acc_tys) $
-              acc_instr `WasmConcat` WasmLocalSet reg_ty reg_i
+              case (# ret_hint, cmmRegWidth platform $ CmmLocal reg #) of
+                (# SignedHint, W8 #) ->
+                  acc_instr
+                    `WasmConcat` WasmConst reg_ty 0xFF
+                    `WasmConcat` WasmAnd reg_ty
+                    `WasmConcat` WasmLocalSet reg_ty reg_i
+                (# SignedHint, W16 #) ->
+                  acc_instr
+                    `WasmConcat` WasmConst reg_ty 0xFFFF
+                    `WasmConcat` WasmAnd reg_ty
+                    `WasmConcat` WasmLocalSet reg_ty reg_i
+                _ -> acc_instr `WasmConcat` WasmLocalSet reg_ty reg_i
       )
       (SomeWasmPostCCall TypeListNil WasmNop)
-      ret_locals
+      ret_locals_hints
   case target of
     Left sym_callee -> do
       platform <- wasmPlatformM
@@ -1388,6 +1420,11 @@ lower_CmmUnsafeForeignCall lbl target ret_info ret_locals arg_exprs = do
                              CmmMayReturn -> ret_instr
                              CmmNeverReturns -> WasmUnreachable
                          )
+  where
+    (# arg_exprs_hints, ret_locals_hints #) = case mb_hints of
+      Just (arg_hints, ret_hints) ->
+        (# zip arg_exprs arg_hints, zip ret_locals ret_hints #)
+      _ -> (# map (,NoHint) arg_exprs, map (,NoHint) ret_locals #)
 
 -- | Lower a 'CmmStore'.
 lower_CmmStore ::
@@ -1443,7 +1480,7 @@ lower_CmmAction lbl act = do
     CmmUnsafeForeignCall
       ( ForeignTarget
           (CmmLit (CmmLabel lbl_callee))
-          (ForeignConvention conv _ _ ret_info)
+          (ForeignConvention conv arg_hints ret_hints ret_info)
         )
       ret_locals
       arg_exprs
@@ -1451,17 +1488,19 @@ lower_CmmAction lbl act = do
             lower_CmmUnsafeForeignCall
               lbl
               (Left $ symNameFromCLabel lbl_callee)
+              (Just (arg_hints, ret_hints))
               ret_info
               ret_locals
               arg_exprs
     CmmUnsafeForeignCall
-      (ForeignTarget target_expr (ForeignConvention conv _ _ ret_info))
+      (ForeignTarget target_expr (ForeignConvention conv arg_hints ret_hints ret_info))
       ret_locals
       arg_exprs
         | conv `elem` [CCallConv, CApiConv] ->
             lower_CmmUnsafeForeignCall
               lbl
               (Right target_expr)
+              (Just (arg_hints, ret_hints))
               ret_info
               ret_locals
               arg_exprs
