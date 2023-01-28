@@ -62,8 +62,8 @@ foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
 
-{-
-__Test stategy:__
+{- Test stategy
+   ~~~~~~~~~~~~
 
 - Create @StgStack@s in C that contain two closures (as they are on stack they
 may also be called "frames"). A stop frame and the frame which's decoding should
@@ -98,6 +98,7 @@ main = do
         assertEqual knownUpdateFrameType NormalUpdateFrame
         assertEqual 1 =<< (getWordFromBlackhole =<< getBoxedClosureData updatee)
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_update_frame# 2
   test any_catch_frame# $
     \case
       CatchFrame {..} -> do
@@ -105,6 +106,7 @@ main = do
         assertEqual exceptions_blocked 1
         assertConstrClosure 1 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_catch_frame# 3
   test any_catch_stm_frame# $
     \case
       CatchStmFrame {..} -> do
@@ -112,6 +114,7 @@ main = do
         assertConstrClosure 1 =<< getBoxedClosureData catchFrameCode
         assertConstrClosure 2 =<< getBoxedClosureData handler
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_catch_stm_frame# 3
   test any_catch_retry_frame# $
     \case
       CatchRetryFrame {..} -> do
@@ -120,6 +123,7 @@ main = do
         assertConstrClosure 1 =<< getBoxedClosureData first_code
         assertConstrClosure 2 =<< getBoxedClosureData alt_code
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_catch_retry_frame# 4
   test any_atomically_frame# $
     \case
       AtomicallyFrame {..} -> do
@@ -127,6 +131,7 @@ main = do
         assertConstrClosure 1 =<< getBoxedClosureData atomicallyFrameCode
         assertConstrClosure 2 =<< getBoxedClosureData result
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_atomically_frame# 3
   -- TODO: Test for UnderflowFrame once it points to a Box payload
   test any_ret_small_prim_frame# $
     \case
@@ -137,6 +142,7 @@ main = do
         assertEqual (length pCs) 1
         assertUnknownTypeWordSizedPrimitive 1 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_small_prim_frame# 2
   test any_ret_small_closure_frame# $
     \case
       RetSmall {..} -> do
@@ -146,6 +152,7 @@ main = do
         assertEqual (length pCs) 1
         assertConstrClosure 1 (head pCs)
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_small_closure_frame# 2
   test any_ret_small_closures_frame# $
     \case
       RetSmall {..} -> do
@@ -156,6 +163,7 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 58]
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_small_closures_frame# (1 + fromIntegral maxSmallBitmapBits_c)
   test any_ret_small_prims_frame# $
     \case
       RetSmall {..} -> do
@@ -166,6 +174,7 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1 .. 58]
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_small_prims_frame# (1 + fromIntegral maxSmallBitmapBits_c)
   test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
@@ -175,15 +184,7 @@ main = do
         let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
         assertEqual wds [1 .. 59]
       e -> error $ "Wrong closure type: " ++ show e
-  test any_ret_big_prims_min_frame# $
-    \case
-      RetBig {..} -> do
-        assertEqual (tipe info) RET_BIG
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) 59
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
-        assertEqual wds [1 .. 59]
-      e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_big_prims_min_frame# (minBigBitmapBits + 1)
   test any_ret_big_closures_min_frame# $
     \case
       RetBig {..} -> do
@@ -193,15 +194,18 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 59]
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_big_closures_min_frame# (minBigBitmapBits + 1)
   test any_ret_big_closures_two_words_frame# $
     \case
       RetBig {..} -> do
         assertEqual (tipe info) RET_BIG
         pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) 65
+        let closureCount = 64 + 1
+        assertEqual (length pCs) closureCount
         let wds = map getWordFromConstr01 pCs
-        assertEqual wds [1 .. 65]
+        assertEqual wds [1 .. (fromIntegral closureCount)]
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_big_closures_two_words_frame# (64 + 1 + 1)
   test any_ret_fun_arg_n_prim_framezh# $
     \case
       RetFun {..} -> do
@@ -232,6 +236,7 @@ main = do
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 9]
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_ret_fun_arg_gen_framezh# (3 + 9)
   test any_ret_fun_arg_gen_big_framezh# $
     \case
       RetFun {..} -> do
@@ -249,6 +254,7 @@ main = do
         assertEqual (length pCs) 59
         let wds = map getWordFromConstr01 pCs
         assertEqual wds [1 .. 59]
+  testSize any_ret_fun_arg_gen_big_framezh# (3 + 59)
   test any_bco_frame# $
     \case
       RetBCO {..} -> do
@@ -271,6 +277,7 @@ main = do
               ] bitmap
           e -> error $ "Wrong closure type: " ++ show e
       e -> error $ "Wrong closure type: " ++ show e
+  testSize any_bco_frame# 3
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
@@ -300,6 +307,7 @@ test setup assertion = do
     assert sn stack = do
       assertStackInvariants sn stack
       assertEqual (length stack) 2
+      -- TODO: Isn't this also a stack invariant? (assertStackInvariants)
       assertThat
         "Last frame is stop frame"
         ( \case
@@ -308,6 +316,12 @@ test setup assertion = do
         )
         (last stack)
       assertion $ head stack
+
+testSize :: HasCallStack => SetupFunction -> Int -> IO ()
+testSize setup expectedSize = do
+  sn <- getStackSnapshot setup
+  (SimpleStack boxedFrames) <- decodeStack sn
+  assertEqual expectedSize (closureSize (head boxedFrames))
 
 -- | Get a `StackSnapshot` from test setup
 --
@@ -374,6 +388,9 @@ assertUnknownTypeWordSizedPrimitive w c = case c of
 
 unboxSingletonTuple :: (# StackSnapshot# #) -> StackSnapshot#
 unboxSingletonTuple (# s# #) = s#
+
+minBigBitmapBits :: Num a => a
+minBigBitmapBits = 1 + fromIntegral maxSmallBitmapBits_c
 
 -- | A function with 59 arguments
 --

@@ -53,6 +53,7 @@ import Numeric
 
 #if MIN_VERSION_base(4,17,0)
 import GHC.Stack.CloneStack (StackSnapshot(..))
+import GHC.Exts.StackConstants
 import Unsafe.Coerce (unsafeCoerce)
 #endif
 
@@ -603,6 +604,20 @@ allClosures _ = []
 -- Includes header and payload. Does not follow pointers.
 --
 -- @since 8.10.1
--- TODO: Handle PrimitiveWordHolder
 closureSize :: Box -> Int
 closureSize (Box x) = I# (closureSize# x)
+#if MIN_VERSION_base(4,17,0)
+closureSize (DecodedBox c) = case c of
+  UpdateFrame {} -> sizeStgUpdateFrame
+  CatchFrame {} -> sizeStgCatchFrame
+  CatchStmFrame {} -> sizeStgCatchSTMFrame
+  CatchRetryFrame {} -> sizeStgCatchRetryFrame
+  AtomicallyFrame {} -> sizeStgAtomicallyFrame
+  RetSmall {..} -> sizeStgClosure + length payload
+  RetBig {..} -> sizeStgClosure + length payload
+  RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
+  -- The one additional word is a pointer to the StgBCO in the closure's payload
+  RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
+  -- TODO: What to do about other closure types?
+  _ -> error "Unexpected closure type"
+#endif
