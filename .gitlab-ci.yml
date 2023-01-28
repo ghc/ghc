@@ -277,6 +277,8 @@ lint-ci-config:
     - .gitlab/generate_jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
     - nix shell nixpkgs#git -c git diff --exit-code
+    # And run this to just make sure that works
+    - .gitlab/generate_job_metadata
   dependencies: []
 
 lint-submods:
