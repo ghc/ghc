@@ -36,6 +36,66 @@ import GHC.Exts.StackConstants
 import GHC.Stack.CloneStack
 import Prelude
 
+{- Note [Decoding the stack]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The stack is represented by a chain of StgStack closures. Each of these closures
+is subject to garbage collection. I.e. they can be moved in memory (in a
+simplified perspective) at any time.
+
+The array of closures inside an StgStack (that makeup the execution stack; the
+stack frames) is moved as bare memory by the garbage collector. References
+(pointers) to stack frames are not updated.
+
+As the StgStack closure is moved as whole, the relative offsets inside it stay
+the same. (Though, the absolute addresses change!)
+
+Stack frame iterator
+====================
+
+A StackFrameIter consists of a StackSnapshot# and a relative offset into the the
+array of stack frames (StgStack->stack). The StackSnapshot# represents a
+StgStack closure. It is updated by the garbage collector when the stack closure
+is moved.
+
+The relative offset describes the location of a stack frame. As stack frames
+come in various sizes, one cannot simply step over the stack array with a
+constant offset.
+
+The head of the stack frame array has offset 0. To traverse the stack frames the
+latest stacke frame's offset is incremented by the closure size. The unit of the
+offset is machine words (32bit or 64bit).
+
+Boxes
+=====
+
+As references into thestack frame array aren't updated by the garbage collector,
+creating a Box with a pointer (address) to a stack frame would break as soon as
+the StgStack closure is moved.
+
+To deal with this another kind of Box is introduced: A DecodedBox contains a
+thunk for a decoded stack frame or the closure for the decoded stack frame
+itself. I.e. we're not boxing the closure, but the ghc-heap representation of
+it.
+
+Heap-represented closures referenced by stack frames are boxed the usual way,
+with a Box that contains a pointer to the closure.
+
+Technical details
+=================
+
+- All access to StgStack/StackSnapshot# closures is made through Cmm code. This
+  keeps the closure from being moved by the garbage collector during the
+  operation.
+
+- As StgStacks are mainly used in Cmm and C code, much of the decoding logic is
+  implemented in Cmm and C. It's just easier to reuse existing helper macros and
+  functions, than reinventing them in Haskell.
+
+- Offsets and sizes of closures are imported from DerivedConstants.h via HSC.
+  This keeps the code very portable.
+-}
+
 foreign import prim "derefStackWordzh" derefStackWord# :: StackSnapshot# -> Word# -> Word#
 
 derefStackWord :: StackFrameIter -> Word
