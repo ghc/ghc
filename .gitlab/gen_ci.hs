@@ -17,7 +17,6 @@ import Data.List (intercalate)
 import Data.Set (Set)
 import qualified Data.Set as S
 import System.Environment
-import Data.Maybe
 
 {-
 Note [Generating the CI pipeline]
@@ -931,7 +930,7 @@ mkPlatform arch opsys = archName arch <> "-" <> opsysName opsys
 --  * Explicitly require tie-breaking for other cases.
 platform_mapping :: Map String (JobGroup BindistInfo)
 platform_mapping = Map.map go $
-  Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ v j)), j) | j <- job_groups ]
+  Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ v j)), j) | j <- filter hasReleaseBuild job_groups ]
   where
     whitelist = [ "x86_64-linux-alpine3_12-int_native-validate+fully_static"
                 , "x86_64-linux-deb10-validate"
@@ -942,8 +941,6 @@ platform_mapping = Map.map go $
     combine a b
       | name (v a) `elem` whitelist = a -- Explicitly selected
       | name (v b) `elem` whitelist = b
-      | hasReleaseBuild a, not (hasReleaseBuild b) = a -- Has release build, but other doesn't
-      | hasReleaseBuild b, not (hasReleaseBuild a) = b
       | otherwise = error (show (name (v a)) ++ show (name (v b)))
 
     go = fmap (BindistInfo . unwords . fromJust . mmlookup "BIN_DIST_NAME" . jobVariables)
