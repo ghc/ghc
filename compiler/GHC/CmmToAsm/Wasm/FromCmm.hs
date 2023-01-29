@@ -123,15 +123,15 @@ alignmentFromWordType TagI32 = mkAlignment 4
 alignmentFromWordType TagI64 = mkAlignment 8
 alignmentFromWordType _ = panic "alignmentFromWordType: unreachable"
 
--- | Calculate a data section's alignment. Closures needs to be
--- naturally aligned; info tables need to align to 2, so to get 1 tag
--- bit as forwarding pointer marker. The rest have no alignment
--- requirements.
-alignmentFromCmmSection :: WasmTypeTag w -> CLabel -> Alignment
-alignmentFromCmmSection t lbl
-  | isStaticClosureLabel lbl = alignmentFromWordType t
-  | isInfoTableLabel lbl = mkAlignment 2
-  | otherwise = mkAlignment 1
+-- | Calculate a data section's alignment. As a conservative
+-- optimization, a data section with a single CmmString/CmmFileEmbed
+-- has no alignment requirement, otherwise we always align to the word
+-- size to satisfy pointer tagging requirements and avoid unaligned
+-- loads/stores.
+alignmentFromCmmSection :: WasmTypeTag w -> [DataSectionContent] -> Alignment
+alignmentFromCmmSection _ [DataASCII {}] = mkAlignment 1
+alignmentFromCmmSection _ [DataIncBin {}] = mkAlignment 1
+alignmentFromCmmSection t _ = alignmentFromWordType t
 
 -- | Lower a 'CmmStatic'.
 lower_CmmStatic :: CmmStatic -> WasmCodeGenM w DataSectionContent
@@ -1650,7 +1650,7 @@ onCmmData lbl s statics = do
           { dataSectionKind =
               dataSectionKindFromCmmSection s,
             dataSectionAlignment =
-              alignmentFromCmmSection ty_word lbl,
+              alignmentFromCmmSection ty_word cs,
             dataSectionContents =
               case cs of
                 [DataASCII buf] -> [DataASCII $ buf `BS.snoc` 0]
