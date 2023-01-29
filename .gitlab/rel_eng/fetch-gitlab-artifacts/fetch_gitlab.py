@@ -29,6 +29,7 @@ def job_triple(job_name):
         'release-x86_64-linux-centos7-release': 'x86_64-centos7-linux',
         'release-x86_64-linux-alpine3_12-release+fully_static': 'x86_64-alpine3_12-linux-static',
         'release-x86_64-linux-alpine3_12-int_native-release+fully_static': 'x86_64-alpine3_12-linux-static-int_native',
+        'release-x86_64-linux-rocky8-release': 'x86_64-rocky8-linux',
         'release-x86_64-darwin-release': 'x86_64-apple-darwin',
         'release-i386-linux-deb9-release': 'i386-deb9-linux',
         'release-armv7-linux-deb10-release': 'armv7-deb10-linux',
