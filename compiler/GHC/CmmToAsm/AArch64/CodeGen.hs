@@ -1532,9 +1532,34 @@ genCCall target dest_regs arg_regs bid = do
         MO_BRev w           -> mkCCall (bRevLabel w)
 
         -- -- Atomic read-modify-write.
+        MO_AtomicRead w ord
+          | [p_reg] <- arg_regs
+          , [dst_reg] <- dest_regs -> do
+              (p, _fmt_p, code_p) <- getSomeReg p_reg
+              platform <- getPlatform
+              let instr = case ord of
+                      MemOrderRelaxed -> LDR
+                      _               -> LDAR
+                  dst = getRegisterReg platform (CmmLocal dst_reg)
+                  code =
+                    code_p `snocOL`
+                    instr (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)
+              return (code, Nothing)
+          | otherwise -> panic "mal-formed AtomicRead"
+        MO_AtomicWrite w ord
+          | [p_reg, val_reg] <- arg_regs -> do
+              (p, _fmt_p, code_p) <- getSomeReg p_reg
+              (val, fmt_val, code_val) <- getSomeReg val_reg
+              let instr = case ord of
+                      MemOrderRelaxed -> STR
+                      _               -> STLR
+                  code =
+                    code_p `appOL`
+                    code_val `snocOL`
+                    instr fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+              return (code, Nothing)
+          | otherwise -> panic "mal-formed AtomicWrite"
         MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
-        MO_AtomicRead w _   -> mkCCall (atomicReadLabel w)
-        MO_AtomicWrite w _  -> mkCCall (atomicWriteLabel w)
         MO_Cmpxchg w        -> mkCCall (cmpxchgLabel w)
         -- -- Should be an AtomicRMW variant eventually.
         -- -- Sequential consistent.

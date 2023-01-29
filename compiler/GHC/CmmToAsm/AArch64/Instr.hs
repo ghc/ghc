@@ -127,7 +127,9 @@ regUsageOfInstr platform instr = case instr of
   CBNZ src _               -> usage (regOp src, [])
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
+  STLR _ src dst           -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
+  LDAR _ dst src           -> usage (regOp src, regOp dst)
   -- TODO is this right? see STR, which I'm only partial about being right?
   STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
   LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
@@ -263,7 +265,9 @@ patchRegsOfInstr instr env = case instr of
     CBNZ o l       -> CBNZ (patchOp o) l
     -- 7. Load and Store Instructions ------------------------------------------
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
+    STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
+    LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
     STP f o1 o2 o3 -> STP f (patchOp o1) (patchOp o2) (patchOp o3)
     LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
 
@@ -616,7 +620,9 @@ data Instr
     -- Load and stores.
     -- TODO STR/LDR might want to change to STP/LDP with XZR for the second register.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
+    | STLR Format Operand Operand -- stlr Xn, address-mode // Xn -> *addr
     | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
+    | LDAR Format Operand Operand -- ldar Xn, address-mode // Xn <- *addr
     | STP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn -> *addr, Xm -> *(addr + 8)
     | LDP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn <- *addr, Xm <- *(addr + 8)
 
@@ -691,7 +697,9 @@ instrCon i =
       ROR{} -> "ROR"
       TST{} -> "TST"
       STR{} -> "STR"
+      STLR{} -> "STLR"
       LDR{} -> "LDR"
+      LDAR{} -> "LDAR"
       STP{} -> "STP"
       LDP{} -> "LDP"
       CSET{} -> "CSET"

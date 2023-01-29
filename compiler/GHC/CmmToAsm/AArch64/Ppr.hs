@@ -469,6 +469,7 @@ pprInstr platform instr = case instr of
   STR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     op2 (text "\tstrh") o1 o2
   STR _f o1 o2 -> op2 (text "\tstr") o1 o2
+  STLR _f o1 o2 -> op2 (text "\tstlr") o1 o2
 
 #if defined(darwin_HOST_OS)
   LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
@@ -533,6 +534,7 @@ pprInstr platform instr = case instr of
   LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     op2 (text "\tldrh") o1 o2
   LDR _f o1 o2 -> op2 (text "\tldr") o1 o2
+  LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
   LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
