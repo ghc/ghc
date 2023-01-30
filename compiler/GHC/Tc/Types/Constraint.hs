@@ -2127,10 +2127,10 @@ uses GHC.Tc.Utils.anyUnfilledCoercionHoles to look through any filled coercion
 holes. The idea is that we wish to report the "root cause" -- the error that
 rewrote all the others.
 
-Worry: It seems possible that *all* unsolved wanteds are rewritten by other
-unsolved wanteds, so that e.g. w1 has w2 in its rewriter set, and w2 has
-w1 in its rewiter set. We are unable to come up with an example of this in
-practice, however, and so we believe this case cannot happen.
+Wrinkle: In #22707, we have a case where all of the Wanteds have rewritten
+each other. In order to report /some/ error in this case, we simply report
+all the Wanteds. The user will get a perhaps-confusing error message, but
+they've written a confusing program!
 
 Note [Avoiding rewriting cycles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
