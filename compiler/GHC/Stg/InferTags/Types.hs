@@ -54,24 +54,30 @@ combineAltInfo ti               TagTagged      = ti
 type TagSigEnv = IdEnv TagSig
 data TagEnv p = TE { te_env :: TagSigEnv
                    , te_get :: BinderP p -> Id
+                   , te_bytecode :: !Bool
                    }
 
 instance Outputable (TagEnv p) where
-    ppr te = ppr (te_env te)
-
+    ppr te = for_txt <+> ppr (te_env te)
+        where
+            for_txt = if te_bytecode te
+                then text "for_bytecode"
+                else text "for_native"
 
 getBinderId :: TagEnv p -> BinderP p -> Id
 getBinderId = te_get
 
-initEnv :: TagEnv 'CodeGen
-initEnv = TE { te_env = emptyVarEnv
-             , te_get = \x -> x}
+initEnv :: Bool -> TagEnv 'CodeGen
+initEnv for_bytecode = TE { te_env = emptyVarEnv
+             , te_get = \x -> x
+             , te_bytecode = for_bytecode }
 
 -- | Simple convert env to a env of the 'InferTaggedBinders pass
 -- with no other changes.
 makeTagged :: TagEnv p -> TagEnv 'InferTaggedBinders
 makeTagged env = TE { te_env = te_env env
-                    , te_get = fst }
+                    , te_get = fst
+                    , te_bytecode = te_bytecode env }
 
 noSig :: TagEnv p -> BinderP p -> (Id, TagSig)
 noSig env bndr
@@ -80,14 +86,18 @@ noSig env bndr
   where
     var = getBinderId env bndr
 
+-- | Look up a sig in the given env
 lookupSig :: TagEnv p -> Id -> Maybe TagSig
 lookupSig env fun = lookupVarEnv (te_env env) fun
 
+-- | Look up a sig in the env or derive it from information
+-- in the arg itself.
 lookupInfo :: TagEnv p -> StgArg -> TagInfo
 lookupInfo env (StgVarArg var)
   -- Nullary data constructors like True, False
   | Just dc <- isDataConWorkId_maybe var
   , isNullaryRepDataCon dc
+  , not for_bytecode
   = TagProper
 
   | isUnliftedType (idType var)
@@ -98,6 +108,7 @@ lookupInfo env (StgVarArg var)
   = info
 
   | Just lf_info <- idLFInfo_maybe var
+  , not for_bytecode
   =   case lf_info of
           -- Function, tagged (with arity)
           LFReEntrant {}
@@ -117,6 +128,8 @@ lookupInfo env (StgVarArg var)
 
   | otherwise
   = TagDunno
+  where
+    for_bytecode = te_bytecode env
 
 lookupInfo _ (StgLitArg {})
   = TagProper

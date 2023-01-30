@@ -50,6 +50,7 @@ data StgPipelineOpts = StgPipelineOpts
   -- ^ Should we lint the STG at various stages of the pipeline?
   , stgPipeline_pprOpts     :: !StgPprOpts
   , stgPlatform             :: !Platform
+  , stgPipeline_forBytecode :: !Bool
   }
 
 newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
@@ -93,7 +94,7 @@ stg2stg logger ictxt opts this_mod binds
           -- annotations (which is used by code generator to compute offsets into closures)
         ; let binds_sorted_with_fvs = depSortWithAnnotStgPgm this_mod binds'
         -- See Note [Tag inference for interactive contexts]
-        ; inferTags (stgPipeline_pprOpts opts) logger this_mod binds_sorted_with_fvs
+        ; inferTags (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
    }
 
   where

@@ -204,6 +204,33 @@ a different StgPass! To handle this a large part of the analysis is polymorphic
 over the exact StgPass we are using. Which allows us to run the analysis on
 the output of itself.
 
+Note [Tag inference for interpreted code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The bytecode interpreter has a different behaviour when it comes
+to the tagging of binders in certain situations than the StgToCmm code generator.
+
+a) Tags for let-bindings:
+
+  When compiling a binding for a constructor like `let x = Just True`
+  Whether `x` will be properly tagged depends on the backend.
+  For the interpreter x points to a BCO which once
+  evaluated returns a properly tagged pointer to the heap object.
+  In the Cmm backend for the same binding we would allocate the constructor right
+  away and x will immediately be represented by a tagged pointer.
+  This means for interpreted code we can not assume let bound constructors are
+  properly tagged. Hence we distinguish between targeting bytecode and native in
+  the analysis.
+  We make this differentiation in `mkLetSig` where we simply never assume
+  lets are tagged when targeting bytecode.
+
+b) When referencing ids from other modules the Cmm backend will try to put a
+   proper tag on these references through various means. When doing analysis we
+   usually predict these cases to improve precision of the analysis.
+   But to my knowledge the bytecode generator makes no such attempts so we must
+   not infer imported bindings as tagged.
+   This is handled in GHC.Stg.InferTags.Types.lookupInfo
+
+
 -}
 
 {- *********************************************************************
@@ -212,20 +239,12 @@ the output of itself.
 *                                                                      *
 ********************************************************************* -}
 
--- doCodeGen :: HscEnv -> Module -> InfoTableProvMap -> [TyCon]
---           -> CollectedCCs
---           -> [CgStgTopBinding] -- ^ Bindings come already annotated with fvs
---           -> HpcInfo
---           -> IO (Stream IO CmmGroupSRTs CmmCgInfos)
---          -- Note we produce a 'Stream' of CmmGroups, so that the
---          -- backend can be run incrementally.  Otherwise it generates all
---          -- the C-- up front, which has a significant space cost.
-inferTags :: StgPprOpts -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
-inferTags ppr_opts logger this_mod stg_binds = do
-
+inferTags :: StgPprOpts -> Bool -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
+inferTags ppr_opts !for_bytecode logger this_mod stg_binds = do
+    -- pprTraceM "inferTags for " (ppr this_mod <> text " bytecode:" <> ppr for_bytecode)
     -- Annotate binders with tag information.
     let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
-                                        inferTagsAnal stg_binds
+                                        inferTagsAnal for_bytecode stg_binds
     putDumpFileMaybe logger Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings ppr_opts stg_binds_w_tags)
 
     let export_tag_info = collectExportInfo stg_binds_w_tags
@@ -254,10 +273,10 @@ type InferExtEq i = ( XLet i ~ XLet 'InferTaggedBinders
                     , XLetNoEscape i ~ XLetNoEscape 'InferTaggedBinders
                     , XRhsClosure i ~ XRhsClosure 'InferTaggedBinders)
 
-inferTagsAnal :: [GenStgTopBinding 'CodeGen] -> [GenStgTopBinding 'InferTaggedBinders]
-inferTagsAnal binds =
+inferTagsAnal :: Bool -> [GenStgTopBinding 'CodeGen] -> [GenStgTopBinding 'InferTaggedBinders]
+inferTagsAnal for_bytecode binds =
   -- pprTrace "Binds" (pprGenStgTopBindings shortStgPprOpts $ binds) $
-  snd (mapAccumL inferTagTopBind initEnv binds)
+  snd (mapAccumL inferTagTopBind (initEnv for_bytecode) binds)
 
 -----------------------
 inferTagTopBind :: TagEnv 'CodeGen -> GenStgTopBinding 'CodeGen
@@ -420,11 +439,12 @@ inferTagBind in_env (StgNonRec bndr rhs)
     --   ppr bndr $$
     --   ppr (isDeadEndId id) $$
     --   ppr sig)
-    (env', StgNonRec (id, sig) rhs')
+    (env', StgNonRec (id, out_sig) rhs')
   where
     id   = getBinderId in_env bndr
-    env' = extendSigEnv in_env [(id, sig)]
-    (sig,rhs') = inferTagRhs id in_env rhs
+    (in_sig,rhs') = inferTagRhs id in_env rhs
+    out_sig = mkLetSig in_env in_sig
+    env' = extendSigEnv in_env [(id, out_sig)]
 
 inferTagBind in_env (StgRec pairs)
   = -- pprTrace "rec" (ppr (map fst pairs) $$ ppr (in_env { te_env = out_env }, StgRec pairs')) $
@@ -443,14 +463,17 @@ inferTagBind in_env (StgRec pairs)
        | in_sigs == out_sigs = (te_env rhs_env, out_bndrs `zip` rhss')
        | otherwise     = go env' out_sigs rhss'
        where
-         out_bndrs = map updateBndr in_bndrs -- TODO: Keeps in_ids alive
          in_bndrs = in_ids `zip` in_sigs
+         out_bndrs = map updateBndr in_bndrs -- TODO: Keeps in_ids alive
          rhs_env = extendSigEnv go_env in_bndrs
          (out_sigs, rhss') = unzip (zipWithEqual "inferTagBind" anaRhs in_ids go_rhss)
          env' = makeTagged go_env
 
          anaRhs :: Id -> GenStgRhs q -> (TagSig, GenStgRhs 'InferTaggedBinders)
-         anaRhs bnd rhs = inferTagRhs bnd rhs_env rhs
+         anaRhs bnd rhs =
+            let (sig_rhs,rhs') = inferTagRhs bnd rhs_env rhs
+            in (mkLetSig go_env sig_rhs, rhs')
+
 
          updateBndr :: (Id,TagSig) -> (Id,TagSig)
          updateBndr (v,sig) = (setIdTagSig v sig, sig)
@@ -535,6 +558,15 @@ inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args)
 -- become thunks. We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
     (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args)
+
+-- Adjust let semantics to the targeted backend.
+-- See Note [Tag inference for interpreted code]
+mkLetSig :: TagEnv p -> TagSig -> TagSig
+mkLetSig env in_sig
+  | for_bytecode = TagSig TagDunno
+  | otherwise = in_sig
+  where
+    for_bytecode = te_bytecode env
 
 {- Note [Constructor TagSigs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
