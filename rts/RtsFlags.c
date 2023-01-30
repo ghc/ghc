@@ -243,7 +243,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.nullWriter = false;
 #endif
 
-#if defined(PROFILING)
+// See Note [No timer on wasm32]
+#if defined(PROFILING) && !defined(wasm32_HOST_ARCH)
     // When profiling we want a lot more ticks
     RtsFlags.MiscFlags.tickInterval     = USToTime(1000);  // 1ms
 #else
@@ -1853,7 +1854,7 @@ static void normaliseRtsOpts (void)
                     RtsFlags.MiscFlags.tickInterval);
     }
 
-    if (RtsFlags.ConcFlags.ctxtSwitchTime > 0) {
+    if (RtsFlags.ConcFlags.ctxtSwitchTime > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.ConcFlags.ctxtSwitchTicks =
             RtsFlags.ConcFlags.ctxtSwitchTime /
             RtsFlags.MiscFlags.tickInterval;
@@ -1861,7 +1862,7 @@ static void normaliseRtsOpts (void)
         RtsFlags.ConcFlags.ctxtSwitchTicks = 0;
     }
 
-    if (RtsFlags.ProfFlags.heapProfileInterval > 0) {
+    if (RtsFlags.ProfFlags.heapProfileInterval > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.ProfFlags.heapProfileIntervalTicks =
             RtsFlags.ProfFlags.heapProfileInterval /
             RtsFlags.MiscFlags.tickInterval;
@@ -1869,7 +1870,7 @@ static void normaliseRtsOpts (void)
         RtsFlags.ProfFlags.heapProfileIntervalTicks = 0;
     }
 
-    if (RtsFlags.TraceFlags.eventlogFlushTime > 0) {
+    if (RtsFlags.TraceFlags.eventlogFlushTime > 0 && RtsFlags.MiscFlags.tickInterval != 0) {
         RtsFlags.TraceFlags.eventlogFlushTicks =
             RtsFlags.TraceFlags.eventlogFlushTime /
             RtsFlags.MiscFlags.tickInterval;
