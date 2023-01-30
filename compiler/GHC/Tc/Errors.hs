@@ -478,30 +478,37 @@ mkErrorItem ct
                             , ei_m_reason = m_reason
                             , ei_suppress = suppress }}
 
+-- | Actually report this 'ErrorItem'.
+unsuppressErrorItem :: ErrorItem -> ErrorItem
+unsuppressErrorItem ei = ei { ei_suppress = False }
+
 ----------------------------------------------------------------
 reportWanteds :: SolverReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                  , wc_errors = errs })
   | isEmptyWC wc = traceTc "reportWanteds empty WC" empty
   | otherwise
-  = do { tidy_items <- mapMaybeM mkErrorItem tidy_cts
+  = do { tidy_items1 <- mapMaybeM mkErrorItem tidy_cts
        ; traceTc "reportWanteds 1" (vcat [ text "Simples =" <+> ppr simples
                                          , text "Suppress =" <+> ppr (cec_suppress ctxt)
                                          , text "tidy_cts   =" <+> ppr tidy_cts
-                                         , text "tidy_items =" <+> ppr tidy_items
+                                         , text "tidy_items1 =" <+> ppr tidy_items1
                                          , text "tidy_errs =" <+> ppr tidy_errs ])
 
-       -- This check makes sure that we aren't suppressing the only error that will
-       -- actually stop compilation
-       ; assertPprM
-           ( do { errs_already <- ifErrsM (return True) (return False)
-                ; return $
-                    errs_already ||                  -- we already reported an error (perhaps from an outer implication)
-                    null simples ||                  -- no errors to report here
-                    any ignoreConstraint simples ||  -- one error is ignorable (is reported elsewhere)
-                    not (all ei_suppress tidy_items) -- not all errors are suppressed
-                } )
-           (vcat [text "reportWanteds is suppressing all errors"])
+         -- Catch an awkward case in which /all/ errors are suppressed:
+         -- see Wrinkle at end of Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
+         -- Unless we are sure that an error will be reported some other way (details
+         -- in the defn of tidy_items) un-suppress the lot. This makes sure we don't forget to
+         -- report an error at all, which is catastrophic: GHC proceeds to desguar and optimise
+         -- the program, even though it is full of type errors (#22702, #22793)
+       ; errs_already <- ifErrsM (return True) (return False)
+       ; let tidy_items
+               | not errs_already                     -- Have not already reported an error (perhaps
+                                                      --   from an outer implication); see #21405
+               , not (any ignoreConstraint simples)   -- No error is ignorable (is reported elsewhere)
+               , all ei_suppress tidy_items1          -- All errors are suppressed
+                           = map unsuppressErrorItem tidy_items1
+               | otherwise = tidy_items1
 
          -- First, deal with any out-of-scope errors:
        ; let (out_of_scope, other_holes, not_conc_errs) = partition_errors tidy_errs

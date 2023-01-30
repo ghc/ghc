@@ -1,0 +1,16 @@
+
+T22707.hs:6:37: error: [GHC-18872]
+    • Couldn't match kind ‘*’ with ‘GHC.Types.RuntimeRep’
+      When matching types
+        p0 :: *
+        GHC.Types.LiftedRep :: GHC.Types.RuntimeRep
+      Expected: Cont o i1 a
+        Actual: Cont (i2 -> o) i1 a
+    • In the first argument of ‘runCont’, namely ‘c’
+      In the expression:
+        (runCont c)
+          (ati1tti2 $ \ a -> evalCont (t1 c) >>== \ ati1 -> return ati1 a)
+      In the second argument of ‘($)’, namely
+        ‘\ ati1tti2
+           -> (runCont c)
+                (ati1tti2 $ \ a -> evalCont (t1 c) >>== \ ati1 -> ...)’
