@@ -4,22 +4,23 @@
 \section[GHC.Builtin.Names]{Definitions of prelude modules and names}
 
 
-Nota Bene: all Names defined in here should come from the base package
+Nota Bene: all Names defined in here should come from the base package,
+the big-num package or (for plugins) the ghc package.
 
  - ModuleNames for prelude modules,
-        e.g.    pREL_BASE_Name :: ModuleName
+        e.g.    pRELUDE_NAME :: ModuleName
 
  - Modules for prelude modules
-        e.g.    pREL_Base :: Module
+        e.g.    pRELUDE :: Module
 
  - Uniques for Ids, DataCons, TyCons and Classes that the compiler
    "knows about" in some way
-        e.g.    intTyConKey :: Unique
+        e.g.    orderingTyConKey :: Unique
                 minusClassOpKey :: Unique
 
  - Names for Ids, DataCons, TyCons and Classes that the compiler
    "knows about" in some way
-        e.g.    intTyConName :: Name
+        e.g.    orderingTyConName :: Name
                 minusName    :: Name
    One of these Names contains
         (a) the module and occurrence name of the thing
@@ -31,8 +32,9 @@ Nota Bene: all Names defined in here should come from the base package
    foldrName in the environment.
 
  - RdrNames for Ids, DataCons etc that the compiler may emit into
-   generated code (e.g. for deriving).  It's not necessary to know
-   the uniques for these guys, only their names
+   generated code (e.g. for deriving).
+        e.g.    and_RDR :: RdrName
+   It's not necessary to know the uniques for these guys, only their names
 
 
 Note [Known-key names]
