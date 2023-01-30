@@ -21,6 +21,5 @@ In file included from /rts/include/Stg.h:207,
      error: for each function it appears in.)
 -}
 
-foreign import ccall unsafe "math.h gamma"
-    gamma :: CDouble -> CDouble
-
+foreign import ccall unsafe "math.h tgamma"
+    tgamma :: CDouble -> CDouble
