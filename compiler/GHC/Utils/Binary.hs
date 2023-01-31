@@ -185,16 +185,16 @@ setUserData :: BinHandle -> UserData -> BinHandle
 setUserData bh us = bh { bh_usr = us }
 
 getBinIndex :: BinHandle -> IO Int
-getBinIndex (BinMem _ ints _) = readFastMutInt ints
+getBinIndex (BinMem _ ints _) = readFirstFastMutInt ints
 
 putBinIndex :: BinHandle -> Int -> IO ()
-putBinIndex (BinMem _ ints _) x = writeFastMutInt ints x
+putBinIndex (BinMem _ ints _) x = writeFirstFastMutInt ints x
 
 getArraySize :: BinHandle -> IO Int
-getArraySize (BinMem _ ints _) = readFastMutInt2 ints
+getArraySize (BinMem _ ints _) = readSecondFastMutInt ints
 
 putArraySize :: BinHandle -> Int -> IO ()
-putArraySize (BinMem _ ints _) x = writeFastMutInt2 ints x
+putArraySize (BinMem _ ints _) x = writeSecondFastMutInt ints x
 
 -- | Get access to the underlying buffer.
 withBinBuffer :: BinHandle -> (ByteString -> IO a) -> IO a
@@ -205,10 +205,9 @@ withBinBuffer h@(BinMem _ _ arr_r) action = do
 
 unsafeUnpackBinBuffer :: ByteString -> IO BinHandle
 unsafeUnpackBinBuffer (BS.BS arr len) = do
-  arr_r <- newIORef arr
-  ix_r <- newFastMutInt 0
-  sz_r <- newFastMutInt len
-  return (BinMem noUserData ix_r sz_r arr_r)
+  arr_r   <- newIORef arr
+  ix_sz_r <- newFastMutInt2 0 len
+  return (BinMem noUserData ix_sz_r arr_r)
 
 ---------------------------------------------------------------
 -- Bin
@@ -264,11 +263,11 @@ seekBin h (BinPtr !p) = do
 
 -- | SeekBin but without calling expandBin
 seekBinNoExpand :: BinHandle -> Bin a -> IO ()
-seekBinNoExpand (BinMem _ ix_r sz_r _) (BinPtr !p) = do
-  sz <- readFastMutInt sz_r
+seekBinNoExpand (BinMem _ ix_sz_r _) (BinPtr !p) = do
+  sz <- readSecondFastMutInt ix_sz_r
   if (p >= sz)
         then panic "seekBinNoExpand: seek out of range"
-        else writeFastMutInt ix_r p
+        else writeFirstFastMutInt ix_sz_r p
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem bh@(BinMem _ _ arr_r) fn = do
@@ -1175,7 +1174,7 @@ initFSTable bh = do
         , fs_tab_map  = dict_map_ref
         }
   let put_dict = do
-        fs_count <- readFastMutInt dict_next_ref
+        fs_count <- readFirstFastMutInt dict_next_ref
         dict_map  <- readIORef dict_map_ref
         putDictionary bh fs_count dict_map
         pure fs_count
@@ -1199,8 +1198,8 @@ allocateFastString FSTable { fs_tab_next = j_r
     case lookupUFM_Directly out uniq of
         Just (j, _)  -> return (fromIntegral j :: Word32)
         Nothing -> do
-           j <- readFastMutInt j_r
-           writeFastMutInt j_r (j + 1)
+           j <- readFirstFastMutInt j_r
+           writeFirstFastMutInt j_r (j + 1)
            writeIORef out_r $! addToUFM_Directly out uniq (j, f)
            return (fromIntegral j :: Word32)
 

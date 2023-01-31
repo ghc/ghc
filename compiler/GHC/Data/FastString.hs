@@ -342,7 +342,7 @@ maybeResizeSegment segmentRef = do
   segment@(FastStringTableSegment lock counter old#) <- readIORef segmentRef
   let oldSize# = sizeofMutableArray# old#
       newSize# = oldSize# *# 2#
-  (I# n#) <- readFastMutInt counter
+  (I# n#) <- readFirstFastMutInt counter
   if isTrue# (n# <# newSize#) -- maximum load of 1
   then return segment
   else do
@@ -476,7 +476,7 @@ mkFastStringWith mk_fs sbs = do
       withMVar lock $ \_ -> insert new_fs
   where
     !(FastStringTable uid n_zencs segments#) = stringTable
-    get_uid = atomicFetchAddFastMut uid 1
+    get_uid = atomicFetchAddFirstFastMut uid 1
 
     !(I# hash#) = hashStr sbs
     (# segmentRef #) = indexArray# segments# (hashToSegment# hash#)
@@ -492,7 +492,7 @@ mkFastStringWith mk_fs sbs = do
           IO $ \s1# ->
             case writeArray# buckets# idx# (fs : bucket) s1# of
               s2# -> (# s2#, () #)
-          _ <- atomicFetchAddFastMut counter 1
+          _ <- atomicFetchAddFirstFastMut counter 1
           return fs
 
 bucket_match :: [FastString] -> ShortByteString -> Maybe FastString
@@ -552,7 +552,7 @@ mkFastStringByteList str = mkFastStringShortByteString (SBS.pack str)
 -- account the number of forced z-strings into the passed 'FastMutInt'.
 mkZFastString :: FastMutInt -> ShortByteString -> FastZString
 mkZFastString n_zencs sbs = unsafePerformIO $ do
-  _ <- atomicFetchAddFastMut n_zencs 1
+  _ <- atomicFetchAddFirstFastMut n_zencs 1
   return $ mkFastZStringString (zEncodeString (utf8DecodeShortByteString sbs))
 
 mkNewFastStringShortByteString :: ShortByteString -> Int
@@ -644,7 +644,7 @@ getFastStringTable =
     !(FastStringTable _ _ segments#) = stringTable
 
 getFastStringZEncCounter :: IO Int
-getFastStringZEncCounter = readFastMutInt n_zencs
+getFastStringZEncCounter = readFirstFastMutInt n_zencs
   where
     !(FastStringTable _ n_zencs _) = stringTable
 

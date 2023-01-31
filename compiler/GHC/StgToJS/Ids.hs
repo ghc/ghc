@@ -68,8 +68,8 @@ freshUnique = do
   id_gen <- State.gets gsId
   liftIO $ do
     -- no need for atomicFetchAdd as we don't use threads in G
-    v <- readFastMutInt id_gen
-    writeFastMutInt id_gen (v+1)
+    v <- readFirstFastMutInt id_gen
+    writeFirstFastMutInt id_gen (v+1)
     pure v
 
 -- | Get fresh local Ident of the form: h$$unit:module_uniq

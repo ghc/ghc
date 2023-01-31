@@ -242,7 +242,7 @@ putWithTables bh put_payload = do
       -- NB. write the dictionary after the symbol table, because
       -- writing the symbol table may create more dictionary entries.
       let put_symtab = do
-            name_count <- readFastMutInt symtab_next
+            name_count <- readFirstFastMutInt symtab_next
             symtab_map  <- readIORef symtab_map
             putSymbolTable bh_fs name_count symtab_map
             pure name_count
@@ -348,9 +348,9 @@ putName _dict BinSymbolTable{
        case lookupUFM symtab_map name of
          Just (off,_) -> put_ bh (fromIntegral off :: Word32)
          Nothing -> do
-            off <- readFastMutInt symtab_next
+            off <- readFirstFastMutInt symtab_next
             -- massert (off < 2^(30 :: Int))
-            writeFastMutInt symtab_next (off+1)
+            writeFirstFastMutInt symtab_next (off+1)
             writeIORef symtab_map_ref
                 $! addToUFM symtab_map name (off,name)
             put_ bh (fromIntegral off :: Word32)

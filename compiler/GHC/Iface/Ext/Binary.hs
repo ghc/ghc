@@ -118,7 +118,7 @@ writeHieFile hie_file_path hiefile = do
   seekBin bh symtab_p
 
   -- write the symbol table itself
-  symtab_next' <- readFastMutInt symtab_next
+  symtab_next' <- readFirstFastMutInt symtab_next
   symtab_map'  <- readIORef symtab_map
   putSymbolTable bh symtab_next' symtab_map'
 
@@ -128,7 +128,7 @@ writeHieFile hie_file_path hiefile = do
   seekBin bh dict_p
 
   -- write the dictionary itself
-  dict_next <- readFastMutInt dict_next_ref
+  dict_next <- readFirstFastMutInt dict_next_ref
   dict_map  <- readIORef dict_map_ref
   putDictionary bh dict_next dict_map
 
@@ -256,9 +256,9 @@ putFastString HieDictionary { hie_dict_next = j_r,
     case lookupUFM_Directly out unique of
         Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
         Nothing -> do
-           j <- readFastMutInt j_r
+           j <- readFirstFastMutInt j_r
            put_ bh (fromIntegral j :: Word32)
-           writeFastMutInt j_r (j + 1)
+           writeFirstFastMutInt j_r (j + 1)
            writeIORef out_r $! addToUFM_Directly out unique (j, f)
 
 putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,HieName) -> IO ()
@@ -297,8 +297,8 @@ putName (HieSymbolTable next ref) bh name = do
       put_ bh (fromIntegral off :: Word32)
     Just (off, _) -> put_ bh (fromIntegral off :: Word32)
     Nothing -> do
-        off <- readFastMutInt next
-        writeFastMutInt next (off+1)
+        off <- readFirstFastMutInt next
+        writeFirstFastMutInt next (off+1)
         writeIORef ref $! addToUFM symmap name (off, toHieName name)
         put_ bh (fromIntegral off :: Word32)
 
