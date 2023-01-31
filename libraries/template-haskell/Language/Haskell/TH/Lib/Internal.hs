@@ -462,14 +462,16 @@ instanceD :: Quote m => m Cxt -> m Type -> [m Dec] -> m Dec
 instanceD = instanceWithOverlapD Nothing
 
 instanceWithOverlapD :: Quote m => Maybe Overlap -> m Cxt -> m Type -> [m Dec] -> m Dec
-instanceWithOverlapD o ctxt ty decs =
+instanceWithOverlapD o ctxt ty decs = instanceWithAllD o Nothing ctxt ty decs
+
+instanceWithAllD :: Quote m => Maybe Overlap -> Maybe [m (TyVarBndr ())] -> m Cxt -> m Type -> [m Dec] -> m Dec
+instanceWithAllD o ty_bndrs ctxt ty decs =
   do
+    ty_bndrs1 <- traverse sequenceA ty_bndrs
     ctxt1 <- ctxt
     decs1 <- sequenceA decs
     ty1   <- ty
-    pure $ InstanceD o ctxt1 ty1 decs1
-
-
+    pure $ InstanceD o ty_bndrs1 ctxt1 ty1 decs1
 
 sigD :: Quote m => Name -> m Type -> m Dec
 sigD fun ty = liftA (SigD fun) $ ty
@@ -599,12 +601,16 @@ standaloneDerivD :: Quote m => m Cxt -> m Type -> m Dec
 standaloneDerivD = standaloneDerivWithStrategyD Nothing
 
 standaloneDerivWithStrategyD :: Quote m => Maybe (m DerivStrategy) -> m Cxt -> m Type -> m Dec
-standaloneDerivWithStrategyD mdsq ctxtq tyq =
+standaloneDerivWithStrategyD mdsq ctxtq tyq = standaloneDerivWithAllD mdsq Nothing ctxtq tyq
+
+standaloneDerivWithAllD :: Quote m => Maybe (m DerivStrategy) -> Maybe [m (TyVarBndr ())] -> m Cxt -> m Type -> m Dec
+standaloneDerivWithAllD mdsq ty_bndrsq ctxtq tyq =
   do
-    mds  <- sequenceA mdsq
-    ctxt <- ctxtq
-    ty   <- tyq
-    pure $ StandaloneDerivD mds ctxt ty
+    mds      <- sequenceA mdsq
+    ty_bndrs <- traverse sequenceA ty_bndrsq
+    ctxt     <- ctxtq
+    ty       <- tyq
+    pure $ StandaloneDerivD mds ty_bndrs ctxt ty
 
 defaultSigD :: Quote m => Name -> m Type -> m Dec
 defaultSigD n tyq =
@@ -1056,21 +1062,21 @@ withDecDoc doc dec = do
     doc_loc (PatSynSigD n _)                               = Just $ DeclDoc n
 
     -- For instances we just pass along the full type
-    doc_loc (InstanceD _ _ t _)           = Just $ InstDoc t
+    doc_loc (InstanceD _ _ _ t _)         = Just $ InstDoc t
     doc_loc (DataInstD _ _ t _ _ _)       = Just $ InstDoc t
     doc_loc (NewtypeInstD _ _ t _ _ _)    = Just $ InstDoc t
     doc_loc (TySynInstD (TySynEqn _ t _)) = Just $ InstDoc t
 
     -- Declarations that can't have documentation attached to
     -- ValDs that aren't a simple variable pattern
-    doc_loc (ValD _ _ _)             = Nothing
-    doc_loc (KiSigD _ _)             = Nothing
-    doc_loc (PragmaD _)              = Nothing
-    doc_loc (RoleAnnotD _ _)         = Nothing
-    doc_loc (StandaloneDerivD _ _ _) = Nothing
-    doc_loc (DefaultSigD _ _)        = Nothing
-    doc_loc (ImplicitParamBindD _ _) = Nothing
-    doc_loc (DefaultD _)             = Nothing
+    doc_loc (ValD _ _ _)               = Nothing
+    doc_loc (KiSigD _ _)               = Nothing
+    doc_loc (PragmaD _)                = Nothing
+    doc_loc (RoleAnnotD _ _)           = Nothing
+    doc_loc (StandaloneDerivD _ _ _ _) = Nothing
+    doc_loc (DefaultSigD _ _)          = Nothing
+    doc_loc (ImplicitParamBindD _ _)   = Nothing
+    doc_loc (DefaultD _)               = Nothing
 
 -- | Variant of 'withDecDoc' that applies the same documentation to
 -- multiple declarations. Useful for documenting quoted declarations.

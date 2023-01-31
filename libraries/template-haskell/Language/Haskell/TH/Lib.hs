@@ -91,7 +91,7 @@ module Language.Haskell.TH.Lib (
     stockStrategy, anyclassStrategy, newtypeStrategy,
     viaStrategy, DerivStrategy(..),
     -- **** Class
-    classD, instanceD, instanceWithOverlapD, Overlap(..),
+    classD, instanceD, instanceWithOverlapD, instanceWithAllD, Overlap(..),
     sigD, kiSigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,
 
     -- **** Role annotations
@@ -165,6 +165,7 @@ import Language.Haskell.TH.Lib.Internal hiding
 
   , derivClause
   , standaloneDerivWithStrategyD
+  , standaloneDerivWithAllD
 
   , doE
   , mdoE
@@ -331,10 +332,20 @@ derivClause mds p = do
   return $ DerivClause mds p'
 
 standaloneDerivWithStrategyD :: Quote m => Maybe DerivStrategy -> m Cxt -> m Type -> m Dec
-standaloneDerivWithStrategyD mds ctxt ty = do
+standaloneDerivWithStrategyD mds ctxt ty =
+  standaloneDerivWithAllD mds Nothing ctxt ty
+
+standaloneDerivWithAllD :: Quote m
+                        => Maybe DerivStrategy
+                        -> Maybe [m (TyVarBndr ())]
+                        -> m Cxt
+                        -> m Type
+                        -> m Dec
+standaloneDerivWithAllD mds mtvs ctxt ty = do
+  mtvs' <- traverse sequenceA mtvs
   ctxt' <- ctxt
   ty'   <- ty
-  return $ StandaloneDerivD mds ctxt' ty'
+  return $ StandaloneDerivD mds mtvs' ctxt' ty'
 
 -------------------------------------------------------------------------------
 -- * Bytes literals

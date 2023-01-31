@@ -70,8 +70,8 @@ templateHaskellNames = [
     bindSName, letSName, noBindSName, parSName, recSName,
     -- Dec
     funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName,
-    classDName, instanceWithOverlapDName,
-    standaloneDerivWithStrategyDName, sigDName, kiSigDName, forImpDName,
+    classDName, instanceWithAllDName,
+    standaloneDerivWithAllDName, sigDName, kiSigDName, forImpDName,
     pragInlDName, pragOpaqueDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
     pragRuleDName, pragCompleteDName, pragAnnDName, defaultSigDName, defaultDName,
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
@@ -356,9 +356,9 @@ recSName    = libFun (fsLit "recS")    recSIdKey
 
 -- data Dec = ...
 funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName, classDName,
-    instanceWithOverlapDName, sigDName, kiSigDName, forImpDName, pragInlDName,
+    instanceWithAllDName, sigDName, kiSigDName, forImpDName, pragInlDName,
     pragSpecDName, pragSpecInlDName, pragSpecInstDName, pragRuleDName,
-    pragAnnDName, standaloneDerivWithStrategyDName, defaultSigDName, defaultDName,
+    pragAnnDName, standaloneDerivWithAllDName, defaultSigDName, defaultDName,
     dataInstDName, newtypeInstDName, tySynInstDName, dataFamilyDName,
     openTypeFamilyDName, closedTypeFamilyDName, infixLDName, infixRDName,
     infixNDName, roleAnnotDName, patSynDName, patSynSigDName,
@@ -370,8 +370,8 @@ newtypeDName                     = libFun (fsLit "newtypeD")                    
 typeDataDName                    = libFun (fsLit "typeDataD")                    typeDataDIdKey
 tySynDName                       = libFun (fsLit "tySynD")                       tySynDIdKey
 classDName                       = libFun (fsLit "classD")                       classDIdKey
-instanceWithOverlapDName         = libFun (fsLit "instanceWithOverlapD")         instanceWithOverlapDIdKey
-standaloneDerivWithStrategyDName = libFun (fsLit "standaloneDerivWithStrategyD") standaloneDerivWithStrategyDIdKey
+instanceWithAllDName             = libFun (fsLit "instanceWithAllD")             instanceWithAllIdKey
+standaloneDerivWithAllDName      = libFun (fsLit "standaloneDerivWithAllD")      standaloneDerivWithAllDIdKey
 sigDName                         = libFun (fsLit "sigD")                         sigDIdKey
 kiSigDName                       = libFun (fsLit "kiSigD")                       kiSigDIdKey
 defaultDName                     = libFun (fsLit "defaultD")                     defaultDIdKey
@@ -884,11 +884,11 @@ recSIdKey        = mkPreludeMiscIdUnique 315
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey, classDIdKey,
-    instanceWithOverlapDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey,
+    instanceWithAllIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey,
     pragInlDIdKey, pragSpecDIdKey, pragSpecInlDIdKey, pragSpecInstDIdKey,
     pragRuleDIdKey, pragAnnDIdKey, defaultSigDIdKey, dataFamilyDIdKey,
     openTypeFamilyDIdKey, closedTypeFamilyDIdKey, dataInstDIdKey,
-    newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivWithStrategyDIdKey,
+    newtypeInstDIdKey, tySynInstDIdKey, standaloneDerivWithAllDIdKey,
     infixLDIdKey, infixRDIdKey, infixNDIdKey, roleAnnotDIdKey, patSynDIdKey,
     patSynSigDIdKey, pragCompleteDIdKey, implicitParamBindDIdKey,
     kiSigDIdKey, defaultDIdKey, pragOpaqueDIdKey, typeDataDIdKey :: Unique
@@ -898,7 +898,7 @@ dataDIdKey                        = mkPreludeMiscIdUnique 322
 newtypeDIdKey                     = mkPreludeMiscIdUnique 323
 tySynDIdKey                       = mkPreludeMiscIdUnique 324
 classDIdKey                       = mkPreludeMiscIdUnique 325
-instanceWithOverlapDIdKey         = mkPreludeMiscIdUnique 326
+instanceWithAllIdKey              = mkPreludeMiscIdUnique 326
 instanceDIdKey                    = mkPreludeMiscIdUnique 327
 sigDIdKey                         = mkPreludeMiscIdUnique 328
 forImpDIdKey                      = mkPreludeMiscIdUnique 329
@@ -918,7 +918,7 @@ infixLDIdKey                      = mkPreludeMiscIdUnique 342
 infixRDIdKey                      = mkPreludeMiscIdUnique 343
 infixNDIdKey                      = mkPreludeMiscIdUnique 344
 roleAnnotDIdKey                   = mkPreludeMiscIdUnique 345
-standaloneDerivWithStrategyDIdKey = mkPreludeMiscIdUnique 346
+standaloneDerivWithAllDIdKey      = mkPreludeMiscIdUnique 346
 defaultSigDIdKey                  = mkPreludeMiscIdUnique 347
 patSynDIdKey                      = mkPreludeMiscIdUnique 348
 patSynSigDIdKey                   = mkPreludeMiscIdUnique 349

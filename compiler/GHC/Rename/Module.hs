@@ -604,7 +604,8 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_datafam_insts = adts })
   = do { checkInferredVars ctxt inf_err inst_ty
        ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
-       ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
+       ; let (ktv_bndrs, _, head_ty') = splitLHsInstDeclTy inst_ty'
+             ktv_names = hsOuterTyVarNames ktv_bndrs
              -- Check if there are any nested `forall`s or contexts, which are
              -- illegal in the type of an instance declaration (see
              -- Note [No nested foralls or contexts in instance types] in

@@ -643,7 +643,7 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                          , cid_datafam_insts = adts
                          , cid_overlap_mode = overlap
                          })
-  = addSimpleTyVarBinds FreshNamesOnly tvs $
+  = withOuterForallBinders tv_outer $ \tvs ->
             -- We must bring the type variables into scope, so their
             -- occurrences don't fail, even though the binders don't
             -- appear in the resulting data structure
@@ -661,22 +661,39 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
                ; adts1  <- mapM (repDataFamInstD . unLoc) adts
                ; decls1 <- coreListM decTyConName (ats1 ++ adts1 ++ sigs_binds)
                ; rOver  <- repOverlap (fmap unLoc overlap)
-               ; decls2 <- repInst rOver cxt1 inst_ty1 decls1
+               ; decls2 <- repInst rOver tvs cxt1 inst_ty1 decls1
                ; wrapGenSyms ss decls2 }
  where
-   (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
+    (tv_outer, cxt, inst_ty) = splitLHsInstDeclTy ty
 
 repStandaloneDerivD :: LDerivDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repStandaloneDerivD (L loc (DerivDecl { deriv_strategy = strat
                                        , deriv_type     = ty }))
-  = do { dec <- repDerivStrategy strat  $ \strat' ->
-                addSimpleTyVarBinds FreshNamesOnly tvs $
+  = do { dec <- repDerivStrategy strat $ \strat' ->
+                withOuterForallBinders tv_outer $ \tvs ->
                 do { cxt'     <- repLContext cxt
                    ; inst_ty' <- repLTy inst_ty
-                   ; repDeriv strat' cxt' inst_ty' }
+                   ; repDeriv strat' tvs cxt' inst_ty' }
        ; return (locA loc, dec) }
   where
-    (tvs, cxt, inst_ty) = splitLHsInstDeclTy (dropWildCards ty)
+    (tv_outer, cxt, inst_ty) = splitLHsInstDeclTy (dropWildCards ty)
+
+-- | Utility function for 'repClsInstD' and 'repStandaloneDerivD':
+-- bind some type variables from an outer forall, and pass them to the thing inside.
+withOuterForallBinders :: HsOuterTyVarBndrs Specificity GhcRn
+                       -> ( Core (Maybe [M (TH.TyVarBndr ())]) -> MetaM (Core (M r)) )
+                       -> MetaM (Core (M r))
+withOuterForallBinders tv_outer thing_inside =
+  addHsTyVarBinds FreshNamesOnly tv_bndrs $ \tvs' ->
+  do { elt_ty <- wrapName tyVarBndrUnitTyConName
+     ; let !tvs'' = case tv_outer of
+              HsOuterImplicit {} -> coreNothing' (mkListTy elt_ty)
+              HsOuterExplicit {} -> coreJust'    (mkListTy elt_ty) tvs'
+     ; thing_inside tvs'' }
+  where
+    tv_bndrs :: [LHsTyVarBndr () GhcRn]
+    tv_bndrs = fmap (fmap $ setHsTyVarBndrFlag ()) -- set visibility flag to ()
+             $ hsOuterTyVarBndrs tv_outer
 
 repTyFamInstD :: TyFamInstDecl GhcRn -> MetaM (Core (M TH.Dec))
 repTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
@@ -2566,9 +2583,10 @@ repTySyn (MkC nm) (MkC tvs) (MkC rhs)
   = rep2 tySynDName [nm, tvs, rhs]
 
 repInst :: Core (Maybe TH.Overlap) ->
+           Core (Maybe [M (TH.TyVarBndr ())]) ->
            Core (M TH.Cxt) -> Core (M TH.Type) -> Core [(M TH.Dec)] -> MetaM (Core (M TH.Dec))
-repInst (MkC o) (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceWithOverlapDName
-                                                              [o, cxt, ty, ds]
+repInst (MkC o) (MkC tvs) (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceWithAllDName
+                                                              [o, tvs, cxt, ty, ds]
 
 repDerivStrategy :: Maybe (LDerivStrategy GhcRn)
                  -> (Core (Maybe (M TH.DerivStrategy)) -> MetaM (Core (M a)))
@@ -2625,10 +2643,12 @@ repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
   = rep2 classDName [cxt, cls, tvs, fds, ds]
 
 repDeriv :: Core (Maybe (M TH.DerivStrategy))
-         -> Core (M TH.Cxt) -> Core (M TH.Type)
+         -> Core (Maybe [M (TH.TyVarBndr ())])
+         -> Core (M TH.Cxt)
+         -> Core (M TH.Type)
          -> MetaM (Core (M TH.Dec))
-repDeriv (MkC ds) (MkC cxt) (MkC ty)
-  = rep2 standaloneDerivWithStrategyDName [ds, cxt, ty]
+repDeriv (MkC ds) (MkC tvs) (MkC cxt) (MkC ty)
+  = rep2 standaloneDerivWithAllDName [ds, tvs, cxt, ty]
 
 repPragInl :: Core TH.Name -> Core TH.Inline -> Core TH.RuleMatch
            -> Core TH.Phases -> MetaM (Core (M TH.Dec))

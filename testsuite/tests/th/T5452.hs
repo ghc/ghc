@@ -11,8 +11,8 @@ class D (f :: Type -> Type)
 instance C ((,) Int)
 
 $(do { ClassI _ [inst_dec] <- reify ''C
-     ; let InstanceD o cxt (AppT _ ty) _ = inst_dec
-     ; return [InstanceD o cxt
+     ; let InstanceD o tvs cxt (AppT _ ty) _ = inst_dec
+     ; return [InstanceD o tvs cxt
                          (foldl AppT (ConT ''D) [ty]) 
                          []
               ] })

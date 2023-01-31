@@ -1,0 +1,46 @@
+T21794.hs:(19,2)-(35,6): Splicing declarations
+    [d| type ForAllA1 :: TConstraint -> Constraint
+        type ForAllA2 :: TConstraint -> Constraint
+        
+        data P = L | R
+        data T (a :: P)
+          where
+            A :: T a
+            B :: T R
+        type TConstraint = forall a. T a -> Constraint
+        class (forall a. constr @a A) => ForAllA1 constr
+        class (forall a. constr @a A) => ForAllA2 constr
+        
+        instance forall (constr :: TConstraint). (forall a. constr @a A) =>
+                                                 ForAllA1 constr
+        
+        deriving anyclass instance forall (constr :: TConstraint). (forall a.
+                                                                    constr @a A) =>
+                                                                   ForAllA2 constr |]
+  ======>
+    data P = L | R
+    data T (a :: P)
+      where
+        A :: T a
+        B :: T 'R
+    type TConstraint = forall a. T a -> Constraint
+    type ForAllA1 :: TConstraint -> Constraint
+    class (forall a. constr @a 'A) => ForAllA1 constr
+    instance forall (constr :: TConstraint). (forall a.
+                                              constr @a 'A) =>
+                                             ForAllA1 constr
+    type ForAllA2 :: TConstraint -> Constraint
+    class (forall a. constr @a 'A) => ForAllA2 constr
+    deriving anyclass instance forall (constr :: TConstraint). (forall a.
+                                                                constr @a 'A) =>
+                                                               ForAllA2 constr
+T21794.hs:(38,2)-(43,6): Splicing declarations
+    [d| type C :: forall {k} {l}. k -> l -> Constraint
+        
+        class C a b
+        
+        instance forall k (a :: k) (b :: Type). C a k |]
+  ======>
+    type C :: forall {k} {l}. k -> l -> Constraint
+    class C a b
+    instance forall k (a :: k) (b :: Type). C a k

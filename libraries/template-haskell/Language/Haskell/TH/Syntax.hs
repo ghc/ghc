@@ -2409,8 +2409,8 @@ data Dec
   | TySynD Name [TyVarBndr ()] Type -- ^ @{ type T x = (x,x) }@
   | ClassD Cxt Name [TyVarBndr ()]
          [FunDep] [Dec]           -- ^ @{ class Eq a => Ord a where ds }@
-  | InstanceD (Maybe Overlap) Cxt Type [Dec]
-                                  -- ^ @{ instance {\-\# OVERLAPS \#-\}
+  | InstanceD (Maybe Overlap) (Maybe [TyVarBndr ()]) Cxt Type [Dec]
+                                  -- ^ @{ instance {\-\# OVERLAPS \#-\} forall w .
                                   --        Show w => Show [w] where ds }@
   | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
   | KiSigD Name Kind              -- ^ @{ type TypeRep :: k -> Type }@
@@ -2451,8 +2451,8 @@ data Dec
        -- ^ @{ type family F a b = (r :: *) | r -> a where ... }@
 
   | RoleAnnotD Name [Role]     -- ^ @{ type role T nominal representational }@
-  | StandaloneDerivD (Maybe DerivStrategy) Cxt Type
-       -- ^ @{ deriving stock instance Ord a => Ord (Foo a) }@
+  | StandaloneDerivD (Maybe DerivStrategy) (Maybe [TyVarBndr ()]) Cxt Type
+       -- ^ @{ deriving stock instance forall a. Ord a => Ord (Foo a) }@
   | DefaultSigD Name Type      -- ^ @{ default size :: Data a => a -> Int }@
 
   -- | Pattern Synonyms

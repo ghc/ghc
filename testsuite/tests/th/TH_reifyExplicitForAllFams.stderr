@@ -3,7 +3,7 @@ data instance forall (a_1 :: *). TH_reifyExplicitForAllFams.F (GHC.Maybe.Maybe a
     = TH_reifyExplicitForAllFams.MkF a_1
 class TH_reifyExplicitForAllFams.C (a_0 :: *)
     where {type TH_reifyExplicitForAllFams.G (a_0 :: *) (b_1 :: *) :: *}
-instance TH_reifyExplicitForAllFams.C [a_2]
+instance forall (a_2 :: *). TH_reifyExplicitForAllFams.C [a_2]
 type family TH_reifyExplicitForAllFams.G (a_0 :: *) (b_1 :: *) :: *
 type instance forall (a_2 :: *)
                      (b_3 :: *). TH_reifyExplicitForAllFams.G [a_2]

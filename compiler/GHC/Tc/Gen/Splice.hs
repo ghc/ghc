@@ -2470,14 +2470,17 @@ reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
                    -> ClsInst -> TcM TH.Dec
 reifyClassInstance is_poly_tvs i
-  = do { cxt <- reifyCxt theta
+  = do { th_tvs <- reifyTyVarBndrs [ Bndr tv () | tv <- tvs ]
+           -- Quantified type variables in an instance are always
+           -- invisible and specified.
+       ; cxt <- reifyCxt theta
        ; let vis_types = filterOutInvisibleTypes cls_tc types
        ; thtypes <- reifyTypes vis_types
        ; annot_thtypes <- zipWith3M annotThType is_poly_tvs vis_types thtypes
        ; let head_ty = mkThAppTs (TH.ConT (reifyName cls)) annot_thtypes
-       ; return $ (TH.InstanceD over cxt head_ty []) }
+       ; return $ (TH.InstanceD over (Just th_tvs) cxt head_ty []) }
   where
-     (_tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
+     (tvs, theta, cls, types) = tcSplitDFunTy (idType dfun)
      cls_tc   = classTyCon cls
      dfun     = instanceDFunId i
      over     = case overlapMode (is_flag i) of

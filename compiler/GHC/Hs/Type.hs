@@ -61,7 +61,8 @@ module GHC.Hs.Type (
 
         mkAnonWildCardTy, pprAnonWildCard,
 
-        hsOuterTyVarNames, hsOuterExplicitBndrs, mapHsOuterImplicit,
+        hsOuterTyVarNames, hsOuterTyVarBndrs,
+        hsOuterExplicitBndrs, mapHsOuterImplicit,
         mkHsOuterImplicit, mkHsOuterExplicit,
         mkHsImplicitSigType, mkHsExplicitSigType,
         mkHsWildCardBndrs, mkHsPatSigType,
@@ -106,7 +107,7 @@ import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
 import GHC.Types.Name( Name, NamedThing(getName), tcName, dataName )
 import GHC.Types.Name.Reader ( RdrName )
-import GHC.Types.Var ( VarBndr, visArgTypeLike )
+import GHC.Types.Var ( VarBndr(..), visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
@@ -236,6 +237,11 @@ dropWildCards sig_ty = hswc_body sig_ty
 hsOuterTyVarNames :: HsOuterTyVarBndrs flag GhcRn -> [Name]
 hsOuterTyVarNames (HsOuterImplicit{hso_ximplicit = imp_tvs}) = imp_tvs
 hsOuterTyVarNames (HsOuterExplicit{hso_bndrs = bndrs})       = hsLTyVarNames bndrs
+
+hsOuterTyVarBndrs :: HsOuterTyVarBndrs Specificity GhcRn -> [LHsTyVarBndr Specificity GhcRn]
+hsOuterTyVarBndrs (HsOuterImplicit{hso_ximplicit = imp_tvs})
+  = [ noLocA $ UserTyVar noAnn SpecifiedSpec (noLocA tv) | tv <- imp_tvs ]
+hsOuterTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) = bndrs
 
 hsOuterExplicitBndrs :: HsOuterTyVarBndrs flag (GhcPass p)
                      -> [LHsTyVarBndr flag (NoGhcTc (GhcPass p))]
@@ -765,7 +771,7 @@ splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
 -- @forall <tvs>. context => instance_head@) into its constituent parts.
--- Note that the @[Name]@s returned correspond to either:
+-- Note that the @HsOuterTyVarBndrs@s returned correspond to either:
 --
 -- * The implicitly bound type variables (if the type lacks an outermost
 --   @forall@), or
@@ -777,9 +783,11 @@ splitLHsQualTy_KP body = (Nothing, body)
 -- See @Note [No nested foralls or contexts in instance types]@
 -- for why this is important.
 splitLHsInstDeclTy :: LHsSigType GhcRn
-                   -> ([Name], Maybe (LHsContext GhcRn), LHsType GhcRn)
+                   -> ( HsOuterTyVarBndrs Specificity GhcRn
+                      , Maybe (LHsContext GhcRn)
+                      , LHsType GhcRn)
 splitLHsInstDeclTy (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = inst_ty})) =
-  (hsOuterTyVarNames outer_bndrs, mb_cxt, body_ty)
+  (outer_bndrs, mb_cxt, body_ty)
   where
     (mb_cxt, body_ty) = splitLHsQualTy_KP inst_ty
 

@@ -26,6 +26,16 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The constructors ``InstanceD`` and ``StandaloneDerivD`` now take one extra
+  argument, of type ``Maybe (TyVarBndr ())``, in order to handle
+  instances with user-written quantification, such as: ::
+
+    instance forall k (a :: k). C a
+    deriving instance forall k (a :: k). D a
+
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

@@ -97,10 +97,9 @@ pprPatSynType :: PatSynType -> Doc
 pprPatSynType ty@(ForallT uniTys reqs ty'@(ForallT exTys provs ty''))
   | null exTys,  null provs = ppr (ForallT uniTys reqs ty'')
   | null uniTys, null reqs  = noreqs <+> ppr ty'
-  | null reqs               = pprForallBndrs uniTys <+> noreqs <+> ppr ty'
+  | null reqs               = ppr_invis_forall_bndrs uniTys <+> noreqs <+> ppr ty'
   | otherwise               = ppr ty
   where noreqs = text "() =>"
-        pprForallBndrs tvs = text "forall" <+> hsep (map ppr tvs) <+> text "."
 pprPatSynType ty            = ppr ty
 
 ------------------------------
@@ -404,9 +403,13 @@ ppr_dec _ (TypeDataD t xs ksig cs)
 ppr_dec _  (ClassD ctxt c xs fds ds)
   = text "class" <+> pprCxt ctxt <+> ppr c <+> hsep (map ppr xs) <+> ppr fds
     $$ where_clause ds
-ppr_dec _ (InstanceD o ctxt i ds) =
-        text "instance" <+> maybe empty ppr_overlap o <+> pprCxt ctxt <+> ppr i
-                                  $$ where_clause ds
+ppr_dec _ (InstanceD o tvs ctxt i ds)
+  =   text "instance"
+  <+> maybe empty ppr_overlap o
+  <+> maybe empty ppr_invis_forall_bndrs tvs
+  <+> pprCxt ctxt
+  <+> ppr i
+  $$ where_clause ds
 ppr_dec _ (SigD f t)    = pprPrefixOcc f <+> dcolon <+> ppr t
 ppr_dec _ (KiSigD f k)  = text "type" <+> pprPrefixOcc f <+> dcolon <+> ppr k
 ppr_dec _ (ForeignD f)  = ppr f
@@ -452,10 +455,11 @@ ppr_dec _ (ClosedTypeFamilyD tfhead eqns)
       = ppr_bndrs mb_bndrs <+> ppr lhs <+> text "=" <+> ppr rhs
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
-ppr_dec _ (StandaloneDerivD ds cxt ty)
+ppr_dec _ (StandaloneDerivD ds tvs cxt ty)
   = hsep [ text "deriving"
          , maybe empty ppr_deriv_strategy ds
          , text "instance"
+         , maybe empty ppr_invis_forall_bndrs tvs
          , pprCxt cxt
          , ppr ty ]
 ppr_dec _ (DefaultSigD n ty)
@@ -472,6 +476,13 @@ ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
 ppr_dec _ (ImplicitParamBindD n e)
   = hsep [text ('?' : n), text "=", ppr e]
+
+ppr_invis_forall_bndrs :: Ppr a => [a] -> Doc
+ppr_invis_forall_bndrs bndrs
+  | null bndrs
+  = empty
+  | otherwise
+  = text "forall" <+> fsep (map ppr bndrs) <> char '.'
 
 ppr_deriv_strategy :: DerivStrategy -> Doc
 ppr_deriv_strategy ds =
@@ -565,7 +576,7 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
              | otherwise          = empty
 
 ppr_bndrs :: PprFlag flag => Maybe [TyVarBndr flag] -> Doc
-ppr_bndrs (Just bndrs) = text "forall" <+> sep (map ppr bndrs) <> text "."
+ppr_bndrs (Just bndrs) = ppr_invis_forall_bndrs bndrs
 ppr_bndrs Nothing = empty
 
 ------------------------------
@@ -623,17 +634,12 @@ instance Ppr Pragma where
        = text "{-# SPECIALISE instance" <+> ppr inst <+> text "#-}"
     ppr (RuleP n ty_bndrs tm_bndrs lhs rhs phases)
        = sep [ text "{-# RULES" <+> pprString n <+> ppr phases
-             , nest 4 $ ppr_ty_forall ty_bndrs <+> ppr_tm_forall ty_bndrs
-                                               <+> ppr lhs
+             , nest 4 $ maybe empty ppr_invis_forall_bndrs ty_bndrs
+                     <+> ppr_tm_forall ty_bndrs
+                     <+> ppr lhs
              , nest 4 $ char '=' <+> ppr rhs <+> text "#-}" ]
-      where ppr_ty_forall Nothing      = empty
-            ppr_ty_forall (Just bndrs) = text "forall"
-                                         <+> fsep (map ppr bndrs)
-                                         <+> char '.'
-            ppr_tm_forall Nothing | null tm_bndrs = empty
-            ppr_tm_forall _ = text "forall"
-                              <+> fsep (map ppr tm_bndrs)
-                              <+> char '.'
+      where ppr_tm_forall Nothing | null tm_bndrs = empty
+            ppr_tm_forall _ = ppr_invis_forall_bndrs tm_bndrs
     ppr (AnnP tgt expr)
        = text "{-# ANN" <+> target1 tgt <+> ppr expr <+> text "#-}"
       where target1 ModuleAnnotation    = text "module"

@@ -308,13 +308,17 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                               -- no docs in TH ^^
         }
 
-cvtDec (InstanceD o ctxt ty decs)
+cvtDec (InstanceD o tv_bndrs ctxt ty decs)
   = do  { (binds', sigs', fams', ats', adts') <- cvt_ci_decs InstanceDecl decs
         ; for_ (nonEmpty fams') $ \ bad_fams ->
             failWith (IllegalDeclaration InstanceDecl $ IllegalFamDecls bad_fams)
+        ; tv_bndrs' <- traverse (cvtTvs . map mk_spec) tv_bndrs
         ; ctxt' <- cvtContext funPrec ctxt
         ; (L loc ty') <- cvtType ty
-        ; let inst_ty' = L loc $ mkHsImplicitSigType $
+        ; let mk_sig_type = case tv_bndrs' of
+                              Nothing  -> mkHsImplicitSigType
+                              Just tvs -> mkHsExplicitSigType noAnn tvs
+        ; let inst_ty' = L loc $ mk_sig_type $
                          mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustLA $ InstD noExtField $ ClsInstD noExtField $
           ClsInstDecl { cid_ext = (noAnn, NoAnnSortKey), cid_poly_ty = inst_ty'
@@ -411,11 +415,15 @@ cvtDec (TH.RoleAnnotD tc roles)
        ; returnJustLA
                    $ Hs.RoleAnnotD noExtField (RoleAnnotDecl noAnn tc' roles') }
 
-cvtDec (TH.StandaloneDerivD ds cxt ty)
-  = do { cxt' <- cvtContext funPrec cxt
+cvtDec (TH.StandaloneDerivD ds tv_bndrs cxt ty)
+  = do { tv_bndrs' <- traverse (cvtTvs . map mk_spec) tv_bndrs
+       ; cxt' <- cvtContext funPrec cxt
        ; ds'  <- traverse cvtDerivStrategy ds
        ; (L loc ty') <- cvtType ty
-       ; let inst_ty' = L loc $ mkHsImplicitSigType $
+       ; let mk_sig_type = case tv_bndrs' of
+                             Nothing  -> mkHsImplicitSigType
+                             Just tvs -> mkHsExplicitSigType noAnn tvs
+       ; let inst_ty' = L loc $ mk_sig_type $
                         mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustLA $ DerivD noExtField $
          DerivDecl { deriv_ext = noAnn
@@ -1501,6 +1509,9 @@ cvt_tv (TH.KindedTV nm fl ki)
        ; let fl' = cvtFlag fl
        ; ki' <- cvtKind ki
        ; returnLA $ KindedTyVar noAnn fl' nm' ki' }
+
+mk_spec :: TH.TyVarBndr () -> TH.TyVarBndr TH.Specificity
+mk_spec = fmap $ const TH.SpecifiedSpec
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal

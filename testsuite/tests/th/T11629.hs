@@ -21,8 +21,8 @@ instance E '[True, False]
 instance E '[False, True]
 
 do
-  let getType (InstanceD _ _ ty _) = ty
-      getType _                    = error "getType: only defined for InstanceD"
+  let getType (InstanceD _ _ _ ty _) = ty
+      getType _                      = error "getType: only defined for InstanceD"
 
       failMsg a ty1 ty2 = fail $ "example " ++ a
         ++ ": ty1 /= ty2, where\n ty1 = "

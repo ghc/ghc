@@ -2,11 +2,21 @@
 
 ## 2.20.0.0
 
-  * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 
+  * The `Ppr.pprInfixT` function has gained a `Precedence` argument.
+
   * The values of named precedence levels like `Ppr.appPrec` have changed.
 
   * Add `TypeDataD` constructor to the `Dec` type for `type data`
     declarations (GHC proposal #106).
+
+  * The constructors `InstanceD` and `StandaloneDerivD` now take one extra
+    argument, of type `Maybe (TyVarBndr ())`, in order to handle
+    instances with user-written quantification, such as:
+
+    ```
+    instance forall k (a :: k). C a
+    deriving instance forall k (a :: k). D a
+    ```
 
 ## 2.19.0.0
 
