@@ -42,8 +42,8 @@ instance Eq StackSnapshot where
   (StackSnapshot s1#) == (StackSnapshot s2#) = isTrue# (((unsafeCoerce# s1#) :: Word#) `eqWord#` ((unsafeCoerce# s2#) :: Word#))
 
 -- TODO: Show and Eq instances are mainly here to fulfill Closure deriving requirements
-instance Show StackSnapshot where
-  show _ = "StackSnapshot"
+-- instance Show StackSnapshot where
+--   show _ = "StackSnapshot"
 
 foreign import prim "stg_decodeStackzh" decodeStack# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Array# (Ptr InfoProvEnt) #)
 

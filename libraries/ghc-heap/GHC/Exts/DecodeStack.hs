@@ -18,6 +18,7 @@
 -- TODO: Find better place than top level. Re-export from top-level?
 module GHC.Exts.DecodeStack
   ( decodeStack,
+    unpackStackFrameIter
   )
 where
 
@@ -150,10 +151,7 @@ getInfoTable StackFrameIter {..} =
   let infoTablePtr = Ptr (getInfoTableAddr# stackSnapshot# (wordOffsetToWord# index))
    in peekItbl infoTablePtr
 
-data StackFrameIter = StackFrameIter
-  { stackSnapshot# :: StackSnapshot#,
-    index :: WordOffset
-  }
+foreign import prim "getBoxedClosurezh" getBoxedClosure# :: StackSnapshot# -> Word# -> Any
 
 -- -- TODO: Remove this instance (debug only)
 -- instance Show StackFrameIter where
@@ -161,23 +159,22 @@ data StackFrameIter = StackFrameIter
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
-stackHead (StackSnapshot s) = StackFrameIter s 0 -- GHC stacks are never empty
+stackHead (StackSnapshot s) = StackFrameIter s 0 False -- GHC stacks are never empty
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
 advanceStackFrameIter (StackFrameIter {..}) =
   let !(# s', i', hasNext #) = advanceStackFrameIter# stackSnapshot# (wordOffsetToWord# index)
    in if (I# hasNext) > 0
-        then Just $ StackFrameIter s' (primWordToWordOffset i')
+        then Just $ StackFrameIter s' (primWordToWordOffset i') False
         else Nothing
 
 primWordToWordOffset :: Word# -> WordOffset
 primWordToWordOffset w# = fromIntegral (W# w#)
 
+-- TODO: can be just StackFrameIter
 data BitmapEntry = BitmapEntry
-  { closureFrame :: StackFrameIter,
-    isPrimitive :: Bool
-  }
+  { closureFrame :: StackFrameIter }
 
 wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [BitmapEntry]
 wordsToBitmapEntries _ [] 0 = []
@@ -189,7 +186,7 @@ wordsToBitmapEntries sfi (b : bs) bitmapSize =
       mbLastFrame = fmap closureFrame mbLastEntry
    in case mbLastFrame of
         Just (StackFrameIter {..}) ->
-          entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) bs (subtractDecodedBitmapWord bitmapSize)
+          entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) bs (subtractDecodedBitmapWord bitmapSize)
         Nothing -> error "This should never happen! Recursion ended not in base case."
   where
     subtractDecodedBitmapWord :: Word -> Word
@@ -198,26 +195,26 @@ wordsToBitmapEntries sfi (b : bs) bitmapSize =
 toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
 toBitmapEntries _ _ 0 = []
 toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize =
+  -- TODO: overriding isPrimitive field is a bit weird. Could be calculated before
   BitmapEntry
-    { closureFrame = sfi,
-      isPrimitive = (bitmapWord .&. 1) /= 0
+    { closureFrame = sfi {
+        isPrimitive = (bitmapWord .&. 1) /= 0
+        }
     }
-    : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1)) (bitmapWord `shiftR` 1) (bSize - 1)
+    : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: BitmapEntry -> Box
 toBitmapPayload e
-  | isPrimitive e =
-      let !b = (UnknownTypeWordSizedPrimitive . derefStackWord . closureFrame) e
-       in DecodedBox b
+  | (isPrimitive . closureFrame) e = trace "PRIM" $ StackFrameBox $ (closureFrame e) {
+                                      isPrimitive = True
+                                     }
 toBitmapPayload e = getClosure (closureFrame e) 0
 
 getClosure :: StackFrameIter -> WordOffset -> Box
 getClosure StackFrameIter {..} relativeOffset =
-  -- TODO: What happens if the GC kicks in here?
-  let offset = wordOffsetToWord# (index + relativeOffset)
-      !ptr = (getAddr# stackSnapshot# offset)
-      !a :: Any = unsafeCoerce# ptr
-   in Box a
+  let !c = (getBoxedClosure# stackSnapshot# (wordOffsetToWord# (index + relativeOffset)))
+  in
+      Box c
 
 decodeLargeBitmap :: (StackSnapshot# -> Word# -> (# ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> [Box]
 decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
@@ -227,7 +224,7 @@ decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset =
 
 decodeBitmaps :: StackFrameIter -> WordOffset -> [Word] -> Word -> [Box]
 decodeBitmaps (StackFrameIter {..}) relativePayloadOffset bitmapWords size =
-  let bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset)) bitmapWords size
+  let bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset) False) bitmapWords size
    in map toBitmapPayload bes
 
 decodeSmallBitmap :: (StackSnapshot# -> Word# -> (# Word#, Word# #)) -> StackFrameIter -> WordOffset -> [Box]
@@ -248,11 +245,13 @@ byteArrayToList bArray = go 0
 wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 
-unpackStackFrameIter :: StackFrameIter -> IO Box
+unpackStackFrameIter :: StackFrameIter -> IO Closure
+unpackStackFrameIter sfi | isPrimitive sfi = pure $ UnknownTypeWordSizedPrimitive (getWord sfi 0)
 unpackStackFrameIter sfi = do
   info <- getInfoTable sfi
-  let c = unpackStackFrameIter' info
-  pure $ DecodedBox c
+  traceM $ "unpackStackFrameIter - sfi " ++ show sfi
+  traceM $ "unpackStackFrameIter - unpacked " ++ show (unpackStackFrameIter' info)
+  pure $ unpackStackFrameIter' info
   where
     unpackStackFrameIter' :: StgInfoTable -> Closure
     unpackStackFrameIter' info =
@@ -265,6 +264,7 @@ unpackStackFrameIter sfi = do
               bcoArgs = decodeLargeBitmap getBCOLargeBitmap# sfi (offsetStgClosurePayload + 1)
             }
         RET_SMALL ->
+          trace "RET_SMALL" $
           RetSmall
             { info = info,
               knownRetSmallType = getRetSmallSpecialType sfi,
@@ -338,17 +338,15 @@ toInt# (I# i) = i
 intToWord# :: Int -> Word#
 intToWord# i = int2Word# (toInt# i)
 
-decodeStack :: StackSnapshot -> IO Closure
-decodeStack s = do
-  stack <- decodeStack' s
-  pure $ SimpleStack stack
+decodeStack :: StackSnapshot -> Closure
+decodeStack = SimpleStack . decodeStack'
 
-decodeStack' :: StackSnapshot -> IO [Box]
-decodeStack' s = unpackStackFrameIter (stackHead s) >>= \frame -> (frame :) <$> go (advanceStackFrameIter (stackHead s))
+decodeStack' :: StackSnapshot -> [Box]
+decodeStack' s = StackFrameBox (stackHead s) : go (advanceStackFrameIter (stackHead s))
   where
-    go :: Maybe StackFrameIter -> IO [Box]
-    go Nothing = pure []
-    go (Just sfi) = (trace "decode\n" (unpackStackFrameIter sfi)) >>= \frame -> (frame :) <$> go (advanceStackFrameIter sfi)
+    go :: Maybe StackFrameIter -> [Box]
+    go Nothing = []
+    go (Just sfi) = (StackFrameBox sfi) : go (advanceStackFrameIter sfi)
 #else
 module GHC.Exts.DecodeStack where
 #endif

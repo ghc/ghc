@@ -7,6 +7,10 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
+#if MIN_TOOL_VERSION_ghc(9,5,0)
+{-# LANGUAGE RecordWildCards #-}
+#endif
 {-# LANGUAGE UnliftedFFITypes #-}
 
 {-|
@@ -53,6 +57,7 @@ module GHC.Exts.Heap (
      -- * Closure inspection
     , getBoxedClosureData
     , allClosures
+    , closureSize
 
     -- * Boxes
     , Box(..)
@@ -77,6 +82,9 @@ import GHC.Word
 #if MIN_TOOL_VERSION_ghc(9,5,0)
 import GHC.Stack.CloneStack
 import GHC.Exts.DecodeStack
+import GHC.Exts.StackConstants
+import Data.Functor
+import Debug.Trace
 #endif
 
 
@@ -135,7 +143,7 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
 
 #if MIN_TOOL_VERSION_ghc(9,5,0)
 instance {-# OVERLAPPING #-} HasHeapRep StackSnapshot# where
-    getClosureData s# = decodeStack (StackSnapshot s#)
+    getClosureData s# = pure $ decodeStack (StackSnapshot s#)
 #endif
 
 -- | Get the heap representation of a closure _at this moment_, even if it is
@@ -174,7 +182,31 @@ getClosureDataFromHeapObject x = do
 
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
-getBoxedClosureData (Box a) = getClosureData a
+getBoxedClosureData (Box a) = let !a' = a
+                              in getClosureData a'
 #if MIN_TOOL_VERSION_ghc(9,5,0)
-getBoxedClosureData (DecodedBox a) = pure a
+getBoxedClosureData b@(StackFrameBox sfi) = trace ("unpack " ++ show b) $ unpackStackFrameIter sfi
+#endif
+
+-- | Get the size of the top-level closure in words.
+-- Includes header and payload. Does not follow pointers.
+--
+-- @since 8.10.1
+closureSize :: Box -> IO Int
+closureSize (Box x) = pure $ I# (closureSize# x)
+#if MIN_VERSION_base(4,17,0)
+closureSize (StackFrameBox sfi) = unpackStackFrameIter sfi <&>
+  \c ->
+    case c of
+      UpdateFrame {} -> sizeStgUpdateFrame
+      CatchFrame {} -> sizeStgCatchFrame
+      CatchStmFrame {} -> sizeStgCatchSTMFrame
+      CatchRetryFrame {} -> sizeStgCatchRetryFrame
+      AtomicallyFrame {} -> sizeStgAtomicallyFrame
+      RetSmall {..} -> sizeStgClosure + length payload
+      RetBig {..} -> sizeStgClosure + length payload
+      RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
+      -- The one additional word is a pointer to the StgBCO in the closure's payload
+      RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
+      _ -> error "Unexpected closure type"
 #endif

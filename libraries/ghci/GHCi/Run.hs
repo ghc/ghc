@@ -97,7 +97,7 @@ run m = case m of
     mapM (\case
              Heap.Box x -> mkRemoteRef (HValue x)
              -- TODO: Is this unsafeCoerce really necessary?
-             Heap.DecodedBox d -> mkRemoteRef (HValue (unsafeCoerce d))
+             Heap.StackFrameBox d -> mkRemoteRef (HValue (unsafeCoerce d))
          ) clos
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref

@@ -62,6 +62,7 @@ checkSmallBitmap( StgPtr payload, StgWord bitmap, uint32_t size )
 {
     uint32_t i;
 
+    debugBelch("checkSmallBitmap - payload %p , bitmap %lu, size %u\n", payload, bitmap, size);
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
         if ((bitmap & 1) == 0) {
             checkClosureShallow((StgClosure *)payload[i]);
@@ -1324,5 +1325,9 @@ memInventory (bool show)
 
 }
 
-
+//TODO: Remove after debugging
+#else
+void
+checkSTACK (StgStack *stack){}
+void checkSanity (bool after_gc, bool major_gc){}
 #endif /* DEBUG */

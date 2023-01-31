@@ -29,8 +29,8 @@ import Unsafe.Coerce (unsafeCoerce)
 
 getDecodedStack :: IO (StackSnapshot, [Closure])
 getDecodedStack = do
-  s <- cloneMyStack
-  (SimpleStack cs) <- decodeStack s
+  s@(StackSnapshot s#) <- cloneMyStack
+  (SimpleStack cs) <- getClosureData s#
   unboxedCs <- mapM getBoxedClosureData cs
   pure (s, unboxedCs)
 

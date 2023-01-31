@@ -247,6 +247,7 @@ extern void checkSTACK(StgStack *stack);
 
 StgStack *setup(Capability *cap, StgWord closureSizeWords,
                 void (*f)(Capability *, StgStack *, StgWord)) {
+  checkSanity(1, 1);
   StgWord totalSizeWords =
       sizeofW(StgStack) + closureSizeWords + MIN_STACK_WORDS;
   StgStack *stack = (StgStack *)allocate(cap, totalSizeWords);
@@ -270,6 +271,7 @@ StgStack *setup(Capability *cap, StgWord closureSizeWords,
   // Make a sanitiy check to find unsound closures before the GC and the decode
   // code.
   checkSTACK(stack);
+  checkSanity(1, 1);
   return stack;
 }
 

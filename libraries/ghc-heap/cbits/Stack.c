@@ -1,5 +1,6 @@
 #include "MachDeps.h"
 #include "Rts.h"
+#include "RtsAPI.h"
 #include "rts/Messages.h"
 #include "rts/Types.h"
 #include "rts/storage/ClosureTypes.h"
@@ -199,9 +200,11 @@ static StgArrBytes *largeBitmapToStgArrBytes(Capability *cap, StgLargeBitmap *bi
 
 StgArrBytes *getLargeBitmap(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
-
+  debugBelch("getLargeBitmap %p \n", c);
   const StgInfoTable *info = get_itbl(c);
+  debugBelch("getLargeBitmap tipe %ul \n", info->type);
   StgLargeBitmap *bitmap = GET_LARGE_BITMAP(info);
+  debugBelch("getLargeBitmap size %lu \n", bitmap->size);
 
   return largeBitmapToStgArrBytes(cap, bitmap);
 }
@@ -238,4 +241,13 @@ StgWord getRetFunType(StgRetFun *ret_fun) {
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   return fun_info->f.fun_type;
+}
+
+RTS_INFO(box_info);
+StgClosure* getBoxedClosure(Capability *cap, StgClosure **c){
+//  StgClosure *box = (StgClosure*) allocate(cap, sizeofW(StgClosure) + 1);
+//  SET_HDR(box, &box_info, CCS_SYSTEM);
+//  box->payload[0] = *c;
+//  return box;
+  return *c;
 }

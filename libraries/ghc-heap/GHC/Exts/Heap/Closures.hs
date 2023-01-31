@@ -19,12 +19,14 @@ module GHC.Exts.Heap.Closures (
     , SpecialRetSmall(..)
     , RetFunType(..)
     , allClosures
-    , closureSize
 
     -- * Boxes
     , Box(..)
     , areBoxesEqual
     , asBox
+#if MIN_VERSION_base(4,17,0)
+    , StackFrameIter(..)
+#endif
     ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -55,6 +57,7 @@ import Numeric
 import GHC.Stack.CloneStack (StackSnapshot(..))
 import GHC.Exts.StackConstants
 import Unsafe.Coerce (unsafeCoerce)
+import Data.Functor
 #endif
 
 ------------------------------------------------------------------------
@@ -65,14 +68,40 @@ foreign import prim "aToWordzh" aToWord# :: Any -> Word#
 foreign import prim "reallyUnsafePtrEqualityUpToTag"
     reallyUnsafePtrEqualityUpToTag# :: Any -> Any -> Int#
 
+#if MIN_VERSION_base(4,17,0)
+foreign import prim "stackSnapshotToWordzh" stackSnapshotToWord# :: StackSnapshot# -> Word#
+
+foreign import prim "eqStackSnapshotszh" eqStackSnapshots# :: StackSnapshot# -> StackSnapshot# -> Word#
+#endif
 -- | An arbitrary Haskell value in a safe Box. The point is that even
 -- unevaluated thunks can safely be moved around inside the Box, and when
 -- required, e.g. in 'getBoxedClosureData', the function knows how far it has
 -- to evaluate the argument.
 #if MIN_VERSION_base(4,17,0)
-data Box = Box Any | DecodedBox Closure
+data StackFrameIter = StackFrameIter
+  { stackSnapshot# :: !StackSnapshot#,
+    index :: !WordOffset,
+    -- TODO: could be a sum type to prevent boolean-blindness
+    isPrimitive :: !Bool
+  }
 
+instance Show StackFrameIter where
+   showsPrec _ (StackFrameIter s# i p) rs =
+    -- TODO: Record syntax could be nicer to read
+    "StackFrameIter(" ++ pad_out (showHex addr "") ++ ", " ++ show i ++ ", " ++ show p ++ ")" ++ rs
+     where
+        addr  = W# (stackSnapshotToWord# s#)
+        pad_out ls = '0':'x':ls
 
+instance Show StackSnapshot where
+   showsPrec _ (StackSnapshot s#) rs =
+    -- TODO: Record syntax could be nicer to read
+    "StackSnapshot(" ++ pad_out (showHex addr "") ++ ")" ++ rs
+     where
+        addr  = W# (stackSnapshotToWord# s#)
+        pad_out ls = '0':'x':ls
+
+data Box = Box Any | StackFrameBox StackFrameIter
 #else
 data Box = Box Any
 #endif
@@ -89,7 +118,9 @@ instance Show Box where
        addr = ptr - tag
        pad_out ls = '0':'x':ls
 #if MIN_VERSION_base(4,17,0)
-   showsPrec _ (DecodedBox a) rs = "(DecodedBox " ++ show a ++ ")" ++ rs
+   showsPrec _ (StackFrameBox sfi) rs =
+    -- TODO: Record syntax could be nicer to read
+    "(StackFrameBox StackFrameIter(" ++ show sfi ++ ")" ++ rs
 #endif
 
 -- | Boxes can be compared, but this is not pure, as different heap objects can,
@@ -100,9 +131,13 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
     0# -> pure False
     _  -> pure True
 #if MIN_VERSION_base(4,17,0)
-areBoxesEqual (DecodedBox a) (DecodedBox b) = areBoxesEqual
-  (Box (unsafeCoerce a))
-  (Box (unsafeCoerce b))
+-- TODO: Could be used for `instance Eq StackFrameIter`
+areBoxesEqual
+  (StackFrameBox (StackFrameIter s1# i1 p1))
+  (StackFrameBox (StackFrameIter s2# i2 p2)) = pure $
+    W# (eqStackSnapshots# s1# s2#) == 1
+    && i1 == i2
+    && p1 == p2
 areBoxesEqual _ _ = pure False
 #endif
 
@@ -600,24 +635,3 @@ allClosures (RetBCO {..}) = bco : bcoArgs
 #endif
 allClosures _ = []
 
--- | Get the size of the top-level closure in words.
--- Includes header and payload. Does not follow pointers.
---
--- @since 8.10.1
-closureSize :: Box -> Int
-closureSize (Box x) = I# (closureSize# x)
-#if MIN_VERSION_base(4,17,0)
-closureSize (DecodedBox c) = case c of
-  UpdateFrame {} -> sizeStgUpdateFrame
-  CatchFrame {} -> sizeStgCatchFrame
-  CatchStmFrame {} -> sizeStgCatchSTMFrame
-  CatchRetryFrame {} -> sizeStgCatchRetryFrame
-  AtomicallyFrame {} -> sizeStgAtomicallyFrame
-  RetSmall {..} -> sizeStgClosure + length payload
-  RetBig {..} -> sizeStgClosure + length payload
-  RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
-  -- The one additional word is a pointer to the StgBCO in the closure's payload
-  RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
-  -- TODO: What to do about other closure types?
-  _ -> error "Unexpected closure type"
-#endif
