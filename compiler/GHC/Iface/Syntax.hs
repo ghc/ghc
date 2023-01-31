@@ -80,7 +80,7 @@ import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
-import GHC.Stg.InferTags.TagSig
+import GHC.Stg.EnforceEpt.TagSig
 import GHC.Parser.Annotation (noLocA)
 import GHC.Hs.Extension ( GhcRn )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )

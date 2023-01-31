@@ -31,9 +31,6 @@ import GHC.Core.Reduction
 import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.FamInstEnv      ( FamInstEnv, topNormaliseType_maybe )
 import GHC.Core.DataCon
-   ( DataCon, dataConWorkId, dataConRepStrictness
-   , dataConRepArgTys, isUnboxedTupleDataCon
-   , StrictnessMark (..), dataConWrapId_maybe )
 import GHC.Core.Opt.Stats ( Tick(..) )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
@@ -2204,16 +2201,20 @@ zap the SubstEnv.  This is VITAL.  Consider
 We'll clone the inner \x, adding x->x' in the id_subst Then when we
 inline y, we must *not* replace x by x' in the inlined copy!!
 
-Note [Fast path for data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For applications of a data constructor worker, the full glory of
+Note [Fast path for lazy data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For applications of a /lazy/ data constructor worker, the full glory of
 rebuildCall is a waste of effort;
 * They never inline, obviously
 * They have no rewrite rules
-* They are not strict (see Note [Data-con worker strictness]
-  in GHC.Core.DataCon)
+* Lazy constructors don't need the `StrictArg` treatment.
 So it's fine to zoom straight to `rebuild` which just rebuilds the
 call in a very straightforward way.
+
+For a data constructor worker that is strict (see Note [Strict fields in Core])
+we take the slow path, so that we'll transform
+  K (case x of (a,b) -> a)  -->   case x of (a,b) -> K a
+via the StrictArg case of rebuildCall
 
 Some programs have a /lot/ of data constructors in the source program
 (compiler/perf/T9961 is an example), so this fast path can be very
@@ -2235,7 +2236,8 @@ simplVar env var
 
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
-  | isDataConWorkId var         -- See Note [Fast path for data constructors]
+  | Just dc <- isDataConWorkId_maybe var
+  , isLazyDataConRep dc                    -- See Note [Fast path for lazy data constructors]
   = rebuild env (Var var) cont
   | otherwise
   = case substId env var of
@@ -3461,7 +3463,7 @@ a case pattern.  This is *important*.  Consider
 
 We really must record that b is already evaluated so that we don't
 go and re-evaluate it when constructing the result.
-See Note [Data-con worker strictness] in GHC.Core.DataCon
+See Note [Strict fields in Core] in GHC.Core.
 
 NB: simplLamBndrs preserves this eval info
 

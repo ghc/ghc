@@ -25,7 +25,8 @@ fun3 :: a -> IO a
 fun3 x = do
   pure ()
   evaluate $! x
-  -- This should not push a continuation to the stack before entering 'x'
+  -- This ideally also should not push a continuation to the stack
+  -- before entering 'x'.
 
 funPair :: a -> IO (a, a)
 {-# OPAQUE funPair #-}

@@ -46,7 +46,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Id
 import GHC.Types.Id.Info
 
-import GHC.Stg.InferTags.TagSig
+import GHC.Stg.EnforceEpt.TagSig
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

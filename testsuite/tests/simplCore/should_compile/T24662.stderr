@@ -1,0 +1,122 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 78, types: 60, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/0}
+f1 [InlPrag=OPAQUE] :: forall a. a -> Int# -> Int -> Int
+[GblId, Arity=3, Str=<A><L><1L>, Unf=OtherCon []]
+f1
+  = \ (@a) _ [Occ=Dead] (x :: Int#) (ds1 :: Int) ->
+      case ds1 of { I# y -> GHC.Types.I# (+# x y) }
+
+-- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/0}
+f2 [InlPrag=OPAQUE] :: forall a. Int# -> a -> Int -> Int
+[GblId, Arity=3, Str=<L><A><1L>, Unf=OtherCon []]
+f2
+  = \ (@a) (x :: Int#) _ [Occ=Dead] (ds1 :: Int) ->
+      case ds1 of { I# y -> GHC.Types.I# (+# x y) }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T24662.$trModule4 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
+T24662.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T24662.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T24662.$trModule3 = GHC.Types.TrNameS T24662.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T24662.$trModule2 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
+T24662.$trModule2 = "T24662"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T24662.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T24662.$trModule1 = GHC.Types.TrNameS T24662.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T24662.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
+T24662.$trModule
+  = GHC.Types.Module T24662.$trModule3 T24662.$trModule1
+
+Rec {
+-- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
+T24662.$wloopy [InlPrag=[2], Occ=LoopBreaker] :: Int# -> Int#
+[GblId, Arity=1, Str=<L>, Unf=OtherCon []]
+T24662.$wloopy
+  = \ (ww :: Int#) ->
+      case ># ww 0# of {
+        __DEFAULT -> 0#;
+        1# -> T24662.$wloopy ww
+      }
+end Rec }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+loopy [InlPrag=[2]] :: Int -> Int#
+[GblId,
+ Arity=1,
+ Str=<1!P(L)>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x [Occ=Once1!] :: Int) ->
+                 case x of { I# ww [Occ=Once1] -> T24662.$wloopy ww }}]
+loopy = \ (x :: Int) -> case x of { I# ww -> T24662.$wloopy ww }
+
+-- RHS size: {terms: 10, types: 7, coercions: 0, joins: 0/0}
+foo2 :: Int -> (Int, Int -> Int)
+[GblId,
+ Arity=1,
+ Str=<SL>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x :: Int) ->
+                 case f2 @Bool (loopy x) GHC.Types.True of t [Occ=Once1]
+                 { __DEFAULT ->
+                 (x, t)
+                 }}]
+foo2
+  = \ (x :: Int) ->
+      case f2 @Bool (loopy x) GHC.Types.True of t { __DEFAULT -> (x, t) }
+
+-- RHS size: {terms: 10, types: 7, coercions: 0, joins: 0/0}
+foo1 :: Int -> (Int, Int -> Int)
+[GblId,
+ Arity=1,
+ Str=<SL>,
+ Cpr=1,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (x :: Int) ->
+                 case f1 @Bool GHC.Types.True (loopy x) of t [Occ=Once1]
+                 { __DEFAULT ->
+                 (x, t)
+                 }}]
+foo1
+  = \ (x :: Int) ->
+      case f1 @Bool GHC.Types.True (loopy x) of t { __DEFAULT -> (x, t) }
+
+
+

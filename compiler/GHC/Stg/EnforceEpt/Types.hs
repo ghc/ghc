@@ -5,8 +5,8 @@
 {-# LANGUAGE UndecidableInstances #-}
  -- To permit: type instance XLet 'InferTaggedBinders = XLet 'CodeGen
 
-module GHC.Stg.InferTags.Types
-    ( module GHC.Stg.InferTags.Types
+module GHC.Stg.EnforceEpt.Types
+    ( module GHC.Stg.EnforceEpt.Types
     , module TagSig)
 where
 
@@ -16,7 +16,7 @@ import GHC.Core.DataCon
 import GHC.Core.Type (isUnliftedType)
 import GHC.Types.Id
 import GHC.Stg.Syntax
-import GHC.Stg.InferTags.TagSig as TagSig
+import GHC.Stg.EnforceEpt.TagSig as TagSig
 import GHC.Types.Var.Env
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( zipWithEqual )
