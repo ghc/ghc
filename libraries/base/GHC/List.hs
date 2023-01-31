@@ -34,8 +34,8 @@ module GHC.List (
    head, last, tail, init, uncons, (!?), (!!),
    scanl, scanl1, scanl', scanr, scanr1,
    iterate, iterate', repeat, replicate, cycle,
-   take, drop, splitAt, takeWhile, dropWhile, span, break, reverse,
-   zip, zip3, zipWith, zipWith3, unzip, unzip3,
+   take, drop, splitAt, takeWhile, dropWhile, span, span', break, break',
+   reverse, zip, zip3, zipWith, zipWith3, unzip, unzip3,
    errorEmptyList,
 
    -- * GHC List fusion
@@ -1082,6 +1082,15 @@ span p xs@(x:xs')
          | p x          =  let (ys,zs) = span p xs' in (x:ys,zs)
          | otherwise    =  ([],xs)
 
+-- | span' is equivalent to span, but is strict on the recursive tuple
+span'                    :: (a -> Bool) -> [a] -> ([a],[a])
+span' _ xs@[]            =  (xs, xs)
+span' p xs@(x:xs')
+         | p x          =  let !(ys,zs) = span' p xs' in (x:ys,zs)
+         | otherwise    =  ([],xs)
+
+
+
 -- | 'break', applied to a predicate @p@ and a list @xs@, returns a tuple where
 -- first element is longest prefix (possibly empty) of @xs@ of elements that
 -- /do not satisfy/ @p@ and second element is the remainder of the list:
@@ -1104,6 +1113,14 @@ break p xs@(x:xs')
            | p x        =  ([],xs)
            | otherwise  =  let (ys,zs) = break p xs' in (x:ys,zs)
 #endif
+
+-- | break' is equivalent to break, but is strict on the recursive tuple
+break'                  :: (a -> Bool) -> [a] -> ([a],[a])
+break' _ xs@[]          =  (xs, xs)
+break' p xs@(x:xs')
+           | p x        =  ([],xs)
+           | otherwise  =  let !(ys,zs) = break' p xs' in (x:ys,zs)
+
 
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
 -- @xs@ must be finite.
