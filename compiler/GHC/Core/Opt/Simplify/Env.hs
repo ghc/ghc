@@ -8,14 +8,13 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        SimplMode(..), updMode,
-        smPedanticBottoms, smPlatform,
+        SimplMode(..), updMode, smPlatform,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
         seArityOpts, seCaseCase, seCaseFolding, seCaseMerge, seCastSwizzle,
         seDoEtaReduction, seEtaExpand, seFloatEnable, seInline, seNames,
-        seOptCoercionOpts, sePedanticBottoms, sePhase, sePlatform, sePreInline,
+        seOptCoercionOpts, sePhase, sePlatform, sePreInline,
         seRuleOpts, seRules, seUnfoldingOpts,
         mkSimplEnv, extendIdSubst, extendCvIdSubst,
         extendTvSubst, extendCvSubst,
@@ -235,9 +234,6 @@ seNames env = sm_names (seMode env)
 seOptCoercionOpts :: SimplEnv -> OptCoercionOpts
 seOptCoercionOpts env = sm_co_opt_opts (seMode env)
 
-sePedanticBottoms :: SimplEnv -> Bool
-sePedanticBottoms env = smPedanticBottoms (seMode env)
-
 sePhase :: SimplEnv -> CompilerPhase
 sePhase env = sm_phase (seMode env)
 
@@ -291,9 +287,6 @@ instance Outputable SimplMode where
              , pp_flag cc  (text "case-of-case") ])
          where
            pp_flag f s = ppUnless f (text "no") <+> s
-
-smPedanticBottoms :: SimplMode -> Bool
-smPedanticBottoms opts = ao_ped_bot (sm_arity_opts opts)
 
 smPlatform :: SimplMode -> Platform
 smPlatform opts = roPlatform (sm_rule_opts opts)

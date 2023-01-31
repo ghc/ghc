@@ -505,7 +505,7 @@ test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -
 
 # The -ddump-simpl of T22404 should have no let-bindings
 test('T22404', [only_ways(['optasm']), check_errmsg(r'let') ], compile, ['-ddump-simpl -dsuppress-uniques'])
-test('T23864', normal, compile, ['-O -dcore-lint -package ghc -Wno-gadt-mono-local-binds'])
+test('T23864', js_broken(23864), compile, ['-O -dcore-lint -package ghc -Wno-gadt-mono-local-binds'])
 test('T23938', [extra_files(['T23938A.hs'])], multimod_compile, ['T23938', '-O -v0'])
 test('T23922a', normal, compile, ['-O'])
 test('T23952', [extra_files(['T23952a.hs'])], multimod_compile, ['T23952', '-v0 -O'])
@@ -527,6 +527,7 @@ test('T24808', [ grep_errmsg(r'myFunction') ], compile, ['-O -ddump-simpl'])
 test('T24944', [extra_files(['T24944a.hs'])], multimod_compile, ['T24944', '-v0 -O2'])
 
 test('T24625', [ grep_errmsg(r'case lazy') ], compile, ['-O -fno-ignore-asserts -ddump-simpl -dsuppress-uniques'])
+test('T24662', [ grep_errmsg(r'case f') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T24725a', [ grep_errmsg(r'testedRule')], compile, ['-O -ddump-rule-firings'])
 test('T25033', normal, compile, ['-O'])
 test('T25160', normal, compile, ['-O -ddump-rules'])

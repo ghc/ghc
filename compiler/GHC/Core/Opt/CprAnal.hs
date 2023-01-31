@@ -209,7 +209,7 @@ cprAnal, cprAnal'
   -> (CprType, CoreExpr) -- ^ the updated expression and its 'CprType'
 
 cprAnal env e = -- pprTraceWith "cprAnal" (\res -> ppr (fst (res)) $$ ppr e) $
-                  cprAnal' env e
+                cprAnal' env e
 
 cprAnal' _ (Lit lit)     = (topCprType, Lit lit)
 cprAnal' _ (Type ty)     = (topCprType, Type ty)      -- Doesn't happen, in fact
@@ -296,9 +296,16 @@ data TermFlag -- Better than using a Bool
 
 -- See Note [Nested CPR]
 exprTerminates :: CoreExpr -> TermFlag
+-- ^ A /very/ simple termination analysis.
 exprTerminates e
-  | exprIsHNF e = Terminates -- A /very/ simple termination analysis.
-  | otherwise   = MightDiverge
+  | exprIsHNF e            = Terminates
+  | exprOkForSpeculation e = Terminates
+  | otherwise              = MightDiverge
+  -- Annoyingly, we have to check both for HNF and ok-for-spec.
+  --   * `I# (x# *# 2#)` is ok-for-spec, but not in HNF. Still worth CPR'ing!
+  --   * `lvl` is an HNF if its unfolding is evaluated
+  --     (perhaps `lvl = I# 0#` at top-level). But, tiresomely, it is never
+  --     ok-for-spec due to Note [exprOkForSpeculation and evaluated variables].
 
 cprAnalApp :: AnalEnv -> CoreExpr -> [(CprType, CoreArg)] -> (CprType, CoreExpr)
 -- Main function that takes care of /nested/ CPR. See Note [Nested CPR]
@@ -367,8 +374,8 @@ cprTransformDataConWork env con args
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
   , ae_rec_dc env con /= DefinitelyRecursive -- See Note [CPR for recursive data constructors]
-  -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
-  = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
+  = -- pprTraceWith "cprTransformDataConWork" (\r -> ppr con <+> ppr wkr_arity <+> ppr args <+> ppr r) $
+    CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
   | otherwise
   = topCprType
   where
@@ -505,7 +512,8 @@ cprAnalBind env id rhs
   | isDataStructure id -- Data structure => no code => no need to analyse rhs
   = (id,  rhs,  env)
   | otherwise
-  = (id `setIdCprSig` sig',       rhs', env')
+  = -- pprTrace "cprAnalBind" (ppr id <+> ppr sig <+> ppr sig')
+    (id `setIdCprSig` sig',       rhs', env')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info

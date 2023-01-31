@@ -834,7 +834,7 @@ We could still try to do C) in the future by having PAP calls which will evaluat
 before calling the partially applied function. But this would be neither a small nor simple change so we
 stick with A) and a flag for B) for now.
 
-See also Note [Tag Inference] and Note [CBV Function Ids]
+See also Note [EPT enforcement] and Note [CBV Function Ids]
 
 Note [Worker/wrapper for strict arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -860,7 +860,7 @@ happens at all.
 
 The worker `$wf` is a CBV function (see `Note [CBV Function Ids]`
 in GHC.Types.Id.Info) and the code generator guarantees that every
-call to `$wf` has a properly tagged argument (see `GHC.Stg.InferTags.Rewrite`).
+call to `$wf` has a properly tagged argument (see `GHC.Stg.EnforceEpt.Rewrite`).
 
 Is this a win?  Not always:
 * It can cause slight codesize increases. This is since we push evals to every

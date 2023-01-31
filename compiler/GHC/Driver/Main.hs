@@ -296,7 +296,7 @@ import Data.Time
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
 import GHC.Platform.Ways
-import GHC.Stg.InferTags.TagSig (seqTagSig)
+import GHC.Stg.EnforceEpt.TagSig (seqTagSig)
 import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM

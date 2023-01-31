@@ -1,13 +1,13 @@
 
 ==================== CodeGenAnal STG: ====================
 Rec {
-(InferTags004.x, <TagDunno>) = {} \u [] InferTags004.x;
+(EnforceEpt004.x, <TagDunno>) = {} \u [] EnforceEpt004.x;
 end Rec }
 
-(InferTags004.f, <TagTuple[TagDunno, TagProper]>) =
+(EnforceEpt004.f, <TagTuple[TagDunno, TagProper]>) =
     {} \r [(g, <TagDunno>)]
         case g of (g', <TagProper>) {
-        __DEFAULT -> (#,#) [InferTags004.x g'];
+        __DEFAULT -> (#,#) [EnforceEpt004.x g'];
         };
 
 

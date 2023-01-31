@@ -21,7 +21,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Stg.InferTags.TagSig (StgCgInfos)
+import GHC.Stg.EnforceEpt.TagSig (StgCgInfos)
 import GHC.StgToCmm.Types (CmmCgInfos (..))
 
 import GHC.Tc.Utils.TcType

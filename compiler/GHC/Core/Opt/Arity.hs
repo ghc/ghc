@@ -1533,7 +1533,7 @@ myExprIsCheap (AE { am_opts = opts, am_sigs = sigs }) e mb_ty
         -- See Note [Eta expanding through dictionaries]
         -- See Note [Eta expanding through CallStacks]
 
-    cheap_fun e = exprIsCheapX (myIsCheapApp sigs) e
+    cheap_fun e = exprIsCheapX (myIsCheapApp sigs) False e
 
 -- | A version of 'isCheapApp' that considers results from arity analysis.
 -- See Note [Arity analysis] for what's in the signature environment and why

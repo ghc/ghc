@@ -731,7 +731,7 @@ H2. The simplifier rewrites most case expressions scrutinizing their results.
 H3. Each evaluates its argument.  But we want to omit this eval when the
     actual argument is already evaluated and properly tagged.  To do this,
 
-    * We have a special case in GHC.Stg.InferTags.Rewrite.rewriteOpApp
+    * We have a special case in GHC.Stg.EnforceEpt.Rewrite.rewriteOpApp
       ensuring that any inferred tag information on the argument is
       retained until code generation.
 
@@ -891,8 +891,8 @@ mostly relating to under what circumstances it evaluates its argument.
 Today, that story is simple: A dataToTag primop always evaluates its
 argument, unless tag inference determines the argument was already
 evaluated and correctly tagged.  Getting here was a long journey, with
-many similarities to the story behind Note [Strict Field Invariant] in
-GHC.Stg.InferTags.  See also #15696.
+many similarities to the story behind Note [Evaluated and Properly Tagged] in
+GHC.Stg.EnforceEpt.  See also #15696.
 
 -}
 

@@ -55,7 +55,7 @@ module GHC.Core.Type (
         splitForAllForAllTyBinders, splitForAllForAllTyBinder_maybe,
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
         splitForAllTyVar_maybe, splitForAllCoVar_maybe,
-        splitPiTy_maybe, splitPiTy, splitPiTys,
+        splitPiTy_maybe, splitPiTy, splitPiTys, collectPiTyBinders,
         getRuntimeArgTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys,
@@ -290,6 +290,7 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 
 import GHC.Data.Maybe   ( orElse, isJust, firstJust )
+import GHC.List (build)
 
 -- $type_classification
 -- #type_classification#
@@ -2054,6 +2055,18 @@ splitPiTys ty = split ty ty []
                                       = split res res (Anon (Scaled w arg) af : bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split orig_ty _                bs = (reverse bs, orig_ty)
+
+collectPiTyBinders :: Type -> [PiTyBinder]
+collectPiTyBinders ty = build $ \c n ->
+  let
+    split (ForAllTy b res) = Named b `c` split res
+    split (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
+                           = Anon (Scaled w arg) af `c` split res
+    split ty | Just ty' <- coreView ty = split ty'
+    split _                = n
+  in
+    split ty
+{-# INLINE collectPiTyBinders #-}
 
 -- | Extracts a list of run-time arguments from a function type,
 -- looking through newtypes to the right of arrows.

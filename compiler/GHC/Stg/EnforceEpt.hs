@@ -5,7 +5,7 @@
  -- To permit: type instance XLet 'InferTaggedBinders = XLet 'SomePass
 
 {-# OPTIONS_GHC -Wname-shadowing #-}
-module GHC.Stg.InferTags ( inferTags ) where
+module GHC.Stg.EnforceEpt ( enforceEpt ) where
 
 import GHC.Prelude hiding (id)
 
@@ -24,31 +24,153 @@ import Data.List (mapAccumL)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( zipWithEqual, zipEqual, notNull )
 
-import GHC.Stg.InferTags.Types
-import GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
+import GHC.Stg.EnforceEpt.Types
+import GHC.Stg.EnforceEpt.Rewrite (rewriteTopBinds)
 import Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv, NameEnv)
 import GHC.Driver.DynFlags
 import GHC.Utils.Logger
 import qualified GHC.Unit.Types
 
-{- Note [Tag Inference]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The purpose of this pass is to attach to every binder a flag
-to indicate whether or not it is "properly tagged".  A binder
-is properly tagged if it is guaranteed:
- - to point to a heap-allocated *value*
- - and to have the tag of the value encoded in the pointer
+{- Note [Evaluated and Properly Tagged]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A pointer is Evaluated and Properly Tagged (EPT) when the pointer
 
-For example
-  let x = Just y in ...
+  (a) points directly to the value (not to an indirection, and not to a thunk)
+  (b) is tagged with the tag corresponding to said value (e.g. constructor tag
+      or arity of a function).
 
-Here x will be properly tagged: it will point to the heap-allocated
-values for (Just y), and the tag-bits of the pointer will encode
-the tag for Just so there is no need to re-enter the closure or even
-check for the presence of tag bits. The impacts of this can be very large.
+A binder is EPT when all the runtime pointers it binds are EPT.
 
-For containers the reduction in runtimes with this optimization was as follows:
+Note that a lifted EPT pointer will never point to a thunk, nor will it be
+tagged `000` (meaning "might be a thunk").
+
+See https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/rts/haskell-execution/pointer-tagging
+for more information on pointer tagging.
+
+Examples:
+* Case binders are always EPT; hence an eval
+    case x of x' { __DEFAULT -> ... }
+  ensures that x' is EPT even if x was not.
+* Data constructor bindings
+    let x = Just y in ...
+  are EPT: x will point to the heap-allocated constructor closure for (Just y),
+  and the tag-bits of the pointer will encode the tag for Just (i.e. `010`).
+* In practice, GHC also guarantees that strict fields (and others) are EPT;
+  see Note [EPT enforcement].
+
+Caveat:
+Currently, the proper tag for builtin *unlifted* data types such as `Array#` is
+not `001` but `000`, which is not a proper tag for lifted data.
+This means that UnliftedRep is not a proper sub-rep of LiftedRep.
+SG thinks it would be good to fix this; see #21792.
+
+Note [EPT enforcement]
+~~~~~~~~~~~~~~~~~~~~~~
+The goal of EnforceEPT pass is to mark as many binders as possible as EPT
+(see Note [Evaluated and Properly Tagged]).
+To find more EPT binders, it establishes the following
+
+EPT INVARIANT:
+> Any binder of
+>   * a strict field (see Note [Strict fields in Core]), or
+>   * a CBV argument (see Note [CBV Function Ids])
+> is EPT.
+
+(Note that prior to EPT enforcement, this invariant may *not* always be upheld.
+An example can be found at the end of this Note.)
+This is all to optimise code such as the following:
+
+  data SPair a b = SP !a !b
+  case p :: SP Bool Bool of
+    SP x y ->
+      case x of
+        True  -> ...
+        False -> ...
+
+We can infer that the strict field x is EPT and hence may safely
+omit the code to enter x and the check for the presence of a tag that goes along
+with it. However we still branch on the tag as usual to jump to the True or
+False case.
+
+Note that for every example involving strict fields we could find a similar
+example using CBV functions, e.g.
+
+  $wf x[EPT] y =
+    case x of
+      True  -> ...
+      False -> ...
+
+is the above example translated to use a CBV function $wf.
+Note that /any/ strict function can in principle be chosen as a CBV function;
+however, we presently only promote worker functions such as $wf to CBV because
+we see all its call sites and can use the proper by-value calling convention.
+More precisely, with -O0, we guarantee that no CBV functions are visible in
+the interface file, so that naïve clients do not need to know how to call CBV
+functions. See Note [CBV Function Ids] for more details.
+
+Specification
+-------------
+EPT enforcement works like implicit type conversions in C, such as from int to
+float, only much simpler (no overloaded operations such as +).
+For EPT enforcement, the "type system" in question is whether a binder is
+statically EPT. We differentiate "EPT binder" from "non-EPT binder", where the
+latter means "might be EPT, but we could not prove it so".
+In this sense, EPT binders form a subtype of non-EPT binders.
+We differentiate two conversion directions:
+
+  * Downcast: EPT binders can be converted into non-EPT binders for free.
+  * Upcast: non-EPT binders can be converted into EPT binders by inserting an eval.
+
+The EPT invariant expresses type signatures. In particular, these type
+signatures entail two things:
+
+  * A _precondition_: Any binder that is passed as a CBV arg/strict field
+    must be EPT (i.e. must have type "EPT binder").
+  * A _postcondition_: Any binder of a CBV arg/strict field is EPT.
+
+EPT enforcement is then simply a matter of figuring out where to insert
+Upcasts (remember that Downcasts are free).
+Since Upcasts (evals!) are not free, it is desirable to insert as few as possible.
+To this end, we run a static *EPT analysis*, the purpose of which is to identify
+as many EPT binders as possible.
+Beyond discovering case binders and value bindings, EPT analysis exploits the
+type signatures provided by the EPT invariant, looks inside returned tuples and
+does some limited amount of fixpointing.
+Afterwards, the *EPT rewriter* inserts the actual evals realising Upcasts.
+
+Implementation
+--------------
+
+* EPT analysis is implemented in GHC.Stg.EnforceEpt.inferTags.
+  It attaches its result to /binders/, not occurrence sites.
+* The EPT rewriter establishes the EPT invariant by inserting evals. That is, if
+    (a) a binder x is used to
+          * construct a strict field (`SP x y`), or
+          * passed as a CBV argument (`$wf x`),
+        and
+    (b) x was not inferred EPT,
+  then the EPT rewriter inserts an eval prior to the call, e.g.
+    case x of x' { __ DEFAULT -> SP x' y }.
+    case x of x' { __ DEFAULT -> $wf x' }.
+  (Recall that the case binder x' is always EPT.)
+  This is implemented in GHC.Stg.EnforceEpt.Rewrite.rewriteTopBinds.
+  This pass also propagates the EPTness from binders to occurrences.
+  It is sound to insert evals on strict fields (Note [Strict fields in Core]),
+  and on CBV arguments as well (Note [CBV Function Ids]).
+* We also export the EPTness of top level bindings to allow this optimisation
+  to work across module boundaries.
+  NB: The EPT Invariant *must* be upheld, regardless of the optimisation level;
+  hence EPTness is practically part of the internal ABI of a strict data
+  constructor or CBV function. Note [CBV Function Ids] contains the details.
+* Finally, code generation skips the thunk check when branching on binders that
+  are EPT. This is done by `cgExpr`/`cgCase` in the backend.
+
+Evaluation
+----------
+EPT enforcement can have large impact on spine-strict tree data structure
+performance. For containers the reduction in runtimes with this optimization
+was as follows:
 
 intmap-benchmarks:    89.30%
 intset-benchmarks:    90.87%
@@ -63,78 +185,47 @@ lookupge-map:         70.95%
 
 With nofib being ~0.3% faster as well.
 
-See Note [Tag inference passes] for how we proceed to generate and use this information.
+Note that EPT enforcement may cause regressions in rare cases.
+For example consider this code:
 
-Note [Strict Field Invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As part of tag inference we introduce the Strict Field Invariant.
-Which consists of us saying that:
+  foo x = ...
+    let c = StrictJust x
+    in ...
 
-* Pointers in strict fields must (a) point directly to the value, and
-  (b) must be properly tagged.
+When x cannot be inferred EPT, the rewriter transforms to
 
-For example, given
-  data T = MkT ![Int]
+  foo x = ...
+    let c = case x of x' -> StrictJust x'
+    in ...
 
-the Strict Field Invariant guarantees that the first field of any `MkT` constructor
-will either point directly to nil, or directly to a cons cell;
-and will be tagged with `001` or `010` respectively.
-It will never point to a thunk, nor will it be tagged `000` (meaning "might be a thunk").
-NB: Note that the proper tag for some objects is indeed `000`. Currently this is the case for PAPs.
+which allocates an additional thunk for `c` that returns the constructor.  Boo!
 
-This works analogous to how `WorkerLikeId`s work. See also Note [CBV Function Ids].
+Note [EPT enforcement lowers strict constructor worker semantics]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Core, a saturated application of a strict constructor worker evaluates its
+strict fields and thus is *not* a value; see Note [Strict fields in Core].
+This is also the semantics of strict constructor workers in STG *before* EPT
+enforcement (see Note [EPT enforcement])
 
-Why do we care? Because if we have code like:
+However, after enforcing the EPT Invariant, all constructor workers can
+effectively be lazy. That is, when actually generating code to allocate the
+data constructor, the code generator does not need to evaluate the argument;
+that has already been done by the EPT pass.
 
-case strictPair of
-  SP x y ->
-    case x of ...
+Thus for code-gen reasons (StgToX), all constructor workers are considered lazy
+after EPT enforcement.
 
-It allows us to safely omit the code to enter x and the check
-for the presence of a tag that goes along with it.
-However we might still branch on the tag as usual.
-See Note [Tag Inference] for how much impact this can have for
-some code.
+Note [Why isn't the EPT Invariant enforced during Core passes?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recall the definition of the EPT Invariant from Note [EPT enforcement].
+Why can't it be established as an invariant right while desugaring to Core?
+The reason is that some Core optimisations, such as FloatOut, will drop or delay
+evals whenever they think it useful and thus destroy the Invariant.  Example:
 
-This is enforced by the code GHC.Stg.InferTags.Rewrite
-where we:
-
-* Look at all constructor allocations.
-* Check if arguments to their strict fields are known to be properly tagged
-* If not we convert `StrictJust x` into `case x of x' -> StrictJust x'`
-
-This is usually very beneficial but can cause regressions in rare edge cases where
-we fail to proof that x is properly tagged, or where it simply isn't.
-See Note [How untagged pointers can end up in strict fields] for how the second case
-can arise.
-
-For a full example of the worst case consider this code:
-
-foo ... = ...
-  let c = StrictJust x
-  in ...
-
-Here we would rewrite `let c = StrictJust x` into `let c = case x of x' -> StrictJust x'`
-However that is horrible! We end up allocating a thunk for `c` first, which only when
-evaluated will allocate the constructor.
-
-So we do our best to establish that `x` is already tagged (which it almost always is)
-to avoid this cost. In my benchmarks I haven't seen any cases where this causes regressions.
-
-Note that there are similar constraints around Note [CBV Function Ids].
-
-Note [How untagged pointers can end up in strict fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
   data Set a = Tip | Bin !a (Set a) (Set a)
 
-We make a wrapper for Bin that evaluates its arguments
-  $WBin x a b = case x of xv -> Bin xv a b
-Here `xv` will always be evaluated and properly tagged, just as the
-Strict Field Invariant requires.
-
-But alas the Simplifier can destroy the invariant: see #15696.
 We start with
+
   thk = f ()
   g x = ...(case thk of xv -> Bin xv Tip Tip)...
 
@@ -153,29 +244,13 @@ indeed it does! We float the Bin to top level:
 Now you can see that the argument of Bin, namely thk, points to the
 thunk, not to the value as it did before.
 
-In short, although it may be rare, the output of optimisation passes
-cannot guarantee to obey the Strict Field Invariant. For this reason
-we run tag inference. See Note [Tag inference passes].
+In short, although it may be rare, the output of Core optimisation passes
+might destroy the EPT Invariant, hence we need to enforce the EPT invariant
+*after* passes such as FloatOut.
+-}
 
-Note [Tag inference passes]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Tag inference proceeds in two passes:
-* The first pass is an analysis to compute which binders are properly tagged.
-  The result is then attached to /binders/.
-  This is implemented by `inferTagsAnal` in GHC.Stg.InferTags
-* The second pass walks over the AST checking if the Strict Field Invariant is upheld.
-  See Note [Strict Field Invariant].
-  If required this pass modifies the program to uphold this invariant.
-  Tag information is also moved from /binders/ to /occurrences/ during this pass.
-  This is done by `GHC.Stg.InferTags.Rewrite (rewriteTopBinds)`.
-* Finally the code generation uses this information to skip the thunk check when branching on
-  values. This is done by `cgExpr`/`cgCase` in the backend.
-
-Last but not least we also export the tag sigs of top level bindings to allow this optimization
- to work across module boundaries.
-
-Note [TagInfo of functions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [TagInfo of functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The purpose of tag inference is really to figure out when we don't have to enter
 value closures. There the meaning of the tag is fairly obvious.
 For functions we never make use of the tag info so we have two choices:
@@ -189,10 +264,10 @@ why we couldn't be more rigorous in dealing with functions.
 NB: It turned in #21193 that PAPs get tag zero, so the tag check can't be omitted for functions.
 So option two isn't really an option without reworking this anyway.
 
-Note [Tag inference debugging]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [EPT enforcement debugging]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There is a flag -dtag-inference-checks which inserts various
-compile/runtime checks in order to ensure the Strict Field Invariant
+compile/runtime checks in order to ensure the EPT Invariant
 holds. It should cover all places
 where tags matter and disable optimizations which interfere with checking
 the invariant like generation of AP-Thunks.
@@ -205,8 +280,8 @@ a different StgPass! To handle this a large part of the analysis is polymorphic
 over the exact StgPass we are using. Which allows us to run the analysis on
 the output of itself.
 
-Note [Tag inference for interpreted code]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [EPT enforcement for interpreted code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The bytecode interpreter has a different behaviour when it comes
 to the tagging of binders in certain situations than the StgToCmm code generator.
 
@@ -229,30 +304,30 @@ b) When referencing ids from other modules the Cmm backend will try to put a
    usually predict these cases to improve precision of the analysis.
    But to my knowledge the bytecode generator makes no such attempts so we must
    not infer imported bindings as tagged.
-   This is handled in GHC.Stg.InferTags.Types.lookupInfo
+   This is handled in GHC.Stg.EnforceEpt.Types.lookupInfo
 
 
 -}
 
 {- *********************************************************************
 *                                                                      *
-                         Tag inference pass
+                         EPT enforcement pass
 *                                                                      *
 ********************************************************************* -}
 
-inferTags :: StgPprOpts -> Bool -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
-inferTags ppr_opts !for_bytecode logger this_mod stg_binds = do
-    -- pprTraceM "inferTags for " (ppr this_mod <> text " bytecode:" <> ppr for_bytecode)
+enforceEpt :: StgPprOpts -> Bool -> Logger -> (GHC.Unit.Types.Module) -> [CgStgTopBinding] -> IO ([TgStgTopBinding], NameEnv TagSig)
+enforceEpt ppr_opts !for_bytecode logger this_mod stg_binds = do
+    -- pprTraceM "enforceEpt for " (ppr this_mod <> text " bytecode:" <> ppr for_bytecode)
     -- Annotate binders with tag information.
-    let (!stg_binds_w_tags) = {-# SCC "StgTagFields" #-}
-                                        inferTagsAnal for_bytecode stg_binds
+    let (!stg_binds_w_tags) = {-# SCC "StgEptInfer" #-}
+                                        inferTags for_bytecode stg_binds
     putDumpFileMaybe logger Opt_D_dump_stg_tags "CodeGenAnal STG:" FormatSTG (pprGenStgTopBindings ppr_opts stg_binds_w_tags)
 
     let export_tag_info = collectExportInfo stg_binds_w_tags
 
     -- Rewrite STG to uphold the strict field invariant
     us_t <- mkSplitUniqSupply 't'
-    let rewritten_binds = {-# SCC "StgTagRewrite" #-} rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
+    let rewritten_binds = {-# SCC "StgEptRewrite" #-} rewriteTopBinds this_mod us_t stg_binds_w_tags :: [TgStgTopBinding]
 
     return (rewritten_binds,export_tag_info)
 
@@ -274,8 +349,8 @@ type InferExtEq i = ( XLet i ~ XLet 'InferTaggedBinders
                     , XLetNoEscape i ~ XLetNoEscape 'InferTaggedBinders
                     , XRhsClosure i ~ XRhsClosure 'InferTaggedBinders)
 
-inferTagsAnal :: Bool -> [GenStgTopBinding 'CodeGen] -> [GenStgTopBinding 'InferTaggedBinders]
-inferTagsAnal for_bytecode binds =
+inferTags :: Bool -> [GenStgTopBinding 'CodeGen] -> [GenStgTopBinding 'InferTaggedBinders]
+inferTags for_bytecode binds =
   -- pprTrace "Binds" (pprGenStgTopBindings shortStgPprOpts $ binds) $
   snd (mapAccumL inferTagTopBind (initEnv for_bytecode) binds)
 
@@ -561,7 +636,7 @@ inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args typ)
     (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args typ)
 
 -- Adjust let semantics to the targeted backend.
--- See Note [Tag inference for interpreted code]
+-- See Note [EPT enforcement for interpreted code]
 mkLetSig :: TagEnv p -> TagSig -> TagSig
 mkLetSig env in_sig
   | for_bytecode = TagSig TagDunno

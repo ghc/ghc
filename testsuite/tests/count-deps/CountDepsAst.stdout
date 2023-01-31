@@ -123,7 +123,7 @@ GHC.Runtime.Heap.Layout
 GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
-GHC.Stg.InferTags.TagSig
+GHC.Stg.EnforceEpt.TagSig
 GHC.StgToCmm.Types
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes

@@ -3,7 +3,7 @@
 Foo.f :: forall {a}. a -> [GHC.Internal.Maybe.Maybe a]
 [GblId, Arity=1, Str=<1L>, Unf=OtherCon []] =
     {} \r [x]
-        case x of x1 [Dmd=SL] {
+        case x of x1 {
         __DEFAULT ->
         let {
           sat [Occ=Once1] :: GHC.Internal.Maybe.Maybe a
