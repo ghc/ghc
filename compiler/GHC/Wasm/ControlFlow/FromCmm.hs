@@ -75,7 +75,7 @@ flowLeaving platform b =
           let (offset, target_labels) = switchTargetsToTable targets
               (lo, hi) = switchTargetsRange targets
               default_label = switchTargetsDefault targets
-              scrutinee = smartPlus platform e offset
+              scrutinee = smartExtend platform $ smartPlus platform e offset
               range = inclusiveInterval (lo+toInteger offset) (hi+toInteger offset)
           in  Switch scrutinee range target_labels default_label
       CmmCall { cml_cont = Nothing, cml_target = e } -> TailCall e
@@ -314,6 +314,14 @@ structuredControl platform txExpr txBlock g =
 nodeBody :: CmmBlock -> CmmActions
 nodeBody (BlockCC _first middle _last) = middle
 
+-- | A CmmSwitch scrutinee may have any width, but a br_table operand
+-- must be exactly word sized, hence the extension here. (#22871)
+smartExtend :: Platform -> CmmExpr -> CmmExpr
+smartExtend p e | w0 == w1 = e
+                | otherwise = CmmMachOp (MO_UU_Conv w0 w1) [e]
+  where
+    w0 = cmmExprWidth p e
+    w1 = wordWidth p
 
 smartPlus :: Platform -> CmmExpr -> Int -> CmmExpr
 smartPlus _ e 0 = e
