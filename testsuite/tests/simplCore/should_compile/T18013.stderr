@@ -131,72 +131,36 @@ Rule fired: Class op fmap (BUILTIN)
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 36, types: 86, coercions: 17, joins: 0/0}
+  = {terms: 51, types: 122, coercions: 17, joins: 0/0}
 
--- RHS size: {terms: 35, types: 74, coercions: 17, joins: 0/0}
-mapMaybeRule [InlPrag=[2]]
-  :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
-[GblId,
- Arity=1,
- Str=<1!P(L,LC(S,C(1,C(1,P(L,1L)))))>,
- Unf=Unf{Src=StableSystem, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (@b) (f [Occ=Once1!] :: Rule IO a b) ->
-                 case f of { Rule @s ww ww1 [Occ=OnceL1!] ->
-                 T18013a.Rule
-                   @IO
-                   @(Maybe a)
-                   @(Maybe b)
-                   @s
-                   ww
-                   ((\ (s2 [Occ=Once1] :: s)
-                       (a1 [Occ=Once1!] :: Maybe a)
-                       (s1 [Occ=Once2] :: GHC.Prim.State# GHC.Prim.RealWorld) ->
-                       case a1 of {
-                         Nothing ->
-                           (# s1,
-                              T18013a.Result @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) #);
-                         Just x [Occ=Once1] ->
-                           case ((ww1 s2 x)
-                                 `cast` <Co:4> :: IO (Result s b)
-                                                  ~R# (GHC.Prim.State# GHC.Prim.RealWorld
-                                                       -> (# GHC.Prim.State# GHC.Prim.RealWorld,
-                                                             Result s b #)))
-                                  s1
-                           of
-                           { (# ipv [Occ=Once1], ipv1 [Occ=Once1!] #) ->
-                           case ipv1 of { Result t2 [Occ=Once1] c1 [Occ=Once1] ->
-                           (# ipv,
-                              T18013a.Result @s @(Maybe b) t2 (GHC.Internal.Maybe.Just @b c1) #)
-                           }
-                           }
-                       })
-                    `cast` <Co:13> :: (s
-                                       -> Maybe a
-                                       -> GHC.Prim.State# GHC.Prim.RealWorld
-                                       -> (# GHC.Prim.State# GHC.Prim.RealWorld,
-                                             Result s (Maybe b) #))
-                                      ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
-                 }}]
-mapMaybeRule
-  = \ (@a) (@b) (f :: Rule IO a b) ->
-      case f of { Rule @s ww ww1 ->
+-- RHS size: {terms: 40, types: 73, coercions: 17, joins: 0/0}
+T18013.$wmapMaybeRule [InlPrag=NOINLINE]
+  :: forall a b s.
+     s -> (s -> a -> IO (Result s b)) -> Rule IO (Maybe a) (Maybe b)
+[GblId[StrictWorker([!])],
+ Arity=2,
+ Str=<1L><1C(L,C(1,C(1,P(L,1L))))>,
+ Unf=OtherCon []]
+T18013.$wmapMaybeRule
+  = \ (@a) (@b) (@s) (ww :: s) (ww1 :: s -> a -> IO (Result s b)) ->
+      case ww1 of wild { __DEFAULT ->
+      case ww of wild1 { __DEFAULT ->
       T18013a.Rule
         @IO
         @(Maybe a)
         @(Maybe b)
         @s
-        ww
+        wild1
         ((\ (s2 :: s)
             (a1 :: Maybe a)
             (s1 :: GHC.Prim.State# GHC.Prim.RealWorld) ->
             case a1 of {
               Nothing ->
                 (# s1,
-                   T18013a.Result @s @(Maybe b) ww (GHC.Internal.Maybe.Nothing @b) #);
+                   T18013a.Result
+                     @s @(Maybe b) wild1 (GHC.Internal.Maybe.Nothing @b) #);
               Just x ->
-                case ((ww1 s2 x)
+                case ((wild s2 x)
                       `cast` <Co:4> :: IO (Result s b)
                                        ~R# (GHC.Prim.State# GHC.Prim.RealWorld
                                             -> (# GHC.Prim.State# GHC.Prim.RealWorld,
@@ -215,6 +179,26 @@ mapMaybeRule
                             -> GHC.Prim.State# GHC.Prim.RealWorld
                             -> (# GHC.Prim.State# GHC.Prim.RealWorld, Result s (Maybe b) #))
                            ~R# (s -> Maybe a -> IO (Result s (Maybe b))))
+      }
+      }
+
+-- RHS size: {terms: 9, types: 21, coercions: 0, joins: 0/0}
+mapMaybeRule [InlPrag=NOINLINE[final]]
+  :: forall a b. Rule IO a b -> Rule IO (Maybe a) (Maybe b)
+[GblId,
+ Arity=1,
+ Str=<1!P(1L,1C(L,C(1,C(1,P(L,1L)))))>,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a) (@b) (f [Occ=Once1!] :: Rule IO a b) ->
+                 case f of { Rule @s ww [Occ=Once1] ww1 [Occ=Once1] ->
+                 T18013.$wmapMaybeRule @a @b @s ww ww1
+                 }}]
+mapMaybeRule
+  = \ (@a) (@b) (f :: Rule IO a b) ->
+      case f of { Rule @s ww ww1 ->
+      T18013.$wmapMaybeRule @a @b @s ww ww1
       }
 
 

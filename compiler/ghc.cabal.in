@@ -698,10 +698,10 @@ Library
         GHC.Stg.Lift.Monad
         GHC.Stg.Lift.Types
         GHC.Stg.Lint
-        GHC.Stg.InferTags
-        GHC.Stg.InferTags.Rewrite
-        GHC.Stg.InferTags.TagSig
-        GHC.Stg.InferTags.Types
+        GHC.Stg.EnforceEpt
+        GHC.Stg.EnforceEpt.Rewrite
+        GHC.Stg.EnforceEpt.TagSig
+        GHC.Stg.EnforceEpt.Types
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.Subst

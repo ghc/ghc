@@ -835,6 +835,10 @@ to the Divergence lattice, but in practice it turned out to be hard to untaint
 from 'topDiv' to 'conDiv', leading to bugs, performance regressions and
 complexity that didn't justify the single fixed testcase T13380c.
 
+You might think that we should check for side-effects rather than just for
+precise exceptions. Right you are! See Note [Side-effects and strictness]
+for why we unfortunately do not.
+
 Note [Demand analysis for recursive data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 T11545 features a single-product, recursive data type

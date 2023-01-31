@@ -15,7 +15,7 @@ T23083.g
       let {
         sat [Occ=Once1] :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer
         [LclId, Unf=OtherCon []]
-        sat = \ (eta [Occ=Once1] :: GHC.Num.Integer.Integer) -> case h of h1 [Occ=Once1, Dmd=SL] { __DEFAULT -> T23083.$$ @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer h1 eta } } in
+        sat = \ (eta [Occ=Once1] :: GHC.Num.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer h1 eta } } in
       f sat
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

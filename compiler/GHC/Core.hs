@@ -42,7 +42,7 @@ module GHC.Core (
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
-        collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
+        collectArgs, collectValArgs, stripNArgs, collectArgsTicks, flattenBinds,
         collectFunSimple,
 
         exprToType,
@@ -1028,6 +1028,61 @@ This also justifies why we do not consider the `e` in `e |> co` to be in
 tail position: A cast changes the type, but the type must be the same. But
 operationally, casts are vacuous, so this is a bit unfortunate! See #14610 for
 ideas how to fix this.
+
+Note [Strict fields in Core]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Evaluating a data constructor worker evaluates its strict fields.
+
+In other words, if `MkT` is strict in its first field and `xs` reduces to
+`error "boom"`, then `MkT xs b` will throw that error.
+Consequently, it is sound to seq the field before the call to the constructor,
+e.g., with `case xs of xs' { __DEFAULT -> MkT xs' b }`.
+Let's call this transformation "field eval insertion".
+
+Note in particular that the data constructor application `MkT xs b` above is
+*not* a value, unless `xs` is!
+
+This has pervasive effect on the Core pipeline:
+
+(SFC1) `exprIsHNF`/`exprIsConLike`/`exprOkForSpeculation` need to assert that the
+    strict arguments of a DataCon worker are values/ok-for-spec themselves.
+
+(SFC2) `exprIsConApp_maybe` inserts field evals in the `FloatBind`s it returns, so
+    that the Simplifier, Constant-folding, the pattern-match checker, etc.
+    all see the inserted field evals when they match on strict workers. Often this
+    is just to emphasise strict semantics, but for case-of-known constructor
+    and case-to-let, field insertion is *vital*, otherwise these transformations
+    would lose field evals that the user expects to happen, perhaps in order to
+    fix a space leak. For example,
+      case MkT xs b of MkT xs' b' -> b'
+    optimising this expression with case-of-known-con must leave behind the
+    field eval on `xs`, thus
+      case xs of xs' { __DEFAULT -> b }
+
+(SFC3) The demand signature of a data constructor is strict in strict field
+    position when otherwise it is lazy. Likewise the demand *transformer*
+    of a DataCon worker can stricten up demands on strict field args.
+    See Note [Demand transformer for data constructors].
+
+(SFC4) In the absence of `-fpedantic-bottoms`, it is still possible that some seqs
+    are ultimately dropped or delayed due to eta-expansion.
+    See Note [Dealing with bottom].
+
+Strict field semantics is exploited and lowered in STG during EPT enforcement;
+see Note [EPT enforcement lowers strict constructor worker semantics] for the
+connection.
+
+Historical Note:
+The delightfully simple description of strict field semantics is the result of
+a long saga (#20749, the bits about strict data constructors in #21497, #22475),
+where we tried a more lenient (but actually not) semantics first that would
+allow both strict and lazy implementations of DataCon workers. This was favoured
+because the "pervasive effect" throughout the compiler was deemed too large
+(when it really turned out to be quite modest).
+Alas, this semantics would require us to implement `exprIsHNF` in *exactly* the
+same way as above, otherwise the analysis would not be conservative wrt. the
+lenient semantics (which includes the strict one). It is also much harder to
+explain and maintain, as it turned out.
 
 ************************************************************************
 *                                                                      *
@@ -2156,6 +2211,17 @@ collectArgs expr
   = go expr []
   where
     go (App f a) as = go f (a:as)
+    go e         as = (e, as)
+
+-- | Takes a nested application expression and returns the function
+-- being applied and the arguments to which it is applied
+collectValArgs :: Expr b -> (Expr b, [Arg b])
+collectValArgs expr
+  = go expr []
+  where
+    go (App f a) as
+      | isValArg a  = go f (a:as)
+      | otherwise   = go f as
     go e         as = (e, as)
 
 -- | Takes a nested application expression and returns the function
