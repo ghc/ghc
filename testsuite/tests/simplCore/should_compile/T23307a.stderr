@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 28, types: 41, coercions: 0, joins: 0/0}
+  = {terms: 18, types: 28, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}
 T23307a.$WYes [InlPrag=INLINE[final] CONLIKE]
@@ -20,29 +20,6 @@ T23307a.$WYes
   = \ (@a) (conrep [Occ=Once1!] :: Unconsed a) ->
       case conrep of { Unconsed unbx [Occ=Once1] unbx1 [Occ=Once1] ->
       T23307a.Yes @a unbx unbx1
-      }
-
--- RHS size: {terms: 9, types: 7, coercions: 0, joins: 0/0}
-T23307a.$WUnconsed [InlPrag=INLINE[final] CONLIKE]
-  :: forall a. a %1 -> List a %1 -> Unconsed a
-[GblId[DataConWrapper],
- Arity=2,
- Str=<L><SL>,
- Unf=Unf{Src=StableSystem, TopLvl=True,
-         Value=True, ConLike=True, WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a)
-                 (conrep [Occ=Once1] :: a)
-                 (conrep1 [Occ=Once1] :: List a) ->
-                 case conrep1 of conrep2 [Occ=Once1] { __DEFAULT ->
-                 T23307a.Unconsed @a conrep conrep2
-                 }}]
-T23307a.$WUnconsed
-  = \ (@a)
-      (conrep [Occ=Once1] :: a)
-      (conrep1 [Occ=Once1] :: List a) ->
-      case conrep1 of conrep2 [Occ=Once1] { __DEFAULT ->
-      T23307a.Unconsed @a conrep conrep2
       }
 
 -- RHS size: {terms: 8, types: 9, coercions: 0, joins: 0/0}

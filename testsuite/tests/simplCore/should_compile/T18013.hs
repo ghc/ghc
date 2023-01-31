@@ -16,3 +16,7 @@ mapMaybeRule f = proc v -> case v of
     y <- f -< x
     returnA -< Just y
   Nothing -> returnA -< Nothing
+{-# NOINLINE mapMaybeRule #-}
+  -- The size of mapMaybeRule is very close to the inlining threshold.
+  -- The NOINLINE consistently forces a worker/wrapper split to make
+  -- the test output more stable.

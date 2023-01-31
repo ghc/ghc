@@ -56,7 +56,7 @@ import GHC.Utils.Panic
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
 import Data.List     ( partition )
-import GHC.Stg.InferTags.TagSig (isTaggedSig)
+import GHC.Stg.EnforceEpt.TagSig (isTaggedSig)
 import GHC.Platform.Profile (profileIsProfiling)
 
 ------------------------------------------------------------------------

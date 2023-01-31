@@ -72,7 +72,7 @@ module GHC.Stg.Syntax (
 
 import GHC.Prelude
 
-import GHC.Stg.InferTags.TagSig( TagSig )
+import GHC.Stg.EnforceEpt.TagSig( TagSig )
 import GHC.Stg.Lift.Types
   -- To avoid having an orphan instances for BinderP, XLet etc
 
@@ -610,9 +610,9 @@ StgPass data type indexes:
      each binding.
      See Note [Late lambda lifting in STG].
 
-  4. Tag inference takes in 'Vanilla and produces 'InferTagged STG, while using
+  4. EPT enforcement takes in 'Vanilla and produces 'InferTagged STG, while using
      the InferTaggedBinders annotated AST internally.
-     See Note [Tag Inference].
+     See Note [EPT enforcement].
 
   5. Stg.FVs annotates closures with their free variables. To store these
      annotations we use the 'CodeGen parameterisation.
@@ -627,9 +627,9 @@ data StgPass
   = Vanilla
   | LiftLams -- ^ Use internally by the lambda lifting pass
   | InferTaggedBinders -- ^ Tag inference information on binders.
-                       -- See Note [Tag inference passes] in GHC.Stg.InferTags
+                       -- See Note [EPT enforcement] in GHC.Stg.EnforceEpt
   | InferTagged -- ^ Tag inference information put on relevant StgApp nodes
-                -- See Note [Tag inference passes] in GHC.Stg.InferTags
+                -- See Note [EPT enforcement] in GHC.Stg.EnforceEpt
   | CodeGen
 
 type family BinderP (pass :: StgPass)

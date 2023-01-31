@@ -704,6 +704,10 @@ Library
         GHC.Stg.BcPrep
         GHC.Stg.CSE
         GHC.Stg.Debug
+        GHC.Stg.EnforceEpt
+        GHC.Stg.EnforceEpt.Rewrite
+        GHC.Stg.EnforceEpt.TagSig
+        GHC.Stg.EnforceEpt.Types
         GHC.Stg.FVs
         GHC.Stg.Lift
         GHC.Stg.Lift.Analysis
@@ -711,10 +715,6 @@ Library
         GHC.Stg.Lift.Monad
         GHC.Stg.Lift.Types
         GHC.Stg.Lint
-        GHC.Stg.InferTags
-        GHC.Stg.InferTags.Rewrite
-        GHC.Stg.InferTags.TagSig
-        GHC.Stg.InferTags.Types
         GHC.Stg.Make
         GHC.Stg.Pipeline
         GHC.Stg.Stats

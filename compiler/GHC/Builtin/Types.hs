@@ -708,6 +708,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
     -- See Note [Constructor tag allocation] and #14657
     data_con = mkDataCon dc_name declared_infix prom_info
                 (map (const no_bang) arg_tys)
+                (map (const HsLazy) arg_tys)
+                (map (const NotMarkedStrict) arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
                 conc_tyvars

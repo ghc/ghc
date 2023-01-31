@@ -1,13 +1,5 @@
 
 ==================== Final STG: ====================
-$WMkW_NB :: NU_B %1 -> WNU_B =
-    \r [conrep]
-        case conrep of conrep1 { __DEFAULT -> MkW_NB [conrep1]; };
-
-$WMkW_NA :: NU_A %1 -> WNU_A =
-    \r [conrep]
-        case conrep of conrep1 { __DEFAULT -> MkW_NA [conrep1]; };
-
 $WMkW_F :: UF %1 -> WU_F =
     \r [conrep] case conrep of conrep1 { Mk_F us -> MkW_F [us]; };
 

@@ -113,7 +113,7 @@ import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars, noConcreteTyVars )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Stg.InferTags.TagSig
+import GHC.Stg.EnforceEpt.TagSig
 import GHC.StgToCmm.Types (LambdaFormInfo)
 
 import Data.Data ( Data )
@@ -220,7 +220,7 @@ data IdDetails
         -- Worker like functions are create by W/W and SpecConstr and we can expect that they
         -- aren't used unapplied.
         -- See Note [CBV Function Ids]
-        -- See Note [Tag Inference]
+        -- See Note [EPT enforcement]
         -- The [CbvMark] is always empty (and ignored) until after Tidy for ids from the current
         -- module.
 
@@ -249,14 +249,14 @@ conLikesRecSelInfo con_likes lbls
 
 
 {- Note [CBV Function Ids]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 A WorkerLikeId essentially allows us to constrain the calling convention
 for the given Id. Each such Id carries with it a list of CbvMarks
 with each element representing a value argument. Arguments who have
 a matching `MarkedCbv` entry in the list need to be passed evaluated+*properly tagged*.
 
 CallByValueFunIds give us additional expressiveness which we use to improve
-runtime. This is all part of the TagInference work. See also Note [Tag Inference].
+runtime. This is all part of the EPT enforcement work. See also Note [EPT enforcement].
 
 They allows us to express the fact that an argument is not only evaluated to WHNF once we
 entered it's RHS but also that an lifted argument is already *properly tagged* once we jump
@@ -276,7 +276,7 @@ The invariants around the arguments of call by value function like Ids are then:
   * Any `WorkerLikeId`
   * Some `JoinId` bindings.
 
-This works analogous to the Strict Field Invariant. See also Note [Strict Field Invariant].
+This works analogous to the EPT Invariant. See also Note [EPT enforcement].
 
 To make this work what we do is:
 * During W/W and SpecConstr any worker/specialized binding we introduce

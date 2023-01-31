@@ -1,4 +1,4 @@
-module T15226b where
+module T24124 where
 
 import Control.Exception
 

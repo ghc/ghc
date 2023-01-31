@@ -1,94 +1,33 @@
 
 ==================== Output Cmm ====================
-[M.$WMkT_entry() { //  [R3, R2]
-         { info_tbls: [(cEx,
-                        label: block_cEx_info
-                        rep: StackRep [False]
-                        srt: Nothing),
-                       (cEA,
-                        label: M.$WMkT_info
-                        rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 15} }
-                        srt: Nothing),
-                       (cED,
-                        label: block_cED_info
-                        rep: StackRep [False]
-                        srt: Nothing)]
-           stack_info: arg_space: 8
-         }
-     {offset
-       cEA: // global
-           if ((Sp + -16) < SpLim) (likely: False) goto cEG; else goto cEH;   // CmmCondBranch
-       cEG: // global
-           R1 = M.$WMkT_closure;   // CmmAssign
-           call (stg_gc_fun)(R3, R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cEH: // global
-           I64[Sp - 16] = cEx;   // CmmStore
-           R1 = R2;   // CmmAssign
-           P64[Sp - 8] = R3;   // CmmStore
-           Sp = Sp - 16;   // CmmAssign
-           if (R1 & 7 != 0) goto cEx; else goto cEy;   // CmmCondBranch
-       cEy: // global
-           call (I64[R1])(R1) returns to cEx, args: 8, res: 8, upd: 8;   // CmmCall
-       cEx: // global
-           // slowCall
-           I64[Sp] = cED;   // CmmStore
-           _sEi::P64 = R1;   // CmmAssign
-           R1 = P64[Sp + 8];   // CmmAssign
-           P64[Sp + 8] = _sEi::P64;   // CmmStore
-           call stg_ap_0_fast(R1) returns to cED, args: 8, res: 8, upd: 8;   // CmmCall
-       cED: // global
-           // slow_call for _sEh::P64 with pat stg_ap_0
-           Hp = Hp + 24;   // CmmAssign
-           if (Hp > HpLim) (likely: False) goto cEL; else goto cEK;   // CmmCondBranch
-       cEL: // global
-           HpAlloc = 24;   // CmmAssign
-           call stg_gc_unpt_r1(R1) returns to cED, args: 8, res: 8, upd: 8;   // CmmCall
-       cEK: // global
-           // allocHeapClosure
-           I64[Hp - 16] = M.MkT_con_info;   // CmmStore
-           P64[Hp - 8] = P64[Sp + 8];   // CmmStore
-           P64[Hp] = R1;   // CmmStore
-           R1 = Hp - 15;   // CmmAssign
-           Sp = Sp + 16;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
-     }
- },
- section ""data" . M.$WMkT_closure" {
-     M.$WMkT_closure:
-         const M.$WMkT_info;
- }]
-
-
-
-==================== Output Cmm ====================
 [M.fun_entry() { //  [R2]
-         { info_tbls: [(cEV,
-                        label: block_cEV_info
+         { info_tbls: [(cB9,
+                        label: block_cB9_info
                         rep: StackRep []
                         srt: Nothing),
-                       (cEY,
+                       (cBc,
                         label: M.fun_info
                         rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 5} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cEY: // global
-           if ((Sp + -8) < SpLim) (likely: False) goto cEZ; else goto cF0;   // CmmCondBranch
-       cEZ: // global
-           R1 = M.fun_closure;   // CmmAssign
-           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cF0: // global
-           I64[Sp - 8] = cEV;   // CmmStore
-           R1 = R2;   // CmmAssign
-           Sp = Sp - 8;   // CmmAssign
-           if (R1 & 7 != 0) goto cEV; else goto cEW;   // CmmCondBranch
-       cEW: // global
-           call (I64[R1])(R1) returns to cEV, args: 8, res: 8, upd: 8;   // CmmCall
-       cEV: // global
-           R1 = P64[R1 + 15];   // CmmAssign
-           Sp = Sp + 8;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cBc: // global
+           if ((Sp + -8) < SpLim) (likely: False) goto cBd; else goto cBe;
+       cBd: // global
+           R1 = M.fun_closure;
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;
+       cBe: // global
+           I64[Sp - 8] = cB9;
+           R1 = R2;
+           Sp = Sp - 8;
+           if (R1 & 7 != 0) goto cB9; else goto cBa;
+       cBa: // global
+           call (I64![R1])(R1) returns to cB9, args: 8, res: 8, upd: 8;
+       cB9: // global
+           R1 = P64[R1 + 15];
+           Sp = Sp + 8;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
      }
  },
  section ""data" . M.fun_closure" {
@@ -100,56 +39,53 @@
 
 ==================== Output Cmm ====================
 [M.MkT_entry() { //  [R3, R2]
-         { info_tbls: [(cFc,
-                        label: block_cFc_info
+         { info_tbls: [(cBx,
+                        label: block_cBx_info
                         rep: StackRep [False]
                         srt: Nothing),
-                       (cFf,
+                       (cBA,
                         label: M.MkT_info
                         rep: HeapRep static { Fun {arity: 2 fun_type: ArgSpec 15} }
                         srt: Nothing),
-                       (cFi,
-                        label: block_cFi_info
+                       (cBD,
+                        label: block_cBD_info
                         rep: StackRep [False]
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cFf: // global
-           if ((Sp + -16) < SpLim) (likely: False) goto cFl; else goto cFm;   // CmmCondBranch
-       cFl: // global
-           R1 = M.MkT_closure;   // CmmAssign
-           call (stg_gc_fun)(R3, R2, R1) args: 8, res: 0, upd: 8;   // CmmCall
-       cFm: // global
-           I64[Sp - 16] = cFc;   // CmmStore
-           R1 = R2;   // CmmAssign
-           P64[Sp - 8] = R3;   // CmmStore
-           Sp = Sp - 16;   // CmmAssign
-           if (R1 & 7 != 0) goto cFc; else goto cFd;   // CmmCondBranch
-       cFd: // global
-           call (I64[R1])(R1) returns to cFc, args: 8, res: 8, upd: 8;   // CmmCall
-       cFc: // global
-           // slowCall
-           I64[Sp] = cFi;   // CmmStore
-           _tEq::P64 = R1;   // CmmAssign
-           R1 = P64[Sp + 8];   // CmmAssign
-           P64[Sp + 8] = _tEq::P64;   // CmmStore
-           call stg_ap_0_fast(R1) returns to cFi, args: 8, res: 8, upd: 8;   // CmmCall
-       cFi: // global
-           // slow_call for _B1::P64 with pat stg_ap_0
-           Hp = Hp + 24;   // CmmAssign
-           if (Hp > HpLim) (likely: False) goto cFq; else goto cFp;   // CmmCondBranch
-       cFq: // global
-           HpAlloc = 24;   // CmmAssign
-           call stg_gc_unpt_r1(R1) returns to cFi, args: 8, res: 8, upd: 8;   // CmmCall
-       cFp: // global
-           // allocHeapClosure
-           I64[Hp - 16] = M.MkT_con_info;   // CmmStore
-           P64[Hp - 8] = P64[Sp + 8];   // CmmStore
-           P64[Hp] = R1;   // CmmStore
-           R1 = Hp - 15;   // CmmAssign
-           Sp = Sp + 16;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cBA: // global
+           if ((Sp + -16) < SpLim) (likely: False) goto cBG; else goto cBH;
+       cBG: // global
+           R1 = M.MkT_closure;
+           call (stg_gc_fun)(R3, R2, R1) args: 8, res: 0, upd: 8;
+       cBH: // global
+           I64[Sp - 16] = cBx;
+           R1 = R2;
+           P64[Sp - 8] = R3;
+           Sp = Sp - 16;
+           if (R1 & 7 != 0) goto cBx; else goto cBy;
+       cBy: // global
+           call (I64![R1])(R1) returns to cBx, args: 8, res: 8, upd: 8;
+       cBx: // global
+           I64[Sp] = cBD;
+           _tB0::P64 = R1;
+           R1 = P64[Sp + 8];
+           P64[Sp + 8] = _tB0::P64;
+           call stg_ap_0_fast(R1) returns to cBD, args: 8, res: 8, upd: 8;
+       cBD: // global
+           Hp = Hp + 24;
+           if (Hp > HpLim) (likely: False) goto cBL; else goto cBK;
+       cBL: // global
+           HpAlloc = 24;
+           call stg_gc_unpt_r1(R1) returns to cBD, args: 8, res: 8, upd: 8;
+       cBK: // global
+           I64[Hp - 16] = M.MkT_con_info;
+           P64[Hp - 8] = P64[Sp + 8];
+           P64[Hp] = R1;
+           R1 = Hp - 15;
+           Sp = Sp + 16;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
      }
  },
  section ""data" . M.MkT_closure" {
@@ -161,16 +97,16 @@
 
 ==================== Output Cmm ====================
 [M.MkT_con_entry() { //  []
-         { info_tbls: [(cFw,
+         { info_tbls: [(cBX,
                         label: M.MkT_con_info
                         rep: HeapRep 2 ptrs { Con {tag: 0 descr:"main:M.MkT"} }
                         srt: Nothing)]
            stack_info: arg_space: 8
          }
      {offset
-       cFw: // global
-           R1 = R1 + 1;   // CmmAssign
-           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;   // CmmCall
+       cBX: // global
+           R1 = R1 + 1;
+           call (P64[Sp])(R1) args: 8, res: 0, upd: 8;
      }
  }]
 
