@@ -98,7 +98,7 @@ import GHC.Data.Maybe (isNothing)
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
 import GHC.StgToCmm.Config
-import GHC.Stg.InferTags.TagSig (isTaggedSig)
+import GHC.Stg.EnforceEpt.TagSig (isTaggedSig)
 
 -----------------------------------------------------------------------------
 --                Data types and synonyms
@@ -508,8 +508,8 @@ data CallMethod
                         -- or constructor), so just return it.
 
   | InferedReturnIt     -- A properly tagged value, as determined by tag inference.
-                        -- See Note [Tag Inference] and Note [Tag inference passes] in
-                        -- GHC.Stg.InferTags.
+                        -- See Note [Evaluated and Properly Tagged]
+                        -- and Note [EPT enforcement] in GHC.Stg.EnforceEpt.
                         -- It behaves /precisely/ like `ReturnIt`, except that when debugging is
                         -- enabled we emit an extra assertion to check that the returned value is
                         -- properly tagged.  We can use this as a check that tag inference is working
@@ -583,8 +583,8 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _cg_loc _self_loop_info
 
   | Just sig <- idTagSig_maybe id
-  , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
-  , n_args == 0     -- See Note [Tag Inference]
+  , isTaggedSig sig -- Infered to be already evaluated by EPT analysis
+  , n_args == 0     -- See Note [EPT enforcement]
   = InferedReturnIt
 
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
@@ -621,12 +621,12 @@ getCallMethod cfg name id (LFThunk _ _ updatable std_form_info is_fun)
 getCallMethod cfg name id (LFUnknown might_be_a_function) n_args _cg_locs _self_loop_info
   | n_args == 0
   , Just sig <- idTagSig_maybe id
-  , isTaggedSig sig -- Infered to be already evaluated by Tag Inference
+  , isTaggedSig sig -- Infered to be already evaluated by EPT analysis
   -- When profiling we must enter all potential functions to make sure we update the SCC
   -- even if the function itself is already evaluated.
   -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   , not (profileIsProfiling (stgToCmmProfile cfg) && might_be_a_function)
-  = InferedReturnIt -- See Note [Tag Inference]
+  = InferedReturnIt -- See Note [EPT enforcement]
 
   | might_be_a_function = SlowCall
 

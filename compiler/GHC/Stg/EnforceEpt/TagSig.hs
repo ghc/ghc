@@ -2,11 +2,11 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 
--- We export this type from this module instead of GHC.Stg.InferTags.Types
+-- We export this type from this module instead of GHC.Stg.EnforceEpt.Types
 -- because it's used by more than the analysis itself. For example in interface
 -- files where we record a tag signature for bindings.
 -- By putting the sig into its own module we can avoid module loops.
-module GHC.Stg.InferTags.TagSig
+module GHC.Stg.EnforceEpt.TagSig
 
 where
 

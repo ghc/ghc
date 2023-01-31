@@ -391,7 +391,7 @@ mkRhsClosure    profile use_std_ap check_tags bndr _cc
                          -- thunk (e.g. its type) (#949)
   , idArity fun_id == unknownArity -- don't spoil a known call
           -- Ha! an Ap thunk
-  , not check_tags -- See Note [Tag inference debugging]
+  , not check_tags -- See Note [EPT enforcement debugging]
   = cgRhsStdThunk bndr lf_info payload
 
   where

@@ -158,7 +158,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 
-import GHC.Stg.InferTags.TagSig
+import GHC.Stg.EnforceEpt.TagSig
 
 import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)

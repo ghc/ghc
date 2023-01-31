@@ -43,8 +43,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import GHC.Settings (Platform)
-import GHC.Stg.InferTags (inferTags)
-import GHC.Stg.InferTags.TagSig ( StgCgInfos )
+import GHC.Stg.EnforceEpt (enforceEpt)
+import GHC.Stg.EnforceEpt.TagSig ( StgCgInfos )
 
 data StgPipelineOpts = StgPipelineOpts
   { stgPipeline_phases      :: ![StgToDo]
@@ -100,7 +100,7 @@ stg2stg logger extra_vars opts this_mod binds
           -- annotations (which is used by code generator to compute offsets into closures)
         ; let (binds_sorted_with_fvs, imp_fvs) = unzip (depSortWithAnnotStgPgm this_mod binds')
         -- See Note [Tag inference for interactive contexts]
-        ; (cg_binds, cg_infos) <- inferTags (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
+        ; (cg_binds, cg_infos) <- enforceEpt (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
         ; stg_linter False "StgCodeGen" cg_binds
         ; pure (zip cg_binds imp_fvs, cg_infos)
    }

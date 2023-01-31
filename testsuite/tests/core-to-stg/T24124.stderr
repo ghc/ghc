@@ -1,46 +1,42 @@
 
 ==================== Final STG: ====================
-T15226b.$WMkStrictPair [InlPrag=INLINE[final] CONLIKE]
-  :: forall a b. a %1 -> b %1 -> T15226b.StrictPair a b
-[GblId[DataConWrapper], Arity=2, Str=<SL><SL>, Unf=OtherCon []] =
-    {} \r [conrep conrep1]
-        case conrep of conrep2 {
-        __DEFAULT ->
-        case conrep1 of conrep3 {
-        __DEFAULT -> T15226b.MkStrictPair [conrep2 conrep3];
-        };
-        };
-
-T15226b.testFun1
+T24124.testFun1
   :: forall a b.
      a
      -> b
      -> GHC.Prim.State# GHC.Prim.RealWorld
-     -> (# GHC.Prim.State# GHC.Prim.RealWorld, T15226b.StrictPair a b #)
-[GblId, Arity=3, Str=<L><ML><L>, Cpr=1, Unf=OtherCon []] =
+     -> (# GHC.Prim.State# GHC.Prim.RealWorld, T24124.StrictPair a b #)
+[GblId, Arity=3, Str=<L><L><L>, Cpr=1, Unf=OtherCon []] =
     {} \r [x y void]
         case x of sat {
         __DEFAULT ->
-        case y of conrep {
-        __DEFAULT ->
-        case T15226b.MkStrictPair [sat conrep] of sat {
+        case
+            case y of y [OS=OneShot] {
+            __DEFAULT -> T24124.MkStrictPair [sat y];
+            }
+        of
+        sat
+        {
         __DEFAULT -> MkSolo# [sat];
         };
         };
-        };
 
-T15226b.testFun
-  :: forall a b. a -> b -> GHC.Types.IO (T15226b.StrictPair a b)
-[GblId, Arity=3, Str=<L><ML><L>, Cpr=1, Unf=OtherCon []] =
-    {} \r [eta eta void] T15226b.testFun1 eta eta GHC.Prim.void#;
+T24124.testFun
+  :: forall a b. a -> b -> GHC.Types.IO (T24124.StrictPair a b)
+[GblId, Arity=3, Str=<L><L><L>, Cpr=1, Unf=OtherCon []] =
+    {} \r [eta eta void] T24124.testFun1 eta eta GHC.Prim.void#;
 
-T15226b.MkStrictPair [InlPrag=CONLIKE]
-  :: forall {a} {b}. a %1 -> b %1 -> T15226b.StrictPair a b
-[GblId[DataCon], Arity=2, Caf=NoCafRefs, Unf=OtherCon []] =
+T24124.MkStrictPair [InlPrag=CONLIKE]
+  :: forall a b. a %1 -> b %1 -> T24124.StrictPair a b
+[GblId[DataCon],
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=<SL><SL>,
+ Unf=OtherCon []] =
     {} \r [eta eta]
         case eta of eta {
         __DEFAULT ->
-        case eta of eta { __DEFAULT -> T15226b.MkStrictPair [eta eta]; };
+        case eta of eta { __DEFAULT -> T24124.MkStrictPair [eta eta]; };
         };
 
 

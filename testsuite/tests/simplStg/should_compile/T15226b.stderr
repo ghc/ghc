@@ -1,11 +1,5 @@
 
 ==================== Final STG: ====================
-T15226b.$WStr [InlPrag=INLINE[final] CONLIKE]
-  :: forall a. a %1 -> T15226b.Str a
-[GblId[DataConWrapper], Arity=1, Str=<SL>, Unf=OtherCon []] =
-    {} \r [conrep]
-        case conrep of conrep1 { __DEFAULT -> T15226b.Str [conrep1]; };
-
 T15226b.bar1
   :: forall a.
      GHC.Internal.Maybe.Maybe a
@@ -18,7 +12,7 @@ T15226b.bar1
         __DEFAULT ->
         let {
           sat [Occ=Once1] :: T15226b.Str (GHC.Internal.Maybe.Maybe a)
-          [LclId] =
+          [LclId, Unf=OtherCon []] =
               T15226b.Str! [sat];
         } in  MkSolo# [sat];
         };
@@ -30,8 +24,12 @@ T15226b.bar
 [GblId, Arity=2, Str=<L><L>, Cpr=1(, 1), Unf=OtherCon []] =
     {} \r [eta void] T15226b.bar1 eta GHC.Prim.void#;
 
-T15226b.Str [InlPrag=CONLIKE] :: forall {a}. a %1 -> T15226b.Str a
-[GblId[DataCon], Arity=1, Caf=NoCafRefs, Unf=OtherCon []] =
+T15226b.Str [InlPrag=CONLIKE] :: forall a. a %1 -> T15226b.Str a
+[GblId[DataCon],
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<SL>,
+ Unf=OtherCon []] =
     {} \r [eta] case eta of eta { __DEFAULT -> T15226b.Str [eta]; };
 
 

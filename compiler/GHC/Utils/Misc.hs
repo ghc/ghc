@@ -23,7 +23,7 @@ module GHC.Utils.Misc (
 
         dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
 
-        List.foldl1', foldl2, count, countWhile, all2, any2,
+        List.foldl1', foldl2, count, countWhile, all2, any2, all2Prefix, all3Prefix,
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -657,6 +657,36 @@ any2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
 -- Unlike `all2`, this ignores excess elements of the other list
 any2 p (x:xs) (y:ys) = p x y || any2 p xs ys
 any2 _ _      _      = False
+
+all2Prefix :: forall a b. (a -> b -> Bool) -> [a] -> [b] -> Bool
+-- ^ `all2Prefix p xs ys` is a fused version of `and $ zipWith2 p xs ys`.
+-- (It generates good code nonetheless.)
+-- So if one list is shorter than the other, `p` is assumed to be `True` for the
+-- suffix.
+all2Prefix p = foldr k z
+  where
+    k :: a -> ([b] -> Bool) -> [b] -> Bool
+    k x go ys' = case ys' of
+      (y:ys'') -> p x y && go ys''
+      _ -> True
+    z :: [b] -> Bool
+    z _ = True
+{-# INLINE all2Prefix #-}
+
+all3Prefix :: forall a b c. (a -> b -> c -> Bool) -> [a] -> [b] -> [c] -> Bool
+-- ^ `all3Prefix p xs ys zs` is a fused version of `and $ zipWith3 p xs ys zs`.
+-- (It generates good code nonetheless.)
+-- So if one list is shorter than the others, `p` is assumed to be `True` for
+-- the suffix.
+all3Prefix p = foldr k z
+  where
+    k :: a -> ([b] -> [c] -> Bool) -> [b] -> [c] -> Bool
+    k x go ys' zs' = case (ys',zs') of
+      (y:ys'',z:zs'') -> p x y z && go ys'' zs''
+      _ -> False
+    z :: [b] -> [c] -> Bool
+    z _ _ = True
+{-# INLINE all3Prefix #-}
 
 -- Count the number of times a predicate is true
 

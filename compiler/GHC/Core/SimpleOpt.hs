@@ -1286,11 +1286,8 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        --       simplifier produces rhs[exp/a], changing semantics if exp is not ok-for-spec
        -- Good: returning (Mk#, [x]) with a float of  case exp of x { DEFAULT -> [] }
        --       simplifier produces case exp of a { DEFAULT -> exp[x/a] }
-       = let arg' = subst_expr subst arg
-             bndr = uniqAway (subst_in_scope subst) (mkWildValBinder ManyTy arg_type)
-             float = FloatCase arg' bndr DEFAULT []
-             subst' = subst_extend_in_scope subst bndr
-         in go subst' (float:floats) fun (CC (Var bndr : args) mco)
+       , (subst', float, bndr) <- case_bind subst arg arg_type
+       = go subst' (float:floats) fun (CC (Var bndr : args) mco)
        | otherwise
        = go subst floats fun (CC (subst_expr subst arg : args) mco)
 
@@ -1333,8 +1330,10 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
 
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
-        = succeedWith in_scope floats $
-          pushCoDataCon con args mco
+        , (in_scope', seq_floats, args') <- mkFieldSeqFloats in_scope con args
+          -- mkFieldSeqFloats: See (SFC2) in Note [Strict fields in Core]
+        = succeedWith in_scope' (seq_floats ++ floats) $
+          pushCoDataCon con args' mco
 
         -- Look through data constructor wrappers: they inline late (See Note
         -- [Activation for data constructor wrappers]) but we want to do
@@ -1419,6 +1418,38 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
 
+    case_bind :: Either InScopeSet Subst -> CoreExpr -> Type -> (Either InScopeSet Subst, FloatBind, Id)
+    case_bind subst expr expr_ty = (subst', float, bndr)
+      where
+        bndr   = setCaseBndrEvald MarkedStrict $
+                 uniqAway (subst_in_scope subst) $
+                 mkWildValBinder ManyTy expr_ty
+        subst' = subst_extend_in_scope subst bndr
+        expr'  = subst_expr subst expr
+        float  = FloatCase expr' bndr DEFAULT []
+
+    mkFieldSeqFloats :: InScopeSet -> DataCon -> [CoreExpr] -> (InScopeSet, [FloatBind], [CoreExpr])
+    -- See Note [Strict fields in Core] for what a field seq is and (SFC2) for
+    -- why we insert them
+    mkFieldSeqFloats in_scope dc args
+      | isLazyDataConRep dc
+      = (in_scope, [], args)
+      | otherwise
+      = (in_scope', floats', ty_args ++ val_args')
+      where
+        (ty_args, val_args) = splitAtList (dataConUnivAndExTyCoVars dc) args
+        (in_scope', floats', val_args') = foldr do_one (in_scope, [], []) $ zipEqual "mkFieldSeqFloats" str_marks val_args
+        str_marks = dataConRepStrictness dc
+        do_one (str, arg) (in_scope,floats,args)
+          | NotMarkedStrict <- str   = no_seq
+          | exprIsHNF arg            = no_seq
+          | otherwise                = (in_scope', float:floats, Var bndr:args)
+          where
+            no_seq = (in_scope, floats, arg:args)
+            (in_scope', float, bndr) =
+               case case_bind (Left in_scope) arg (exprType arg) of
+                 (Left in_scope', float, bndr) -> (in_scope', float, bndr)
+                 (right, _, _) -> pprPanic "case_bind did not preserve Left" (ppr in_scope $$ ppr arg $$ ppr right)
 
 -- See Note [exprIsConApp_maybe on literal strings]
 dealWithStringLiteral :: Var -> BS.ByteString -> MCoercion
