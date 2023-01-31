@@ -493,7 +493,8 @@ function h$follow(obj, sp) {
 		    }
                 }
 		for(i=0;i<c.excep.length;i++) {
-		    ADDW(c.excep[i]);
+		    ADDW(c.excep[i][0]); // the posting thread
+		    ADDW(c.excep[i][1]); // the exception
 		}
             } else if(c instanceof h$Transaction) {
                 // - the accessed TVar values don't need to be marked
