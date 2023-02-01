@@ -44,3 +44,6 @@ test(
 )
 test('T15531', normal, compile, ['-Wall'])
 test('T22043', [omit_ways(['ghci'])], compile, [''])
+
+test('T22774', when(not js_arch(), expect_fail), compile, [''])
+
