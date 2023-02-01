@@ -74,6 +74,7 @@ packageArgs = do
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
+            , flag UseLibzstd `cabalFlag` "with-libzstd"
             -- ROMES: While the boot compiler is not updated wrt -this-unit-id
             -- not being fixed to `ghc`, when building stage0, we must set
             -- -this-unit-id to `ghc` because the boot compiler expects that.
@@ -288,6 +289,8 @@ rtsPackageArgs = package rts ? do
     libdwLibraryDir   <- getSetting LibdwLibDir
     libnumaIncludeDir <- getSetting LibnumaIncludeDir
     libnumaLibraryDir <- getSetting LibnumaLibDir
+    libzstdIncludeDir <- getSetting LibZstdIncludeDir
+    libzstdLibraryDir <- getSetting LibZstdLibDir
 
     -- Arguments passed to GHC when compiling C and .cmm sources.
     let ghcArgs = mconcat
@@ -394,6 +397,7 @@ rtsPackageArgs = package rts ? do
         , builder (Cabal Setup) ? mconcat
               [ cabalExtraDirs libdwIncludeDir libdwLibraryDir
               , cabalExtraDirs libnumaIncludeDir libnumaLibraryDir
+              , cabalExtraDirs libzstdIncludeDir libzstdLibraryDir
               , useSystemFfi ? cabalExtraDirs ffiIncludeDir ffiLibraryDir
               ]
         , builder (Cc (FindCDependencies CDep)) ? cArgs

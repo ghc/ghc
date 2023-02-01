@@ -1105,6 +1105,10 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 
+dnl ** IPE data compression
+dnl --------------------------------------------------------------
+FP_FIND_LIBZSTD
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW

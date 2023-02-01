@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 
 import GHC.Prelude
@@ -24,6 +26,13 @@ import Control.Monad.Trans.State.Strict
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as BSL
+
+do_compress :: Int
+#if defined(HAVE_LIBZSTD)
+do_compress = 1
+#else
+do_compress = 0
+#endif
 
 emitIpeBufferListNode ::
      Module
@@ -66,7 +75,7 @@ emitIpeBufferListNode this_mod ents = do
             zeroCLit platform
 
             -- 'compressed' field
-          , int $ 0 -- hardcoded to 0 for now
+          , int $ do_compress
 
             -- 'count' field
           , int $ length cg_ipes

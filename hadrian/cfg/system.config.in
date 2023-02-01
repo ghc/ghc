@@ -199,10 +199,14 @@ libdw-lib-dir       = @LibdwLibDir@
 libnuma-include-dir   = @LibNumaIncludeDir@
 libnuma-lib-dir       = @LibNumaLibDir@
 
+libzstd-include-dir   = @LibZstdIncludeDir@
+libzstd-lib-dir       = @LibZstdLibDir@
+
 # Optional Dependencies:
 #=======================
 
 use-lib-dw        = @UseLibdw@
+use-lib-zstd      = @UseLibZstd@
 use-lib-numa      = @UseLibNuma@
 use-lib-m         = @UseLibm@
 use-lib-rt        = @UseLibrt@
