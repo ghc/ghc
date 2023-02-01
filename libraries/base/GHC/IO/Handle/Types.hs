@@ -124,11 +124,11 @@ data Handle__
     Handle__ {
       haDevice      :: !dev,
       haType        :: HandleType,           -- type (read/write/append etc.)
-      haByteBuffer  :: !(IORef (Buffer Word8)), -- See [note Buffering Implementation]
+      haByteBuffer  :: !(IORef (Buffer Word8)), -- See Note [Buffering Implementation]
       haBufferMode  :: BufferMode,
       haLastDecode  :: !(IORef (dec_state, Buffer Word8)),
       -- ^ The byte buffer just  before we did our last batch of decoding.
-      haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- See [note Buffering Implementation]
+      haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- See Note [Buffering Implementation]
       haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
       haEncoder     :: Maybe (TextEncoder enc_state),
       haDecoder     :: Maybe (TextDecoder dec_state),
@@ -261,13 +261,13 @@ data BufferMode
             )
 
 {-
-[note Buffering Implementation]
-
+Note [Buffering Implementation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Each Handle has two buffers: a byte buffer (haByteBuffer) and a Char
 buffer (haCharBuffer).
 
-[note Buffered Reading]
-
+Note [Buffered Reading]
+~~~~~~~~~~~~~~~~~~~~~~~
 For read Handles, bytes are read into the byte buffer, and immediately
 decoded into the Char buffer (see
 GHC.IO.Handle.Internals.readTextDevice).  The only way there might be
@@ -279,8 +279,8 @@ reading data into a Handle.  When reading, we can always just read all
 the data there is available without blocking, decode it into the Char
 buffer, and then provide it immediately to the caller.
 
-[note Buffered Writing]
-
+Note [Buffered Writing]
+~~~~~~~~~~~~~~~~~~~~~~~
 Characters are written into the Char buffer by e.g. hPutStr.  At the
 end of the operation, or when the char buffer is full, the buffer is
 decoded to the byte buffer (see writeCharBuffer).  This is so that we
@@ -288,8 +288,8 @@ can detect encoding errors at the right point.
 
 Hence, the Char buffer is always empty between Handle operations.
 
-[note Buffer Sizing]
-
+Note [Buffer Sizing]
+~~~~~~~~~~~~~~~~~~~~
 The char buffer is always a default size (dEFAULT_CHAR_BUFFER_SIZE).
 The byte buffer size is chosen by the underlying device (via its
 IODevice.newBuffer).  Hence the size of these buffers is not under
@@ -322,8 +322,8 @@ writeCharBuffer, which checks whether the buffer should be flushed
 according to the current buffering mode.  Additionally, we look for
 newlines and flush if the mode is LineBuffering.
 
-[note Buffer Flushing]
-
+Note [Buffer Flushing]
+~~~~~~~~~~~~~~~~~~~~~~
 ** Flushing the Char buffer
 
 We must be able to flush the Char buffer, in order to implement
