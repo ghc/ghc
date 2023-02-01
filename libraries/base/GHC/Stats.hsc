@@ -162,7 +162,8 @@ data GCDetails = GCDetails {
     -- | The amount of memory lost due to block fragmentation in bytes.
     -- Block fragmentation is the difference between the amount of blocks retained by the RTS and the blocks that are in use.
     -- This occurs when megablocks are only sparsely used, eg, when data that cannot be moved retains a megablock.
-    -- @since 4.17.0.0
+    --
+    -- @since 4.18.0.0
   , gcdetails_block_fragmentation_bytes :: Word64
     -- | The time elapsed during synchronisation before GC
   , gcdetails_sync_elapsed_ns :: RtsTime
