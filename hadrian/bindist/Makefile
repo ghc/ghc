@@ -92,6 +92,7 @@ lib/settings : config.mk
 	@echo ',("ld flags", "$(SettingsLdFlags)")' >> $@
 	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
+	@echo ',("ld supports response files", "$(LdSupportsResponseFiles)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
 	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
 	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@

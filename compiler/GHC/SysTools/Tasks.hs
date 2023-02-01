@@ -29,7 +29,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
-import GHC.Utils.Constants (isWindowsHost)
 import GHC.Utils.Panic
 
 import Data.List (tails, isPrefixOf)
@@ -350,9 +349,7 @@ runMergeObjects logger tmpfs dflags args =
             , "does not support object merging." ]
         optl_args = map Option (getOpts dflags opt_lm)
         args2     = args0 ++ args ++ optl_args
-    -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
-    -- use them on Windows where they are truly necessary.
-    if isWindowsHost
+    if toolSettings_ldSupportsResponseFiles (toolSettings dflags)
       then do
         mb_env <- getGccEnv args2
         runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env

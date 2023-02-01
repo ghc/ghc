@@ -140,6 +140,7 @@ conf-merge-objects-args-stage3  = @MergeObjsArgs@
 gcc-extra-via-c-opts = @GccExtraViaCOpts@
 ld-has-no-compact-unwind = @LdHasNoCompactUnwind@
 ld-has-filelist = @LdHasFilelist@
+ld-supports-response-files = @LdSupportsResponseFiles@
 ld-is-gnu-ld = @LdIsGNULd@
 ar-args = @ArArgs@
 

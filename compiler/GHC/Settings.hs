@@ -19,6 +19,7 @@ module GHC.Settings
   , sGlobalPackageDatabasePath
   , sLdSupportsCompactUnwind
   , sLdSupportsFilelist
+  , sLdSupportsResponseFiles
   , sLdIsGnuLd
   , sGccSupportsNoPie
   , sUseInplaceMinGW
@@ -87,6 +88,7 @@ data Settings = Settings
 data ToolSettings = ToolSettings
   { toolSettings_ldSupportsCompactUnwind :: Bool
   , toolSettings_ldSupportsFilelist      :: Bool
+  , toolSettings_ldSupportsResponseFiles :: Bool
   , toolSettings_ldIsGnuLd               :: Bool
   , toolSettings_ccSupportsNoPie         :: Bool
   , toolSettings_useInplaceMinGW         :: Bool
@@ -189,6 +191,8 @@ sLdSupportsCompactUnwind :: Settings -> Bool
 sLdSupportsCompactUnwind = toolSettings_ldSupportsCompactUnwind . sToolSettings
 sLdSupportsFilelist :: Settings -> Bool
 sLdSupportsFilelist = toolSettings_ldSupportsFilelist . sToolSettings
+sLdSupportsResponseFiles :: Settings -> Bool
+sLdSupportsResponseFiles = toolSettings_ldSupportsResponseFiles . sToolSettings
 sLdIsGnuLd :: Settings -> Bool
 sLdIsGnuLd = toolSettings_ldIsGnuLd . sToolSettings
 sGccSupportsNoPie :: Settings -> Bool
