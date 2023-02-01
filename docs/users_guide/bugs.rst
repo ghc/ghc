@@ -546,6 +546,16 @@ them will be fixed in the short term.
 Bugs in GHC
 ~~~~~~~~~~~
 
+-  `readIORef` from `Data.IORef` is missing memory barriers and might
+   result in inconsistent or unsafe behaviour in multithreaded programs
+   on architectures with weaker memory models such as AArch64. See
+   :ghc-ticket:`22468` for more details.
+
+-  `isByteArrayPinned#` considers large `ByteArray#`s pinned, even if they
+   were not explicitly pinned. This is incorrect if the `ByteArray#` is
+   subsequently added to a compact region as the `ByteArray#` will be moved in
+   the process. See :ghc-ticket:`22255` for more details.
+
 -  GHC's runtime system implements cooperative multitasking, with
    context switching potentially occurring only when a program
    allocates. This means that programs that do not allocate may never
