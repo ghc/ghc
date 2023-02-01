@@ -3,7 +3,6 @@
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -ddump-stg-final -ddump-to-file #-}
 
 -- -----------------------------------------------------------------------------
 --
