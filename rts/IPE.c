@@ -77,22 +77,22 @@ void exitIpe(void) { }
 
 #endif // THREADED_RTS
 
-static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, const IpeBufferEntry *ent)
+static InfoProvEnt ipeBufferEntryToIpe(const char *strings, const StgInfoTable *tbl, const IpeBufferEntry ent)
 {
-    const char *strings = node->string_table;
     return (InfoProvEnt) {
-            .info = ent->info,
+            .info = tbl,
             .prov = {
-                .table_name = &strings[ent->table_name],
-                .closure_desc = &strings[ent->closure_desc],
-                .ty_desc = &strings[ent->ty_desc],
-                .label = &strings[ent->label],
-                .module = &strings[ent->module_name],
-                .src_file = &strings[ent->src_file],
-                .src_span = &strings[ent->src_span]
+                .table_name = &strings[ent.table_name],
+                .closure_desc = &strings[ent.closure_desc],
+                .ty_desc = &strings[ent.ty_desc],
+                .label = &strings[ent.label],
+                .module = &strings[ent.module_name],
+                .src_file = &strings[ent.src_file],
+                .src_span = &strings[ent.src_span]
             }
     };
 }
+
 
 #if defined(TRACING)
 static void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
@@ -106,7 +106,11 @@ void dumpIPEToEventLog(void) {
     IpeBufferListNode *cursor = RELAXED_LOAD(&ipeBufferList);
     while (cursor != NULL) {
         for (uint32_t i = 0; i < cursor->count; i++) {
-            const InfoProvEnt ent = ipeBufferEntryToIpe(cursor, &cursor->entries[i]);
+            const InfoProvEnt ent = ipeBufferEntryToIpe(
+                cursor->string_table,
+                cursor->tables[i],
+                cursor->entries[i]
+            );
             traceIPE(&ent);
         }
         cursor = cursor->next;
@@ -119,6 +123,7 @@ void dumpIPEToEventLog(void) {
     }
     RELEASE_LOCK(&ipeMapLock);
 }
+
 
 #else
 
@@ -169,15 +174,30 @@ void updateIpeMap() {
     }
 
     while (pending != NULL) {
-        IpeBufferListNode *currentNode = pending;
-        InfoProvEnt *ip_ents = stgMallocBytes(sizeof(InfoProvEnt) * currentNode->count, "updateIpeMap");
-        for (uint32_t i = 0; i < currentNode->count; i++) {
-            const IpeBufferEntry *ent = &currentNode->entries[i];
-            ip_ents[i] = ipeBufferEntryToIpe(currentNode, ent);
-            insertHashTable(ipeMap, (StgWord) ent->info, &ip_ents[i]);
+        IpeBufferListNode *current_node = pending;
+        const char *strings;
+        const IpeBufferEntry *entries;
+
+        // Here is where decompression logic will go if current_node->compressed
+        // is set
+
+        strings = current_node->string_table;
+        entries = current_node->entries;
+
+        // Convert the on-disk IPE buffer entry representation (IpeBufferEntry)
+        // into the runtime representation (InfoProvEnt)
+        InfoProvEnt *ip_ents = stgMallocBytes(
+            sizeof(InfoProvEnt) * current_node->count,
+            "updateIpeMap: ip_ents"
+        );
+        for (uint32_t i = 0; i < current_node->count; i++) {
+            const IpeBufferEntry ent = entries[i];
+            const StgInfoTable *tbl = current_node->tables[i];
+            ip_ents[i] = ipeBufferEntryToIpe(strings, tbl, ent);
+            insertHashTable(ipeMap, (StgWord) tbl, &ip_ents[i]);
         }
 
-        pending = currentNode->next;
+        pending = current_node->next;
     }
 
     RELEASE_LOCK(&ipeMapLock);
