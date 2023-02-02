@@ -181,12 +181,46 @@ void updateIpeMap() {
         IpeBufferListNode *current_node = pending;
         const char *strings;
         const IpeBufferEntry *entries;
+        if (current_node->compressed) {
+            // The strings table and IPE data has been compressed. Begin by
+            // decompressing the strings table.
+            size_t decompressed_sz = ZSTD_findFrameCompressedSize(
+                current_node->string_table,
+                current_node->string_table_size
+            );
+            char *decompressed_strings = stgMallocBytes(
+                decompressed_sz,
+                "updateIpeMap: decompressed_strings"
+            );
+            ZSTD_decompress(
+                decompressed_strings,
+                decompressed_sz,
+                current_node->string_table,
+                current_node->string_table_size
+            );
+            strings = decompressed_strings;
 
-        // Here is where decompression logic will go if current_node->compressed
-        // is set
-
-        strings = current_node->string_table;
-        entries = current_node->entries;
+            // Decompress the IPE data
+            decompressed_sz = ZSTD_findFrameCompressedSize(
+                current_node->entries,
+                current_node->entries_size
+            );
+            void *decompressed_entries = stgMallocBytes(
+                decompressed_sz,
+                "updateIpeMap: decompressed_entries"
+            );
+            ZSTD_decompress(
+                decompressed_entries,
+                decompressed_sz,
+                current_node->entries,
+                current_node->entries_size
+            );
+            entries = decompressed_entries;
+        } else {
+            // Not compressed, no need to decompress
+            strings = current_node->string_table;
+            entries = current_node->entries;
+        }
 
         // Convert the on-disk IPE buffer entry representation (IpeBufferEntry)
         // into the runtime representation (InfoProvEnt)

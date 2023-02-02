@@ -45,6 +45,8 @@ flag libdw
   default: @CabalHaveLibdw@
 flag libnuma
   default: @CabalHaveLibNuma@
+flag libzstd
+  default: @CabalHaveLibZstd@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
 flag smp
@@ -211,6 +213,8 @@ library
          extra-libraries: elf dw
       if flag(libnuma)
          extra-libraries: numa
+      if flag(libzstd)
+         extra-libraries: zstd
       if !flag(smp)
          cpp-options: -DNOSMP
 
