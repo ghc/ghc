@@ -26,6 +26,9 @@ struct GcConfig {
     bool overflow_gc;
     // is this GC triggered by a deadlock?
     bool deadlock_detect;
+    // should we force non-concurrent collection if the non-moving collector is
+    // being used?
+    bool nonconcurrent;
     // should we use parallel scavenging?
     bool parallel;
 };

@@ -27,8 +27,10 @@
 #include "sm/Storage.h"
 #include "CNF.h"
 
+#if defined(THREADED_RTS)
 static void nonmovingResetUpdRemSetQueue (MarkQueue *rset);
 static void nonmovingResetUpdRemSet (UpdRemSet *rset);
+#endif
 static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void trace_tso (MarkQueue *queue, StgTSO *tso);
@@ -955,6 +957,7 @@ void nonmovingInitUpdRemSet (UpdRemSet *rset)
     rset->queue.is_upd_rem_set = true;
 }
 
+#if defined(THREADED_RTS)
 static void nonmovingResetUpdRemSetQueue (MarkQueue *rset)
 {
     // UpdRemSets always have one block for the mark queue. This assertion is to
@@ -968,6 +971,7 @@ void nonmovingResetUpdRemSet (UpdRemSet *rset)
 {
     nonmovingResetUpdRemSetQueue(&rset->queue);
 }
+#endif
 
 void freeMarkQueue (MarkQueue *queue)
 {
