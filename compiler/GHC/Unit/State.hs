@@ -360,7 +360,7 @@ initUnitConfig dflags cached_dbs home_units =
          | not (gopt Opt_AutoLinkPackages dflags) = []
          -- By default we add base & rts to the preload units (when they are
          -- found in the unit database) except when we are building them
-         | otherwise = filter (hu_id /=) [baseUnitId, rtsUnitId]
+         | otherwise = filter (hu_id /=) [ghcBaseUnitId, rtsUnitId]
 
        -- if the home unit is indefinite, it means we are type-checking it only
        -- (not producing any code). Hence we can use virtual units instantiated

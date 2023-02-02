@@ -673,7 +673,7 @@ mkBaseModule :: FastString -> Module
 mkBaseModule m = mkBaseModule_ (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
-mkBaseModule_ m = mkModule baseUnit m
+mkBaseModule_ m = mkModule ghcBaseUnit m
 
 mkThisGhcModule :: FastString -> Module
 mkThisGhcModule m = mkThisGhcModule_ (mkModuleNameFS m)

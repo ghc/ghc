@@ -540,7 +540,7 @@ runCcPhase cc_phase pipe_env hsc_env location input_fn = do
           -- way we do the import depends on whether we're currently compiling
           -- the base package or not.
                  ++ (if platformOS platform == OSMinGW32 &&
-                        isHomeUnitId home_unit baseUnitId
+                        isHomeUnitId home_unit ghcBaseUnitId
                           then [ "-DCOMPILING_BASE_PACKAGE" ]
                           else [])
 

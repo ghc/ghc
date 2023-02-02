@@ -623,7 +623,7 @@ diffDeps pkgs (deps_pkgs,deps_funs) =
 -- | dependencies for the RTS, these need to be always linked
 rtsDeps :: [UnitId] -> ([UnitId], Set ExportedFun)
 rtsDeps pkgs = diffDeps pkgs $
-  ( [baseUnitId, primUnitId]
+  ( [ghcBaseUnitId, primUnitId]
   , S.fromList $ concat
       [ mkBaseFuns "GHC.Conc.Sync"
           ["reportError"]
@@ -684,7 +684,7 @@ rtsDeps pkgs = diffDeps pkgs $
 
 -- | Export the functions in base
 mkBaseFuns :: FastString -> [FastString] -> [ExportedFun]
-mkBaseFuns = mkExportedFuns baseUnitId
+mkBaseFuns = mkExportedFuns ghcBaseUnitId
 
 -- | Export the Prim functions
 mkPrimFuns :: FastString -> [FastString] -> [ExportedFun]

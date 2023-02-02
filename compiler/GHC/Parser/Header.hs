@@ -139,7 +139,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
         -- allow explicit "base" package qualifier (#19082, #17045)
         && case ideclPkgQual decl of
             NoRawPkgQual -> True
-            RawPkgQual b -> sl_fs b == unitIdFS baseUnitId
+            RawPkgQual b -> sl_fs b == unitIdFS ghcBaseUnitId
 
 
       loc' = noAnnSrcSpan loc

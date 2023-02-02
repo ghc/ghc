@@ -62,7 +62,7 @@ module GHC.Unit.Types
      -- * Wired-in units
    , primUnitId
    , bignumUnitId
-   , baseUnitId
+   , ghcBaseUnitId
    , rtsUnitId
    , thUnitId
    , mainUnitId
@@ -71,7 +71,7 @@ module GHC.Unit.Types
 
    , primUnit
    , bignumUnit
-   , baseUnit
+   , ghcBaseUnit
    , rtsUnit
    , thUnit
    , mainUnit
@@ -587,15 +587,15 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 -}
 
-bignumUnitId, primUnitId, baseUnitId, rtsUnitId,
+bignumUnitId, primUnitId, ghcBaseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 
-bignumUnit, primUnit, baseUnit, rtsUnit,
+bignumUnit, primUnit, ghcBaseUnit, rtsUnit,
   thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
 
 primUnitId        = UnitId (fsLit "ghc-prim")
 bignumUnitId      = UnitId (fsLit "ghc-bignum")
-baseUnitId        = UnitId (fsLit "base")
+ghcBaseUnitId     = UnitId (fsLit "base")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit "ghc")
 interactiveUnitId = UnitId (fsLit "interactive")
@@ -604,7 +604,7 @@ thUnitId          = UnitId (fsLit "template-haskell")
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)
 bignumUnit        = RealUnit (Definite bignumUnitId)
-baseUnit          = RealUnit (Definite baseUnitId)
+ghcBaseUnit       = RealUnit (Definite ghcBaseUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
@@ -622,7 +622,7 @@ wiredInUnitIds :: [UnitId]
 wiredInUnitIds =
    [ primUnitId
    , bignumUnitId
-   , baseUnitId
+   , ghcBaseUnitId
    , rtsUnitId
    , thUnitId
    , thisGhcUnitId
