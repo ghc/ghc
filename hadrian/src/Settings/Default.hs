@@ -127,6 +127,7 @@ stage1Packages = do
     return $ mconcat
       [ libraries0 -- Build all Stage0 libraries in Stage1
       , [ array
+        , ghcBase
         , base
         , containers
         , deepseq
