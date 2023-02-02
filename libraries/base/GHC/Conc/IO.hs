@@ -65,12 +65,12 @@ import GHC.IO.SubSystem
 import GHC.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
-#elif !defined(js_HOST_ARCH)
+#elif !defined(javascript_HOST_ARCH)
 import qualified GHC.Event.Thread as Event
 #endif
 
 ensureIOManagerIsRunning :: IO ()
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 ensureIOManagerIsRunning = pure ()
 #elif !defined(mingw32_HOST_OS)
 ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
@@ -91,7 +91,7 @@ interruptIOManager = Windows.interruptIOManager
 #endif
 
 ioManagerCapabilitiesChanged :: IO ()
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
 ioManagerCapabilitiesChanged = Event.ioManagerCapabilitiesChanged
 #else
 ioManagerCapabilitiesChanged = return ()
@@ -105,7 +105,7 @@ ioManagerCapabilitiesChanged = return ()
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitRead fd
 #endif
   | otherwise = IO $ \s ->
@@ -121,7 +121,7 @@ threadWaitRead fd
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitWrite fd
 #endif
   | otherwise = IO $ \s ->
@@ -135,7 +135,7 @@ threadWaitWrite fd
 -- in the file descriptor.
 threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
 threadWaitReadSTM fd
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitReadSTM fd
 #endif
   | otherwise = do
@@ -154,7 +154,7 @@ threadWaitReadSTM fd
 -- in the file descriptor.
 threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
 threadWaitWriteSTM fd
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadWaitWriteSTM fd
 #endif
   | otherwise = do
@@ -179,7 +179,7 @@ closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
             -> Fd            -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
   | threaded  = Event.closeFdWith close fd
 #endif
   | otherwise = close fd
@@ -199,7 +199,7 @@ threadDelay time
 #if defined(mingw32_HOST_OS)
   | isWindowsNativeIO = Windows.threadDelay time
   | threaded          = Windows.threadDelay time
-#elif !defined(js_HOST_ARCH)
+#elif !defined(javascript_HOST_ARCH)
   | threaded  = Event.threadDelay time
 #endif
   | otherwise         = IO $ \s ->
@@ -219,11 +219,11 @@ registerDelay _usecs
 #if defined(mingw32_HOST_OS)
   | isWindowsNativeIO = Windows.registerDelay _usecs
   | threaded          = Windows.registerDelay _usecs
-#elif !defined(js_HOST_ARCH)
+#elif !defined(javascript_HOST_ARCH)
   | threaded          = Event.registerDelay _usecs
 #endif
   | otherwise         = errorWithoutStackTrace "registerDelay: requires -threaded"
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 #endif

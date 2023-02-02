@@ -1449,7 +1449,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate": {
+  "nightly-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1459,7 +1459,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate.tar.xz",
+        "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1501,13 +1501,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
-      "CROSS_TARGET": "js-unknown-ghcjs",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate",
+      "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -3993,7 +3993,7 @@
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
   },
-  "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate": {
+  "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -4003,7 +4003,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate.tar.xz",
+        "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -4045,13 +4045,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
-      "CROSS_TARGET": "js-unknown-ghcjs",
-      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_js-unknown-ghcjs-validate"
+      "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate"
     }
   },
   "x86_64-linux-fedora33-release": {

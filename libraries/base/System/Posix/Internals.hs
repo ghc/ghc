@@ -429,7 +429,7 @@ c_safe_open filepath oflags mode =
 hostIsThreaded :: Bool
 hostIsThreaded = rtsIsThreaded_ /= 0
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
@@ -454,7 +454,7 @@ foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
 #endif
 
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 
 foreign import javascript unsafe "(() => { return rts_isThreaded; })" rtsIsThreaded_ :: Int
 foreign import javascript interruptible "(($1_1, $2_2, $2, $c) => { return h$base_access($1_1,$2_2,$2,$c); })"
@@ -743,7 +743,7 @@ foreign import ccall unsafe "HsBase.h getpid"
 #endif
 #endif
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "HsBase.h __hscore_stat"
    c_stat :: CFilePath -> Ptr CStat -> IO CInt
 
@@ -751,7 +751,7 @@ foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
    c_ftruncate :: CInt -> COff -> IO CInt
 #endif
 
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
 foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
@@ -822,7 +822,7 @@ c_waitpid _ _ _ = ioError (ioeSetLocation unsupportedOperation "waitpid")
 
 #endif
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 -- POSIX flags only:
 foreign import ccall unsafe "HsBase.h __hscore_o_rdonly" o_RDONLY :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_o_wronly" o_WRONLY :: CInt

@@ -180,7 +180,7 @@ initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 -- N.B. initLocaleEncoding is exported for use in System.IO.localeEncoding.
 -- NOINLINE ensures that this result is shared.
 
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 initLocaleEncoding     = utf8
 initFileSystemEncoding = utf8
 initForeignEncoding    = utf8

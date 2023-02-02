@@ -136,7 +136,7 @@ stringEncodeArch = \case
   ArchMipsel        -> "mipsel"
   ArchRISCV64       -> "riscv64"
   ArchLoongArch64   -> "loongarch64"
-  ArchJavaScript    -> "js"
+  ArchJavaScript    -> "javascript"
   ArchWasm32        -> "wasm32"
 
 -- | See Note [Platform Syntax].

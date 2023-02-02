@@ -19,7 +19,7 @@
 
 -- #not-home
 module GHC.Conc.Windows
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
        () where
 #else
        ( ensureIOManagerIsRunning

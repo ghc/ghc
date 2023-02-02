@@ -139,12 +139,12 @@ def skip( name, opts ):
 
 # disable test on JS arch
 def js_skip( name, opts ):
-    if arch("js"):
+    if arch("javascript"):
         skip(name,opts)
 
 # expect broken for the JS backend
 def js_broken( bug: IssueNumber ):
-    if arch("js"):
+    if arch("javascript"):
         return expect_broken(bug);
     else:
         return normal;
@@ -2364,7 +2364,7 @@ def normalise_errmsg(s: str) -> str:
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
-    # Remove platform prefix (e.g. js-unknown-ghcjs) for cross-compiled tools
+    # Remove platform prefix (e.g. javascript-unknown-ghcjs) for cross-compiled tools
     # (ghc, ghc-pkg, unlit, etc.)
     s = re.sub('\\w+-\\w+-\\w+-ghc', 'ghc', s)
     s = re.sub('\\w+-\\w+-\\w+-unlit', 'unlit', s)

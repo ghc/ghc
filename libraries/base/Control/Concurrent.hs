@@ -106,7 +106,7 @@ module Control.Concurrent (
     ) where
 
 -- JavaScript platform doesn't support bound threads
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 #define SUPPORT_BOUND_THREADS
 #endif
 

@@ -10,7 +10,7 @@
 module GHC.JS.Prim ( JSVal(..), JSVal#
                    , JSException(..)
                    , WouldBlockException(..)
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
                   , toIO
                   , resolve
                   , resolveIO
@@ -54,7 +54,7 @@ import           GHC.IO
   argument or result.
 -}
 
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 data JSVal  = JSVal ByteArray#
 type JSVal# = ByteArray#
 #else
@@ -75,7 +75,7 @@ instance Ex.Exception JSException
 instance Show JSException where
   show (JSException _ xs) = "JavaScript exception: " ++ xs
 
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 
 {-# NOINLINE toIO #-}
 toIO :: Exts.Any -> IO Exts.Any

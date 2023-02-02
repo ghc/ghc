@@ -5,7 +5,7 @@
 #include <ghcplatform.h>
 
 module GHC.Event.Thread
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
     ( ) where
 #else
     ( getSystemEventManager

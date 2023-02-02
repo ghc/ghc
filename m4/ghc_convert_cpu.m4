@@ -83,8 +83,8 @@ case "$1" in
   wasm32)
     $2="wasm32"
     ;;
-  js)
-    $2="js"
+  javascript)
+    $2="javascript"
     ;;
   *)
     echo "Unknown CPU $1"

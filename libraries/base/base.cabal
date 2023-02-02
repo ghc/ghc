@@ -362,7 +362,7 @@ Library
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
-    if !arch(js)
+    if !arch(javascript)
       c-sources:
           cbits/DarwinUtils.c
           cbits/PrelIOUtils.c
@@ -378,7 +378,7 @@ Library
           cbits/CastFloatWord.cmm
           cbits/StackCloningDecoding.cmm
 
-    if arch(js)
+    if arch(javascript)
       js-sources:
           -- "platform" must be linked first because it defines global constants
           -- (e.g. h$isNode)
@@ -460,7 +460,7 @@ Library
             System.CPUTime.Posix.RUsage
             System.CPUTime.Unsupported
 
-        if arch(js)
+        if arch(javascript)
           other-modules:
             System.CPUTime.Javascript
 
@@ -470,7 +470,7 @@ Library
     if os(freebsd)
         cc-options: -DLIBICONV_PLUG
 
-    if arch(js)
+    if arch(javascript)
         exposed-modules:
             GHC.JS.Prim
             GHC.JS.Prim.Internal
