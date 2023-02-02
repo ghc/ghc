@@ -166,7 +166,10 @@ static bool scheduleHandleThreadFinished( Capability *cap, Task *task,
                                           StgTSO *t );
 static bool scheduleNeedHeapProfile(bool ready_to_gc);
 static void scheduleDoGC( Capability **pcap, Task *task,
-                          bool force_major, bool is_overflow_gc, bool deadlock_detect );
+                          bool force_major,
+                          bool is_overflow_gc,
+                          bool deadlock_detect,
+                          bool nonconcurrent );
 
 static void deleteThread (StgTSO *tso);
 static void deleteAllThreads (void);
@@ -268,7 +271,7 @@ schedule (Capability *initialCapability, Task *task)
     case SCHED_INTERRUPTING:
         debugTrace(DEBUG_sched, "SCHED_INTERRUPTING");
         /* scheduleDoGC() deletes all the threads */
-        scheduleDoGC(&cap,task,true,false,false);
+        scheduleDoGC(&cap,task,true,false,false,false);
 
         // after scheduleDoGC(), we must be shutting down.  Either some
         // other Capability did the final GC, or we did it above,
@@ -577,7 +580,7 @@ run_thread:
     }
 
     if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
-      scheduleDoGC(&cap,task,false,ready_to_gc,false);
+      scheduleDoGC(&cap,task,false,ready_to_gc,false,false);
     }
   } /* end of while() */
 }
@@ -951,7 +954,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
         // they are unreachable and will therefore be sent an
         // exception.  Any threads thus released will be immediately
         // runnable.
-        scheduleDoGC (pcap, task, true/*force major GC*/, false /* Whether it is an overflow GC */, true/*deadlock detection*/);
+        scheduleDoGC (pcap, task, true/*force major GC*/, false /* Whether it is an overflow GC */, true/*deadlock detection*/, false/*nonconcurrent*/);
         cap = *pcap;
         // when force_major == true. scheduleDoGC sets
         // recent_activity to ACTIVITY_DONE_GC and turns off the timer
@@ -1000,7 +1003,7 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
     while (!emptyInbox(cap)) {
         // Executing messages might use heap, so we should check for GC.
         if (doYouWantToGC(cap)) {
-            scheduleDoGC(pcap, cap->running_task, false, false, false);
+            scheduleDoGC(pcap, cap->running_task, false, false, false, false);
             cap = *pcap;
         }
 
@@ -1566,7 +1569,10 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 // behind deadlock_detect argument.
 static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
-              bool force_major, bool is_overflow_gc, bool deadlock_detect)
+              bool force_major,
+              bool is_overflow_gc,
+              bool deadlock_detect,
+              bool nonconcurrent)
 {
     Capability *cap = *pcap;
     bool heap_census;
@@ -1857,6 +1863,7 @@ delete_threads_and_gc:
         .do_heap_census = heap_census,
         .overflow_gc = is_overflow_gc,
         .deadlock_detect = deadlock_detect,
+        .nonconcurrent = nonconcurrent
     };
 
 #if defined(THREADED_RTS)
@@ -2762,7 +2769,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
         nonmovingStop();
         Capability *cap = task->cap;
         waitForCapability(&cap,task);
-        scheduleDoGC(&cap,task,true,false,false);
+        scheduleDoGC(&cap,task,true,false,false,true);
         ASSERT(task->incall->tso == NULL);
         releaseCapability(cap);
     }
@@ -2817,7 +2824,7 @@ void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
    -------------------------------------------------------------------------- */
 
 static void
-performGC_(bool force_major)
+performGC_(bool force_major, bool nonconcurrent)
 {
     Task *task;
     Capability *cap = NULL;
@@ -2830,7 +2837,7 @@ performGC_(bool force_major)
     // TODO: do we need to traceTask*() here?
 
     waitForCapability(&cap,task);
-    scheduleDoGC(&cap,task,force_major,false,false);
+    scheduleDoGC(&cap,task,force_major,false,false,nonconcurrent);
     releaseCapability(cap);
     exitMyTask();
 }
@@ -2838,13 +2845,19 @@ performGC_(bool force_major)
 void
 performGC(void)
 {
-    performGC_(false);
+    performGC_(false, false);
 }
 
 void
 performMajorGC(void)
 {
-    performGC_(true);
+    performGC_(true, false);
+}
+
+void
+performBlockingMajorGC(void)
+{
+    performGC_(true, true);
 }
 
 /* ---------------------------------------------------------------------------

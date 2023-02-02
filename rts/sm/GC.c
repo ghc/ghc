@@ -856,6 +856,8 @@ GarbageCollect (struct GcConfig config,
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
   ASSERT(oldest_gen->scavenged_large_objects == NULL);
   if (RtsFlags.GcFlags.useNonmoving && major_gc) {
+      bool concurrent = false;
+
       // All threads in non-moving heap should be found to be alive, because
       // threads in the non-moving generation's list should live in the
       // non-moving heap, and we consider non-moving objects alive during
@@ -869,18 +871,21 @@ GarbageCollect (struct GcConfig config,
       // old_weak_ptr_list should be empty.
       ASSERT(oldest_gen->old_weak_ptr_list == NULL);
 
+#if defined(THREADED_RTS)
+      concurrent = !config.nonconcurrent;
+#else
+      // In the non-threaded runtime this is the only time we push to the
+      // upd_rem_set
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set);
+#endif
+
       // dead_weak_ptr_list contains weak pointers with dead keys. Those need to
       // be kept alive because we'll use them in finalizeSchedulers(). Similarly
       // resurrected_threads are also going to be used in resurrectedThreads()
       // so we need to mark those too.
       // Note that in sequential case these lists will be appended with more
       // weaks and threads found to be dead in mark.
-#if !defined(THREADED_RTS)
-      // In the non-threaded runtime this is the only time we push to the
-      // upd_rem_set
-      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set);
-#endif
-      nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
+      nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads, concurrent);
   }
 
   // Update the max size of older generations after a major GC:

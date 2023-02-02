@@ -146,7 +146,8 @@ void nonmovingExit(void);
 //   directly, but in a pause.
 //
 void nonmovingCollect(StgWeak **dead_weaks,
-                       StgTSO **resurrected_threads);
+                      StgTSO **resurrected_threads,
+                      bool concurrent);
 
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
 

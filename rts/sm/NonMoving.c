@@ -549,7 +549,7 @@ MarkBudget sync_phase_marking_budget = 200000;
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
 #endif
-static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
+static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent);
 
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
@@ -713,7 +713,7 @@ static void nonmovingPrepareMark(void)
 #endif
 }
 
-void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
+void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent STG_UNUSED)
 {
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
@@ -800,7 +800,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     }
     trace(TRACE_nonmoving_gc, "Finished nonmoving GC preparation");
 
-    // We are now safe to start concurrent marking
+    // We are now safe to start (possibly concurrent) marking
 
     // Note that in concurrent mark we can't use dead_weaks and
     // resurrected_threads from the preparation to add new weaks and threads as
@@ -808,13 +808,17 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // those lists to mark function in sequential case. In concurrent case we
     // allocate fresh lists.
 
-#if defined(THREADED_RTS)
     // If we're interrupting or shutting down, do not let this capability go and
     // run a STW collection. Reason: we won't be able to acquire this capability
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (getSchedState() == SCHED_RUNNING) {
+    if (getSchedState() != SCHED_RUNNING) {
+        concurrent = false;
+    }
+
+#if defined(THREADED_RTS)
+    if (concurrent) {
         RELAXED_STORE(&concurrent_coll_running, true);
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
@@ -824,14 +828,19 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
         RELAXED_STORE(&mark_thread, thread);
+        return;
     } else {
-        nonmovingConcurrentMark(mark_queue);
+        RELEASE_SM_LOCK;
     }
-#else
+#endif
+
     // Use the weak and thread lists from the preparation for any new weaks and
     // threads found to be dead in mark.
-    nonmovingMark_(mark_queue, dead_weaks, resurrected_threads);
-#endif
+    nonmovingMark_(mark_queue, dead_weaks, resurrected_threads, false);
+
+    if (!concurrent) {
+        ACQUIRE_SM_LOCK;
+    }
 }
 
 /* Mark queue, threads, and weak pointers until no more weaks have been
@@ -863,7 +872,7 @@ static void* nonmovingConcurrentMark(void *data)
     MarkQueue *mark_queue = (MarkQueue*)data;
     StgWeak *dead_weaks = NULL;
     StgTSO *resurrected_threads = (StgTSO*)&stg_END_TSO_QUEUE_closure;
-    nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads);
+    nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads, true);
     return NULL;
 }
 
@@ -877,8 +886,11 @@ static void appendWeakList( StgWeak **w1, StgWeak *w2 )
 }
 #endif
 
-static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads)
+static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent)
 {
+#if !defined(THREADED_RTS)
+    ASSERT(!concurrent);
+#endif
     ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
     stat_startNonmovingGc();
@@ -921,38 +933,41 @@ concurrent_marking:
     }
 
 #if defined(THREADED_RTS)
-    Task *task = newBoundTask();
+    Task *task = NULL;
+    if (concurrent) {
+        task = newBoundTask();
 
-    // If at this point if we've decided to exit then just return
-    if (getSchedState() > SCHED_RUNNING) {
-        // Note that we break our invariants here and leave segments in
-        // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
-        // However because we won't be running sweep in the final GC this
-        // is OK.
-        //
-        // However, we must move any weak pointers remaining on
-        // nonmoving_old_weak_ptr_list back to nonmoving_weak_ptr_list
-        // such that their C finalizers can be run by hs_exit_.
-        appendWeakList(&nonmoving_weak_ptr_list, nonmoving_old_weak_ptr_list);
-        goto finish;
-    }
-
-    // We're still running, request a sync
-    nonmovingBeginFlush(task);
-
-    bool all_caps_syncd;
-    MarkBudget sync_marking_budget = sync_phase_marking_budget;
-    do {
-        all_caps_syncd = nonmovingWaitForFlush();
-        if (nonmovingMarkThreadsWeaks(&sync_marking_budget, mark_queue) == false) {
-            // We ran out of budget for marking. Abort sync.
-            // See Note [Sync phase marking budget].
-            traceConcSyncEnd();
-            stat_endNonmovingGcSync();
-            releaseAllCapabilities(n_capabilities, NULL, task);
-            goto concurrent_marking;
+        // If at this point if we've decided to exit then just return
+        if (getSchedState() > SCHED_RUNNING) {
+            // Note that we break our invariants here and leave segments in
+            // nonmovingHeap.sweep_list, don't free nonmoving_large_objects etc.
+            // However because we won't be running sweep in the final GC this
+            // is OK.
+            //
+            // However, we must move any weak pointers remaining on
+            // nonmoving_old_weak_ptr_list back to nonmoving_weak_ptr_list
+            // such that their C finalizers can be run by hs_exit_.
+            appendWeakList(&nonmoving_weak_ptr_list, nonmoving_old_weak_ptr_list);
+            goto finish;
         }
-    } while (!all_caps_syncd);
+
+        // We're still running, request a sync
+        nonmovingBeginFlush(task);
+
+        bool all_caps_syncd;
+        MarkBudget sync_marking_budget = sync_phase_marking_budget;
+        do {
+            all_caps_syncd = nonmovingWaitForFlush();
+            if (nonmovingMarkThreadsWeaks(&sync_marking_budget, mark_queue) == false) {
+                // We ran out of budget for marking. Abort sync.
+                // See Note [Sync phase marking budget].
+                traceConcSyncEnd();
+                stat_endNonmovingGcSync();
+                releaseAllCapabilities(n_capabilities, NULL, task);
+                goto concurrent_marking;
+            }
+        } while (!all_caps_syncd);
+    }
 #endif
 
     nonmovingResurrectThreads(mark_queue, resurrected_threads);
@@ -982,15 +997,15 @@ concurrent_marking:
 
 
     // Schedule finalizers and resurrect threads
-#if defined(THREADED_RTS)
-    // Just pick a random capability. Not sure if this is a good idea -- we use
-    // only one capability for all finalizers.
-    scheduleFinalizers(getCapability(0), *dead_weaks);
-    // Note that this mutates heap and causes running write barriers.
-    // See Note [Unintentional marking in resurrectThreads] in NonMovingMark.c
-    // for how we deal with this.
-    resurrectThreads(*resurrected_threads);
-#endif
+    if (concurrent) {
+        // Just pick a random capability. Not sure if this is a good idea -- we use
+        // only one capability for all finalizers.
+        scheduleFinalizers(getCapability(0), *dead_weaks);
+        // Note that this mutates heap and causes running write barriers.
+        // See Note [Unintentional marking in resurrectThreads] in NonMovingMark.c
+        // for how we deal with this.
+        resurrectThreads(*resurrected_threads);
+    }
 
 #if defined(DEBUG)
     // Zap CAFs that we will sweep
@@ -1020,15 +1035,19 @@ concurrent_marking:
     // Prune spark lists
     // See Note [Spark management under the nonmoving collector].
 #if defined(THREADED_RTS)
-    for (uint32_t n = 0; n < getNumCapabilities(); n++) {
-        pruneSparkQueue(true, getCapability(n));
+    if (concurrent) {
+        for (uint32_t n = 0; n < getNumCapabilities(); n++) {
+            pruneSparkQueue(true, getCapability(n));
+        }
     }
-#endif
 
     // Everything has been marked; allow the mutators to proceed
-#if defined(THREADED_RTS) && !defined(NONCONCURRENT_SWEEP)
-    nonmoving_write_barrier_enabled = false;
-    nonmovingFinishFlush(task);
+#if !defined(NONCONCURRENT_SWEEP)
+    if (concurrent) {
+        nonmoving_write_barrier_enabled = false;
+        nonmovingFinishFlush(task);
+    }
+#endif
 #endif
 
     current_mark_queue = NULL;
@@ -1065,24 +1084,28 @@ concurrent_marking:
         nonmovingTraceAllocatorCensus();
 #endif
 
-#if defined(THREADED_RTS) && defined(NONCONCURRENT_SWEEP)
+#if defined(NONCONCURRENT_SWEEP)
 #if defined(DEBUG)
     checkNonmovingHeap(&nonmovingHeap);
     checkSanity(true, true);
 #endif
-    nonmoving_write_barrier_enabled = false;
-    nonmovingFinishFlush(task);
+    if (concurrent) {
+        nonmoving_write_barrier_enabled = false;
+        nonmovingFinishFlush(task);
+    }
 #endif
 
     // TODO: Remainder of things done by GarbageCollect (update stats)
 
 #if defined(THREADED_RTS)
 finish:
-    exitMyTask();
+    if (concurrent) {
+        exitMyTask();
 
-    // We are done...
-    RELAXED_STORE(&mark_thread, 0);
-    stat_endNonmovingGc();
+        // We are done...
+        RELAXED_STORE(&mark_thread, 0);
+        stat_endNonmovingGc();
+    }
 
     // Signal that the concurrent collection is finished, allowing the next
     // non-moving collection to proceed

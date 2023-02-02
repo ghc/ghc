@@ -214,6 +214,7 @@ extern W_ large_alloc_lim;
 
 void performGC(void);
 void performMajorGC(void);
+void performBlockingMajorGC(void);
 
 /* -----------------------------------------------------------------------------
    The CAF table - used to let us revert CAFs in GHCi
