@@ -1190,7 +1190,7 @@ case $cpu-$vendor in
 			| arc | arceb | arc32 | arc64 \
 			| arm | arm[lb]e | arme[lb] | armv* \
 			| avr | avr32 \
-			| asmjs | js \
+			| asmjs | javascript \
 			| ba \
 			| be32 | be64 \
 			| bfin | bpf | bs2000 \

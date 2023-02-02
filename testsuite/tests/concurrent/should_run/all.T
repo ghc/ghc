@@ -130,7 +130,7 @@ test('conc012',
 test('conc013', normal, compile_and_run, [''])
 test('conc014', normal, compile_and_run, [''])
 test('conc015',
-  [ when(arch("js"), fragile(22261)) # delays are flaky with the JS backend when the system is overloaded
+  [ when(arch("javascript"), fragile(22261)) # delays are flaky with the JS backend when the system is overloaded
   ], compile_and_run, [''])
 test('conc015a', normal, compile_and_run, [''])
 test('conc016', [omit_ways(concurrent_ways)  # see comment in conc016.hs

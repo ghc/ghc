@@ -7,7 +7,7 @@
 
 -- TODO: use the new Windows IO manager
 module GHC.Event.TimerManager
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
     () where
 #else
     ( -- * Types

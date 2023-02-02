@@ -76,7 +76,7 @@ clearCCS :: IO a -> IO a
 clearCCS (IO m) = IO $ \s -> clearCCS## m s
 
 -- | Get the 'CostCentre' at the head of a 'CostCentreStack'.
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
 ccsCC p = peekByteOff p 4
 

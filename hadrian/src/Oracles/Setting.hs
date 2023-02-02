@@ -258,7 +258,7 @@ isWinTarget :: Action Bool
 isWinTarget = anyTargetOs ["mingw32"]
 
 isJsTarget :: Action Bool
-isJsTarget = anyTargetArch ["js"]
+isJsTarget = anyTargetArch ["javascript"]
 
 isOsxTarget :: Action Bool
 isOsxTarget = anyTargetOs ["darwin"]

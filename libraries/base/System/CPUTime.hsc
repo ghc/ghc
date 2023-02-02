@@ -34,7 +34,7 @@ import System.IO.Unsafe (unsafePerformIO)
 #if defined(mingw32_HOST_OS)
 import qualified System.CPUTime.Windows as I
 
-#elif defined(js_HOST_ARCH)
+#elif defined(javascript_HOST_ARCH)
 import qualified System.CPUTime.Javascript as I
 
 #elif _POSIX_TIMERS > 0 && defined(_POSIX_CPUTIME) && _POSIX_CPUTIME >= 0

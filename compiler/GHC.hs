@@ -357,7 +357,7 @@ import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 import GHC.Utils.Panic.Plain
 #endif
 import GHC.Utils.Logger
@@ -560,7 +560,7 @@ withCleanupSession ghc = ghc `MC.finally` cleanup
 
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir = setSession =<< liftIO ( do
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
     -- The call to c_keepCAFsForGHCi must not be optimized away. Even in non-debug builds.
     -- So we can't use assertM here.
     -- See Note [keepCAFsForGHCi] in keepCAFsForGHCi.c for details about why.
@@ -1962,7 +1962,7 @@ mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
 
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "keepCAFsForGHCi"
     c_keepCAFsForGHCi   :: IO Bool
 #endif
