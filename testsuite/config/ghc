@@ -68,12 +68,12 @@ if windows:
         config.other_ways += winio_ways
 
 # LLVM
-if not config.unregisterised and not config.arch == "js" and config.have_llvm:
+if not config.unregisterised and not config.arch == "javascript" and config.have_llvm:
     config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
 # HPC
-if not config.arch == "js":
+if not config.arch == "javascript":
     config.compile_ways.append('hpc')
     config.run_ways.append('hpc')
 

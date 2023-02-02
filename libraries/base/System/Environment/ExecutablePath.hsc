@@ -18,12 +18,12 @@
 
 module System.Environment.ExecutablePath
   ( getExecutablePath
-##if !defined(js_HOST_ARCH)
+##if !defined(javascript_HOST_ARCH)
   , executablePath
 ##endif
   ) where
 
-##if defined(js_HOST_ARCH)
+##if defined(javascript_HOST_ARCH)
 
 getExecutablePath :: IO FilePath
 getExecutablePath = return "a.jsexe"

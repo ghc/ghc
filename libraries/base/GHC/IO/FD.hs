@@ -570,7 +570,7 @@ indicates that there's no data, we call threadWaitRead.
 
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd !buf !off !len
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
   = fmap fromIntegral . uninterruptibleMask_ $
     throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
 #else
@@ -592,7 +592,7 @@ readRawBufferPtr loc !fd !buf !off !len
 -- return: -1 indicates EOF, >=0 is bytes read
 readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtrNoBlock loc !fd !buf !off !len
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
   = uninterruptibleMask_ $ do
       r <- throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
       case r of
@@ -617,7 +617,7 @@ readRawBufferPtrNoBlock loc !fd !buf !off !len
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd !buf !off !len
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
   = fmap fromIntegral . uninterruptibleMask_ $
     throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
 #else
@@ -637,7 +637,7 @@ writeRawBufferPtr loc !fd !buf !off !len
 
 writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock loc !fd !buf !off !len
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
   = uninterruptibleMask_ $ do
       r <- throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
       case r of
@@ -658,7 +658,7 @@ writeRawBufferPtrNoBlock loc !fd !buf !off !len
     safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
 #endif
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 isNonBlocking :: FD -> Bool
 isNonBlocking fd = fdIsNonBlocking fd /= 0
 
@@ -754,14 +754,14 @@ foreign import WINDOWS_CCONV safe "send"
 
 #endif
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 #endif
 
 -- -----------------------------------------------------------------------------
 -- utils
 
-#if !defined(mingw32_HOST_OS) && !defined(js_HOST_ARCH)
+#if !defined(mingw32_HOST_OS) && !defined(javascript_HOST_ARCH)
 throwErrnoIfMinus1RetryOnBlock  :: String -> IO CSsize -> IO CSsize -> IO CSsize
 throwErrnoIfMinus1RetryOnBlock loc f on_block  =
   do

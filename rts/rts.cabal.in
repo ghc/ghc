@@ -66,7 +66,8 @@ library
 
     exposed: True
     exposed-modules:
-    if os(ghcjs)
+
+    if arch(javascript)
 
       include-dirs: include
       -- dummy file to force the build of a .a lib

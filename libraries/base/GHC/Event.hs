@@ -11,7 +11,7 @@
 -- ----------------------------------------------------------------------------
 
 module GHC.Event
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
     ( ) where
 #else
     ( -- * Types

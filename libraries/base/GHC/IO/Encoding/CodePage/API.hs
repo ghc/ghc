@@ -32,7 +32,7 @@ import GHC.ForeignPtr (castForeignPtr)
 
 import System.Posix.Internals
 
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 mkCodePageEncoding :: String
 mkCodePageEncoding = ""
 #else

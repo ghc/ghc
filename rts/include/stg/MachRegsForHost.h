@@ -14,7 +14,7 @@
 
 #pragma once
 
-#if defined(UnregisterisedCompiler) || defined(js_HOST_ARCH)
+#if defined(UnregisterisedCompiler) || defined(javascript_HOST_ARCH)
 #if !defined(NO_REGS)
 #define NO_REGS
 #endif

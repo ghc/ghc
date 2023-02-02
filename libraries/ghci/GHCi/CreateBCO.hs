@@ -133,7 +133,7 @@ writePtrsArrayPtr (I# i) (Ptr a#) (PtrsArr arr) = IO $ \s ->
 -- without making a thunk turns out to be surprisingly tricky.
 {-# NOINLINE writeArrayAddr# #-}
 writeArrayAddr# :: MutableArray# s a -> Int# -> Addr# -> State# s -> State# s
-#if defined(js_HOST_ARCH)
+#if defined(javascript_HOST_ARCH)
 -- Addr# isn't coercible with Any with the JS backend.
 writeArrayAddr# = error "writeArrayAddr#: currently unsupported with the JS backend"
 #else

@@ -21,7 +21,7 @@
    they are every used.
 -}
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 #include <ffi.h>
 #endif
 
@@ -35,7 +35,7 @@ module GHCi.FFI
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 import Control.Exception
 import Foreign.C
 #endif
@@ -70,7 +70,7 @@ prepForeignCall
     -> FFIType            -- result type
     -> IO (Ptr C_ffi_cif) -- token for making calls (must be freed by caller)
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 prepForeignCall cconv arg_types result_type = do
   let n_args = length arg_types
   arg_arr <- mallocArray n_args
@@ -93,7 +93,7 @@ prepForeignCall _ _ _ =
 
 
 freeForeignCallInfo :: Ptr C_ffi_cif -> IO ()
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 freeForeignCallInfo p = do
   free ((#ptr ffi_cif, arg_types) p)
   free p
@@ -104,7 +104,7 @@ freeForeignCallInfo _ =
 
 data C_ffi_cif
 
-#if !defined(js_HOST_ARCH)
+#if !defined(javascript_HOST_ARCH)
 data C_ffi_type
 
 strError :: C_ffi_status -> String

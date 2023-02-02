@@ -42,7 +42,7 @@ test('derefnull',
       when(platform('aarch64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       when(opsys('mingw32'), [fragile(18548)]),
-      when(platform('js-unknown-ghcjs'), [ignore_stderr, exit_code(1)]),
+      when(arch('javascript'), [ignore_stderr, exit_code(1)]),
       # ThreadSanitizer changes the output
       when(have_thread_sanitizer(), skip),
       # since these test are supposed to crash the
