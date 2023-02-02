@@ -1,9 +1,6 @@
 {-# LANGUAGE CPP #-}
-{-# OPTIONS_GHC -fno-warn-unused-matches #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -fno-warn-overlapping-patterns #-}
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 -- The above warning suppression flags are a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
@@ -124,7 +121,7 @@ assignRegs
             Int)                -- Sp of left-over args
 assignRegs regstatus sp args = assign sp args (availableRegs regstatus) []
 
-assign sp [] regs doc = (doc, [], sp)
+assign sp [] _regs doc = (doc, [], sp)
 assign sp (V : args) regs doc = assign sp args regs doc
 assign sp (arg : args) regs doc
  = case findAvailableReg arg regs of
@@ -248,7 +245,7 @@ stackCheck
    -> Doc
 stackCheck regstatus args args_in_regs fun_info_label (prof_sp, norm_sp) =
   let
-     (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
+     (reg_locs, _leftovers, sp_offset) = assignRegs regstatus 1 args
 
      cmp_sp n
        | n > 0 =
@@ -287,7 +284,7 @@ genMkPAP :: RegStatus -- Register status
          -> Doc       -- info label
          -> Bool      -- Is a function
          -> (Doc, StackUsage)
-genMkPAP regstatus macro jump live ticker disamb
+genMkPAP regstatus macro jump live _ticker disamb
         no_load_regs    -- don't load argument regs before jumping
         args_in_regs    -- arguments are already in regs
         is_pap args all_args_size fun_info_label
@@ -391,6 +388,7 @@ genMkPAP regstatus macro jump live ticker disamb
                                (reg,off) <- extra_reg_locs ]
               adj = case extra_reg_locs of
                       (reg, fst_off):_ -> fst_off
+                      [] -> error "Impossible: genapply.hs : No extra register locations"
               size = snd (last adj_reg_locs) + 1
 
               doc =
@@ -470,7 +468,7 @@ genMkPAP regstatus macro jump live ticker disamb
     (larger_arity_doc, larger_arity_stack) = (doc, stack)
      where
        -- offsets in case we need to save regs:
-       (reg_locs, leftovers, sp_offset)
+       (reg_locs, _leftovers, sp_offset)
            = assignRegs regstatus stk_args_slow_offset args
            -- BUILD_PAP assumes args start at offset 1
 
@@ -827,7 +825,7 @@ genApplyFast regstatus args =
             False{-reg apply-} True{-args in regs-} False{-not a PAP-}
             args all_args_size fun_info_label {- tag stmt -}True
 
-    (reg_locs, leftovers, sp_offset) = assignRegs regstatus 1 args
+    (reg_locs, _leftovers, sp_offset) = assignRegs regstatus 1 args
 
     stack_usage = maxStack [fun_stack, (sp_offset,sp_offset)]
    in
