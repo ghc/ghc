@@ -214,8 +214,6 @@ function set_toolchain_paths() {
         cat toolchain.sh
       fi
       source toolchain.sh
-      info "--info for GHC for $NIX_SYSTEM"
-      $GHC --info
       ;;
     env)
       # These are generally set by the Docker image but
@@ -274,6 +272,11 @@ function setup() {
   show_tool CABAL
   show_tool HAPPY
   show_tool ALEX
+
+  info "====================================================="
+  info "ghc --info"
+  info "====================================================="
+  $GHC --info
 }
 
 function fetch_ghc() {
