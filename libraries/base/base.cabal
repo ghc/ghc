@@ -9,7 +9,7 @@ maintainer:     libraries@haskell.org
 bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
 synopsis:       Basic libraries
 category:       Prelude
-build-type:     Configure
+build-type:     Simple
 description:
     This package contains the Standard Haskell "Prelude" and its support libraries,
     and a large collection of useful libraries ranging from data

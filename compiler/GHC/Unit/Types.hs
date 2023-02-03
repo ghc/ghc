@@ -595,7 +595,7 @@ bignumUnit, primUnit, ghcBaseUnit, rtsUnit,
 
 primUnitId        = UnitId (fsLit "ghc-prim")
 bignumUnitId      = UnitId (fsLit "ghc-bignum")
-ghcBaseUnitId     = UnitId (fsLit "base")
+ghcBaseUnitId     = UnitId (fsLit "ghc-base")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit "ghc")
 interactiveUnitId = UnitId (fsLit "interactive")

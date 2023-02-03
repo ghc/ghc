@@ -254,6 +254,6 @@ AC_CHECK_TYPE([struct MD5Context], [], [AC_MSG_ERROR([internal error])], [#inclu
 AC_CHECK_SIZEOF([struct MD5Context], [], [#include "include/md5.h"])
 
 AC_SUBST(EXTRA_LIBS)
-AC_CONFIG_FILES([base.buildinfo])
+AC_CONFIG_FILES([ghc-base.buildinfo])
 
 AC_OUTPUT
