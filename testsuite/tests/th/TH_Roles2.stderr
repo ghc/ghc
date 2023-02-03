@@ -2,7 +2,7 @@ TYPE CONSTRUCTORS
   data type T{2} :: forall k. k -> *
     roles nominal representational
 Dependent modules: []
-Dependent packages: [base-4.17.0.0, template-haskell-2.19.0.0]
+Dependent packages: [ghc-base-4.18.0.0, template-haskell-2.20.0.0]
 
 ==================== Typechecker ====================
 TH_Roles2.$tcT

@@ -1,2 +1,6 @@
+
+<no location info>: error:
+    Ambiguous module name ‘GHC.Base’:
+      it was found in multiple packages: base-4.18.0.0 ghc-base-4.18.0.0
 False
 False

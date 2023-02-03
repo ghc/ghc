@@ -12,8 +12,8 @@ T11071a.hs:13:12: error: [GHC-88464]
           ‘foldl’ (imported from Prelude), ‘foldl1’ (imported from Prelude),
           ‘foldr’ (imported from Prelude)
       • Perhaps you want to add ‘foldl'’ to one of these import lists:
-          ‘Data.List’ (T11071a.hs:3:1-24)
           ‘Data.IntMap’ (T11071a.hs:4:1-21)
+          ‘Data.List’ (T11071a.hs:3:1-24)
 
 T11071a.hs:14:12: error: [GHC-88464]
     Data constructor not in scope: Down

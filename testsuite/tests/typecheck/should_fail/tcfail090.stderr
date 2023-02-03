@@ -1,8 +1,4 @@
 
-tcfail090.hs:11:9: error: [GHC-18872]
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        a0 :: *
-        ByteArray# :: UnliftedType
-    • In the expression: my_undefined
-      In an equation for ‘die’: die _ = my_undefined
+tcfail090.hs:5:1: error:
+    Ambiguous module name ‘GHC.Base’:
+      it was found in multiple packages: base-4.18.0.0 ghc-base-4.18.0.0

@@ -1,5 +1,4 @@
 
-unboxed-bind.hs:11:11: error: [GHC-21030] [-Wunbanged-strict-patterns (in -Wextra), Werror=unbanged-strict-patterns]
-    Pattern bindings containing unlifted types should use
-    an outermost bang pattern:
-      P arg = x
+unboxed-bind.hs:5:1: error:
+    Ambiguous module name ‘GHC.Base’:
+      it was found in multiple packages: base-4.18.0.0 ghc-base-4.18.0.0

@@ -20,7 +20,7 @@ DATA CONSTRUCTORS
   K2 :: forall a. a -> T2 a
   K1 :: forall a. a -> T1 a
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [ghc-base-4.18.0.0]
 
 ==================== Typechecker ====================
 Roles1.$tcT7

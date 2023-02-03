@@ -1,4 +1,4 @@
 TYPE SIGNATURES
   foo :: forall b a. (a, b) -> (a, b)
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [ghc-base-4.18.0.0]

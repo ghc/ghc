@@ -30,9 +30,9 @@ T10403.hs:23:15: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
         h2 :: (a1 -> a2) -> f0 a1 -> H f0 (bound at T10403.hs:23:1)
       Probable fix: use a type annotation to specify what ‘f0’ should be.
       Potentially matching instances:
-        instance Functor IO -- Defined in ‘GHC.Base’
+        instance Functor IO -- Defined in ‘ghc-base-4.18.0.0:GHC.Base’
         instance Functor (B t) -- Defined at T10403.hs:11:10
-        ...plus 8 others
+        ...plus 11 others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘fmap (const ())’
@@ -43,11 +43,11 @@ T10403.hs:29:8: warning: [GHC-46956] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘f0’ with ‘B t’
       Expected: H (B t)
         Actual: H f0
-    • because type variable ‘t’ would escape its scope
-    This (rigid, skolem) type variable is bound by
-      the type signature for:
-        app2 :: forall t. H (B t)
-      at T10403.hs:28:1-15
+        because type variable ‘t’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        the type signature for:
+          app2 :: forall t. H (B t)
+        at T10403.hs:28:1-15
     • In the expression: h2 (H . I) (B ())
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include

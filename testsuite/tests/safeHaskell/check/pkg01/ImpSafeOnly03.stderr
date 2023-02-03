@@ -1,4 +1,8 @@
 
+ImpSafeOnly03.hs:3:8: error: [GHC-75165]
+    Prelude: Can't be safely imported!
+    The package (ghc-base-4.18.0.0) the module resides in isn't trusted.
+
 ImpSafeOnly03.hs:5:1: error: [GHC-75165]
     M_SafePkg3: Can't be safely imported!
     The package (safePkg01-1.0) the module resides in isn't trusted.
