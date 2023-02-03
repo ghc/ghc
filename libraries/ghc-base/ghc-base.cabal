@@ -477,7 +477,7 @@ Library
             GHC.JS.Prim.Internal
             GHC.JS.Prim.Internal.Build
 
-    -- We need to set the unit id to base (without a version number)
+    -- We need to set the unit id to ghc-base (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-base
 

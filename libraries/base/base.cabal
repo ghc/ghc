@@ -27,7 +27,7 @@ Library
     default-language: Haskell2010
 
     build-depends:
-        ghc-base, ghc-prim
+        ghc-base
 
     exposed-modules:
         GHC.Base
@@ -303,10 +303,6 @@ Library
             GHC.JS.Prim,
             GHC.JS.Prim.Internal,
             GHC.JS.Prim.Internal.Build
-
-    -- We need to set the unit id to base (without a version number)
-    -- as it's magic.
-    ghc-options: -this-unit-id base
 
     -- Make sure we don't accidentally regress into anti-patterns
     ghc-options: -Wcompat -Wnoncanonical-monad-instances
