@@ -1772,6 +1772,10 @@ We never unbox class dictionaries in worker/wrapper.
    to inline; the inlining heuristics seem to prefer to inline a function
    applied to a dictionary over a function applied to a bunch of functions.
 
+4. We still W/W NOINLINE functions. The specialiser currently won't specialise
+   these anyway so there is no reason not to.
+   See Note [Auto-specialisation and RULES]
+
 TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
 a raft of higher-order functions isn't a huge win anyway -- you really want to
 specialise the function.
@@ -1964,7 +1968,8 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
 
     get_dmd :: Id -> Type -> Demand
     get_dmd bndr bndr_ty
-      | isClassPred bndr_ty = trimBoxity dmd
+      | isClassPred bndr_ty
+      , not (isNeverActive (idInlineActivation fn)) = trimBoxity dmd
         -- See Note [Do not unbox class dictionaries]
         -- NB: 'ty' has not been normalised, so this will (rightly)
         --     catch newtype dictionaries too.
