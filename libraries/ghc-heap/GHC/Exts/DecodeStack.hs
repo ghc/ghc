@@ -55,33 +55,37 @@ the same. (Though, the absolute addresses change!)
 Stack frame iterator
 ====================
 
-A StackFrameIter consists of a StackSnapshot# and a relative offset into the the
-array of stack frames (StgStack->stack). The StackSnapshot# represents a
-StgStack closure. It is updated by the garbage collector when the stack closure
-is moved.
+A stack frame interator (StackFrameIter) consists of a StackSnapshot# and a
+relative offset into the the array of stack frames (StgStack->stack). The
+StackSnapshot# represents a StgStack closure. It is updated by the garbage
+collector when the stack closure is moved.
 
 The relative offset describes the location of a stack frame. As stack frames
 come in various sizes, one cannot simply step over the stack array with a
 constant offset.
 
 The head of the stack frame array has offset 0. To traverse the stack frames the
-latest stacke frame's offset is incremented by the closure size. The unit of the
+latest stack frame's offset is incremented by the closure size. The unit of the
 offset is machine words (32bit or 64bit).
+
+Additionally, StackFrameIter contains a flag (isPrimitive) to indicate if a
+location on the stack should be interpreted as plain data word (in contrast to
+being a closure or a pointer to a closure.) It's used when bitmap encoded
+arguments are interpreted.
 
 Boxes
 =====
 
-As references into thestack frame array aren't updated by the garbage collector,
+As references into the stack frame array aren't updated by the garbage collector,
 creating a Box with a pointer (address) to a stack frame would break as soon as
 the StgStack closure is moved.
 
-To deal with this another kind of Box is introduced: A DecodedBox contains a
-thunk for a decoded stack frame or the closure for the decoded stack frame
-itself. I.e. we're not boxing the closure, but the ghc-heap representation of
-it.
+To deal with this another kind of Box is introduced: A StackFrameBox contains a
+stack frame iterator for a decoded stack frame or it's payload.
 
 Heap-represented closures referenced by stack frames are boxed the usual way,
-with a Box that contains a pointer to the closure.
+with a Box that contains a pointer to the closure as it's payload. In
+Haskell-land this means: A Box which contains the closure.
 
 Technical details
 =================
