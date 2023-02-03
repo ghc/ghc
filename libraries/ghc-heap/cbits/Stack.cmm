@@ -177,7 +177,6 @@ getInfoTableAddrzh(P_ stack, W_ offsetWords){
 
 // Just a cast
 stackSnapshotToWordzh(P_ stack) {
-  ccall checkSTACK(stack);
   return (stack);
 }
 
@@ -188,19 +187,17 @@ eqStackSnapshotszh(P_ stack1, P_ stack2) {
 }
 
 getBoxedClosurezh(P_ stack, W_ offsetWords){
+  ccall debugBelch("getBoxedClosurezh - stack %p , offsetWords %lu", stack, offsetWords);
+
   ccall checkSTACK(stack);
   P_ ptr;
   ptr = StgStack_sp(stack) + WDS(offsetWords);
 
   P_ box;
   (box) = ccall getBoxedClosure(MyCapability(), ptr);
+  ccall debugBelch("getBoxedClosurezh - box %p", box);
   return (box);
 }
 
 INFO_TABLE_CONSTR(box, 1, 0, 0, CONSTR_1_0, "BOX", "BOX")
 { foreign "C" barf("BOX object (%p) entered!", R1) never returns; }
-
-checkSanityzh(I64 a, I64 b){
-  ccall checkSanity(a,b);
-  return (42);
-}

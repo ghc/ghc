@@ -37,7 +37,7 @@ isUnderflowFrame _ = False
 assertStackChunksAreDecodable :: HasCallStack => [Closure] -> IO ()
 assertStackChunksAreDecodable s = do
   let underflowFrames = filter isUnderflowFrame s
-  framesOfChunks <- mapM (decodeStack . nextChunk) underflowFrames
+  let framesOfChunks = map (stackClosures . decodeStack . nextChunk) underflowFrames
   assertThat
     "No empty stack chunks"
     (== True)

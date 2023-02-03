@@ -245,15 +245,15 @@ void create_any_bco_frame(Capability *cap, StgStack *stack, StgWord w) {
 // Import from Sanity.c
 extern void checkSTACK(StgStack *stack);
 
+// Basically, a stripped down version of createThread() (regarding stack
+// creation)
 StgStack *setup(Capability *cap, StgWord closureSizeWords,
                 void (*f)(Capability *, StgStack *, StgWord)) {
-  checkSanity(1, 1);
   StgWord totalSizeWords =
       sizeofW(StgStack) + closureSizeWords + MIN_STACK_WORDS;
   StgStack *stack = (StgStack *)allocate(cap, totalSizeWords);
-  StgWord totalSizeBytes = WDS(totalSizeWords);
   SET_HDR(stack, &stg_STACK_info, CCS_SYSTEM);
-  stack->stack_size = totalSizeBytes;
+  stack->stack_size = totalSizeWords - sizeofW(StgStack);
   stack->dirty = 0;
   stack->marking = 0;
 
@@ -271,7 +271,6 @@ StgStack *setup(Capability *cap, StgWord closureSizeWords,
   // Make a sanitiy check to find unsound closures before the GC and the decode
   // code.
   checkSTACK(stack);
-  checkSanity(1, 1);
   return stack;
 }
 

@@ -182,8 +182,8 @@ getClosureDataFromHeapObject x = do
 
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
-getBoxedClosureData (Box a) = let !a' = a
-                              in getClosureData a'
+getBoxedClosureData (Box a) = getClosureData a
+
 #if MIN_TOOL_VERSION_ghc(9,5,0)
 getBoxedClosureData b@(StackFrameBox sfi) = trace ("unpack " ++ show b) $ unpackStackFrameIter sfi
 #endif

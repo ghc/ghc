@@ -62,8 +62,6 @@ foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
 
-foreign import prim "checkSanityzh" checkSanity# :: Int# -> Int# -> State# RealWorld -> (# State# RealWorld, Int# #)
-
 {- Test stategy
    ~~~~~~~~~~~~
 
@@ -318,9 +316,10 @@ type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
 test :: HasCallStack => SetupFunction -> (Closure -> IO ()) -> IO ()
 test setup assertion = do
-  checkSanity 1# 1#
+  traceM $ "test -  getStackSnapshot"
   sn@(StackSnapshot sn#) <- getStackSnapshot setup
   traceM $ "test - sn " ++ show sn
+  performGC
   traceM $ "entertainGC - " ++ (entertainGC 10)
   -- Run garbage collection now, to prevent later surprises: It's hard to debug
   -- when the GC suddenly does it's work and there were bad closures or pointers.
@@ -329,11 +328,9 @@ test setup assertion = do
   traceM $ "test - sn' " ++ show sn
   ss@(SimpleStack boxedFrames) <- getClosureData sn#
   traceM $ "test - ss" ++ show ss
-  checkSanity 1# 1#
   performGC
   traceM $ "call getBoxedClosureData"
   stack <- mapM getBoxedClosureData boxedFrames
-  checkSanity 1# 1#
   performGC
   assert sn stack
   -- The result of HasHeapRep should be similar (wrapped in the closure for
@@ -366,11 +363,9 @@ entertainGC x = show x ++ entertainGC (x -1)
 
 testSize :: HasCallStack => SetupFunction -> Int -> IO ()
 testSize setup expectedSize = do
-  checkSanity 1# 1#
   (StackSnapshot sn#) <- getStackSnapshot setup
   (SimpleStack boxedFrames) <- getClosureData sn#
   assertEqual expectedSize =<< closureSize (head boxedFrames)
-  void $ checkSanity 1# 1#
 
 -- | Get a `StackSnapshot` from test setup
 --
@@ -379,10 +374,6 @@ testSize setup expectedSize = do
 getStackSnapshot :: SetupFunction -> IO StackSnapshot
 getStackSnapshot action# = IO $ \s ->
   case action# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
-
-checkSanity :: Int# -> Int# -> IO Int
-checkSanity b1# b2# = IO $ \s ->
-  case checkSanity# b1# b2# s of (# s1, r1 #) -> (# s1, I# r1 #)
 
 assertConstrClosure :: HasCallStack => Word -> Closure -> IO ()
 assertConstrClosure w c = case c of

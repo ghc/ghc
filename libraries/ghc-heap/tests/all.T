@@ -102,5 +102,5 @@ test('stack_misc_closures',
         [ ('stack_misc_closures_c.c', '')
          ,('stack_misc_closures_prim.cmm', '')
          ]
-      , '-debug -optc-g -optc-O0 -g -ddump-to-file -dlint -ddump-cmm'
+      , '-debug -optc-g -optc-O0 -g -ddump-to-file -dlint -ddump-cmm' # -with-rtsopts="-Dg -Ds -Db"'
       ])
