@@ -1124,7 +1124,7 @@ function h$main(a) {
     t.stack[0] = h$doneMain_e;
 #ifndef GHCJS_BROWSER
   if(!h$isBrowser() && !h$isGHCJSi()) {
-    t.stack[2] = h$ghczmghczmbaseZCGHCziTopHandlerzitopHandler;
+    t.stack[2] = h$ghczmbaseZCGHCziTopHandlerzitopHandler;
   }
 #endif
   t.stack[4] = h$ap_1_0;
