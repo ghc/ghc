@@ -3,10 +3,14 @@
 module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 
 import Foreign
+
+#if defined(HAVE_LIBZSTD)
 import Foreign.C.Types
+import qualified Data.ByteString.Internal as BSI
+import GHC.IO (unsafePerformIO)
+#endif
 
 import GHC.Data.FastString (fastStringToShortText)
-import GHC.IO (unsafePerformIO)
 import GHC.Prelude
 import GHC.Platform
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
@@ -29,7 +33,6 @@ import Control.Monad.Trans.State.Strict
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
-import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map.Strict as M
 
@@ -93,17 +96,16 @@ emitIpeBufferListNode this_mod ents = do
         uncompressed_strings = getStringTableStrings strtab
 
         strings_bytes :: BS.ByteString
-        strings_bytes =
-          if do_compress == 1 then
-            compress defaultCompressionLevel uncompressed_strings
-          else
-            uncompressed_strings
+        strings_bytes = compress defaultCompressionLevel uncompressed_strings
 
         strings :: [CmmStatic]
         strings = [CmmString strings_bytes]
 
+        entries_bytes :: BS.ByteString
+        entries_bytes = toIpeBufferEntries (platformByteOrder platform) cg_ipes
+
         entries :: [CmmStatic]
-        entries = toIpeBufferEntries cg_ipes
+        entries = [CmmString entries_bytes]
 
         ipe_buffer_lbl :: CLabel
         ipe_buffer_lbl = mkIPELabel this_mod
@@ -114,7 +116,7 @@ emitIpeBufferListNode this_mod ents = do
             zeroCLit platform
 
             -- 'compressed' field
-          , int $ do_compress
+          , int do_compress
 
             -- 'count' field
           , int $ length cg_ipes
@@ -126,13 +128,13 @@ emitIpeBufferListNode this_mod ents = do
           , CmmLabel entries_lbl
 
             -- 'entries_size' field
-          , int (length cg_ipes * 8 * 32)
+          , int $ BS.length entries_bytes
 
             -- 'string_table' field
           , CmmLabel strings_lbl
 
             -- 'string_table_size' field
-          , int (BS.length strings_bytes)
+          , int $ BS.length strings_bytes
           ]
 
     -- Emit the list of info table pointers
@@ -156,21 +158,17 @@ emitIpeBufferListNode this_mod ents = do
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
 
 -- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.
--- The fields are converted to a bytestring, compressed, and then emitted as a
--- string. If compression is not enabled, the compression step is simply
--- @id@.
+-- The fields are converted to a bytestring and compressed. If compression is
+-- not enabled, the compression step is simply @id@.
 toIpeBufferEntries ::
-     [CgInfoProvEnt] -- ^ List of IPE buffer entries
-  -> [CmmStatic]
-toIpeBufferEntries cg_ipes =
-    [ CmmString
-    . compress defaultCompressionLevel
+     ByteOrder       -- ^ Byte order to write the data in
+  -> [CgInfoProvEnt] -- ^ List of IPE buffer entries
+  -> BS.ByteString
+toIpeBufferEntries byte_order cg_ipes =
+      compress defaultCompressionLevel
     . BSL.toStrict . BSB.toLazyByteString . mconcat
-    $ map (mconcat . map (BSB.word32BE) . to_ipe_buf_ent) cg_ipes
-    ]
+    $ map (mconcat . map word32Builder . to_ipe_buf_ent) cg_ipes
   where
-    int32 n = CmmStaticLit $ CmmInt (fromIntegral n) W32
-
     to_ipe_buf_ent :: CgInfoProvEnt -> [Word32]
     to_ipe_buf_ent cg_ipe =
       [ ipeTableName cg_ipe
@@ -182,6 +180,11 @@ toIpeBufferEntries cg_ipes =
       , ipeSrcSpan cg_ipe
       , 0 -- padding
       ]
+
+    word32Builder :: Word32 -> BSB.Builder
+    word32Builder = case byte_order of
+      BigEndian    -> BSB.word32BE
+      LittleEndian -> BSB.word32LE
 
 toCgIPE :: Platform -> SDocContext -> StrTabOffset -> InfoProvEnt -> State StringTable CgInfoProvEnt
 toCgIPE platform ctx module_name ipe = do
@@ -197,7 +200,7 @@ toCgIPE platform ctx module_name ipe = do
                       coords = renderWithContext ctx (pprUserRealSpan False span)
                   in (file, coords)
     label    <- lookupStringTable $ ST.pack label_str
-    src_file <- lookupStringTable $ src_loc_file
+    src_file <- lookupStringTable src_loc_file
     src_span <- lookupStringTable $ ST.pack src_loc_span
     return $ CgInfoProvEnt { ipeInfoTablePtr = infoTablePtr ipe
                            , ipeTableName = table_name

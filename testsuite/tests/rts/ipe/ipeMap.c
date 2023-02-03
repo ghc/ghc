@@ -40,15 +40,23 @@ void shouldFindNothingInAnEmptyIPEMap(Capability *cap) {
 }
 
 HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
-    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode) + sizeof(IpeBufferEntry));
+    // Allocate buffers for IPE buffer list node
+    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
+    node->tables = malloc(sizeof(StgInfoTable *));
+    node->entries = malloc(sizeof(IpeBufferEntry));
+
     StringTable st;
     init_string_table(&st);
 
     HaskellObj fortyTwo = UNTAG_CLOSURE(rts_mkInt(cap, 42));
-    node->entries[0] = makeAnyProvEntry(cap, &st, fortyTwo, 42);
-    node->count = 1;
     node->next = NULL;
+    node->compressed = 0;
+    node->count = 1;
+    node->tables[0] = get_itbl(fortyTwo);
+    node->entries[0] = makeAnyProvEntry(cap, &st, 42);
+    node->entries_size = sizeof(IpeBufferEntry);
     node->string_table = st.buffer;
+    node->string_table_size = st.size;
 
     registerInfoProvList(node);
 
@@ -72,15 +80,23 @@ HaskellObj shouldFindOneIfItHasBeenRegistered(Capability *cap) {
 
 void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
                                           HaskellObj fortyTwo) {
-    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode) + sizeof(IpeBufferEntry));
+    // Allocate buffers for IPE buffer list node
+    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
+    node->tables = malloc(sizeof(StgInfoTable *));
+    node->entries = malloc(sizeof(IpeBufferEntry));
+
     StringTable st;
     init_string_table(&st);
 
     HaskellObj twentyThree = UNTAG_CLOSURE(rts_mkInt8(cap, 23));
-    node->entries[0] = makeAnyProvEntry(cap, &st, twentyThree, 23);
-    node->count = 1;
     node->next = NULL;
+    node->compressed = 0;
+    node->count = 1;
+    node->tables[0] = get_itbl(twentyThree);
+    node->entries[0] = makeAnyProvEntry(cap, &st, 23);
+    node->entries_size = sizeof(IpeBufferEntry);
     node->string_table = st.buffer;
+    node->string_table_size = st.size;
 
     registerInfoProvList(node);
 
@@ -103,17 +119,26 @@ void shouldFindTwoIfTwoHaveBeenRegistered(Capability *cap,
 }
 
 void shouldFindTwoFromTheSameList(Capability *cap) {
-    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode) + 2 * sizeof(IpeBufferEntry));
+    // Allocate buffers for IPE buffer list node
+    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
+    node->tables = malloc(sizeof(StgInfoTable *) * 2);
+    node->entries = malloc(sizeof(IpeBufferEntry) * 2);
+
     StringTable st;
     init_string_table(&st);
 
     HaskellObj one = UNTAG_CLOSURE(rts_mkInt16(cap, 1));
     HaskellObj two = UNTAG_CLOSURE(rts_mkInt32(cap, 2));
-    node->entries[0] = makeAnyProvEntry(cap, &st, one, 1);
-    node->entries[1] = makeAnyProvEntry(cap, &st, two, 2);
-    node->count = 2;
     node->next = NULL;
+    node->compressed = 0;
+    node->count = 2;
+    node->tables[0] = get_itbl(one);
+    node->tables[1] = get_itbl(two);
+    node->entries[0] = makeAnyProvEntry(cap, &st, 1);
+    node->entries[1] = makeAnyProvEntry(cap, &st, 2);
+    node->entries_size = sizeof(IpeBufferEntry) * 2;
     node->string_table = st.buffer;
+    node->string_table_size = st.size;
 
     registerInfoProvList(node);
 
