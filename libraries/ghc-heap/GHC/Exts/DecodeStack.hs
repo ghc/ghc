@@ -161,7 +161,7 @@ getInfoTable StackFrameIter {..} =
   let infoTablePtr = Ptr (getInfoTableAddr# stackSnapshot# (wordOffsetToWord# index))
    in peekItbl infoTablePtr
 
-foreign import prim "getBoxedClosurezh" getBoxedClosure# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Addr# #)
+foreign import prim "getBoxedClosurezh" getBoxedClosure# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
 
 -- -- TODO: Remove this instance (debug only)
 -- instance Show StackFrameIter where
@@ -214,7 +214,7 @@ getClosure :: StackFrameIter -> WordOffset -> IO Box
 getClosure sfi@StackFrameIter {..} relativeOffset = trace ("getClosure " ++ show sfi ++ "  " ++ show relativeOffset) $
    IO $ \s ->
       case (getBoxedClosure# stackSnapshot# (wordOffsetToWord# (index + relativeOffset)) s) of (# s1, ptr #) ->
-                                                                                                 (# s1, Box (unsafeCoerce# ptr) #)
+                                                                                                 (# s1, Box ptr #)
 
 decodeLargeBitmap :: (StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, ByteArray#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
 decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset = do
