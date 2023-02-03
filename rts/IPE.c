@@ -40,8 +40,9 @@ collecting IPE lists on registration.
 
 It's a singly linked list of IPE list buffers (IpeBufferListNode). These are
 emitted by the code generator, with generally one produced per module. Each
-contains an array of IPE entries and a link field (which is used to link
-buffers onto the pending list.
+contains a pointer to a list of IPE entries, a pointer to a list of info
+table pointers, and a link field (which is used to link buffers onto the
+pending list.
 
 For reasons of space efficiency, IPE entries are represented slightly
 differently in the object file than the InfoProvEnt which we ultimately expose
@@ -182,8 +183,13 @@ void updateIpeMap() {
         const char *strings;
         const IpeBufferEntry *entries;
         if (current_node->compressed) {
-            // The strings table and IPE data has been compressed. Begin by
-            // decompressing the strings table.
+            // The IPE list buffer node indicates that the strings table and
+            // entries list has been compressed. If zstd is not available, fail.
+            // If zstd is available, decompress.
+#if HAVE_LIBZSTD == 0
+            barf("An IPE buffer list node has been compressed, but the \
+                  decompression library (zstd) is not available.");
+#else
             size_t decompressed_sz = ZSTD_findFrameCompressedSize(
                 current_node->string_table,
                 current_node->string_table_size
@@ -216,6 +222,8 @@ void updateIpeMap() {
                 current_node->entries_size
             );
             entries = decompressed_entries;
+#endif // HAVE_LIBZSTD == 0
+
         } else {
             // Not compressed, no need to decompress
             strings = current_node->string_table;
