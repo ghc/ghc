@@ -178,18 +178,13 @@ advanceStackFrameIter (StackFrameIter {..}) =
 primWordToWordOffset :: Word# -> WordOffset
 primWordToWordOffset w# = fromIntegral (W# w#)
 
--- TODO: can be just StackFrameIter
-data BitmapEntry = BitmapEntry
-  { closureFrame :: StackFrameIter }
-
-wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [BitmapEntry]
+wordsToBitmapEntries :: StackFrameIter -> [Word] -> Word -> [StackFrameIter]
 wordsToBitmapEntries _ [] 0 = []
 wordsToBitmapEntries _ [] i = error $ "Invalid state: Empty list, size " ++ show i
 wordsToBitmapEntries _ l 0 = error $ "Invalid state: Size 0, list " ++ show l
 wordsToBitmapEntries sfi (b : bs) bitmapSize =
   let entries = toBitmapEntries sfi b (min bitmapSize (fromIntegral wORD_SIZE_IN_BITS))
-      mbLastEntry = (listToMaybe . reverse) entries
-      mbLastFrame = fmap closureFrame mbLastEntry
+      mbLastFrame = (listToMaybe . reverse) entries
    in case mbLastFrame of
         Just (StackFrameIter {..}) ->
           entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) bs (subtractDecodedBitmapWord bitmapSize)
@@ -198,23 +193,21 @@ wordsToBitmapEntries sfi (b : bs) bitmapSize =
     subtractDecodedBitmapWord :: Word -> Word
     subtractDecodedBitmapWord bSize = fromIntegral $ max 0 ((fromIntegral bSize) - wORD_SIZE_IN_BITS)
 
-toBitmapEntries :: StackFrameIter -> Word -> Word -> [BitmapEntry]
+toBitmapEntries :: StackFrameIter -> Word -> Word -> [StackFrameIter]
 toBitmapEntries _ _ 0 = []
 toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize =
   -- TODO: overriding isPrimitive field is a bit weird. Could be calculated before
-  BitmapEntry
-    { closureFrame = sfi {
+    sfi {
         isPrimitive = (bitmapWord .&. 1) /= 0
         }
-    }
     : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) (bitmapWord `shiftR` 1) (bSize - 1)
 
-toBitmapPayload :: BitmapEntry -> IO Box
-toBitmapPayload e
-  | (isPrimitive . closureFrame) e = trace "PRIM" $ pure . StackFrameBox $ (closureFrame e) {
+toBitmapPayload :: StackFrameIter -> IO Box
+toBitmapPayload sfi
+  | isPrimitive sfi = trace "PRIM" $ pure . StackFrameBox $ sfi {
                                       isPrimitive = True
                                      }
-toBitmapPayload e = getClosure (closureFrame e) 0
+toBitmapPayload sfi = getClosure sfi 0
 
 getClosure :: StackFrameIter -> WordOffset -> IO Box
 getClosure sfi@StackFrameIter {..} relativeOffset = trace ("getClosure " ++ show sfi ++ "  " ++ show relativeOffset) $
