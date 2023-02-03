@@ -4939,6 +4939,7 @@ needSourceNotes dflags = debugLevel dflags > 0
 -- LinkerInfo contains any extra options needed by the system linker.
 data LinkerInfo
   = GnuLD    [Option]
+  | Mold     [Option]
   | GnuGold  [Option]
   | LlvmLLD  [Option]
   | DarwinLD [Option]

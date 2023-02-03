@@ -70,6 +70,7 @@ The flag is only needed on ELF systems. On Windows (PE) and Mac OS X
 
 neededLinkArgs :: LinkerInfo -> [Option]
 neededLinkArgs (GnuLD o)     = o
+neededLinkArgs (Mold o)      = o
 neededLinkArgs (GnuGold o)   = o
 neededLinkArgs (LlvmLLD o)   = o
 neededLinkArgs (DarwinLD o)  = o
@@ -104,6 +105,10 @@ getLinkerInfo' logger dflags = do
           -- Set DT_NEEDED for all shared libraries. #10110.
           return (GnuLD $ map Option [-- ELF specific flag
                                       -- see Note [ELF needed shared libs]
+                                      "-Wl,--no-as-needed"])
+
+        | any ("mold" `isPrefixOf`) stdo =
+          return (Mold $ map Option [ --see Note [ELF needed shared libs]
                                       "-Wl,--no-as-needed"])
 
         | any ("GNU gold" `isPrefixOf`) stdo =
