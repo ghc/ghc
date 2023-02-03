@@ -115,37 +115,37 @@ genCommonCppDefs profiling = mconcat
 
   -- GHCJS.Prim.JSVal
   , if profiling
-      then "#define MK_JSVAL(x) (h$baseZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM)\n"
-      else "#define MK_JSVAL(x) (h$baseZCGHCziJSziPrimziJSVal_con_e, (x))\n"
+      then "#define MK_JSVAL(x) (h$ghczmbaseZCGHCziJSziPrimziJSVal_con_e, (x), h$CCS_SYSTEM)\n"
+      else "#define MK_JSVAL(x) (h$ghczmbaseZCGHCziJSziPrimziJSVal_con_e, (x))\n"
   ,  "#define JSVAL_VAL(x) ((x).d1)\n"
 
   -- GHCJS.Prim.JSException
   , if profiling
-      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
-      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$baseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
+      then "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghczmbaseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg),h$CCS_SYSTEM))\n"
+      else "#define MK_JSEXCEPTION(msg,hsMsg) (h$c2(h$ghczmbaseZCGHCziJSziPrimziJSException_con_e,(msg),(hsMsg)))\n"
 
   -- Exception dictionary for JSException
-  , "#define HS_JSEXCEPTION_EXCEPTION h$baseZCGHCziJSziPrimzizdfExceptionJSException\n"
+  , "#define HS_JSEXCEPTION_EXCEPTION h$ghczmbaseZCGHCziJSziPrimzizdfExceptionJSException\n"
 
   -- SomeException
   , if profiling
-      then "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$baseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except),h$CCS_SYSTEM))\n"
-      else "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$baseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except)))\n"
+      then "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$ghczmbaseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except),h$CCS_SYSTEM))\n"
+      else "#define MK_SOMEEXCEPTION(dict,except) (h$c2(h$ghczmbaseZCGHCziExceptionziTypeziSomeException_con_e,(dict),(except)))\n"
 
   -- GHC.Ptr.Ptr
   , if profiling
-      then "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
-      else "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
+      then "#define MK_PTR(val,offset) (h$c2(h$ghczmbaseZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
+      else "#define MK_PTR(val,offset) (h$c2(h$ghczmbaseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
 
   -- Data.Maybe.Maybe
-  , "#define HS_NOTHING h$baseZCGHCziMaybeziNothing\n"
-  , "#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziMaybeziNothing_con_e)\n"
-  , "#define IS_JUST(cl) ((cl).f === h$baseZCGHCziMaybeziJust_con_e)\n"
+  , "#define HS_NOTHING h$ghczmbaseZCGHCziMaybeziNothing\n"
+  , "#define IS_NOTHING(cl) ((cl).f === h$ghczmbaseZCGHCziMaybeziNothing_con_e)\n"
+  , "#define IS_JUST(cl) ((cl).f === h$ghczmbaseZCGHCziMaybeziJust_con_e)\n"
   , "#define JUST_VAL(jj) ((jj).d1)\n"
   -- "#define HS_NOTHING h$nothing\n"
   , if profiling
-      then "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))\n"
-      else "#define MK_JUST(val) (h$c1(h$baseZCGHCziMaybeziJust_con_e, (val)))\n"
+      then "#define MK_JUST(val) (h$c1(h$ghczmbaseZCGHCziMaybeziJust_con_e, (val), h$CCS_SYSTEM))\n"
+      else "#define MK_JUST(val) (h$c1(h$ghczmbaseZCGHCziMaybeziJust_con_e, (val)))\n"
 
   -- Data.List
   , "#define HS_NIL h$ghczmprimZCGHCziTypesziZMZN\n"

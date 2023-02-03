@@ -216,7 +216,7 @@ ioManagerDie (void)
 void
 ioManagerStartCap (Capability **cap)
 {
-    rts_evalIO(cap,&base_GHCziConcziIO_ensureIOManagerIsRunning_closure,NULL);
+    rts_evalIO(cap,&ghczmbase_GHCziConcziIO_ensureIOManagerIsRunning_closure,NULL);
 }
 
 void
@@ -485,7 +485,7 @@ startSignalHandlers(Capability *cap)
                        RtsFlags.GcFlags.initialStkSize,
                        rts_apply(cap,
                                  rts_apply(cap,
-                                           &base_GHCziConcziSignal_runHandlersPtr_closure,
+                                           &ghczmbase_GHCziConcziSignal_runHandlersPtr_closure,
                                            rts_mkPtr(cap, info)),
                                  rts_mkInt(cap, info->si_signo)));
     scheduleThread(cap, t);

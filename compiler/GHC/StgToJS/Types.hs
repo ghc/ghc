@@ -178,14 +178,14 @@ instance ToJExpr VarType where
 -- in JS Land. For example, the entry function for the 'Just' constructor is a
 -- 'IdConEntry' which compiles to:
 -- @
--- function h$baseZCGHCziMaybeziJust_con_e() { return h$rs() };
+-- function h$ghczmbaseZCGHCziMaybeziJust_con_e() { return h$rs() };
 -- @
 -- which just returns whatever the stack point is pointing to. Whereas the entry
 -- function to 'Just' is an 'IdEntry' and does the work. It compiles to:
 -- @
--- function h$baseZCGHCziMaybeziJust_e() {
---    var h$$baseZCGHCziMaybezieta_8KXnScrCjF5 = h$r2;
---    h$r1 = h$c1(h$baseZCGHCziMaybeziJust_con_e, h$$baseZCGHCziMaybezieta_8KXnScrCjF5);
+-- function h$ghczmbaseZCGHCziMaybeziJust_e() {
+--    var h$$ghczmbaseZCGHCziMaybezieta_8KXnScrCjF5 = h$r2;
+--    h$r1 = h$c1(h$ghczmbaseZCGHCziMaybeziJust_con_e, h$$ghczmbaseZCGHCziMaybezieta_8KXnScrCjF5);
 --    return h$rs();
 --    };
 -- @
