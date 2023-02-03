@@ -6,13 +6,14 @@ AC_DEFUN([FP_FIND_LIBZSTD],
       ipe-data-compression,
       [AS_HELP_STRING(
           [--enable-ipe-data-compression],
-          [Enable compression of info table provenance map entries using the
+          [Enable compression of info table provenance entries using the
           zstd compression library [default=no]]
         )],
       [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableIpeDataCompression])],
       [EnableIpeDataCompression=NO]
     )
 
+  HaveLibZstd=0
   if test "$EnableIpeDataCompression" = "YES"; then
     dnl ** Have zstd?
     dnl --------------------------------------------------------------
@@ -44,8 +45,6 @@ AC_DEFUN([FP_FIND_LIBZSTD],
 
     AC_SUBST(LibZstdIncludeDir)
 
-    HaveLibZstd=0
-
     CFLAGS2="$CFLAGS"
     CFLAGS="$LIBZSTD_CFLAGS $CFLAGS"
     LDFLAGS2="$LDFLAGS"
@@ -67,9 +66,9 @@ AC_DEFUN([FP_FIND_LIBZSTD],
     LDFLAGS="$LDFLAGS2"
   fi
 
-
   AC_DEFINE_UNQUOTED([HAVE_LIBZSTD], [$HaveLibZstd], [Define to 1 if you
-  wish to compress IPE data in compiler results (requires libzstd)])
+    wish to compress IPE data in compiler results (requires libzstd)])
+
   if test $HaveLibZstd = "1" ; then
     AC_SUBST([UseLibZstd],[YES])
     AC_SUBST([CabalHaveLibZstd],[True])
