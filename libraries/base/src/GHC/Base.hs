@@ -159,8 +159,11 @@ module GHC.Base
     KindRep(..), KindBndr,
 
     -- * From GHC.Prim
+    module GHC.Prim, -- TODO
     -- * From GHC.Prim.Ext
+    module GHC.Prim.Ext, -- TODO
     -- * From GHC.Prim.PtrEq
+    module GHC.Prim.PtrEq, -- TODO
     -- * From GHC.Err
     absentErr, error, errorWithoutStackTrace, undefined,
 
@@ -169,3 +172,6 @@ module GHC.Base
     ) where
 
 import "ghc-base" GHC.Base
+import "ghc-prim" GHC.Prim
+import "ghc-prim" GHC.Prim.Ext
+import "ghc-prim" GHC.Prim.PtrEq
