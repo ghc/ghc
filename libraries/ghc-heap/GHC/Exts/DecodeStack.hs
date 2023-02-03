@@ -207,10 +207,7 @@ toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize =
     : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: StackFrameIter -> IO Box
-toBitmapPayload sfi
-  | isPrimitive sfi = trace "PRIM" $ pure . StackFrameBox $ sfi {
-                                      isPrimitive = True
-                                     }
+toBitmapPayload sfi | isPrimitive sfi = pure (StackFrameBox sfi)
 toBitmapPayload sfi = getClosure sfi 0
 
 getClosure :: StackFrameIter -> WordOffset -> IO Box

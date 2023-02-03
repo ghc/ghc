@@ -81,7 +81,6 @@ foreign import prim "eqStackSnapshotszh" eqStackSnapshots# :: StackSnapshot# -> 
 data StackFrameIter = StackFrameIter
   { stackSnapshot# :: !StackSnapshot#,
     index :: !WordOffset,
-    -- TODO: could be a sum type to prevent boolean-blindness
     isPrimitive :: !Bool
   }
 
