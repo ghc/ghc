@@ -1,5 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.19.0.0 *TBA*
+  * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
+  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
+    types significantly.
+
 ## 4.18.0.0 *TBA*
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
@@ -63,9 +68,6 @@
   * Add `Data.Typeable.heqT`, a kind-heterogeneous version of
     `Data.Typeable.eqT`
     ([CLC proposal #99](https://github.com/haskell/core-libraries-committee/issues/99))
-  * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
-  * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
-    types significantly.
 
 ## 4.17.0.0 *August 2022*
 
