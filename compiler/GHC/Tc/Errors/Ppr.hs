@@ -1315,6 +1315,12 @@ instance Diagnostic TcRnMessage where
     TcRnSectionWithoutParentheses expr -> mkSimpleDecorated $
       hang (text "A section must be enclosed in parentheses")
          2 (text "thus:" <+> (parens (ppr expr)))
+    TcRnIncompatibleForallVisibility act exp ->
+      mkSimpleDecorated $
+        hang (text "Visibilities of forall-bound variables are not compatible") 2 $
+        vcat
+          [ text "Expected:" <+> ppr exp
+          , text "  Actual:" <+> ppr act ]
 
     TcRnCapturedTermName tv_name shadowed_term_names
       -> mkSimpleDecorated $
@@ -2311,7 +2317,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInterfaceError err
       -> interfaceErrorReason err
-
+    TcRnIncompatibleForallVisibility{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2913,6 +2920,8 @@ instance Diagnostic TcRnMessage where
       -> [SuggestAddTypeSignatures UnnamedBinding]
     TcRnInterfaceError reason
       -> interfaceErrorHints reason
+    TcRnIncompatibleForallVisibility{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

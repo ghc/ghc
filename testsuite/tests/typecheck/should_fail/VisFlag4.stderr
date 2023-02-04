@@ -1,0 +1,6 @@
+
+VisFlag4.hs:8:1: error: [GHC-25115]
+    • Visibilities of forall-bound variables are not compatible
+        Expected: forall k -> k -> k
+          Actual: forall k. k -> k
+    • In the class declaration for ‘C’

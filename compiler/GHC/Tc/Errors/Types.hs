@@ -3804,6 +3804,22 @@ data TcRnMessage where
   TcRnTypeSynonymCycle :: !TySynCycleTyCons -- ^ The tycons involved in the cycle
                        -> TcRnMessage
 
+  {-| TcRnIncompatibleForallVisibility is an error that occurs when
+      the expected and actual types contain forall-bound variables
+      that have incompatible visibilities.
+
+      Example:
+        type family Invis :: Type -> forall a. a
+        type family Vis   :: Type -> forall a -> a
+        type instance Vis = Invis   -- Bad instance
+
+      Test cases: T18863a VisFlag1 VisFlag1_ql VisFlag2 VisFlag3 VisFlag4 VisFlag5
+  -}
+  TcRnIncompatibleForallVisibility
+    :: TcType
+    -> TcType
+    -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.

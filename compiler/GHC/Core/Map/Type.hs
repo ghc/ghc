@@ -38,7 +38,6 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Compare( eqForAllVis )
 import GHC.Data.TrieMap
 
 import GHC.Data.FastString
@@ -261,11 +260,9 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
               -> liftEquality (tc == tc') `andEq` gos env env' tys tys'
           (LitTy l, LitTy l')
               -> liftEquality (l == l')
-          (ForAllTy (Bndr tv vis) ty, ForAllTy (Bndr tv' vis') ty')
-              -> -- See Note [ForAllTy and type equality] in
-                 -- GHC.Core.TyCo.Compare for why we use `eqForAllVis` here
-                 liftEquality (vis `eqForAllVis` vis') `andEq`
-                 go (D env (varType tv)) (D env' (varType tv')) `andEq`
+          (ForAllTy (Bndr tv _) ty, ForAllTy (Bndr tv' _) ty')
+              -- Ignore ForAllTyFlag. See Note [ForAllTy and type equality] in GHC.Core.TyCo.Compare
+              -> go (D env (varType tv)) (D env' (varType tv')) `andEq`
                  go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
           (CoercionTy {}, CoercionTy {})
               -> TEQ

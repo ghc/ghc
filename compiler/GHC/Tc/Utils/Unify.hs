@@ -2080,6 +2080,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
          then not_ok_so_defer
          else
     do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
+       ; checkEqForallVis (typeKind ty2) (tyVarKind tv1)  -- See Note [Use sites of checkEqForallVis]
        ; traceTc "uUnfilledVar2 ok" $
          vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
               , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)

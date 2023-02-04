@@ -216,9 +216,8 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
-           s1@(ForAllTy (Bndr _ vis1) _) _
-           s2@(ForAllTy (Bndr _ vis2) _) _
-  | vis1 `eqForAllVis` vis2 -- Note [ForAllTy and type equality]
+           s1@ForAllTy{} _
+           s2@ForAllTy{} _
   = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require rewritten types

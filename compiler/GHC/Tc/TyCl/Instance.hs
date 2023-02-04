@@ -922,6 +922,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
                   -- is none)
                   ; let hs_lhs = nlHsTyConApp NotPromoted fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just . HsTypeRnThing $ unLoc hs_lhs) lhs_applied_kind res_kind
+                  ; checkEqForallVis lhs_applied_kind res_kind  -- See Note [Use sites of checkEqForallVis]
 
                   ; traceTc "tcDataFamInstHeader" $
                     vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind, ppr m_ksig]

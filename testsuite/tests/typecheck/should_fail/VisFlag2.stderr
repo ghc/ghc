@@ -1,0 +1,14 @@
+
+VisFlag2.hs:13:21: error: [GHC-25115]
+    • Visibilities of forall-bound variables are not compatible
+        Expected: * -> forall a -> a
+          Actual: * -> forall a. a
+    • In the type ‘Invis’
+      In the type instance declaration for ‘Vis’
+
+VisFlag2.hs:14:23: error: [GHC-25115]
+    • Visibilities of forall-bound variables are not compatible
+        Expected: * -> forall a. a
+          Actual: * -> forall a -> a
+    • In the type ‘Vis’
+      In the type instance declaration for ‘Invis’

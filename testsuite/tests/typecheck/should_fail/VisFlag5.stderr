@@ -1,0 +1,6 @@
+
+VisFlag5.hs:8:1: error: [GHC-25115]
+    • Visibilities of forall-bound variables are not compatible
+        Expected: (forall i. i -> i) -> *
+          Actual: (forall i -> i -> i) -> *
+    • In the data instance declaration for ‘D’

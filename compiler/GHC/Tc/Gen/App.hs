@@ -352,6 +352,11 @@ tcApp rn_expr exp_res_ty
                  = addFunResCtxt rn_fun rn_args app_res_rho exp_res_ty $
                    thing_inside
 
+       -- QL may have instantiated some delta variables to polytypes.
+       -- Zonk before we call checkEqForallVis (and possibly tcSubTypeDS),
+       -- as those functions do not expect polytypes inside unification variables.
+       ; app_res_rho <- zonkQuickLook do_ql app_res_rho
+
        -- Match up app_res_rho: the result type of rn_expr
        --     with exp_res_ty:  the expected result type
        ; do_ds <- xoptM LangExt.DeepSubsumption
@@ -368,10 +373,14 @@ tcApp rn_expr exp_res_ty
                  -- Even though both app_res_rho and exp_res_ty are rho-types,
                  -- they may have nested polymorphism, so if deep subsumption
                  -- is on we must call tcSubType.
-                 -- Zonk app_res_rho first, because QL may have instantiated some
-                 -- delta variables to polytypes, and tcSubType doesn't expect that
-                 do { app_res_rho <- zonkQuickLook do_ql app_res_rho
-                    ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
+                 tcSubTypeDS rn_expr app_res_rho exp_res_ty
+
+       -- See Note [Use sites of checkEqForallVis]
+       --   This particular call is commented out because we do not have
+       --   visible forall in types of terms yet (#281), so it is a no-op.
+       -- ; case exp_res_ty of
+       --     Check res_ty -> checkEqForallVis app_res_rho res_ty
+       --     Infer _      -> return ()
 
        -- Typecheck the value arguments
        ; tc_args <- tcValArgs do_ql inst_args
@@ -1041,14 +1050,14 @@ qlUnify delta ty1 ty2
       | -- See Note [Actual unification in qlUnify]
         let ty2_tvs = shallowTyCoVarsOfType ty2
       , not (ty2_tvs `intersectsVarSet` bvs2)
-          -- Can't instantiate a delta-varto a forall-bound variable
+          -- Can't instantiate a delta-var to a forall-bound variable
       , Just ty2 <- occCheckExpand [kappa] ty2
           -- Passes the occurs check
       = do { let ty2_kind   = typeKind ty2
                  kappa_kind = tyVarKind kappa
            ; co <- unifyKind (Just (TypeThing ty2)) ty2_kind kappa_kind
                    -- unifyKind: see Note [Actual unification in qlUnify]
-
+           ; checkEqForallVis ty2_kind kappa_kind  -- See Note [Use sites of checkEqForallVis]
            ; traceTc "qlUnify:update" $
              vcat [ hang (ppr kappa <+> dcolon <+> ppr kappa_kind)
                        2 (text ":=" <+> ppr ty2 <+> dcolon <+> ppr ty2_kind)

@@ -16,7 +16,7 @@ module GHC.Core.TyCo.Compare (
     tcEqTyConApps,
 
    -- * Visiblity comparision
-   eqForAllVis, cmpForAllVis
+   eqForAllVis,
 
    ) where
 
@@ -171,11 +171,13 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     go _   (LitTy lit1) (LitTy lit2)
       = lit1 == lit2
 
-    go env (ForAllTy (Bndr tv1 vis1) ty1)
-           (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 `eqForAllVis` vis2
-      && (vis_only || go env (varType tv1) (varType tv2))
-      && go (rnBndr2 env tv1 tv2) ty1 ty2
+    go env (ForAllTy (Bndr tv1 _) ty1)
+           (ForAllTy (Bndr tv2 _) ty2)
+      -- Ignore ForAllTyFlag. See Note [ForAllTy and type equality]
+      = kinds_eq && go (rnBndr2 env tv1 tv2) ty1 ty2
+      where
+        kinds_eq | vis_only  = True
+                 | otherwise = go env (varType tv1) (varType tv2)
 
     -- Make sure we handle all FunTy cases since falling through to the
     -- AppTy case means that tcSplitAppTyNoView_maybe may see an unzonked
@@ -227,7 +229,9 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
 -- | Do these denote the same level of visibility? 'Required'
 -- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
+-- equates 'Specified' and 'Inferred'.
+--
+-- Used for printing and in tcEqForallVis.
 eqForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Bool
 -- See Note [ForAllTy and type equality]
 -- If you change this, see IMPORTANT NOTE in the above Note
@@ -235,28 +239,41 @@ eqForAllVis Required      Required      = True
 eqForAllVis (Invisible _) (Invisible _) = True
 eqForAllVis _             _             = False
 
--- | Do these denote the same level of visibility? 'Required'
--- arguments are visible, others are not. So this function
--- equates 'Specified' and 'Inferred'. Used for printing.
-cmpForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Ordering
--- See Note [ForAllTy and type equality]
--- If you change this, see IMPORTANT NOTE in the above Note
-cmpForAllVis Required      Required       = EQ
-cmpForAllVis Required      (Invisible {}) = LT
-cmpForAllVis (Invisible _) Required       = GT
-cmpForAllVis (Invisible _) (Invisible _)  = EQ
-
-
 {- Note [ForAllTy and type equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we compare (ForAllTy (Bndr tv1 vis1) ty1)
          and    (ForAllTy (Bndr tv2 vis2) ty2)
-what should we do about `vis1` vs `vis2`.
+what should we do about `vis1` vs `vis2`?
 
-First, we always compare with `eqForAllVis` and `cmpForAllVis`.
-But what decision do we make?
+An extensive discussion can be found at https://github.com/ghc-proposals/ghc-proposals/issues/558.
+A short summary of our options and the currently implemented design are described below.
 
-Should GHC type-check the following program (adapted from #15740)?
+One option is to take those flags into account and check (vis1==vis2).
+But in Core, the visibilities of forall-bound variables have no meaning,
+as type abstraction and type application are always explicit.
+Going to great lengths to carry them around is counterproductive,
+but not going far enough may lead to Core Lint errors (#22762).
+
+The other option (the one we take) is to ignore those flags.
+Neither the name of a forall-bound variable nor its visibility flag
+affect GHC's notion of type equality.
+
+That said, the visibilities of foralls do matter
+a great deal in user-written programs. For example, if we unify tv := T, where
+  tv :: forall k.   k -> Type
+  T  :: forall k -> k -> Type
+then the user cannot substitute `T Maybe` for `tv Maybe` in their program
+by hand. They'd have to write `T (Type -> Type) Maybe` instead.
+This entails a loss of referential transparency. We solve this issue by
+checking the flags in the (source-language) type checker, not in the
+(Core language) equality relation `eqType`. All checks of forall visibility
+are listed in Note [Use sites of checkEqForallVis].
+
+These checks use `eqForAllVis` to compare the `ForAllTyFlag`s.
+But should we perhaps use (==) instead?
+Do we only care about visibility (Required vs Invisible)
+or do we also care about specificity (Specified vs Inferred)?
+For example, should GHC type-check the following program (adapted from #15740)?
 
   {-# LANGUAGE PolyKinds, ... #-}
   data D a
@@ -280,34 +297,15 @@ programs like the one above. Whether a kind variable binder ends up being
 specified or inferred can be somewhat subtle, however, especially for kinds
 that aren't explicitly written out in the source code (like in D above).
 
-For now, we decide
+For now, we decide to ignore specificity. That is, we have the following:
 
-    the specified/inferred status of an invisible type variable binder
-    does not affect GHC's notion of equality.
+  eqForAllVis Required      Required      = True
+  eqForAllVis (Invisible _) (Invisible _) = True
+  eqForAllVis _             _             = False
 
-That is, we have the following:
-
-  --------------------------------------------------
-  | Type 1            | Type 2            | Equal? |
-  --------------------|-----------------------------
-  | forall k. <...>   | forall k. <...>   | Yes    |
-  |                   | forall {k}. <...> | Yes    |
-  |                   | forall k -> <...> | No     |
-  --------------------------------------------------
-  | forall {k}. <...> | forall k. <...>   | Yes    |
-  |                   | forall {k}. <...> | Yes    |
-  |                   | forall k -> <...> | No     |
-  --------------------------------------------------
-  | forall k -> <...> | forall k. <...>   | No     |
-  |                   | forall {k}. <...> | No     |
-  |                   | forall k -> <...> | Yes    |
-  --------------------------------------------------
-
-IMPORTANT NOTE: if we want to change this decision, ForAllCo will need to carry
-visiblity (by taking a ForAllTyBinder rathre than a TyCoVar), so that
-coercionLKind/RKind build forall types that match (are equal to) the desired
-ones.  Otherwise we get an infinite loop in the solver via canEqCanLHSHetero.
-Examples: T16946, T15079.
+One unfortunate consequence of this setup is that it can be exploited
+to observe the order of inferred quantification (#22648). However, fixing this
+would be a breaking change, so we choose not to (at least for now).
 
 Historical Note [Typechecker equality vs definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -335,7 +333,7 @@ is more finer-grained than definitional equality in two places:
   Constraint, but typechecker treats them as distinct types.
 
 * Unlike definitional equality, which does not care about the ForAllTyFlag of a
-  ForAllTy, typechecker equality treats Required type variable binders as
+  ForAllTy, typechecker equality treated Required type variable binders as
   distinct from Invisible type variable binders.
   See Note [ForAllTy and type equality]
 
@@ -513,9 +511,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
-    go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
-      = liftOrdering (vis1 `cmpForAllVis` vis2)
-        `thenCmpTy` go env (varType tv1) (varType tv2)
+    go env (ForAllTy (Bndr tv1 _) t1) (ForAllTy (Bndr tv2 _) t2)
+      -- Ignore ForAllTyFlag. See Note [ForAllTy and type equality]
+      = go env (varType tv1) (varType tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 
         -- See Note [Equality on AppTys]

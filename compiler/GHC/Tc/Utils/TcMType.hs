@@ -68,6 +68,10 @@ module GHC.Tc.Utils.TcMType (
   inferResultToType, ensureMonoType, promoteTcType,
 
   --------------------------------
+  -- Visibility flag check
+  tcEqForallVis, checkEqForallVis,
+
+  --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin, zonkTidyOrigins,
   zonkTidyFRRInfos,
@@ -603,6 +607,213 @@ tc_infer mb_frr tc_check
        ; result <- tc_check res_ty
        ; res_ty <- readExpType res_ty
        ; return (result, res_ty) }
+
+{- *********************************************************************
+*                                                                      *
+              Visibility flag check
+*                                                                      *
+********************************************************************* -}
+
+-- Check if two presumably equal types actually differ in the visibility
+-- of their foralls. Example (from #18863):
+--
+--   type IDa :: forall i -> i -> Type
+--   data IDa :: forall i.   i -> Type
+--
+-- Report TcRnIncompatibleForallVisibility if the visibilities differ,
+-- as in the example above.
+--
+-- See Note [Presumably equal types] and Note [Use sites of checkEqForallVis]
+checkEqForallVis :: TcType -> TcType -> TcM ()
+checkEqForallVis ty1 ty2 =
+  unless (tcEqForallVis ty1 ty2) $
+    addErr $ TcRnIncompatibleForallVisibility ty1 ty2
+
+-- Structurally match two presumably equal types, checking that all pairs of
+-- foralls have equal visibilities.
+--
+-- See Note [Presumably equal types]
+tcEqForallVis :: Type -> Type -> Bool
+tcEqForallVis = matchUpForAllTyFlags eqForAllVis
+  -- This is the only use of matchUpForAllTyFlags at the moment.
+
+-- Structurally match two presumably equal types, checking that all pairs of
+-- forall visibility flags (ForAllTyFlag) satisfy a predicate.
+--
+-- For example, given the types
+--     ty1 = forall a1. Bool -> forall b1.   ...
+--     ty2 = forall a2. Bool -> forall b2 -> ...
+-- We have
+--     matchUpForAllTyFlags f ty1 ty2 =
+--        f Specified Specified &&   -- from (a1, a2)
+--        f Specified Required       -- from (b1, b2)
+--
+-- Metavariables are of no interest to us: they stand for monotypes, so there
+-- are no forall flags to be found. We do not look through metavariables.
+--
+-- See Note [Presumably equal types]
+matchUpForAllTyFlags
+  :: (ForAllTyFlag -> ForAllTyFlag -> Bool)
+  -> TcType     -- actual
+  -> TcType     -- expected
+  -> Bool
+matchUpForAllTyFlags zip_flags actual expected =
+    go actual expected True
+  where
+    go :: TcType -> TcType -> Bool -> Bool
+    -- See Note [Comparing nullary type synonyms] in GHC.Core.Type
+    go (TyConApp tc1 []) (TyConApp tc2 []) cont | tc1 == tc2 = cont
+
+    go t1 t2 cont | Just t1' <- coreView t1 = go t1' t2 cont
+    go t1 t2 cont | Just t2' <- coreView t2 = go t1 t2' cont
+
+    go (LitTy lit1) (LitTy lit2) cont
+      | lit1 /= lit2 = True  -- See Note [Presumably equal types]
+      | otherwise    = cont
+
+    go (ForAllTy (Bndr tv1 vis1) ty1) (ForAllTy (Bndr tv2 vis2) ty2) cont
+      = go (varType tv1) (varType tv2) $
+        go ty1 ty2 $
+        zip_flags vis1 vis2 && cont
+
+    go (FunTy _ w1 arg1 res1) (FunTy _ w2 arg2 res2) cont =
+      go arg1 arg2 $ go res1 res2 $ go w1 w2 $ cont
+    go (AppTy s1 t1) (AppTy s2 t2) cont =
+      go s1 s2 $ go t1 t2 $ cont
+    go (TyConApp tc1 ts1) (TyConApp tc2 ts2) cont
+      | tc1 /= tc2 = True    -- See Note [Presumably equal types]
+      | otherwise  = gos ts1 ts2 cont
+
+    go (CastTy t1 _) t2               cont = go t1 t2 cont
+    go t1            (CastTy t2 _)    cont = go t1 t2 cont
+    go _             _                cont = cont
+
+    gos (t1:ts1) (t2:ts2) cont = gos ts1 ts2 $ go t1 t2 cont
+    gos []       []       cont = cont
+    gos _        _        _    = True    -- See Note [Presumably equal types]
+
+{- Note [Presumably equal types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In matchUpForAllTyFlags (and by extension tcEqForallVis, checkEqForallVis)
+we assume that there is always a separate (possibly subsequent) check for
+  t1 `eqType` t2
+eqType defines the equality relation that we are checking, but the actual
+check may be performed by tcEqType or uType (unifyType/unifyKind).
+
+So `matchUpForAllTyFlags` should return True (i.e. "no problem") if the types
+appear to differ. Examples:
+* t1 is a unification variable and t2 is Int.
+  Later they will be unified -- no problems here!
+* t1 is Int and t2 is Bool.
+  Later that will cause an error -- and it's bad for `checkEqForallVis`
+  to complain instead about mismatched visibilities.
+
+Note carefully that foralls can't hide inside unification variables
+(unification variables stand for monotypes) so there is no danger of
+missing a visiblitly mismatch with
+   alpha ~ (forall a -> blah)
+where alpha is subsequently unified with (forall a. blah).
+That latter unification can't happen. Quick Look does use unification variables
+(so called "instantiation variables") but they are short lived.
+
+To reiterate, the ideal scenario is that `matchUpForAllTyFlags` returns True
+when (ty1 /= ty2). In practice, however, it would make the check more
+complicated and expensive. For instance, we'd have to maintain a RnEnv2
+to check type variables for equality. To make our lives easier, we follow
+this principle on a best-effort basis. The worst case scenario is that
+we report a less helpful error message.
+-}
+
+{- Note [Use sites of checkEqForallVis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The calls to checkEqForallVis must be carefully placed to cover all cases
+but at the same time not incur the performance cost of excessive checking.
+
+Here we list all use sites of checkEqForallVis and examples of code covered
+by that particular call. First, some helper definitions used in the examples:
+
+    type family InvisF :: Type -> forall a.   a
+    type family VisF   :: Type -> forall a -> a
+
+    type V :: forall k -> k -> Type
+    data V k (a :: k) = MkV
+
+    f :: forall {k} {a :: k} (hk :: forall j. j -> Type). hk a -> ()
+    f _ = ()
+
+With those definitions in mind, here are the examples of code
+for each call to checkEqForallVis:
+
+1. The call in GHC.Tc.Gen.HsType.checkExpectedKind
+  1a)
+    Used when kind-checking type family instances (test: VisFlag2)
+        type instance VisF = InvisF
+        type instance InvisF = VisF
+    Here we try to unify the kinds of VisF and InvisF:
+        (Type -> forall a -> a) ~ (Type -> forall a. a)
+  1b)
+    Used when kind-checking type applications (test: VisFlag1)
+        bad_tyapp :: ()
+        bad_tyapp = f @V MkV
+    Here we use type applications to instantiatie hk := V (where hk is a type parameter of f),
+    therefore we unify their kinds
+        (forall j. j -> Type) ~ (forall k -> k -> Type)
+
+2. The call in GHC.Tc.Gen.App.qlUnify
+    Used when kind-checking Quick Look instantiations (test: VisFlag1_ql)
+        {-# LANGUAGE ImpredicativeTypes #-}
+        bad_infer :: ()
+        bad_infer = f MkV
+    Here Quick Look tries to instantiate hk := V (where hk is a type parameter of f),
+    therefore we unify their kinds
+        (forall j. j -> Type) ~ (forall k -> k -> Type)
+
+3. The call in GHC.Tc.Utils.Unify.uUnfilledVar2
+    Used when kind-checking inferred type variable instantiations (test: VisFlag1)
+        bad_infer :: ()
+        bad_infer = f MkV
+    Here the unifier tries to fill in hk := V (where hk is a type parameter of f),
+    therefore we unify their kinds
+        (forall j. j -> Type) ~ (forall k -> k -> Type)
+
+4. The call in GHC.Tc.Gen.HsType.kcCheckDeclHeader_sig
+    Used when checking the result kind annotation
+    in type declarations with standalone kind signatures (test: T18863a)
+        type IDa :: forall i -> i -> Type
+        data IDa :: forall i.   i -> Type
+    Here we unify the inline kind signature with the SAKS
+        (forall i -> i -> Type) ~ (forall i. i -> Type)
+
+5. The call in GHC.Tc.Gen.HsType.matchUpSigWithDecl
+    Used when checking kind annotations on type parameters
+    in type declarations with standalone kind signatures (test: VisFlag4)
+        type C :: (forall k -> k -> k) -> Constraint
+        class C (hk :: forall k. k -> k) where
+    Here we unify the inline kind signature on hk with the relevant
+    part of the SAKS
+        (forall k -> k -> k) ~ (forall k. k -> k)
+
+6. The call in GHC.Tc.Gen.HsType.bindExplicitTKBndrsX
+    Used when checking kind annotations on type parameters
+    of associated type families (test: VisFlag3)
+        class C (hk :: forall k. k -> k) where
+          type F (hk :: forall k -> k -> k)
+    Here we unify the kinds given to hk in F and C
+        (forall k. k -> k) ~ (forall k -> k -> k)
+
+7. The call in GHC.Tc.TyCl.Instance.tcDataFamInstHeader
+    Used when checking the result kind annotation
+    of data family instances (test: VisFlag5)
+        data family   D a   :: (forall i -> i -> i) -> Type
+        data instance D Int :: (forall i.   i -> i) -> Type
+    Here we unify the result kinds in the data family header
+    and the data instance
+        ((forall i -> i -> i) -> Type) ~ ((forall i. i -> i) -> Type)
+
+8. The call in GHC.Tc.Gen.App.tcApp (commented out)
+    The commented out call in tcApp marks the spot where we should
+    perform the check when we implement visible forall in terms (#281).
+-}
 
 {- *********************************************************************
 *                                                                      *

@@ -1930,13 +1930,16 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 
        ; let res_ty = ty `mkAppTys` new_args
 
-       ; if act_kind' `tcEqType` exp_kind
+       ; res_ty' <-
+         if act_kind' `tcEqType` exp_kind
          then return res_ty  -- This is very common
          else do { co_k <- uType KindLevel origin act_kind' exp_kind
                  ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                                      , ppr exp_kind
                                                      , ppr co_k ])
-                ; return (res_ty `mkCastTy` co_k) } }
+                 ; return (res_ty `mkCastTy` co_k) }
+       ; checkEqForallVis act_kind' exp_kind   -- See Note [Use sites of checkEqForallVis]
+       ; return res_ty' }
     where
       -- We need to make sure that both kinds have the same number of implicit
       -- foralls out front. If the actual kind has more, instantiate accordingly.
@@ -2551,7 +2554,8 @@ kcCheckDeclHeader_sig sig_kind name flav
                  ; case ctx_k of
                       AnyKind -> return ()   -- No signature
                       _ -> do { res_ki <- newExpectedKind ctx_k
-                              ; discardResult (unifyKind Nothing sig_res_kind' res_ki) }
+                              ; discardResult (unifyKind Nothing sig_res_kind' res_ki)
+                              ; checkEqForallVis sig_res_kind' res_ki }  -- See Note [Use sites of checkEqForallVis]
 
                  -- Add more binders for data/newtype, so the result kind has no arrows
                  -- See Note [Datatype return kinds]
@@ -2662,7 +2666,8 @@ matchUpSigWithDecl sig_tcbs sig_res_kind hs_bndrs thing_inside
     tc_hs_bndr (KindedTyVar _ _ (L _ hs_nm) lhs_kind) expected_kind
       = do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt hs_nm) lhs_kind
            ; discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-             unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind }
+             unifyKind (Just (NameThing hs_nm)) sig_kind expected_kind
+           ; checkEqForallVis sig_kind expected_kind }  -- See Note [Use sites of checkEqForallVis]
 
 substTyConBinderX :: Subst -> TyConBinder -> (Subst, TyConBinder)
 substTyConBinderX subst (Bndr tv vis)
@@ -3288,6 +3293,7 @@ bindExplicitTKBndrsX skol_mode@(SM { sm_parent = check_parent, sm_kind = ctxt_ki
                           -- This unify rejects:
                           --    class C (m :: * -> *) where
                           --      type F (m :: *) = ...
+           ; checkEqForallVis kind (tyVarKind tv)  -- See Note [Use sites of checkEqForallVis]
            ; return tv }
 
       | otherwise

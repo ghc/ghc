@@ -1,0 +1,6 @@
+
+VisFlag3.hs:6:3: error: [GHC-25115]
+    • Visibilities of forall-bound variables are not compatible
+        Expected: forall k. k -> k
+          Actual: forall k -> k -> k
+    • In the associated type family declaration for ‘F’

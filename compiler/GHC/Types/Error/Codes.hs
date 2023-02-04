@@ -577,6 +577,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIncoherentRoles"                           = 18273
   GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
   GhcDiagnosticCode "TcRnTypeSynonymCycle"                          = 97522
+  GhcDiagnosticCode "TcRnIncompatibleForallVisibility"              = 25115
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
