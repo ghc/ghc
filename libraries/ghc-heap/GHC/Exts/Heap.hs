@@ -208,5 +208,7 @@ closureSize (StackFrameBox sfi) = unpackStackFrameIter sfi <&>
       RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
       -- The one additional word is a pointer to the StgBCO in the closure's payload
       RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
+      -- The one additional word is a pointer to the next stack chunk
+      UnderflowFrame {} -> sizeStgClosure + 1
       _ -> error "Unexpected closure type"
 #endif

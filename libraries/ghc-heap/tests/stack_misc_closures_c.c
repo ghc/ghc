@@ -242,6 +242,14 @@ void create_any_bco_frame(Capability *cap, StgStack *stack, StgWord w) {
   c->payload[1] = (StgClosure *)rts_mkWord(cap, w);
 }
 
+StgStack *any_ret_small_prim_frame(Capability *cap);
+
+void create_any_underflow_frame(Capability *cap, StgStack *stack, StgWord w) {
+  StgUnderflowFrame *underflowF = (StgUnderflowFrame *)stack->sp;
+  underflowF->info = &stg_stack_underflow_frame_info;
+  underflowF->next_chunk = any_ret_small_prim_frame(cap);
+}
+
 // Import from Sanity.c
 extern void checkSTACK(StgStack *stack);
 
@@ -353,6 +361,11 @@ StgStack *any_ret_fun_arg_gen_big_frame(Capability *cap) {
 StgStack *any_bco_frame(Capability *cap) {
   return setup(cap, sizeofW(StgClosure) + 2 * sizeofW(StgWord),
                &create_any_bco_frame);
+}
+
+StgStack *any_underflow_frame(Capability *cap) {
+  return setup(cap, sizeofW(StgUnderflowFrame),
+               &create_any_underflow_frame);
 }
 
 void belchStack(StgStack *stack) { printStack(stack); }

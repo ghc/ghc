@@ -96,6 +96,12 @@ any_bco_framezh() {
     return (stack);
 }
 
+any_underflow_framezh() {
+    P_ stack;
+    (stack) = ccall any_underflow_frame(MyCapability() "ptr");
+    return (stack);
+}
+
 INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
 #if SIZEOF_VOID_P == 4
 P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,

@@ -58,6 +58,8 @@ foreign import prim "any_ret_fun_arg_gen_big_framezh" any_ret_fun_arg_gen_big_fr
 
 foreign import prim "any_bco_framezh" any_bco_frame# :: SetupFunction
 
+foreign import prim "any_underflow_framezh" any_underflow_frame# :: SetupFunction
+
 foreign import ccall "maxSmallBitmapBits" maxSmallBitmapBits_c :: Word
 
 foreign import ccall "belchStack" belchStack# :: StackSnapshot# -> IO ()
@@ -311,6 +313,30 @@ main = do
   traceM $ "Test 31"
   testSize any_bco_frame# 3
   traceM $ "Test 32"
+  test any_underflow_frame# $
+    \case
+      UnderflowFrame {..} -> do
+        assertEqual (tipe info) UNDERFLOW_FRAME
+        nextStack <- getBoxedClosureData nextChunk
+        case nextStack of
+          StackClosure {..} -> do
+            assertEqual (tipe info) STACK
+            assertEqual stack_size 27
+            assertEqual stack_dirty 0
+            assertEqual stack_marking 0
+            nextStackClosures <- mapM getBoxedClosureData stack
+            assertEqual (length nextStackClosures) 2
+            case head nextStackClosures of
+              RetSmall {..} ->
+                assertEqual (tipe info) RET_SMALL
+              e -> error $ "Wrong closure type: " ++ show e
+            case last nextStackClosures of
+              StopFrame {..} ->
+                assertEqual (tipe info) STOP_FRAME
+              e -> error $ "Wrong closure type: " ++ show e
+          e -> error $ "Wrong closure type: " ++ show e
+      e -> error $ "Wrong closure type: " ++ show e
+  testSize any_underflow_frame# 2
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 

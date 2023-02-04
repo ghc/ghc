@@ -404,7 +404,7 @@ data GenClosure b
     -- TODO: nextChunk could be a CL.Closure, too! (StackClosure)
   | UnderflowFrame
       { info            :: !StgInfoTable
-      , nextChunk:: !b
+      , nextChunk       :: !b
       }
 
   | StopFrame
