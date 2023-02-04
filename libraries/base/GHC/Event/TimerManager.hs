@@ -175,7 +175,7 @@ step mgr = do
   state `seq` return (state == Running)
  where
 
-  -- | Call all expired timer callbacks and return the time to the
+  -- Call all expired timer callbacks and return the time to the
   -- next timeout.
   mkTimeout :: IO Timeout
   mkTimeout = do

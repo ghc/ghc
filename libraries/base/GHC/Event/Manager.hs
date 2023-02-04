@@ -467,7 +467,7 @@ onFdEvent mgr fd evs
         IT.delete (fromIntegral fd) tbl >>= maybe (return []) (selectCallbacks tbl)
     forM_ fdds $ \(FdData reg _ cb) -> cb reg evs
   where
-    -- | Here we look through the list of registrations for the fd of interest
+    -- Here we look through the list of registrations for the fd of interest
     -- and sort out which match the events that were triggered. We,
     --
     --   1. re-arm the fd as appropriate

@@ -1752,13 +1752,12 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
                new_lvl vs
-  = do { us <- getUniqueSupplyM
-       ; let (subst', vs') = cloneBndrs subst us vs
+  = do { (subst', vs') <- cloneBndrs subst vs
              -- N.B. We are not moving the body of the case, merely its case
              -- binders.  Consequently we should *not* set le_ctxt_lvl and
              -- le_join_ceil.  See Note [Setting levels when floating
              -- single-alternative cases].
-             env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
+       ; let env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
                         , le_env       = foldl' add_id id_env (vs `zip` vs') }
 
@@ -1773,13 +1772,13 @@ cloneLetVars :: RecFlag -> LevelEnv -> Level -> [InVar]
 cloneLetVars is_rec
           env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
           dest_lvl vs
-  = do { us <- getUniqueSupplyM
-       ; let vs1  = map zap vs
+  = do { let vs1  = map zap vs
                       -- See Note [Zapping the demand info]
-             (subst', vs2) = case is_rec of
-                               NonRecursive -> cloneBndrs      subst us vs1
-                               Recursive    -> cloneRecIdBndrs subst us vs1
-             prs  = vs `zip` vs2
+       ; (subst', vs2) <- case is_rec of
+                            NonRecursive -> cloneBndrs      subst vs1
+                            Recursive    -> cloneRecIdBndrs subst vs1
+
+       ; let prs  = vs `zip` vs2
              env' = env { le_lvl_env = addLvls dest_lvl lvl_env vs2
                         , le_subst   = subst'
                         , le_env     = foldl' add_id id_env prs }

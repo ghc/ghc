@@ -119,7 +119,6 @@ data TextEncoding
 
 -- | @since 4.3.0.0
 instance Show TextEncoding where
-  -- | Returns the value of 'textEncodingName'
   show te = textEncodingName te
 
 -- | @since 4.4.0.0

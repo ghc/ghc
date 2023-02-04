@@ -556,7 +556,8 @@ chunkify xs
   where
     n_xs     = length xs
     split [] = []
-    split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
+    split xs = let (as, bs) = splitAt mAX_TUPLE_SIZE xs
+               in as : split bs
 
 
 {-
