@@ -86,6 +86,7 @@ import qualified Data.ByteString as BS
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
 #else
+import System.Environment (lookupEnv)
 import System.Posix hiding (fdToHandle)
 #endif
 
@@ -1591,8 +1592,9 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                           pkg = display (mungedId p)
 
     is_tty <- hIsTerminalDevice stdout
-    -- Coloured text is a part of ANSI standard, no reason to query terminfo
-    mapM_ (if is_tty then show_colour else show_normal) stack
+    -- Equivalent of https://hackage.haskell.org/package/ansi-terminal/docs/System-Console-ANSI.html#v:hSupportsANSI
+    term <- lookupEnv "TERM"
+    mapM_ (if is_tty && term /= Just "dumb" then show_colour else show_normal) stack
 #endif
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()

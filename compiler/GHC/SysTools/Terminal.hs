@@ -5,6 +5,7 @@ module GHC.SysTools.Terminal (stderrSupportsAnsiColors) where
 import GHC.Prelude
 
 #if !defined(mingw32_HOST_OS)
+import System.Environment (lookupEnv)
 import System.IO (hIsTerminalDevice, stderr)
 #else
 import GHC.IO (catchException)
@@ -36,8 +37,10 @@ stderrSupportsAnsiColors = unsafePerformIO stderrSupportsAnsiColors'
 stderrSupportsAnsiColors' :: IO Bool
 stderrSupportsAnsiColors' = do
 #if !defined(mingw32_HOST_OS)
-    -- Coloured text is a part of ANSI standard, no reason to query terminfo
-    hIsTerminalDevice stderr
+  -- Equivalent of https://hackage.haskell.org/package/ansi-terminal/docs/System-Console-ANSI.html#v:hSupportsANSI
+  isTerminal <- hIsTerminalDevice stderr
+  term <- lookupEnv "TERM"
+  pure $ isTerminal && term /= Just "dumb"
 #else
   h <- Win32.getStdHandle Win32.sTD_ERROR_HANDLE
          `catchException` \ (_ :: IOError) ->
