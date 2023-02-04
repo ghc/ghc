@@ -25,6 +25,7 @@ module GHC.Exts.Heap.Closures (
     , areBoxesEqual
     , asBox
 #if MIN_VERSION_base(4,17,0)
+    , SfiKind(..)
     , StackFrameIter(..)
 #endif
     ) where
@@ -78,10 +79,13 @@ foreign import prim "eqStackSnapshotszh" eqStackSnapshots# :: StackSnapshot# -> 
 -- required, e.g. in 'getBoxedClosureData', the function knows how far it has
 -- to evaluate the argument.
 #if MIN_VERSION_base(4,17,0)
+data SfiKind = SfiClosure | SfiPrimitive | SfiStack
+  deriving (Eq, Show)
+
 data StackFrameIter = StackFrameIter
   { stackSnapshot# :: !StackSnapshot#,
     index :: !WordOffset,
-    isPrimitive :: !Bool
+    sfiKind :: !SfiKind
   }
 
 instance Show StackFrameIter where
@@ -360,14 +364,12 @@ data GenClosure b
 #if __GLASGOW_HASKELL__ >= 811
       , stack_marking   :: !Word8
 #endif
+      -- | The frames of the stack. Only available if a cloned stack was
+      -- decoded, otherwise empty.
+      , stack           :: ![b]
       }
 
 #if MIN_TOOL_VERSION_ghc(9,5,0)
-    -- TODO: I could model stack chunks here (much better). However, I need the
-    -- code to typecheck, now.
-  | SimpleStack {
-      stackClosures :: ![b]
-                }
   | UpdateFrame
       { info            :: !StgInfoTable
       , knownUpdateFrameType :: !UpdateFrameType
@@ -402,7 +404,7 @@ data GenClosure b
     -- TODO: nextChunk could be a CL.Closure, too! (StackClosure)
   | UnderflowFrame
       { info            :: !StgInfoTable
-      , nextChunk:: !StackSnapshot
+      , nextChunk:: !b
       }
 
   | StopFrame
@@ -621,7 +623,7 @@ allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
 #if MIN_TOOL_VERSION_ghc(9,5,0)
-allClosures (SimpleStack {..}) = stackClosures
+allClosures (StackClosure {..}) = stack
 allClosures (UpdateFrame {..}) = [updatee]
 allClosures (CatchFrame {..}) = [handler]
 allClosures (CatchStmFrame {..}) = [catchFrameCode, handler]

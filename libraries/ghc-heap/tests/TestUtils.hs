@@ -30,8 +30,8 @@ import Unsafe.Coerce (unsafeCoerce)
 getDecodedStack :: IO (StackSnapshot, [Closure])
 getDecodedStack = do
   s@(StackSnapshot s#) <- cloneMyStack
-  (SimpleStack cs) <- getClosureData s#
-  unboxedCs <- mapM getBoxedClosureData cs
+  stackClosure <- getClosureData s#
+  unboxedCs <- mapM getBoxedClosureData (stack stackClosure)
   pure (s, unboxedCs)
 
 assertEqual :: (HasCallStack, Monad m, Show a, Eq a) => a -> a -> m ()

@@ -143,7 +143,7 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
 
 #if MIN_TOOL_VERSION_ghc(9,5,0)
 instance {-# OVERLAPPING #-} HasHeapRep StackSnapshot# where
-    getClosureData s# = pure $ decodeStack (StackSnapshot s#)
+    getClosureData s# = decodeStack (StackSnapshot s#)
 #endif
 
 -- | Get the heap representation of a closure _at this moment_, even if it is

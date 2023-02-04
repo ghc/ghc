@@ -5,6 +5,7 @@ module Main where
 
 import Data.Bool (Bool (True))
 import GHC.Exts.DecodeStack
+import GHC.Exts.Heap
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.InfoTable.Types
@@ -37,7 +38,9 @@ isUnderflowFrame _ = False
 assertStackChunksAreDecodable :: HasCallStack => [Closure] -> IO ()
 assertStackChunksAreDecodable s = do
   let underflowFrames = filter isUnderflowFrame s
-  let framesOfChunks = map (stackClosures . decodeStack . nextChunk) underflowFrames
+  stackClosures <- mapM (getBoxedClosureData . nextChunk) underflowFrames
+  let stackBoxes = map stack stackClosures
+  framesOfChunks <- sequence (map (mapM getBoxedClosureData) stackBoxes)
   assertThat
     "No empty stack chunks"
     (== True)

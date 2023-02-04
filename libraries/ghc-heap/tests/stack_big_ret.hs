@@ -37,8 +37,8 @@ main = do
 
   mbStackSnapshot <- readIORef stackRef
   let stackSnapshot@(StackSnapshot s#) = fromJust mbStackSnapshot
-  (SimpleStack boxedFrames) <- getClosureData s#
-  stackFrames <- mapM getBoxedClosureData boxedFrames
+  stackClosure <- getClosureData s#
+  stackFrames <- mapM getBoxedClosureData (stack stackClosure)
 
   assertStackInvariants stackSnapshot stackFrames
   assertThat

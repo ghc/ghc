@@ -234,6 +234,7 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
 #if __GLASGOW_HASKELL__ >= 811
                                 , stack_marking = FFIClosures.stack_marking fields
 #endif
+                                , stack = []
                                 })
             | otherwise
                 -> fail $ "Expected 0 ptr argument to STACK, found "

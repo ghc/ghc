@@ -37,6 +37,7 @@ import GHC.Stack.CloneStack
 import Prelude
 import GHC.IO (IO (..))
 import Data.Array.Byte
+import GHC.Word
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -156,27 +157,34 @@ foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSna
 
 foreign import prim "getInfoTableAddrzh" getInfoTableAddr# :: StackSnapshot# -> Word# -> Addr#
 
+foreign import prim "getStackInfoTableAddrzh" getStackInfoTableAddr# :: StackSnapshot# -> Addr#
+
 getInfoTable :: StackFrameIter -> IO StgInfoTable
-getInfoTable StackFrameIter {..} =
+getInfoTable StackFrameIter {..} | sfiKind == SfiClosure =
   let infoTablePtr = Ptr (getInfoTableAddr# stackSnapshot# (wordOffsetToWord# index))
    in peekItbl infoTablePtr
+getInfoTable StackFrameIter {..} | sfiKind == SfiStack = peekItbl $ Ptr (getStackInfoTableAddr# stackSnapshot#)
+getInfoTable StackFrameIter {..} | sfiKind == SfiPrimitive = error "Primitives have no info table!"
 
 foreign import prim "getBoxedClosurezh" getBoxedClosure# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
 
--- -- TODO: Remove this instance (debug only)
--- instance Show StackFrameIter where
---   show (StackFrameIter {..}) = "StackFrameIter " ++ "(StackSnapshot _" ++ " " ++ show index
+foreign import prim "getStackFieldszh" getStackFields# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Word32#, Word8#, Word8# #)
+
+getStackFields :: StackFrameIter -> IO (Word32, Word8, Word8)
+getStackFields StackFrameIter {..} = IO $ \s ->
+  case getStackFields# stackSnapshot# s of (# s1, sSize#, sDirty#, sMarking# #)
+                                             -> (# s1, (W32# sSize#, W8# sDirty#, W8# sMarking#) #)
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> StackFrameIter
-stackHead (StackSnapshot s) = StackFrameIter s 0 False -- GHC stacks are never empty
+stackHead (StackSnapshot s) = StackFrameIter s 0 SfiClosure -- GHC stacks are never empty
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackFrameIter -> Maybe StackFrameIter
 advanceStackFrameIter (StackFrameIter {..}) =
   let !(# s', i', hasNext #) = advanceStackFrameIter# stackSnapshot# (wordOffsetToWord# index)
    in if (I# hasNext) > 0
-        then Just $ StackFrameIter s' (primWordToWordOffset i') False
+        then Just $ StackFrameIter s' (primWordToWordOffset i') SfiClosure
         else Nothing
 
 primWordToWordOffset :: Word# -> WordOffset
@@ -191,7 +199,7 @@ wordsToBitmapEntries sfi (b : bs) bitmapSize =
       mbLastFrame = (listToMaybe . reverse) entries
    in case mbLastFrame of
         Just (StackFrameIter {..}) ->
-          entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) bs (subtractDecodedBitmapWord bitmapSize)
+          entries ++ wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + 1) SfiClosure) bs (subtractDecodedBitmapWord bitmapSize)
         Nothing -> error "This should never happen! Recursion ended not in base case."
   where
     subtractDecodedBitmapWord :: Word -> Word
@@ -202,12 +210,12 @@ toBitmapEntries _ _ 0 = []
 toBitmapEntries sfi@(StackFrameIter {..}) bitmapWord bSize =
   -- TODO: overriding isPrimitive field is a bit weird. Could be calculated before
     sfi {
-        isPrimitive = (bitmapWord .&. 1) /= 0
+        sfiKind = if (bitmapWord .&. 1) /= 0 then SfiPrimitive else SfiClosure
         }
-    : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1) False) (bitmapWord `shiftR` 1) (bSize - 1)
+    : toBitmapEntries (StackFrameIter stackSnapshot# (index + 1) SfiClosure) (bitmapWord `shiftR` 1) (bSize - 1)
 
 toBitmapPayload :: StackFrameIter -> IO Box
-toBitmapPayload sfi | isPrimitive sfi = pure (StackFrameBox sfi)
+toBitmapPayload sfi | sfiKind sfi == SfiPrimitive = pure (StackFrameBox sfi)
 toBitmapPayload sfi = getClosure sfi 0
 
 getClosure :: StackFrameIter -> WordOffset -> IO Box
@@ -226,7 +234,7 @@ decodeLargeBitmap getterFun# sfi@(StackFrameIter {..}) relativePayloadOffset = d
 
 decodeBitmaps :: StackFrameIter -> WordOffset -> [Word] -> Word -> IO [Box]
 decodeBitmaps (StackFrameIter {..}) relativePayloadOffset bitmapWords size =
-  let bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset) False) bitmapWords size
+  let bes = wordsToBitmapEntries (StackFrameIter stackSnapshot# (index + relativePayloadOffset) SfiClosure) bitmapWords size
    in mapM toBitmapPayload bes
 
 decodeSmallBitmap :: (StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word#, Word# #)) -> StackFrameIter -> WordOffset -> IO [Box]
@@ -249,7 +257,21 @@ wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 
 unpackStackFrameIter :: StackFrameIter -> IO Closure
-unpackStackFrameIter sfi | isPrimitive sfi = UnknownTypeWordSizedPrimitive <$> (getWord sfi 0)
+unpackStackFrameIter sfi | sfiKind sfi == SfiPrimitive = UnknownTypeWordSizedPrimitive <$> (getWord sfi 0)
+unpackStackFrameIter sfi | sfiKind sfi == SfiStack = do
+  info <- getInfoTable sfi
+  (stack_size', stack_dirty', stack_marking') <- getStackFields sfi
+  case tipe info of
+    STACK -> do
+      let stack' = decodeStack' (StackSnapshot (stackSnapshot# sfi))
+      pure $ StackClosure {
+                            info = info,
+                            stack_size = stack_size',
+                            stack_dirty = stack_dirty',
+                            stack_marking = stack_marking',
+                            stack = stack'
+                          }
+    _ -> error $ "Expected STACK closure, got " ++ show info
 unpackStackFrameIter sfi = do
   traceM $ "unpackStackFrameIter - sfi " ++ show sfi
   info <- getInfoTable sfi
@@ -316,10 +338,14 @@ unpackStackFrameIter sfi = do
               handler = handler'
             }
         UNDERFLOW_FRAME -> do
-          nextChunk' <- getUnderflowFrameNextChunk sfi
+          (StackSnapshot nextChunk') <- getUnderflowFrameNextChunk sfi
           pure $ UnderflowFrame
             { info = info,
-              nextChunk = nextChunk'
+              nextChunk = StackFrameBox $ StackFrameIter {
+                                          stackSnapshot# = nextChunk',
+                                          index = 0,
+                                          sfiKind = SfiStack
+                                         }
             }
         STOP_FRAME -> pure $ StopFrame {info = info}
         ATOMICALLY_FRAME -> do
@@ -363,9 +389,12 @@ toInt# (I# i) = i
 intToWord# :: Int -> Word#
 intToWord# i = int2Word# (toInt# i)
 
-decodeStack :: StackSnapshot -> Closure
-decodeStack = SimpleStack . decodeStack'
-
+decodeStack :: StackSnapshot -> IO Closure
+decodeStack (StackSnapshot stack#) = unpackStackFrameIter $ StackFrameIter {
+  stackSnapshot# = stack#,
+  index = 0,
+  sfiKind = SfiStack
+                                   }
 decodeStack' :: StackSnapshot -> [Box]
 decodeStack' s = StackFrameBox (stackHead s) : go (advanceStackFrameIter (stackHead s))
   where

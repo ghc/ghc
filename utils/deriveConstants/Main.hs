@@ -476,6 +476,7 @@ wanteds os = concat
           ,closureFieldOffset Both "StgStack" "stack"
           ,closureField       C    "StgStack" "stack_size"
           ,closureField       C    "StgStack" "dirty"
+          ,closureField       C    "StgStack" "marking"
 
           ,structSize C "StgTSOProfInfo"
 

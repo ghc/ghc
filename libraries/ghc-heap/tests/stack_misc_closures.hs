@@ -326,10 +326,11 @@ test setup assertion = do
   -- Better fail early, here.
   performGC
   traceM $ "test - sn' " ++ show sn
-  ss@(SimpleStack boxedFrames) <- getClosureData sn#
-  traceM $ "test - ss" ++ show ss
+  stackClosure <- getClosureData sn#
+  traceM $ "test - ss" ++ show stackClosure
   performGC
   traceM $ "call getBoxedClosureData"
+  let boxedFrames = stack stackClosure
   stack <- mapM getBoxedClosureData boxedFrames
   performGC
   assert sn stack
@@ -338,8 +339,8 @@ test setup assertion = do
   let (StackSnapshot sn#) = sn
   stack' <- getClosureData sn#
   case stack' of
-    SimpleStack {..} -> do
-      !cs <- mapM getBoxedClosureData stackClosures
+    StackClosure {..} -> do
+      !cs <- mapM getBoxedClosureData stack
       assert sn cs
     _ -> error $ "Unexpected closure type : " ++ show stack'
   where
@@ -364,8 +365,8 @@ entertainGC x = show x ++ entertainGC (x -1)
 testSize :: HasCallStack => SetupFunction -> Int -> IO ()
 testSize setup expectedSize = do
   (StackSnapshot sn#) <- getStackSnapshot setup
-  (SimpleStack boxedFrames) <- getClosureData sn#
-  assertEqual expectedSize =<< closureSize (head boxedFrames)
+  stackClosure <- getClosureData sn#
+  assertEqual expectedSize =<< (closureSize . head . stack) stackClosure
 
 -- | Get a `StackSnapshot` from test setup
 --
