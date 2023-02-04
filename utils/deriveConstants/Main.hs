@@ -27,7 +27,6 @@ needing to run the program, by inspecting the object file using 'nm'.
 
 import Control.Monad (when, unless)
 import Data.Bits (shiftL)
-import Data.Char (toLower)
 import Data.List (elemIndex, stripPrefix, intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map

@@ -3461,9 +3461,8 @@ cloneBndrSM env@(SE { se_subst = subst }) bndr
 
 cloneRecBndrsSM :: SpecEnv -> [Id] -> SpecM (SpecEnv, [Id])
 cloneRecBndrsSM env@(SE { se_subst = subst }) bndrs
-  = do { us <- getUniqueSupplyM
-       ; let (subst', bndrs') = Core.cloneRecIdBndrs subst us bndrs
-             env' = env { se_subst = subst' }
+  = do { (subst', bndrs') <- Core.cloneRecIdBndrs subst bndrs
+       ; let env' = env { se_subst = subst' }
        ; return (env', bndrs') }
 
 newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)

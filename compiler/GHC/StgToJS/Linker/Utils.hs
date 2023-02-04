@@ -41,6 +41,7 @@ import          GHC.StgToJS.Types
 
 import           Prelude
 import GHC.Platform
+import GHC.Utils.Misc
 import Data.List (isPrefixOf)
 import System.IO
 import Data.Char (isSpace)
@@ -299,7 +300,7 @@ getJsOptions handle = do
 parseJsOptions :: String -> [JSOption]
 parseJsOptions xs = go xs
   where
-    trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
+    trim = dropWhileEndLE isSpace . dropWhile isSpace
     go [] = []
     go xs = let (tok, rest) = break (== ',') xs
                 tok' = trim tok

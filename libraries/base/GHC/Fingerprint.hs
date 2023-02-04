@@ -84,7 +84,7 @@ getFileHash path = withBinaryFile path ReadMode $ \h ->
   where
     _BUFSIZE = 4096
 
-    -- | Loop over _BUFSIZE sized chunks read from the handle,
+    -- Loop over _BUFSIZE sized chunks read from the handle,
     -- passing the callback a block of bytes and its size.
     processChunks :: Handle -> (Ptr Word8 -> Int -> IO ()) -> IO ()
     processChunks h f = allocaBytes _BUFSIZE $ \arrPtr ->

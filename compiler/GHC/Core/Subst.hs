@@ -417,11 +417,12 @@ cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneIdBndrs subst us ids
   = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
-cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
+cloneBndrs :: MonadUnique m => Subst -> [Var] -> m (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
-cloneBndrs subst us vs
-  = mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (vs `zip` uniqsFromSupply us)
+cloneBndrs subst vs
+  = do us <- getUniquesM
+       pure $ mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (vs `zip` us)
 
 cloneBndr :: Subst -> Unique -> Var -> (Subst, Var)
 cloneBndr subst uniq v
@@ -429,12 +430,11 @@ cloneBndr subst uniq v
   | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
 
 -- | Clone a mutually recursive group of 'Id's
-cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
-cloneRecIdBndrs subst us ids
-  = (subst', ids')
-  where
-    (subst', ids') = mapAccumL (clone_id subst') subst
-                               (ids `zip` uniqsFromSupply us)
+cloneRecIdBndrs :: MonadUnique m => Subst -> [Id] -> m (Subst, [Id])
+cloneRecIdBndrs subst ids
+  = do us <- getUniquesM
+       let (subst', ids') = mapAccumL (clone_id subst') subst (ids `zip` us)
+       pure (subst', ids')
 
 -- Just like substIdBndr, except that it always makes a new unique
 -- It is given the unique to use

@@ -213,12 +213,11 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
         -- Clone and prepare arg_vars of the original fun RHS
         -- See Note [Freshen WW arguments]
         -- and Note [Zap IdInfo on worker args]
-        ; uniq_supply <- getUniqueSupplyM
         ; let args_free_tcvs = tyCoVarsOfTypes (res_ty : map varType arg_vars)
               empty_subst = mkEmptySubst (mkInScopeSet args_free_tcvs)
               zapped_arg_vars = map zap_var arg_vars
-              (subst, cloned_arg_vars) = cloneBndrs empty_subst uniq_supply zapped_arg_vars
-              res_ty' = substTyUnchecked subst res_ty
+        ; (subst, cloned_arg_vars) <- cloneBndrs empty_subst zapped_arg_vars
+        ; let res_ty' = substTyUnchecked subst res_ty
               init_str_marks = map (const NotMarkedStrict) cloned_arg_vars
 
         ; (useful1, work_args_str, wrap_fn_str, fn_args)

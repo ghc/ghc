@@ -2715,7 +2715,7 @@ genCCall64 addr conv dest_regs args = do
                <- load_args prom_args (allIntArgRegs platform)
                                       (allFPArgRegs platform)
                                       nilOL nilOL
-           let used_regs rs as = reverse (drop (length rs) (reverse as))
+           let used_regs rs as = dropTail (length rs) as
                fregs_used      = used_regs fregs (allFPArgRegs platform)
                aregs_used      = used_regs aregs (allIntArgRegs platform)
            return (stack_args, aregs_used, fregs_used, load_args_code
