@@ -1511,7 +1511,7 @@ sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
   map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
 
--- | Produce singleton list.
+-- | Construct a list from a single element.
 --
 -- >>> singleton True
 -- [True]
