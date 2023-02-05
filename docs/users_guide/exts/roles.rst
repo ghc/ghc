@@ -103,7 +103,7 @@ hand, has its parameter at role nominal, because ``Complex Age`` and
 Role inference
 --------------
 
-What role should a given type parameter should have? GHC performs role
+What role should a given type parameter have? GHC performs role
 inference to determine the correct role for every parameter. It starts
 with a few base facts: ``(->)`` has two representational parameters;
 ``(~)`` has two nominal parameters; all type families' parameters are
