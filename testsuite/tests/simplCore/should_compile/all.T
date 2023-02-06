@@ -429,7 +429,6 @@ test('T21763a', only_ways(['optasm']), compile, ['-O2 -ddump-rules'])
 test('T22028', normal, compile, ['-O -ddump-rule-firings'])
 test('T22114', normal, compile, ['-O'])
 test('T21286',  normal, multimod_compile, ['T21286', '-O -ddump-rule-firings'])
-test('T21148', [grep_errmsg(r'Cpr=') ], compile, ['-O -ddump-simpl'])
 
 # One module, T21851.hs, has OPTIONS_GHC -ddump-simpl
 test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O -dno-typeable-binds -dsuppress-uniques'])

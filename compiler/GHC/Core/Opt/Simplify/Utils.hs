@@ -1395,11 +1395,11 @@ preInlineUnconditionally
 -- Reason: we don't want to inline single uses, or discard dead bindings,
 --         for unlifted, side-effect-ful bindings
 preInlineUnconditionally env top_lvl bndr rhs rhs_env
-  | not pre_inline                           = Nothing
+  | not pre_inline_unconditionally           = Nothing
   | not active                               = Nothing
   | isTopLevel top_lvl && isDeadEndId bndr   = Nothing -- Note [Top-level bottoming Ids]
   | isCoVar bndr                             = Nothing -- Note [Do not inline CoVars unconditionally]
-  | keep_exits, isExitJoinId bndr            = Nothing -- Note [Do not inline exit join points]
+  | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
   | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
@@ -1409,36 +1409,19 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   , Just inl <- maybeUnfoldingTemplate unf   = Just $! (extend_subst_with inl)
   | otherwise                                = Nothing
   where
-    mode       = seMode env
-    phase      = sm_phase mode
-    keep_exits = sm_keep_exits mode
-    pre_inline = sm_pre_inline mode
-
     unf = idUnfolding bndr
     extend_subst_with inl_rhs = extendIdSubst env bndr $! (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
-
     one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
                   , occ_int_cxt = IsInteresting } = canInlineInLam rhs
+    one_occ _                                     = False
 
-    one_occ OneOcc{ occ_n_br = 1 } -- Inline join point that are used once, even inside
-      | isJoinId bndr = True       -- lambdas (which are presumably other join points)
-      -- E.g.   join j x = rhs in
-      --        joinrec k y = ....j x....
-      -- Here j must be an exit for k, and we can safely inline it under the lambda
-      -- This includes the case where j is nullary: a nullary join point is just the
-      -- same as an arity-1 one. So we don't look at occ_int_cxt.
-      -- All of this only applies if keep_exits is False, otherwise the
-      -- earlier guard on preInlineUnconditionally would have fired
-
-    one_occ _ = False
-
-    active = isActive phase (inlinePragmaActivation inline_prag)
+    pre_inline_unconditionally = sePreInline env
+    active = isActive (sePhase env) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     inline_prag = idInlinePragma bndr
 
@@ -1470,7 +1453,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
-    early_phase = phase /= FinalPhase
+    early_phase = sePhase env /= FinalPhase
     -- If we don't have this early_phase test, consider
     --      x = length [1,2,3]
     -- The full laziness pass carefully floats all the cons cells to
