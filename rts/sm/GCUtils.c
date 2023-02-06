@@ -350,7 +350,12 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
                 bd = gct->free_blocks;
                 gct->free_blocks = bd->link;
             } else {
-                allocBlocks_sync(16, &bd);
+                // We allocate in chunks of at most 16 blocks, use one
+                // block to satisfy the allocation request and place
+                // the rest on `gct->free_blocks` for future use.
+                StgWord chunk_size = 16;
+                StgWord n_blocks = stg_min(chunk_size, 1 << (MBLOCK_SHIFT - BLOCK_SHIFT - 1));
+                allocBlocks_sync(n_blocks, &bd);
                 gct->free_blocks = bd->link;
             }
         }

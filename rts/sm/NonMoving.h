@@ -29,6 +29,8 @@
 
 GHC_STATIC_ASSERT(NONMOVING_SEGMENT_SIZE % BLOCK_SIZE == 0, "non-moving segment size must be multiple of block size");
 
+GHC_STATIC_ASSERT(NONMOVING_SEGMENT_BLOCKS * 2 <= BLOCKS_PER_MBLOCK, "non-moving segment size must not exceed half of mblock size");
+
 // The index of a block within a segment
 typedef uint16_t nonmoving_block_idx;
 
