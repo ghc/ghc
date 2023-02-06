@@ -637,6 +637,11 @@ KNOWN_OPERATING_SYSTEMS = set([
     'solaris2',
 ])
 
+def exe_extension() -> str:
+    if config.arch == 'wasm32':
+        return '.wasm'
+    return ''
+
 def opsys( os: str ) -> bool:
     assert os in KNOWN_OPERATING_SYSTEMS
     return config.os == os
@@ -1590,7 +1595,7 @@ def compile_and_run__(name: TestName,
         if badResult(result):
             return result
 
-        cmd = './' + name;
+        cmd = './' + name + exe_extension()
 
         # we don't check the compiler's stderr for a compile-and-run test
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -2137,7 +2142,7 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
     if not expected_prof_path.exists():
         return True
 
-    actual_prof_file = add_suffix(name, 'prof')
+    actual_prof_file = add_suffix(name + exe_extension(), 'prof')
     actual_prof_path = in_testdir(actual_prof_file)
 
     if not actual_prof_path.exists():
