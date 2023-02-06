@@ -513,10 +513,13 @@ getInertGivens
        ; return (filter isGivenCt all_cts) }
 
 getPendingGivenScs :: TcS [Ct]
--- Find all inert Given dictionaries, or quantified constraints,
---     whose cc_pend_sc flag is True
---     and that belong to the current level
--- Set their cc_pend_sc flag to False in the inert set, and return that Ct
+-- Find all inert Given dictionaries, or quantified constraints, such that
+--     1. cc_pend_sc flag has fuel strictly > 0
+--     2. belongs to the current level
+-- For each such dictionary:
+-- * Return it (with unmodified cc_pend_sc) in sc_pending
+-- * Modify the dict in the inert set to have cc_pend_sc = doNotExpand
+--   to record that we have expanded superclasses for this dict
 getPendingGivenScs = do { lvl <- getTcLevel
                         ; updRetInertCans (get_sc_pending lvl) }
 
@@ -530,29 +533,33 @@ get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
     sc_pending = sc_pend_insts ++ sc_pend_dicts
 
     sc_pend_dicts = foldDicts get_pending dicts []
-    dicts' = foldr add dicts sc_pend_dicts
+    dicts' = foldr exhaustAndAdd dicts sc_pend_dicts
 
     (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
 
-    get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
-                                       -- but flipping the flag
+    get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc > 0
     get_pending dict dicts
-        | Just dict' <- pendingScDict_maybe dict
+        | isPendingScDict dict
         , belongs_to_this_level (ctEvidence dict)
-        = dict' : dicts
+        = dict : dicts
         | otherwise
         = dicts
 
-    add :: Ct -> DictMap Ct -> DictMap Ct
-    add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
-        = addDict dicts cls tys ct
-    add ct _ = pprPanic "getPendingScDicts" (ppr ct)
+    exhaustAndAdd :: Ct -> DictMap Ct -> DictMap Ct
+    exhaustAndAdd ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
+    -- exhaust the fuel for this constraint before adding it as
+    -- we don't want to expand these constraints again
+        = addDict dicts cls tys (ct {cc_pend_sc = doNotExpand})
+    exhaustAndAdd ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
     get_pending_inst cts qci@(QCI { qci_ev = ev })
        | Just qci' <- pendingScInst_maybe qci
        , belongs_to_this_level ev
-       = (CQuantCan qci' : cts, qci')
+       = (CQuantCan qci : cts, qci')
+       -- qci' have their fuel exhausted
+       -- we don't want to expand these constraints again
+       -- qci is expanded
        | otherwise
        = (cts, qci)
 

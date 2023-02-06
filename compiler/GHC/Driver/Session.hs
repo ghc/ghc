@@ -517,7 +517,15 @@ data DynFlags = DynFlags {
   reductionDepth        :: IntWithInf,   -- ^ Typechecker maximum stack depth
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
-
+  givensFuel            :: Int,          -- ^ Number of layers of superclass expansion for givens
+                                         --   Should be < solverIterations
+                                         --   See Note [Expanding Recursive Superclasses and ExpansionFuel]
+  wantedsFuel           :: Int,          -- ^ Number of layers of superclass expansion for wanteds
+                                         --   Should be < givensFuel
+                                         --   See Note [Expanding Recursive Superclasses and ExpansionFuel]
+  qcsFuel                :: Int,          -- ^ Number of layers of superclass expansion for quantified constraints
+                                         --   Should be < givensFuel
+                                         --   See Note [Expanding Recursive Superclasses and ExpansionFuel]
   homeUnitId_             :: UnitId,                 -- ^ Target home unit-id
   homeUnitInstanceOf_     :: Maybe UnitId,           -- ^ Id of the unit to instantiate
   homeUnitInstantiations_ :: [(ModuleName, Module)], -- ^ Module instantiations
@@ -1148,6 +1156,9 @@ defaultDynFlags mySettings =
         mainFunIs               = Nothing,
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
+        givensFuel              = mAX_GIVENS_FUEL,
+        wantedsFuel             = mAX_WANTEDS_FUEL,
+        qcsFuel                 = mAX_QC_FUEL,
 
         homeUnitId_             = mainUnitId,
         homeUnitInstanceOf_     = Nothing,
@@ -2733,6 +2744,12 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { reductionDepth = treatZeroAsInf n }))
   , make_ord_flag defFlag "fconstraint-solver-iterations"
       (intSuffix (\n d -> d { solverIterations = treatZeroAsInf n }))
+  , make_ord_flag defFlag "fgivens-expansion-fuel"
+      (intSuffix (\n d -> d { givensFuel = n }))
+  , make_ord_flag defFlag "fwanteds-expansion-fuel"
+      (intSuffix (\n d -> d { wantedsFuel = n }))
+  , make_ord_flag defFlag "fqcs-expansion-fuel"
+      (intSuffix (\n d -> d { qcsFuel = n }))
   , (Deprecated, defFlag "fcontext-stack"
       (intSuffixM (\n d ->
        do { deprecate $ "use -freduction-depth=" ++ show n ++ " instead"
