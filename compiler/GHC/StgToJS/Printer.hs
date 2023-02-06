@@ -108,19 +108,17 @@ ghcjsRenderJsV r (JHash m)
   where
     quoteIfRequired :: FastString -> Doc
     quoteIfRequired x
-      | isUnquotedKey x' = text x'
-      | otherwise        = PP.squotes (text x')
-      where x' = unpackFS x
+      | isUnquotedKey x = ftext x
+      | otherwise       = PP.squotes (ftext x)
 
-    isUnquotedKey :: String -> Bool
-    isUnquotedKey x | null x        = False
-                    | all isDigit x = True
-                    | otherwise     = validFirstIdent (head x)
-                                      && all validOtherIdent (tail x)
-
+    isUnquotedKey :: FastString -> Bool
+    isUnquotedKey fs = case unpackFS fs of
+      []       -> False
+      s@(c:cs) -> all isDigit s || (validFirstIdent c && all validOtherIdent cs)
 
     validFirstIdent c = c == '_' || c == '$' || isAlpha c
     validOtherIdent c = isAlpha c || isDigit c
+
 ghcjsRenderJsV r v = renderJsV defaultRenderJs r v
 
 prettyBlock :: RenderJs -> [JStat] -> Doc
