@@ -26,7 +26,9 @@ from pathlib import Path
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import getStdout, Watcher, str_warn, str_info, print_table, shorten_metric_name
+from concurrent.futures import ThreadPoolExecutor
+
+from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
@@ -480,26 +482,28 @@ if config.list_broken:
         print('WARNING:', len(t.framework_failures), 'framework failures!')
         print('')
 else:
-    # completion watcher
-    watcher = Watcher(len(parallelTests))
-
     # Now run all the tests
     try:
-        for oneTest in parallelTests:
-            if stopping():
-                break
-            oneTest(watcher)
+        with ThreadPoolExecutor(max_workers=config.threads) as executor:
+            for oneTest in parallelTests:
+                if stopping():
+                    break
+                oneTest(executor)
 
-        # wait for parallel tests to finish
-        if not stopping():
-            watcher.wait()
+            # wait for parallel tests to finish
+            if not stopping():
+                executor.shutdown(wait=True)
 
         # Run the following tests purely sequential
-        config.threads = 1
-        for oneTest in aloneTests:
-            if stopping():
-                break
-            oneTest(watcher)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            for oneTest in aloneTests:
+                if stopping():
+                    break
+                oneTest(executor)
+
+            if not stopping():
+                executor.shutdown(wait=True)
+
     except KeyboardInterrupt:
         pass
 

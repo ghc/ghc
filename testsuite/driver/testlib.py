@@ -36,9 +36,7 @@ from my_typing import *
 from threading import Timer
 from collections import OrderedDict
 
-global pool_sema
 import threading
-pool_sema = threading.BoundedSemaphore(value=config.threads)
 
 global wantToStop
 wantToStop = False
@@ -1014,13 +1012,8 @@ parallelTests = []
 aloneTests = []
 allTestNames = set([])  # type: Set[TestName]
 
-def runTest(watcher, opts, name: TestName, func, args):
-    pool_sema.acquire()
-    t = threading.Thread(target=test_common_thread,
-                             name=name,
-                             args=(watcher, name, opts, func, args))
-    t.daemon = False
-    t.start()
+def runTest(executor, opts, name: TestName, func, args):
+    return executor.submit(test_common_work, name, opts, func, args)
 
 # name  :: String
 # setup :: [TestOpt] -> IO ()
@@ -1058,18 +1051,12 @@ def test(name: TestName,
     if name in config.broken_tests:
         myTestOpts.expect = 'fail'
 
-    thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
+    thisTest = lambda executor: runTest(executor, myTestOpts, name, func, args)
     if myTestOpts.alone:
         aloneTests.append(thisTest)
     else:
         parallelTests.append(thisTest)
     allTestNames.add(name)
-
-def test_common_thread(watcher, name, opts, func, args):
-    try:
-        test_common_work(watcher, name, opts, func, args)
-    finally:
-        pool_sema.release()
 
 def get_package_cache_timestamp() -> float:
     if config.package_conf_cache_file is None:
@@ -1084,8 +1071,7 @@ do_not_copy = ('.hi', '.o', '.dyn_hi'
               , '.dyn_o', '.out'
               ,'.hi-boot', '.o-boot') # 12112
 
-def test_common_work(watcher: testutil.Watcher,
-                     name: TestName, opts,
+def test_common_work(name: TestName, opts,
                      func, args) -> None:
     try:
         t.total_tests += 1
@@ -1204,8 +1190,6 @@ def test_common_work(watcher: testutil.Watcher,
 
     except Exception as e:
         framework_fail(name, None, 'Unhandled exception: ' + str(e))
-    finally:
-        watcher.notify()
 
 def do_test(name: TestName,
             way: WayName,
