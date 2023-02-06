@@ -30,6 +30,27 @@ mAX_REDUCTION_DEPTH = 200
 mAX_SOLVER_ITERATIONS :: Int
 mAX_SOLVER_ITERATIONS = 4
 
+-- | In case of loopy quantified costraints constraints,
+--   how many times should we allow superclass expansions
+--   Should be less than mAX_SOLVER_ITERATIONS
+--   See Note [Expanding Recursive Superclasses and ExpansionFuel]
+mAX_QC_FUEL :: Int
+mAX_QC_FUEL = 3
+
+-- | In case of loopy wanted constraints,
+--   how many times should we allow superclass expansions
+--   Should be less than mAX_GIVENS_FUEL
+-- See Note [Expanding Recursive Superclasses and ExpansionFuel]
+mAX_WANTEDS_FUEL :: Int
+mAX_WANTEDS_FUEL = 1
+
+-- | In case of loopy given constraints,
+--   how many times should we allow superclass expansions
+--   Should be less than max_SOLVER_ITERATIONS
+-- See Note [Expanding Recursive Superclasses and ExpansionFuel]
+mAX_GIVENS_FUEL :: Int
+mAX_GIVENS_FUEL = 3
+
 wORD64_SIZE :: Int
 wORD64_SIZE = 8
 

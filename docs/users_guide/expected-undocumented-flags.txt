@@ -33,6 +33,9 @@
 -fbang-patterns
 -fbuilding-cabal-package
 -fconstraint-solver-iterations
+-fgivens-expansion-fuel
+-fwanteds-expansion-fuel
+-fqcs-expansion-fuel
 -fcontext-stack
 -fcross-module-specialize
 -fdiagnostics-color=always

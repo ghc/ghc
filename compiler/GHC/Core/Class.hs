@@ -17,8 +17,8 @@ module GHC.Core.Class (
         mkClass, mkAbstractClass, classTyVars, classArity,
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
-        classAllSelIds, classSCSelId, classSCSelIds, classMinimalDef, classHasFds,
-        isAbstractClass,
+        classHasSCs, classAllSelIds, classSCSelId, classSCSelIds, classMinimalDef,
+        classHasFds, isAbstractClass,
     ) where
 
 import GHC.Prelude
@@ -294,6 +294,9 @@ classSCTheta :: Class -> [PredType]
 classSCTheta (Class { classBody = ConcreteClass { cls_sc_theta = theta_stuff }})
   = theta_stuff
 classSCTheta _ = []
+
+classHasSCs :: Class -> Bool
+classHasSCs cls = not (null (classSCTheta cls))
 
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c = (classTyVars c, classFunDeps c)

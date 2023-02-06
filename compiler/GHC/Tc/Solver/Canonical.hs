@@ -59,7 +59,7 @@ import Control.Monad
 import Data.Maybe ( isJust, isNothing )
 import Data.List  ( zip4 )
 import GHC.Types.Basic
-
+import GHC.Driver.Session ( givensFuel, wantedsFuel, qcsFuel )
 import qualified Data.Semigroup as S
 import Data.Bifunctor ( bimap )
 
@@ -154,9 +154,13 @@ canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 canClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
-  = do { sc_cts <- mkStrictSuperClasses ev [] [] cls tys
+  = do { dflags <- getDynFlags
+       ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev [] [] cls tys
+                           -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
        ; emitWork sc_cts
-       ; canClass ev cls tys False }
+       ; canClass ev cls tys doNotExpand }
+                           -- doNotExpand: We have already expanded superclasses for /this/ dict
+                           -- so set the fuel to doNotExpand to avoid repeating expansion
 
   | CtWanted { ctev_rewriters = rewriters } <- ev
   , Just ip_name <- isCallStackPred cls tys
@@ -168,7 +172,7 @@ canClassNC ev cls tys
   -- and Note [Solving CallStack constraints] in GHC.Tc.Solver.Types
   = do { -- First we emit a new constraint that will capture the
          -- given CallStack.
-       ; let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
+         let new_loc = setCtLocOrigin loc (IPOccOrigin (HsIPName ip_name))
                             -- We change the origin to IPOccOrigin so
                             -- this rule does not fire again.
                             -- See Note [Overview of implicit CallStacks]
@@ -182,14 +186,20 @@ canClassNC ev cls tys
                                   (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
-       ; canClass new_ev cls tys False -- No superclasses
+       ; canClass new_ev cls tys doNotExpand
+                              -- doNotExpand: No superclasses for class CallStack
+                              -- See invariants in CDictCan.cc_pend_sc
        }
 
   | otherwise
-  = canClass ev cls tys (has_scs cls)
+  = do { dflags <- getDynFlags
+       ; let fuel | classHasSCs cls = wantedsFuel dflags
+                  | otherwise   = doNotExpand
+                  -- See Invariants in `CCDictCan.cc_pend_sc`
+       ; canClass ev cls tys fuel
+       }
 
   where
-    has_scs cls = not (null (classSCTheta cls))
     loc  = ctEvLoc ev
     orig = ctLocOrigin loc
     pred = ctEvPred ev
@@ -206,7 +216,7 @@ solveCallStack ev ev_cs = do
 
 canClass :: CtEvidence
          -> Class -> [Type]
-         -> Bool            -- True <=> un-explored superclasses
+         -> ExpansionFuel            -- n > 0 <=> un-explored superclasses
          -> TcS (StopOrContinue Ct)
 -- Precondition: EvVar is class evidence
 
@@ -307,10 +317,11 @@ So here's the plan:
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in GHC.Tc.Solver.simpl_loop.
 
-The cc_pend_sc flag in a CDictCan records whether the superclasses of
+The cc_pend_sc field in a CDictCan records whether the superclasses of
 this constraint have been expanded.  Specifically, in Step 3 we only
-expand superclasses for constraints with cc_pend_sc set to true (i.e.
-isPendingScDict holds).
+expand superclasses for constraints with cc_pend_sc > 0
+(i.e. isPendingScDict holds).
+See Note [Expanding Recursive Superclasses and ExpansionFuel]
 
 Why do we do this?  Two reasons:
 
@@ -337,7 +348,8 @@ our strategy.  Consider
   f :: C a => a -> Bool
   f x = x==x
 Then canClassNC gets the [G] d1: C a constraint, and eager emits superclasses
-G] d2: D a, [G] d3: C a (psc).  (The "psc" means it has its sc_pend flag set.)
+G] d2: D a, [G] d3: C a (psc).  (The "psc" means it has its cc_pend_sc has pending
+expansion fuel.)
 When processing d3 we find a match with d1 in the inert set, and we always
 keep the inert item (d1) if possible: see Note [Replacement vs keeping] in
 GHC.Tc.Solver.Interact.  So d3 dies a quick, happy death.
@@ -484,7 +496,6 @@ the sc_theta_ids at all. So our final construction is
 
 makeSuperClasses :: [Ct] -> TcS [Ct]
 -- Returns strict superclasses, transitively, see Note [The superclass story]
--- See Note [The superclass story]
 -- The loop-breaking here follows Note [Expanding superclasses] in GHC.Tc.Utils.TcType
 -- Specifically, for an incoming (C t) constraint, we return all of (C t)'s
 --    superclasses, up to /and including/ the first repetition of C
@@ -493,39 +504,45 @@ makeSuperClasses :: [Ct] -> TcS [Ct]
 --           class C [a] => D a
 -- makeSuperClasses (C x) will return (D x, C [x])
 --
--- NB: the incoming constraints have had their cc_pend_sc flag already
---     flipped to False, by isPendingScDict, so we are /obliged/ to at
---     least produce the immediate superclasses
+-- NB: the incoming constraint's superclass will consume a unit of fuel
+-- Preconditions on `cts`: 1. They are either `CDictCan` or `CQuantCan`
+--                         2. Their fuel (stored in cc_pend_sc or qci_pend_sc) is > 0
 makeSuperClasses cts = concatMapM go cts
   where
-    go (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
-      = mkStrictSuperClasses ev [] [] cls tys
-    go (CQuantCan (QCI { qci_pred = pred, qci_ev = ev }))
+    go (CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys, cc_pend_sc = fuel })
+      = assertFuelPreconditionStrict fuel $ -- fuel needs to be more than 0 always
+        mkStrictSuperClasses fuel ev [] [] cls tys
+    go (CQuantCan (QCI { qci_pred = pred, qci_ev = ev, qci_pend_sc = fuel }))
       = assertPpr (isClassPred pred) (ppr pred) $  -- The cts should all have
                                                    -- class pred heads
-        mkStrictSuperClasses ev tvs theta cls tys
+        assertFuelPreconditionStrict fuel $ -- fuel needs to be more than 0 always
+        mkStrictSuperClasses fuel ev tvs theta cls tys
       where
         (tvs, theta, cls, tys) = tcSplitDFunTy (ctEvPred ev)
     go ct = pprPanic "makeSuperClasses" (ppr ct)
 
 mkStrictSuperClasses
-    :: CtEvidence
+    :: ExpansionFuel -> CtEvidence
     -> [TyVar] -> ThetaType  -- These two args are non-empty only when taking
                              -- superclasses of a /quantified/ constraint
     -> Class -> [Type] -> TcS [Ct]
 -- Return constraints for the strict superclasses of
 --   ev :: forall as. theta => cls tys
-mkStrictSuperClasses ev tvs theta cls tys
-  = mk_strict_superclasses (unitNameSet (className cls))
+-- Precondition: fuel > 0
+-- Postcondition: fuel for recursive superclass ct is one unit less than cls fuel
+mkStrictSuperClasses fuel ev tvs theta cls tys
+  = mk_strict_superclasses (consumeFuel fuel) (unitNameSet (className cls))
                            ev tvs theta cls tys
 
-mk_strict_superclasses :: NameSet -> CtEvidence
+mk_strict_superclasses :: ExpansionFuel -> NameSet -> CtEvidence
                        -> [TyVar] -> ThetaType
                        -> Class -> [Type] -> TcS [Ct]
 -- Always return the immediate superclasses of (cls tys);
 -- and expand their superclasses, provided none of them are in rec_clss
 -- nor are repeated
-mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
+-- The caller of this function is supposed to perform fuel book keeping
+-- Precondition: fuel >= 0
+mk_strict_superclasses fuel rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                        tvs theta cls tys
   = concatMapM do_one_given $
     classSCSelIds cls
@@ -543,7 +560,8 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
       | otherwise
       = do { given_ev <- newGivenEvVar sc_loc $
                          mk_given_desc sel_id sc_pred
-           ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
+           ; assertFuelPrecondition fuel
+             $ mk_superclasses fuel rec_clss given_ev tvs theta sc_pred }
       where
         sc_pred = classMethodInstTy sel_id tys
 
@@ -604,7 +622,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
     newly_blocked (InstSkol _ head_size) = isJust (this_size `ltPatersonSize` head_size)
     newly_blocked _                      = False
 
-mk_strict_superclasses rec_clss ev tvs theta cls tys
+mk_strict_superclasses fuel rec_clss ev tvs theta cls tys
   | all noFreeVarsOfType tys
   = return [] -- Wanteds with no variables yield no superclass constraints.
               -- See Note [Improvement from Ground Wanteds]
@@ -619,7 +637,7 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
     do_one sc_pred
       = do { traceTcS "mk_strict_superclasses Wanted" (ppr (mkClassPred cls tys) $$ ppr sc_pred)
            ; sc_ev <- newWantedNC loc (ctEvRewriters ev) sc_pred
-           ; mk_superclasses rec_clss sc_ev [] [] sc_pred }
+           ; mk_superclasses fuel rec_clss sc_ev [] [] sc_pred }
 
 {- Note [Improvement from Ground Wanteds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -634,46 +652,53 @@ dependencies.  See Note [Why adding superclasses can help] above.
 But no variables means no improvement; case closed.
 -}
 
-mk_superclasses :: NameSet -> CtEvidence
+mk_superclasses :: ExpansionFuel -> NameSet -> CtEvidence
                 -> [TyVar] -> ThetaType -> PredType -> TcS [Ct]
 -- Return this constraint, plus its superclasses, if any
-mk_superclasses rec_clss ev tvs theta pred
+-- Precondition: fuel >= 0
+mk_superclasses fuel rec_clss ev tvs theta pred
   | ClassPred cls tys <- classifyPredType pred
-  = mk_superclasses_of rec_clss ev tvs theta cls tys
+  = assertFuelPrecondition fuel $
+    mk_superclasses_of fuel rec_clss ev tvs theta cls tys
 
   | otherwise   -- Superclass is not a class predicate
   = return [mkNonCanonical ev]
 
-mk_superclasses_of :: NameSet -> CtEvidence
+mk_superclasses_of :: ExpansionFuel -> NameSet -> CtEvidence
                    -> [TyVar] -> ThetaType -> Class -> [Type]
                    -> TcS [Ct]
 -- Always return this class constraint,
 -- and expand its superclasses
-mk_superclasses_of rec_clss ev tvs theta cls tys
+-- Precondition: fuel >= 0
+mk_superclasses_of fuel rec_clss ev tvs theta cls tys
   | loop_found = do { traceTcS "mk_superclasses_of: loop" (ppr cls <+> ppr tys)
-                    ; return [this_ct] }  -- cc_pend_sc of this_ct = True
+                    ; assertFuelPrecondition fuel $ return [mk_this_ct fuel] }
+                                                  -- cc_pend_sc of returning ct = fuel
   | otherwise  = do { traceTcS "mk_superclasses_of" (vcat [ ppr cls <+> ppr tys
                                                           , ppr (isCTupleClass cls)
                                                           , ppr rec_clss
                                                           ])
-                    ; sc_cts <- mk_strict_superclasses rec_clss' ev tvs theta cls tys
-                    ; return (this_ct : sc_cts) }
-                                   -- cc_pend_sc of this_ct = False
+                    ; sc_cts <- assertFuelPrecondition fuel $
+                                mk_strict_superclasses fuel rec_clss' ev tvs theta cls tys
+                    ; return (mk_this_ct doNotExpand : sc_cts) }
+                                      -- doNotExpand: we have expanded this cls's superclasses, so
+                                      -- exhaust the associated constraint's fuel,
+                                      -- to avoid duplicate work
   where
     cls_nm     = className cls
     loop_found = not (isCTupleClass cls) && cls_nm `elemNameSet` rec_clss
                  -- Tuples never contribute to recursion, and can be nested
     rec_clss'  = rec_clss `extendNameSet` cls_nm
-
-    this_ct | null tvs, null theta
-            = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
-                       , cc_pend_sc = loop_found }
-                 -- NB: If there is a loop, we cut off, so we have not
-                 --     added the superclasses, hence cc_pend_sc = True
-            | otherwise
-            = CQuantCan (QCI { qci_tvs = tvs, qci_pred = mkClassPred cls tys
-                             , qci_ev = ev
-                             , qci_pend_sc = loop_found })
+    mk_this_ct :: ExpansionFuel -> Ct
+    mk_this_ct fuel | null tvs, null theta
+                    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
+                               , cc_pend_sc = fuel }
+                    -- NB: If there is a loop, we cut off, so we have not
+                    --     added the superclasses, hence cc_pend_sc = fuel
+                    | otherwise
+                    = CQuantCan (QCI { qci_tvs = tvs, qci_pred = mkClassPred cls tys
+                                     , qci_ev = ev
+                                     , qci_pend_sc = fuel })
 
 
 {- Note [Equality superclasses in quantified constraints]
@@ -828,19 +853,28 @@ canForAllNC :: CtEvidence -> [TyVar] -> TcThetaType -> TcPredType
 canForAllNC ev tvs theta pred
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
   , Just (cls, tys) <- cls_pred_tys_maybe
-  = do { sc_cts <- mkStrictSuperClasses ev tvs theta cls tys
+  = do { dflags <- getDynFlags
+       ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev tvs theta cls tys
+       -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
        ; emitWork sc_cts
-       ; canForAll ev False }
+       ; canForAll ev doNotExpand }
+       -- doNotExpand: as we have already (eagerly) expanded superclasses for this class
 
   | otherwise
-  = canForAll ev (isJust cls_pred_tys_maybe)
-
+  = do { dflags <- getDynFlags
+       ; let fuel | Just (cls, _) <- cls_pred_tys_maybe
+                  , classHasSCs cls = qcsFuel dflags
+                  -- See invariants (a) and (b) in QCI.qci_pend_sc
+                  -- qcsFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
+                  -- See Note [Quantified constraints]
+                  | otherwise = doNotExpand
+       ; canForAll ev fuel }
   where
     cls_pred_tys_maybe = getClassPredTys_maybe pred
 
-canForAll :: CtEvidence -> Bool -> TcS (StopOrContinue Ct)
+canForAll :: CtEvidence -> ExpansionFuel -> TcS (StopOrContinue Ct)
 -- We have a constraint (forall as. blah => C tys)
-canForAll ev pend_sc
+canForAll ev fuel
   = do { -- First rewrite it to apply the current substitution
          let pred = ctEvPred ev
        ; (redn, rewriters) <- rewrite ev pred
@@ -850,14 +884,14 @@ canForAll ev pend_sc
          -- (It takes a lot less code to rewrite before decomposing.)
        ; case classifyPredType (ctEvPred new_ev) of
            ForAllPred tvs theta pred
-              -> solveForAll new_ev tvs theta pred pend_sc
+              -> solveForAll new_ev tvs theta pred fuel
            _  -> pprPanic "canForAll" (ppr new_ev)
     } }
 
-solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> Bool
+solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> ExpansionFuel
             -> TcS (StopOrContinue Ct)
 solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
-            tvs theta pred _pend_sc
+            tvs theta pred _fuel
   = -- See Note [Solving a Wanted forall-constraint]
     setLclEnv (ctLocEnv loc) $
     -- This setLclEnv is important: the emitImplicationTcS uses that
@@ -903,12 +937,12 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
                       _                 -> pSizeType pred
 
  -- See Note [Solving a Given forall-constraint]
-solveForAll ev@(CtGiven {}) tvs _theta pred pend_sc
+solveForAll ev@(CtGiven {}) tvs _theta pred fuel
   = do { addInertForAll qci
        ; stopWith ev "Given forall-constraint" }
   where
     qci = QCI { qci_ev = ev, qci_tvs = tvs
-              , qci_pred = pred, qci_pend_sc = pend_sc }
+              , qci_pred = pred, qci_pend_sc = fuel }
 
 {- Note [Solving a Wanted forall-constraint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

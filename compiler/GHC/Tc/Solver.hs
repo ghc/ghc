@@ -2338,6 +2338,10 @@ maybe_simplify_again n limit unif_happened wc@(WC { wc_simple = simples })
     do { new_given  <- makeSuperClasses pending_given
        ; new_wanted <- makeSuperClasses pending_wanted
        ; solveSimpleGivens new_given -- Add the new Givens to the inert set
+       ; traceTcS "maybe_simplify_again" (vcat [ text "pending_given" <+> ppr pending_given
+                                               , text "new_given" <+> ppr new_given
+                                               , text "pending_wanted" <+> ppr pending_wanted
+                                               , text "new_wanted" <+> ppr new_wanted ])
        ; simplify_loop n limit (not (null pending_given)) $
          wc { wc_simple = simples1 `unionBags` listToBag new_wanted } } }
          -- (not (null pending_given)): see Note [Superclass iteration]
@@ -2365,6 +2369,73 @@ True, but False in the case where the only reason to iterate is new Wanted
 superclasses.  In that case we check whether the new Wanteds actually led to
 any new unifications, and iterate the implications only if so.
 -}
+
+{- Note [Expanding Recursive Superclasses and ExpansionFuel]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the class declaration (T21909)
+
+    class C [a] => C a where
+       foo :: a -> Int
+
+and suppose during type inference we obtain an implication constraint:
+
+    forall a. C a => C [[a]]
+
+To solve this implication constraint, we first expand one layer of the superclass
+of Given constraints, but not for Wanted constraints.
+(See Note [Eagerly expand given superclasses] and Note [Why adding superclasses can help]
+in GHC.Tc.Solver.Canonical.) We thus get:
+
+    [G] g1 :: C a
+    [G] g2 :: C [a]    -- new superclass layer from g1
+    [W] w1 :: C [[a]]
+
+Now, we cannot solve `w1` directly from `g1` or `g2` as we may not have
+any instances for C. So we expand a layer of superclasses of each Wanteds and Givens
+that we haven't expanded yet.
+This is done in `maybe_simplify_again`. And we get:
+
+    [G] g1 :: C a
+    [G] g2 :: C [a]
+    [G] g3 :: C [[a]]    -- new superclass layer from g2, can solve w1
+    [W] w1 :: C [[a]]
+    [W] w2 :: C [[[a]]]  -- new superclass layer from w1, not solvable
+
+Now, although we can solve `w1` using `g3` (obtained from expanding `g2`),
+we have a new wanted constraint `w2` (obtained from expanding `w1`) that cannot be solved.
+We thus make another go at solving in `maybe_simplify_again` by expanding more
+layers of superclasses. This looping is futile as Givens will never be able to catch up with Wanteds.
+
+Side Note: In principle we don't actually need to /solve/ `w2`, as it is a superclass of `w1`
+but we only expand it to expose any functional dependencies (see Note [The superclass story])
+But `w2` is a wanted constraint, so we will try to solve it like any other,
+even though ultimately we will discard its evidence.
+
+Solution: Simply bound the maximum number of layers of expansion for
+Givens and Wanteds, with ExpansionFuel.  Give the Givens more fuel
+(say 3 layers) than the Wanteds (say 1 layer). Now the Givens will
+win.  The Wanteds don't need much fuel: we are only expanding at all
+to expose functional dependencies, and wantedFuel=1 means we will
+expand a full recursive layer.  If the superclass hierarchy is
+non-recursive (the normal case) one layer is therefore full expansion.
+
+The default value for wantedFuel = Constants.max_WANTEDS_FUEL = 1.
+The default value for givenFuel  = Constants.max_GIVENS_FUEL = 3.
+Both are configurable via the `-fgivens-fuel` and `-fwanteds-fuel`
+compiler flags.
+
+There are two preconditions for the default fuel values:
+   (1) default givenFuel >= default wantedsFuel
+   (2) default givenFuel < solverIterations
+
+Precondition (1) ensures that we expand givens at least as many times as we expand wanted constraints
+preferably givenFuel > wantedsFuel to avoid issues like T21909 while
+the precondition (2) ensures that we do not reach the solver iteration limit and fail with a
+more meaningful error message
+
+This also applies for quantified constraints; see `-fqcs-fuel` compiler flag and `QCI.qci_pend_sc` field.
+-}
+
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Bag Implication)

@@ -11,6 +11,8 @@ module GHC.Tc.Types.Constraint (
 
         -- Canonical constraints
         Xi, Ct(..), Cts,
+        ExpansionFuel, doNotExpand, consumeFuel, pendingFuel,
+        assertFuelPrecondition, assertFuelPreconditionStrict,
         emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
@@ -138,8 +140,6 @@ import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
 
 
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -191,6 +191,37 @@ type Xi = TcType
 
 type Cts = Bag Ct
 
+-- | Says how many layers of superclasses can we expand.
+--   Invariant: ExpansionFuel should always be >= 0
+-- see Note [Expanding Recursive Superclasses and ExpansionFuel]
+type ExpansionFuel = Int
+
+-- | Do not expand superclasses any further
+doNotExpand :: ExpansionFuel
+doNotExpand = 0
+
+-- | Consumes one unit of fuel.
+--   Precondition: fuel > 0
+consumeFuel :: ExpansionFuel -> ExpansionFuel
+consumeFuel fuel = assertFuelPreconditionStrict fuel $ fuel - 1
+
+-- | Returns True if we have any fuel left for superclass expansion
+pendingFuel :: ExpansionFuel -> Bool
+pendingFuel n = n > 0
+
+insufficientFuelError :: SDoc
+insufficientFuelError = text "Superclass expansion fuel should be > 0"
+
+-- | asserts if fuel is non-negative
+assertFuelPrecondition :: ExpansionFuel -> a -> a
+{-# INLINE assertFuelPrecondition #-}
+assertFuelPrecondition fuel = assertPpr (fuel >= 0) insufficientFuelError
+
+-- | asserts if fuel is strictly greater than 0
+assertFuelPreconditionStrict :: ExpansionFuel -> a -> a
+{-# INLINE assertFuelPreconditionStrict #-}
+assertFuelPreconditionStrict fuel = assertPpr (pendingFuel fuel) insufficientFuelError
+
 data Ct
   -- Atomic canonical constraints
   = CDictCan {  -- e.g.  Num ty
@@ -199,11 +230,12 @@ data Ct
       cc_class  :: Class,
       cc_tyargs :: [Xi],   -- cc_tyargs are rewritten w.r.t. inerts, so Xi
 
-      cc_pend_sc :: Bool
+      cc_pend_sc :: ExpansionFuel
           -- See Note [The superclass story] in GHC.Tc.Solver.Canonical
-          -- True <=> (a) cc_class has superclasses
-          --          (b) we have not (yet) added those
-          --              superclasses as Givens
+          -- See Note [Expanding Recursive Superclasses and ExpansionFuel] in GHC.Tc.Solver
+          -- Invariants: cc_pend_sc > 0 <=>
+          --                    (a) cc_class has superclasses
+          --                    (b) those superclasses are not yet explored
     }
 
   | CIrredCan {  -- These stand for yet-unusable predicates
@@ -273,8 +305,13 @@ data QCInst  -- A much simplified version of ClsInst
                                  -- Always Given
         , qci_tvs  :: [TcTyVar]  -- The tvs
         , qci_pred :: TcPredType -- The ty
-        , qci_pend_sc :: Bool    -- Same as cc_pend_sc flag in CDictCan
-                                 -- Invariant: True => qci_pred is a ClassPred
+        , qci_pend_sc :: ExpansionFuel
+             -- Invariants: qci_pend_sc > 0 =>
+             --       (a) qci_pred is a ClassPred
+             --       (b) this class has superclass(es), and
+             --       (c) the superclass(es) are not explored yet
+             -- Same as cc_pend_sc flag in CDictCan
+             -- See Note [Expanding Recursive Superclasses and ExpansionFuel] in GHC.Tc.Solver
     }
 
 instance Outputable QCInst where
@@ -673,11 +710,11 @@ instance Outputable Ct where
          CEqCan {}        -> text "CEqCan"
          CNonCanonical {} -> text "CNonCanonical"
          CDictCan { cc_pend_sc = psc }
-            | psc          -> text "CDictCan(psc)"
-            | otherwise    -> text "CDictCan"
+            | psc > 0       -> text "CDictCan" <> parens (text "psc" <+> ppr psc)
+            | otherwise     -> text "CDictCan"
          CIrredCan { cc_reason = reason } -> text "CIrredCan" <> ppr reason
-         CQuantCan (QCI { qci_pend_sc = pend_sc })
-            | pend_sc   -> text "CQuantCan(psc)"
+         CQuantCan (QCI { qci_pend_sc = psc })
+            | psc > 0  -> text "CQuantCan"  <> parens (text "psc" <+> ppr psc)
             | otherwise -> text "CQuantCan"
 
 -----------------------------------
@@ -893,23 +930,24 @@ isUserTypeError pred = case getUserTypeErrorMsg pred of
                              _      -> False
 
 isPendingScDict :: Ct -> Bool
-isPendingScDict (CDictCan { cc_pend_sc = psc }) = psc
--- Says whether this is a CDictCan with cc_pend_sc is True;
+isPendingScDict (CDictCan { cc_pend_sc = f }) = pendingFuel f
+-- Says whether this is a CDictCan with cc_pend_sc has positive fuel;
 -- i.e. pending un-expanded superclasses
 isPendingScDict _ = False
 
 pendingScDict_maybe :: Ct -> Maybe Ct
--- Says whether this is a CDictCan with cc_pend_sc is True,
--- AND if so flips the flag
-pendingScDict_maybe ct@(CDictCan { cc_pend_sc = True })
-                      = Just (ct { cc_pend_sc = False })
+-- Says whether this is a CDictCan with cc_pend_sc has fuel left,
+-- AND if so exhausts the fuel so that they are not expanded again
+pendingScDict_maybe ct@(CDictCan { cc_pend_sc = f })
+  | pendingFuel f = Just (ct { cc_pend_sc = doNotExpand })
+  | otherwise     = Nothing
 pendingScDict_maybe _ = Nothing
 
 pendingScInst_maybe :: QCInst -> Maybe QCInst
 -- Same as isPendingScDict, but for QCInsts
-pendingScInst_maybe qci@(QCI { qci_pend_sc = True })
-                      = Just (qci { qci_pend_sc = False })
-pendingScInst_maybe _ = Nothing
+pendingScInst_maybe qci@(QCI { qci_pend_sc = f })
+  | pendingFuel f = Just (qci { qci_pend_sc = doNotExpand })
+  | otherwise     = Nothing
 
 superClassesMightHelp :: WantedConstraints -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
@@ -928,11 +966,12 @@ superClassesMightHelp (WC { wc_simple = simples, wc_impl = implics })
     is_ip _                             = False
 
 getPendingWantedScs :: Cts -> ([Ct], Cts)
+-- in the return values [Ct] has original fuel while Cts has fuel exhausted
 getPendingWantedScs simples
   = mapAccumBagL get [] simples
   where
-    get acc ct | Just ct' <- pendingScDict_maybe ct
-               = (ct':acc, ct')
+    get acc ct | Just ct_exhausted <- pendingScDict_maybe ct
+               = (ct:acc, ct_exhausted)
                | otherwise
                = (acc,     ct)
 
