@@ -5,8 +5,6 @@ import tempfile
 from pathlib import Path, PurePath
 from term_color import Color, colored
 
-import threading
-
 from my_typing import *
 
 
@@ -124,24 +122,6 @@ else:
             shutil.copyfile(str(src), str(dst))
         else:
             os.symlink(str(src), str(dst))
-
-class Watcher(object):
-    def __init__(self, count: int) -> None:
-        self.pool = count
-        self.evt = threading.Event()
-        self.sync_lock = threading.Lock()
-        if count <= 0:
-            self.evt.set()
-
-    def wait(self):
-        self.evt.wait()
-
-    def notify(self):
-        self.sync_lock.acquire()
-        self.pool -= 1
-        if self.pool <= 0:
-            self.evt.set()
-        self.sync_lock.release()
 
 def memoize(f):
     """
