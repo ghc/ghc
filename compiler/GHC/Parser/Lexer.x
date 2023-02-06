@@ -163,7 +163,6 @@ $small     = [$ascsmall $unismall \_]
 
 $uniidchar = \x07 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $idchar    = [$small $large $digit $uniidchar \']
-$labelchar = [$small $large $digit $uniidchar \' \.]
 
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See Note [Unicode in Alex].
 $graphic   = [$small $large $symbol $digit $idchar $special $unigraphic \"\']
@@ -455,7 +454,7 @@ $unigraphic / { isSmartQuote } { smart_quote_error }
 }
 
 <0> {
-  "#" $labelchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src ITlabelvarid }
+  "#" $idchar+ / { ifExtension OverloadedLabelsBit } { skip_one_varid_src ITlabelvarid }
   "#" \" / { ifExtension OverloadedLabelsBit } { lex_quoted_label }
 }
 

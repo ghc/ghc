@@ -84,7 +84,7 @@ Language
   This extends the variety syntax for constructing labels under :extension:`OverloadedLabels`.
   Examples of newly allowed syntax:
   - Leading capital letters: `#Foo` equivalant to `getLabel @"Foo"`
-  - Numeric characters: `#3.14` equivalent to `getLabel @"3.14"`
+  - Numeric characters: `#1728` equivalent to `getLabel @"1728"`
   - Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
 
 Compiler
