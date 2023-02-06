@@ -19,7 +19,14 @@
       []
       []))
     (EpaCommentsBalanced
-     []
+     [(L
+       (Anchor
+        { Test20239.hs:3:1-28 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaLineComment
+         "-- | Leading Haddock Comment")
+        { Test20239.hs:1:18-22 }))]
      [(L
        (Anchor
         { Test20239.hs:8:1 }
@@ -46,14 +53,6 @@
                   [])
                  (EpaComments
                   [(L
-                    (Anchor
-                     { Test20239.hs:3:1-28 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- | Leading Haddock Comment")
-                     { Test20239.hs:1:18-22 }))
-                  ,(L
                     (Anchor
                      { Test20239.hs:7:34-63 }
                      (UnchangedAnchor))
@@ -326,5 +325,5 @@
 
 
 
-Test20239.hs:4:15: error: [GHC-76037]
+Test20239.hs:4:15: [GHC-76037]
     Not in scope: type constructor or class ‘Method’

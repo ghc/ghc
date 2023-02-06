@@ -4,6 +4,9 @@
   -}
 module DumpParsedAstComments where
 
+-- comment 1 for bar
+-- comment 2 for bar
+bar = 1
 -- Other comment
 
 -- comment 1 for foo
