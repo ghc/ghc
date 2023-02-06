@@ -3701,11 +3701,13 @@ allocatePriorComments ss comment_q mheader_comments =
     cmp (L l _) = anchor l <= ss
     (newAnns,after) = partition cmp comment_q
     comment_q'= after
-    (prior_comments, decl_comments) = splitPriorComments ss newAnns
+    (prior_comments, decl_comments)
+        = case mheader_comments of
+           Strict.Nothing -> (reverse newAnns, [])
+           _ -> splitPriorComments ss newAnns
   in
     case mheader_comments of
       Strict.Nothing -> (Strict.Just prior_comments, comment_q', decl_comments)
-      -- Strict.Nothing -> (Strict.Just [], comment_q', newAnns)
       Strict.Just _ -> (mheader_comments, comment_q', reverse newAnns)
 
 allocateFinalComments
