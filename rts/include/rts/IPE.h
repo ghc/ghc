@@ -79,10 +79,10 @@ typedef struct IpeBufferListNode_ {
     StgInfoTable **tables;
 
     IpeBufferEntry *entries;
-    StgWord entries_size;
+    StgWord entries_size; // decompressed size
 
     char *string_table;
-    StgWord string_table_size;
+    StgWord string_table_size; // decompressed size
 } IpeBufferListNode;
 
 void registerInfoProvList(IpeBufferListNode *node);

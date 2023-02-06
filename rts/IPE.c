@@ -110,11 +110,17 @@ void dumpIPEToEventLog(void) {
     // Dump pending entries
     IpeBufferListNode *cursor = RELAXED_LOAD(&ipeBufferList);
     while (cursor != NULL) {
+        IpeBufferEntry *entries;
+        char *strings;
+
+        // Decompress if compressed
+        decompressIPEBufferListNodeIfCompressed(cursor, &entries, &strings);
+
         for (uint32_t i = 0; i < cursor->count; i++) {
             const InfoProvEnt ent = ipeBufferEntryToIpe(
-                cursor->string_table,
+                strings,
                 cursor->tables[i],
-                cursor->entries[i]
+                entries[i]
             );
             traceIPE(&ent);
         }
@@ -180,55 +186,11 @@ void updateIpeMap() {
 
     while (pending != NULL) {
         IpeBufferListNode *current_node = pending;
-        const char *strings;
         const IpeBufferEntry *entries;
-        if (current_node->compressed) {
-            // The IPE list buffer node indicates that the strings table and
-            // entries list has been compressed. If zstd is not available, fail.
-            // If zstd is available, decompress.
-#if HAVE_LIBZSTD == 0
-            barf("An IPE buffer list node has been compressed, but the \
-                  decompression library (zstd) is not available.");
-#else
-            size_t decompressed_sz = ZSTD_findFrameCompressedSize(
-                current_node->string_table,
-                current_node->string_table_size
-            );
-            char *decompressed_strings = stgMallocBytes(
-                decompressed_sz,
-                "updateIpeMap: decompressed_strings"
-            );
-            ZSTD_decompress(
-                decompressed_strings,
-                decompressed_sz,
-                current_node->string_table,
-                current_node->string_table_size
-            );
-            strings = decompressed_strings;
+        const char *strings;
 
-            // Decompress the IPE data
-            decompressed_sz = ZSTD_findFrameCompressedSize(
-                current_node->entries,
-                current_node->entries_size
-            );
-            void *decompressed_entries = stgMallocBytes(
-                decompressed_sz,
-                "updateIpeMap: decompressed_entries"
-            );
-            ZSTD_decompress(
-                decompressed_entries,
-                decompressed_sz,
-                current_node->entries,
-                current_node->entries_size
-            );
-            entries = decompressed_entries;
-#endif // HAVE_LIBZSTD == 0
-
-        } else {
-            // Not compressed, no need to decompress
-            strings = current_node->string_table;
-            entries = current_node->entries;
-        }
+        // Decompress if compressed
+        decompressIPEBufferListNodeIfCompressed(current_node, &entries, &strings);
 
         // Convert the on-disk IPE buffer entry representation (IpeBufferEntry)
         // into the runtime representation (InfoProvEnt)
@@ -247,4 +209,60 @@ void updateIpeMap() {
     }
 
     RELEASE_LOCK(&ipeMapLock);
+}
+
+/* Decompress the IPE data and strings table referenced by an IPE buffer list
+node if it is compressed. No matter whether the data is compressed, the pointers
+referenced by the 'entries_dst' and 'string_table_dst' parameters will point at
+the decompressed IPE data and string table for the given node, respectively,
+upon return from this function.
+*/
+void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node, IpeBufferEntry **entries_dst, char **string_table_dst) {
+    if (node->compressed) {
+        // The IPE list buffer node indicates that the strings table and
+        // entries list has been compressed. If zstd is not available, fail.
+        // If zstd is available, decompress.
+#if HAVE_LIBZSTD == 0
+        barf("An IPE buffer list node has been compressed, but the \
+                decompression library (zstd) is not available.");
+#else
+        size_t compressed_sz = ZSTD_findFrameCompressedSize(
+            node->string_table,
+            node->string_table_size
+        );
+        char *decompressed_strings = stgMallocBytes(
+            node->string_table_size,
+            "updateIpeMap: decompressed_strings"
+        );
+        ZSTD_decompress(
+            decompressed_strings,
+            node->string_table_size,
+            node->string_table,
+            compressed_sz
+        );
+        *string_table_dst = decompressed_strings;
+
+        // Decompress the IPE data
+        compressed_sz = ZSTD_findFrameCompressedSize(
+            node->entries,
+            node->entries_size
+        );
+        void *decompressed_entries = stgMallocBytes(
+            node->entries_size,
+            "updateIpeMap: decompressed_entries"
+        );
+        ZSTD_decompress(
+            decompressed_entries,
+            node->entries_size,
+            node->entries,
+            compressed_sz
+        );
+        *entries_dst = decompressed_entries;
+#endif // HAVE_LIBZSTD == 0
+
+    } else {
+        // Not compressed, no need to decompress
+        *entries_dst = node->entries;
+        *string_table_dst = node->string_table;
+    }
 }
