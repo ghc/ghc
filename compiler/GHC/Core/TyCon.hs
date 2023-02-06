@@ -194,7 +194,7 @@ Note [Type synonym families]
 * Type synonym families, also known as "type functions", map directly
   onto the type functions in FC:
 
-        type family F a :: *
+        type family F a :: Type
         type instance F Int = Bool
         ..etc...
 
@@ -210,11 +210,11 @@ Note [Type synonym families]
         type instance F (F Int) = ...   -- BAD!
 
 * Translation of type family decl:
-        type family F a :: *
+        type family F a :: Type
   translates to
     a FamilyTyCon 'F', whose FamTyConFlav is OpenSynFamilyTyCon
 
-        type family G a :: * where
+        type family G a :: Type where
           G Int = Bool
           G Bool = Char
           G a = ()
@@ -229,7 +229,7 @@ Note [Data type families]
 See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
 
 * Data type families are declared thus
-        data family T a :: *
+        data family T a :: Type
         data instance T Int = T1 | T2 Bool
 
   Here T is the "family TyCon".
@@ -321,7 +321,7 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
   should not think of a data family T as a *type function* at all, not
   even an injective one!  We can't allow even injective type functions
   on the LHS of a type function:
-        type family injective G a :: *
+        type family injective G a :: Type
         type instance F (G Int) = Bool
   is no good, even if G is injective, because consider
         type instance G Int = Bool
@@ -572,21 +572,21 @@ Since they are user-callable we must get their type-argument visibility
 information right; and that info is in the TyConBinders.
 Here is an example:
 
-  data App a b = MkApp (a b) -- App :: forall {k}. (k->*) -> k -> *
+  data App a b = MkApp (a b) -- App :: forall {k}. (k->Type) -> k -> Type
 
 The TyCon has
 
-  tyConTyBinders = [ Named (Bndr (k :: *) Inferred), Anon (k->*), Anon k ]
+  tyConTyBinders = [ Named (Bndr (k :: Type) Inferred), Anon (k->Type), Anon k ]
 
 The TyConBinders for App line up with App's kind, given above.
 
 But the DataCon MkApp has the type
-  MkApp :: forall {k} (a:k->*) (b:k). a b -> App k a b
+  MkApp :: forall {k} (a:k->Type) (b:k). a b -> App k a b
 
 That is, its ForAllTyBinders should be
 
-  dataConUnivTyVarBinders = [ Bndr (k:*)    Inferred
-                            , Bndr (a:k->*) Specified
+  dataConUnivTyVarBinders = [ Bndr (k:Type)    Inferred
+                            , Bndr (a:k->Type) Specified
                             , Bndr (b:k)    Specified ]
 
 So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
@@ -620,8 +620,8 @@ They fit together like so:
 
     type App a (b :: k) = a b
 
-  tyConBinders = [ Bndr (k::*)   (NamedTCB Inferred)
-                 , Bndr (a:k->*) AnonTCB
+  tyConBinders = [ Bndr (k::Type)   (NamedTCB Inferred)
+                 , Bndr (a:k->Type) AnonTCB
                  , Bndr (b:k)    AnonTCB ]
 
   Note that there are three binders here, including the
@@ -636,13 +636,13 @@ They fit together like so:
   that TyVar may scope over some other part of the TyCon's definition. Eg
       type T a = a -> a
   we have
-      tyConBinders = [ Bndr (a:*) AnonTCB ]
+      tyConBinders = [ Bndr (a:Type) AnonTCB ]
       synTcRhs     = a -> a
   So the 'a' scopes over the synTcRhs
 
 * From the tyConBinders and tyConResKind we can get the tyConKind
   E.g for our App example:
-      App :: forall k. (k->*) -> k -> *
+      App :: forall k. (k->Type) -> k -> Type
 
   We get a 'forall' in the kind for each NamedTCB, and an arrow
   for each AnonTCB
@@ -725,15 +725,15 @@ instance Binary TyConBndrVis where
 -- things such as:
 --
 -- 1) Data declarations: @data Foo = ...@ creates the @Foo@ type constructor of
---    kind @*@
+--    kind @Type@
 --
 -- 2) Type synonyms: @type Foo = ...@ creates the @Foo@ type constructor
 --
 -- 3) Newtypes: @newtype Foo a = MkFoo ...@ creates the @Foo@ type constructor
---    of kind @* -> *@
+--    of kind @Type -> Type@
 --
 -- 4) Class declarations: @class Foo where@ creates the @Foo@ type constructor
---    of kind @*@
+--    of kind @Constraint@
 --
 -- This data type also encodes a number of primitive, built in type constructors
 -- such as those for function and tuple types.
@@ -1252,16 +1252,16 @@ data FamTyConFlav
     --
     -- These are introduced by either a top level declaration:
     --
-    -- > data family T a :: *
+    -- > data family T a :: Type
     --
     -- Or an associated data type declaration, within a class declaration:
     --
     -- > class C a b where
-    -- >   data T b :: *
+    -- >   data T b :: Type
      DataFamilyTyCon
        TyConRepName
 
-     -- | An open type synonym family  e.g. @type family F x y :: * -> *@
+     -- | An open type synonym family  e.g. @type family F x y :: Type -> Type@
    | OpenSynFamilyTyCon
 
    -- | A closed type synonym family  e.g.
