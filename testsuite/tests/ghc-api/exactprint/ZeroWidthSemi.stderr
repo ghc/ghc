@@ -30,7 +30,15 @@
        (EpaComment
         (EpaLineComment
          "-- leading comments")
-        { ZeroWidthSemi.hs:1:22-26 }))]
+        { ZeroWidthSemi.hs:1:22-26 }))
+     ,(L
+       (Anchor
+        { ZeroWidthSemi.hs:5:1-19 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaLineComment
+         "-- Function comment")
+        { ZeroWidthSemi.hs:3:1-19 }))]
      [(L
        (Anchor
         { ZeroWidthSemi.hs:8:1-58 }
@@ -57,14 +65,7 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [(L
-                    (Anchor
-                     { ZeroWidthSemi.hs:5:1-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- Function comment")
-                     { ZeroWidthSemi.hs:3:1-19 }))])) { ZeroWidthSemi.hs:6:1-5 })
+                  [])) { ZeroWidthSemi.hs:6:1-5 })
     (ValD
      (NoExtField)
      (FunBind

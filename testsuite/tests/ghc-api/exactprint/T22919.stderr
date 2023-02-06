@@ -1,0 +1,116 @@
+
+==================== Parser AST ====================
+
+(L
+ { T22919.hs:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { T22919.hs:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnModule (EpaSpan { T22919.hs:1:1-6 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T22919.hs:1:29-33 }))]
+     (AnnList
+      (Nothing)
+      (Nothing)
+      (Nothing)
+      []
+      [])
+     (Just
+      ((,)
+       { T22919.hs:3:1 }
+       { T22919.hs:2:7-9 })))
+    (EpaCommentsBalanced
+     [(L
+       (Anchor
+        { T22919.hs:1:15-27 }
+        (UnchangedAnchor))
+       (EpaComment
+        (EpaBlockComment
+         "{- comment -}")
+        { T22919.hs:1:8-13 }))]
+     []))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:1:8-13 })
+    {ModuleName: T22919}))
+  (Nothing)
+  []
+  [(L
+    (SrcSpanAnn (EpAnn
+                 (Anchor
+                  { T22919.hs:2:1-9 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T22919.hs:2:1-9 })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-3 })
+       (Unqual
+        {OccName: foo}))
+      (MG
+       (FromSource)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-9 })
+        [(L
+          (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-9 })
+          (Match
+           (EpAnn
+            (Anchor
+             { T22919.hs:2:1-9 }
+             (UnchangedAnchor))
+            []
+            (EpaComments
+             []))
+           (FunRhs
+            (L
+             (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-3 })
+             (Unqual
+              {OccName: foo}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (EpaComments
+             [])
+            [(L
+              (SrcSpanAnn
+               (EpAnnNotUsed)
+               { T22919.hs:2:5-9 })
+              (GRHS
+               (EpAnn
+                (Anchor
+                 { T22919.hs:2:5-9 }
+                 (UnchangedAnchor))
+                (GrhsAnn
+                 (Nothing)
+                 (AddEpAnn AnnEqual (EpaSpan { T22919.hs:2:5 })))
+                (EpaComments
+                 []))
+               []
+               (L
+                (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:7-9 })
+                (HsLit
+                 (EpAnn
+                  (Anchor
+                   { T22919.hs:2:7-9 }
+                   (UnchangedAnchor))
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (HsChar
+                  (SourceText 's')
+                  ('s'))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])))))]))
