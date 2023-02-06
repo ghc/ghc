@@ -15,7 +15,7 @@ import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( endPass )
 import GHC.Driver.Config.Core.Opt.LiberateCase ( initLiberateCaseOpts )
-import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode )
+import GHC.Driver.Config.Core.Opt.Simplify ( initSimplifyOpts, initSimplMode, initGentleSimplMode )
 import GHC.Driver.Config.Core.Opt.WorkWrap ( initWorkWrapOpts )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Platform.Ways  ( hasWay, Way(WayProf) )
@@ -28,7 +28,6 @@ import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.Lint    ( lintAnnots )
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Opt.Simplify ( simplifyExpr, simplifyPgm )
-import GHC.Core.Opt.Simplify.Env( SimplMode(..) )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.Monad
 import GHC.Core.Opt.Pipeline.Types
@@ -153,44 +152,31 @@ getCoreToDo dflags hpt_rule_base extra_vars
     maybe_strictness_before _
       = CoreDoNothing
 
-    ----------------------------
-    base_simpl_mode :: SimplMode
-    base_simpl_mode = initSimplMode dflags
-
-    -- gentle_mode: make specialiser happy: minimum effort please
-    -- See Note [Inline in InitialPhase]
-    -- See Note [RULEs enabled in InitialPhase]
-    gentle_mode = base_simpl_mode { sm_names     = ["Gentle"]
-                                  , sm_phase     = InitialPhase
-                                  , sm_case_case = False }
-
-    simpl_mode phase name
-      = base_simpl_mode { sm_names = [name], sm_phase = phase }
-
-    keep_exits :: SimplMode -> SimplMode
-    -- See Note [Be selective about not-inlining exit join points]
-    -- in GHC.Core.Opt.Exitify
-    keep_exits mode = mode { sm_keep_exits = True }
-
-    ----------------------------
-    run_simplifier mode iter
-      = CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter mode hpt_rule_base
-
-    simpl_phase phase name iter = CoreDoPasses $
-                                  [ maybe_strictness_before phase
-                                  , run_simplifier (simpl_mode phase name) iter
-                                  , maybe_rule_check phase ]
+    simpl_phase phase name iter
+      = CoreDoPasses
+      $   [ maybe_strictness_before phase
+          , CoreDoSimplify $ initSimplifyOpts dflags extra_vars iter
+                             (initSimplMode dflags phase name) hpt_rule_base
+          , maybe_rule_check phase ]
 
     -- Run GHC's internal simplification phase, after all rules have run.
     -- See Note [Compiler phases] in GHC.Types.Basic
-    simpl_gently          = run_simplifier gentle_mode  max_iter
-    simplify_final   name = run_simplifier (             simpl_mode FinalPhase name) max_iter
-    simpl_keep_exits name = run_simplifier (keep_exits $ simpl_mode FinalPhase name) max_iter
+    simplify name = simpl_phase FinalPhase name max_iter
 
-    ----------------------------
+    -- initial simplify: mk specialiser happy: minimum effort please
+    -- See Note [Inline in InitialPhase]
+    -- See Note [RULEs enabled in InitialPhase]
+    simpl_gently = CoreDoSimplify $ initSimplifyOpts dflags extra_vars max_iter
+                                    (initGentleSimplMode dflags) hpt_rule_base
+
     dmd_cpr_ww = if ww_on then [CoreDoDemand True,CoreDoCpr,CoreDoWorkerWrapper]
                           else [CoreDoDemand False] -- NB: No CPR! See Note [Don't change boxity without worker/wrapper]
 
+
+    demand_analyser = (CoreDoPasses (
+                           dmd_cpr_ww ++
+                           [simplify "post-worker-wrapper"]
+                           ))
 
     -- Static forms are moved to the top level with the FloatOut pass.
     -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
@@ -281,16 +267,14 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         runWhen call_arity $ CoreDoPasses
             [ CoreDoCallArity
-            , simplify_final "post-call-arity"
+            , simplify "post-call-arity"
             ],
 
         -- Strictness analysis
-        runWhen strictness $ CoreDoPasses
-            (dmd_cpr_ww ++ [simplify_final "post-worker-wrapper"]),
+        runWhen strictness demand_analyser,
 
         runWhen exitification CoreDoExitify,
             -- See Note [Placement of the exitification pass]
-            -- in GHC.Core.Opt.Exitify
 
         runWhen full_laziness $
            CoreDoFloatOutwards FloatOutSwitches {
@@ -312,17 +296,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
 
         runWhen do_float_in CoreDoFloatInwards,
 
-        -- Final tidy-up run of the simplifier
-        simpl_keep_exits "final tidy up",
-            -- Keep exit join point because this is the first
-            -- Simplifier run after Exitify. Subsequent runs will
-            -- re-inline those exit join points; their work is done.
-            -- See Note [Be selective about not-inlining exit join points]
-            -- in GHC.Core.Opt.Exitify
-            --
-            -- Annoyingly, we only /have/ a subsequent run with -O2.  With
-            -- plain -O we'll still have those exit join points hanging around.
-            -- Oh well.
+        simplify "final",  -- Final tidy-up
 
         maybe_rule_check FinalPhase,
 
@@ -332,31 +306,31 @@ getCoreToDo dflags hpt_rule_base extra_vars
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
         runWhen liberate_case $ CoreDoPasses
-           [ CoreLiberateCase, simplify_final "post-liberate-case" ],
+           [ CoreLiberateCase, simplify "post-liberate-case" ],
            -- Run the simplifier after LiberateCase to vastly
            -- reduce the possibility of shadowing
            -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
 
         runWhen spec_constr $ CoreDoPasses
-           [ CoreDoSpecConstr, simplify_final "post-spec-constr"],
+           [ CoreDoSpecConstr, simplify "post-spec-constr"],
            -- See Note [Simplify after SpecConstr]
 
         maybe_rule_check FinalPhase,
 
         runWhen late_specialise $ CoreDoPasses
-           [ CoreDoSpecialising, simplify_final "post-late-spec"],
+           [ CoreDoSpecialising, simplify "post-late-spec"],
 
         -- LiberateCase can yield new CSE opportunities because it peels
         -- off one layer of a recursive function (concretely, I saw this
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
         runWhen ((liberate_case || spec_constr) && cse) $ CoreDoPasses
-           [ CoreCSE, simplify_final "post-final-cse" ],
+           [ CoreCSE, simplify "post-final-cse" ],
 
         ---------  End of -O2 passes --------------
 
         runWhen late_dmd_anal $ CoreDoPasses (
-            dmd_cpr_ww ++ [simplify_final "post-late-ww"]
+            dmd_cpr_ww ++ [simplify "post-late-ww"]
           ),
 
         -- Final run of the demand_analyser, ensures that one-shot thunks are
