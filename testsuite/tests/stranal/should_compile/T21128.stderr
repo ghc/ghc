@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 125, types: 68, coercions: 4, joins: 0/0}
+  = {terms: 137, types: 92, coercions: 4, joins: 0/0}
 
 lvl = "error"#
 
@@ -29,11 +29,17 @@ lvl9 = SrcLoc lvl2 lvl3 lvl5 lvl6 lvl7 lvl6 lvl8
 
 lvl10 = PushCallStack lvl1 lvl9 EmptyCallStack
 
+$windexError
+  = \ @a @b ww eta eta1 eta2 ->
+      error
+        (lvl10 `cast` <Co:4> :: CallStack ~R# (?callStack::CallStack))
+        (++ (ww eta) (++ (ww eta1) (ww eta2)))
+
 indexError
   = \ @a @b $dShow eta eta1 eta2 ->
-      error
-        (lvl10 `cast` <Co:4> :: ...)
-        (++ (show $dShow eta) (++ (show $dShow eta1) (show $dShow eta2)))
+      case $dShow of { C:Show ww ww1 ww2 ->
+      $windexError ww1 eta eta1 eta2
+      }
 
 $trModule3 = TrNameS $trModule4
 
@@ -42,7 +48,8 @@ $trModule1 = TrNameS $trModule2
 $trModule = Module $trModule3 $trModule1
 
 $wlvl
-  = \ ww ww1 ww2 -> indexError $fShowInt (I# ww2) (I# ww1) (I# ww)
+  = \ ww ww1 ww2 ->
+      $windexError $fShowInt_$cshow (I# ww2) (I# ww1) (I# ww)
 
 index
   = \ l u i ->
@@ -66,7 +73,7 @@ index
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 108, types: 46, coercions: 0, joins: 3/3}
+  = {terms: 108, types: 47, coercions: 0, joins: 3/4}
 
 $trModule4 = "main"#
 
@@ -82,34 +89,35 @@ i = I# 1#
 
 l = I# 0#
 
-lvl = \ x ww -> indexError $fShowInt x (I# ww) i
+lvl = \ y -> $windexError $fShowInt_$cshow l y l
 
-lvl1 = \ ww -> indexError $fShowInt l (I# ww) l
+lvl1 = \ ww y -> $windexError $fShowInt_$cshow (I# ww) y i
 
 $wtheresCrud
   = \ ww ww1 ->
+      let { y = I# ww1 } in
       join {
-        exit
-          = case <# 0# ww1 of {
-              __DEFAULT -> case lvl1 ww1 of wild { };
-              1# -> 0#
-            } } in
-      join {
-        exit1
+        lvl2
           = case <=# ww 1# of {
-              __DEFAULT -> case lvl (I# ww) ww1 of wild { };
+              __DEFAULT -> case lvl1 ww y of wild { };
               1# ->
                 case <# 1# ww1 of {
-                  __DEFAULT -> case lvl (I# ww) ww1 of wild { };
+                  __DEFAULT -> case lvl1 ww y of wild { };
                   1# -> -# 1# ww
                 }
+            } } in
+      join {
+        lvl3
+          = case <# 0# ww1 of {
+              __DEFAULT -> case lvl y of wild { };
+              1# -> 0#
             } } in
       joinrec {
         $wgo ww2
           = case ww2 of wild {
               __DEFAULT -> jump $wgo (-# wild 1#);
-              0# -> jump exit;
-              1# -> jump exit1
+              0# -> jump lvl3;
+              1# -> jump lvl2
             }; } in
       jump $wgo ww
 

@@ -248,16 +248,13 @@ data SimplMode = SimplMode -- See comments in GHC.Core.Opt.Simplify.Monad
   , sm_uf_opts      :: !UnfoldingOpts -- ^ Unfolding options
   , sm_case_case    :: !Bool          -- ^ Whether case-of-case is enabled
   , sm_pre_inline   :: !Bool          -- ^ Whether pre-inlining is enabled
-  , sm_keep_exits   :: !Bool          -- ^ True <=> keep ExitJoinIds
-                                      -- See Note [Do not inline exit join points]
-                                      --          in GHC.Core.Opt.Exitify
-  , sm_float_enable     :: !FloatEnable   -- ^ Whether to enable floating out
+  , sm_float_enable :: !FloatEnable   -- ^ Whether to enable floating out
   , sm_do_eta_reduction :: !Bool
-  , sm_arity_opts       :: !ArityOpts
-  , sm_rule_opts        :: !RuleOpts
-  , sm_case_folding     :: !Bool
-  , sm_case_merge       :: !Bool
-  , sm_co_opt_opts      :: !OptCoercionOpts -- ^ Coercion optimiser options
+  , sm_arity_opts :: !ArityOpts
+  , sm_rule_opts :: !RuleOpts
+  , sm_case_folding :: !Bool
+  , sm_case_merge :: !Bool
+  , sm_co_opt_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
   }
 
 instance Outputable SimplMode where
