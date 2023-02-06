@@ -150,7 +150,6 @@ config.broken_tests |= {TestName(t) for t in args.broken_test}
 
 if args.threads:
     config.threads = args.threads
-    config.use_threads = True
 
 if args.verbose is not None:
     config.verbose = args.verbose
@@ -497,7 +496,7 @@ else:
             watcher.wait()
 
         # Run the following tests purely sequential
-        config.use_threads = False
+        config.threads = 1
         for oneTest in aloneTests:
             if stopping():
                 break

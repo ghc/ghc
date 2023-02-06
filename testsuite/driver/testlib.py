@@ -37,9 +37,8 @@ from threading import Timer
 from collections import OrderedDict
 
 global pool_sema
-if config.use_threads:
-    import threading
-    pool_sema = threading.BoundedSemaphore(value=config.threads)
+import threading
+pool_sema = threading.BoundedSemaphore(value=config.threads)
 
 global wantToStop
 wantToStop = False
@@ -84,12 +83,7 @@ def get_all_ways() -> Set[WayName]:
 # testdir_testopts after each test).
 
 global testopts_local
-if config.use_threads:
-    testopts_local = threading.local()
-else:
-    class TestOpts_Local:
-        pass
-    testopts_local = TestOpts_Local() # type: ignore
+testopts_local = threading.local()
 
 def getTestOpts() -> TestOptions:
     return testopts_local.x
@@ -1009,15 +1003,12 @@ aloneTests = []
 allTestNames = set([])  # type: Set[TestName]
 
 def runTest(watcher, opts, name: TestName, func, args):
-    if config.use_threads:
-        pool_sema.acquire()
-        t = threading.Thread(target=test_common_thread,
+    pool_sema.acquire()
+    t = threading.Thread(target=test_common_thread,
                              name=name,
                              args=(watcher, name, opts, func, args))
-        t.daemon = False
-        t.start()
-    else:
-        test_common_work(watcher, name, opts, func, args)
+    t.daemon = False
+    t.start()
 
 # name  :: String
 # setup :: [TestOpt] -> IO ()
@@ -1062,12 +1053,11 @@ def test(name: TestName,
         parallelTests.append(thisTest)
     allTestNames.add(name)
 
-if config.use_threads:
-    def test_common_thread(watcher, name, opts, func, args):
-            try:
-                test_common_work(watcher, name, opts, func, args)
-            finally:
-                pool_sema.release()
+def test_common_thread(watcher, name, opts, func, args):
+    try:
+        test_common_work(watcher, name, opts, func, args)
+    finally:
+        pool_sema.release()
 
 def get_package_cache_timestamp() -> float:
     if config.package_conf_cache_file is None:

@@ -174,7 +174,6 @@ class TestConfig:
 
         # threads
         self.threads = 1
-        self.use_threads = False
 
         # tests which should be considered to be broken during this testsuite
         # run.
