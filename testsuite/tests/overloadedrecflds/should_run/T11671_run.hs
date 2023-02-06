@@ -12,8 +12,9 @@ import GHC.Prim (Addr#)
 instance KnownSymbol symbol => IsLabel symbol String where
   fromLabel = symbolVal (Proxy :: Proxy symbol)
 
-(#) :: String -> Int -> String
+(#), (#.) :: String -> Int -> String
 (#) _ i = show i
+_ #. i = show i
 
 f :: Addr# -> Int -> String
 f _ i = show i
@@ -26,13 +27,13 @@ main = traverse_ putStrLn
   , #type
   , #Foo
   , #3
-  , #199.4
+  , #"199.4"
   , #17a23b
   , #f'a'
   , #'a'
   , #'
   , #''notTHSplice
-  , #...
+  , #"..."
   , #привет
   , #こんにちは
   , #"3"
