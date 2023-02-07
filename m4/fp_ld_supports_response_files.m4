@@ -1,6 +1,6 @@
 # FP_LD_SUPPORTS_RESPONSE_FILES
 # --------------------
-# See if whether we are using a version of ld64 on darwin platforms which
+# See if whether we are using a version of ld which
 # supports response files.
 AC_DEFUN([FP_LD_SUPPORTS_RESPONSE_FILES], [
     AC_MSG_CHECKING([whether $LD supports response files])
