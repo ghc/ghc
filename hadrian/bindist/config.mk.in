@@ -236,6 +236,7 @@ GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 s390x),@UseL
 
 GccExtraViaCOpts = @GccExtraViaCOpts@
 LdHasFilelist = @LdHasFilelist@
+LdSupportsResponseFiles = @LdSupportsResponseFiles@
 LdHasBuildId = @LdHasBuildId@
 LdHasFilelist = @LdHasFilelist@
 LdIsGNULd = @LdIsGNULd@
