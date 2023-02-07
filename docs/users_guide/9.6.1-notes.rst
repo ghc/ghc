@@ -3,9 +3,35 @@
 Version 9.6.1
 ==============
 
-
 Language
 ~~~~~~~~
+
+- GHC is now more conservative when solving constraints that arise from
+  superclass expansion in terms of other constraints that also arise from
+  superclass expansion.
+
+  For example: ::
+
+    class C a
+    class C a => D a b
+    instance D a a => D a b
+
+  When typechecking the instance, we need to also solve the constraints arising
+  from the superclasses of ``D``; in this case, we need ``C a``. We could obtain
+  evidence for this constraint by expanding the superclasses of the context,
+  as ``D a a`` also has a superclass context of ``C a``.
+  However, is it unsound to do so in general, as we might be assuming precisely
+  the predicate we want to prove! This can lead to programs that loop at runtime.
+
+  When such potentially-loopy situations arise, GHC now emits a warning.
+  In future releases, this behaviour will no longer be supported, and the
+  typechecker will outright refuse to solve these constraints, emitting a
+  ``Could not deduce`` error.
+
+  In practice, you should be able to fix these issues by adding the necessary
+  constraint to the context, e.g. for the above example: ::
+
+    instance (C a, D a a) => D a b
 
 - Record updates for GADTs and other existential datatypes are now
   fully supported.

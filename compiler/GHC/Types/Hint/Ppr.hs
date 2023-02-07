@@ -14,6 +14,7 @@ import GHC.Types.Hint
 
 import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Hs.Expr ()   -- instance Outputable
+import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
 import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace, nameModule)
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
@@ -214,6 +215,14 @@ instance Outputable GhcHint where
            mod = nameModule name
     SuggestRenameTypeVariable
       -> text "Consider renaming the type variable."
+    LoopySuperclassSolveHint pty cls_or_qc
+      -> vcat [ text "Add the constraint" <+> quotes (ppr pty) <+> text "to the" <+> what <> comma
+              , text "even though it seems logically implied by other constraints in the context." ]
+        where
+          what :: SDoc
+          what = case cls_or_qc of
+            IsClsInst -> text "instance context"
+            IsQC {}   -> text "context of the quantified constraint"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

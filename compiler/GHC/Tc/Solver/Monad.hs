@@ -15,7 +15,7 @@ module GHC.Tc.Solver.Monad (
 
     -- The TcS monad
     TcS, runTcS, runTcSEarlyAbort, runTcSWithEvBinds, runTcSInerts,
-    failTcS, warnTcS, addErrTcS, wrapTcS,
+    failTcS, warnTcS, addErrTcS, wrapTcS, ctLocWarnTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
@@ -673,16 +673,18 @@ lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
 lookupInInerts loc pty
   | ClassPred cls tys <- classifyPredType pty
   = do { inerts <- getTcSInerts
-       ; return $ -- Maybe monad
-                  do { found_ev <-
-                         lookupSolvedDict inerts loc cls tys `mplus`
-                         fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)
-                     ; guard (not (prohibitedSuperClassSolve (ctEvLoc found_ev) loc))
-                      -- We're about to "solve" the wanted we're looking up, so we
-                      -- must make sure doing so wouldn't run afoul of
-                      -- Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
-                      -- Forgetting this led to #20666.
-                     ; return found_ev }}
+       ; let mb_solved = lookupSolvedDict inerts loc cls tys
+             mb_inert  = fmap ctEvidence (lookupInertDict (inert_cans inerts) loc cls tys)
+       ; return $ do -- Maybe monad
+            found_ev <- mb_solved `mplus` mb_inert
+
+            -- We're about to "solve" the wanted we're looking up, so we
+            -- must make sure doing so wouldn't run afoul of
+            -- Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
+            -- Forgetting this led to #20666.
+            guard $ not (prohibitedSuperClassSolve (ctEvLoc found_ev) loc)
+
+            return found_ev }
   | otherwise -- NB: No caching for equalities, IPs, holes, or errors
   = return Nothing
 
@@ -854,6 +856,10 @@ failTcS      = wrapTcS . TcM.failWith
 warnTcS msg  = wrapTcS (TcM.addDiagnostic msg)
 addErrTcS    = wrapTcS . TcM.addErr
 panicTcS doc = pprPanic "GHC.Tc.Solver.Canonical" doc
+
+-- | Emit a warning within the 'TcS' monad at the location given by the 'CtLoc'.
+ctLocWarnTcS :: CtLoc -> TcRnMessage -> TcS ()
+ctLocWarnTcS loc msg = wrapTcS $ TcM.setCtLocM loc $ TcM.addDiagnostic msg
 
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = wrapTcS (TcM.traceTc herald doc)

@@ -2319,6 +2319,22 @@ of ``-W(no-)*``.
     triggered whenever this happens, and can be addressed by enabling the
     extension.
 
+.. ghc-flag:: -Wloopy-superclass-solve
+    :shortdesc: warn when creating potentially-loopy superclass constraint evidence
+    :type: dynamic
+    :reverse: -Wno-loopy-superclass-solve
+
+    :since: 9.6.1
+
+    As explained in :ref:`undecidable_instances`, when using
+    :extension:`UndecidableInstances` it is possible for GHC to construct
+    non-terminating evidence for certain superclass constraints.
+
+    This behaviour is scheduled to be removed in a future GHC version.
+    In the meantime, GHC emits this warning to inform users of potential
+    non-termination. Users can manually add the required constraint to the context
+    to avoid the problem (thus silencing the warning).
+
 .. ghc-flag:: -Wterm-variable-capture
     :shortdesc: warn when an implicitly quantified type variable captures a term's name
     :type: dynamic

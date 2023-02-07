@@ -2924,6 +2924,23 @@ data TcRnMessage where
   -}
   TcRnDuplicateMinimalSig :: LSig GhcPs -> LSig GhcPs -> [LSig GhcPs] -> TcRnMessage
 
+  {-| TcRnLoopySuperclassSolve is a warning, controlled by @-Wloopy-superclass-solve@,
+      that is triggered when GHC solves a constraint in a possibly-loopy way,
+      violating the class instance termination rules described in the section
+      "Undecidable instances and loopy superclasses" of the user's guide.
+
+      Example:
+
+        class Foo f
+        class Foo f => Bar f g
+        instance Bar f f => Bar f (h k)
+
+      Test cases: T20666, T20666{a,b}, T22891, T22912.
+  -}
+  TcRnLoopySuperclassSolve :: CtLoc    -- ^ Wanted 'CtLoc'
+                           -> PredType -- ^ Wanted 'PredType'
+                           -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
