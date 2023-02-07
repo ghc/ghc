@@ -1347,7 +1347,7 @@ def do_test(name: TestName,
 # if found and instead have the testsuite decide on what to do
 # with the output.
 def override_options(pre_cmd):
-    if config.verbose >= 5 and bool(re.match('\$make', pre_cmd, re.I)):
+    if config.verbose >= 5 and bool(re.match(r'\$make', pre_cmd, re.I)):
         return pre_cmd.replace(' -s'     , '') \
                       .replace('--silent', '') \
                       .replace('--quiet' , '')
@@ -1989,7 +1989,7 @@ def split_file(in_fn: Path, delimiter: str, out1_fn: Path, out2_fn: Path):
         with out1_fn.open('w', encoding='utf8', newline='') as out1:
             with out2_fn.open('w', encoding='utf8', newline='') as out2:
                 line = infile.readline()
-                while re.sub('^\s*','',line) != delimiter and line != '':
+                while re.sub(r'^\s*','',line) != delimiter and line != '':
                     out1.write(line)
                     line = infile.readline()
 
@@ -2399,20 +2399,20 @@ def normalise_errmsg(s: str) -> str:
     # warning message to get clean output.
     if config.msys:
         s = re.sub('Failed to remove file (.*); error= (.*)$', '', s)
-        s = re.sub('DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', s)
+        s = re.sub(r'DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', s)
 
     # filter out unsupported GNU_PROPERTY_TYPE (5), which is emitted by LLVM10
     # and not understood by older binutils (ar, ranlib, ...)
-    s = modify_lines(s, lambda l: re.sub('^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
+    s = modify_lines(s, lambda l: re.sub(r'^(.+)warning: (.+): unsupported GNU_PROPERTY_TYPE \(5\) type: 0xc000000(.*)$', '', l))
 
-    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
+    s = re.sub(r'ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
     # ignore superfluous dylibs passed to the linker.
     s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
     # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\.\.\..*\n','',s)
+    s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\\.\\.\\..*\n','',s)
     # ignore warning about strip invalidating signatures
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     # clang may warn about unused argument when used as assembler
@@ -2475,8 +2475,8 @@ def normalise_slashes_( s: str ) -> str:
     return s
 
 def normalise_exe_( s: str ) -> str:
-    s = re.sub('\.exe', '', s)
-    s = re.sub('\.jsexe', '', s)
+    s = re.sub(r'\.exe', '', s)
+    s = re.sub(r'\.jsexe', '', s)
     return s
 
 def normalise_output( s: str ) -> str:
@@ -2494,14 +2494,14 @@ def normalise_output( s: str ) -> str:
     # ghci outputs are pretty unstable with -fexternal-dynamic-refs, which is
     # requires for -fPIC
     s = re.sub('  -fexternal-dynamic-refs\n','',s)
-    s = re.sub('ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
+    s = re.sub(r'ld: warning: passed .* min versions \(.*\) for platform macOS. Using [\.0-9]+.','',s)
     s = re.sub('ld: warning: -sdk_version and -platform_version are not compatible, ignoring -sdk_version','',s)
     # ignore superfluous dylibs passed to the linker.
     s = re.sub('ld: warning: .*, ignoring unexpected dylib file\n','',s)
     # ignore LLVM Version mismatch garbage; this will just break tests.
     s = re.sub('You are using an unsupported version of LLVM!.*\n','',s)
-    s = re.sub('Currently only [\.0-9]+ is supported. System LLVM version: [\.0-9]+.*\n','',s)
-    s = re.sub('We will try though\.\.\..*\n','',s)
+    s = re.sub('Currently only [\\.0-9]+ is supported. System LLVM version: [\\.0-9]+.*\n','',s)
+    s = re.sub('We will try though\\.\\.\\..*\n','',s)
     # ignore warning about strip invalidating signatures
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     # clang may warn about unused argument when used as assembler

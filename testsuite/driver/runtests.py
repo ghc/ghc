@@ -601,6 +601,7 @@ else:
 
     if args.junit:
         junit(t).write(args.junit)
+        args.junit.close()
 
     if config.only_report_hadrian_deps:
       print("WARNING - skipping all tests and only reporting required hadrian dependencies:", config.hadrian_deps)
