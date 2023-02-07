@@ -66,6 +66,23 @@ Runtime system
 
 - Truncate eventlog events with a large payload (:ghc-ticket:`20221`).
 
+- A bug in the nonmoving garbage collector regarding the treatment of
+  zero-length ``SmallArray#``\ s has been fixed (:ghc-ticket:`22264`)
+
+- A number of bugs regarding the non-moving garbage collector's treatment of
+  ``Weak#`` pointers have been fixed (:ghc-ticket:`22327`)
+
+- A few race conditions between the non-moving collector and
+  ``setNumCapabilities`` which could result in undefined behavior have been
+  fixed (:ghc-ticket:`22926`, :ghc-ticket:`22927`)
+
+- The non-moving collector is now able to better schedule marking work during
+  the post-mark synchronization phase of collection, significantly reducing
+  pause times in some workloads (:ghc-ticket:`22929`).
+
+- Various bugs in the non-moving collector's implementation of the selector
+  optimisation have been fixed (:ghc-ticket:`22930`)
+
 Build system and packaging
 --------------------------
 
