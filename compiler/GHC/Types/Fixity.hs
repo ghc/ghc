@@ -24,7 +24,7 @@ import GHC.Utils.Binary
 import Data.Data hiding (Fixity, Prefix, Infix)
 
 data Fixity = Fixity SourceText Int FixityDirection
-  -- Note [Pragma source text]
+  -- Note [Pragma source text] in "GHC.Types.SourceText"
   deriving Data
 
 instance Outputable Fixity where

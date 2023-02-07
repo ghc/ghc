@@ -99,7 +99,7 @@ playInterruptible _ = False
 data CExportSpec
   = CExportStatic               -- foreign export ccall foo :: ty
         SourceText              -- of the CLabelString.
-                                -- See Note [Pragma source text] in GHC.Types.SourceText
+                                -- See Note [Pragma source text] in "GHC.Types.SourceText"
         CLabelString            -- C Name of exported function
         CCallConv
   deriving Data
@@ -117,7 +117,7 @@ data CCallTarget
   -- An "unboxed" ccall# to named function in a particular package.
   = StaticTarget
         SourceText                -- of the CLabelString.
-                                  -- See Note [Pragma source text] in GHC.Types.SourceText
+                                  -- See Note [Pragma source text] in "GHC.Types.SourceText"
         CLabelString                    -- C-land name of label.
 
         (Maybe Unit)                    -- What package the function is in.
@@ -233,7 +233,7 @@ instance Outputable CCallSpec where
         = text "__ffi_dyn_ccall" <> gc_suf <+> text "\"\""
 
 -- The filename for a C header file
--- Note [Pragma source text] in GHC.Types.SourceText
+-- Note [Pragma source text] in "GHC.Types.SourceText"
 data Header = Header SourceText FastString
     deriving (Eq, Data)
 
@@ -247,7 +247,7 @@ instance Outputable Header where
 --        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
 
 -- For details on above see Note [exact print annotations] in "GHC.Parser.Annotation"
-data CType = CType SourceText -- Note [Pragma source text] in GHC.Types.SourceText
+data CType = CType SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself
     deriving (Eq, Data)

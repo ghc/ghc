@@ -77,7 +77,7 @@ type instance ImportDeclPkgQual GhcTc = PkgQual
 type instance XCImportDecl  GhcPs = XImportDeclPass
 type instance XCImportDecl  GhcRn = XImportDeclPass
 type instance XCImportDecl  GhcTc = DataConCantHappen
-                                 -- Note [Pragma source text] in GHC.Types.SourceText
+                                 -- Note [Pragma source text] in "GHC.Types.SourceText"
 
 data XImportDeclPass = XImportDeclPass
     { ideclAnn        :: EpAnn EpAnnImportDecl

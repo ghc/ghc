@@ -771,7 +771,7 @@ data Token
   | ITdependency
   | ITrequires
 
-  -- Pragmas, see  Note [Pragma source text] in "GHC.Types.Basic"
+  -- Pragmas, see  Note [Pragma source text] in "GHC.Types.SourceText"
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITopaque_prag       SourceText
   | ITspec_prag         SourceText                -- SPECIALISE
@@ -855,17 +855,17 @@ data Token
   | ITlabelvarid SourceText FastString   -- Overloaded label: #x
                                          -- The SourceText is required because we can
                                          -- have a string literal as a label
-                                         -- Note [Literal source text] in "GHC.Types.Basic"
+                                         -- Note [Literal source text] in "GHC.Types.SourceText"
 
-  | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.Basic"
-  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.Basic"
-  | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITrational FractionalLit
 
-  | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.Basic"
-  | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.Basic"
-  | ITprimint    SourceText Integer  -- Note [Literal source text] in "GHC.Types.Basic"
-  | ITprimword   SourceText Integer  -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimint    SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
+  | ITprimword   SourceText Integer  -- Note [Literal source text] in "GHC.Types.SourceText"
   | ITprimfloat  FractionalLit
   | ITprimdouble FractionalLit
 

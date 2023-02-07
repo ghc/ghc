@@ -1599,7 +1599,7 @@ data RuleDecl pass
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
        , rd_name :: XRec pass RuleName
-           -- ^ Note [Pragma source text] in "GHC.Types.Basic"
+           -- ^ Note [Pragma source text] in "GHC.Types.SourceText"
        , rd_act  :: Activation
        , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars

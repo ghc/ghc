@@ -3950,7 +3950,7 @@ getPRIMWORDs    (L _ (ITprimword   src _)) = src
 
 getLABELVARIDs   (L _ (ITlabelvarid src _)) = src
 
--- See Note [Pragma source text] in "GHC.Types.Basic" for the following
+-- See Note [Pragma source text] in "GHC.Types.SourceText" for the following
 getINLINE_PRAGs       (L _ (ITinline_prag       _ inl _)) = inlineSpecSource inl
 getOPAQUE_PRAGs       (L _ (ITopaque_prag       src))     = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src

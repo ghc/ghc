@@ -42,9 +42,9 @@ import Prelude (Integer)
 ************************************************************************
 -}
 
--- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
+-- Note [Literal source text] in "GHC.Types.SourceText" for SourceText fields in
 -- the following
--- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the Xxxxx
+-- Note [Trees That Grow] in "Language.Haskell.Syntax.Extension" for the Xxxxx
 -- fields in the following
 -- | Haskell Literal
 data HsLit x
@@ -107,7 +107,7 @@ data HsOverLit p
   | XOverLit
       !(XXOverLit p)
 
--- Note [Literal source text] in GHC.Types.Basic for SourceText fields in
+-- Note [Literal source text] in "GHC.Types.SourceText" for SourceText fields in
 -- the following
 -- | Overloaded Literal Value
 data OverLitVal

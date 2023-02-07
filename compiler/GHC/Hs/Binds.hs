@@ -680,7 +680,7 @@ type instance XSpecInstSig      (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
 type instance XMinimalSig       (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
 type instance XSCCFunSig        (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
 type instance XCompleteMatchSig (GhcPass p) = (EpAnn [AddEpAnn], SourceText)
-    -- SourceText: Note [Pragma source text] in GHC.Types.SourceText
+    -- SourceText: Note [Pragma source text] in "GHC.Types.SourceText"
 type instance XXSig             GhcPs = DataConCantHappen
 type instance XXSig             GhcRn = IdSig
 type instance XXSig             GhcTc = IdSig

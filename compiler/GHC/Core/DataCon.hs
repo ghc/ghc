@@ -800,7 +800,7 @@ type DataConEnv a = UniqFM DataCon a     -- Keyed by DataCon
 -- emit a warning (in checkValidDataCon) and treat it like
 -- @(HsSrcBang _ NoSrcUnpack SrcLazy)@
 data HsSrcBang =
-  HsSrcBang SourceText -- Note [Pragma source text] in GHC.Types.SourceText
+  HsSrcBang SourceText -- Note [Pragma source text] in "GHC.Types.SourceText"
             SrcUnpackedness
             SrcStrictness
   deriving Data.Data
