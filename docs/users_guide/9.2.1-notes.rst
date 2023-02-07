@@ -45,6 +45,19 @@ Language
 
 .. _Unlifted Datatypes Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst
 
+* GHC now supports visible type applications in patterns when :extension:`TypeApplications` is enabled . This allows
+  you to use the ``@variable`` syntax to bind types in patterns. For instance, instead of ::
+
+    foo (Just (x :: ty)) = …
+
+  You can now use
+
+    foo (Just @ty x) = …
+
+  See the `Type Applications in Patterns Proposal`_ for more details
+
+.. _Type Applications in Patterns Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0126-type-applications-in-patterns.rst
+
 * Kind inference for data/newtype instance declarations is slightly more restrictive than before.
   In particular, GHC now requires that the kind of a data family instance be fully determined
   by the header of the instance, without looking at the definition of the constructor.

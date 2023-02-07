@@ -1,0 +1,128 @@
+.. _release-9-2-6:
+
+Version 9.2.6
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+9, 10, 11, or 12.
+
+Compiler
+--------
+
+- Fix a regression in the simplifier due to a bad backport in GHC 9.2.5 that
+  could seriously impact runtime performance when compiling with optimisations
+  due to duplication of expensive work (:ghc-ticket:`22425`).
+
+- Fix a compiler panic in the simplifier due to a bad backport in GHC 9.2.5
+  (:ghc-ticket:`22491`).
+
+- Fix a compiler panic in the simplifier that manifests when compiling with
+  optimisations (:ghc-ticket:`19824`,:ghc-ticket:`22482`).
+
+- Fix a compiler panic in the demand analyser due to a bug involving shadowing
+  (:ghc-ticket:`22718`).
+
+- Fix a compiler panic during the "Float In" optimsation pass due to improper
+  handling of shadowing (:ghc-ticket:`22662`).
+
+- Fix a compiler panic in the demand analyser (:ghc-ticket:`22039`).
+
+- Fix a shadowing related bug in the occurence analysis phase of the simplifier
+  (:ghc-ticket:`22623`).
+
+- Fix a compiler bug where programs using Template Haskell involving Constant
+  Applicative forms could be garbage collected too early (:ghc-ticket:`22417`).
+
+- Fix a regression in the typechecker where certain typeclass instances
+  involving type and data familes would fail to resolve (:ghc-ticket:`22647`).
+
+- Fix the linker warning about chained fixups on Darwin platforms for programs
+  compiled with GHC (:ghc-ticket:`22429`).
+
+- Fix a bug with the graph-colouring register allocater leading to compiler
+  panics when compiling with ``-fregs-graph`` (:ghc-ticket:`22798`).
+
+- Fix a parser bug where certain keywords which could be used as variables
+  were not allowed to be used with :extension:`OverloadedRecordDot`
+  (:ghc-ticket:`20723`).
+
+- Fix the location of some ``Typeable`` definitions from ``GHC.Types`` which
+  resulted in poor error messages (:ghc-ticket:`22510`).
+
+- Improve error messages involving non-exhaustive patterns when using
+  :extension:`ApplicativeDo` (:ghc-ticket:`22483`).
+
+- Fix a driver bug where certain non-fatal Safe Haskell related warnings were
+  being marked as fatal (:ghc-ticket:`22728`).
+
+Runtime system
+--------------
+
+- Fix a GC bug where a race condition in the parallel GC could cause it to
+  garbage collect live sparks (:ghc-ticket:`22528`).
+
+- Truncate eventlog events with a large payload (:ghc-ticket:`20221`).
+
+Build system and packaging
+--------------------------
+
+- Bump ``gmp-tarballs`` to a version which doesn't use the reserved ``x18``
+  register on AArch64/Darwin systems, and also has fixes for CVE-2021-43618
+  (:ghc-ticket:`22497`, :ghc-ticket:`22789`).
+
+- Include haddock documentation in interface files for hadrian generated
+  bindists, including darwin platforms (:ghc-ticket:`22734`).
+
+Core libraries
+--------------
+
+- Bump ``bytestring`` to 0.11.4.0.
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
+
