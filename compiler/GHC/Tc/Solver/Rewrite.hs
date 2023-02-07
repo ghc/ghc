@@ -42,7 +42,6 @@ import GHC.Builtin.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
 import qualified GHC.Data.List.Infinite as Inf
-import GHC.Tc.Instance.Family (tcTopNormaliseNewTypeTF_maybe)
 
 {-
 ************************************************************************
@@ -225,10 +224,10 @@ rewrite ev ty
        ; return result }
 
 -- | See Note [Rewriting]
--- This variant of 'rewrite' rewrites w.r.t. nominal equality only,
--- as this is better than full rewriting for error messages. Specifically,
--- we want to avoid unwrapping newtypes, as doing so can end up causing
--- an otherwise-unnecessary stack overflow.
+-- `rewriteForErrors` is a variant of 'rewrite' that rewrites
+-- w.r.t. nominal equality only, as this is better than full rewriting
+-- for error messages. (This was important when we flirted with rewriting
+-- newtypes but perhaps less so now.)
 rewriteForErrors :: CtEvidence -> TcType
                  -> TcS (Reduction, RewriterSet)
 rewriteForErrors ev ty
@@ -499,27 +498,14 @@ rewrite_one (TyVarTy tv)
 rewrite_one (AppTy ty1 ty2)
   = rewrite_app_tys ty1 [ty2]
 
-rewrite_one ty@(TyConApp tc tys)
+rewrite_one (TyConApp tc tys)
   -- If it's a type family application, try to reduce it
   | isTypeFamilyTyCon tc
   = rewrite_fam_app tc tys
 
-  | otherwise
-  = do { eq_rel <- getEqRel
-       ; if eq_rel == ReprEq
-
-         then -- Rewriting w.r.t. representational equality requires
-              --   unwrapping newtypes; see GHC.Tc.Solver.Canonical.
-              --   Note [Unwrap newtypes first]
-              -- NB: try rewrite_newtype_app even when tc isn't a newtype;
-              -- the allows the possibility of having a newtype buried under
-              -- a synonym. Needed for e.g. T12067.
-              rewrite_newtype_app ty
-
-         else -- For * a normal data type application
-              --     * data family application
-              -- we just recursively rewrite the arguments.
-              rewrite_ty_con_app tc tys }
+  | otherwise -- We just recursively rewrite the arguments.
+              -- See Note [Do not rewrite newtypes]
+  = rewrite_ty_con_app tc tys
 
 rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
   = do { arg_redn <- rewrite_one ty1
@@ -678,42 +664,12 @@ rewrite_vector ki roles tys
     fvs                                = tyCoVarsOfType ki
 {-# INLINE rewrite_vector #-}
 
--- Rewrite a (potential) newtype application
--- Precondition: the ambient EqRel is ReprEq
--- Precondition: the type is a TyConApp
--- See Note [Newtypes can blow the stack]
-rewrite_newtype_app :: TcType -> RewriteM Reduction
-rewrite_newtype_app ty@(TyConApp tc tys)
-  = do { rdr_env <- liftTcS getGlobalRdrEnvTcS
-       ; tf_envs <- liftTcS getFamInstEnvs
-       ; case (tcTopNormaliseNewTypeTF_maybe tf_envs rdr_env ty) of
-           Nothing -> -- Non-newtype or abstract newtype
-                      rewrite_ty_con_app tc tys
 
-           Just ((used_ctors, co), ty')   -- co :: ty ~ ty'
-             -> do { liftTcS $ recordUsedGREs used_ctors
-                   ; checkStackDepth ty
-                   ; rewrite_reduction (Reduction co ty') } }
-
-rewrite_newtype_app other_ty = pprPanic "rewrite_newtype_app" (ppr other_ty)
-
-{- Note [Newtypes can blow the stack]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-
-  newtype X = MkX (Int -> X)
-  newtype Y = MkY (Int -> Y)
-
-and now wish to prove
-
-  [W] X ~R Y
-
-This Wanted will loop, expanding out the newtypes ever deeper looking
-for a solid match or a solid discrepancy. Indeed, there is something
-appropriate to this looping, because X and Y *do* have the same representation,
-in the limit -- they're both (Fix ((->) Int)). However, no finitely-sized
-coercion will ever witness it. This loop won't actually cause GHC to hang,
-though, because we check our depth when unwrapping newtypes.
+{- Note [Do not rewrite newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We flirted with unwrapping newtypes in the rewriter -- see GHC.Tc.Solver.Canonical
+Note [Unwrap newtypes first]. But that turned out to be a bad idea because
+of recursive newtypes, as that Note says.  So be careful if you re-add it!
 
 Note [Rewriting synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
