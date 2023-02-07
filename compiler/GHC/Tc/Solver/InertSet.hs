@@ -21,7 +21,7 @@ module GHC.Tc.Solver.InertSet (
     addInertItem,
 
     noMatchableGivenDicts,
-    noGivenIrreds,
+    noGivenNewtypeReprEqs,
     mightEqualLater,
     prohibitedSuperClassSolve,
 
@@ -1537,9 +1537,22 @@ isOuterTyVar tclvl tv
     -- becomes "outer" even though its level numbers says it isn't.
   | otherwise  = False  -- Coercion variables; doesn't much matter
 
-noGivenIrreds :: InertSet -> Bool
-noGivenIrreds (IS { inert_cans = inert_cans })
-  = isEmptyBag (inert_irreds inert_cans)
+noGivenNewtypeReprEqs :: TyCon -> InertSet -> Bool
+-- True <=> there is no Irred looking like (N tys1 ~ N tys2)
+-- See Note [Decomposing newtype equalities] (EX2) in GHC.Tc.Solver.Canonical
+--     This is the only call site.
+noGivenNewtypeReprEqs tc inerts
+  = not (anyBag might_help (inert_irreds (inert_cans inerts)))
+  where
+    might_help ct
+      = case classifyPredType (ctPred ct) of
+          EqPred ReprEq t1 t2
+             | Just (tc1,_) <- tcSplitTyConApp_maybe t1
+             , tc == tc1
+             , Just (tc2,_) <- tcSplitTyConApp_maybe t2
+             , tc == tc2
+             -> True
+          _  -> False
 
 -- | Returns True iff there are no Given constraints that might,
 -- potentially, match the given class consraint. This is used when checking to see if a

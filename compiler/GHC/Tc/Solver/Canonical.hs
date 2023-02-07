@@ -1084,7 +1084,7 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
-can_eq_nc' rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
+can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
    -- we want to catch e.g. Maybe Int ~ (Int -> Int) here for better
@@ -1092,7 +1092,7 @@ can_eq_nc' rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
    -- hence no direct match on TyConApp
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
-  = canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
+  = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
 
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            s1@(ForAllTy (Bndr _ vis1) _) _
@@ -1114,8 +1114,12 @@ can_eq_nc' True _rdr_env _envs ev NomEq ty1 _ ty2 _
 -------------------
 
 -- No similarity in type structure detected. Rewrite and try again.
-can_eq_nc' False _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
-  = rewrite_and_try_again ev eq_rel ps_ty1 ps_ty2
+can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
+  = -- Rewrite the two types and try again
+    do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ps_ty1
+       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ps_ty2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
+       ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 ----------------------------
 -- Look for a canonical LHS. See Note [Canonical LHS].
@@ -1153,15 +1157,6 @@ can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
           -- No need to call canEqFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
 
--- Rewrite the two types and try again
-rewrite_and_try_again :: CtEvidence -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
-rewrite_and_try_again ev eq_rel ty1 ty2
-  = do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ty1
-       ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ty2
-       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
-       ; rdr_env <- getGlobalRdrEnvTcS
-       ; envs <- getFamInstEnvs
-       ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 {- Note [Unsolved equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1407,62 +1402,41 @@ which is easier to satisfy.
 Conclusion: we must unwrap newtypes before decomposing them. This happens
 in `can_eq_newtype_nc`
 
-But even this is challenging. Here are two cases to consider:
+We did flirt with making the /rewriter/ expand newtypes, rather than
+doing it in `can_eq_newtype_nc`.   But with recursive newtypes we want
+to be super-careful about expanding!
 
-Case 1:
+   newtype A = MkA [A]   -- Recursive!
 
-  newtype Age = MkAge Int
-  [G] c
-  [W] w1 :: IO Age ~R# IO Int
+   f :: A -> [A]
+   f = coerce
 
-Case 2:
+We have [W] A ~R# [A].  If we rewrite [A], it'll expand to
+   [[[[[...]]]]]
+and blow the reduction stack.  See Note [Newtypes can blow the stack]
+in GHC.Tc.Solver.Rewrite.  But if we expand only the /top level/ of
+both sides, we get
+   [W] [A] ~R# [A]
+which we can, just, solve by reflexivity.
 
-  newtype A = MkA [A]
-  [W] A ~R# [A]
+So we simply unwrap, on-demand, at top level, in `can_eq_newtype_nc`.
 
-For Case 1, recall that IO is an abstract newtype. Then read Note
-[Decomposing newtype equalities]. According to that Note, we should not
-decompose w1, because we have an Irred Given. Yet we still want to solve
-the wanted!  We can do so by unwrapping the (non-abstract) Age newtype
-underneath the IO, giving
-   [W] w2 :: IO Int ~R# IO Int
-   w1 = (IO unwrap-Age ; w2)
-where unwrap-Age :: Age ~R# Int. Now we case solve w2 by reflexivity;
-see Note [Eager reflexivity check].
-
-Conclusion: unwrap newtypes (deeply, inside types) in the rewriter:
-specifically in GHC.Tc.Solver.Rewrite.rewrite_newtype_app.
-
-Yet for Case 2, deep rewriting would be a disaster: we would loop.
-  [W] A ~R# [A] ---> {unwrap}
-                     [W] [A] ~R# [[A]]
-                ---> {decompose}
-                     [W] A ~R# [A]
-
-In this case, we just want to unwrap newtypes /at the top level/, allowing us
-to succeed via Note [Eager reflexivity check]:
-  [W] A ~R# [A] ---> {unwrap at top level only}
-                     [W] [A] ~R# [A]
-                ---> {reflexivity} success
-
-Conclusion: to satisfy Case 1 and Case 2, we unwrap
-* /both/ at top level, in can_eq_nc'
-* /and/ deeply, in the rewriter, rewrite_newtype_app
-
-The former unwraps outer newtypes (when the data constructor is in scope).
-The latter unwraps deeply -- but it won't be invoked in Case 2, when we can
-recognize an equality between the types [A] and [A] before rewriting
-deeply.
-
-This "before" business is delicate -- there is still a real risk of a loop
-in the type checker with recursive newtypes -- but I think we're doomed to do
-*something* delicate, as we're really trying to solve for equirecursive
-type equality. Bottom line for users: recursive newtypes are dangerous.
-See also Section 5.3.1 and 5.3.4 of
+This is all very delicate. There is a real risk of a loop in the type checker
+with recursive newtypes -- but I think we're doomed to do *something*
+delicate, as we're really trying to solve for equirecursive type
+equality. Bottom line for users: recursive newtypes do not play well with type
+inference for representational equality.  See also Section 5.3.1 and 5.3.4 of
 "Safe Zero-cost Coercions for Haskell" (JFP 2016).
 
-Another approach -- which we ultimately decided against -- is described in
-Note [Decomposing newtypes a bit more aggressively].
+See also Note [Decomposing newtype equalities].
+
+--- Historical side note ---
+
+We flirted with doing /both/ unwrap-at-top-level /and/ rewrite-deeply;
+see #22519.  But that didn't work: see discussion in #22924. Specifically
+we got a loop with a minor variation:
+   f2 :: a -> [A]
+   f2 = coerce
 
 Note [Eager reflexivity check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1492,6 +1466,24 @@ we do a reflexivity check.
 
 (This would be sound in the nominal case, but unnecessary, and I [Richard
 E.] am worried that it would slow down the common case.)
+
+ Note [Newtypes can blow the stack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+  newtype X = MkX (Int -> X)
+  newtype Y = MkY (Int -> Y)
+
+and now wish to prove
+
+  [W] X ~R Y
+
+This Wanted will loop, expanding out the newtypes ever deeper looking
+for a solid match or a solid discrepancy. Indeed, there is something
+appropriate to this looping, because X and Y *do* have the same representation,
+in the limit -- they're both (Fix ((->) Int)). However, no finitely-sized
+coercion will ever witness it. This loop won't actually cause GHC to hang,
+though, because we check our depth in `can_eq_newtype_nc`.
 -}
 
 ------------------------
@@ -1598,8 +1590,7 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
     role = eqRelRole eq_rel
 
 ------------------------
-canTyConApp :: Bool   -- True <=> the types have been rewritten
-            -> CtEvidence -> EqRel
+canTyConApp :: CtEvidence -> EqRel
             -> TyCon -> [TcType]
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
@@ -1607,17 +1598,13 @@ canTyConApp :: Bool   -- True <=> the types have been rewritten
 -- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
 -- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
 -- But they can be data families.
-canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
+canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
          then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-         else if rewritten
-              then canEqFailure ev eq_rel ty1 ty2
-              else rewrite_and_try_again ev eq_rel ty1 ty2 }
-              -- Why rewrite and try again?  See Case 1
-              -- of Note [Unwrap newtypes first]
+         else canEqFailure ev eq_rel ty1 ty2 }
 
   -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
@@ -1641,7 +1628,7 @@ canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
     ty2 = mkTyConApp tc2 tys2
 
      -- See Note [Decomposing TyConApp equalities]
-     -- Note [Decomposing newtypes a bit more aggressively]
+     -- and Note [Decomposing newtype equalities]
     can_decompose inerts
       =  isInjectiveTyCon tc1 (eqRelRole eq_rel)
       || (assert (eq_rel == ReprEq) $
@@ -1650,7 +1637,8 @@ canTyConApp rewritten ev eq_rel tc1 tys1 tc2 tys2
           -- Moreover isInjectiveTyCon is True for Representational
           --   for algebraic data types.  So we are down to newtypes
           --   and data families.
-          ctEvFlavour ev == Wanted && noGivenIrreds inerts)
+          ctEvFlavour ev == Wanted && noGivenNewtypeReprEqs tc1 inerts)
+             -- See Note [Decomposing newtype equalities] (EX2)
 
 {-
 Note [Use canEqFailure in canDecomposableTyConApp]
@@ -1838,13 +1826,13 @@ Example is wrinkle {1} in Note [Decomposing TyConApp equalities].
 
 For a Wanted with r=R, since newtypes are not injective at representational
 role, decomposition is sound, but we may lose completeness.  Nevertheless,
-if the newtype is abstraction (so can't be unwrapped) we can only solve
+if the newtype is abstract (so can't be unwrapped) we can only solve
 the equality by (a) using a Given or (b) decomposition.  If (a) is impossible
-(e.g. no Givens) then (b) is safe.
+(e.g. no Givens) then (b) is safe albeit potentially incomplete.
 
-Conclusion: decompose newtypes (at role R) only if there are no usable Givens.
+There are two ways in which decomposing (N ty1) ~r (N ty2) could be incomplete:
 
-* Incompleteness example (EX1)
+* Incompleteness example (EX1): unwrap first
       newtype Nt a = MkNt (Id a)
       type family Id a where Id a = a
 
@@ -1856,39 +1844,68 @@ Conclusion: decompose newtypes (at role R) only if there are no usable Givens.
 
   Conclusion: always unwrap newtypes before attempting to decompose
   them.  This is done in can_eq_nc'.  Of course, we can't unwrap if the data
-  constructor isn't in scope.  See See Note [Unwrap newtypes first].
+  constructor isn't in scope.  See Note [Unwrap newtypes first].
 
-* Incompleteness example (EX2)
+* Incompleteness example (EX2): available Givens
       newtype Nt a = Mk Bool         -- NB: a is not used in the RHS,
       type role Nt representational  -- but the user gives it an R role anyway
 
-  If we have [W] Nt alpha ~R Nt beta, we *don't* want to decompose to
-  [W] alpha ~R beta, because it's possible that alpha and beta aren't
-  representationally equal.
+      [G] Nt t1 ~R Nt t2
+      [W] Nt alpha ~R Nt beta
 
-  and maybe there is a Given (Nt t1 ~R Nt t2), just waiting to be used, if we
-  figure out (elsewhere) that alpha:=t1 and beta:=t2.  This is somewhat
-  similar to the question of overlapping Givens for class constraints: see
-  Note [Instance and Given overlap] in GHC.Tc.Solver.Interact.
+  We *don't* want to decompose to [W] alpha ~R beta, because it's possible
+  that alpha and beta aren't representationally equal.  And if we figure
+  out (elsewhere) that alpha:=t1 and beta:=t2, we can solve the Wanted
+  from the Given.  This is somewhat similar to the question of overlapping
+  Givens for class constraints: see Note [Instance and Given overlap] in
+  GHC.Tc.Solver.Interact.
 
   Conclusion: don't decompose [W] N s ~R N t, if there are any Given
   equalities that could later solve it.
 
-  But what does "any Given equalities that could later solve it" mean, precisely?
-  It must be a Given constraint that could turn into N s ~ N t.  But that
-  could include [G] (a b) ~ (c d), or even just [G] c.  But it'll definitely
-  be an CIrredCan.  So we settle for having no CIrredCans at all, which is
-  conservative but safe. See noGivenIrreds and #22331.
+  But what precisely does it mean to say "any Given equalities that could
+  later solve it"?
 
-  Well not 100.0% safe. There could be a CDictCan with some un-expanded
-  superclasses; but only in some very obscure recursive-superclass
-  situations.
+  In #22924 we had
+     [G] f a ~R# a     [W] Const (f a) a ~R# Const a a
+  where Const is an abstract newtype.  If we decomposed the newtype, we
+  could solve.  Not-decomposing on the grounds that (f a ~R# a) might turn
+  into (Const (f a) a ~R# Const a a) seems a bit silly.
 
-If there are no Irred Givens (which is quite common) then we will
-successfuly decompose [W] (IO Age) ~R (IO Int), and solve it.  But
-that won't happen and [W] (IO Age) ~R (IO Int) will be stuck.
-We /could/, however, be a bit more aggressive about decomposition;
-see Note [Decomposing newtypes a bit more aggressively].
+  In #22331 we had
+     [G] N a ~R# N b   [W] N b ~R# N a
+  (where N is abstract so we can't unwrap). Here we really /don't/ want to
+  decompose, because the /only/ way to solve the Wanted is from that Given
+  (with a Sym).
+
+  In #22519 we had
+     [G] a <= b     [W] IO Age ~R# IO Int
+
+  (where IO is abstract so we can't unwrap, and newtype Age = Int; and (<=)
+  is a type-level comparison on Nats).  Here we /must/ decompose, despite the
+  existence of an Irred Given, or we will simply be stuck.  (Side note: We
+  flirted with deep-rewriting of newtypes (see discussion on #22519 and
+  !9623) but that turned out not to solve #22924, and also makes type
+  inference loop more often on recursive newtypes.)
+
+  The currently-implemented compromise is this:
+
+    we decompose [W] N s ~R# N t unless there is a [G] N s' ~ N t'
+
+  that is, a Given Irred equality with both sides headed with N.
+  See the call to noGivenNewtypeReprEqs in canTyConApp.
+
+  This is not perfect.  In principle a Given like [G] (a b) ~ (c d), or
+  even just [G] c, could later turn into N s ~ N t.  But since the free
+  vars of a Given are skolems, or at least untouchable unification
+  variables, this is extremely unlikely to happen.
+
+  Another worry: there could, just, be a CDictCan with some
+  un-expanded equality superclasses; but only in some very obscure
+  recursive-superclass situations.
+
+   Yet another approach (!) is desribed in
+   Note [Decomposing newtypes a bit more aggressively].
 
 Remember: decomposing Wanteds is always /sound/. This Note is
 only about /completeness/.
@@ -1896,7 +1913,8 @@ only about /completeness/.
 Note [Decomposing newtypes a bit more aggressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 IMPORTANT: the ideas in this Note are *not* implemented. Instead, the
-current approach is detailed in Note [Unwrap newtypes first].
+current approach is detailed in Note [Decomposing newtype equalities]
+and Note [Unwrap newtypes first].
 For more details about the ideas in this Note see
   * GHC propoosal: https://github.com/ghc-proposals/ghc-proposals/pull/549
   * issue #22441

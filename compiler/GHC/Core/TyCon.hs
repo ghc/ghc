@@ -1974,7 +1974,7 @@ isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon (TyCon { tyConDetails = details }) role
   = go details role
   where
-    go _                             Phantom          = True -- Vacuously; (t1 ~P t2) holes for all t1, t2!
+    go _                             Phantom          = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
     go (AlgTyCon {})                 Nominal          = True
     go (AlgTyCon {algTcRhs = rhs})   Representational
       = isGenInjAlgRhs rhs
