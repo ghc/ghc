@@ -5,18 +5,19 @@ expectations. Also please answer the following question in your MR description:*
 
 **Where is the key part of this patch? That is, what should reviewers look at first?**
 
-Please take a few moments to verify that your commits fulfill the following:
+Please take a few moments to address the following points:
 
- * [ ] are either individually buildable or squashed
- * [ ] have commit messages which describe *what they do*
-   (referring to [Notes][notes] and tickets using `#NNNN` syntax when
-   appropriate)
+ * [ ] if your MR may break existing programs (e.g. touches `base` or causes the
+   compiler to reject programs), please describe the expected breakage and add
+   the ~"user facing" label. This will run ghc/head.hackage> to characterise
+   the effect of your change on Hackage.
+ * [ ] ensure that your commits are either individually buildable or squashed
+ * [ ] ensure that your commit messages describe *what they do*
+   (referring to tickets using `#NNNN` syntax when appropriate)
  * [ ] have added source comments describing your change. For larger changes you
    likely should add a [Note][notes] and cross-reference it from the relevant
    places.
- * [ ] add a [testcase to the testsuite](https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding).
- * [ ] if your MR affects library interfaces (e.g. changes `base`) or affects whether GHC will accept user-written code, please add
-   the ~"user facing" label.
+ * [ ] add a [testcase to the testsuite][adding test].
  * [ ] updates the users guide if applicable
  * [ ] mentions new features in the release notes for the next release
 
@@ -29,3 +30,4 @@ no one has offerred review in a few days then please leave a comment mentioning
 @triagers.
 
 [notes]: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/coding-style#comments-in-the-source-code
+[adding test]: https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/adding
