@@ -129,14 +129,17 @@ def no_deps( name, opts):
 def skip( name, opts ):
     opts.skip = True
 
+def js_arch() -> bool:
+    return arch("javascript");
+
 # disable test on JS arch
 def js_skip( name, opts ):
-    if arch("javascript"):
+    if js_arch():
         skip(name,opts)
 
 # expect broken for the JS backend
 def js_broken( bug: IssueNumber ):
-    if arch("javascript"):
+    if js_arch():
         return expect_broken(bug);
     else:
         return normal;
