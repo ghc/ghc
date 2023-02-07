@@ -7,4 +7,8 @@ data SkolemInfo
 data FixedRuntimeRepContext
 data FixedRuntimeRepOrigin
 
+data CtOrigin
+data ClsInstOrQC = IsClsInst
+                 | IsQC CtOrigin
+
 unkSkol :: HasCallStack => SkolemInfo

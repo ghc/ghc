@@ -500,6 +500,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMissingClassAssoc"                         = 06205
   GhcDiagnosticCode "TcRnBadFamInstDecl"                            = 06206
   GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
+  GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = 36038
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

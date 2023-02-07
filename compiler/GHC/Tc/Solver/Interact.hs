@@ -449,7 +449,7 @@ instance Outputable InteractResult where
 
 solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
                      -> Ct  -- WorkItem (same predicate as inert)
-                     -> TcS InteractResult
+                     -> InteractResult
 -- Precondition:
 -- * inert and work item represent evidence for the /same/ predicate
 -- * Both are CDictCan or CIrredCan
@@ -461,28 +461,28 @@ solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
 solveOneFromTheOther ct_i ct_w
   | CtWanted { ctev_loc = loc_w } <- ev_w
   , prohibitedSuperClassSolve loc_i loc_w
+  -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
   = -- Inert must be Given
-    do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
-       ; return KeepWork }
+    KeepWork
 
   | CtWanted {} <- ev_w
   = -- Inert is Given or Wanted
     case ev_i of
-      CtGiven {} -> return KeepInert
+      CtGiven {} -> KeepInert
         -- work is Wanted; inert is Given: easy choice.
 
       CtWanted {} -- Both are Wanted
         -- If only one has no pending superclasses, use it
         -- Otherwise we can get infinite superclass expansion (#22516)
         -- in silly cases like   class C T b => C a b where ...
-        | not is_psc_i, is_psc_w     -> return KeepInert
-        | is_psc_i,     not is_psc_w -> return KeepWork
+        | not is_psc_i, is_psc_w     -> KeepInert
+        | is_psc_i,     not is_psc_w -> KeepWork
 
         -- If only one is a WantedSuperclassOrigin (arising from expanding
         -- a Wanted class constraint), keep the other: wanted superclasses
         -- may be unexpected by users
-        | not is_wsc_orig_i, is_wsc_orig_w     -> return KeepInert
-        | is_wsc_orig_i,     not is_wsc_orig_w -> return KeepWork
+        | not is_wsc_orig_i, is_wsc_orig_w     -> KeepInert
+        | is_wsc_orig_i,     not is_wsc_orig_w -> KeepWork
 
         -- otherwise, just choose the lower span
         -- reason: if we have something like (abs 1) (where the
@@ -490,29 +490,28 @@ solveOneFromTheOther ct_i ct_w
         -- get an error about abs than about 1.
         -- This test might become more elaborate if we see an
         -- opportunity to improve the error messages
-        | ((<) `on` ctLocSpan) loc_i loc_w -> return KeepInert
-        | otherwise                        -> return KeepWork
+        | ((<) `on` ctLocSpan) loc_i loc_w -> KeepInert
+        | otherwise                        -> KeepWork
 
   -- From here on the work-item is Given
 
   | CtWanted { ctev_loc = loc_i } <- ev_i
   , prohibitedSuperClassSolve loc_w loc_i
-  = do { traceTcS "prohibitedClassSolve2" (ppr ev_i $$ ppr ev_w)
-       ; return KeepInert }      -- Just discard the un-usable Given
-                                 -- This never actually happens because
-                                 -- Givens get processed first
+  = KeepInert   -- Just discard the un-usable Given
+                -- This never actually happens because
+                -- Givens get processed first
 
   | CtWanted {} <- ev_i
-  = return KeepWork
+  = KeepWork
 
   -- From here on both are Given
   -- See Note [Replacement vs keeping]
 
   | lvl_i == lvl_w
-  = return same_level_strategy
+  = same_level_strategy
 
   | otherwise   -- Both are Given, levels differ
-  = return different_level_strategy
+  = different_level_strategy
   where
      ev_i  = ctEvidence ct_i
      ev_w  = ctEvidence ct_w
@@ -662,14 +661,12 @@ interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
   , ((ct_i, swap) : _rest) <- bagToList matching_irreds
         -- See Note [Multiple matching irreds]
   , let ev_i = ctEvidence ct_i
-  = do { what_next <- solveOneFromTheOther ct_i ct_w
-       ; traceTcS "iteractIrred" $
+  = do { traceTcS "iteractIrred" $
          vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
-              , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i))
-              , ppr what_next ]
-       ; case what_next of
+              , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i)) ]
+       ; case solveOneFromTheOther ct_i ct_w of
             KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)
-                            ; return (Stop ev_w (text "Irred equal" <+> parens (ppr what_next))) }
+                            ; return (Stop ev_w (text "Irred equal:KeepInert" <+> ppr ct_w)) }
             KeepWork ->  do { setEvBindIfWanted ev_i (swap_me swap ev_w)
                             ; updInertIrreds (\_ -> others)
                             ; continueWith ct_w } }
@@ -1007,7 +1004,9 @@ and Given/instance fundeps entirely.
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactDict inerts ct_w@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = tys })
   | Just ct_i <- lookupInertDict inerts (ctEvLoc ev_w) cls tys
-  , let ev_i = ctEvidence ct_i
+  , let ev_i  = ctEvidence ct_i
+        loc_i = ctEvLoc ev_i
+        loc_w = ctEvLoc ev_w
   = -- There is a matching dictionary in the inert set
     do { -- First to try to solve it /completely/ from top level instances
          -- See Note [Shortcut solving]
@@ -1015,16 +1014,24 @@ interactDict inerts ct_w@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = t
        ; short_cut_worked <- shortCutSolver dflags ev_w ev_i
        ; if short_cut_worked
          then stopWith ev_w "interactDict/solved from instance"
-         else
 
-    do { -- Ths short-cut solver didn't fire, so we
-         -- solve ev_w from the matching inert ev_i we found
-         what_next <- solveOneFromTheOther ct_i ct_w
-       ; traceTcS "lookupInertDict" (ppr what_next)
-       ; case what_next of
-           KeepInert -> do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
-                           ; return $ Stop ev_w (text "Dict equal" <+> parens (ppr what_next)) }
-           KeepWork  -> do { setEvBindIfWanted ev_i (ctEvTerm ev_w)
+         -- Next see if we are in "loopy-superclass" land.  If so,
+         -- we don't want to replace the (Given) inert with the
+         -- (Wanted) work-item, or vice versa; we want to hang on
+         -- to both, and try to solve the work-item via an instance.
+         -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+         else if prohibitedSuperClassSolve loc_i loc_w
+         then continueWith ct_w
+         else
+    do { -- The short-cut solver didn't fire, and loopy superclasses
+         -- are dealt with, so we can either solve
+         -- the inert from the work-item or vice-versa.
+       ; case solveOneFromTheOther ct_i ct_w of
+           KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr ct_w)
+                           ; setEvBindIfWanted ev_w (ctEvTerm ev_i)
+                           ; return $ Stop ev_w (text "Dict equal" <+> ppr ct_w) }
+           KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr ct_w)
+                           ; setEvBindIfWanted ev_i (ctEvTerm ev_w)
                            ; updInertDicts $ \ ds -> delDict ds cls tys
                            ; continueWith ct_w } } }
 
@@ -1894,7 +1901,7 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doTopFundepImprovement :: Ct -> TcS (StopOrContinue Ct)
+doTopFundepImprovement :: Ct -> TcS ()
 -- Try to functional-dependency improvement between the constraint
 -- and the top-level instance declarations
 -- See Note [Fundeps with instances, and equality orientation]
@@ -1904,8 +1911,7 @@ doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
   = do { traceTcS "try_fundeps" (ppr work_item)
        ; instEnvs <- getInstEnvs
        ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
-       ; emitFunDepWanteds (ctEvRewriters ev) fundep_eqns
-       ; continueWith work_item }
+       ; emitFunDepWanteds (ctEvRewriters ev) fundep_eqns }
   where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc ev
@@ -2276,14 +2282,35 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                         ; chooseInstance work_item lkup_res }
                _  -> -- NoInstance or NotSure
                      -- We didn't solve it; so try functional dependencies with
-                     -- the instance environment, and return
-                     doTopFundepImprovement work_item }
+                     -- the instance environment
+                     do { doTopFundepImprovement work_item
+                        ; tryLastResortProhibitedSuperclass inerts work_item } }
    where
      dict_loc = ctEvLoc ev
 
 
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
+-- | As a last resort, we TEMPORARILY allow a prohibited superclass solve,
+-- emitting a loud warning when doing so: we might be creating non-terminating
+-- evidence (as we are in T22912 for example).
+--
+-- See Note [Migrating away from loopy superclass solving] in GHC.Tc.TyCl.Instance.
+tryLastResortProhibitedSuperclass :: InertSet -> Ct -> TcS (StopOrContinue Ct)
+tryLastResortProhibitedSuperclass inerts
+    work_item@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = xis })
+  | let loc_w  = ctEvLoc ev_w
+        orig_w = ctLocOrigin loc_w
+  , ScOrigin _ NakedSc <- orig_w   -- work_item is definitely Wanted
+  , Just ct_i <- lookupInertDict (inert_cans inerts) loc_w cls xis
+  , let ev_i = ctEvidence ct_i
+  , isGiven ev_i
+  = do { setEvBindIfWanted ev_w (ctEvTerm ev_i)
+       ; ctLocWarnTcS loc_w $
+         TcRnLoopySuperclassSolve loc_w (ctPred work_item)
+       ; return $ Stop ev_w (text "Loopy superclass") }
+tryLastResortProhibitedSuperclass _ work_item
+  = continueWith work_item
 
 chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
 chooseInstance work_item

@@ -628,6 +628,7 @@ data WarningFlag =
    | Opt_WarnGADTMonoLocalBinds                      -- Since 9.4
    | Opt_WarnTypeEqualityOutOfScope                  -- Since 9.4
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
+   | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -732,6 +733,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUnicodeBidirectionalFormatCharacters    -> "unicode-bidirectional-format-characters" :| []
   Opt_WarnGADTMonoLocalBinds                      -> "gadt-mono-local-binds" :| []
   Opt_WarnTypeEqualityOutOfScope                  -> "type-equality-out-of-scope" :| []
+  Opt_WarnLoopySuperclassSolve                    -> "loopy-superclass-solve" :| []
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
 
 -- -----------------------------------------------------------------------------
@@ -829,6 +831,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnForallIdentifier,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
+        Opt_WarnLoopySuperclassSolve,
         Opt_WarnTypeEqualityRequiresOperators
       ]
 

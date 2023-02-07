@@ -1633,10 +1633,17 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       = False
     can_unify lhs_tv _other _rhs_ty = mentions_meta_ty_var lhs_tv
 
-prohibitedSuperClassSolve :: CtLoc    -- ^ is it loopy to use this one ...
-                          -> CtLoc    -- ^ ... to solve this one?
-                          -> Bool     -- ^ True ==> don't solve it
--- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance, (sc2)
+-- | Is it (potentially) loopy to use the first @ct1@ to solve @ct2@?
+--
+-- Necessary (but not sufficient) conditions for this function to return @True@:
+--
+--   - @ct1@ and @ct2@ both arise from superclass expansion,
+--   - @ct1@ is a Given and @ct2@ is a Wanted.
+--
+-- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance, (sc2).
+prohibitedSuperClassSolve :: CtLoc -- ^ is it loopy to use this one ...
+                          -> CtLoc -- ^ ... to solve this one?
+                          -> Bool  -- ^ True ==> don't solve it
 prohibitedSuperClassSolve given_loc wanted_loc
   | GivenSCOrigin _ _ blocked <- ctLocOrigin given_loc
   , blocked
