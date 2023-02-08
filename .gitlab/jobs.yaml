@@ -1091,7 +1091,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-x86_64-linux-deb10-numa-slow-validate+ipe": {
+  "nightly-x86_64-linux-deb10-numa-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -1101,7 +1101,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb10-numa-slow-validate+ipe.tar.xz",
+        "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -1143,11 +1143,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate+ipe",
-      "BUILD_FLAVOUR": "slow-validate+ipe",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate",
+      "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
-      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate+ipe",
+      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -4072,7 +4072,7 @@
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate"
     }
   },
-  "x86_64-linux-deb10-numa-slow-validate+ipe": {
+  "x86_64-linux-deb10-numa-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh clean",
@@ -4082,7 +4082,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-x86_64-linux-deb10-numa-slow-validate+ipe.tar.xz",
+        "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -4124,11 +4124,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate+ipe",
-      "BUILD_FLAVOUR": "slow-validate+ipe",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-numa-slow-validate",
+      "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
-      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate+ipe"
+      "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate"
     }
   },
   "x86_64-linux-deb10-unreg-validate": {

@@ -218,7 +218,7 @@ the decompressed IPE data and string table for the given node, respectively,
 upon return from this function.
 */
 void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node, IpeBufferEntry **entries_dst, char **string_table_dst) {
-    if (node->compressed) {
+    if (node->compressed == 1) {
         // The IPE list buffer node indicates that the strings table and
         // entries list has been compressed. If zstd is not available, fail.
         // If zstd is available, decompress.
