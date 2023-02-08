@@ -1,0 +1,254 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 186, types: 410, coercions: 10, joins: 0/0}
+
+-- RHS size: {terms: 6, types: 8, coercions: 3, joins: 0/0}
+unF :: forall (t :: * -> *) a. F t a -> Functor t => t a
+[GblId[[RecSel]],
+ Arity=2,
+ Str=<1C(1,L)><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=True)}]
+unF
+  = \ (@(t_aPM :: * -> *))
+      (@a_aPN)
+      (ds_d14Y :: F t_aPM a_aPN)
+      ($dFunctor_aPP :: Functor t_aPM) ->
+      (ds_d14Y
+       `cast` (ExposeOverloaded.N:F[0] <t_aPM>_N <a_aPN>_N
+               :: F t_aPM a_aPN ~R# (Functor t_aPM => t_aPM a_aPN)))
+        $dFunctor_aPP
+
+-- RHS size: {terms: 44, types: 123, coercions: 0, joins: 0/0}
+foo
+  :: forall (f :: * -> *) a b.
+     Functor f =>
+     Maybe (Maybe (Maybe (Maybe (Maybe (Maybe (f a))))))
+     -> (a -> b) -> Maybe (Maybe (Maybe (Maybe (f b))))
+[GblId,
+ Arity=3,
+ Str=<MP(1C(1,C(1,L)),A)><1L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=NEVER}]
+foo
+  = \ (@(f_a11y :: * -> *))
+      (@a_a11z)
+      (@b_a11A)
+      ($dFunctor_a11B :: Functor f_a11y)
+      (ds_d14D
+         :: Maybe (Maybe (Maybe (Maybe (Maybe (Maybe (f_a11y a_a11z)))))))
+      (f1_aON :: a_a11z -> b_a11A) ->
+      case ds_d14D of {
+        Nothing ->
+          GHC.Internal.Maybe.Nothing
+            @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+        Just ds1_d14P ->
+          case ds1_d14P of {
+            Nothing ->
+              GHC.Internal.Maybe.Nothing
+                @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+            Just ds2_d14Q ->
+              case ds2_d14Q of {
+                Nothing ->
+                  GHC.Internal.Maybe.Nothing
+                    @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+                Just ds3_d14R ->
+                  case ds3_d14R of {
+                    Nothing ->
+                      GHC.Internal.Maybe.Nothing
+                        @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+                    Just ds4_d14S ->
+                      case ds4_d14S of {
+                        Nothing ->
+                          GHC.Internal.Maybe.Nothing
+                            @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+                        Just ds5_d14T ->
+                          case ds5_d14T of {
+                            Nothing ->
+                              GHC.Internal.Maybe.Nothing
+                                @(Maybe (Maybe (Maybe (f_a11y b_a11A))));
+                            Just x_aOM ->
+                              GHC.Internal.Maybe.Just
+                                @(Maybe (Maybe (Maybe (f_a11y b_a11A))))
+                                (GHC.Internal.Maybe.Just
+                                   @(Maybe (Maybe (f_a11y b_a11A)))
+                                   (GHC.Internal.Maybe.Just
+                                      @(Maybe (f_a11y b_a11A))
+                                      (GHC.Internal.Maybe.Just
+                                         @(f_a11y b_a11A)
+                                         (fmap
+                                            @f_a11y $dFunctor_a11B @a_a11z @b_a11A f1_aON x_aOM))))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+
+-- RHS size: {terms: 31, types: 20, coercions: 0, joins: 0/0}
+bar :: forall a. (C a, Enum a) => a -> a -> Bool
+[GblId,
+ Arity=4,
+ Str=<A><SP(MC(1,L),LC(S,L),A,SC(S,L),A,A,A,A)><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=NEVER}]
+bar
+  = \ (@a_a10F)
+      _ [Occ=Dead]
+      ($dEnum_a10H :: Enum a_a10F)
+      (a1_aOV :: a_a10F)
+      (b_aOW :: a_a10F) ->
+      case fromEnum @a_a10F $dEnum_a10H (succ @a_a10F $dEnum_a10H a1_aOV)
+      of
+      { GHC.Types.I# x_a15W ->
+      case fromEnum
+             @a_a10F
+             $dEnum_a10H
+             (pred
+                @a_a10F
+                $dEnum_a10H
+                (pred
+                   @a_a10F
+                   $dEnum_a10H
+                   (pred
+                      @a_a10F
+                      $dEnum_a10H
+                      (pred @a_a10F $dEnum_a10H (pred @a_a10F $dEnum_a10H b_aOW)))))
+      of
+      { GHC.Types.I# y_a15Z ->
+      GHC.Prim.tagToEnum# @Bool (GHC.Prim.># x_a15W y_a15Z)
+      }
+      }
+
+-- RHS size: {terms: 46, types: 21, coercions: 0, joins: 0/0}
+fam :: forall a. C a => a -> Char -> Int -> (Bool, a)
+[GblId,
+ Arity=4,
+ Str=<A><L><ML><MP(1L)>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=NEVER}]
+fam
+  = \ (@a_aZM)
+      _ [Occ=Dead]
+      (c_aP4 :: a_aZM)
+      (a1_aP5 :: Char)
+      (b_aP6 :: Int) ->
+      (case a1_aP5 of { GHC.Types.C# c#_a15M ->
+       case GHC.Prim.ord# c#_a15M of wild1_a15O {
+         __DEFAULT ->
+           case b_aP6 of { GHC.Types.I# x1_a15B ->
+           case x1_a15B of wild3_a15D {
+             __DEFAULT ->
+               GHC.Prim.tagToEnum#
+                 @Bool
+                 (GHC.Prim.>#
+                    (GHC.Prim.+# wild1_a15O 1#) (GHC.Prim.-# wild3_a15D 5#));
+             -9223372036854775808# -> case GHC.Internal.Enum.$fEnumInt1 of {};
+             -9223372036854775807# -> case GHC.Internal.Enum.$fEnumInt1 of {};
+             -9223372036854775806# -> case GHC.Internal.Enum.$fEnumInt1 of {};
+             -9223372036854775805# -> case GHC.Internal.Enum.$fEnumInt1 of {};
+             -9223372036854775804# -> case GHC.Internal.Enum.$fEnumInt1 of {}
+           }
+           };
+         1114111# -> case GHC.Internal.Enum.$fEnumChar2 of {}
+       }
+       },
+       c_aP4)
+
+-- RHS size: {terms: 8, types: 10, coercions: 0, joins: 0/0}
+eq_constraint [InlPrag=NOINLINE]
+  :: forall a b. (a ~ b) => a -> b -> (a, b)
+[GblId,
+ Arity=3,
+ Str=<A><L><L>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)}]
+eq_constraint
+  = \ (@a_aZD)
+      (@b_aZE)
+      _ [Occ=Dead]
+      (a1_aP7 :: a_aZD)
+      (b1_aP8 :: b_aZE) ->
+      (a1_aP7, b1_aP8)
+
+-- RHS size: {terms: 45, types: 146, coercions: 7, joins: 0/0}
+baz
+  :: forall (t :: * -> *) a b.
+     Maybe (Maybe (Maybe (Maybe (Maybe (Maybe (F t a))))))
+     -> (a -> b) -> Maybe (Maybe (Maybe (Maybe (F t b))))
+[GblId, Arity=2, Str=<1L><L>, Unf=OtherCon []]
+baz
+  = \ (@(t_aYx :: * -> *))
+      (@a_aYy)
+      (@b_aYz)
+      (ds_d148
+         :: Maybe (Maybe (Maybe (Maybe (Maybe (Maybe (F t_aYx a_aYy)))))))
+      (f_aPa :: a_aYy -> b_aYz) ->
+      case ds_d148 of {
+        Nothing ->
+          GHC.Internal.Maybe.Nothing
+            @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+        Just ds1_d14m ->
+          case ds1_d14m of {
+            Nothing ->
+              GHC.Internal.Maybe.Nothing
+                @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+            Just ds2_d14n ->
+              case ds2_d14n of {
+                Nothing ->
+                  GHC.Internal.Maybe.Nothing
+                    @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+                Just ds3_d14o ->
+                  case ds3_d14o of {
+                    Nothing ->
+                      GHC.Internal.Maybe.Nothing
+                        @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+                    Just ds4_d14p ->
+                      case ds4_d14p of {
+                        Nothing ->
+                          GHC.Internal.Maybe.Nothing
+                            @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+                        Just ds5_d14q ->
+                          case ds5_d14q of {
+                            Nothing ->
+                              GHC.Internal.Maybe.Nothing
+                                @(Maybe (Maybe (Maybe (F t_aYx b_aYz))));
+                            Just x_aP9 ->
+                              GHC.Internal.Maybe.Just
+                                @(Maybe (Maybe (Maybe (F t_aYx b_aYz))))
+                                (GHC.Internal.Maybe.Just
+                                   @(Maybe (Maybe (F t_aYx b_aYz)))
+                                   (GHC.Internal.Maybe.Just
+                                      @(Maybe (F t_aYx b_aYz))
+                                      (GHC.Internal.Maybe.Just
+                                         @(F t_aYx b_aYz)
+                                         ((\ ($dFunctor_aZi :: Functor t_aYx) ->
+                                             fmap
+                                               @t_aYx
+                                               $dFunctor_aZi
+                                               @a_aYy
+                                               @b_aYz
+                                               f_aPa
+                                               ((x_aP9
+                                                 `cast` (ExposeOverloaded.N:F[0] <t_aYx>_N <a_aYy>_N
+                                                         :: F t_aYx a_aYy
+                                                            ~R# (Functor t_aYx => t_aYx a_aYy)))
+                                                  $dFunctor_aZi))
+                                          `cast` (Sym (ExposeOverloaded.N:F[0] <t_aYx>_N <b_aYz>_N)
+                                                  :: (Functor t_aYx => t_aYx b_aYz)
+                                                     ~R# F t_aYx b_aYz)))))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+
+
+
