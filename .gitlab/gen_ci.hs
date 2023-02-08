@@ -409,6 +409,8 @@ opsysVariables Amd64 (Darwin {}) =
           , "ac_cv_func_clock_gettime" =: "no"
           -- # Only newer OS Xs support utimensat. See #17895
           , "ac_cv_func_utimensat" =: "no"
+          -- # Only newer OS Xs support futimens. See #22938
+          , "ac_cv_func_futimens" =: "no"
           , "LANG" =: "en_US.UTF-8"
           , "CONFIGURE_ARGS" =: "--with-intree-gmp --with-system-libffi"
           -- Fonts can't be installed on darwin
