@@ -893,17 +893,15 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
 
        -- Rename the pragmas and signatures
        -- Annoyingly the type variables /are/ in scope for signatures, but
-       -- /are not/ in scope in the SPECIALISE instance pramas; e.g.
-       --    instance Eq a => Eq (T a) where
-       --       (==) :: a -> a -> a
-       --       {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
-       ; let (spec_inst_prags, other_sigs) = partition isSpecInstLSig sigs
+       -- /are not/ in scope in SPECIALISE and SPECIALISE instance pragmas.
+       -- See Note [Type variable scoping in SPECIALISE pragmas].
+       ; let (spec_prags, other_sigs) = partition (isSpecLSig <||> isSpecInstLSig) sigs
              bound_nms = mkNameSet (collectHsBindsBinders CollNoDictBinders binds')
              sig_ctxt | is_cls_decl = ClsDeclCtxt cls
                       | otherwise   = InstDeclCtxt bound_nms
-       ; (spec_inst_prags', sip_fvs) <- renameSigs sig_ctxt spec_inst_prags
-       ; (other_sigs',      sig_fvs) <- bindLocalNamesFV ktv_names $
-                                        renameSigs sig_ctxt other_sigs
+       ; (spec_prags', spg_fvs) <- renameSigs sig_ctxt spec_prags
+       ; (other_sigs', sig_fvs) <- bindLocalNamesFV ktv_names $
+                                      renameSigs sig_ctxt other_sigs
 
        -- Rename the bindings RHSs.  Again there's an issue about whether the
        -- type variables from the class/instance head are in scope.
@@ -914,8 +912,47 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
                                            emptyFVs binds_w_dus
                  ; return (mapBag fstOf3 binds_w_dus, bind_fvs) }
 
-       ; return ( binds'', spec_inst_prags' ++ other_sigs'
-                , sig_fvs `plusFV` sip_fvs `plusFV` bind_fvs) }
+       ; return ( binds'', spec_prags' ++ other_sigs'
+                , sig_fvs `plusFV` spg_fvs `plusFV` bind_fvs) }
+
+{- Note [Type variable scoping in SPECIALISE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When renaming the methods of a class or instance declaration, we must be careful
+with the scoping of the type variables that occur in SPECIALISE and SPECIALISE instance
+pragmas: the type variables from the class/instance header DO NOT scope over these,
+unlike class/instance method type signatures.
+
+Examples:
+
+  1. SPECIALISE
+
+    class C a where
+      meth :: a
+    instance C (Maybe a) where
+      meth = Nothing
+      {-# SPECIALISE INLINE meth :: Maybe [a] #-}
+
+  2. SPECIALISE instance
+
+    instance Eq a => Eq (T a) where
+       (==) :: a -> a -> a
+       {-# SPECIALISE instance Eq a => Eq (T [a]) #-}
+
+  In both cases, the type variable `a` mentioned in the PRAGMA is NOT the same
+  as the type variable `a` from the instance header.
+  For example, the SPECIALISE instance pragma above is a shorthand for
+
+      {-# SPECIALISE instance forall a. Eq a => Eq (T [a]) #-}
+
+  which is alpha-equivalent to
+
+      {-# SPECIALISE instance forall b. Eq b => Eq (T [b]) #-}
+
+  This shows that the type variables are not bound in the header.
+
+  Getting this scoping wrong can lead to out-of-scope type variable errors from
+  Core Lint, see e.g. #22913.
+-}
 
 rnMethodBindLHS :: Bool -> Name
                 -> LHsBindLR GhcPs GhcPs
