@@ -1199,6 +1199,7 @@ countNonMovingHeap(struct NonmovingHeap *heap)
     for (int alloc_idx = 0; alloc_idx < NONMOVING_ALLOCA_CNT; alloc_idx++) {
         struct NonmovingAllocator *alloc = &heap->allocators[alloc_idx];
         ret += countNonMovingSegments(alloc->filled);
+        ret += countNonMovingSegments(alloc->saved_filled);
         ret += countNonMovingSegments(alloc->active);
         for (uint32_t c = 0; c < getNumCapabilities(); ++c) {
             Capability *cap = getCapability(c);
