@@ -167,10 +167,10 @@ test('T5594', [ omit_ways(['ghci']),
               ],
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
-test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c']), js_broken(22374)],
+test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h', 'capi_ctype_001_c.c']), req_c],
      makefile_test, ['Capi_Ctype_001'])
 
-test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h']), js_broken(22374)],
+test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h']), req_c],
      makefile_test, ['Capi_Ctype_002'])
 
 test('ffi_parsing_001', [omit_ways(['ghci']), req_c], compile_and_run,
