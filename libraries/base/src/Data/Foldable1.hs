@@ -34,7 +34,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup
        (Dual (..), First (..), Last (..), Max (..), Min (..), Product (..),
        Semigroup (..), Sum (..))
-import GHC.Tuple          (Solo (..))
+import GHC.Tuple (Solo (..))
 import Prelude
        (Maybe (..), Monad (..), Ord, Ordering (..), id, seq, ($!), ($), (.),
        (=<<), flip, const, error)

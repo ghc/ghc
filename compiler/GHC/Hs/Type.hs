@@ -1310,9 +1310,9 @@ ppr_mono_ty (HsExplicitTupleTy _ tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `'MkSolo x`, not `'(x)`
   | [ty] <- tys
-  = quote $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
+  = quoteIfPunsEnabled $ sep [text (mkTupleStr Boxed dataName 1), ppr_mono_lty ty]
   | otherwise
-  = quote $ parens (maybeAddSpace tys $ interpp'SP tys)
+  = quoteIfPunsEnabled $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 

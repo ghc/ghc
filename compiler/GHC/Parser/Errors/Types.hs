@@ -459,6 +459,8 @@ data PsMessage
       Char -- ^ the character it looks like
       String -- ^ the name of the character that it looks like
 
+   | PsErrInvalidPun !PsErrPunDetails
+
    deriving Generic
 
 -- | Extra details about a parse error, which helps
@@ -508,6 +510,11 @@ data PsErrInPatDetails
                     !PatIsRecursive -- ^ Is the parsed pattern recursive?
                     !ParseContext
   | PEIP_OtherPatDetails !ParseContext
+
+data PsErrPunDetails
+  = PEP_QuoteDisambiguation
+  | PEP_TupleSyntaxType
+  | PEP_SumSyntaxType
 
 noParseContext :: ParseContext
 noParseContext = ParseContext Nothing NoIncompleteDoBlock

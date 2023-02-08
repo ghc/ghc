@@ -38,7 +38,7 @@ import GHC.Prelude
 import qualified Language.Haskell.TH as TH
 
 import GHC.Builtin.Names
-import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple )
+import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple, pretendNameIsInScope )
 
 import GHC.Types.Name.Reader
 import GHC.Unit.Module.ModIface

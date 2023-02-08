@@ -32,7 +32,7 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
-      GHC.Tuple.Prim.$tcUnit [] @GHC.Types.KindRep
+      GHC.Tuple.$tcUnit [] @GHC.Types.KindRep
 Bug.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Bug"#)

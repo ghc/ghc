@@ -1081,6 +1081,9 @@ def multiline_grep_errmsg(needle):
         return "" if match is None else match.group(0)
     return normalise_errmsg_fun(norm)
 
+def limit_stdout_lines(count):
+    return normalise_fun(lambda str: "".join(str.splitlines(True)[:count]))
+
 def normalise_whitespace_fun(f):
     return lambda name, opts: _normalise_whitespace_fun(name, opts, f)
 

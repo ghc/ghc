@@ -67,6 +67,8 @@ module GHC.Types.Name (
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName, isDynLinkName, isFieldName,
         isWiredInName, isWiredIn, isBuiltInSyntax, isTupleTyConName,
+        isSumTyConName,
+        isUnboxedTupleDataConLikeName,
         isHoleName,
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsExternalOrFrom, nameIsHomePackage,
@@ -102,12 +104,13 @@ import GHC.Utils.Binary
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.OldList (intersperse)
 
 import Control.DeepSeq
 import Data.Data
 import qualified Data.Semigroup as S
-import GHC.Types.Basic (Boxity(Boxed))
-import GHC.Builtin.Uniques (isTupleTyConUnique)
+import GHC.Types.Basic (Boxity(Boxed, Unboxed))
+import GHC.Builtin.Uniques (isTupleTyConUnique, isSumTyConUnique, isTupleDataConLikeUnique)
 
 {-
 ************************************************************************
@@ -309,6 +312,15 @@ isBuiltInSyntax _                                           = False
 isTupleTyConName :: Name -> Bool
 isTupleTyConName = isJust . isTupleTyConUnique . getUnique
 
+isSumTyConName :: Name -> Bool
+isSumTyConName = isJust . isSumTyConUnique . getUnique
+
+-- | This matches a datacon as well as its worker and promoted tycon.
+isUnboxedTupleDataConLikeName :: Name -> Bool
+isUnboxedTupleDataConLikeName n
+  | Just (Unboxed, _) <- isTupleDataConLikeUnique (getUnique n) = True
+  | otherwise = False
+
 isExternalName (Name {n_sort = External _})    = True
 isExternalName (Name {n_sort = WiredIn _ _ _}) = True
 isExternalName _                               = False
@@ -365,14 +377,26 @@ is_interactive_or_from from mod = from == mod || isInteractiveModule mod
 
 -- Return the pun for a name if available.
 -- Used for pretty-printing under ListTuplePuns.
+-- Arity 1 is skipped here because unary tuples have no prefix representation,
+-- since that is occupied by the unit tuple.
 namePun_maybe :: Name -> Maybe FastString
 namePun_maybe name
   | getUnique name == getUnique listTyCon = Just (fsLit "[]")
 
-  | Just (Boxed, ar) <- isTupleTyConUnique (getUnique name)
-  , ar /= 1 = Just (fsLit $ '(' : commas ar ++ ")")
+  | Just (boxity, ar) <- isTupleTyConUnique (getUnique name)
+  , ar /= 1 =
+    let
+      (lpar, rpar) =
+        case boxity of
+          Boxed -> ("(", ")")
+          Unboxed -> ("(#", "#)")
+    in Just (fsLit $ lpar ++ commas ar ++ rpar)
+
+  | Just ar <- isSumTyConUnique (getUnique name)
+  = Just (fsLit $ "(# " ++ bars ar ++ " #)")
   where
     commas ar = replicate (ar-1) ','
+    bars ar = intersperse ' ' (replicate (ar-1) '|')
 
 namePun_maybe _ = Nothing
 

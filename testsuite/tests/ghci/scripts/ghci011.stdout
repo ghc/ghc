@@ -17,7 +17,7 @@ instance Eq a => Eq [a] -- Defined in ‘GHC.Classes’
 instance Ord a => Ord [a] -- Defined in ‘GHC.Classes’
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple.Prim’
+  	-- Defined in ‘GHC.Tuple’
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Read () -- Defined in ‘GHC.Internal.Read’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’
@@ -28,7 +28,7 @@ instance Show () -- Defined in ‘GHC.Internal.Show’
 instance Eq () -- Defined in ‘GHC.Classes’
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
-  	-- Defined in ‘GHC.Tuple.Prim’
+  	-- Defined in ‘GHC.Tuple’
 instance Traversable ((,) a)
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Monoid a => Applicative ((,) a)

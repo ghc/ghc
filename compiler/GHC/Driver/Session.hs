@@ -2698,6 +2698,7 @@ xFlagsDeps = [
   flagSpec "LexicalNegation"                  LangExt.LexicalNegation,
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
   flagSpec "LinearTypes"                      LangExt.LinearTypes,
+  flagSpec "ListTuplePuns"                    LangExt.ListTuplePuns,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,

@@ -20,7 +20,7 @@ T15226b.testFun1
 [GblId, Arity=3, Str=<L><ML><L>, Unf=OtherCon []] =
     {} \r [x y void]
         case seq# [x GHC.Prim.void#] of ds1 {
-        Solo# ipv1 [Occ=Once1] ->
+        (# #) ipv1 [Occ=Once1] ->
         let {
           sat [Occ=Once1] :: T15226b.StrictPair a b
           [LclId] =

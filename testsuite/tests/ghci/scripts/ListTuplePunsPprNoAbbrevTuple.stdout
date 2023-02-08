@@ -1,0 +1,13 @@
+type Tuple :: forall (n :: GHC.TypeNats.Nat).
+              Data.Tuple.Experimental.TupleArgKind (*) n -> *
+type family Tuple ts = r | r -> n ts where
+    Tuple () = Unit
+    Tuple (a, b) = Tuple2 a b
+    Tuple (a, b, c) = Tuple3 a b c
+    Tuple (a, b, c, d) = Tuple4 a b c d
+    Tuple (a, b, c, d, e) = Tuple5 a b c d e
+    Tuple (a, b, c, d, e, f) = Tuple6 a b c d e f
+    Tuple (a, b, c, d, e, f, g) = Tuple7 a b c d e f g
+    Tuple (a, b, c, d, e, f, g, h) = Tuple8 a b c d e f g h
+    Tuple (a, b, c, d, e, f, g, h, i) = Tuple9 a b c d e f g h i
+    Tuple (a, b, c, d, e, f, g, h, i, j) = Tuple10 a b c d e f g h i j

@@ -28,15 +28,15 @@ foo [InlPrag=[2]] :: forall a. PairDict a => a -> a -> String
          Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@a)
-                 ($d(%,%) [Occ=Once1!] :: PairDict a)
+                 ($dCTuple2 [Occ=Once1!] :: PairDict a)
                  (eta [Occ=Once1] :: a)
                  (eta1 [Occ=Once1] :: a) ->
-                 case $d(%,%) of { (ww [Occ=Once1], ww1 [Occ=Once1]) ->
+                 case $dCTuple2 of { (ww [Occ=Once1], ww1 [Occ=Once1]) ->
                  T23398.$wfoo @a ww ww1 eta eta1
                  }}]
 foo
-  = \ (@a) ($d(%,%) :: PairDict a) (eta :: a) (eta1 :: a) ->
-      case $d(%,%) of { (ww, ww1) -> T23398.$wfoo @a ww ww1 eta eta1 }
+  = \ (@a) ($dCTuple2 :: PairDict a) (eta :: a) (eta1 :: a) ->
+      case $dCTuple2 of { (ww, ww1) -> T23398.$wfoo @a ww ww1 eta eta1 }
 
 Rec {
 -- RHS size: {terms: 21, types: 19, coercions: 3, joins: 0/0}

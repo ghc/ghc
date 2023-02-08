@@ -2,7 +2,7 @@
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
              PolyKinds, NegativeLiterals, DataKinds, ScopedTypeVariables,
              TypeApplications, StandaloneKindSignatures, GADTs,
-             FlexibleInstances, UndecidableInstances #-}
+             FlexibleInstances, UndecidableInstances, UnboxedSums #-}
 -- NegativeLiterals: see Note [Fixity of (->)]
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
 -----------------------------------------------------------------------------
@@ -62,6 +62,140 @@ module GHC.Types (
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
         KindRep(..), KindBndr,
+
+        -- * Unboxed tuples
+        Unit#,
+        Solo#,
+        Tuple0#,
+        Tuple1#,
+        Tuple2#,
+        Tuple3#,
+        Tuple4#,
+        Tuple5#,
+        Tuple6#,
+        Tuple7#,
+        Tuple8#,
+        Tuple9#,
+        Tuple10#,
+        Tuple11#,
+        Tuple12#,
+        Tuple13#,
+        Tuple14#,
+        Tuple15#,
+        Tuple16#,
+        Tuple17#,
+        Tuple18#,
+        Tuple19#,
+        Tuple20#,
+        Tuple21#,
+        Tuple22#,
+        Tuple23#,
+        Tuple24#,
+        Tuple25#,
+        Tuple26#,
+        Tuple27#,
+        Tuple28#,
+        Tuple29#,
+        Tuple30#,
+        Tuple31#,
+        Tuple32#,
+        Tuple33#,
+        Tuple34#,
+        Tuple35#,
+        Tuple36#,
+        Tuple37#,
+        Tuple38#,
+        Tuple39#,
+        Tuple40#,
+        Tuple41#,
+        Tuple42#,
+        Tuple43#,
+        Tuple44#,
+        Tuple45#,
+        Tuple46#,
+        Tuple47#,
+        Tuple48#,
+        Tuple49#,
+        Tuple50#,
+        Tuple51#,
+        Tuple52#,
+        Tuple53#,
+        Tuple54#,
+        Tuple55#,
+        Tuple56#,
+        Tuple57#,
+        Tuple58#,
+        Tuple59#,
+        Tuple60#,
+        Tuple61#,
+        Tuple62#,
+        Tuple63#,
+        Tuple64#,
+
+        -- * Unboxed sums
+        Sum2#,
+        Sum3#,
+        Sum4#,
+        Sum5#,
+        Sum6#,
+        Sum7#,
+        Sum8#,
+        Sum9#,
+        Sum10#,
+        Sum11#,
+        Sum12#,
+        Sum13#,
+        Sum14#,
+        Sum15#,
+        Sum16#,
+        Sum17#,
+        Sum18#,
+        Sum19#,
+        Sum20#,
+        Sum21#,
+        Sum22#,
+        Sum23#,
+        Sum24#,
+        Sum25#,
+        Sum26#,
+        Sum27#,
+        Sum28#,
+        Sum29#,
+        Sum30#,
+        Sum31#,
+        Sum32#,
+        Sum33#,
+        Sum34#,
+        Sum35#,
+        Sum36#,
+        Sum37#,
+        Sum38#,
+        Sum39#,
+        Sum40#,
+        Sum41#,
+        Sum42#,
+        Sum43#,
+        Sum44#,
+        Sum45#,
+        Sum46#,
+        Sum47#,
+        Sum48#,
+        Sum49#,
+        Sum50#,
+        Sum51#,
+        Sum52#,
+        Sum53#,
+        Sum54#,
+        Sum55#,
+        Sum56#,
+        Sum57#,
+        Sum58#,
+        Sum59#,
+        Sum60#,
+        Sum61#,
+        Sum62#,
+        Sum63#,
+
     ) where
 
 import GHC.Prim
@@ -744,3 +878,2768 @@ data TyCon = TyCon Word64#    -- ^ Fingerprint (high)
                    TrName     -- ^ Type constructor name
                    Int#       -- ^ How many kind variables do we accept?
                    KindRep    -- ^ A representation of the type's kind
+
+{- *********************************************************************
+*                                                                      *
+             Unboxed tuples and sums
+*                                                                      *
+********************************************************************* -}
+
+type Unit# :: TYPE (TupleRep '[])
+data Unit# = (# #)
+
+type Solo# :: TYPE rep -> TYPE (TupleRep '[rep])
+data Solo# a = (# a #)
+
+type Tuple0# = Unit#
+type Tuple1# = Solo#
+
+type Tuple2# :: TYPE r1 -> TYPE r2 -> TYPE (TupleRep [r1, r2])
+data Tuple2# a b =
+  (# a,b #)
+type Tuple3# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE (TupleRep [r1, r2, r3])
+data Tuple3# a b c =
+  (# a,b,c #)
+type Tuple4# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE (TupleRep [r1, r2, r3, r4])
+data Tuple4# a b c d =
+  (# a,b,c,d #)
+type Tuple5# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE (TupleRep [r1, r2, r3, r4, r5])
+data Tuple5# a b c d e =
+  (# a,b,c,d,e #)
+type Tuple6# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6])
+data Tuple6# a b c d e f =
+  (# a,b,c,d,e,f #)
+type Tuple7# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7])
+data Tuple7# a b c d e f g =
+  (# a,b,c,d,e,f,g #)
+type Tuple8# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8])
+data Tuple8# a b c d e f g h =
+  (# a,b,c,d,e,f,g,h #)
+type Tuple9# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9])
+data Tuple9# a b c d e f g h i =
+  (# a,b,c,d,e,f,g,h,i #)
+type Tuple10# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10])
+data Tuple10# a b c d e f g h i j =
+  (# a,b,c,d,e,f,g,h,i,j #)
+type Tuple11# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11])
+data Tuple11# a b c d e f g h i j k =
+  (# a,b,c,d,e,f,g,h,i,j,k #)
+type Tuple12# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12])
+data Tuple12# a b c d e f g h i j k l =
+  (# a,b,c,d,e,f,g,h,i,j,k,l #)
+type Tuple13# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13])
+data Tuple13# a b c d e f g h i j k l m =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m #)
+type Tuple14# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14])
+data Tuple14# a b c d e f g h i j k l m n =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n #)
+type Tuple15# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15])
+data Tuple15# a b c d e f g h i j k l m n o =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o #)
+type Tuple16# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16])
+data Tuple16# a b c d e f g h i j k l m n o p =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p #)
+type Tuple17# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17])
+data Tuple17# a b c d e f g h i j k l m n o p q =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q #)
+type Tuple18# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18])
+data Tuple18# a b c d e f g h i j k l m n o p q r =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r #)
+type Tuple19# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19])
+data Tuple19# a b c d e f g h i j k l m n o p q r s =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s #)
+type Tuple20# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20])
+data Tuple20# a b c d e f g h i j k l m n o p q r s t =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t #)
+type Tuple21# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21])
+data Tuple21# a b c d e f g h i j k l m n o p q r s t u =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u #)
+type Tuple22# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22])
+data Tuple22# a b c d e f g h i j k l m n o p q r s t u v =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v #)
+type Tuple23# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23])
+data Tuple23# a b c d e f g h i j k l m n o p q r s t u v w =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w #)
+type Tuple24# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24])
+data Tuple24# a b c d e f g h i j k l m n o p q r s t u v w x =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x #)
+type Tuple25# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25])
+data Tuple25# a b c d e f g h i j k l m n o p q r s t u v w x y =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y #)
+type Tuple26# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26])
+data Tuple26# a b c d e f g h i j k l m n o p q r s t u v w x y z =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z #)
+type Tuple27# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27])
+data Tuple27# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1 #)
+type Tuple28# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28])
+data Tuple28# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1 #)
+type Tuple29# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29])
+data Tuple29# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1 #)
+type Tuple30# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30])
+data Tuple30# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1 #)
+type Tuple31# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31])
+data Tuple31# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1 #)
+type Tuple32# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32])
+data Tuple32# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1 #)
+type Tuple33# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33])
+data Tuple33# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1 #)
+type Tuple34# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34])
+data Tuple34# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1 #)
+type Tuple35# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35])
+data Tuple35# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1 #)
+type Tuple36# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36])
+data Tuple36# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1 #)
+type Tuple37# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37])
+data Tuple37# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1 #)
+type Tuple38# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38])
+data Tuple38# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1 #)
+type Tuple39# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39])
+data Tuple39# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1 #)
+type Tuple40# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40])
+data Tuple40# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1 #)
+type Tuple41# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41])
+data Tuple41# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1 #)
+type Tuple42# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42])
+data Tuple42# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1 #)
+type Tuple43# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43])
+data Tuple43# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1 #)
+type Tuple44# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44])
+data Tuple44# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1 #)
+type Tuple45# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45])
+data Tuple45# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1 #)
+type Tuple46# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46])
+data Tuple46# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1 #)
+type Tuple47# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47])
+data Tuple47# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1 #)
+type Tuple48# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48])
+data Tuple48# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1 #)
+type Tuple49# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49])
+data Tuple49# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1 #)
+type Tuple50# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50])
+data Tuple50# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1 #)
+type Tuple51# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51])
+data Tuple51# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1 #)
+type Tuple52# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52])
+data Tuple52# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1 #)
+type Tuple53# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53])
+data Tuple53# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2 #)
+type Tuple54# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54])
+data Tuple54# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2 #)
+type Tuple55# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55])
+data Tuple55# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2 #)
+type Tuple56# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56])
+data Tuple56# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2 #)
+type Tuple57# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57])
+data Tuple57# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2 #)
+type Tuple58# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58])
+data Tuple58# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2 #)
+type Tuple59# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59])
+data Tuple59# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2 #)
+type Tuple60# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60])
+data Tuple60# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2 #)
+type Tuple61# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61])
+data Tuple61# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2,i2 #)
+type Tuple62# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE r62 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61, r62])
+data Tuple62# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2,i2,j2 #)
+type Tuple63# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE r62 -> TYPE r63 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61, r62, r63])
+data Tuple63# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 k2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2,i2,j2,k2 #)
+type Tuple64# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 ->
+  TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 ->
+  TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 ->
+  TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 ->
+  TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 ->
+  TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 ->
+  TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE r62 -> TYPE r63 -> TYPE r64 ->
+  TYPE (TupleRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22,
+  r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45,
+  r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61, r62, r63, r64])
+data Tuple64# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1
+     r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 k2 l2 =
+  (# a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,a1,b1,c1,d1,e1,f1,g1,h1,i1,j1,k1,l1,m1,n1,o1,p1,q1,r1,s1,t1,
+     u1,v1,w1,x1,y1,z1,a2,b2,c2,d2,e2,f2,g2,h2,i2,j2,k2,l2 #)
+
+{-
+Note [Unboxed sum with arity 64]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While tuples are defined up to arity 64, sums can maximally have 63 alternatives.
+This is due to the Unique layout for unboxed sums, which allots only six bits
+for encoding the alternative.
+-}
+
+type Sum2# :: TYPE r1 -> TYPE r2 -> TYPE (SumRep [r1, r2])
+data Sum2# a b =
+    (# a | #)
+  | (# | b #)
+
+type Sum3# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE (SumRep [r1, r2, r3])
+data Sum3# a b c =
+    (# a | | #)
+  | (# | b | #)
+  | (# | | c #)
+
+type Sum4# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE (SumRep [r1, r2, r3, r4])
+data Sum4# a b c d =
+    (# a | | | #)
+  | (# | b | | #)
+  | (# | | c | #)
+  | (# | | | d #)
+
+type Sum5# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE (SumRep [r1, r2, r3, r4, r5])
+data Sum5# a b c d e =
+    (# a | | | | #)
+  | (# | b | | | #)
+  | (# | | c | | #)
+  | (# | | | d | #)
+  | (# | | | | e #)
+
+type Sum6# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6])
+data Sum6# a b c d e f =
+    (# a | | | | | #)
+  | (# | b | | | | #)
+  | (# | | c | | | #)
+  | (# | | | d | | #)
+  | (# | | | | e | #)
+  | (# | | | | | f #)
+
+type Sum7# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7])
+data Sum7# a b c d e f g =
+    (# a | | | | | | #)
+  | (# | b | | | | | #)
+  | (# | | c | | | | #)
+  | (# | | | d | | | #)
+  | (# | | | | e | | #)
+  | (# | | | | | f | #)
+  | (# | | | | | | g #)
+
+type Sum8# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8])
+data Sum8# a b c d e f g h =
+    (# a | | | | | | | #)
+  | (# | b | | | | | | #)
+  | (# | | c | | | | | #)
+  | (# | | | d | | | | #)
+  | (# | | | | e | | | #)
+  | (# | | | | | f | | #)
+  | (# | | | | | | g | #)
+  | (# | | | | | | | h #)
+
+type Sum9# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9])
+data Sum9# a b c d e f g h i =
+    (# a | | | | | | | | #)
+  | (# | b | | | | | | | #)
+  | (# | | c | | | | | | #)
+  | (# | | | d | | | | | #)
+  | (# | | | | e | | | | #)
+  | (# | | | | | f | | | #)
+  | (# | | | | | | g | | #)
+  | (# | | | | | | | h | #)
+  | (# | | | | | | | | i #)
+
+type Sum10# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10])
+data Sum10# a b c d e f g h i j =
+    (# a | | | | | | | | | #)
+  | (# | b | | | | | | | | #)
+  | (# | | c | | | | | | | #)
+  | (# | | | d | | | | | | #)
+  | (# | | | | e | | | | | #)
+  | (# | | | | | f | | | | #)
+  | (# | | | | | | g | | | #)
+  | (# | | | | | | | h | | #)
+  | (# | | | | | | | | i | #)
+  | (# | | | | | | | | | j #)
+
+type Sum11# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11])
+data Sum11# a b c d e f g h i j k =
+    (# a | | | | | | | | | | #)
+  | (# | b | | | | | | | | | #)
+  | (# | | c | | | | | | | | #)
+  | (# | | | d | | | | | | | #)
+  | (# | | | | e | | | | | | #)
+  | (# | | | | | f | | | | | #)
+  | (# | | | | | | g | | | | #)
+  | (# | | | | | | | h | | | #)
+  | (# | | | | | | | | i | | #)
+  | (# | | | | | | | | | j | #)
+  | (# | | | | | | | | | | k #)
+
+type Sum12# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12])
+data Sum12# a b c d e f g h i j k l =
+    (# a | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | #)
+  | (# | | | d | | | | | | | | #)
+  | (# | | | | e | | | | | | | #)
+  | (# | | | | | f | | | | | | #)
+  | (# | | | | | | g | | | | | #)
+  | (# | | | | | | | h | | | | #)
+  | (# | | | | | | | | i | | | #)
+  | (# | | | | | | | | | j | | #)
+  | (# | | | | | | | | | | k | #)
+  | (# | | | | | | | | | | | l #)
+
+type Sum13# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13])
+data Sum13# a b c d e f g h i j k l m =
+    (# a | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | #)
+  | (# | | | | | f | | | | | | | #)
+  | (# | | | | | | g | | | | | | #)
+  | (# | | | | | | | h | | | | | #)
+  | (# | | | | | | | | i | | | | #)
+  | (# | | | | | | | | | j | | | #)
+  | (# | | | | | | | | | | k | | #)
+  | (# | | | | | | | | | | | l | #)
+  | (# | | | | | | | | | | | | m #)
+
+type Sum14# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14])
+data Sum14# a b c d e f g h i j k l m n =
+    (# a | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | #)
+  | (# | | | | | | | h | | | | | | #)
+  | (# | | | | | | | | i | | | | | #)
+  | (# | | | | | | | | | j | | | | #)
+  | (# | | | | | | | | | | k | | | #)
+  | (# | | | | | | | | | | | l | | #)
+  | (# | | | | | | | | | | | | m | #)
+  | (# | | | | | | | | | | | | | n #)
+
+type Sum15# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15])
+data Sum15# a b c d e f g h i j k l m n o =
+    (# a | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | #)
+  | (# | | | | | | | | | j | | | | | #)
+  | (# | | | | | | | | | | k | | | | #)
+  | (# | | | | | | | | | | | l | | | #)
+  | (# | | | | | | | | | | | | m | | #)
+  | (# | | | | | | | | | | | | | n | #)
+  | (# | | | | | | | | | | | | | | o #)
+
+type Sum16# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16])
+data Sum16# a b c d e f g h i j k l m n o p =
+    (# a | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | #)
+  | (# | | | | | | | | | | | l | | | | #)
+  | (# | | | | | | | | | | | | m | | | #)
+  | (# | | | | | | | | | | | | | n | | #)
+  | (# | | | | | | | | | | | | | | o | #)
+  | (# | | | | | | | | | | | | | | | p #)
+
+type Sum17# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17])
+data Sum17# a b c d e f g h i j k l m n o p q =
+    (# a | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | #)
+  | (# | | | | | | | | | | | | | n | | | #)
+  | (# | | | | | | | | | | | | | | o | | #)
+  | (# | | | | | | | | | | | | | | | p | #)
+  | (# | | | | | | | | | | | | | | | | q #)
+
+type Sum18# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18])
+data Sum18# a b c d e f g h i j k l m n o p q r =
+    (# a | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | #)
+  | (# | | | | | | | | | | | | | | | p | | #)
+  | (# | | | | | | | | | | | | | | | | q | #)
+  | (# | | | | | | | | | | | | | | | | | r #)
+
+type Sum19# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19])
+data Sum19# a b c d e f g h i j k l m n o p q r s =
+    (# a | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | #)
+  | (# | | | | | | | | | | | | | | | | | r | #)
+  | (# | | | | | | | | | | | | | | | | | | s #)
+
+type Sum20# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20])
+data Sum20# a b c d e f g h i j k l m n o p q r s t =
+    (# a | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | #)
+  | (# | | | | | | | | | | | | | | | | | | | t #)
+
+type Sum21# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21])
+data Sum21# a b c d e f g h i j k l m n o p q r s t u =
+    (# a | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u #)
+
+type Sum22# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22])
+data Sum22# a b c d e f g h i j k l m n o p q r s t u v =
+    (# a | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v #)
+
+type Sum23# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23])
+data Sum23# a b c d e f g h i j k l m n o p q r s t u v w =
+    (# a | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w #)
+
+type Sum24# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24])
+data Sum24# a b c d e f g h i j k l m n o p q r s t u v w x =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x #)
+
+type Sum25# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25])
+data Sum25# a b c d e f g h i j k l m n o p q r s t u v w x y =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y #)
+
+type Sum26# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26])
+data Sum26# a b c d e f g h i j k l m n o p q r s t u v w x y z =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z #)
+
+type Sum27# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27])
+data Sum27# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 #)
+
+type Sum28# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28])
+data Sum28# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 #)
+
+type Sum29# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29])
+data Sum29# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 #)
+
+type Sum30# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30])
+data Sum30# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 #)
+
+type Sum31# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31])
+data Sum31# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 #)
+
+type Sum32# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32])
+data Sum32# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 #)
+
+type Sum33# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33])
+data Sum33# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 #)
+
+type Sum34# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34])
+data Sum34# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 #)
+
+type Sum35# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35])
+data Sum35# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 #)
+
+type Sum36# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36])
+data Sum36# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 #)
+
+type Sum37# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37])
+data Sum37# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 #)
+
+type Sum38# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38])
+data Sum38# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 #)
+
+type Sum39# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39])
+data Sum39# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 #)
+
+type Sum40# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40])
+data Sum40# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 #)
+
+type Sum41# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41])
+data Sum41# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 #)
+
+type Sum42# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42])
+data Sum42# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 #)
+
+type Sum43# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43])
+data Sum43# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 #)
+
+type Sum44# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44])
+data Sum44# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 #)
+
+type Sum45# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45])
+data Sum45# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 #)
+
+type Sum46# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46])
+data Sum46# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 #)
+
+type Sum47# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47])
+data Sum47# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 #)
+
+type Sum48# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48])
+data Sum48# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 #)
+
+type Sum49# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49])
+data Sum49# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 #)
+
+type Sum50# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50])
+data Sum50# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 #)
+
+type Sum51# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51])
+data Sum51# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 #)
+
+type Sum52# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52])
+data Sum52# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 #)
+
+type Sum53# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53])
+data Sum53# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 #)
+
+type Sum54# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54])
+data Sum54# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 #)
+
+type Sum55# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55])
+data Sum55# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 #)
+
+type Sum56# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56])
+data Sum56# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 #)
+
+type Sum57# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57])
+data Sum57# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 #)
+
+type Sum58# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58])
+data Sum58# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 #)
+
+type Sum59# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59])
+data Sum59# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g2 #)
+
+type Sum60# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60])
+data Sum60# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h2 #)
+
+type Sum61# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61])
+data Sum61# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i2 #)
+
+type Sum62# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE r62 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61, r62])
+data Sum62# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j2 #)
+
+type Sum63# :: TYPE r1 -> TYPE r2 -> TYPE r3 -> TYPE r4 -> TYPE r5 -> TYPE r6 -> TYPE r7 -> TYPE r8 -> TYPE r9 -> TYPE r10 -> TYPE r11 -> TYPE r12 -> TYPE r13 -> TYPE r14 -> TYPE r15 -> TYPE r16 -> TYPE r17 -> TYPE r18 -> TYPE r19 -> TYPE r20 -> TYPE r21 -> TYPE r22 -> TYPE r23 -> TYPE r24 -> TYPE r25 -> TYPE r26 -> TYPE r27 -> TYPE r28 -> TYPE r29 -> TYPE r30 -> TYPE r31 -> TYPE r32 -> TYPE r33 -> TYPE r34 -> TYPE r35 -> TYPE r36 -> TYPE r37 -> TYPE r38 -> TYPE r39 -> TYPE r40 -> TYPE r41 -> TYPE r42 -> TYPE r43 -> TYPE r44 -> TYPE r45 -> TYPE r46 -> TYPE r47 -> TYPE r48 -> TYPE r49 -> TYPE r50 -> TYPE r51 -> TYPE r52 -> TYPE r53 -> TYPE r54 -> TYPE r55 -> TYPE r56 -> TYPE r57 -> TYPE r58 -> TYPE r59 -> TYPE r60 -> TYPE r61 -> TYPE r62 -> TYPE r63 -> TYPE (SumRep [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, r16, r17, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27, r28, r29, r30, r31, r32, r33, r34, r35, r36, r37, r38, r39, r40, r41, r42, r43, r44, r45, r46, r47, r48, r49, r50, r51, r52, r53, r54, r55, r56, r57, r58, r59, r60, r61, r62, r63])
+data Sum63# a b c d e f g h i j k l m n o p q r s t u v w x y z a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 k1 l1 m1 n1 o1 p1 q1 r1 s1 t1 u1 v1 w1 x1 y1 z1 a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 k2 =
+    (# a | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | b | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | c | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | d | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | e | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | f | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | g | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | h | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | i | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | j | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | k | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | l | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | m | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | n | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | o | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | p | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | q | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | r | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | s | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | t | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | u | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | v | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | w | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | x | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | y | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | z | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | a1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | b1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | c1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i1 | | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j1 | | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k1 | | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | l1 | | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | m1 | | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | n1 | | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | o1 | | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | p1 | | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | q1 | | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | r1 | | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | s1 | | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | t1 | | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | u1 | | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | v1 | | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | w1 | | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | x1 | | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | y1 | | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | z1 | | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | a2 | | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | b2 | | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | c2 | | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | d2 | | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | e2 | | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | f2 | | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | g2 | | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | h2 | | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | i2 | | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | j2 | #)
+  | (# | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | k2 #)

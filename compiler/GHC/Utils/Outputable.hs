@@ -39,7 +39,7 @@ module GHC.Utils.Outputable (
         isEmpty, nest,
         ptext,
         int, intWithCommas, integer, word64, word, float, double, rational, doublePrec,
-        parens, cparen, brackets, braces, quotes, quote,
+        parens, cparen, brackets, braces, quotes, quote, quoteIfPunsEnabled,
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
@@ -733,6 +733,12 @@ angleBrackets d = char '<' <> d <> char '>'
 cparen :: Bool -> SDoc -> SDoc
 {-# INLINE CONLIKE cparen #-}
 cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
+
+quoteIfPunsEnabled :: SDoc -> SDoc
+quoteIfPunsEnabled doc =
+  sdocOption sdocListTuplePuns $ \case
+    True -> quote doc
+    False -> doc
 
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote

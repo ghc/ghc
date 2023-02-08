@@ -973,7 +973,7 @@ rtsDeps =
           [ ":"
           , "[]"
           ]
-      , mkPrimFuns "GHC.Tuple.Prim"
+      , mkPrimFuns "GHC.Tuple"
           [ "(,)"
           , "(,,)"
           , "(,,,)"

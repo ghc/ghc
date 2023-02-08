@@ -2261,25 +2261,36 @@ atype :: { LHsType GhcPs }
         | '{' fielddecls '}'             {% do { decls <- amsA' (sLL $1 $> $ HsRecTy (AnnList (listAsAnchorM $2) (Just $ moc $1) (Just $ mcc $3) [] []) $2)
                                                ; checkRecordSyntax decls }}
                                                         -- Constructor sigs only
-        | '(' ')'                        {% amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParens (glAA $1) (glAA $2))
-                                                    HsBoxedOrConstraintTuple []) }
+
+        -- List and tuple syntax whose interpretation depends on the extension ListTuplePuns.
+        | '(' ')'                        {% amsA' . sLL $1 $> =<< (mkTupleSyntaxTy (glR $1) [] (glR $>)) }
         | '(' ktype ',' comma_types1 ')' {% do { h <- addTrailingCommaA $2 (gl $3)
-                                               ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParens (glAA $1) (glAA $5))
-                                                        HsBoxedOrConstraintTuple (h : $4)) }}
-        | '(#' '#)'                   {% amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $2)) HsUnboxedTuple []) }
-        | '(#' comma_types1 '#)'      {% amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) HsUnboxedTuple $2) }
-        | '(#' bar_types2 '#)'        {% amsA' (sLL $1 $> $ HsSumTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) $2) }
-        | '[' ktype ']'               {% amsA' (sLL $1 $> $ HsListTy (AnnParen AnnParensSquare (glAA $1) (glAA $3)) $2) }
+                                               ; amsA' . sLL $1 $> =<< (mkTupleSyntaxTy (glR $1) (h : $4) (glR $>)) }}
+        | '(#' '#)'                   {% do { requireLTPuns PEP_TupleSyntaxType $1 $>
+                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $2)) HsUnboxedTuple []) } }
+        | '(#' comma_types1 '#)'      {% do { requireLTPuns PEP_TupleSyntaxType $1 $>
+                                            ; amsA' (sLL $1 $> $ HsTupleTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) HsUnboxedTuple $2) } }
+        | '(#' bar_types2 '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
+                                      ; amsA' (sLL $1 $> $ HsSumTy (AnnParen AnnParensHash (glAA $1) (glAA $3)) $2) } }
+        | '[' ktype ']'               {% amsA' . sLL $1 $> =<< (mkListSyntaxTy1 (glR $1) $2 (glR $3)) }
         | '(' ktype ')'               {% amsA' (sLL $1 $> $ HsParTy  (AnnParen AnnParens       (glAA $1) (glAA $3)) $2) }
+                                      -- see Note [Promotion] for the followings
+        | SIMPLEQUOTE '(' ')'         {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
+                                            ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $3] []) }}
+        | SIMPLEQUOTE gen_qcon {% amsA' (sLL $1 $> $ HsTyVar [mj AnnSimpleQuote $1,mjN AnnName $2] IsPromoted $2) }
+        | SIMPLEQUOTE sysdcon_nolist {% do { requireLTPuns PEP_QuoteDisambiguation $1 (reLoc $>)
+                                           ; amsA' (sLL $1 $> $ HsTyVar [mj AnnSimpleQuote $1,mjN AnnName $2] IsPromoted (L (getLoc $2) $ nameRdrName (dataConName (unLoc $2)))) }}
+        | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
+                             {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
+                                   ; h <- addTrailingCommaA $3 (gl $4)
+                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $6] (h : $5)) }}
+        | '[' ']'               {% withCombinedComments $1 $> (mkListSyntaxTy0 (glR $1) (glR $2)) }
+        | SIMPLEQUOTE  '[' comma_types0 ']'     {% do { requireLTPuns PEP_QuoteDisambiguation $1 $>
+                                                      ; amsA' (sLL $1 $> $ HsExplicitListTy [mj AnnSimpleQuote $1,mos $2,mcs $4] IsPromoted $3) }}
+        | SIMPLEQUOTE var                       {% amsA' (sLL $1 $> $ HsTyVar [mj AnnSimpleQuote $1,mjN AnnName $2] IsPromoted $2) }
+
         | quasiquote                  { mapLocA (HsSpliceTy noExtField) $1 }
         | splice_untyped              { mapLocA (HsSpliceTy noExtField) $1 }
-                                      -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% amsA' (sLL $1 $> $ HsTyVar [mj AnnSimpleQuote $1,mjN AnnName $2] IsPromoted $2) }
-        | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
-                             {% do { h <- addTrailingCommaA $3 (gl $4)
-                                   ; amsA' (sLL $1 $> $ HsExplicitTupleTy [mj AnnSimpleQuote $1,mop $2,mcp $6] (h : $5)) }}
-        | SIMPLEQUOTE  '[' comma_types0 ']'     {% amsA' (sLL $1 $> $ HsExplicitListTy [mj AnnSimpleQuote $1,mos $2,mcs $4] IsPromoted $3) }
-        | SIMPLEQUOTE var                       {% amsA' (sLL $1 $> $ HsTyVar [mj AnnSimpleQuote $1,mjN AnnName $2] IsPromoted $2) }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
         -- if you had written '[ty, ty, ty]
@@ -2386,6 +2397,11 @@ bounded in the type level, then we look for it in the term level (we
 change its namespace to DataName, see Note [Demotion] in GHC.Types.Names.OccName).
 And both become a HsTyVar ("Zero", DataName) after the renamer.
 
+- ListTuplePuns
+When this extension is disabled, ticked constructors for lists and tuples are
+not accepted, while the unticked variants are unconditionally parsed as data
+constructors.
+
 -}
 
 
@@ -2472,8 +2488,13 @@ forall :: { Located ([AddEpAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
 
 constr_stuff :: { Located (LocatedN RdrName, HsConDeclH98Details GhcPs) }
         : infixtype       {% fmap (reLoc. (fmap (\b -> (dataConBuilderCon b,
-                                                          dataConBuilderDetails b))))
-                                     (runPV $1) }
+                                                        dataConBuilderDetails b))))
+                                  (runPV $1) }
+        | '(#' usum_constr '#)' {% let (t, tag, arity) = $2 in pure (sLL $1 $3 $ mkUnboxedSumCon t tag arity)}
+
+usum_constr :: { (LHsType GhcPs, Int, Int) } -- constructor for the data decls SumN#
+         : ktype bars { ($1, 1, (snd $2 + 1)) }
+         | bars ktype bars0 { ($2, snd $1 + 1, snd $1 + snd $3 + 1) }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }
@@ -3590,10 +3611,6 @@ name_var : var { $1 }
 -- There are two different productions here as lifted list constructors
 -- are parsed differently.
 
-qcon_nowiredlist :: { LocatedN RdrName }
-        : gen_qcon                     { $1 }
-        | sysdcon_nolist               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
-
 qcon :: { LocatedN RdrName }
   : gen_qcon              { $1}
   | sysdcon               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
@@ -3620,8 +3637,7 @@ qcon_list : qcon                  { sL1 $1 [$1] }
 
 -- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
-        : '(' ')'               {% amsr (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
-        | '(' commas ')'        {% amsr (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
+        : '(' commas ')'        {% amsr (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
                                        (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
         | '(#' '#)'             {% amsr (sLL $1 $> $ unboxedUnitDataCon) (NameAnnOnly NameParensHash (glAA $1) (glAA $2) []) }
         | '(#' commas '#)'      {% amsr (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
@@ -3630,7 +3646,8 @@ sysdcon_nolist :: { LocatedN DataCon }  -- Wired in data constructors
 -- See Note [Empty lists] in GHC.Hs.Expr
 sysdcon :: { LocatedN DataCon }
         : sysdcon_nolist                 { $1 }
-        | '[' ']'               {% amsr (sLL $1 $> nilDataCon) (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
+        | '(' ')'               {% amsr (sLL $1 $> unitDataCon) (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
+        |  '[' ']'               {% amsr (sLL $1 $> nilDataCon) (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
 conop :: { LocatedN RdrName }
         : consym                { $1 }
@@ -3654,21 +3671,20 @@ gtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, including unit t
                                                 (NameAnnOnly NameParens (glAA $1) (glAA $2) []) }
         | '(#' '#)'                    {% amsr (sLL $1 $> $ getRdrName unboxedUnitTyCon)
                                                 (NameAnnOnly NameParensHash (glAA $1) (glAA $2) []) }
+        | '[' ']'               {% amsr (sLL $1 $> $ listTyCon_RDR)
+                                      (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
 ntgtycon :: { LocatedN RdrName }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
-        | '(' commas ')'        {% amsr (sLL $1 $> $ getRdrName (tupleTyCon Boxed
-                                                       (snd $2 + 1)))
-                                       (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
-        | '(#' commas '#)'      {% amsr (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
-                                                       (snd $2 + 1)))
-                                       (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
-        | '(#' bars '#)'        {% amsr (sLL $1 $> $ getRdrName (sumTyCon (snd $2 + 1)))
-                                       (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }
+        | '(' commas ')'        {% do { n <- mkTupleSyntaxTycon Boxed (snd $2 + 1)
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParens (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }}
+        | '(#' commas '#)'      {% do { n <- mkTupleSyntaxTycon Unboxed (snd $2 + 1)
+                                      ; amsr (sLL $1 $> n) (NameAnnCommas NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) }}
+        | '(#' bars '#)'        {% do { requireLTPuns PEP_SumSyntaxType $1 $>
+                                      ; amsr (sLL $1 $> $ (getRdrName (sumTyCon (snd $2 + 1))))
+                                       (NameAnnBars NameParensHash (glAA $1) (map srcSpan2e (fst $2)) (glAA $3) []) } }
         | '(' '->' ')'          {% amsr (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        (NameAnnRArrow (isUnicode $2) (Just $ glAA $1) (glAA $2) (Just $ glAA $3) []) }
-        | '[' ']'               {% amsr (sLL $1 $> $ listTyCon_RDR)
-                                       (NameAnnOnly NameSquare (glAA $1) (glAA $2) []) }
 
 oqtycon :: { LocatedN RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists

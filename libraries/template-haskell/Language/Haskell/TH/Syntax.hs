@@ -1431,7 +1431,7 @@ dataToQa mkCon mkLit appCon antiQ t =
                       con@('(':_) -> Name (mkOccName con)
                                           (NameG DataName
                                                 (mkPkgName "ghc-prim")
-                                                (mkModName "GHC.Tuple.Prim"))
+                                                (mkModName "GHC.Tuple"))
 
                       -- Tricky case: see Note [Data for non-algebraic types]
                       fun@(x:_)   | startsVarSym x || startsVarId x
@@ -1923,10 +1923,12 @@ mk_tup_name n space boxed
     withParens thing
       | boxed     = "("  ++ thing ++ ")"
       | otherwise = "(#" ++ thing ++ "#)"
-    tup_occ | n == 1    = if boxed then solo else "Solo#"
+    tup_occ | n == 0, space == TcClsName = if boxed then "Unit" else "Unit#"
+            | n == 1 = if boxed then solo else "Solo#"
+            | space == TcClsName = "Tuple" ++ show n ++ if boxed then "" else "#"
             | otherwise = withParens (replicate n_commas ',')
     n_commas = n - 1
-    tup_mod  = mkModName "GHC.Tuple.Prim"
+    tup_mod  = mkModName (if boxed then "GHC.Tuple" else "GHC.Prim")
     solo
       | space == DataName = "MkSolo"
       | otherwise = "Solo"

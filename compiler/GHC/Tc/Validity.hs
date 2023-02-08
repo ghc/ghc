@@ -1624,7 +1624,11 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   = checkHasFieldInst clas cls_args
 
   | isCTupleClass clas
-  = failWithTc (TcRnTupleConstraintInst clas)
+  = do
+    -- Since we're now declaring instances for constraint tuples in
+    -- GHC.Classes, this check must exclude that file.
+    this_mod <- fmap tcg_mod getGblEnv
+    when (this_mod /= gHC_CLASSES) (failWithTc (TcRnTupleConstraintInst clas))
 
   -- Check language restrictions on the args to the class
   | check_h98_arg_shape

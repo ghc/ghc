@@ -1,0 +1,28 @@
+
+:set -XUnboxedTuples -XNoListTuplePuns -XDataKinds
+import GHC.Tuple (Solo (MkSolo))
+
+:i ()
+:i (##)
+:i Solo
+:t ()
+:t (##)
+:t (   )
+:t (#   #)
+:i (,)
+:i (#,#)
+:t (,)
+:t (#,#)
+:t (  ,  )
+:t (#  ,  #)
+type T = (Int, Int)
+type S = MkSolo Int
+type L = [Int]
+:k (Int, Int)
+:i T
+:i S
+:i L
+f i (j, k) = i + j + k :: Int
+:t f
+:t (\ (_, _) -> ())
+:t (\ (MkSolo _) -> ())

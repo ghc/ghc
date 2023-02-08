@@ -52,7 +52,7 @@ $wxs
   = \ (ww :: GHC.Prim.Int#) ->
       case ww of ds1 {
         __DEFAULT -> $wxs (GHC.Prim.-# ds1 1#);
-        1# -> GHC.Prim.(##)
+        1# -> GHC.Types.(##)
       }
 end Rec }
 
@@ -62,7 +62,7 @@ T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> (# #)
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
       case GHC.Prim.<# 0# ww of {
-        __DEFAULT -> GHC.Prim.(##);
+        __DEFAULT -> GHC.Types.(##);
         1# -> $wxs ww
       }
 
@@ -77,12 +77,12 @@ foo [InlPrag=NOINLINE[final]] :: Int -> ()
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
                  case n of { GHC.Types.I# ww [Occ=Once1] ->
-                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.Prim.() }
+                 case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
                  }}]
 foo
   = \ (n :: Int) ->
       case n of { GHC.Types.I# ww ->
-      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.Prim.() }
+      case T3772.$wfoo ww of { (# #) -> GHC.Tuple.() }
       }
 
 

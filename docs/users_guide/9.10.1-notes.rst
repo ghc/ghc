@@ -112,6 +112,18 @@ Language
     {-# WARNING in "x-partial" data Head [ "This is a partial synonym,"
                                          , "it throws an error on empty lists."] #-}
 
+- GHC Proposal `#475 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst>`_
+  "Non-punning list and tuple syntax" has been partially implemented.
+  When the newly introduced extension :extension:`ListTuplePuns` is disabled,
+  bracket syntax for lists, tuples and sums only denotes their data
+  constructors, while their type constructors have been changed to use regular
+  prefix syntax::
+
+    data List a = [] | a : List a
+    data Tuple2 a b = (a, b)
+
+  The extension is enabled by default, establishing the usual behavior.
+
 Compiler
 ~~~~~~~~
 

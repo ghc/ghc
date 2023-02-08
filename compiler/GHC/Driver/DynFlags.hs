@@ -1357,8 +1357,9 @@ languageExtensions (Just Haskell98)
            -- turning it off breaks code, so we're keeping it on for
            -- backwards compatibility.  Cabal uses -XHaskell98 by
            -- default unless you specify another language.
-       LangExt.DeepSubsumption
+       LangExt.DeepSubsumption,
        -- Non-standard but enabled for backwards compatability (see GHC proposal #511)
+       LangExt.ListTuplePuns
       ]
 
 languageExtensions (Just Haskell2010)
@@ -1375,7 +1376,8 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
-       LangExt.DeepSubsumption ]
+       LangExt.DeepSubsumption,
+       LangExt.ListTuplePuns ]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1389,6 +1391,7 @@ languageExtensions (Just GHC2021)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
+       LangExt.ListTuplePuns,
        -- Now the new extensions (not in Haskell2010)
        LangExt.BangPatterns,
        LangExt.BinaryLiterals,
@@ -1534,7 +1537,7 @@ initSDocContext dflags style = SDC
   , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
-  , sdocListTuplePuns               = True
+  , sdocListTuplePuns               = xopt LangExt.ListTuplePuns dflags
   , sdocPrintTypeAbbreviations      = True
   , sdocUnitIdForUser               = ftext
   }
@@ -1546,7 +1549,7 @@ initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
 initPromotionTickContext :: DynFlags -> PromotionTickContext
 initPromotionTickContext dflags =
   PromTickCtx {
-    ptcListTuplePuns = True,
+    ptcListTuplePuns = xopt LangExt.ListTuplePuns dflags,
     ptcPrintRedundantPromTicks = gopt Opt_PrintRedundantPromotionTicks dflags
   }
 

@@ -1,6 +1,6 @@
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple.Prim’
+  	-- Defined in ‘GHC.Tuple’
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’
 instance Bounded () -- Defined in ‘GHC.Internal.Enum’
@@ -9,16 +9,16 @@ instance Enum () -- Defined in ‘GHC.Internal.Enum’
 instance Show () -- Defined in ‘GHC.Internal.Show’
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
-type (##) :: GHC.Types.ZeroBitType
-data (##) = (##)
-  	-- Defined in ‘GHC.Prim’
+type Unit# :: GHC.Types.ZeroBitType
+data Unit# = (##)
+  	-- Defined in ‘GHC.Types’
 () :: ()
 (##) :: (# #)
 (   ) :: ()
 (#   #) :: (# #)
 type Tuple2 :: * -> * -> *
 data Tuple2 a b = (,) a b
-  	-- Defined in ‘GHC.Tuple.Prim’
+  	-- Defined in ‘GHC.Tuple’
 instance Traversable ((,) a)
   -- Defined in ‘GHC.Internal.Data.Traversable’
 instance Monoid a => Applicative ((,) a)
@@ -40,12 +40,12 @@ instance (Eq a, Eq b) => Eq (a, b) -- Defined in ‘GHC.Classes’
 instance (Ord a, Ord b) => Ord (a, b) -- Defined in ‘GHC.Classes’
 instance (Show a, Show b) => Show (a, b)
   -- Defined in ‘GHC.Internal.Show’
-type (#,#) :: *
-              -> *
-              -> TYPE
-                   (GHC.Types.TupleRep [GHC.Types.LiftedRep, GHC.Types.LiftedRep])
-data (#,#) a b = (#,#) a b
-  	-- Defined in ‘GHC.Prim’
+type Tuple2# :: *
+                -> *
+                -> TYPE
+                     (GHC.Types.TupleRep [GHC.Types.LiftedRep, GHC.Types.LiftedRep])
+data Tuple2# a b = (#,#) a b
+  	-- Defined in ‘GHC.Types’
 (,) :: a -> b -> (a, b)
 (#,#) :: a -> b -> (# a, b #)
 (  ,  ) :: a -> b -> (a, b)

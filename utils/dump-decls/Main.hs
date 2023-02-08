@@ -15,13 +15,13 @@ import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.TyThing (tyThingParent_maybe)
 import GHC.Types.TyThing.Ppr (pprTyThing)
 import GHC.Types.Name (nameOccName, nameModule_maybe, stableNameCmp)
-import GHC.Types.Name.Occurrence (OccName, mkDataOcc, mkVarOcc)
+import GHC.Types.Name.Occurrence (OccName, mkDataOcc, mkVarOcc, occNameString)
 import GHC.Unit.External (eps_inst_env)
 import GHC.Iface.Syntax (ShowSub(..), ShowHowMuch(..), AltPpr(..))
 import GHC.Iface.Type (ShowForAllFlag(..))
 
 import Data.Function (on)
-import Data.List (sortBy)
+import Data.List (sortBy, isPrefixOf)
 import Control.Monad.IO.Class
 import System.Environment (getArgs)
 import Prelude hiding ((<>))
@@ -148,12 +148,24 @@ ignoredTyCon = ignoredName . getName
 ignoredType :: Type -> Bool
 ignoredType = any ignoredTyCon . nonDetEltsUniqSet . tyConsOfType
 
+ctupleInstance :: Name -> Bool
+ctupleInstance name =
+  isPrefixOf "CTuple" nameS
+  ||
+  nameS == "CUnit"
+  ||
+  nameS == "CSolo"
+  where
+    nameS = occNameString (getOccName name)
+
 -- | Ignore instances whose heads mention ignored types.
 ignoredInstance :: ClsInst -> Bool
 ignoredInstance inst
   | ignoredName $ getName cls
   = True
   | any ignoredType tys
+  = True
+  | ctupleInstance $ getName cls
   = True
   | otherwise
   = False

@@ -26,7 +26,7 @@ PRELUDE_CLOSURE(ghczmprim_GHCziPrimziPanic_absentSumFieldError_closure);
  * modules these names are defined in.
  */
 
-PRELUDE_CLOSURE(ghczmprim_GHCziTupleziPrim_Z0T_closure);
+PRELUDE_CLOSURE(ghczmprim_GHCziTuple_Z0T_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_True_closure);
 PRELUDE_CLOSURE(ghczmprim_GHCziTypes_False_closure);
 PRELUDE_CLOSURE(ghczminternal_GHCziInternalziPack_unpackCString_closure);
@@ -87,7 +87,7 @@ PRELUDE_INFO(ghczminternal_GHCziInternalziWord_W32zh_con_info);
 PRELUDE_INFO(ghczminternal_GHCziInternalziWord_W64zh_con_info);
 PRELUDE_INFO(ghczminternal_GHCziInternalziStable_StablePtr_con_info);
 
-#define Unit_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTupleziPrim_Z0T_closure)
+#define Unit_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTuple_Z0T_closure)
 #define True_closure              DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_True_closure)
 #define False_closure             DLL_IMPORT_DATA_REF(ghczmprim_GHCziTypes_False_closure)
 #define unpackCString_closure     DLL_IMPORT_DATA_REF(ghczminternal_GHCziInternalziPack_unpackCString_closure)

@@ -112,6 +112,15 @@ module GHC.Parser.PostProcess (
         addUnpackednessP,
         dataConBuilderCon,
         dataConBuilderDetails,
+        mkUnboxedSumCon,
+
+        -- ListTuplePuns related parsers
+        mkTupleSyntaxTy,
+        mkTupleSyntaxTycon,
+        mkListSyntaxTy0,
+        mkListSyntaxTy1,
+        withCombinedComments,
+        requireLTPuns,
     ) where
 
 import GHC.Prelude
@@ -136,7 +145,8 @@ import GHC.Types.TyThing
 import GHC.Core.Type    ( Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey, unrestrictedFunTyCon )
+                          listTyConName, listTyConKey, sumDataCon,
+                          unrestrictedFunTyCon , listTyCon_RDR )
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
@@ -146,6 +156,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Misc
+import GHC.Utils.Monad (unlessM)
 import Data.Either
 import Data.List        ( findIndex )
 import Data.Foldable
@@ -1133,17 +1144,36 @@ checkContext orig_t@(L (EpAnn l _ _) _orig_t) =
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
     -- be used as context constraints.
     -- Ditto ()
-    = return (L (EpAnn l
-                  -- Append parens so that the original order in the source is maintained
-                  (AnnContext Nothing (oparens ++ [ap_open ann']) (ap_close ann':cparens)) cs) ts)
+    = mkCTuple (oparens ++ [ap_open ann'], ap_close ann' : cparens, cs) ts
 
+  -- With NoListTuplePuns, contexts are parsed as data constructors, which causes failure
+  -- downstream.
+  -- This converts them just like when they are parsed as types in the punned case.
+  check (oparens,cparens,cs) (L _l (HsExplicitTupleTy anns ts))
+    = punsAllowed >>= \case
+      True -> unprocessed
+      False -> do
+        let
+          (op, cp) = case anns of
+            [o, c] -> ([o], [c])
+            [q, _, c] -> ([q], [c])
+            _ -> ([], [])
+        mkCTuple (oparens ++ (addLoc <$> op), (addLoc <$> cp) ++ cparens, cs) ts
   check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
     = check (ap_open ann':opi, ap_close ann':cpi, csi) ty
 
   -- No need for anns, returning original
-  check (_opi,_cpi,_csi) _t =
-                 return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
+  check (_opi,_cpi,_csi) _t = unprocessed
+
+  unprocessed =
+    return (L (EpAnn l (AnnContext Nothing [] []) emptyComments) [orig_t])
+
+  addLoc (AddEpAnn _ l) = l
+
+  mkCTuple (oparens, cparens, cs) ts =
+    -- Append parens so that the original order in the source is maintained
+    return (L (EpAnn l (AnnContext Nothing oparens cparens) cs) ts)
 
 checkImportDecl :: Maybe EpaLocation
                 -> Maybe EpaLocation
@@ -2084,6 +2114,9 @@ tyToDataConBuilder (L l (HsTyVar _ prom v)) = do
 tyToDataConBuilder (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) = do
   let data_con = L (l2l l) (getRdrName (tupleDataCon Boxed (length ts)))
   return $ L l (PrefixDataConBuilder (toOL ts) data_con)
+tyToDataConBuilder (L l (HsTupleTy _ HsUnboxedTuple ts)) = do
+  let data_con = L (l2l l) (getRdrName (tupleDataCon Unboxed (length ts)))
+  return $ L l (PrefixDataConBuilder (toOL ts) data_con)
 tyToDataConBuilder t =
   addFatalError $ mkPlainErrorMsgEnvelope (getLocA t) $
                     (PsErrInvalidDataCon (unLoc t))
@@ -2094,6 +2127,10 @@ checkNotPromotedDataCon NotPromoted _ = return ()
 checkNotPromotedDataCon IsPromoted (L l name) =
   addError $ mkPlainErrorMsgEnvelope (locA l) $
     PsErrIllegalPromotionQuoteDataCon name
+
+mkUnboxedSumCon :: LHsType GhcPs -> ConTag -> Arity -> (LocatedN RdrName, HsConDeclH98Details GhcPs)
+mkUnboxedSumCon t tag arity =
+  (noLocA (getRdrName (sumDataCon tag arity)), PrefixCon noTypeArgs [hsLinear t])
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3243,3 +3280,114 @@ mkRdrProjUpdate loc (L l flds) arg isPun anns =
     , hfbRHS = arg
     , hfbPun = isPun
   }
+
+-----------------------------------------------------------------------------
+-- Tuple and list punning
+
+punsAllowed :: P Bool
+punsAllowed = getBit ListTuplePunsBit
+
+-- | Check whether @ListTuplePuns@ is enabled and return the first arg if it is,
+-- the second arg otherwise.
+punsIfElse :: a -> a -> P a
+punsIfElse enabled disabled = do
+  allowed <- punsAllowed
+  pure (if allowed then enabled else disabled)
+
+-- | Emit an error of type 'PsErrInvalidPun' with a location from @start@ to
+-- @end@ if the extension @ListTuplePuns@ is disabled.
+--
+-- This is used in Parser.y to guard rules that require punning.
+requireLTPuns :: PsErrPunDetails -> Located a -> Located b -> P ()
+requireLTPuns err start end =
+  unlessM punsAllowed $ do
+    addError (mkPlainErrorMsgEnvelope loc (PsErrInvalidPun err))
+  where
+    loc = (combineSrcSpans (getLoc start) (getLoc end))
+
+-- | Call a parser with a span and its comments given by a start and end token.
+withCombinedComments ::
+  HasLoc l1 =>
+  HasLoc l2 =>
+  l1 ->
+  l2 ->
+  (SrcSpan -> EpAnnComments -> P a) ->
+  P (LocatedA a)
+withCombinedComments start end use = do
+  cs <- getCommentsFor fullSpan
+  a <- use fullSpan cs
+  pure (L (noAnnSrcSpan fullSpan) a)
+  where
+    fullSpan = combineSrcSpans (getHasLoc start) (getHasLoc end)
+
+-- | Decide whether to parse tuple syntax @(Int, Double)@ in a type as a
+-- type or data constructor, based on the extension @ListTuplePuns@.
+-- The case with an explicit promotion quote, @'(Int, Double)@, is handled
+-- by 'mkExplicitTupleTy'.
+mkTupleSyntaxTy :: EpaLocation
+                -> [LocatedA (HsType GhcPs)]
+                -> EpaLocation
+                -> P (HsType GhcPs)
+mkTupleSyntaxTy parOpen args parClose =
+  punsIfElse enabled disabled
+  where
+    enabled =
+      HsTupleTy annParen HsBoxedOrConstraintTuple args
+    disabled =
+      HsExplicitTupleTy annsKeyword args
+
+    annParen = AnnParen AnnParens parOpen parClose
+    annsKeyword = [AddEpAnn AnnOpenP parOpen, AddEpAnn AnnCloseP parClose]
+
+-- | Decide whether to parse tuple con syntax @(,)@ in a type as a
+-- type or data constructor, based on the extension @ListTuplePuns@.
+-- The case with an explicit promotion quote, @'(,)@, is handled
+-- by the rule @SIMPLEQUOTE sysdcon_nolist@ in @atype@.
+mkTupleSyntaxTycon :: Boxity -> Int -> P RdrName
+mkTupleSyntaxTycon boxity n =
+  punsIfElse
+    (getRdrName (tupleTyCon boxity n))
+    (getRdrName (tupleDataCon boxity n))
+
+-- | Decide whether to parse list tycon syntax @[]@ in a type as a type or data
+-- constructor, based on the extension @ListTuplePuns@.
+-- The case with an explicit promotion quote, @'[]@, is handled by
+-- 'mkExplicitListTy'.
+mkListSyntaxTy0 :: EpaLocation
+                -> EpaLocation
+                -> SrcSpan
+                -> EpAnnComments
+                -> P (HsType GhcPs)
+mkListSyntaxTy0 brkOpen brkClose span comments =
+  punsIfElse enabled disabled
+  where
+    enabled = HsTyVar noAnn NotPromoted rn
+
+    -- attach the comments only to the RdrName since it's the innermost AST node
+    rn = L (EpAnn fullLoc rdrNameAnn comments) listTyCon_RDR
+
+    disabled =
+      HsExplicitListTy annsKeyword NotPromoted []
+
+    rdrNameAnn = NameAnnOnly NameSquare brkOpen brkClose []
+    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    fullLoc = EpaSpan span
+
+-- | Decide whether to parse list type syntax @[Int]@ in a type as a
+-- type or data constructor, based on the extension @ListTuplePuns@.
+-- The case with an explicit promotion quote, @'[Int]@, is handled
+-- by 'mkExplicitListTy'.
+mkListSyntaxTy1 :: EpaLocation
+                -> LocatedA (HsType GhcPs)
+                -> EpaLocation
+                -> P (HsType GhcPs)
+mkListSyntaxTy1 brkOpen t brkClose =
+  punsIfElse enabled disabled
+  where
+    enabled = HsListTy annParen t
+
+    disabled =
+      HsExplicitListTy annsKeyword NotPromoted [t]
+
+    annsKeyword = [AddEpAnn AnnOpenS brkOpen, AddEpAnn AnnCloseS brkClose]
+    annParen = AnnParen AnnParensSquare brkOpen brkClose

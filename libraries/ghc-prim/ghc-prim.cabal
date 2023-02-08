@@ -59,7 +59,6 @@ Library
         GHC.Prim.PtrEq
         GHC.PrimopWrappers
         GHC.Tuple
-        GHC.Tuple.Prim
         GHC.Types
 
     virtual-modules:

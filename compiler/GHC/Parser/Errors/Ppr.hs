@@ -507,7 +507,25 @@ instance Diagnostic PsMessage where
                 , text "'" <> text [looks_like_char] <> text "' (" <> text looks_like_char_name <> text ")" <> comma
                 , text "but it is not" ]
 
-  diagnosticReason = \case
+    PsErrInvalidPun PEP_QuoteDisambiguation
+      -> mkSimpleDecorated $ vcat
+        [ text "Disambiguating data constructors of tuples and lists is disabled."
+        , text "Remove the quote to use the data constructor."
+        ]
+
+    PsErrInvalidPun PEP_TupleSyntaxType
+      -> mkSimpleDecorated $ vcat
+        [ text "Unboxed tuple data constructors are not supported in types."
+        , text "Use" <+> quotes (text "Tuple<n># a b c ...") <+> text "to refer to the type constructor."
+        ]
+
+    PsErrInvalidPun PEP_SumSyntaxType
+      -> mkSimpleDecorated $ vcat
+        [ text "Unboxed sum data constructors are not supported in types."
+        , text "Use" <+> quotes (text "Sum<n># a b c ...") <+> text "to refer to the type constructor."
+        ]
+
+  diagnosticReason  = \case
     PsUnknownMessage m                            -> diagnosticReason m
     PsHeaderMessage  m                            -> psHeaderMessageReason m
     PsWarnBidirectionalFormatChars{}              -> WarningWithFlag Opt_WarnUnicodeBidirectionalFormatCharacters
@@ -621,6 +639,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
+    PsErrInvalidPun {}                            -> ErrorWithoutFlag
 
   diagnosticHints = \case
     PsUnknownMessage m                            -> diagnosticHints m
@@ -788,6 +807,7 @@ instance Diagnostic PsMessage where
     PsErrInvalidCApiImport {}                     -> noHints
     PsErrMultipleConForNewtype {}                 -> noHints
     PsErrUnicodeCharLooksLike{}                   -> noHints
+    PsErrInvalidPun {}                            -> [suggestExtension LangExt.ListTuplePuns]
 
   diagnosticCode = constructorCode
 
