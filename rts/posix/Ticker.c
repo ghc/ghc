@@ -71,7 +71,7 @@
  * For older version of linux/netbsd without timerfd we fall back to the
  * pthread based implementation.
  */
-#if HAVE_SYS_TIMERFD_H
+#if defined(HAVE_SYS_TIMERFD_H)
 #define USE_TIMERFD_FOR_ITIMER
 #endif
 
