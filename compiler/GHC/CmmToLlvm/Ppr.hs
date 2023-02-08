@@ -40,8 +40,10 @@ pprLlvmData cfg (globals, types) =
 
 
 -- | Pretty print LLVM code
--- Both HDoc and SDoc are returned so that they can be dumped when
--- @Opt_D_dump_llvm@ is set.
+-- Thw HDoc we return is used to produce the final LLVM file, with the 
+-- SDoc being returned alongside for used when @Opt_D_dump_llvm@ is set
+-- as we can't (currently) dump HDocs.
+
 pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
 pprLlvmCmmDecl (CmmData _ lmdata) = do
   opts <- getConfig
