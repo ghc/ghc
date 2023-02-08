@@ -32,7 +32,7 @@ test('safePkg01',
       normalise_version("array", "ghc-bignum", "bytestring",
                         "base", "deepseq", "ghc-prim"),
       normalise_fun(normalise_errmsg),
-      js_skip],
+      js_broken(22356)],
      run_command, ['$MAKE -s --no-print-directory safePkg01 ' + make_args])
 
 # Fail since we enable package trust
