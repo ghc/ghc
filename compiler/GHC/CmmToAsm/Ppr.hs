@@ -248,6 +248,7 @@ pprGNUSectionHeader config t suffix =
       Text
         | OSMinGW32 <- platformOS platform
                     -> text ",\"xr\""
+        | otherwise -> text ",\"ax\"," <> sectionType platform "progbits"
       CString
         | OSMinGW32 <- platformOS platform
                     -> empty
