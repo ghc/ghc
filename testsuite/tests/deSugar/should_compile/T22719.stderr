@@ -6,7 +6,7 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 ex1 :: ()
 [GblId, Unf=OtherCon []]
-ex1 = GHC.Tuple.Prim.()
+ex1 = GHC.Tuple.()
 
 Rec {
 -- RHS size: {terms: 15, types: 5, coercions: 0, joins: 0/0}
@@ -25,7 +25,7 @@ end Rec }
 -- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
 ex2 :: ()
 [GblId]
-ex2 = case f (GHC.Types.I# 10#) of { T -> GHC.Tuple.Prim.() }
+ex2 = case f (GHC.Types.I# 10#) of { T -> GHC.Tuple.() }
 
 
 

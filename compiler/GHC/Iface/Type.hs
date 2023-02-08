@@ -71,7 +71,8 @@ import {-# SOURCE #-} GHC.Builtin.Types
                                  , tupleTyConName
                                  , tupleDataConName
                                  , manyDataConTyCon
-                                 , liftedRepTyCon, liftedDataConTyCon )
+                                 , liftedRepTyCon, liftedDataConTyCon
+                                 , sumTyCon )
 import GHC.Core.Type ( isRuntimeRepTy, isMultiplicityTy, isLevityTy, funTyFlagTyCon )
 import GHC.Core.TyCo.Rep( CoSel )
 import GHC.Core.TyCo.Compare( eqForAllVis )
@@ -843,7 +844,7 @@ Note [Printing type abbreviations]
 Normally, we pretty-print
    `TYPE       'LiftedRep` as `Type` (or `*`)
    `CONSTRAINT 'LiftedRep` as `Constraint`
-   `FUN 'Many`             as `(->)`.
+   `FUN 'Many`             as `(->)`
 This way, error messages don't refer to representation polymorphism
 or linearity if it is not necessary.  Normally we'd would represent
 these types using their synonyms (see GHC.Core.Type
@@ -968,7 +969,7 @@ ppr_ty _         (IfaceForAllTy {})     = panic "ppr_ty"  -- Covered by not.isIf
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [Free tyvars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
-ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys -- always fully saturated
+ppr_ty ctxt_prec (IfaceTupleTy i p tys) = ppr_tuple ctxt_prec i p tys -- always fully saturated
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
 
         -- Function types
@@ -1574,14 +1575,14 @@ pprTyTcApp ctxt_prec tc tys =
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
        , not debug
        , arity == ifaceVisAppArgsLength tys
-       -> pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
-           -- NB: pprTuple requires a saturated tuple.
+       -> ppr_tuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
+           -- NB: ppr_tuple requires a saturated tuple.
 
        | IfaceSumTyCon arity <- ifaceTyConSort info
        , not debug
        , arity == ifaceVisAppArgsLength tys
-       -> pprSum (ifaceTyConIsPromoted info) tys
-           -- NB: pprSum requires a saturated unboxed sum.
+       -> ppr_sum ctxt_prec (ifaceTyConIsPromoted info) tys
+           -- NB: ppr_sum requires a saturated unboxed sum.
 
        | tc `ifaceTyConHasKey` consDataConKey
        , False <- print_kinds
@@ -1750,68 +1751,104 @@ ppr_iface_tc_app pp ctxt_prec tc tys =
      | otherwise
      -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
--- | Pretty-print an unboxed sum type. The sum should be saturated:
--- as many visible arguments as the arity of the sum.
+data TupleOrSum = IsSum | IsTuple TupleSort
+  deriving (Eq)
+
+-- | Pretty-print a boxed tuple datacon in regular tuple syntax.
+-- Used when -XListTuplePuns is disabled.
+ppr_tuple_no_pun :: PprPrec -> [IfaceType] -> SDoc
+ppr_tuple_no_pun ctxt_prec = \case
+  [t] -> maybeParen ctxt_prec appPrec (text "MkSolo" <+> pprPrecIfaceType appPrec t)
+  tys -> tupleParens BoxedTuple (pprWithCommas pprIfaceType tys)
+
+-- | Pretty-print an unboxed tuple or sum type in its parenthesized, punned, form.
+-- Used when -XListTuplePuns is enabled.
+--
+-- The tycon should be saturated:
+-- as many visible arguments as the arity of the sum or tuple.
 --
 -- NB: this always strips off the invisible 'RuntimeRep' arguments,
 -- even with `-fprint-explicit-runtime-reps` and `-fprint-explicit-kinds`.
-pprSum :: PromotionFlag -> IfaceAppArgs -> SDoc
-pprSum is_promoted args
-  =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-    let tys   = appArgsIfaceTypes args
-        args' = drop (length tys `div` 2) tys
-    in pprPromotionQuoteI is_promoted
-       <> sumParens (pprWithBars (ppr_ty topPrec) args')
+ppr_tuple_sum_pun :: PprPrec -> TupleOrSum -> PromotionFlag -> IfaceType -> Arity -> [IfaceType] -> SDoc
+ppr_tuple_sum_pun ctxt_prec sort promoted tc arity tys
+  | IsSum <- sort
+  = sumParens (pprWithBars (ppr_ty topPrec) tys)
+
+  |  IsTuple ConstraintTuple <- sort
+  ,  NotPromoted <- promoted
+  ,  arity == 0
+  = maybeParen ctxt_prec sigPrec $
+    text "() :: Constraint"
+
+  -- Special-case unary boxed tuples so that they are pretty-printed as
+  -- `Solo x`, not `(x)`
+  | IsTuple BoxedTuple <- sort
+  , arity == 1
+  = pprPrecIfaceType ctxt_prec tc
+
+  | IsTuple tupleSort <- sort
+  = pprPromotionQuoteI promoted <>
+    tupleParens tupleSort (quote_space (pprWithCommas pprIfaceType tys))
+  where
+    quote_space = case promoted of
+      IsPromoted -> spaceIfSingleQuote
+      NotPromoted -> id
+
+-- | Pretty-print an unboxed tuple or sum type either in the punned or unpunned form,
+-- depending on whether -XListTuplePuns is enabled.
+ppr_tuple_sum :: PprPrec -> TupleOrSum -> PromotionFlag -> IfaceAppArgs -> SDoc
+ppr_tuple_sum ctxt_prec sort is_promoted args =
+  sdocOption sdocListTuplePuns $ \case
+    True -> ppr_tuple_sum_pun ctxt_prec sort is_promoted prefix_tc arity non_rep_tys
+    False
+      | IsPromoted <- is_promoted
+      , IsTuple BoxedTuple <- sort
+      -> ppr_tuple_no_pun ctxt_prec non_rep_tys
+      | otherwise
+      -> pprPrecIfaceType ctxt_prec prefix_tc
+  where
+    -- This tycon is used to print in prefix notation for the punned Solo
+    -- case and the unabbreviated case.
+    prefix_tc = IfaceTyConApp (IfaceTyCon (mk_name arity) info) args
+
+    info = mkIfaceTyConInfo NotPromoted IfaceNormalTyCon
+
+    mk_name = case (sort, is_promoted) of
+      (IsTuple BoxedTuple, IsPromoted) -> tupleDataConName Boxed
+      (IsTuple s, _) -> tupleTyConName s
+      (IsSum, _) -> tyConName . sumTyCon
+
+    -- drop the RuntimeRep vars.
+    -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
+    non_rep_tys = if strip_reps then drop arity all_tys else all_tys
+
+    arity = if strip_reps then count `div` 2 else count
+
+    count = length all_tys
+
+    all_tys = appArgsIfaceTypes args
+
+    strip_reps = case is_promoted of
+      IsPromoted -> True
+      NotPromoted -> strip_reps_sort
+
+    strip_reps_sort = case sort of
+      IsTuple BoxedTuple -> False
+      IsTuple UnboxedTuple -> True
+      IsTuple ConstraintTuple -> False
+      IsSum -> True
+
+-- | Pretty-print an unboxed sum type.
+-- The sum should be saturated: as many visible arguments as the arity of
+-- the sum.
+ppr_sum :: PprPrec -> PromotionFlag -> IfaceAppArgs -> SDoc
+ppr_sum ctxt_prec = ppr_tuple_sum ctxt_prec IsSum
 
 -- | Pretty-print a tuple type (boxed tuple, constraint tuple, unboxed tuple).
 -- The tuple should be saturated: as many visible arguments as the arity of
 -- the tuple.
---
--- NB: this always strips off the invisible 'RuntimeRep' arguments,
--- even with `-fprint-explicit-runtime-reps` and `-fprint-explicit-kinds`.
-pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
-pprTuple ctxt_prec sort promoted args =
-  case promoted of
-    IsPromoted
-      -> let tys = appArgsIfaceTypes args
-             args' = drop (length tys `div` 2) tys
-         in ppr_tuple_app args' $
-            pprPromotionQuoteI IsPromoted <>
-            tupleParens sort (spaceIfSingleQuote (pprWithCommas pprIfaceType args'))
-
-    NotPromoted
-      |  ConstraintTuple <- sort
-      ,  IA_Nil <- args
-      -> maybeParen ctxt_prec sigPrec $
-         text "() :: Constraint"
-
-      | otherwise
-      ->   -- drop the RuntimeRep vars.
-           -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-         let tys   = appArgsIfaceTypes args
-             args' = case sort of
-                       UnboxedTuple -> drop (length tys `div` 2) tys
-                       _            -> tys
-         in
-         ppr_tuple_app args' $
-         pprPromotionQuoteI promoted <>
-         tupleParens sort (pprWithCommas pprIfaceType args')
-  where
-    ppr_tuple_app :: [IfaceType] -> SDoc -> SDoc
-    ppr_tuple_app args_wo_runtime_reps ppr_args_w_parens
-        -- Special-case unary boxed tuples so that they are pretty-printed as
-        -- `Solo x`, not `(x)`
-      | [_] <- args_wo_runtime_reps
-      , BoxedTuple <- sort
-      = let solo_tc_info = mkIfaceTyConInfo promoted IfaceNormalTyCon
-            tupleName = case promoted of
-              IsPromoted -> tupleDataConName (tupleSortBoxity sort)
-              NotPromoted -> tupleTyConName sort
-            solo_tc = IfaceTyCon (tupleName 1) solo_tc_info in
-        pprPrecIfaceType ctxt_prec $ IfaceTyConApp solo_tc args
-      | otherwise
-      = ppr_args_w_parens
+ppr_tuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
+ppr_tuple ctxt_prec sort = ppr_tuple_sum ctxt_prec (IsTuple sort)
 
 pprIfaceTyLit :: IfaceTyLit -> SDoc
 pprIfaceTyLit (IfaceNumTyLit n) = integer n

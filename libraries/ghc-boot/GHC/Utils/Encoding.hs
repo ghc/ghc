@@ -81,7 +81,6 @@ The basic encoding scheme is this.
         (,,,,)          Z5T     5-tuple
         (# #)           Z1H     unboxed 1-tuple (note the space)
         (#,,,,#)        Z5H     unboxed 5-tuple
-                (NB: There is no Z1T nor Z0H.)
 -}
 
 type UserString = String        -- As the user typed it
@@ -223,20 +222,21 @@ Tuples are encoded as
 for 3-tuples or unboxed 3-tuples respectively.  No other encoding starts
         Z<digit>
 
-* "(# #)" is the tycon for an unboxed 1-tuple (not 0-tuple)
-  There are no unboxed 0-tuples.
+* "(##)" is the tycon for an unboxed 0-tuple
+* "(# #)" is the tycon for an unboxed 1-tuple
 
 * "()" is the tycon for a boxed 0-tuple.
-  There are no boxed 1-tuples.
 -}
 
 maybe_tuple :: UserString -> Maybe EncodedString
 
+maybe_tuple "(##)" = Just("Z0H")
 maybe_tuple "(# #)" = Just("Z1H")
 maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
                                  (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
                                  _                  -> Nothing
 maybe_tuple "()" = Just("Z0T")
+maybe_tuple "MkSolo" = Just("Z1T")
 maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
                                  (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
                                  _            -> Nothing

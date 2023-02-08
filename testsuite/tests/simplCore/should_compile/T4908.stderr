@@ -49,9 +49,9 @@ T4908.f_$s$wf
         __DEFAULT ->
           case sc1 of ds1 {
             __DEFAULT -> T4908.f_$s$wf sc ds1 (-# ds 1#);
-            0# -> GHC.Prim.(##)
+            0# -> GHC.Types.(##)
           };
-        0# -> GHC.Prim.(##)
+        0# -> GHC.Types.(##)
       }
 end Rec }
 

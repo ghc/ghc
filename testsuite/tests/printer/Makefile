@@ -811,3 +811,8 @@ Test23885:
 	# ppr is not currently unicode aware
 	# $(CHECK_PPR)   $(LIBDIR) Test23885.hs
 	$(CHECK_EXACT) $(LIBDIR) Test23885.hs
+
+.PHONY: AnnotationNoListTuplePuns
+AnnotationNoListTuplePuns:
+	$(CHECK_PPR)   $(LIBDIR) AnnotationNoListTuplePuns.hs
+	$(CHECK_EXACT) $(LIBDIR) AnnotationNoListTuplePuns.hs

@@ -48,7 +48,7 @@ $krep2_r1fT = GHC.Types.: @GHC.Types.KindRep $krep_r1fR $krep1_r1fS
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep3_r1fU :: GHC.Types.KindRep
-$krep3_r1fU = GHC.Types.KindRepTyConApp GHC.Tuple.Prim.$tcTuple2 $krep2_r1fT
+$krep3_r1fU = GHC.Types.KindRepTyConApp GHC.Tuple.$tcTuple2 $krep2_r1fT
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18174.$tcT2 :: GHC.Prim.Addr#

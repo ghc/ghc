@@ -13,7 +13,7 @@ module GHC.Tc.Instance.Typeable(mkTypeableBinds, tyConIsTypeable) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Types.Basic ( Boxity(..), TypeOrConstraint(..), neverInlinePragma )
+import GHC.Types.Basic ( TypeOrConstraint(..), neverInlinePragma )
 import GHC.Types.SourceText ( SourceText(..) )
 import GHC.Iface.Env( newGlobalBinder )
 import GHC.Core.TyCo.Rep( Type(..), TyLit(..) )
@@ -25,7 +25,7 @@ import GHC.Types.TyThing ( lookupId )
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim ( primTyCons )
 import GHC.Builtin.Types
-                  ( tupleTyCon, sumTyCon, runtimeRepTyCon
+                  ( runtimeRepTyCon
                   , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 import GHC.Types.Name
@@ -39,7 +39,6 @@ import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type
-import GHC.Settings.Constants
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -105,7 +104,7 @@ There are many wrinkles:
 
 * GHC.Prim doesn't have any associated object code, so we need to put the
   representations for types defined in this module elsewhere. We chose this
-  place to be GHC.Types. GHC.Tc.Instance.Typeable.mkPrimTypeableBinds is responsible for
+  place to be GHC.Types. GHC.Tc.Instance.Typeable.mkPrimTypeableTodos is responsible for
   injecting the bindings for the GHC.Prim representations when compiling
   GHC.Types.
 
@@ -354,12 +353,10 @@ mkPrimTypeableTodos
 -- The majority of the types we need here are contained in 'primTyCons'.
 -- However, not all of them: in particular unboxed tuples are absent since we
 -- don't want to include them in the original name cache. See
--- Note [Built-in syntax and the OrigNameCache] in "GHC.Iface.Env" for more.
+-- Note [Built-in syntax and the OrigNameCache] in "GHC.Types.Name.Cache" for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
-    , map sumTyCon [2..mAX_SUM_SIZE]
-    , primTyCons
+    [ primTyCons
     ]
 
 -- | These are types which are defined in GHC.Types but are needed in order to

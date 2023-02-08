@@ -68,5 +68,6 @@ docs:
          ImportQualifiedPost
          StandaloneKindSignatures
          FieldSelectors
+         ListTuplePuns
 extensible fields:
 

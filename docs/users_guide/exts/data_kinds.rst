@@ -295,3 +295,82 @@ following ways:
        -- Symbol, which requires DataKinds to use in a kind position
        data D4 :: MySymbol -> Type
        data D4 a
+
+Unique syntax for type-level lists and tuples
+=============================================
+
+.. extension:: ListTuplePuns
+    :shortdesc: Enable punning for list, tuple and sum types.
+
+    :since: 9.10.1
+
+    Accept bracket syntax to denote type constructors, using single quotes to
+    disambiguate data constructors.
+
+The previously defined mechanism for specifying data constructors with bracket
+syntax and single quotes is governed by this extension, which is enabled by
+default.
+
+With ``NoListTuplePuns``, brackets are unambiguously parsed as data
+constructors, while the single quote is not accepted as a prefix for them
+anymore.
+Type constructors cannot be expressed with brackets anymore; instead, new
+data type declarations in regular syntax have been added to ``ghc-prim``: ::
+
+    data List a = [] | a : List a
+    data Unit = ()
+    data Tuple2 a b = (a, b)
+    data Tuple2# a b = (# a, b #)
+    data Sum2# a b = (# a | #) | (# | b #)
+    class (a, b) => CTuple2 a b
+    instance (c1, c2) => CTuple2 c1 c2
+
+`CTuple2` is a constraint tuple, which historically only concerns declarations
+like: ::
+
+    type C = (Eq Int, Ord String)
+
+These are distinct from the usual specification of multiple constraints on
+functions or instances with parentheses, since those are treated specially by
+GHC.
+
+When the extension is disabled, any occurrence of special syntax in types will
+be treated as the data constructor, so a type of ``(Int, String)`` has kind
+``Tuple2 Type Type``, corresponding to the type ``'(Int, String)`` with kind
+``(Type, Type)`` when ``ListTuplePuns`` is enabled.
+
+The explicit disambiguation syntax using single quotes is invalid syntax when
+the extension is disabled.
+
+The earlier example would need to be rewritten like this: ::
+
+    data HList :: List Type -> Type where
+      HNil  :: HList []
+      HCons :: a -> HList t -> HList (a : t)
+
+    data Tuple :: Tuple2 Type Type -> Type where
+      Tuple :: a -> b -> Tuple2 a b
+
+    foo0 :: HList []
+    foo0 = HNil
+
+    foo1 :: HList [Int]
+    foo1 = HCons (3 :: Int) HNil
+
+    foo2 :: HList [Int, Bool]
+    foo2 = ...
+
+Constraint tuples may be mixed with conventional syntax: ::
+
+    f ::
+      Monad m =>
+      CTuple2 (Monad m) (Monad m) =>
+      (Monad m, CTuple2 (Monad m) (Monad m)) =>
+      m Int
+    f = pure 5
+
+The new type constructors are exported only from the library
+``ghc-experimental``, by the modules ``Data.Tuple.Experimental``,
+``Data.Sum.Experimental`` and ``Prelude.Experimental``.
+
+Please refer to `GHC Proposal #475 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst>`__ for the full specification of effects and interactions.

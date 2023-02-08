@@ -2,7 +2,7 @@
 module DataToTagSolving where
 
 import GHC.Exts
-import GHC.Tuple.Prim
+import GHC.Tuple
 import Data.Void (absurd)
 import Type.Reflection
 

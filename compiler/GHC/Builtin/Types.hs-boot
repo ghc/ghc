@@ -15,6 +15,7 @@ mkBoxedTupleTy :: [Type] -> Type
 coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
+unitTyCon :: TyCon
 
 liftedTypeKindTyConName :: Name
 constraintKindTyConName :: Name

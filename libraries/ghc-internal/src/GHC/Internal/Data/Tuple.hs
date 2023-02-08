@@ -16,7 +16,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Internal.Data.Tuple
-  ( Solo (..)
+  ( Solo (Solo, MkSolo)
   , getSolo
   , fst
   , snd

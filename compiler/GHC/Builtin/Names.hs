@@ -561,7 +561,6 @@ gHC_CLASSES        = mkPrimModule (fsLit "GHC.Classes")
 gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
 gHC_INTERNAL_TUPLE                  = mkPrimModule (fsLit "GHC.Tuple")
-gHC_INTERNAL_TUPLE_PRIM             = mkPrimModule (fsLit "GHC.Tuple.Prim")
 
 pRELUDE, dATA_LIST, cONTROL_MONAD_ZIP :: Module
 pRELUDE            = mkBaseModule_ pRELUDE_NAME
@@ -576,7 +575,7 @@ gHC_INTERNAL_NUM_BIGNAT             = mkBignumModule (fsLit "GHC.Num.BigNat")
 gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
     gHC_INTERNAL_GHCI, gHC_INTERNAL_GHCI_HELPERS, gHC_CSTRING, gHC_INTERNAL_DATA_STRING,
     gHC_INTERNAL_SHOW, gHC_INTERNAL_READ, gHC_INTERNAL_NUM, gHC_INTERNAL_MAYBE,
-    gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_TUPLE_PRIM, gHC_INTERNAL_DATA_EITHER,
+    gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_DATA_EITHER,
     gHC_INTERNAL_DATA_FOLDABLE, gHC_INTERNAL_DATA_TRAVERSABLE,
     gHC_INTERNAL_CONC, gHC_INTERNAL_IO, gHC_INTERNAL_IO_Exception,
     gHC_INTERNAL_ST, gHC_INTERNAL_IX, gHC_INTERNAL_STABLE, gHC_INTERNAL_PTR, gHC_INTERNAL_ERR, gHC_INTERNAL_REAL,
@@ -662,6 +661,10 @@ gHC_INTERNAL_OVER_LABELS = mkGhcInternalModule (fsLit "GHC.Internal.OverloadedLa
 gHC_INTERNAL_RECORDS :: Module
 gHC_INTERNAL_RECORDS = mkGhcInternalModule (fsLit "GHC.Internal.Records")
 
+dATA_TUPLE_EXPERIMENTAL, dATA_SUM_EXPERIMENTAL :: Module
+dATA_TUPLE_EXPERIMENTAL = mkExperimentalModule (fsLit "Data.Tuple.Experimental")
+dATA_SUM_EXPERIMENTAL = mkExperimentalModule (fsLit "Data.Sum.Experimental")
+
 rOOT_MAIN :: Module
 rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
@@ -702,6 +705,9 @@ mkMainModule m = mkModule mainUnit (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
 mkMainModule_ m = mkModule mainUnit m
+
+mkExperimentalModule :: FastString -> Module
+mkExperimentalModule m = mkModule experimentalUnit (mkModuleNameFS m)
 
 {-
 ************************************************************************
@@ -2761,57 +2767,3 @@ interactiveClassNames
 
 interactiveClassKeys :: [Unique]
 interactiveClassKeys = map getUnique interactiveClassNames
-
-{-
-************************************************************************
-*                                                                      *
-   Semi-builtin names
-*                                                                      *
-************************************************************************
-
-Note [pretendNameIsInScope]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In general, we filter out instances that mention types whose names are
-not in scope. However, in the situations listed below, we make an exception
-for some commonly used names, such as Data.Kind.Type, which may not actually
-be in scope but should be treated as though they were in scope.
-This includes built-in names, as well as a few extra names such as
-'Type', 'TYPE', 'BoxedRep', etc.
-
-Situations in which we apply this special logic:
-
-  - GHCi's :info command, see GHC.Runtime.Eval.getInfo.
-    This fixes #1581.
-
-  - When reporting instance overlap errors. Not doing so could mean
-    that we would omit instances for typeclasses like
-
-      type Cls :: k -> Constraint
-      class Cls a
-
-    because BoxedRep/Lifted were not in scope.
-    See GHC.Tc.Errors.potentialInstancesErrMsg.
-    This fixes one of the issues reported in #20465.
--}
-
--- | Should this name be considered in-scope, even though it technically isn't?
---
--- This ensures that we don't filter out information because, e.g.,
--- Data.Kind.Type isn't imported.
---
--- See Note [pretendNameIsInScope].
-pretendNameIsInScope :: Name -> Bool
-pretendNameIsInScope n
-  = isBuiltInSyntax n
-  || isTupleTyConName n
-  || any (n `hasKey`)
-    [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
-    , liftedDataConKey, unliftedDataConKey
-    , tYPETyConKey
-    , cONSTRAINTTyConKey
-    , runtimeRepTyConKey, boxedRepDataConKey
-    , eqTyConKey
-    , listTyConKey
-    , oneDataConKey
-    , manyDataConKey
-    , fUNTyConKey, unrestrictedFunTyConKey ]

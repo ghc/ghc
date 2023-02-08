@@ -8,8 +8,8 @@ VecCount: GHC.Types
 'Vec2: GHC.Types
 VecElem: GHC.Types
 'Int8ElemRep: GHC.Types
-((),()): GHC.Tuple.Prim
-(#,#) ('BoxedRep 'Lifted) ('BoxedRep 'Lifted) () (): GHC.Prim
+((),()): GHC.Tuple
+(# (),() #): GHC.Types
 Int64#: GHC.Prim
 Word64#: GHC.Prim
 TYPE: GHC.Prim

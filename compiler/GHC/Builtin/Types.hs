@@ -6,6 +6,7 @@ Wired-in knowledge about {\em non-primitive} types
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -19,7 +20,8 @@ module GHC.Builtin.Types (
         mkWiredInIdName,    -- used in GHC.Types.Id.Make
 
         -- * All wired in things
-        wiredInTyCons, isBuiltInOcc_maybe, isTupleTyOcc_maybe, isPunOcc_maybe,
+        wiredInTyCons, isBuiltInOcc_maybe, isTupleTyOcc_maybe, isSumTyOcc_maybe,
+        isPunOcc_maybe,
 
         -- * Bool
         boolTy, boolTyCon, boolTyCon_RDR, boolTyConName,
@@ -158,7 +160,9 @@ module GHC.Builtin.Types (
         integerINDataCon, integerINDataConName,
         naturalTy, naturalTyCon, naturalTyConName,
         naturalNSDataCon, naturalNSDataConName,
-        naturalNBDataCon, naturalNBDataConName
+        naturalNBDataCon, naturalNBDataConName,
+
+         pretendNameIsInScope,
     ) where
 
 import GHC.Prelude
@@ -215,8 +219,8 @@ import Data.Foldable
 import Data.List        ( elemIndex, intersperse )
 import Numeric          ( showInt )
 
-import Text.Read (readMaybe)
 import Data.Char (ord, isDigit)
+import Control.Applicative ((<|>))
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -706,27 +710,27 @@ Note [How tuples work]
 
 * UnboxedTuples
     - A wired-in type
-    - Have a pretend DataCon, defined in GHC.Prim,
+    - Data type declarations in GHC.Types
       but no actual declaration and no info table
 
 * ConstraintTuples
     - A wired-in type.
     - Declared as classes in GHC.Classes, e.g.
-         class (c1,c2) => (c1,c2)
+         class (c1,c2) => CTuple2 c1 c2
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
-         instance (c1,c2) => (c1,c2)
+         instance (c1,c2) => CTuple2 c1 c2
       See GHC.Tc.Instance.Class.matchCTuple
     - Currently just go up to 64; beyond that
       you have to use manual nesting
-    - Their OccNames look like (%,,,%), so they can easily be
-      distinguished from term tuples.  But (following Haskell) we
-      pretty-print saturated constraint tuples with round parens;
-      see BasicTypes.tupleParens.
     - Unlike BoxedTuples and UnboxedTuples, which only wire
       in type constructors and data constructors, ConstraintTuples also wire in
-      superclass selector functions. For instance, $p1(%,%) and $p2(%,%) are
+      superclass selector functions. For instance, $p1CTuple2 and $p2CTuple2 are
       the selectors for the binary constraint tuple.
+    - The parenthesis syntax for grouping constraints in contexts is not treated
+      as a constraint tuple. The parser starts with a tuple type, then a
+      postprocessing action extracts the individual constraints as a list and
+      stores them in the context field of types like HsQualTy.
 
 * In quite a lot of places things are restricted just to
   BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
@@ -812,7 +816,7 @@ known-key is the next-best way to teach the internals of the compiler about it.
 -- with BuiltInSyntax. However, this should only be necessary while resolving
 -- names produced by Template Haskell splices since we take care to encode
 -- built-in syntax names specially in interface files. See
--- Note [Symbol table representation of names].
+-- Note [Symbol table representation of names] in GHC.Iface.Binary.
 --
 -- Moreover, there is no need to include names of things that the user can't
 -- write (e.g. type representation bindings like $tc(,,,)).
@@ -826,7 +830,7 @@ isBuiltInOcc_maybe occ =
       "FUN"  -> Just fUNTyConName
       "->"  -> Just unrestrictedFunTyConName
 
-      -- boxed tuple data/tycon
+      -- tuple data/tycon
       -- We deliberately exclude Solo (the boxed 1-tuple).
       -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
       "()"    -> Just $ tup_name Boxed 0
@@ -834,9 +838,25 @@ isBuiltInOcc_maybe occ =
         , (commas, rest') <- BS.span (==',') rest
         , ")" <- rest'
              -> Just $ tup_name Boxed (1+BS.length commas)
+      _ | Just rest <- "Tuple" `BS.stripPrefix` name
+        , Just (num, trailing) <- BS.readInt rest
+        , num >= 2 && num <= 64
+             -> if
+             | BS.null trailing -> Just $ tup_name Boxed num
+             | "#" == trailing -> Just $ tup_name Unboxed num
+             | otherwise -> Nothing
+
+      "CUnit" -> Just $ choose_ns (cTupleTyConName 0) (cTupleDataConName 0)
+      "CSolo" -> Just $ choose_ns (cTupleTyConName 1) (cTupleDataConName 1)
+      _ | Just rest <- "CTuple" `BS.stripPrefix` name
+        , Just (num, trailing) <- BS.readInt rest
+        , BS.null trailing
+        , num >= 2 && num <= 64
+             -> Just $ choose_ns (cTupleTyConName num) (cTupleDataConName num)
 
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
+      "Unit#" -> Just $ tup_name Unboxed 0
       "Solo#" -> Just $ tup_name Unboxed 1
       _ | Just rest <- "(#" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
@@ -858,6 +878,12 @@ isBuiltInOcc_maybe occ =
              -> let arity = nb_pipes1 + nb_pipes2 + 1
                     alt = nb_pipes1 + 1
                 in Just $ dataConName $ sumDataCon alt arity
+      _ | Just rest <- "Sum" `BS.stripPrefix` name
+        , Just (num, trailing) <- BS.readInt rest
+        , num >= 2 && num <= 64
+        , trailing == "#"
+             -> Just $ tyConName $ sumTyCon num
+
       _ -> Nothing
   where
     name = bytesFS $ occNameFS occ
@@ -883,12 +909,14 @@ isBuiltInOcc_maybe occ =
 
 isTupleTyOcc_maybe :: Module -> OccName -> Maybe Name
 isTupleTyOcc_maybe mod occ
-  | mod == gHC_INTERNAL_TUPLE_PRIM
+  | mod == gHC_INTERNAL_TUPLE || mod == gHC_TYPES
   = match_occ
   where
     match_occ
       | occ == occName unitTyConName = Just unitTyConName
       | occ == occName soloTyConName = Just soloTyConName
+      | occ == occName unboxedUnitTyConName = Just unboxedUnitTyConName
+      | occ == occName unboxedSoloTyConName = Just unboxedSoloTyConName
       | otherwise = isTupleNTyOcc_maybe occ
 isTupleTyOcc_maybe _ _ = Nothing
 
@@ -897,17 +925,39 @@ isTupleTyOcc_maybe _ _ = Nothing
 isTupleNTyOcc_maybe :: OccName -> Maybe Name
 isTupleNTyOcc_maybe occ =
   case occNameString occ of
-    'T':'u':'p':'l':'e':str | Just n <- readInt str, n > 1
-      -> Just (tupleTyConName BoxedTuple n)
+    'T':'u':'p':'l':'e':str | Just (sort, n) <- arity_and_boxity str, n > 1
+      -> Just (tupleTyConName sort n)
+    _ -> Nothing
+
+isSumTyOcc_maybe :: Module -> OccName -> Maybe Name
+isSumTyOcc_maybe mod occ | mod == gHC_TYPES =
+  isSumNTyOcc_maybe occ
+isSumTyOcc_maybe _ _ = Nothing
+
+isSumNTyOcc_maybe :: OccName -> Maybe Name
+isSumNTyOcc_maybe occ =
+  case occNameString occ of
+    'S':'u':'m':str | Just (UnboxedTuple, n) <- arity_and_boxity str, n > 1
+      -> Just (tyConName (sumTyCon n))
     _ -> Nothing
 
 -- | See Note [Small Ints parsing]
-readInt :: String -> Maybe Int
-readInt s = case s of
-  [c] | isDigit c -> Just (digit_to_int c)
-  [c1, c2] | isDigit c1, isDigit c2
-    -> Just (digit_to_int c1 * 10 + digit_to_int c2)
-  _ -> readMaybe s
+--
+-- Analyze a string as the suffix of an OccName of a tuple or sum tycon to
+-- determine its arity and boxity (based on the presence of a @#@).
+arity_and_boxity :: String -> Maybe (TupleSort, Int)
+arity_and_boxity s = case s of
+  c1 : t1 | isDigit c1 -> case t1 of
+    [] -> Just (BoxedTuple, digit_to_int c1)
+    ['#'] -> Just (UnboxedTuple, digit_to_int c1)
+    c2 : t2 | isDigit c2 ->
+      let ar = digit_to_int c1 * 10 + digit_to_int c2
+      in case t2 of
+        [] -> Just (BoxedTuple, ar)
+        ['#'] -> Just (UnboxedTuple, ar)
+        _ -> Nothing
+    _ -> Nothing
+  _ -> Nothing
   where
     digit_to_int :: Char -> Int
     digit_to_int c = ord c - ord '0'
@@ -935,23 +985,25 @@ isPunOcc_maybe :: Module -> OccName -> Maybe Name
 isPunOcc_maybe mod occ
   | mod == gHC_TYPES, occ == occName listTyConName
   = Just listTyConName
-  | mod == gHC_INTERNAL_TUPLE_PRIM, occ == occName unitTyConName
+  | mod == gHC_INTERNAL_TUPLE, occ == occName unitTyConName
   = Just unitTyConName
-  | mod == gHC_INTERNAL_TUPLE_PRIM
-  = isTupleNTyOcc_maybe occ
+  | mod == gHC_TYPES, occ == occName unboxedUnitTyConName
+  = Just unboxedUnitTyConName
+  | mod == gHC_INTERNAL_TUPLE || mod == gHC_TYPES
+  = isTupleNTyOcc_maybe occ <|> isSumNTyOcc_maybe occ
 isPunOcc_maybe _ _ = Nothing
 
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple
 mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr ns ar)
-mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ar)
+mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ns ar)
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
 mkTupleStr :: Boxity -> NameSpace -> Arity -> String
 mkTupleStr Boxed   = mkBoxedTupleStr
-mkTupleStr Unboxed = const mkUnboxedTupleStr
+mkTupleStr Unboxed = mkUnboxedTupleStr
 
 mkBoxedTupleStr :: NameSpace -> Arity -> String
 mkBoxedTupleStr ns 0
@@ -964,15 +1016,22 @@ mkBoxedTupleStr ns ar
   | isDataConNameSpace ns = '(' : commas ar ++ ")"
   | otherwise             = "Tuple" ++ showInt ar ""
 
-mkUnboxedTupleStr :: Arity -> String
-mkUnboxedTupleStr 0  = "(##)"
-mkUnboxedTupleStr 1  = "Solo#"  -- See Note [One-tuples]
-mkUnboxedTupleStr ar = "(#" ++ commas ar ++ "#)"
+
+mkUnboxedTupleStr :: NameSpace -> Arity -> String
+mkUnboxedTupleStr ns 0
+  | isDataConNameSpace ns = "(##)"
+  | otherwise             = "Unit#"
+mkUnboxedTupleStr ns 1
+  | isDataConNameSpace ns = "(# #)"  -- See Note [One-tuples]
+  | otherwise             = "Solo#"
+mkUnboxedTupleStr ns ar
+  | isDataConNameSpace ns = "(#" ++ commas ar ++ "#)"
+  | otherwise             = "Tuple" ++ show ar ++ "#"
 
 mkConstraintTupleStr :: Arity -> String
-mkConstraintTupleStr 0  = "(%%)"
-mkConstraintTupleStr 1  = "Solo%"   -- See Note [One-tuples]
-mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
+mkConstraintTupleStr 0 = "CUnit"
+mkConstraintTupleStr 1 = "CSolo"
+mkConstraintTupleStr ar = "CTuple" ++ show ar
 
 commas :: Arity -> String
 commas ar = replicate (ar-1) ','
@@ -1030,8 +1089,8 @@ cTupleSelId sc_pos arity
            ++ "(superclass position: " ++ show sc_pos
            ++ ", arity: " ++ show arity ++ ")")
 
-  | arity < 2
-  = panic ("cTupleSelId: Arity starts from 2. "
+  | arity < 1
+  = panic ("cTupleSelId: Arity starts from 1. "
            ++ "(superclass position: " ++ show sc_pos
            ++ ", arity: " ++ show arity ++ ")")
 
@@ -1122,7 +1181,7 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Boxed
-    modu    = gHC_INTERNAL_TUPLE_PRIM
+    modu    = gHC_INTERNAL_TUPLE
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
                          (ATyCon tycon) UserSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
@@ -1156,9 +1215,9 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
         | pos <- [1..arity] ]
 
     boxity  = Unboxed
-    modu    = gHC_PRIM
+    modu    = gHC_TYPES
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
+                         (ATyCon tycon) UserSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
                             (AConLike (RealDataCon tuple_con)) BuiltInSyntax
     tc_uniq = mkTupleTyConUnique   boxity arity
@@ -1180,7 +1239,7 @@ mk_ctuple arity = (tycon, tuple_con, sc_sel_ids_arr)
 
     modu    = gHC_CLASSES
     tc_name = mkWiredInName modu (mkCTupleOcc tcName arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
+                         (ATyCon tycon) UserSyntax
     dc_name = mkWiredInName modu (mkCTupleOcc dataName arity) dc_uniq
                             (AConLike (RealDataCon tuple_con)) BuiltInSyntax
     tc_uniq = mkCTupleTyConUnique   arity
@@ -1233,8 +1292,18 @@ unboxedUnitTy = mkTyConTy unboxedUnitTyCon
 unboxedUnitTyCon :: TyCon
 unboxedUnitTyCon = tupleTyCon Unboxed 0
 
+unboxedUnitTyConName :: Name
+unboxedUnitTyConName = tyConName unboxedUnitTyCon
+
 unboxedUnitDataCon :: DataCon
 unboxedUnitDataCon = tupleDataCon Unboxed 0
+
+unboxedSoloTyCon :: TyCon
+unboxedSoloTyCon = tupleTyCon Unboxed 1
+
+unboxedSoloTyConName :: Name
+unboxedSoloTyConName = tyConName unboxedSoloTyCon
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1247,8 +1316,7 @@ mkSumTyConOcc :: Arity -> OccName
 mkSumTyConOcc n = mkOccName tcName str
   where
     -- No need to cache these, the caching is done in mk_sum
-    str = '(' : '#' : ' ' : bars ++ " #)"
-    bars = intersperse ' ' $ replicate (n-1) '|'
+    str = "Sum" ++ show n ++ "#"
 
 -- | OccName for i-th alternative of n-ary unboxed sum data constructor.
 mkSumDataConOcc :: ConTag -> Arity -> OccName
@@ -1328,8 +1396,8 @@ mk_sum arity = (tycon, sum_cons)
         | ty <- dc_arg_tys
         | pos <- [1..arity] ]
 
-    tc_name = mkWiredInName gHC_PRIM (mkSumTyConOcc arity) tc_uniq
-                            (ATyCon tycon) BuiltInSyntax
+    tc_name = mkWiredInName gHC_TYPES (mkSumTyConOcc arity) tc_uniq
+                            (ATyCon tycon) UserSyntax
 
     sum_cons = listArray (0,arity-1) [sum_con i | i <- [0..arity-1]]
     sum_con i =
@@ -1339,11 +1407,11 @@ mk_sum arity = (tycon, sum_cons)
                   [dc_arg_tys !! i] -- arg types
                   tycon
 
-          dc_name = mkWiredInName gHC_PRIM
-                      (mkSumDataConOcc i arity)
-                      (dc_uniq i)
-                      (AConLike (RealDataCon dc))
-                      BuiltInSyntax
+          dc_name = mkWiredInName gHC_TYPES
+                                  (mkSumDataConOcc i arity)
+                                  (dc_uniq i)
+                                  (AConLike (RealDataCon dc))
+                                  BuiltInSyntax
       in dc
 
     tc_uniq   = mkSumTyConUnique   arity
@@ -2510,3 +2578,59 @@ filterCTuple (Exact n)
   | Just arity <- cTupleTyConNameArity_maybe n
   = Exact $ tupleTyConName BoxedTuple arity
 filterCTuple rdr = rdr
+
+{-
+************************************************************************
+*                                                                      *
+   Semi-builtin names
+*                                                                      *
+************************************************************************
+
+Note [pretendNameIsInScope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, we filter out instances that mention types whose names are
+not in scope. However, in the situations listed below, we make an exception
+for some commonly used names, such as Data.Kind.Type, which may not actually
+be in scope but should be treated as though they were in scope.
+This includes built-in names, as well as a few extra names such as
+'Type', 'TYPE', 'BoxedRep', etc.
+
+Situations in which we apply this special logic:
+
+  - GHCi's :info command, see GHC.Runtime.Eval.getInfo.
+    This fixes #1581.
+
+  - When reporting instance overlap errors. Not doing so could mean
+    that we would omit instances for typeclasses like
+
+      type Cls :: k -> Constraint
+      class Cls a
+
+    because BoxedRep/Lifted were not in scope.
+    See GHC.Tc.Errors.potentialInstancesErrMsg.
+    This fixes one of the issues reported in #20465.
+-}
+
+-- | Should this name be considered in-scope, even though it technically isn't?
+--
+-- This ensures that we don't filter out information because, e.g.,
+-- Data.Kind.Type isn't imported.
+--
+-- See Note [pretendNameIsInScope].
+pretendNameIsInScope :: Name -> Bool
+pretendNameIsInScope n
+  = isBuiltInSyntax n
+  || isTupleTyConName n
+  || isSumTyConName n
+  || isCTupleTyConName n
+  || any (n `hasKey`)
+    [ liftedTypeKindTyConKey, unliftedTypeKindTyConKey
+    , liftedDataConKey, unliftedDataConKey
+    , tYPETyConKey
+    , cONSTRAINTTyConKey
+    , runtimeRepTyConKey, boxedRepDataConKey
+    , eqTyConKey
+    , listTyConKey
+    , oneDataConKey
+    , manyDataConKey
+    , fUNTyConKey, unrestrictedFunTyConKey ]

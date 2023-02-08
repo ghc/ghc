@@ -79,7 +79,7 @@ genMkTup profiling n = mconcat
   [ "#define MK_TUP", sn                                                          -- #define MK_TUPn
   , "(", B.intercalate "," xs, ")"                                                -- (x1,x2,...)
   , "(h$c", sn, "("                                                               -- (h$cn(
-  , bytesFS symbol, ","                                                           -- h$ghczmprimZCGHCziTupleziPrimziZnT_con_e,                                                                        -- ,
+  , bytesFS symbol, ","                                                           -- h$ghczmprimZCGHCziTupleziZnT_con_e,                                                                        -- ,
   , B.intercalate "," $ map (\x -> "(" <> x <> ")") xs                            -- (x1),(x2),(...)
   , if profiling then ",h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM" else "" -- ,h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM
   , "))\n"                                                                        -- ))\n

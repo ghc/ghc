@@ -1228,7 +1228,7 @@ tc_hs_type mode rn_ty@(HsListTy _ elt_ty) exp_kind
        ; checkWiredInTyCon listTyCon
        ; checkExpectedKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
 
--- See Note [Distinguishing tuple kinds] in GHC.Hs.Type
+-- See Note [Distinguishing tuple kinds] in Language.Haskell.Syntax.Type
 -- See Note [Inferring tuple kinds]
 tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
      -- (NB: not zonking before looking at exp_k, to avoid left-right bias)

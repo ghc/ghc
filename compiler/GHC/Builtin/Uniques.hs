@@ -14,12 +14,14 @@ module GHC.Builtin.Uniques
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
     , mkSumTyConUnique, mkSumDataConUnique
+    , isSumTyConUnique
 
       -- ** Tuples
       -- *** Vanilla
     , mkTupleTyConUnique
     , mkTupleDataConUnique
     , isTupleTyConUnique
+    , isTupleDataConLikeUnique
       -- *** Constraint
     , mkCTupleTyConUnique
     , mkCTupleDataConUnique
@@ -119,6 +121,14 @@ mkSumTyConUnique arity =
               -- 0x3f since we only have 6 bits to encode the
               -- alternative
     mkUniqueInt 'z' (arity `shiftL` 8 .|. 0xfc)
+
+isSumTyConUnique :: Unique -> Maybe Arity
+isSumTyConUnique u =
+  case (tag, n .&. 0xfc) of
+    ('z', 0xfc) -> Just (word64ToInt n `shiftR` 8)
+    _ -> Nothing
+  where
+    (tag, n) = unpkUnique u
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique
 mkSumDataConUnique alt arity
@@ -282,6 +292,18 @@ isTupleTyConUnique u =
   where
     (tag,   n) = unpkUnique u
     (arity', i) = quotRem n 2
+    arity = word64ToInt arity'
+
+-- | This function is an inverse of `mkTupleTyDataUnique` that also matches the worker and promoted tycon.
+isTupleDataConLikeUnique :: Unique -> Maybe (Boxity, Arity)
+isTupleDataConLikeUnique u =
+  case tag of
+    '7' -> Just (Boxed,   arity)
+    '8' -> Just (Unboxed, arity)
+    _ -> Nothing
+  where
+    (tag,   n) = unpkUnique u
+    (arity', _) = quotRem n 3
     arity = word64ToInt arity'
 
 getTupleTyConName :: Boxity -> Int -> Name

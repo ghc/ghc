@@ -53,7 +53,7 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepFun GHC.Types.krep$* GHC.Types.krep$Constraint
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
-      GHC.Tuple.Prim.$tcTuple2
+      GHC.Tuple.$tcTuple2
       ((:) @GHC.Types.KindRep
          $krep ((:) @GHC.Types.KindRep $krep [] @GHC.Types.KindRep))
 $krep [InlPrag=[~]]

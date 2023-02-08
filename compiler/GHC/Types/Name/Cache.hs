@@ -31,7 +31,6 @@ import Control.Concurrent.MVar
 import Control.Monad
 import Control.Applicative
 
-
 {-
 
 Note [The Name Cache]
@@ -104,7 +103,7 @@ takeUniqFromNameCache (NameCache c _) = uniqFromTag c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ
-  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_INTERNAL_TUPLE_PRIM
+  | mod == gHC_TYPES || mod == gHC_PRIM || mod == gHC_INTERNAL_TUPLE || mod == gHC_CLASSES
   , Just name <- isBuiltInOcc_maybe occ <|> isPunOcc_maybe mod occ
   =     -- See Note [Known-key names], 3(c) in GHC.Builtin.Names
         -- Special case for tuples; there are too many

@@ -24,7 +24,7 @@ type family E a where
   	-- Defined at T4175.hs:25:1
 type Unit :: *
 data Unit = ()
-  	-- Defined in ‘GHC.Tuple.Prim’
+  	-- Defined in ‘GHC.Tuple’
 instance [safe] C () -- Defined at T4175.hs:22:10
 instance Monoid () -- Defined in ‘GHC.Internal.Base’
 instance Semigroup () -- Defined in ‘GHC.Internal.Base’

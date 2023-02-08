@@ -10,10 +10,10 @@ IO
 Bool
 Ordering
 Int -> Int
-(%,%) (Eq Int) (Eq [Char])
+CTuple2 (Eq Int) (Eq [Char])
 Int#
-(##)
-(#,#) 'IntRep ('BoxedRep 'Lifted) Int# Int
+(#  #)
+(# Int#,Int #)
 Proxy (CONSTRAINT ('BoxedRep 'Lifted)) (Eq Int)
 Proxy * (Int,Int)
 Proxy Symbol "hello world"

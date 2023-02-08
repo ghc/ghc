@@ -79,7 +79,8 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 
-import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
+import GHC.Builtin.Names ( toDynName )
+import GHC.Builtin.Types ( pretendNameIsInScope )
 
 import GHC.Data.Maybe
 import GHC.Data.FastString

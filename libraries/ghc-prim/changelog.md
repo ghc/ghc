@@ -68,6 +68,17 @@
   constructors in scope and the levity of `t` is statically known,
   then the constraint `DataToTag t` can always be solved.
 
+- Renamed several built-in tycon syntaxes to avoid punning:
+
+  - Unboxed tuple tycons are now `Tuple#<N>`
+  - Unboxed sum tycons are now `Sum#<N>`
+  - Constraint tuple classes are now `CTuple<N>`
+  - Unit tycons are now `Unit#`, `CUnit`.
+  - Solo tycons are now `Solo#`, `CSolo`.
+  - `Tuple<N>` have been moved back to `GHC.Tuple`.
+
+  See [https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0475-tuple-syntax.rst].
+
 ## 0.11.0
 
 - Shipped with GHC 9.8.1

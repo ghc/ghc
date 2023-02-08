@@ -91,7 +91,7 @@ import GHC.Internal.Base
 import qualified GHC.Internal.Arr as A
 import GHC.Internal.Data.Either (Either (..))
 import GHC.Internal.Data.Type.Equality
-import GHC.Internal.List ( splitAt, foldl', elem, replicate )
+import GHC.Internal.List ( splitAt, foldl', elem, replicate, length )
 import GHC.Internal.Unicode (isDigit)
 import GHC.Internal.Num ((-), (+), (*))
 import GHC.Internal.Word
@@ -882,13 +882,30 @@ showTypeable _ rep
 
     -- Take care only to render saturated tuple tycon applications
     -- with tuple notation (#14341).
-  | Just _ <- isTupleTyCon tc,
-    Just _ <- TrType `eqTypeRep` typeRepKind rep =
-    showChar '(' . showArgs (showChar ',') tys . showChar ')'
-    -- Print (,,,) instead of Tuple4
-  | Just n <- isTupleTyCon tc, [] <- tys =
-      showChar '(' . showString (replicate (n-1) ',') . showChar ')'
-  where (tc, tys) = splitApps rep
+  | Just (boxed, n) <- isTupleTyCon tc,
+    Just sat <- plainOrSaturated boxed n =
+      tuple n boxed sat
+  where
+    plainOrSaturated True _ | Just _ <- TrType `eqTypeRep` typeRepKind rep = Just True
+    plainOrSaturated False n | n == length tys = Just True
+    plainOrSaturated _ _ | [] <- tys = Just False
+    plainOrSaturated _ _ | otherwise = Nothing
+
+    (tc, tys) = splitApps rep
+
+    tuple n boxed sat =
+      let
+        (lpar, rpar) = case boxed of
+          True -> ("(", ")")
+          False -> ("(#", "#)")
+        commas = showString (replicate (n-1) ',')
+        args = showArgs (showString ",") tys
+        args' = case (boxed, sat) of
+          (True, True) -> args
+          (False, True) -> showChar ' ' . args . showChar ' '
+          (_, False) -> commas
+      in showString lpar . args' . showString rpar
+
 showTypeable _ (TrTyCon {trTyCon = tycon, trKindVars = []})
   = showTyCon tycon
 showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = args})
@@ -976,22 +993,30 @@ funTyCon = typeRepTyCon (typeRep @(->))
 isListTyCon :: TyCon -> Bool
 isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [])
 
-isTupleTyCon :: TyCon -> Maybe Int
+isTupleTyCon :: TyCon -> Maybe (Bool, Int)
 isTupleTyCon tc
   | tyConPackage tc == "ghc-prim"
-  , tyConModule  tc == "GHC.Tuple.Prim"
+  , tyConModule  tc == "GHC.Tuple" || tyConModule tc == "GHC.Types"
   = case tyConName tc of
-      "Unit" -> Just 0
+      "Unit" -> Just (True, 0)
+      "Unit#" -> Just (False, 0)
       'T' : 'u' : 'p' : 'l' : 'e' : arity -> readTwoDigits arity
       _ -> Nothing
   | otherwise                   = Nothing
 
 -- | See Note [Small Ints parsing] in GHC.Builtin.Types
-readTwoDigits :: String -> Maybe Int
+readTwoDigits :: String -> Maybe (Bool, Int)
 readTwoDigits s = case s of
-  [c] | isDigit c -> Just (digit_to_int c)
-  [c1, c2] | isDigit c1, isDigit c2
-    -> Just (digit_to_int c1 * 10 + digit_to_int c2)
+  c1 : t1 | isDigit c1 -> case t1 of
+    [] -> Just (True, digit_to_int c1)
+    ['#'] -> Just (False, digit_to_int c1)
+    c2 : t2 | isDigit c2 ->
+      let ar = digit_to_int c1 * 10 + digit_to_int c2
+      in case t2 of
+        [] -> Just (True, ar)
+        ['#'] -> Just (False, ar)
+        _ -> Nothing
+    _ -> Nothing
   _ -> Nothing
   where
     digit_to_int :: Char -> Int

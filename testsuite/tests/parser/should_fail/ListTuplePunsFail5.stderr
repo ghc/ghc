@@ -1,0 +1,6 @@
+ListTuplePunsFail5.hs:7:13: [GHC-83865]
+     Expected a constraint,
+      but ‘(Monad m, Monad m)’ has kind
+      ‘Tuple2 Constraint Constraint’
+     In the type signature:
+        f :: Monad m => (Monad m, (Monad m, Monad m)) => m Int
