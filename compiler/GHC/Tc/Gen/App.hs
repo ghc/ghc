@@ -543,25 +543,16 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
           HsUnboundVar {} -> True
           _               -> False
 
-    inst_all, inst_inferred, inst_none :: ForAllTyFlag -> Bool
-    inst_all (Invisible {}) = True
-    inst_all Required       = False
-
-    inst_inferred (Invisible InferredSpec)  = True
-    inst_inferred (Invisible SpecifiedSpec) = False
-    inst_inferred Required                  = False
-
-    inst_none _ = False
-
     inst_fun :: [HsExprArg 'TcpRn] -> ForAllTyFlag -> Bool
-    inst_fun [] | inst_final  = inst_all
-                | otherwise   = inst_none
-                -- Using `inst_none` for `:type` avoids
+    -- True <=> instantiate a tyvar with this ForAllTyFlag
+    inst_fun [] | inst_final  = isInvisibleForAllTyFlag
+                | otherwise   = const False
+                -- Using `const False` for `:type` avoids
                 -- `forall {r1} (a :: TYPE r1) {r2} (b :: TYPE r2). a -> b`
                 -- turning into `forall a {r2} (b :: TYPE r2). a -> b`.
                 -- See #21088.
-    inst_fun (EValArg {} : _) = inst_all
-    inst_fun _                = inst_inferred
+    inst_fun (EValArg {} : _) = isInvisibleForAllTyFlag
+    inst_fun _                = isInferredForAllTyFlag
 
     -----------
     go, go1 :: Delta
@@ -588,7 +579,12 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
     -- c.f. GHC.Tc.Utils.Instantiate.topInstantiate
     go1 delta acc so_far fun_ty args
       | (tvs,   body1) <- tcSplitSomeForAllTyVars (inst_fun args) fun_ty
-      , (theta, body2) <- tcSplitPhiTy body1
+      , (theta, body2) <- if inst_fun args Inferred
+                          then tcSplitPhiTy body1
+                          else ([], body1)
+        -- inst_fun args Inferred: dictionary parameters are like Inferred foralls
+        -- E.g. #22908: f :: Foo => blah
+        -- No foralls!  But if inst_final=False, don't instantiate
       , not (null tvs && null theta)
       = do { (inst_tvs, wrap, fun_rho) <- addHeadCtxt fun_ctxt $
                                           instantiateSigma fun_orig tvs theta body2

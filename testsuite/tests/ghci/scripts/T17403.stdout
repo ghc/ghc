@@ -1,1 +1,1 @@
-f :: String
+f :: (() :: Constraint) => String

@@ -1,1 +1,2 @@
-ECC @() @[] @() :: [()] -> ECC (() :: Constraint) [] ()
+ECC @() @[] @()
+  :: (() :: Constraint) => [()] -> ECC (() :: Constraint) [] ()
