@@ -44,6 +44,7 @@ and the migration guide.
 
   The tradeoff is that calling `whoCreated` on top level value definitions like `foo` will be less informative.
 
+- A new flag ``-fexpose-overloaded-unfoldings`` has been added providing a lightweight alternative to ``-fexpose-all-unfoldings``.
 
 GHCi
 ~~~~

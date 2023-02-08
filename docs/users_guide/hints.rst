@@ -366,6 +366,8 @@ extreme cases making it impossible to compile certain code.
 For this reason GHC offers various ways to tune inlining
 behaviour.
 
+.. _inlining-unfolding-creation:
+
 Unfolding creation
 ~~~~~~~~~~~~~~~~~~
 
@@ -374,8 +376,9 @@ GHC requires the functions unfolding. The following flags can
 be used to control unfolding creation. Making their creation more
 or less likely:
 
-* :ghc-flag:`-fexpose-all-unfoldings`
 * :ghc-flag:`-funfolding-creation-threshold=⟨n⟩`
+* :ghc-flag:`-fexpose-overloaded-unfoldings`
+* :ghc-flag:`-fexpose-all-unfoldings`
 
 Inlining decisions
 ~~~~~~~~~~~~~~~~~~
@@ -414,6 +417,96 @@ There are also flags specific to the inlining of generics:
 * :ghc-flag:`-finline-generics`
 * :ghc-flag:`-finline-generics-aggressively`
 
+.. _control-specialization:
+
+Controlling specialization
+--------------------------------------------
+
+.. index::
+    single: specialize-pragma, controlling, specialization
+    single: unfolding, controlling
+
+GHC has the ability to optimize polymorphic code for specific type class instances
+at the use site. We call this specialisation and it's enabled through :ghc-flag:`-fspecialise`
+which is enabled by default at `-O1` or higher.
+
+GHC does this by creating a copy of the overloaded function, optimizing this copy
+for a given type class instance. Calls to the overloaded function using a statically
+known typeclass we created a specialization for will then be replaced by a call
+to the specialized version of the function.
+
+This can often be crucial to avoid overhead at runtime. However since this
+involves potentially making many copies of overloaded functions GHC doesn't
+always apply this optimization by default even in cases where it could do so.
+
+For GHC to be able to specialise, at a miminum the instance it specializes for
+must be known and the overloaded functions unfolding must be available.
+
+Commonly used flag/pragma combinations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For applications which aren't very compute heavy the defaults are often good enough
+as they try to strike a reasonable balance between compile time and runtime.
+
+For libraries, if exported functions would benefit significantly from specialization,
+it's recommended to enable :ghc-flag:`-fexpose-overloaded-unfoldings` or manually
+attach INLINEABLE pragmas to performance relevant functions.
+This will ensure downstream users can specialize any overloaded functions exposed
+by the library if it's beneficial.
+
+If there are key parts of an application which rely on specialization for performance
+using `SPECIALIZE` pragmas in combination with either :ghc-flag:`-fexpose-overloaded-unfoldings`
+or `INLINEABLE` on key overloaded functions should allow for these functions to
+specialize without affecting overall compile times too much.
+
+For compute heavy code reliant on elimination of as much overhead as possible it's
+recommended to use a combination of :ghc-flag:`-fspecialise-aggressively` and
+:ghc-flag:`-fexpose-overloaded-unfoldings` or :ghc-flag:`-fexpose-all-unfoldings`.
+However this comes at a big cost to compile time.
+
+Unfolding availabiliy
+~~~~~~~~~~~~~~~~~~~~~
+
+Unfolding availabiliy is primarily determined by :ref:`these flags <inlining-unfolding-creation>`.
+
+Of particular interest for specialization are:
+
+* :ghc-flag:`-fexpose-all-unfoldings`
+* :ghc-flag:`-fexpose-overloaded-unfoldings`
+
+The former making *all* unfoldings available, potentially at high compile time cost.
+The later only makes available the functions that are overloaded. It's generally
+better to use :ghc-flag:`-fexpose-overloaded-unfoldings` over :ghc-flag:`-fexpose-all-unfoldings`
+when the goal is to ensure specializations.
+
+When does GHC generate specializations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Functions get considered for specialization either implicitly when GHC sees a use
+of an overloaded function used with concrete typeclass instances or explicitly
+when a user requests it through pragmas, see :ref:`specialize-pragma` and :ref:`specialize-instance-pragma`.
+
+The specializer then checks a number of conditions *in order* to decide weither or not
+specialization should happen. Below is a best effort of the list of conditions GHC checks
+currently.
+
+* If any of the type class instances have type arguments and :ghc-flag:`-fpolymorphic-specialisation`
+  is not enabled (off by default) the function **won't** be specialised, otherwise
+* if the specialization was requested through a pragma GHC **will** try to create a specialization, otherwise
+* if the function is imported and:
+  + if the unfolding is not available the function **can't** be specialized, otherwise
+  + if :ghc-flag:`-fcross-module-specialise` is not enabled (enabled by `-O`) the function **won't** be specialised, otherwise
+  + if the flag is enabled, and the function has no INLINABLE/INLINE pragma it **won't** be specialised, otherwise
+* if :ghc-flag:`-fspecialise-aggressively` is enabled GHC **will** try to create a specialization, otherwise
+* if the overloaded function is defined in the current module, and all type class instances
+  are statically known it **will** be specialized, otherwise
+* the function **won't** be specialized.
+
+Note that there are some cases in which GHC will try to specialize a function and fail.
+For example if a functions has an OPAQUE pragma or the unfolding is not available.
+
+Once a function is specialized GHC will create a rule, similar to these created by `RULE` pragmas
+which will fire at call sites involving known instances, replacing calls to the overloaded
+function with calls to the specialized function when possible.
 
 .. _hints-os-memory:
 

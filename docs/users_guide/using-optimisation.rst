@@ -519,9 +519,45 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: off
 
-    An experimental flag to expose all unfoldings, even for very large
-    or recursive functions. This allows for all functions to be inlined
-    while usually GHC would avoid inlining larger functions.
+    A flag to expose all unfoldings, even for very large or recursive functions.
+
+    However GHC will still use the usual heuristics to make inlining
+    and specialization choices. This means further measures are needed to
+    get benefits at use sites. Usually this involves one of:
+
+    * :ghc-flag:`-fspecialise-aggressively` to force as much specialization
+      as possible.
+    * `{-# SPECIALIZE #-}` pragmas to ensure specialization to specific types.
+    * Use of the magic `inline` function to force inlining.
+
+.. ghc-flag:: -fexpose-overloaded-unfoldings
+    :shortdesc: Expose unfoldings carrying constraints, even for very large or recursive functions.
+    :type: dynamic
+    :reverse: -fno-expose-overloaded-unfoldings
+    :category:
+
+    :default: off
+
+    This experimental flag is a slightly less heavy weight alternative
+    to :ghc-flag:`-fexpose-all-unfoldings`.
+
+    Instead of exposing all functions it only aims at exposing constrained functions.
+    This is intended to be used for cases where specialization is considered
+    crucial but :ghc-flag:`-fexpose-all-unfoldings` imposes too much compile
+    time cost.
+
+    Currently this won't expose unfoldings where a type class is hidden under a
+    newtype. That is for cases like: ::
+
+        newtype NT a = NT (Integral a => a)
+
+        foo :: NT a -> T1 -> TR
+
+    GHC won't recognise `foo` as specialisable and won't expose the unfolding
+    even with :ghc-flag:`-fexpose-overloaded-unfoldings` enabled.
+
+    All the other caveats about :ghc-flag:`-fexpose-overloaded-unfoldings`
+    still apply, so please see there for more details.
 
 .. ghc-flag:: -ffloat-in
     :shortdesc: Turn on the float-in transformation. Implied by :ghc-flag:`-O`.
@@ -1120,13 +1156,14 @@ as such you shouldn't need to set any of them explicitly. A flag
 
     :default: off
 
-    By default only type class methods and methods marked ``INLINABLE`` or
-    ``INLINE`` are specialised. This flag will specialise any overloaded function
-    regardless of size if its unfolding is available. This flag is not
-    included in any optimisation level as it can massively increase code
-    size. It can be used in conjunction with :ghc-flag:`-fexpose-all-unfoldings`
-    if you want to ensure all calls are specialised.
+    This flag controls the specialisation of *imported* functions only.  By default, an imported function
+    is only specialised if it is marked ``INLINEABLE`` or ``INLINE``.
+    But with :ghc-flag:`-fspecialise-aggressively`, an imported function is specialised
+    if its unfolding is available in the interface file.  (Use :ghc-flag:`-fexpose-all-unfoldings`
+    or :ghc-flag:`-fexpose-overloaded-unfoldings` to ensure that the unfolding is put into the interface file.)
 
+    :ghc-flag:`-fspecialise-aggressively` is not included in any optimisation level
+    as it can massively increase code size.
 
 .. ghc-flag:: -fcross-module-specialise
     :shortdesc: Turn on specialisation of overloaded functions imported from

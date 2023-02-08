@@ -57,7 +57,7 @@ import GHC.Core.Tidy
 import GHC.Core.Seq         ( seqBinds )
 import GHC.Core.Opt.Arity   ( exprArity, typeArity, exprBotStrictness_maybe )
 import GHC.Core.InstEnv
-import GHC.Core.Type     ( Type, tidyTopType )
+import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -87,6 +87,7 @@ import GHC.Types.Name.Cache
 import GHC.Types.Avail
 import GHC.Types.Tickish
 import GHC.Types.TypeEnv
+import GHC.Tc.Utils.TcType (tcSplitNestedSigmaTys)
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -367,7 +368,9 @@ three places this is actioned:
 
 data UnfoldingExposure
   = ExposeNone -- ^ Don't expose unfoldings
-  | ExposeSome -- ^ Only expose required unfoldings
+  | ExposeSome -- ^ Expose mandatory unfoldings and those meeting inlining thresholds.
+  | ExposeOverloaded -- ^ Expose unfoldings useful for inlinings and those which
+                     -- which might be specialised. See Note [Exposing overloaded functions]
   | ExposeAll  -- ^ Expose all unfoldings
   deriving (Show,Eq,Ord)
 
@@ -793,6 +796,10 @@ addExternal opts id
     show_unfold    = show_unfolding unfolding
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
+    -- bottoming_fn: don't inline bottoming functions, unless the
+    -- RHS is very small or trivial (UnfWhen), in which case we
+    -- may as well do so. For example, a cast might cancel with
+    -- the call site.
     bottoming_fn   = isDeadEndSig (dmdSigInfo idinfo)
 
         -- Stuff to do with the Id's unfolding
@@ -800,29 +807,86 @@ addExternal opts id
         -- In GHCi the unfolding is used by importers
 
     show_unfolding (CoreUnfolding { uf_src = src, uf_guidance = guidance })
-       = opt_expose_unfoldings opts == ExposeAll
+       = stable || profitable || explicitly_requested
+       where
+        -- Always expose things whose
+        -- source is an inline rule
+        stable = isStableSource src
+        -- Good for perf as it might inline
+        profitable
+          | never_active = False
+          | loop_breaker = False
+          | otherwise =
+              case guidance of
+                UnfWhen {}  -> True
+                UnfIfGoodArgs {} -> not bottoming_fn
+                UnfNever -> False
+        -- Requested by the user through a flag.
+        explicitly_requested =
+          case opt_expose_unfoldings opts of
             -- 'ExposeAll' says to expose all
             -- unfoldings willy-nilly
-
-       || isStableSource src     -- Always expose things whose
-                                 -- source is an inline rule
-
-       || not dont_inline
-       where
-         dont_inline
-            | never_active = True   -- Will never inline
-            | loop_breaker = True   -- Ditto
-            | otherwise    = case guidance of
-                                UnfWhen {}       -> False
-                                UnfIfGoodArgs {} -> bottoming_fn
-                                UnfNever {}      -> True
-         -- bottoming_fn: don't inline bottoming functions, unless the
-         -- RHS is very small or trivial (UnfWhen), in which case we
-         -- may as well do so For example, a cast might cancel with
-         -- the call site.
+            ExposeAll -> True
+            -- Overloaded functions like @foo :: Bar a => ...@
+            -- See Note [Exposing overloaded functions]
+            ExposeOverloaded ->
+              not bottoming_fn && isOverloaded id
+            ExposeSome -> False
+            ExposeNone -> False
 
     show_unfolding (DFunUnfolding {}) = True
     show_unfolding _                  = False
+
+isOverloaded :: Id -> Bool
+isOverloaded fn =
+  let fun_type = idType fn
+      -- TODO: The specialiser currently doesn't handle newtypes of the
+      -- form `newtype T x = T (C x => x)` well. So we don't bother
+      -- looking through newtypes for constraints.
+      -- (Newtypes are opaque to tcSplitNestedSigmaTys)
+      -- If the specialiser ever starts looking through newtypes properly
+      -- we might want to use a version of tcSplitNestedSigmaTys that looks
+      -- through newtypes.
+      (_ty_vars, constraints, _ty) = tcSplitNestedSigmaTys fun_type
+      -- NB: This will consider functions with only equality constraints overloaded.
+      -- While these sorts of constraints aren't currently useful for specialization
+      -- it's simpler to just include them.
+  in not . null $ constraints
+
+{- Note [Exposing overloaded functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also #13090 and #22942.
+
+The basic idea is that exposing only overloaded function is reasonably cheap
+but allows the specializer to fire more often as unfoldings for overloaded
+functions will generally be available. So we make the unfoldings of overloaded
+functions available when `-fexpose-overloaded-unfoldings is enabled.
+
+We use `tcSplitNestedSigmaTys` to see the constraints deep within in types like:
+  f :: Int -> forall a. Eq a => blah
+
+We could simply use isClassPred to check if any of the constraints responds to
+a class dictionary, but that would miss (perhaps obscure) opportunities
+like the one in the program below:
+
+    type family C a where
+      C Int = Eq Int
+      C Bool = Ord Bool
+
+
+    bar :: C a => a -> a -> Bool
+    bar = undefined
+    {-# SPECIALIZE bar :: Int -> Int -> Bool #-}
+
+GHC will specialize `bar` properly. However `C a =>` isn't recognized as class
+predicate since it's a type family in the definition. To ensure it's exposed
+anyway we allow for some false positives and simply expose all functions which
+have a constraint. This means we might expose more unhelpful unfoldings. But
+it seems like the better choice.
+
+Currently this option is off by default and has to be enabled manually. But
+we might change this in the future.
+-}
 
 {-
 ************************************************************************

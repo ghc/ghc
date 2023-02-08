@@ -34,6 +34,10 @@ test('T7162', normal, compile, [''])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
+
+# Check if overloaded functions get unfoldings
+test('ExposeOverloaded', [only_ways('[optasm]'), grep_errmsg('Unf=Unf')], compile, ['-ddump-simpl -dno-suppress-unfoldings'])
+
 test('T3118', normal, compile, ['-Wno-overlapping-patterns'])
 test('T4203', normal, compile, [''])
 
@@ -332,7 +336,7 @@ test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], com
 # Cast WW
 test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
 test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
-test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T18328', [ only_ways(['optasm']), grep_errmsg(r'(Arity=2)',1) ], compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T18347', normal, compile, ['-dcore-lint -O'])
 test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T18399', normal, compile, ['-dcore-lint -O'])
@@ -363,7 +367,7 @@ test('T19599a', normal, compile, ['-O -ddump-rules'])
 # Look for a specialisation rule for wimwam
 test('T19672', normal, compile, ['-O2 -ddump-rules'])
 
-test('T20103',  [ grep_errmsg(r'Arity') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T20103',  [ grep_errmsg(r'(Arity=[0-9]*)',[1]) ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T19780', normal, compile, ['-O2'])
 test('T19794', normal, compile, ['-O'])
 test('T19890',  [ grep_errmsg(r'= T19890.foo1') ], compile, ['-O -ddump-simpl'])
