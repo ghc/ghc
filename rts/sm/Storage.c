@@ -41,7 +41,7 @@
 #include "Trace.h"
 #include "GC.h"
 #include "Evac.h"
-#include "NonMoving.h"
+#include "NonMovingAllocate.h"
 #if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
 #endif

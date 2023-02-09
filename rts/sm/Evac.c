@@ -30,7 +30,7 @@
 #include "LdvProfile.h"
 #include "CNF.h"
 #include "Scav.h"
-#include "NonMoving.h"
+#include "NonMovingAllocate.h"
 #include "CheckUnload.h" // n_unloaded_objects and markObjectCode
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
