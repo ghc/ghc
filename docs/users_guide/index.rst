@@ -23,6 +23,7 @@ Contents:
    hints
    utils
    win32-dlls
+   wasm
    bugs
    eventlog-formats
    editing-guide
@@ -33,4 +34,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
-
