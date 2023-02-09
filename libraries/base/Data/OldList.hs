@@ -841,6 +841,7 @@ strictGenericLength l   =  gl l 0
                         where
                            gl [] a     = a
                            gl (_:xs) a = let a' = a + 1 in a' `seq` gl xs a'
+{-# INLINABLE strictGenericLength #-}
 
 -- | The 'genericTake' function is an overloaded version of 'take', which
 -- accepts any 'Integral' value as the number of elements to take.
@@ -848,6 +849,7 @@ genericTake             :: (Integral i) => i -> [a] -> [a]
 genericTake n _ | n <= 0 = []
 genericTake _ []        =  []
 genericTake n (x:xs)    =  x : genericTake (n-1) xs
+{-# INLINABLE genericTake #-}
 
 -- | The 'genericDrop' function is an overloaded version of 'drop', which
 -- accepts any 'Integral' value as the number of elements to drop.
@@ -855,6 +857,7 @@ genericDrop             :: (Integral i) => i -> [a] -> [a]
 genericDrop n xs | n <= 0 = xs
 genericDrop _ []        =  []
 genericDrop n (_:xs)    =  genericDrop (n-1) xs
+{-# INLINABLE genericDrop #-}
 
 
 -- | The 'genericSplitAt' function is an overloaded version of 'splitAt', which
@@ -864,6 +867,7 @@ genericSplitAt n xs | n <= 0 =  ([],xs)
 genericSplitAt _ []     =  ([],[])
 genericSplitAt n (x:xs) =  (x:xs',xs'') where
     (xs',xs'') = genericSplitAt (n-1) xs
+{-# INLINABLE genericSplitAt #-}
 
 -- | The 'genericIndex' function is an overloaded version of '!!', which
 -- accepts any 'Integral' value as the index.
@@ -873,11 +877,13 @@ genericIndex (_:xs) n
  | n > 0     = genericIndex xs (n-1)
  | otherwise = errorWithoutStackTrace "List.genericIndex: negative argument."
 genericIndex _ _      = errorWithoutStackTrace "List.genericIndex: index too large."
+{-# INLINABLE genericIndex #-}
 
 -- | The 'genericReplicate' function is an overloaded version of 'replicate',
 -- which accepts any 'Integral' value as the number of repetitions to make.
 genericReplicate        :: (Integral i) => i -> a -> [a]
 genericReplicate n x    =  genericTake n (repeat x)
+{-# INLINABLE genericReplicate #-}
 
 -- | The 'zip4' function takes four lists and returns a list of
 -- quadruples, analogous to 'zip'.
