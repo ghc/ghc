@@ -64,6 +64,6 @@ labelThread(Capability  *cap,
         }
     }
     recordClosureMutated(cap, (StgClosure*)tso);
-    tso->label = label;
+    RELEASE_STORE(&tso->label, label);
     traceThreadLabel(cap, tso, (char *) label->payload, label->bytes);
 }
