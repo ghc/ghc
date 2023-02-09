@@ -12,10 +12,9 @@
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
   * Add Functor instances for `(,,,,) a b c d`, `(,,,,,) a b c d e` and
     `(,,,,,) a b c d e f`.
-  * Exceptions thrown by weak pointer finalizers are now reported via a global
-    exception handler.
-  * Add `GHC.Weak.Finalize.{get,set}FinalizerExceptionHandler` which allows the
-    user to override the above-mentioned handler.
+  * Exceptions thrown by weak pointer finalizers can now be reported by setting
+    a global exception handler, using `System.Mem.Weak.setFinalizerExceptionHandler`.
+    The default behaviour is unchanged (exceptions are ignored and not reported).
   * `Numeric.Natural` re-exports `GHC.Natural.minusNaturalMaybe`
     ([CLC proposal #45](https://github.com/haskell/core-libraries-committee/issues/45))
   * Add `Data.Foldable1` and `Data.Bifoldable1`

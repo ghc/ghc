@@ -83,7 +83,11 @@ runMainIO main =
     do
       main_thread_id <- myThreadId
       weak_tid <- mkWeakThreadId main_thread_id
-      setFinalizerExceptionHandler handleFinalizerException
+
+    --setFinalizerExceptionHandler printToStderrFinalizerExceptionHandler
+      -- For the time being, we don't install any exception handler for
+      -- Handle finalization. Instead, the user should set one manually.
+
       case weak_tid of (Weak w) -> setMainThread w
       install_interrupt_handler $ do
            m <- deRefWeak weak_tid
@@ -253,13 +257,6 @@ flushStdHandles = do
       -- Swallow any exceptions thrown by the finalizer exception handler
       handleFinalizerExc se `catchException` (\(SomeException _) -> return ())
 
--- | See Note [Handling exceptions during Handle finalization] in
--- GHC.IO.Handle.Internals
-handleFinalizerException :: SomeException -> IO ()
-handleFinalizerException se =
-    hPutStr stderr msg `catchException` (\(SomeException _) -> return ())
-  where
-    msg = "Exception during Weak# finalization (ignored): " ++ displayException se ++ "\n"
 
 safeExit, fastExit :: Int -> IO a
 safeExit = exitHelper useSafeExit

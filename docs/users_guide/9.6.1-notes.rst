@@ -191,10 +191,9 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- Exceptions thrown by weak pointer finalizers are now caught and reported
-  via a global exception handler. By default this handler reports the error
-  to ``stderr`` although this can be changed using
-  ``GHC.Weak.Finalize.setFinalizerExceptionHandler``.
+- Exceptions thrown by weak pointer finalizers can now be reported by setting
+  a global exception handler, using ``GHC.Weak.Finalize.setFinalizerExceptionHandler``.
+  The default behaviour is unchanged (exceptions are ignored and not reported).
 
 - GHC now provides a set of operations for introspecting on the threads of a
   program, ``GHC.Conc.listThreads``, as well as operations for querying a thread's
