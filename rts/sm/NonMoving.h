@@ -149,11 +149,7 @@ void nonmovingExit(void);
 void nonmovingCollect(StgWeak **dead_weaks,
                        StgTSO **resurrected_threads);
 
-void *nonmovingAllocate(Capability *cap, StgWord sz);
-void nonmovingInitCapability(Capability *cap);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
-void nonmovingClearBitmap(struct NonmovingSegment *seg);
-
 
 INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {
     return &Bdescr((StgPtr) seg)->nonmoving_segment;
