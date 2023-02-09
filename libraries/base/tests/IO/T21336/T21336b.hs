@@ -1,6 +1,9 @@
-import GHC.Weak
 import System.IO
+import System.Mem
+import FinalizerExceptionHandler
 
 main :: IO ()
-main = hPutStr stdout "hello"
+main = do
+  setFinalizerExceptionHandler printToStderrFinalizerExceptionHandler
+  hPutStr stdout "hello"
 
