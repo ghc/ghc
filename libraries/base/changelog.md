@@ -1,8 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-
 ## 4.18.0.0 *TBA*
 
+  * Add `INLINABLE` pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
