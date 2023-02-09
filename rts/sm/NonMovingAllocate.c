@@ -15,17 +15,46 @@
 #include "Capability.h"
 #include "NonMovingAllocate.h"
 
+enum AllocLockMode { NO_LOCK, ALLOC_SPIN_LOCK, SM_LOCK };
+
 static inline unsigned long log2_ceil(unsigned long x);
-static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node);
+static struct NonmovingSegment *nonmovingAllocSegment(enum AllocLockMode mode, uint32_t node);
 static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block_size);
 static bool advance_next_free(struct NonmovingSegment *seg, const unsigned int blk_count);
 static struct NonmovingSegment *nonmovingPopFreeSegment(void);
 static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *alloca);
+static void *nonmovingAllocate_(enum AllocLockMode mode, Capability *cap, StgWord sz);
 
 static inline unsigned long log2_ceil(unsigned long x)
 {
     return (sizeof(unsigned long)*8) - __builtin_clzl(x-1);
+}
+
+static inline void acquire_alloc_lock(enum AllocLockMode mode) {
+    switch (mode) {
+        case SM_LOCK:
+            ACQUIRE_SM_LOCK;
+            break;
+        case ALLOC_SPIN_LOCK:
+            ACQUIRE_ALLOC_BLOCK_SPIN_LOCK();
+            break;
+        case NO_LOCK:
+            break;
+    }
+}
+
+static inline void release_alloc_lock(enum AllocLockMode mode) {
+    switch (mode) {
+        case SM_LOCK:
+            RELEASE_SM_LOCK;
+            break;
+        case ALLOC_SPIN_LOCK:
+            RELEASE_ALLOC_BLOCK_SPIN_LOCK();
+            break;
+        case NO_LOCK:
+            break;
+    }
 }
 
 /*
@@ -35,7 +64,7 @@ static inline unsigned long log2_ceil(unsigned long x)
  * Caller must hold SM_MUTEX (although we take the gc_alloc_block_sync spinlock
  * under the assumption that we are in a GC context).
  */
-static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
+static struct NonmovingSegment *nonmovingAllocSegment(enum AllocLockMode mode, uint32_t node)
 {
     // First try taking something off of the free list
     struct NonmovingSegment *ret;
@@ -43,14 +72,12 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
 
     // Nothing in the free list, allocate a new segment...
     if (ret == NULL) {
-        // Take gc spinlock: another thread may be scavenging a moving
-        // generation and call `todo_block_full`
-        ACQUIRE_ALLOC_BLOCK_SPIN_LOCK();
+        acquire_alloc_lock(mode);
         bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
         // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
-        RELEASE_ALLOC_BLOCK_SPIN_LOCK();
+        release_alloc_lock(mode);
 
         for (StgWord32 i = 0; i < bd->blocks; ++i) {
             initBdescr(&bd[i], oldest_gen, oldest_gen);
@@ -83,14 +110,14 @@ static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block
     nonmovingClearBitmap(seg);
 }
 
-/* Initialize a new capability. Caller must hold SM_LOCK */
+/* Initialize a new capability. Must hold SM_LOCK. */
 void nonmovingInitCapability(Capability *cap)
 {
     // Initialize current segment array
     struct NonmovingSegment **segs =
         stgMallocBytes(sizeof(struct NonmovingSegment*) * NONMOVING_ALLOCA_CNT, "current segment array");
     for (unsigned int i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
-        segs[i] = nonmovingAllocSegment(cap->node);
+        segs[i] = nonmovingAllocSegment(NO_LOCK, cap->node);
         nonmovingInitSegment(segs[i], NONMOVING_ALLOCA0 + i);
         SET_SEGMENT_STATE(segs[i], CURRENT);
     }
@@ -161,9 +188,7 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
     }
 }
 
-/* Allocate a block in the nonmoving heap. Caller must hold SM_MUTEX. sz is in words */
-GNUC_ATTR_HOT
-void *nonmovingAllocate(Capability *cap, StgWord sz)
+static void *nonmovingAllocate_(enum AllocLockMode mode, Capability *cap, StgWord sz)
 {
     unsigned int log_block_size = log2_ceil(sz * sizeof(StgWord));
     unsigned int block_count = nonmovingBlockCountFromSize(log_block_size);
@@ -202,7 +227,7 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // there are no active segments, allocate new segment
         if (new_current == NULL) {
-            new_current = nonmovingAllocSegment(cap->node);
+            new_current = nonmovingAllocSegment(mode, cap->node);
             nonmovingInitSegment(new_current, log_block_size);
         }
 
@@ -213,4 +238,20 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
     }
 
     return ret;
+}
+
+/* Allocate a block in the nonmoving heap. Will take ALLOC_SPIN_LOCK if block
+ * allocation is needed. sz is in words. */
+GNUC_ATTR_HOT
+void *nonmovingAllocateGC(Capability *cap, StgWord sz)
+{
+    return nonmovingAllocate_(ALLOC_SPIN_LOCK, cap, sz);
+}
+
+/* Allocate a block in the nonmoving heap. Will take SM_LOCK if block
+ * allocation is needed. sz is in words. */
+GNUC_ATTR_HOT
+void *nonmovingAllocate(Capability *cap, StgWord sz)
+{
+    return nonmovingAllocate_(SM_LOCK, cap, sz);
 }

@@ -559,9 +559,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Allocate the blackhole indirection closure
     if (RtsFlags.GcFlags.useNonmoving) {
         // See Note [Static objects under the nonmoving collector].
-        ACQUIRE_SM_LOCK;
         bh = (StgInd *)nonmovingAllocate(cap, sizeofW(*bh));
-        RELEASE_SM_LOCK;
         recordMutableCap((StgClosure*)bh,
                          regTableToCapability(reg), oldest_gen->no);
     } else {

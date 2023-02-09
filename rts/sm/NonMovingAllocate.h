@@ -13,6 +13,7 @@
 #include "BeginPrivate.h"
 
 void *nonmovingAllocate(Capability *cap, StgWord sz);
+void *nonmovingAllocateGC(Capability *cap, StgWord sz);
 void nonmovingInitCapability(Capability *cap);
 
 #include "EndPrivate.h"

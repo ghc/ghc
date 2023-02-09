@@ -67,7 +67,7 @@ static StgPtr
 alloc_in_nonmoving_heap (uint32_t size)
 {
     gct->copied += size;
-    StgPtr to = nonmovingAllocate(gct->cap, size);
+    StgPtr to = nonmovingAllocateGC(gct->cap, size);
 
     // See Note [Scavenging the non-moving heap] in NonMovingScav.c.
     // Add segment to the todo list unless it's already there
