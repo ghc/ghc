@@ -58,6 +58,12 @@ Compiler
 - Fix a driver bug where certain non-fatal Safe Haskell related warnings were
   being marked as fatal (:ghc-ticket:`22728`).
 
+- Fix a core lint error arises from incorrect scoping of type variables in
+  specialise pragmas inside class instances (:ghc-ticket:`22913`).
+
+- Improve typchecker performance for modules with holes in type signatures
+  (:ghc-ticket:`14766`).
+
 Runtime system
 --------------
 
