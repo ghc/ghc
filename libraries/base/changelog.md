@@ -73,6 +73,7 @@
     * The `whereFrom` function has been moved
   * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
       ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
+  * Add INLINABLE pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
 
 ## 4.17.0.0 *August 2022*
 
