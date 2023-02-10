@@ -1126,7 +1126,8 @@ dynLoadObjs interp hsc_env pls@LoaderState{..} objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib logger tmpfs dflags2 unit_env objs (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
+    pprTraceM "pkgs" (ppr (loaded_pkg_uid <$> eltsUDFM pkgs_loaded))
+    linkDynLib logger tmpfs dflags2 unit_env objs [] -- (loaded_pkg_uid <$> eltsUDFM pkgs_loaded)
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime tmpfs TFL_GhcSession [soFile]
@@ -1383,7 +1384,10 @@ loadPackages' interp hsc_env new_pks pls = do
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (unitIdFS new_pkg)))
 
 
-loadPackage :: Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec])
+loadPackage :: HasCallStack => Interp -> HscEnv -> UnitInfo -> IO ([LibrarySpec], [LibrarySpec])
+
+loadPackage _ hsc_env pkg | unitId pkg `elem` hsc_all_home_unit_ids hsc_env = return ([], [])
+
 loadPackage interp hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
