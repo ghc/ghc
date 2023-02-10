@@ -3,6 +3,14 @@
 Version 9.6.1
 ==============
 
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.6>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+10, 11, 12, 13, or 14.
+
 
 Language
 ~~~~~~~~
