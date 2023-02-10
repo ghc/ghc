@@ -4,6 +4,8 @@
   * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
   * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
     types significantly.
+  * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
+      ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
 
 ## 4.18.0.0 *TBA*
 

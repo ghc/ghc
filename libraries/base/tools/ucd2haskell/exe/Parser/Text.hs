@@ -205,7 +205,11 @@ genEnumBitmap funcName def as = unlines
                <> show (length as)
                <> " then "
                <> show (fromEnum def)
-               <> " else lookupIntN bitmap# n"
+               <> " else lookup_bitmap n"
+
+    , "{-# NOINLINE lookup_bitmap #-}"
+    , "lookup_bitmap :: Int -> Int"
+    , "lookup_bitmap n = lookupIntN bitmap# n"
     , "  where"
     , "    bitmap# = \"" <> enumMapToAddrLiteral as "\"#"
     ]
