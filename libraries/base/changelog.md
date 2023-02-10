@@ -1,5 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+
 ## 4.18.0.0 *TBA*
 
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
@@ -70,6 +71,8 @@
     * `InfoProv` now has additional `ipSrcFile` and `ipSrcSpan` fields. `ipLoc`
       is now a function computed from these fields.
     * The `whereFrom` function has been moved
+  * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
+      ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
 
 ## 4.17.0.0 *August 2022*
 
