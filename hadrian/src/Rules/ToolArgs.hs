@@ -56,7 +56,8 @@ multiSetup pkg_s = do
   tool_targets <- case pkg_s of
         Nothing -> return toolTargets
         Just pkg_s -> case findPackageByName pkg_s of
-                        Just pkg -> (pkg :) . Set.toList <$> pkg_deps pkg
+                        -- Put the requested package last so that's the one which is in scope
+                        Just pkg -> (++ [pkg]) . Set.toList <$> pkg_deps pkg
                         Nothing  -> error $ "Unknown package: " ++ pkg_s
   -- Get the arguments for all the targets
   pargs <- mapM one_args tool_targets
@@ -100,6 +101,7 @@ multiSetup pkg_s = do
     -- See #20887
     th_hack :: [String] -> [String]
     th_hack ((isPrefixOf "-package-id template-haskell" -> True) : xs) = "-package-id" : "template-haskell" : xs
+    th_hack ((isPrefixOf "-package-id ghc-9" -> True) : xs) = "-package-id" : "ghc" : xs
     th_hack (x:xs) = x : th_hack xs
     th_hack [] = []
 
