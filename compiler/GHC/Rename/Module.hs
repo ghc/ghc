@@ -2132,6 +2132,21 @@ The main parts of the implementation are:
   `type data` declarations.  When these are converted back to Hs types
   in a splice, the constructors are placed in the TcCls namespace.
 
+* A `type data` declaration _never_ generates wrappers for its data
+  constructors, as they only make sense for value-level data constructors.
+  See `wrapped_reqd` in GHC.Types.Id.Make.mkDataConRep` for the place where
+  this check is implemented.
+
+  This includes `type data` declarations implemented as GADTs, such as
+  this example from #22948:
+
+    type data T a where
+      A :: T Int
+      B :: T a
+
+  If `T` were an ordinary `data` declaration, then `A` would have a wrapper
+  to account for the GADT-like equality in its return type. Because `T` is
+  declared as a `type data` declaration, however, the wrapper is omitted.
 -}
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
