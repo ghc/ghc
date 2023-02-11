@@ -1046,6 +1046,8 @@ Checking for consistency
     :shortdesc: Align functions at given boundary.
     :type: dynamic
 
+    :since: 8.6.1
+
     Align functions to multiples of the given value. Only valid values are powers
     of two.
 
