@@ -435,7 +435,25 @@ you're reading this in 2023 then things went wrong). See #8326.
 -- specializations. However, not all loops fall into this category.
 --
 -- Libraries can specify this by using 'SPEC' data type to inform which
--- loops should be aggressively specialized.
+-- loops should be aggressively specialized. For example,
+-- instead of
+--
+-- > loop x where loop arg = ...
+--
+-- write
+--
+-- > loop SPEC x where loop !_ arg = ...
+--
+-- There is no semantic difference between 'SPEC' and 'SPEC2',
+-- we just need a type with two contructors lest it is optimised away
+-- before @SpecConstr@.
+--
+-- This type is reexported from "GHC.Exts" since GHC 9.0 and @base-4.15@.
+-- For compatibility with earlier releases import it from "GHC.Types"
+-- in @ghc-prim@ package.
+--
+-- @since 0.3.1.0
+--
 data SPEC = SPEC | SPEC2
 
 

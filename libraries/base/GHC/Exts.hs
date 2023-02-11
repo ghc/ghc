@@ -203,8 +203,11 @@ traceEvent = Debug.Trace.traceEventIO
 *                                                                       *
 ********************************************************************** -}
 
--- Annotating a type with NoSpecConstr will make SpecConstr
--- not specialise for arguments of that type.
+-- | Deprecated, use 'SPEC' directly instead.
+--
+-- Annotating a type with 'NoSpecConstr' will make @SpecConstr@
+-- not specialise for arguments of that type,
+-- e. g., @{-# ANN type SPEC ForceSpecConstr #-}@.
 
 -- This data type is defined here, rather than in the SpecConstr module
 -- itself, so that importing it doesn't force stupidly linking the
