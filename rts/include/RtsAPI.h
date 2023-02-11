@@ -599,6 +599,51 @@ extern StgWord base_GHCziTopHandler_runNonIO_closure[];
 
 /* ------------------------------------------------------------------------ */
 
+// This is a public RTS API function that does its best to zero out
+// unused RTS memory. rts_clearMemory() takes the storage manager
+// lock. It's only safe to call rts_clearMemory() when all mutators
+// have stopped and either minor/major garbage collection has just
+// been run.
+//
+// rts_clearMemory() works for all RTS ways on all platforms, though
+// the main intended use case is the pre-initialization of a
+// wasm32-wasi reactor module (#22920). A reactor module is like
+// shared library on other platforms, with foreign exported Haskell
+// functions as entrypoints. At run-time, the user calls hs_init_ghc()
+// to initialize the RTS, after that they can invoke Haskell
+// computation by calling the exported Haskell functions, persisting
+// the memory state across these invocations.
+//
+// Besides hs_init_ghc(), the user may want to invoke some Haskell
+// function to initialize some global state in the user code, this
+// global state is used by subsequent invocations. Now, it's possible
+// to run hs_init_ghc() & custom init logic in Haskell, then snapshot
+// the entire memory into a new wasm module! And the user can call the
+// new wasm module's exports directly, thus eliminating the
+// initialization overhead at run-time entirely.
+//
+// There's one problem though. After the custom init logic runs, the
+// RTS memory contains a lot of garbage data in various places. These
+// garbage data will be snapshotted into the new wasm module, causing
+// a significant size bloat. Therefore, we need an RTS API function
+// that zeros out unused RTS memory.
+//
+// At the end of the day, the custom init function will be a small C
+// function that first calls hs_init_ghc(), then calls a foreign
+// exported Haskell function to initialize whatever global state the
+// other Haskell functions need, followed by a hs_perform_gc() call to
+// do a major GC, and finally an rts_clearMemory() call to zero out
+// the unused RTS memory.
+//
+// Why add rts_clearMemory(), where there's the -DZ RTS flag that
+// zeros freed memory on GC? The -DZ flag actually fills freed memory
+// with a garbage byte like 0xAA, and the flag only works in debug
+// RTS. Why not add a new RTS flag that zeros freed memory on the go?
+// Because it only makes sense to do the zeroing once before
+// snapshotting the memory, but there's no point to pay for the
+// zeroing overhead at the new module's run-time.
+void rts_clearMemory(void);
+
 #if defined(__cplusplus)
 }
 #endif

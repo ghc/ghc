@@ -5,5 +5,6 @@
 HsInt out (HsInt x)
 {
     performMajorGC();
+    rts_clearMemory();
     return incall(x);
 }

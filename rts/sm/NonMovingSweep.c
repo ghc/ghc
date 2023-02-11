@@ -106,14 +106,16 @@ void nonmovingGcCafs()
     debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
 }
 
-static void
+#endif
+
+void
 clear_segment(struct NonmovingSegment* seg)
 {
     size_t end = ((size_t)seg) + NONMOVING_SEGMENT_SIZE;
     memset(&seg->bitmap, 0, end - (size_t)&seg->bitmap);
 }
 
-static void
+void
 clear_segment_free_blocks(struct NonmovingSegment* seg)
 {
     unsigned int block_size = nonmovingSegmentBlockSize(seg);
@@ -124,8 +126,6 @@ clear_segment_free_blocks(struct NonmovingSegment* seg)
         }
     }
 }
-
-#endif
 
 GNUC_ATTR_HOT void nonmovingSweep(void)
 {

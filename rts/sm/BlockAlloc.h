@@ -32,4 +32,6 @@ void reportUnmarkedBlocks (void);
 extern W_ n_alloc_blocks;   // currently allocated blocks
 extern W_ hw_alloc_blocks;  // high-water allocated blocks
 
+RTS_PRIVATE void clear_free_list(void);
+
 #include "EndPrivate.h"

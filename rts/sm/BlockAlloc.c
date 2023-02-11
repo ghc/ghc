@@ -1395,3 +1395,17 @@ reportUnmarkedBlocks (void)
 }
 
 #endif
+
+void clear_free_list(void) {
+    for (uint32_t node = 0; node < n_numa_nodes; ++node) {
+        for (bdescr *bd = free_mblock_list[node]; bd != NULL; bd = bd->link) {
+            clear_blocks(bd);
+        }
+
+        for (int ln = 0; ln < NUM_FREE_LISTS; ++ln) {
+            for (bdescr *bd = free_list[node][ln]; bd != NULL; bd = bd->link) {
+                clear_blocks(bd);
+            }
+        }
+    }
+}

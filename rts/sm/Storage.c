@@ -1924,3 +1924,46 @@ The compacting collector does nothing to improve megablock
 level fragmentation. The role of the compacting GC is to remove object level
 fragmentation and to use less memory when collecting. - see #19248
 */
+
+void rts_clearMemory(void) {
+    ACQUIRE_SM_LOCK;
+
+    clear_free_list();
+
+    for (uint32_t i = 0; i < n_nurseries; ++i) {
+        for (bdescr *bd = nurseries[i].blocks; bd; bd = bd->link) {
+            clear_blocks(bd);
+        }
+    }
+
+    for (unsigned int i = 0; i < getNumCapabilities(); ++i) {
+        for (bdescr *bd = getCapability(i)->pinned_object_empty; bd; bd = bd->link) {
+            clear_blocks(bd);
+        }
+
+        for (bdescr *bd = gc_threads[i]->free_blocks; bd; bd = bd->link) {
+            clear_blocks(bd);
+        }
+    }
+
+    if (RtsFlags.GcFlags.useNonmoving)
+    {
+        for (struct NonmovingSegment *seg = nonmovingHeap.free; seg; seg = seg->link) {
+            clear_segment(seg);
+        }
+
+        for (int i = 0; i < NONMOVING_ALLOCA_CNT; ++i) {
+            struct NonmovingAllocator *alloc = nonmovingHeap.allocators[i];
+
+            for (struct NonmovingSegment *seg = alloc->active; seg; seg = seg->link) {
+                clear_segment_free_blocks(seg);
+            }
+
+            for (unsigned int j = 0; j < getNumCapabilities(); ++j) {
+                clear_segment_free_blocks(alloc->current[j]);
+            }
+        }
+    }
+
+    RELEASE_SM_LOCK;
+}
