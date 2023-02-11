@@ -730,9 +730,8 @@ refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
 refineDefaultAlt us mult tycon tys imposs_deflt_cons all_alts
   | Alt DEFAULT _ rhs : rest_alts <- all_alts
   , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
-  , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
-                                --      case x of { DEFAULT -> e }
-                                -- and we don't want to fill in a default for them!
+  , not (isNewTyCon tycon)      -- Exception 1 in Note [Refine DEFAULT case alternatives]
+  , not (isTypeDataTyCon tycon) -- Exception 2 in Note [Refine DEFAULT case alternatives]
   , Just all_cons <- tyConDataCons_maybe tycon
   , let imposs_data_cons = mkUniqSet [con | DataAlt con <- imposs_deflt_cons]
                              -- We now know it's a data type, so we can use
@@ -816,6 +815,39 @@ with a specific constructor is desirable.
    at its one call site in GHC.Core.Opt.Simplify.Utils then the
    `imposs_deflt_cons` argument is populated with constructors which
    are matched elsewhere.
+
+There are two exceptions where we avoid refining a DEFAULT case:
+
+* Exception 1: Newtypes
+
+  We can have a newtype, if we are just doing an eval:
+
+    case x of { DEFAULT -> e }
+
+  And we don't want to fill in a default for them!
+
+* Exception 2: `type data` declarations
+
+  The data constructors for a `type data` declaration (see
+  Note [Type data declarations] in GHC.Rename.Module) do not exist at the
+  value level. Nevertheless, it is possible to strictly evaluate a value
+  whose type is a `type data` declaration. Test case
+  type-data/should_compile/T2294b.hs contains an example:
+
+    type data T a where
+      A :: T Int
+
+    f :: T a -> ()
+    f !x = ()
+
+  We want to generate the following Core for f:
+
+    f = \(@a) (x :: T a) ->
+         case x of
+           __DEFAULT -> ()
+
+  Namely, we do _not_ want to match on `A`, as it doesn't exist at the value
+  level!
 
 Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
