@@ -2147,6 +2147,28 @@ The main parts of the implementation are:
   If `T` were an ordinary `data` declaration, then `A` would have a wrapper
   to account for the GADT-like equality in its return type. Because `T` is
   declared as a `type data` declaration, however, the wrapper is omitted.
+
+* Although `type data` data constructors do not exist at the value level,
+  it is still possible to match on a value whose type is headed by a `type data`
+  type constructor, such as this example from #22964:
+
+    type data T a where
+      A :: T Int
+      B :: T a
+
+    f :: T a -> ()
+    f x = case x of {}
+
+  This has two consequences:
+
+  * During checking the coverage of `f`'s pattern matches, we treat `T` as if it
+    were an empty data type so that GHC does not warn the user to match against
+    `A` or `B`. (Otherwise, you end up with the bug reported in #22964.)
+    See GHC.HsToCore.Pmc.Solver.vanillaCompleteMatchTC.
+
+  * In `GHC.Core.Utils.refineDataAlt`, do /not/ fill in the DEFAULT case with
+    the data constructor. See
+    Note [Refine DEFAULT case alternatives] Exception 2, in GHC.Core.Utils.
 -}
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)

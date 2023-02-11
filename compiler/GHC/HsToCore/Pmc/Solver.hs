@@ -146,11 +146,16 @@ updRcm f (RCM vanilla pragmas)
 -- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
 vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
 vanillaCompleteMatchTC tc =
-  let -- TYPE acts like an empty data type on the term-level (#14086), but
-      -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
-      -- special case.
-      mb_dcs | tc == tYPETyCon = Just []
-             | otherwise       = tyConDataCons_maybe tc
+  let mb_dcs | -- TYPE acts like an empty data type on the term level (#14086),
+               -- but it is a PrimTyCon, so tyConDataCons_maybe returns Nothing.
+               -- Hence a special case.
+               tc == tYPETyCon    = Just []
+             | -- Similarly, treat `type data` declarations as empty data types on
+               -- the term level, as `type data` data constructors only exist at
+               -- the type level (#22964).
+               -- See Note [Type data declarations] in GHC.Rename.Module.
+               isTypeDataTyCon tc = Just []
+             | otherwise          = tyConDataCons_maybe tc
   in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
 
 -- | Initialise from 'dsGetCompleteMatches' (containing all COMPLETE pragmas)
