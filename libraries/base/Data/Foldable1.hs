@@ -82,20 +82,27 @@ class Foldable t => Foldable1 t where
     --     foldMap f     = foldMap f     . toNonEmpty
     --     foldrMap1 f g = foldrMap1 f g . toNonEmpty
 
-    -- | Combine the elements of a structure using a semigroup.
+    -- | Given a structure with elements whose type is a 'Semigroup', combine
+    -- them via the semigroup's @('<>')@ operator. This fold is
+    -- right-associative and lazy in the accumulator. When you need a strict
+    -- left-associative fold, use 'foldMap1'' instead, with 'id' as the map.
     fold1 :: Semigroup m => t m -> m
     fold1 = foldMap1 id
 
-    -- | Map each element of the structure to a semigroup,
-    -- and combine the results.
+    -- | Map each element of the structure to a semigroup, and combine the
+    -- results with @('<>')@. This fold is right-associative and lazy in the
+    -- accumulator. For strict left-associative folds consider 'foldMap1''
+    -- instead.
     --
-    -- >>> foldMap1 Sum (1 :| [2, 3, 4])
-    -- Sum {getSum = 10}
+    -- >>> foldMap1 (:[]) (1 :| [2, 3, 4])
+    -- [1,2,3,4]
     --
     foldMap1 :: Semigroup m => (a -> m) -> t a -> m
     foldMap1 f = foldrMap1 f (\a m -> f a <> m)
 
-    -- | A variant of 'foldMap1' that is strict in the accumulator.
+    -- | A left-associative variant of 'foldMap1' that is strict in the
+    -- accumulator. Use this for strict reduction when partial results are
+    -- merged via @('<>')@.
     --
     -- >>> foldMap1' Sum (1 :| [2, 3, 4])
     -- Sum {getSum = 10}
@@ -103,7 +110,7 @@ class Foldable t => Foldable1 t where
     foldMap1' :: Semigroup m => (a -> m) -> t a -> m
     foldMap1' f = foldlMap1' f (\m a -> m <> f a)
 
-    -- | List of elements of a structure, from left to right.
+    -- | 'NonEmpty' list of elements of a structure, from left to right.
     --
     -- >>> toNonEmpty (Identity 2)
     -- 2 :| []
@@ -143,7 +150,24 @@ class Foldable t => Foldable1 t where
     last :: t a -> a
     last = getLast #. foldMap1 Last
 
-    -- | Generalized 'foldr1'.
+    -- | Right-associative fold of a structure, lazy in the accumulator.
+    --
+    -- In case of 'NonEmpty' lists, 'foldrMap1', when given a function @f@, a
+    -- binary operator @g@, and a list, reduces the list using @g@ from right to
+    -- left applying @f@ to the rightmost element:
+    --
+    -- > foldrMap1 f g (x1 :| [x2, ..., xn1, xn]) == x1 `g` (x2 `g` ... (xn1 `g` (f xn))...)
+    --
+    -- Note that since the head of the resulting expression is produced by
+    -- an application of @g@ to the first element of the list, if @g@ is lazy
+    -- in its right argument, 'foldrMap1' can produce a terminating expression
+    -- from an unbounded list.
+    --
+    -- For a general 'Foldable1' structure this should be semantically identical
+    -- to:
+    --
+    -- @foldrMap1 f g = foldrMap1 f g . 'toNonEmpty'@
+    --
     foldrMap1 :: (a -> b) -> (a -> b -> b) -> t a -> b
     foldrMap1 f g xs =
         appFromMaybe (foldMap1 (FromMaybe #. h) xs) Nothing
@@ -151,7 +175,19 @@ class Foldable t => Foldable1 t where
         h a Nothing  = f a
         h a (Just b) = g a b
 
-    -- | Generalized 'foldl1''.
+    -- | Left-associative fold of a structure but with strict application of the
+    -- operator.
+    --
+    -- This ensures that each step of the fold is forced to Weak Head Normal
+    -- Form before being applied, avoiding the collection of thunks that would
+    -- otherwise occur. This is often what you want to strictly reduce a
+    -- finite structure to a single strict result.
+    --
+    -- For a general 'Foldable1' structure this should be semantically identical
+    -- to:
+    --
+    -- @foldlMap1' f z = foldlMap1' f z . 'toNonEmpty'@
+    --
     foldlMap1' :: (a -> b) -> (b -> a -> b) -> t a -> b
     foldlMap1' f g xs =
         foldrMap1 f' g' xs SNothing
@@ -164,7 +200,33 @@ class Foldable t => Foldable1 t where
         g' a x SNothing  = x $! SJust (f a)
         g' a x (SJust b) = x $! SJust (g b a)
 
-    -- | Generalized 'foldl1'.
+    -- | Left-associative fold of a structure, lazy in the accumulator.  This is
+    -- rarely what you want, but can work well for structures with efficient
+    -- right-to-left sequencing and an operator that is lazy in its left
+    -- argument.
+    --
+    -- In case of 'NonEmpty' lists, 'foldlMap1', when given a function @f@, a
+    -- binary operator @g@, and a list, reduces the list using @g@ from left to
+    -- right applying @f@ to the leftmost element:
+    --
+    -- > foldlMap1 f g (x1 :| [x2, ..., xn]) == (...(((f x1) `g` x2) `g`...) `g` xn
+    --
+    -- Note that to produce the outermost application of the operator the entire
+    -- input list must be traversed. This means that 'foldlMap1' will diverge if
+    -- given an infinite list.
+    --
+    -- If you want an efficient strict left-fold, you probably want to use
+    -- 'foldlMap1''  instead of 'foldlMap1'. The reason for this is that the
+    -- latter does not force the /inner/ results (e.g. @(f x1) \`g\` x2@ in the
+    -- above example) before applying them to the operator (e.g. to
+    -- @(\`g\` x3)@). This results in a thunk chain \(O(n)\) elements long,
+    -- which then must be evaluated from the outside-in.
+    --
+    -- For a general 'Foldable1' structure this should be semantically identical
+    -- to:
+    --
+    -- @foldlMap1 f g = foldlMap1 f g . 'toNonEmpty'@
+    --
     foldlMap1 :: (a -> b) -> (b -> a -> b) -> t a -> b
     foldlMap1 f g xs =
         appFromMaybe (getDual (foldMap1 ((Dual . FromMaybe) #. h) xs)) Nothing
@@ -172,7 +234,21 @@ class Foldable t => Foldable1 t where
         h a Nothing  = f a
         h a (Just b) = g b a
 
-    -- | Generalized 'foldr1''.
+    -- | 'foldrMap1'' is a variant of 'foldrMap1' that performs strict reduction
+    -- from right to left, i.e. starting with the right-most element. The input
+    -- structure /must/ be finite, otherwise 'foldrMap1'' runs out of space
+    -- (/diverges/).
+    --
+    -- If you want a strict right fold in constant space, you need a structure
+    -- that supports faster than \(O(n)\) access to the right-most element.
+    --
+    -- This method does not run in constant space for structures such as
+    -- 'NonEmpty' lists that don't support efficient right-to-left iteration and
+    -- so require \(O(n)\) space to perform right-to-left reduction. Use of this
+    -- method with such a structure is a hint that the chosen structure may be a
+    -- poor fit for the task at hand. If the order in which the elements are
+    -- combined is not important, use 'foldlMap1'' instead.
+    --
     foldrMap1' :: (a -> b) -> (a -> b -> b) -> t a -> b
     foldrMap1' f g xs =
         foldlMap1 f' g' xs SNothing
@@ -187,75 +263,22 @@ class Foldable t => Foldable1 t where
 -- Combinators
 -------------------------------------------------------------------------------
 
--- | Right-associative fold of a structure.
---
--- In the case of lists, 'foldr1', when applied to a binary operator,
--- and a list, reduces the list using the binary operator,
--- from right to left:
---
--- > foldr1 f [x1, x2, ..., xn] == x1 `f` (x2 `f` ... (xn1 `f` xn )...)
---
--- Note that, since the head of the resulting expression is produced by
--- an application of the operator to the first element of the list,
--- 'foldr1' can produce a terminating expression from an infinite list.
---
--- For a general 'Foldable1' structure this should be semantically identical
--- to,
---
--- @foldr1 f = foldr1 f . 'toNonEmpty'@
---
+-- | A variant of 'foldrMap1' where the rightmost element maps to itself.
 foldr1 :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldr1 = foldrMap1 id
 {-# INLINE foldr1 #-}
 
--- | Right-associative fold of a structure, but with strict application of
--- the operator.
---
+-- | A variant of 'foldrMap1'' where the rightmost element maps to itself.
 foldr1' :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldr1' = foldrMap1' id
 {-# INLINE foldr1' #-}
 
--- | Left-associative fold of a structure.
---
--- In the case of lists, 'foldl1', when applied to a binary
--- operator, and a list, reduces the list using the binary operator,
--- from left to right:
---
--- > foldl1 f [x1, x2, ..., xn] == (...((x1 `f` x2) `f`...) `f` xn
---
--- Note that to produce the outermost application of the operator the
--- entire input list must be traversed. This means that 'foldl1' will
--- diverge if given an infinite list.
---
--- Also note that if you want an efficient left-fold, you probably want to
--- use 'foldl1'' instead of 'foldl1'. The reason for this is that latter does
--- not force the "inner" results (e.g. @x1 \`f\` x2@ in the above example)
--- before applying them to the operator (e.g. to @(\`f\` x3)@). This results
--- in a thunk chain \(\mathcal{O}(n)\) elements long, which then must be
--- evaluated from the outside-in.
---
--- For a general 'Foldable1' structure this should be semantically identical
--- to,
---
--- @foldl1 f z = foldl1 f . 'toNonEmpty'@
---
+-- | A variant of 'foldlMap1' where the leftmost element maps to itself.
 foldl1 :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldl1 = foldlMap1 id
 {-# INLINE foldl1 #-}
 
--- | Left-associative fold of a structure but with strict application of
--- the operator.
---
--- This ensures that each step of the fold is forced to weak head normal
--- form before being applied, avoiding the collection of thunks that would
--- otherwise occur. This is often what you want to strictly reduce a finite
--- list to a single, monolithic result (e.g. 'length').
---
--- For a general 'Foldable1' structure this should be semantically identical
--- to,
---
--- @foldl1' f z = foldl1 f . 'toNonEmpty'@
---
+-- | A variant of 'foldlMap1'' where the leftmost element maps to itself.
 foldl1' :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldl1' = foldlMap1' id
 {-# INLINE foldl1' #-}
