@@ -2169,6 +2169,17 @@ The main parts of the implementation are:
   * In `GHC.Core.Utils.refineDataAlt`, do /not/ fill in the DEFAULT case with
     the data constructor. See
     Note [Refine DEFAULT case alternatives] Exception 2, in GHC.Core.Utils.
+
+* To prevent users from conjuring up `type data` values at the term level, we
+  disallow using the tagToEnum# function on a type headed by a `type data`
+  type. For instance, GHC will reject this code:
+
+    type data Letter = A | B | C
+
+    f :: Letter
+    f = tagToEnum# 0#
+
+  See `GHC.Tc.Gen.App.checkTagToEnum`, specifically `check_enumeration`.
 -}
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)
