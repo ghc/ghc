@@ -276,6 +276,10 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
               2 (text "Result type must be an enumeration type")
+    TcRnTagToEnumResTyTypeData ty
+      -> mkSimpleDecorated $
+           hang (text "Bad call to tagToEnum# at type" <+> ppr ty)
+              2 (text "Result type cannot be headed by a `type data` type")
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> mkSimpleDecorated $
            text "Predicate type of `ifThenElse' depends on result type"
@@ -1307,6 +1311,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTagToEnumResTyNotAnEnum{}
       -> ErrorWithoutFlag
+    TcRnTagToEnumResTyTypeData{}
+      -> ErrorWithoutFlag
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> ErrorWithoutFlag
     TcRnIllegalHsBootFileDecl
@@ -1712,6 +1718,8 @@ instance Diagnostic TcRnMessage where
     TcRnTagToEnumUnspecifiedResTy{}
       -> noHints
     TcRnTagToEnumResTyNotAnEnum{}
+      -> noHints
+    TcRnTagToEnumResTyTypeData{}
       -> noHints
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> noHints

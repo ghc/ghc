@@ -1226,6 +1226,8 @@ tcTagToEnum tc_fun fun_ctxt tc_args res_ty
     vanilla_result = rebuildHsApps tc_fun fun_ctxt tc_args res_ty
 
     check_enumeration ty' tc
+      | -- isTypeDataTyCon: see Note [Type data declarations] in GHC.Rename.Module
+        isTypeDataTyCon tc    = addErrTc (TcRnTagToEnumResTyTypeData ty')
       | isEnumerationTyCon tc = return ()
       | otherwise             = addErrTc (TcRnTagToEnumResTyNotAnEnum ty')
 

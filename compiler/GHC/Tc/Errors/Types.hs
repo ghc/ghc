@@ -663,6 +663,20 @@ data TcRnMessage where
   -}
   TcRnTagToEnumResTyNotAnEnum :: Type -> TcRnMessage
 
+  {-| TcRnTagToEnumResTyTypeData is an error that occurs when the 'tagToEnum#'
+      function is given a result type that is headed by a @type data@ type, as
+      the data constructors of a @type data@ do not exist at the term level.
+
+      Example(s):
+      type data Letter = A | B | C
+
+      foo :: Letter
+      foo = tagToEnum# 0#
+
+     Test cases: type-data/should_fail/TDTagToEnum.hs
+  -}
+  TcRnTagToEnumResTyTypeData :: Type -> TcRnMessage
+
   {-| TcRnArrowIfThenElsePredDependsOnResultTy is an error that occurs when the
       predicate type of an ifThenElse expression in arrow notation depends on
       the type of the result.

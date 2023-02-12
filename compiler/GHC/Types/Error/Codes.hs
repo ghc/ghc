@@ -354,6 +354,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTagToEnumMissingValArg"                    = 36495
   GhcDiagnosticCode "TcRnTagToEnumUnspecifiedResTy"                 = 08522
   GhcDiagnosticCode "TcRnTagToEnumResTyNotAnEnum"                   = 49356
+  GhcDiagnosticCode "TcRnTagToEnumResTyTypeData"                    = 96189
   GhcDiagnosticCode "TcRnArrowIfThenElsePredDependsOnResultTy"      = 55868
   GhcDiagnosticCode "TcRnIllegalHsBootFileDecl"                     = 58195
   GhcDiagnosticCode "TcRnRecursivePatternSynonym"                   = 72489
