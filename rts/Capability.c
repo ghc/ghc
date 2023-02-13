@@ -439,8 +439,9 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
             if (i < from) {
                 new_capabilities[i] = capabilities[i];
             } else {
-                new_capabilities[i] = stgMallocBytes(sizeof(Capability),
-                                                     "moreCapabilities");
+                new_capabilities[i] = stgMallocAlignedBytes(sizeof(Capability),
+                                                            CAPABILITY_ALIGNMENT,
+                                                            "moreCapabilities");
                 initCapability(new_capabilities[i], i);
             }
         }
@@ -1287,7 +1288,7 @@ freeCapabilities (void)
     for (i=0; i < getNumCapabilities(); i++) {
         freeCapability(capabilities[i]);
         if (capabilities[i] != &MainCapability)
-            stgFree(capabilities[i]);
+            stgFreeAligned(capabilities[i]);
     }
 #else
     freeCapability(&MainCapability);
