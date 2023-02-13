@@ -29,6 +29,10 @@ char *stgStrndup(const char *s, size_t n);
 
 void stgFree(void* p);
 
+void *stgMallocAlignedBytes(size_t n, size_t align, char *msg);
+
+void stgFreeAligned(void *p);
+
 /* -----------------------------------------------------------------------------
  * Misc other utilities
  * -------------------------------------------------------------------------- */

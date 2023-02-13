@@ -1280,7 +1280,7 @@ freeCapabilities (void)
     for (i=0; i < getNumCapabilities(); i++) {
         freeCapability(capabilities[i]);
         if (capabilities[i] != &MainCapability)
-            stgFree(capabilities[i]);
+            stgFreeAligned(capabilities[i]);
     }
 #else
     freeCapability(&MainCapability);
