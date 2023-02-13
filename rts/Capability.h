@@ -27,6 +27,16 @@
 
 #include "BeginPrivate.h"
 
+// We never want a Capability to overlap a cache line with
+// anything else, so round it up to a cache line size:
+#if defined(s390x_HOST_ARCH)
+#define CAPABILITY_ALIGNMENT 256
+#elif !defined(mingw32_HOST_OS)
+#define CAPABILITY_ALIGNMENT 64
+#else
+#define CAPABILITY_ALIGNMENT 1
+#endif
+
 /* N.B. This must be consistent with CapabilityPublic in RtsAPI.h */
 struct Capability_ {
     // State required by the STG virtual machine when running Haskell
@@ -169,14 +179,12 @@ struct Capability_ {
     StgTRecHeader *free_trec_headers;
     uint32_t transaction_tokens;
 } // typedef Capability is defined in RtsAPI.h
-  // We never want a Capability to overlap a cache line with anything
-  // else, so round it up to a cache line size:
-#if defined(s390x_HOST_ARCH)
-  ATTRIBUTE_ALIGNED(256)
-#elif !defined(mingw32_HOST_OS)
-  ATTRIBUTE_ALIGNED(64)
-#endif
-  ;
+  ATTRIBUTE_ALIGNED(CAPABILITY_ALIGNMENT)
+;
+
+// We allocate arrays of Capabilities therefore we must ensure that the size is
+// a multiple of the claimed alignment
+GHC_STATIC_ASSERT(sizeof(struct Capability_) % CAPABILITY_ALIGNMENT == 0, "Capability size does not match cache size");
 
 #if defined(THREADED_RTS)
 #define ASSERT_TASK_ID(task) ASSERT(task->id == osThreadId())
