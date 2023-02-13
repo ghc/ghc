@@ -35,6 +35,7 @@ import GHC.Runtime.Interpreter.Types
 
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
+import GHC.Iface.Recomp ( addFingerprints )
 import GHC.Rename.Names ( gresFromAvails )
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
@@ -156,10 +157,42 @@ checkExternalInterpreter hsc_env = case interpInstance <$> hsc_interp hsc_env of
     -> throwIO (InstallationError "Plugins require -fno-external-interpreter")
   _ -> pure ()
 
+{-
+Note [Loading Plugins]
+~~~~~~~~~~~~~~~~~~~~~~
+
+
+When loading plugins, we must be careful to check that certain packages we
+depend on, like ghc the library, are ABI compatible with the packages the
+plugin was linked against.
+
+Currently, ghc the library and the boot packages don't have an ABI hash in
+their identifier. Consequently, when loading a plugin that was linked against
+ghc-v-xxx into a module that is being linked against ghc-v-yyy, we must
+(somehow) guarantee that xxx and yyy are indeed the same, which isn't trivial
+because xxx and yyy aren't available in the package identifier. Or we risk
+linking the plugin against an incompatible ghc of the same version, leading to
+crashes and segmentation faults (since the loaded plugin will make use of an
+incompatible library thinking it's compatible).
+
+A solution is to re-compute the ABI hash of the plugin being loaded and compare
+it against the ABI hash of the plugin as computed by the compiler that compiled
+it. If the hashes are one and the same, it's safe to load the plugin.
+
+-- Because the ABI hash (see addFingerprints) depends on ... ?
+
+See also #20742
+
+
+-}
+
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface, [Linkable], PkgsLoaded)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
+
+         -- Find plugin_name (e.g. "plugin", "frontendPlugin")
+         -- in the module of the plugin to load
        ; mb_name <- lookupRdrNameInModuleForPlugins hsc_env mod_name
                         plugin_rdr_name
        ; case mb_name of {
@@ -168,8 +201,21 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The module", ppr mod_name
                           , text "did not export the plugin name"
                           , ppr plugin_rdr_name ]) ;
+          -- The modiface of the plugin as compiled by possibly other compiler
             Just (name, mod_iface) ->
 
+          -- The modiface of the plugin as compiled by us
+     do { our_mod_iface <- addFingerprints hsc_env
+                              (mod_iface{mi_final_exts = (), mi_decls = map snd (mi_decls mod_iface)})
+
+          -- Compare ABI hashes of module being loaded. See Note [Loading Plugins]
+        ; if mi_mod_hash (mi_final_exts mod_iface) /= mi_mod_hash (mi_final_exts our_mod_iface)
+             then
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                          [ text "The plugin", ppr mod_name
+                          , text "was built with a compiler that is ABI incompatible with the one loading it"
+                          ]) ;
+             else -- pprTrace "(Their ABI hash, Our ABI Hash):" (ppr (mi_mod_hash $ mi_final_exts mod_iface, mi_mod_hash $ mi_final_exts our_mod_iface)) $
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case eith_plugin of
@@ -182,7 +228,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , text "did not have the type"
                           , text "GHC.Plugins.Plugin"
                           , text "as required"])
-            Right (plugin, links, pkgs) -> return (plugin, mod_iface, links, pkgs) } } }
+            Right (plugin, links, pkgs) -> return (plugin, mod_iface, links, pkgs) } } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
