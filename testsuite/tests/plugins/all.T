@@ -9,11 +9,6 @@ setTestOpts([
     # sequentially until this is fixed.  This likely means that #13194 isn't fully
     # solved.  See also #15313.
     when(opsys('mingw32'), multi_cpu_race),
-    # Unfortunately even with the above these tests are incredibly flaky on Windows.
-    # In any given testsuite run at least half a dozen fail for one reason of another
-    # (typically a cmmbination of timeouts, some missing static archive errors from ld,
-    # and a few plain crashes).
-    when(opsys('mingw32'), fragile(16405))
 ])
 
 
@@ -103,13 +98,11 @@ test('plugins15',
 
 test('T10420',
      [extra_files(['rule-defining-plugin/']),
-      when(opsys('mingw32'), expect_broken(21322)),
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420 TOP={top}')],
      makefile_test, [])
 
 test('T10294',
      [extra_files(['annotation-plugin/']),
-
       pre_cmd('$MAKE -s --no-print-directory -C annotation-plugin package.T10294 TOP={top}')],
      makefile_test, [])
 
@@ -262,13 +255,11 @@ test('T20218b',
 
 test('test-defaulting-plugin',
      [extra_files(['defaulting-plugin/']),
-      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin TOP={top}')],
      makefile_test, [])
 
 test('test-defaulting-plugin-fail',
      [extra_files(['defaulting-plugin/']),
-      when(opsys('mingw32'), fragile(21293)),
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
      makefile_test, [])
 
@@ -319,7 +310,7 @@ test('test-echo-in-line-many-args',
 test('plugins-external',
      [extra_files(['shared-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C shared-plugin package.plugins01 TOP={top}'),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      when(opsys('mingw32') or (opsys('linux') and not ghc_dynamic()), expect_broken(20706))],
      makefile_test, [])
 
 test('test-phase-hooks-plugin',
