@@ -29,16 +29,9 @@ void *stgMallocBytes(size_t n, char *msg)
  * See: https://gitlab.haskell.org/ghc/ghc/-/issues/22380
  */
 
-void *stgReallocBytes(void *p, size_t n, char *msg)
-    STG_MALLOC1(stgFree)
-    STG_ALLOC_SIZE1(2)
-    STG_RETURNS_NONNULL;
-/* Note: `stgRallocBytes` can *not* be tagged as `STG_MALLOC`
- * since its return value *can* alias an existing pointer (i.e.,
- * the given pointer `p`).
- * See the documentation of the `malloc` attribute in the GCC manual
- * for more information.
- */
+void *stgMallocAlignedBytes(size_t n, size_t align, char *msg);
+
+void *stgReallocBytes(void *p, size_t n, char *msg);
 
 void *stgCallocBytes(size_t count, size_t size, char *msg)
     STG_MALLOC STG_MALLOC1(stgFree)
@@ -47,6 +40,10 @@ void *stgCallocBytes(size_t count, size_t size, char *msg)
 
 char *stgStrndup(const char *s, size_t n)
     STG_MALLOC STG_MALLOC1(stgFree);
+
+void *stgMallocAlignedBytes(size_t n, size_t align, char *msg);
+
+void stgFreeAligned(void *p);
 
 /* -----------------------------------------------------------------------------
  * Misc other utilities
