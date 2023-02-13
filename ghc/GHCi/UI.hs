@@ -556,7 +556,10 @@ interactiveUI config srcs maybe_exprs = do
 
    default_editor <- liftIO $ findEditor
    eval_wrapper <- mkEvalWrapper default_progname default_args
-   let prelude_import = simpleImportDecl preludeModuleName
+   let prelude_import =
+         case simpleImportDecl preludeModuleName of
+           -- Set to True because Prelude is implicitly imported.
+           impDecl@ImportDecl{ideclExt=ext} -> impDecl{ideclExt = ext{ideclImplicit=True}}
    hsc_env <- GHC.getSession
    let in_multi = length (hsc_all_home_unit_ids hsc_env) > 1
    empty_cache <- liftIO newIfaceCache
