@@ -438,8 +438,9 @@ moreCapabilities (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
     {
         for (uint32_t i = 0; i < to; i++) {
             if (i >= from) {
-                capabilities[i] = stgMallocBytes(sizeof(Capability),
-                                                     "moreCapabilities");
+                capabilities[i] = stgMallocAlignedBytes(sizeof(Capability),
+                                                        CAPABILITY_ALIGNMENT,
+                                                        "moreCapabilities");
                 initCapability(capabilities[i], i);
             }
         }
