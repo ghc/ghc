@@ -1046,6 +1046,7 @@ extern char **environ;
       SymI_HasProto(sendCloneStackMessage)                              \
       SymI_HasProto(cloneStack)                                         \
       SymI_HasProto(decodeClonedStack)                                  \
+      SymI_HasProto(setKeepCAFs)                                        \
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
