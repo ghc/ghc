@@ -23,7 +23,7 @@ import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Config.Cmm
 import GHC.Prelude
 import GHC.Runtime.Heap.Layout (isStackRep)
-import GHC.Settings (Platform, platformUnregisterised)
+import GHC.Settings (Platform, platformTablesNextToCode)
 import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
@@ -52,13 +52,13 @@ by `generateCgIPEStub`.
 
 This leads to the question: How to figure out the source location of a return frame?
 
-While the lookup algorithms for registerised and unregisterised builds differ in details, they have in
+While the lookup algorithms when tables-next-to-code is on/off differ in details, they have in
 common that we want to lookup the `CmmNode.CmmTick` (containing a `SourceNote`) that is nearest
 (before) the usage of the return frame's label. (Which label and label type is used differs between
 these two use cases.)
 
-Registerised
-~~~~~~~~~~~~~
+With tables-next-to-code
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's consider this example:
 ```
@@ -117,10 +117,10 @@ sure as there are e.g. update frames, too) with it's label (`c18g` in the exampl
     `IpeSourceLocation`. (There are other `Tickish` constructors like `ProfNote` or `HpcTick`, these are
     ignored.)
 
-Unregisterised
-~~~~~~~~~~~~~
+Without tables-next-to-code
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In unregisterised builds there is no return frame / continuation label in calls. The continuation (i.e. return
+When tables-next-to-code is off, there is no return frame / continuation label in calls. The continuation (i.e. return
 frame) is set in an explicit Cmm assignment. Thus the tick lookup algorithm has to be slightly different.
 
 ```
@@ -223,9 +223,9 @@ generateCgIPEStub hsc_env this_mod denv s = do
       if (isStackRep . cit_rep) infoTable
         then do
           let findFun =
-                if platformUnregisterised platform
-                  then findCmmTickishForForUnregistered (cit_lbl infoTable)
-                  else findCmmTickishForRegistered infoTableLabel
+                if platformTablesNextToCode platform
+                  then findCmmTickishWithTNTC infoTableLabel
+                  else findCmmTickishSansTNTC (cit_lbl infoTable)
               blocks = concatMap toBlockList (graphs cmmGroup)
           firstJusts $ map findFun blocks
         else Nothing
@@ -236,8 +236,8 @@ generateCgIPEStub hsc_env this_mod denv s = do
         go acc (CmmProc _ _ _ g) = g : acc
         go acc _ = acc
 
-    findCmmTickishForRegistered :: Label -> Block CmmNode C C -> Maybe IpeSourceLocation
-    findCmmTickishForRegistered label block = do
+    findCmmTickishWithTNTC :: Label -> Block CmmNode C C -> Maybe IpeSourceLocation
+    findCmmTickishWithTNTC label block = do
       let (_, middleBlock, endBlock) = blockSplit block
 
       isCallWithReturnFrameLabel endBlock label
@@ -255,8 +255,8 @@ generateCgIPEStub hsc_env this_mod denv s = do
         maybeTick (CmmTick (SourceNote span name)) = Just (span, name)
         maybeTick _ = Nothing
 
-    findCmmTickishForForUnregistered :: CLabel -> Block CmmNode C C -> Maybe IpeSourceLocation
-    findCmmTickishForForUnregistered cLabel block = do
+    findCmmTickishSansTNTC :: CLabel -> Block CmmNode C C -> Maybe IpeSourceLocation
+    findCmmTickishSansTNTC cLabel block = do
       let (_, middleBlock, _) = blockSplit block
       find cLabel (blockToList middleBlock) Nothing
       where
