@@ -1274,7 +1274,7 @@ freeCapabilities (void)
         Capability *cap = getCapability(i);
         freeCapability(cap);
         if (cap != &MainCapability) {
-            stgFree(cap);
+            stgFreeAligned(cap);
         }
     }
 #else
