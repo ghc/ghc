@@ -59,9 +59,9 @@ extern char *ctime_r(const time_t *, char *);
 void *
 stgMallocBytes (size_t n, char *msg)
 {
-    void *space;
+    void *space = malloc(n);
 
-    if ((space = malloc(n)) == NULL) {
+    if (space == NULL) {
       /* Quoting POSIX.1-2008 (which says more or less the same as ISO C99):
        *
        *   "Upon successful completion with size not equal to 0, malloc() shall
@@ -128,6 +128,53 @@ void
 stgFree(void* p)
 {
   free(p);
+}
+
+// N.B. Allocations resulting from this function must be freed by
+// `stgFreeAligned`, not `stgFree`. This is necessary due to the properties of Windows' `_aligned_malloc`
+void *
+stgMallocAlignedBytes (size_t n, size_t align, char *msg)
+{
+    void *space;
+
+#if defined(mingw32_HOST_OS)
+    space = _aligned_malloc(n, align);
+#else
+    if (posix_memalign(&space, align, n)) {
+        space = NULL; // Allocation failed
+    }
+#endif
+
+    if (space == NULL) {
+      /* Quoting POSIX.1-2008 (which says more or less the same as ISO C99):
+       *
+       *   "Upon successful completion with size not equal to 0, malloc() shall
+       *   return a pointer to the allocated space. If size is 0, either a null
+       *   pointer or a unique pointer that can be successfully passed to free()
+       *   shall be returned. Otherwise, it shall return a null pointer and set
+       *   errno to indicate the error."
+       *
+       * Consequently, a NULL pointer being returned by `malloc()` for a 0-size
+       * allocation is *not* to be considered an error.
+       */
+      if (n == 0) return NULL;
+
+      /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+      rtsConfig.mallocFailHook((W_) n, msg);
+      stg_exit(EXIT_INTERNAL_ERROR);
+    }
+    IF_DEBUG(zero_on_gc, memset(space, 0xbb, n));
+    return space;
+}
+
+void
+stgFreeAligned (void *p)
+{
+#if defined(mingw32_HOST_OS)
+    _aligned_free(p);
+#else
+    free(p);
+#endif
 }
 
 /* -----------------------------------------------------------------------------
