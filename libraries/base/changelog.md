@@ -6,6 +6,7 @@
     types significantly.
 
 ## 4.18.0.0 *TBA*
+
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `forall a. Functor (p a)` superclass for `Bifunctor p` ([CLC proposal #91](https://github.com/haskell/core-libraries-committee/issues/91))
@@ -68,6 +69,13 @@
   * Add `Data.Typeable.heqT`, a kind-heterogeneous version of
     `Data.Typeable.eqT`
     ([CLC proposal #99](https://github.com/haskell/core-libraries-committee/issues/99))
+  * Various declarations GHC's new info-table provenance feature have been
+    moved from `GHC.Stack.CCS` to a new `GHC.InfoProv` module:
+    * The `InfoProv`, along its `ipName`, `ipDesc`, `ipTyDesc`, `ipLabel`,
+      `ipMod`, and `ipLoc` fields, have been moved.
+    * `InfoProv` now has additional `ipSrcFile` and `ipSrcSpan` fields. `ipLoc`
+      is now a function computed from these fields.
+    * The `whereFrom` function has been moved
 
 ## 4.17.0.0 *August 2022*
 
