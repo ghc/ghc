@@ -59,6 +59,7 @@ def checkDynAsm(actual_file, normaliser):
 test('T5435_v_asm_a',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       req_rts_linker,
+      fragile(22970),
       when(arch('arm'), expect_broken(17559)),
       when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T5435_v_asm_a'])
@@ -67,6 +68,7 @@ test('T5435_v_asm_a',
 test('T5435_v_asm_b',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       req_rts_linker,
+      fragile(22970),
       when(arch('arm'), expect_broken(17559)),
       when(opsys('darwin') or opsys('mingw32'), skip),
       when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
@@ -74,16 +76,19 @@ test('T5435_v_asm_b',
 test('T5435_v_gcc',
      [extra_files(['T5435.hs', 'T5435_gcc.c']),
       req_rts_linker,
+      fragile(22970),
       when(arch('arm'), expect_broken(17559)),
       when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
      makefile_test, ['T5435_v_gcc'])
 test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
+      fragile(22970),
       js_skip, # dynamic linking not supported by the JS backend
       check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
 test('T5435_dyn_gcc',
      [extra_files(['T5435.hs', 'T5435_gcc.c']),
+      fragile(22970),
       js_skip], # dynamic linking not supported by the JS backend
      makefile_test, ['T5435_dyn_gcc'])
 
