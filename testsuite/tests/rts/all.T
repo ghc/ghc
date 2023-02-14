@@ -418,13 +418,9 @@ test('T12497', [ unless(opsys('mingw32'), skip), expect_broken(22694)
 test('T13617', [ unless(opsys('mingw32'), skip)],
                makefile_test, ['T13617'])
 
-# This test sometimes produces out of sequence samples in the profasm way, but
-# not reliably, so we just skip it. See ticket #15065.
-# Test is being skipped on darwin due to it's flakiness.
-test('T12903', [ when(opsys('mingw32'), skip)
-               , when(opsys('darwin'), skip)
-               , when(arch('i386'), fragile(20377))
-               , omit_ways(['ghci', 'profasm'])
+# Test is fragile on all systems. #21184 links to various other reports through
+# its history.
+test('T12903', [ fragile(21184)
                , js_broken(22374)]
                , compile_and_run, [''])
 
