@@ -697,8 +697,16 @@ size_t getSymbolSize ( COFF_HEADER_INFO *info )
     }
 }
 
+// Constants which may be returned by getSymSectionNumber.
+// See https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#section-number-values
+#define PE_SECTION_UNDEFINED ((uint32_t) 0)
+#define PE_SECTION_ABSOLUTE  ((uint32_t) -1)
+#define PE_SECTION_DEBUG     ((uint32_t) -2)
+
+// Returns either PE_SECTION_{UNDEFINED,ABSOLUTE,DEBUG} or the (one-based)
+// section number of the given symbol.
 __attribute__ ((always_inline)) inline
-int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
+uint32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
     ASSERT(info);
     ASSERT(sym);
@@ -707,7 +715,16 @@ int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
         case COFF_ANON_BIG_OBJ:
             return sym->ex.SectionNumber;
         default:
-            return sym->og.SectionNumber;
+            // Take care to catch reserved values; see #22941.
+            switch (sym->og.SectionNumber) {
+                case IMAGE_SYM_UNDEFINED: return PE_SECTION_UNDEFINED;
+                case IMAGE_SYM_ABSOLUTE : return PE_SECTION_ABSOLUTE;
+                case IMAGE_SYM_DEBUG: return PE_SECTION_DEBUG;
+                default:
+                  // Ensure that we catch if SectionNumber is made wider in the future
+                  ASSERT(sizeof(sym->og.SectionNumber) == 2);
+                  return (uint16_t) sym->og.SectionNumber;
+            }
     }
 }
 
@@ -1652,7 +1669,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    StgWord globalBssSize = 0;
    for (unsigned int i=0; i < info->numberOfSymbols; i++) {
       COFF_symbol* sym = &oc->info->symbols[i];
-      if (getSymSectionNumber (info, sym) == IMAGE_SYM_UNDEFINED
+      if (getSymSectionNumber (info, sym) == PE_SECTION_UNDEFINED
            && getSymValue (info, sym) > 0
            && getSymStorageClass (info, sym) != IMAGE_SYM_CLASS_SECTION) {
            globalBssSize += getSymValue (info, sym);
@@ -1685,21 +1702,39 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    for (unsigned int i = 0; i < (uint32_t)oc->n_symbols; i++) {
       COFF_symbol* sym = &oc->info->symbols[i];
 
-      int32_t secNumber = getSymSectionNumber (info, sym);
       uint32_t symValue = getSymValue (info, sym);
       uint8_t symStorageClass = getSymStorageClass (info, sym);
-
       SymbolAddr *addr = NULL;
       bool isWeak = false;
       SymbolName *sname = get_sym_name (getSymShortName (info, sym), oc);
-      Section *section = secNumber > 0 ? &oc->sections[secNumber-1] : NULL;
+
+      uint32_t secNumber = getSymSectionNumber (info, sym);
+      Section *section;
+      switch (secNumber) {
+        case PE_SECTION_UNDEFINED:
+          // N.B. This may be a weak symbol
+          section = NULL;
+          break;
+        case PE_SECTION_ABSOLUTE:
+          IF_DEBUG(linker, debugBelch("symbol %s is ABSOLUTE, skipping...\n", sname));
+          i += getSymNumberOfAuxSymbols (info, sym);
+          continue;
+        case PE_SECTION_DEBUG:
+          IF_DEBUG(linker, debugBelch("symbol %s is DEBUG, skipping...\n", sname));
+          i += getSymNumberOfAuxSymbols (info, sym);
+          continue;
+        default:
+          CHECK(secNumber < (uint32_t) oc->n_sections);
+          section = &oc->sections[secNumber-1];
+      }
 
       SymType type;
       switch (getSymType(oc->info->ch_info, sym)) {
       case 0x00: type = SYM_TYPE_DATA; break;
       case 0x20: type = SYM_TYPE_CODE; break;
       default:
-          debugBelch("Invalid symbol type: 0x%x\n", getSymType(oc->info->ch_info, sym));
+          debugBelch("Symbol %s has invalid type 0x%x\n",
+                     sname, getSymType(oc->info->ch_info, sym));
           return 1;
       }
 
@@ -1730,8 +1765,18 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           CHECK(symValue == 0);
           COFF_symbol_aux_weak_external *aux = (COFF_symbol_aux_weak_external *) (sym+1);
           COFF_symbol* targetSym = &oc->info->symbols[aux->TagIndex];
-          int32_t targetSecNumber = getSymSectionNumber (info, targetSym);
-          Section *targetSection = targetSecNumber > 0 ? &oc->sections[targetSecNumber-1] : NULL;
+
+          uint32_t targetSecNumber = getSymSectionNumber (info, targetSym);
+          Section *targetSection;
+          switch (targetSecNumber) {
+            case PE_SECTION_UNDEFINED:
+            case PE_SECTION_ABSOLUTE:
+            case PE_SECTION_DEBUG:
+              targetSection = NULL;
+              break;
+            default:
+              targetSection = &oc->sections[targetSecNumber-1];
+          }
           addr = (SymbolAddr*) ((size_t) targetSection->start + getSymValue(info, targetSym));
       }
       else if (  secNumber == IMAGE_SYM_UNDEFINED && symValue > 0) {
@@ -1850,6 +1895,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                return false;
 
           break;
+      } else if (secNumber == PE_SECTION_UNDEFINED) {
+          IF_DEBUG(linker, debugBelch("symbol %s is UNDEFINED, skipping...\n", sname));
+          i += getSymNumberOfAuxSymbols (info, sym);
       }
 
       if ((addr != NULL || isWeak)
@@ -1976,7 +2024,19 @@ ocResolve_PEi386 ( ObjectCode* oc )
                   debugBelch("'\n" ));
 
          if (getSymStorageClass (info, sym) == IMAGE_SYM_CLASS_STATIC) {
-            Section section = oc->sections[getSymSectionNumber (info, sym)-1];
+            uint32_t sect_n = getSymSectionNumber (info, sym);
+            switch (sect_n) {
+                case PE_SECTION_UNDEFINED:
+                case PE_SECTION_ABSOLUTE:
+                case PE_SECTION_DEBUG:
+                    errorBelch(" | %" PATH_FMT ": symbol `%s' has invalid section number %02x",
+                               oc->fileName, symbol, sect_n);
+                    return false;
+                default:
+                    break;
+            }
+            CHECK(sect_n < (uint32_t) oc->n_sections);
+            Section section = oc->sections[sect_n - 1];
             S = ((size_t)(section.start))
               + ((size_t)(getSymValue (info, sym)));
          } else {
