@@ -404,7 +404,7 @@ stg_newArrayArrayzh ( W_ n /* words */ )
     }
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(size), 0);
 
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
