@@ -39,6 +39,8 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Logger  ( Logger, putDumpFileMaybe, DumpFormat (..) )
 
 import Data.List ( mapAccumL )
+import GHC.Types.Var.Set
+import GHC.Core.FVs
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,7 +193,7 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (env', NonRec id' rhs')
   where
-    (id', rhs', env') = cprAnalBind env id rhs
+    (id', rhs', env') = cprAnalBind env NonRecursive id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -233,28 +235,32 @@ cprAnal' env e@(App{})
 
 cprAnal' env (Lam var body)
   | isTyVar var
-  , (body_ty, body') <- cprAnal env body
+  , (body_ty, body') <- cprAnal body_env body
   = (body_ty, Lam var body')
   | otherwise
   = (lam_ty, Lam var body')
   where
+    body_env
+      | isRec $ ae_rec_context env = addNonSharedArgs env [var]
+      | otherwise = env
     -- See Note [CPR for binders that will be unboxed]
-    env'             = extendSigEnvForArg env var
-    (body_ty, body') = cprAnal env' body
+    body_env'             = extendSigEnvForArg body_env var
+    (body_ty, body') = cprAnal body_env' body
     lam_ty           = abstractCprTy body_ty
 
 cprAnal' env (Case scrut case_bndr ty alts)
   = (res_ty, Case scrut' case_bndr ty alts')
   where
     (scrut_ty, scrut') = cprAnal env scrut
-    env'               = extendSigEnv env case_bndr (CprSig scrut_ty)
-    (alt_tys, alts')   = mapAndUnzip (cprAnalAlt env' scrut_ty) alts
+    alt_env            = addNonSharedArgs (extendSigEnv env case_bndr (CprSig scrut_ty))
+                                     [case_bndr]
+    (alt_tys, alts')   = mapAndUnzip (cprAnalAlt alt_env scrut_ty) alts
     res_ty             = foldl' lubCprType botCprType alt_tys
 
 cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs', env') = cprAnalBind env id rhs
+    (id', rhs', env') = cprAnalBind env NonRecursive id rhs
     (body_ty, body')  = cprAnal env' body
 
 cprAnal' env (Let (Rec pairs) body)
@@ -285,7 +291,7 @@ cprAnalAlt env scrut_ty (Alt con bndrs rhs)
             -> extendSigEnvList env (zipEqual "cprAnalAlt" ids sigs)
       | otherwise
       = env
-    (rhs_ty, rhs') = cprAnal env_alt rhs
+    (rhs_ty, rhs') = cprAnal (addNonSharedArgs env_alt bndrs) rhs
 
 --
 -- * CPR transformer
@@ -306,19 +312,26 @@ cprAnalApp :: AnalEnv -> CoreExpr -> [(CprType, CoreArg)] -> (CprType, CoreExpr)
 cprAnalApp env e arg_infos = go e arg_infos []
   where
     go e arg_infos args'
+
       -- Collect CprTypes for (value) args (inlined collectArgs):
       | App fn arg <- e, isTypeArg arg -- Don't analyse Type args
       = go fn arg_infos (arg:args')
+
       | App fn arg <- e
       , arg_info@(_arg_ty, arg') <- cprAnal env arg
       -- See Note [Nested CPR] on the need for termination analysis
       = go fn (arg_info:arg_infos) (arg':args')
 
       | Var fn <- e
-      = (cprTransform env fn arg_infos, mkApps e args')
+      = let res = (cprTransform env fn arg_infos, mkApps e args')
+        in -- pprTrace "cprAnalApp.var" (ppr fn $$ ppr res)
+           res
 
       | (e_ty, e') <- cprAnal env e -- e is not an App and not a Var
-      = (applyCprTy e_ty (length arg_infos), mkApps e' args')
+      =
+        let res = (applyCprTy e_ty (length arg_infos), mkApps e' args')
+        in -- pprTrace "cprAnalApp.other" (ppr e $$ ppr res)
+           res
 
 cprTransform :: AnalEnv               -- ^ The analysis environment
              -> Id                    -- ^ The function
@@ -340,10 +353,13 @@ cprTransform env id args
   | isLocalId id
   = assertPpr (isDataStructure id) (ppr id) topCprType
   -- See Note [CPR for DataCon wrappers]
-  | isDataConWrapId id, let rhs = uf_tmpl (realIdUnfolding id)
+  | isDataConWrapId id
+    -- , pprTrace "cprTransConWrap" (ppr id $$ ppr args) True
+    , let rhs = uf_tmpl (realIdUnfolding id)
   = fst $ cprAnalApp env rhs args
   -- DataCon worker
   | Just con <- isDataConWorkId_maybe id
+  -- , pprTrace "cprTransConWork" (ppr id $$ ppr args) True
   = cprTransformDataConWork env con args
   -- Imported function
   | otherwise
@@ -367,12 +383,28 @@ cprTransformDataConWork env con args
   | null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
-  , ae_rec_dc env con /= DefinitelyRecursive -- See Note [CPR for recursive data constructors]
-  -- , pprTrace "cprTransformDataConWork" (ppr con <+> ppr wkr_arity <+> ppr args) True
+  -- Don't do CPR when it duplicates work
+  , (ae_rec_dc env con /= DefinitelyRecursive) -- See Note [CPR for recursive data constructors]
+    || args_dependent
+  -- , pprTrace "cprTransformDataConWork.1" (ppr con <+> ppr wkr_arity <+> ppr args
+  --       $$ ppr args_dependent
+  --       $$ text "dep-vars:" <> ppr dependent_vars
+  --       ) True
   = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
   | otherwise
-  = topCprType
+  =
+    -- pprTrace "cprTransformDataConWork.2" (ppr con <+> ppr wkr_arity $$
+    --    (ppr $ null $ dataConExTyCoVars con) $$
+    --     ppr args $$
+    --     ppr (ae_rec_dc env con /= DefinitelyRecursive) $$
+    --     ppr args_dependent $$
+    --     text "dep-vars:" <> ppr dependent_vars )
+       topCprType
   where
+    arg_fvs = exprsFreeVars $ map snd args
+    dependent_vars = intersectVarSet arg_fvs (ae_loop_args env)
+    args_dependent = not $ isEmptyVarSet dependent_vars
+
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con
     -- See Note [Nested CPR]
@@ -428,7 +460,7 @@ cprFix orig_env orig_pairs
       where
         go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs', env') = cprAnalBind env id rhs
+            (id', rhs', env') = cprAnalBind (addNonSharedArgs env (map fst pairs)) Recursive id rhs
 
 {-
 Note [The OPAQUE pragma and avoiding the reboxing of results]
@@ -459,10 +491,11 @@ Note [OPAQUE pragma]), so we should strip 'f's CPR signature.
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
   :: AnalEnv
+  -> RecFlag
   -> Id
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
-cprAnalBind env id rhs
+cprAnalBind env is_rec id rhs
   | isDFunId id -- Never give DFuns the CPR property; we'll never save allocs.
   = (id,  rhs,  extendSigEnv env id topCprSig)
   -- See Note [CPR for data structures]
@@ -471,7 +504,7 @@ cprAnalBind env id rhs
   | otherwise
   = (id `setIdCprSig` sig',       rhs', env')
   where
-    (rhs_ty, rhs')  = cprAnal env rhs
+    (rhs_ty, rhs')  = cprAnal (setRec env is_rec) rhs
     -- possibly trim thunk CPR info
     rhs_ty'
       -- See Note [CPR for thunks]
@@ -483,8 +516,8 @@ cprAnalBind env id rhs
     -- See Note [The OPAQUE pragma and avoiding the reboxing of results]
     sig' | isOpaquePragma (idInlinePragma id) = topCprSig
          | otherwise                          = sig
-    env' = extendSigEnv env id sig'
 
+    env' = extendSigEnv env id sig'
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
     is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
@@ -596,6 +629,11 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   , ae_rec_dc :: DataCon -> IsRecDataConResult
   -- ^ Memoised result of 'GHC.Core.Opt.WorkWrap.Utils.isRecDataCon'
+
+  , ae_rec_context :: !RecFlag
+  -- We are in the body of a recursive bind.
+  , ae_loop_args :: !VarSet
+  -- ^ Vars which are *not* constant across loop iterations.
   }
 
 instance Outputable AnalEnv where
@@ -628,6 +666,8 @@ emptyAnalEnv fam_envs
   , ae_virgin = True
   , ae_fam_envs = fam_envs
   , ae_rec_dc = memoiseUniqueFun (isRecDataCon fam_envs fuel)
+  , ae_loop_args = mempty
+  , ae_rec_context = NonRecursive
   } where
     fuel = 3 -- If we can unbox more than 3 constructors to find a
              -- recursive occurrence, then we can just as well unbox it
@@ -667,6 +707,15 @@ extendSigEnvAllSame env ids sig
 
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
+
+addNonSharedArgs :: AnalEnv -> [Id] -> AnalEnv
+addNonSharedArgs env args
+  | isRec $ ae_rec_context env = env { ae_loop_args = extendVarSetList (ae_loop_args env) args }
+  | otherwise = env
+
+-- We are immediately under a recursive binder
+setRec :: AnalEnv -> RecFlag -> AnalEnv
+setRec env flag = env { ae_rec_context = flag }
 
 -- | A version of 'extendSigEnv' for a binder of which we don't see the RHS
 -- needed to compute a 'CprSig' (e.g. lambdas and DataAlt field binders).
@@ -1010,8 +1059,13 @@ What can we do about it?
  D. No CPR at occurrences of shared data structure in hot paths (e.g. the use of
     `c` in the second eqn of `replicateC`). But we'd need to know which paths
     were hot. We want such static branch frequency estimates in #20378.
+ E. Like A with one exception: We keep track variables variant across loop iterations
+    and allow CPR for any Constructor allocation referencing such a variable.
+    This means if we have:
+      foo :: Char -> [Char]
+      foo c = case c of c : foo c
 
-We adopt solution (A) It is ad-hoc, but appears to work reasonably well.
+We adopt solution (E) It is ad-hoc, but appears to work reasonably well.
 Deciding what a "recursive data constructor" is is quite tricky and ad-hoc, too:
 See Note [Detecting recursive data constructors]. We don't have to be perfect
 and can simply keep on unboxing if unsure.

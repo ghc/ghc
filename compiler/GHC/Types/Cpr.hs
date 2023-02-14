@@ -206,7 +206,7 @@ prependArgsCprSig n_extra cpr_sig@(CprSig (CprType arity cpr))
 --   * `f x = f x` has result CPR `b`
 --   * `1(1,)` is a valid (nested) 'Cpr' denotation for `(I# 42#, f 42)`.
 instance Outputable Cpr where
-  ppr TopCpr         = empty
+  ppr TopCpr         = char 'T'
   ppr (FlatConCpr n) = int n
   ppr (ConCpr n cs)  = int n <> parens (pprWithCommas ppr cs)
   ppr BotCpr         = char 'b'
