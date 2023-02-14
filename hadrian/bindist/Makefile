@@ -77,7 +77,7 @@ endif
 WrapperBinsDir=${bindir}
 
 # N.B. this is duplicated from includes/ghc.mk.
-lib/settings :
+lib/settings : config.mk
 	$(call removeFiles,$@)
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
