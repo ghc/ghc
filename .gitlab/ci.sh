@@ -518,9 +518,9 @@ function build_hadrian() {
   fi
 
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
-    run_hadrian build-cabal -V
+    run_hadrian build-cabal
   else
-    run_hadrian test:all_deps binary-dist -V
+    run_hadrian test:all_deps binary-dist
     mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
   fi
 
