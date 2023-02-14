@@ -143,7 +143,7 @@ struct _Alignments {
 COFF_OBJ_TYPE getObjectType ( char* image, pathchar* fileName );
 COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc );
 size_t getSymbolSize ( COFF_HEADER_INFO *info );
-int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym );
+uint32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint32_t getSymValue ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym );
 uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym );
