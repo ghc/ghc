@@ -271,7 +271,8 @@ test('T13167',
      [ when(opsys('mingw32')
      , only_ways(['winio', 'winio_threaded']))
      , fragile_for(16536, concurrent_ways)
-     , js_broken(22261)
+       # fragile on JS
+     , when(js_arch(), fragile(22921))
      ],
      compile_and_run, [''])
 test('T15183', normal, compile_and_run, [''])
