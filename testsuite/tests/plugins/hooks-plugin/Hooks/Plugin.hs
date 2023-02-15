@@ -10,6 +10,7 @@ import GHC.Hs.Lit
 import GHC.Driver.Hooks
 import GHC.Tc.Utils.Monad
 import GHC.Parser.Annotation
+import System.IO
 
 plugin :: Plugin
 plugin = defaultPlugin { driverPlugin = hooksP }
@@ -28,6 +29,10 @@ hooksP opts hsc_env = do
 fakeRunMeta :: [CommandLineOption] -> MetaHook TcM
 fakeRunMeta opts (MetaE r) _ = do
   liftIO . putStrLn $ "Options = " ++ show opts
+
+  -- TODO: Remove #20791
+  liftIO $ hFlush stdout
+
   pure $ r zero
 
   where zero :: LHsExpr GhcPs
