@@ -214,7 +214,7 @@ may not appear in a position where it would change the grouping of
 subexpressions::
 
   a = 1 / 2 / 2                          -- accepted (a=0.25)
-  b = 1 / {-# SCC "name" #-} / 2 / 2     -- rejected (instead of b=1.0)
+  b = 1 / {-# SCC "name" #-} 2 / 2       -- rejected (instead of b=1.0)
 
 This restriction is required to maintain the property that inserting a pragma,
 just like inserting a comment, does not have unintended effects on the
