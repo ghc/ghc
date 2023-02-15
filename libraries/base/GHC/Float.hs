@@ -1541,7 +1541,7 @@ is using CMM.
 -- | @'castWord32ToFloat' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
 --
--- @since 4.10.0.0
+-- @since 4.11.0.0
 
 {-# INLINE castWord32ToFloat #-}
 castWord32ToFloat :: Word32 -> Float
@@ -1554,7 +1554,7 @@ foreign import prim "stg_word32ToFloatzh"
 -- | @'castFloatToWord32' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
--- @since 4.10.0.0
+-- @since 4.11.0.0
 
 {-# INLINE castFloatToWord32 #-}
 castFloatToWord32 :: Float -> Word32
@@ -1568,7 +1568,7 @@ foreign import prim "stg_floatToWord32zh"
 -- | @'castWord64ToDouble' w@ does a bit-for-bit copy from an integral value
 -- to a floating-point value.
 --
--- @since 4.10.0.0
+-- @since 4.11.0.0
 
 {-# INLINE castWord64ToDouble #-}
 castWord64ToDouble :: Word64 -> Double
@@ -1581,7 +1581,7 @@ foreign import prim "stg_word64ToDoublezh"
 -- | @'castFloatToWord64' f@ does a bit-for-bit copy from a floating-point value
 -- to an integral value.
 --
--- @since 4.10.0.0
+-- @since 4.11.0.0
 
 {-# INLINE castDoubleToWord64 #-}
 castDoubleToWord64 :: Double -> Word64
