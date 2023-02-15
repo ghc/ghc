@@ -867,11 +867,13 @@ linkModules mods = (compact_mods, meta)
     statics = nubStaticInfo (concatMap mc_statics mods)
 
     infos   = concatMap mc_closures mods
+    debug   = False -- TODO: this could be enabled in a debug build.
+                    -- It adds debug info to heap objects
     meta = mconcat
             -- render metadata as individual statements
             [ mconcat (map staticDeclStat statics)
             , mconcat (map staticInitStat statics)
-            , mconcat (map (closureInfoStat True) infos)
+            , mconcat (map (closureInfoStat debug) infos)
             ]
 
 -- | Only keep a single StaticInfo with a given name
