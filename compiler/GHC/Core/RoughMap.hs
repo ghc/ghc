@@ -320,7 +320,11 @@ roughMatchTcsLookup tys = map typeToRoughMatchLookupTc tys
 
 typeToRoughMatchLookupTc :: Type -> RoughMatchLookupTc
 typeToRoughMatchLookupTc ty
-  | Just (ty', _) <- splitCastTy_maybe ty
+  -- Expand synonyms first, as explained in Note [Rough matching in class and family instances].
+  -- Failing to do so led to #22985.
+  | Just ty' <- coreView ty
+  = typeToRoughMatchLookupTc ty'
+  | CastTy ty' _ <- ty
   = typeToRoughMatchLookupTc ty'
   | otherwise
   = case splitAppTys ty of

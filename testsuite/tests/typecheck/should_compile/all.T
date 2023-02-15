@@ -862,4 +862,5 @@ test('T20666b', normal, compile, [''])
 test('T22891', normal, compile, [''])
 test('T22912', normal, compile, [''])
 test('T22924', normal, compile, [''])
-
+test('T22985a', normal, compile, ['-O'])
+test('T22985b', normal, compile, [''])
