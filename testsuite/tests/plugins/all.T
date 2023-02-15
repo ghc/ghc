@@ -294,26 +294,22 @@ test('T20803b',
 
 test('test-echo-in-turn',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}'),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn TOP={top}')],
      makefile_test, [])
 
 test('test-echo-in-line',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line TOP={top}'),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line TOP={top}')],
      makefile_test, [])
 
 test('test-echo-in-turn-many-args',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn-many-args TOP={top}'),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-turn-many-args TOP={top}')],
      makefile_test, [])
 
 test('test-echo-in-line-many-args',
      [extra_files(['echo-plugin/']),
-      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}'),
-      when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],
+      pre_cmd('$MAKE -s --no-print-directory -C echo-plugin package.test-echo-in-line-many-args TOP={top}')],
      makefile_test, [])
 
 test('plugins-external',

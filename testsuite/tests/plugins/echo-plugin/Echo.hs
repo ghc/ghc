@@ -5,6 +5,7 @@ import GHC.Tc.Plugin
 import GHC.Tc.Utils.Monad
 import qualified GHC.Tc.Utils.Monad as Utils
 import GHC.Types.Unique.FM ( emptyUFM )
+import System.IO
 
 plugin :: Plugin
 plugin = mkPureOptTcPlugin optCallCount
@@ -27,6 +28,10 @@ optCallCount opts = Just $
             n <- unsafeTcPluginTcM $ readMutVar c
             let msg = if null opts then "" else mconcat opts
             tcPluginIO . putStrLn $ "Echo TcPlugin " ++ msg ++ "#" ++ show n
+
+            -- TODO: Remove #20791
+            tcPluginIO $ hFlush stdout
+
             unsafeTcPluginTcM $ writeMutVar c (n + 1)
             return $ TcPluginOk [] []
 
