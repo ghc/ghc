@@ -94,6 +94,12 @@ def fedora(n):
 def alpine(n):
     return linux_platform("x86_64", "x86_64-linux-alpine{n}".format(n=n))
 
+def rocky(n):
+    return linux_platform("x86_64", "x86_64-linux-rocky{n}".format(n=n))
+
+def ubuntu(n):
+    return linux_platform("x86_64", "x86_64-linux-ubuntu{n}".format(n=n))
+
 def linux_platform(arch, opsys):
     return PlatformSpec( opsys, 'ghc-{version}-{arch}-unknown-linux'.format(version="{version}", arch=arch) )
 
@@ -157,6 +163,9 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
         return mk_one_metadata(release_mode, version, job_map, mk_from_platform(pipeline_type, platform))
 
+    ubuntu1804 = mk(ubuntu("18_04"))
+    ubuntu2004 = mk(ubuntu("20_04"))
+    rocky8 = mk(rocky("8"))
     # Here are all the bindists we can distribute
     centos7 = mk(centos(7))
     fedora33 = mk(fedora(33))
@@ -180,18 +189,18 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
                            , "(>= 10 && < 11)": deb10
                            , ">= 11": deb11
                            , "unknown_versioning": deb11 }
-          , "Linux_Ubuntu" : { "unknown_versioning": deb10
-                             , "( >= 16 && < 19 )": deb9
+          , "Linux_Ubuntu" : { "unknown_versioning": ubuntu2004
+                             , "( >= 16 && < 19 )": ubuntu1804
                              }
-          , "Linux_Mint"   : { "< 20": deb9
-                             , ">= 20": deb10 }
+          , "Linux_Mint"   : { "< 20": ubuntu1804
+                             , ">= 20": ubuntu2004 }
           , "Linux_CentOS"  : { "( >= 7 && < 8 )" : centos7
                               , "unknown_versioning" : centos7  }
           , "Linux_Fedora"  : { ">= 33": fedora33
                               , "unknown_versioning": centos7 }
           , "Linux_RedHat"  : { "unknown_versioning": centos7 }
           #MP: Replace here with Rocky8 when that job is in the pipeline
-          , "Linux_UnknownLinux" : { "unknown_versioning": fedora33 }
+          , "Linux_UnknownLinux" : { "unknown_versioning": rocky8 }
           , "Darwin" : { "unknown_versioning" : darwin_x86 }
           , "Windows" : { "unknown_versioning" :  windows }
           , "Linux_Alpine" : { "unknown_versioning": alpine3_12 }
