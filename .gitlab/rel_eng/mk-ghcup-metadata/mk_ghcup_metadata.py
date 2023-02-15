@@ -73,6 +73,7 @@ class PlatformSpec(NamedTuple):
     subdir: str
 
 source_artifact = Artifact('source-tarball', 'ghc-{version}-src.tar.xz', 'ghc-{version}' )
+test_artifact = Artifact('source-tarball', 'ghc-{version}-testsuite.tar.xz', 'ghc-{version}' )
 
 def debian(arch, n):
     return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
@@ -170,6 +171,7 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
     deb9_i386 = mk(debian("i386", 9))
 
     source = mk_one_metadata(release_mode, version, job_map, source_artifact)
+    test = mk_one_metadata(release_mode, version, job_map, test_artifact)
 
     # The actual metadata, this is not a precise science, but just what the ghcup
     # developers want.
@@ -220,6 +222,7 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
         # Check that this link exists
         , "viChangeLog": change_log
         , "viSourceDL": source
+        , "viTestDL": test
         , "viArch": { "A_64": a64
                     , "A_32": a32
                     , "A_ARM64": arm64
