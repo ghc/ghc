@@ -11,7 +11,7 @@ module GHC.Types.Cpr (
     lubCprType, applyCprTy, abstractCprTy, trimCprTy,
     UnpackConFieldsResult (..), unpackConFieldsCpr,
     CprSig (..), topCprSig, isTopCprSig, mkCprSigForArity, mkCprSig,
-    seqCprSig, prependArgsCprSig
+    seqCprSig, prependArgsCprSig, trimCprToDepth
   ) where
 
 import GHC.Prelude
@@ -80,6 +80,15 @@ flatConCpr t = FlatConCpr t
 trimCpr :: Cpr -> Cpr
 trimCpr BotCpr = botCpr
 trimCpr _      = topCpr
+
+trimCprToDepth :: Int -> Cpr -> Cpr
+trimCprToDepth 0  !cpr = trimCpr cpr
+trimCprToDepth !n !cpr =
+  case cpr of
+    BotCpr -> cpr
+    FlatConCpr{} -> cpr
+    TopCpr -> cpr
+    ConCpr_ tag nested -> ConCpr_ tag $ map (trimCprToDepth (n-1)) nested
 
 asConCpr :: Cpr -> Maybe (ConTag, [Cpr])
 asConCpr (ConCpr t cs)  = Just (t, cs)

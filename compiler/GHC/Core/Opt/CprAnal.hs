@@ -301,6 +301,10 @@ data TermFlag -- Better than using a Bool
   = Terminates
   | MightDiverge
 
+instance Outputable TermFlag where
+  ppr Terminates = text "Terminates"
+  ppr MightDiverge = text "MightDiverge"
+
 -- See Note [Nested CPR]
 exprTerminates :: CoreExpr -> TermFlag
 exprTerminates e
@@ -384,13 +388,21 @@ cprTransformDataConWork env con args
   , wkr_arity <= mAX_CPR_SIZE -- See Note [Trimming to mAX_CPR_SIZE]
   , args `lengthIs` wkr_arity
   -- Don't do CPR when it duplicates work
-  , (ae_rec_dc env con /= DefinitelyRecursive) -- See Note [CPR for recursive data constructors]
-    || args_dependent
-  -- , pprTrace "cprTransformDataConWork.1" (ppr con <+> ppr wkr_arity <+> ppr args
-  --       $$ ppr args_dependent
-  --       $$ text "dep-vars:" <> ppr dependent_vars
-  --       ) True
-  = CprType 0 (ConCpr (dataConTag con) (strictZipWith extract_nested_cpr args wkr_str_marks))
+  , rec_con <- (ae_rec_dc env con /= DefinitelyRecursive) -- See Note [CPR for recursive data constructors]
+  , rec_con  || args_dependent
+  =
+    -- pprTrace "cprTransformDataConWork.1" (ppr con <+> ppr wkr_arity <+> ppr args
+    --     $$ ppr args_dependent
+    --     $$ text "dep-vars:" <> ppr dependent_vars
+    --     ) $
+    let
+        !tag = (dataConTag con)
+        !nested_cpr = (strictZipWith extract_nested_cpr args wkr_str_marks)
+    in
+      if rec_con
+        then CprType 0 (ConCpr tag nested_cpr )
+        else CprType 0 (ConCpr tag $ map (trimCprToDepth 3) nested_cpr )
+
   | otherwise
   =
     -- pprTrace "cprTransformDataConWork.2" (ppr con <+> ppr wkr_arity $$
@@ -401,16 +413,22 @@ cprTransformDataConWork env con args
     --     text "dep-vars:" <> ppr dependent_vars )
        topCprType
   where
-    arg_fvs = exprsFreeVars $ map snd args
-    dependent_vars = intersectVarSet arg_fvs (ae_loop_args env)
+    dependent_vars = exprsSomeFreeVars (\var -> elemVarSet var (ae_loop_args env))
+                                $ map snd args
+    -- dependent_vars = intersectVarSet arg_fvs
     args_dependent = not $ isEmptyVarSet dependent_vars
 
     wkr_arity = dataConRepArity con
     wkr_str_marks = dataConRepStrictness con
     -- See Note [Nested CPR]
+    extract_nested_cpr :: (CprType, CoreExpr) -> StrictnessMark -> Cpr
     extract_nested_cpr (CprType 0 cpr, arg) str
       | MarkedStrict <- str              = cpr
-      | Terminates <- exprTerminates arg = cpr
+      | Terminates <- exprTerminates arg =
+                                          --  pprTrace "exprTerms"
+                                          --     (ppr arg $$
+                                          --      ppr (exprTerminates arg))
+                                              cpr
     extract_nested_cpr _ _               = topCpr -- intervening lambda or doesn't terminate
 
 -- | See Note [Trimming to mAX_CPR_SIZE].
