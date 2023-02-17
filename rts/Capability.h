@@ -31,10 +31,8 @@
 // anything else, so round it up to a cache line size:
 #if defined(s390x_HOST_ARCH)
 #define CAPABILITY_ALIGNMENT 256
-#elif !defined(mingw32_HOST_OS)
-#define CAPABILITY_ALIGNMENT 64
 #else
-#define CAPABILITY_ALIGNMENT 1
+#define CAPABILITY_ALIGNMENT 64
 #endif
 
 /* N.B. This must be consistent with CapabilityPublic in RtsAPI.h */
