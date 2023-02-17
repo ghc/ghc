@@ -42,6 +42,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr )
 
+import GHC.Rename.Utils ( bindLocalNames )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -473,21 +474,28 @@ tcLcStmt _ _ (BodyStmt _ rhs _ _) elt_ty thing_inside
         ; thing <- thing_inside elt_ty
         ; return (BodyStmt boolTy rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
--- ParStmt: See notes with tcMcStmt
+-- ParStmt: See notes with tcMcStmt and Note [Scoping in parallel list comprehensions]
 tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
-  = do  { (pairs', thing) <- loop bndr_stmts_s
+  = do  { env <- getLocalRdrEnv
+        ; (pairs', thing) <- loop env [] bndr_stmts_s
         ; return (ParStmt unitTy pairs' noExpr noSyntaxExpr, thing) }
   where
-    -- loop :: [([LStmt GhcRn], [GhcRn])]
+    -- loop :: LocalRdrEnv -- The original LocalRdrEnv
+    --      -> [Name]      -- Variables bound by earlier branches
+    --      -> [([LStmt GhcRn], [GhcRn])]
     --      -> TcM ([([LStmt GhcTc], [GhcTc])], thing)
-    loop [] = do { thing <- thing_inside elt_ty
-                 ; return ([], thing) }         -- matching in the branches
+    --
+    -- Invariant: on entry to `loop`, the LocalRdrEnv is set to
+    --            origEnv, the LocalRdrEnv for the entire comprehension
+    loop _ allBinds [] = do { thing <- bindLocalNames allBinds $ thing_inside elt_ty
+                            ; return ([], thing) }   -- matching in the branches
 
-    loop (ParStmtBlock x stmts names _ : pairs)
+    loop origEnv priorBinds (ParStmtBlock x stmts names _ : pairs)
       = do { (stmts', (ids, pairs', thing))
                 <- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
                    do { ids <- tcLookupLocalIds names
-                      ; (pairs', thing) <- loop pairs
+                      ; (pairs', thing) <- setLocalRdrEnv origEnv $
+                          loop origEnv (names ++ priorBinds) pairs
                       ; return (ids, pairs', thing) }
            ; return ( ParStmtBlock x stmts' ids noSyntaxExpr : pairs', thing ) }
 
@@ -1012,6 +1020,21 @@ e_i   :: exp_ty_i
 <$>   :: (pat_ty_1 -> ... -> pat_ty_n -> body_ty) -> exp_ty_1 -> t_1
 <*>_i :: t_(i-1) -> exp_ty_i -> t_i
 join :: tn -> res_ty
+
+Note [Scoping in parallel list comprehensions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a parallel list comprehension like [ ebody | a <- blah1; e1 | b <- blah2; e2 ]
+we want to ensure that in the lexical environment, tcl_rdr :: LocalRdrEnv, we have
+  * 'a' in scope in e1, but not 'b'
+  * 'b' in scope in e2, but not 'a'
+  * Both in scope in ebody
+We don't want too /many/ variables in the LocalRdrEnv, else we make stupid
+suggestions for an out-of-scope variable (#22940).
+
+To achieve this we:
+  * At the start of each branch, reset the LocalRdrEnv to the outer scope.
+  * Before typechecking ebody, add to LocalRdrEnv all the variables bound in
+    all branches. This step is done with bindLocalNames.
 -}
 
 tcApplicativeStmts
