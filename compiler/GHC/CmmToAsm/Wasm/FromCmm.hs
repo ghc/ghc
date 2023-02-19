@@ -191,7 +191,6 @@ globalInfoFromCmmGlobalReg t reg = case reg of
   SpLim -> Just ("__SpLim", ty_word)
   Hp -> Just ("__Hp", ty_word)
   HpLim -> Just ("__HpLim", ty_word)
-  CCCS -> Just ("__CCCS", ty_word)
   _ -> Nothing
   where
     ty_word = SomeWasmType t
@@ -202,7 +201,7 @@ supportedCmmGlobalRegs =
     <> [FloatReg i | i <- [1 .. 6]]
     <> [DoubleReg i | i <- [1 .. 6]]
     <> [LongReg i | i <- [1 .. 1]]
-    <> [Sp, SpLim, Hp, HpLim, CCCS]
+    <> [Sp, SpLim, Hp, HpLim]
 
 -- | Truncate a subword.
 truncSubword :: Width -> WasmTypeTag t -> WasmExpr w t -> WasmExpr w t
