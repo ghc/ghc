@@ -169,10 +169,3 @@ __Hp:
 	.section .data.__HpLim,"",@
 	.globaltype __HpLim, W_
 __HpLim:
-
-	.hidden __CCCS
-	.globl __CCCS
-	.section .data.__CCCS,"",@
-	.globaltype __CCCS, W_
-__CCCS:
-
