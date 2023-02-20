@@ -1,4 +1,6 @@
 setTestOpts(js_broken(22261))
+if have_profiling():
+  setTestOpts(extra_ways(['prof']))
 
 test('cont_simple_shift', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_simple_shift', ''])
 test('cont_exn_masking', [extra_files(['ContIO.hs'])], multimod_compile_and_run, ['cont_exn_masking', ''])
