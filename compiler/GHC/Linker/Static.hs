@@ -126,7 +126,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
       if gopt Opt_SingleLibFolder dflags
       then do
         libs <- getLibs namever ways_ unit_env dep_units
-        tmpDir <- newTempDir logger tmpfs (tmpDir dflags)
+        tmpDir <- newTempSubDir logger tmpfs (tmpDir dflags)
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
         return [ "-L" ++ tmpDir ]
