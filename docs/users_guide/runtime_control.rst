@@ -1367,6 +1367,7 @@ recommended for everyday use!
 .. rts-flag::  -Dc  DEBUG: program coverage
 .. rts-flag::  -Dr  DEBUG: sparks
 .. rts-flag::  -DC  DEBUG: compact
+.. rts-flag::  -Dk  DEBUG: continuation
 
     Debug messages will be sent to the binary event log file instead of
     stdout if the :rts-flag:`-l ⟨flags⟩` option is added. This might be useful

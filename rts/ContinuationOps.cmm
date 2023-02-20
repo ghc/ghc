@@ -49,7 +49,12 @@ stg_newPromptTagzh()
   return (tag);
 }
 
-INFO_TABLE_RET(stg_prompt_frame, RET_SMALL, W_ info_ptr, P_ tag /* :: PromptTag# a */)
+#define PROMPT_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,tag) \
+  w_ info_ptr,                                        \
+  PROF_HDR_FIELDS(w_,p1,p2)                           \
+  p_ tag
+
+INFO_TABLE_RET(stg_prompt_frame, RET_SMALL, PROMPT_FRAME_FIELDS(W_,P_, info_ptr, p1, p2, tag /* :: PromptTag# a */))
   return (P_ ret /* :: a */)
 {
   return (ret);
@@ -61,7 +66,9 @@ stg_promptzh(P_ tag /* :: PromptTag# a */, P_ io /* :: IO a */)
   STK_CHK_GEN();
   TICK_UNKNOWN_CALL();
   TICK_SLOW_CALL_fast_v();
-  jump stg_ap_v_fast (stg_prompt_frame_info, tag) (io);
+  jump stg_ap_v_fast
+    (PROMPT_FRAME_FIELDS(,,stg_prompt_frame_info, CCCS, 0, tag))
+    (io);
 }
 
 /* --------------------------------------------------------------------------

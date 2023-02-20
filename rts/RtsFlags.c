@@ -205,6 +205,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.sparks          = false;
     RtsFlags.DebugFlags.numa            = false;
     RtsFlags.DebugFlags.compact         = false;
+    RtsFlags.DebugFlags.continuation    = false;
 
 #if defined(PROFILING)
     RtsFlags.CcFlags.doCostCentres      = COST_CENTRES_NONE;
@@ -476,6 +477,7 @@ usage_text[] = {
 "  -Dc  DEBUG: program coverage",
 "  -Dr  DEBUG: sparks",
 "  -DC  DEBUG: compact",
+"  -Dk  DEBUG: continuation",
 "",
 "     NOTE: DEBUG events are sent to stderr by default; add -l to create a",
 "     binary event log file instead.",
@@ -2189,6 +2191,9 @@ static void read_debug_flags(const char* arg)
             break;
         case 'C':
             RtsFlags.DebugFlags.compact = true;
+            break;
+        case 'k':
+            RtsFlags.DebugFlags.continuation = true;
             break;
         default:
             bad_option( arg );

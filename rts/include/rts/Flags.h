@@ -113,6 +113,7 @@ typedef struct _DEBUG_FLAGS {
     bool sparks;         /* 'r' */
     bool numa;           /* '--debug-numa' */
     bool compact;        /* 'C' */
+    bool continuation;   /* 'k' */
 } DEBUG_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

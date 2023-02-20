@@ -12,6 +12,7 @@
 #include "sm/Storage.h"
 #include "sm/Sanity.h"
 #include "Continuation.h"
+#include "Printer.h"
 #include "Threads.h"
 
 #include <string.h>
@@ -392,7 +393,14 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
 
   /* --- Phase 1: Find the matching prompt frame ---------------------------- */
 
+  IF_DEBUG(continuation,
+    debugBelch("captureContinuationAndAbort: searching for prompt\n");
+    debugBelch("  prompt_tag = "); printClosure(prompt_tag));
+
   while (true) {
+    IF_DEBUG(continuation,
+      printStackChunk(frame, frame + stack_frame_sizeW((StgClosure *)frame)));
+
     const StgInfoTable *info_ptr = ((StgClosure *)frame)->header.info;
     const StgRetInfoTable *info = get_ret_itbl((StgClosure *)frame);
     StgWord chunk_words = frame - stack->sp;
@@ -429,6 +437,8 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
                   || info->i.type == ATOMICALLY_FRAME
                   || info->i.type == CATCH_RETRY_FRAME
                   || info->i.type == CATCH_STM_FRAME)) {
+      IF_DEBUG(continuation,
+        debugBelch("captureContinuationAndAbort: could not find prompt, bailing out\n"));
       return NULL; // Bail out
     }
 
@@ -451,6 +461,10 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
   }
 
   /* --- Phase 2: Perform the capture --------------------------------------- */
+
+  IF_DEBUG(continuation,
+    debugBelch("captureContinuationAndAbort: found prompt, "
+               "capturing %" FMT_Word " words of stack\n", total_words));
 
   dirty_TSO(cap, tso);
   dirty_STACK(cap, stack);

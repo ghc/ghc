@@ -67,6 +67,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_hpc         RtsFlags.DebugFlags.hpc
 #define DEBUG_sparks      RtsFlags.DebugFlags.sparks
 #define DEBUG_compact     RtsFlags.DebugFlags.compact
+#define DEBUG_continuation RtsFlags.DebugFlags.continuation
 
 // Event-enabled flags
 // These semantically booleans but we use a dense packing to minimize their
