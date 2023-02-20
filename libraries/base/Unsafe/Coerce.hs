@@ -244,11 +244,11 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 -- Why delay inlining to Phase 1?  Because of the RULES for map/unsafeCoerce;
 -- see (U8) in Note [Implementing unsafeCoerce]
 
--- | Coerce a value from one type to another, bypassing the type-checker.
+-- | `unsafeCoerce` coerces a value from one type to another, bypassing the type-checker.
 --
 -- There are several legitimate ways to use 'unsafeCoerce':
 --
---   1. To coerce e.g. @Int@ to @HValue@, put it in a list of @HValue@,
+--   1. To coerce a lifted type such as @Int@ to @Any@, put it in a list of @Any@,
 --      and then later coerce it back to @Int@ before using it.
 --
 --   2. To produce e.g. @(a+b) :~: (b+a)@ from @unsafeCoerce Refl@.
@@ -269,15 +269,35 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --      are the same  -- but the proof of that relies on the complex, trusted
 --      implementation of @Typeable@.
 --
---   4. The "reflection trick", which takes advantage of the fact that in
+--   4. (superseded) The "reflection trick", which takes advantage of the fact that in
 --      @class C a where { op :: ty }@, we can safely coerce between @C a@ and @ty@
 --      (which have different kinds!) because it's really just a newtype.
 --      Note: there is /no guarantee, at all/ that this behavior will be supported
 --      into perpetuity.
+--      It is now preferred to use `withDict` in @GHC.Magic.Dict@, which
+--      is type-safe. See Note [withDict] in GHC.Tc.Instance.Class for details.
 --
+--   5. (superseded) Casting between two types which have exactly the same structure:
+--      between a newtype of T and T, or between types which differ only
+--      in "phantom" type parameters.
+--      It is now preferred to use `coerce` from @Data.Coerce@, which
+--      is type-safe.
 --
---   For safe zero-cost coercions you can instead use the 'Data.Coerce.coerce' function from
---   "Data.Coerce".
+--  Other uses of 'unsafeCoerce' are undefined.  In particular, you should not use
+--  'unsafeCoerce' to cast a T to an algebraic data type D, unless T is also
+--  an algebraic data type.  For example, do not cast @'Int'->'Int'@ to 'Bool', even if
+--  you later cast that 'Bool' back to @'Int'->'Int'@ before applying it.  The reasons
+--  have to do with GHC's internal representation details (for the cognoscenti, data values
+--  can be entered but function closures cannot).  If you want a safe type to cast things
+--  to, use 'Any', which is not an algebraic data type.
+
+-- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
+-- as long as you don't "do anything" with the value in its cast form, such as seq on it.  This
+-- isn't the case: the compiler can insert seqs itself, and if these happen at the wrong type,
+-- Bad Things Might Happen.  See bug #1616: in this case we cast a function of type (a,b) -> (a,b)
+-- to () -> () and back again.  The strictness analyser saw that the function was strict, but
+-- the wrapper had type () -> (), and hence the wrapper de-constructed the (), the worker re-constructed
+-- a new (), with the result that the code ended up with "case () of (a,b) -> ...".
 unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
