@@ -6,8 +6,8 @@ module GHC.Utils.TmpFs
     , initTmpFs
     , forkTmpFsFrom
     , mergeTmpFsInto
-    , FilesToClean(..)
-    , emptyFilesToClean
+    , PathsToClean(..)
+    , emptyPathsToClean
     , TempFileLifetime(..)
     , TempDir (..)
     , cleanTempDirs
@@ -17,7 +17,7 @@ module GHC.Utils.TmpFs
     , changeTempFilesLifetime
     , newTempName
     , newTempLibName
-    , newTempDir
+    , newTempSubDir
     , withSystemTempDirectory
     , withTempDirectory
     )
@@ -63,25 +63,29 @@ data TmpFs = TmpFs
       --
       -- Shared with forked TmpFs.
 
-  , tmp_files_to_clean :: IORef FilesToClean
+  , tmp_files_to_clean :: IORef PathsToClean
       -- ^ Files to clean (per session or per module)
+      --
+      -- Not shared with forked TmpFs.
+  , tmp_subdirs_to_clean :: IORef PathsToClean
+      -- ^ Subdirs to clean (per session or per module)
       --
       -- Not shared with forked TmpFs.
   }
 
--- | A collection of files that must be deleted before ghc exits.
-data FilesToClean = FilesToClean
-    { ftcGhcSession :: !(Set FilePath)
-        -- ^ Files that will be deleted at the end of runGhc(T)
+-- | A collection of paths that must be deleted before ghc exits.
+data PathsToClean = PathsToClean
+    { ptcGhcSession :: !(Set FilePath)
+        -- ^ Paths that will be deleted at the end of runGhc(T)
 
-    , ftcCurrentModule :: !(Set FilePath)
-        -- ^ Files that will be deleted the next time
+    , ptcCurrentModule :: !(Set FilePath)
+        -- ^ Paths that will be deleted the next time
         -- 'cleanCurrentModuleTempFiles' is called, or otherwise at the end of
         -- the session.
     }
 
 -- | Used when a temp file is created. This determines which component Set of
--- FilesToClean will get the temp file
+-- PathsToClean will get the temp file
 data TempFileLifetime
   = TFL_CurrentModule
   -- ^ A file with lifetime TFL_CurrentModule will be cleaned up at the
@@ -93,38 +97,45 @@ data TempFileLifetime
 
 newtype TempDir = TempDir FilePath
 
--- | An empty FilesToClean
-emptyFilesToClean :: FilesToClean
-emptyFilesToClean = FilesToClean Set.empty Set.empty
+-- | An empty PathsToClean
+emptyPathsToClean :: PathsToClean
+emptyPathsToClean = PathsToClean Set.empty Set.empty
 
--- | Merge two FilesToClean
-mergeFilesToClean :: FilesToClean -> FilesToClean -> FilesToClean
-mergeFilesToClean x y = FilesToClean
-    { ftcGhcSession    = Set.union (ftcGhcSession x) (ftcGhcSession y)
-    , ftcCurrentModule = Set.union (ftcCurrentModule x) (ftcCurrentModule y)
+-- | Merge two PathsToClean
+mergePathsToClean :: PathsToClean -> PathsToClean -> PathsToClean
+mergePathsToClean x y = PathsToClean
+    { ptcGhcSession    = Set.union (ptcGhcSession x) (ptcGhcSession y)
+    , ptcCurrentModule = Set.union (ptcCurrentModule x) (ptcCurrentModule y)
     }
 
 -- | Initialise an empty TmpFs
 initTmpFs :: IO TmpFs
 initTmpFs = do
-    files <- newIORef emptyFilesToClean
-    dirs  <- newIORef Map.empty
-    next  <- newIORef 0
+    files   <- newIORef emptyPathsToClean
+    subdirs <- newIORef emptyPathsToClean
+    dirs    <- newIORef Map.empty
+    next    <- newIORef 0
     return $ TmpFs
-        { tmp_files_to_clean = files
-        , tmp_dirs_to_clean  = dirs
-        , tmp_next_suffix    = next
+        { tmp_files_to_clean   = files
+        , tmp_subdirs_to_clean = subdirs
+        , tmp_dirs_to_clean    = dirs
+        , tmp_next_suffix      = next
         }
 
 -- | Initialise an empty TmpFs sharing unique numbers and per-process temporary
 -- directories with the given TmpFs
+--
+-- It's not safe to use the subdirs created by the original TmpFs with the
+-- forked one. Use @newTempSubDir@ to create new subdirs instead.
 forkTmpFsFrom :: TmpFs -> IO TmpFs
 forkTmpFsFrom old = do
-    files <- newIORef emptyFilesToClean
+    files <- newIORef emptyPathsToClean
+    subdirs <- newIORef emptyPathsToClean
     return $ TmpFs
-        { tmp_files_to_clean = files
-        , tmp_dirs_to_clean  = tmp_dirs_to_clean old
-        , tmp_next_suffix    = tmp_next_suffix old
+        { tmp_files_to_clean   = files
+        , tmp_subdirs_to_clean = subdirs
+        , tmp_dirs_to_clean    = tmp_dirs_to_clean old
+        , tmp_next_suffix      = tmp_next_suffix old
         }
 
 -- | Merge the first TmpFs into the second.
@@ -132,8 +143,11 @@ forkTmpFsFrom old = do
 -- The first TmpFs is returned emptied.
 mergeTmpFsInto :: TmpFs -> TmpFs -> IO ()
 mergeTmpFsInto src dst = do
-    src_files <- atomicModifyIORef' (tmp_files_to_clean src) (\s -> (emptyFilesToClean, s))
-    atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergeFilesToClean src_files s, ()))
+    src_files <- atomicModifyIORef' (tmp_files_to_clean src) (\s -> (emptyPathsToClean, s))
+    src_subdirs <- atomicModifyIORef' (tmp_subdirs_to_clean src) (\s -> (emptyPathsToClean, s))
+    atomicModifyIORef' (tmp_files_to_clean dst) (\s -> (mergePathsToClean src_files s, ()))
+    atomicModifyIORef' (tmp_subdirs_to_clean dst) (\s -> (mergePathsToClean src_subdirs s, ()))
+
 
 cleanTempDirs :: Logger -> TmpFs -> IO ()
 cleanTempDirs logger tmpfs
@@ -142,64 +156,78 @@ cleanTempDirs logger tmpfs
         ds <- atomicModifyIORef' ref $ \ds -> (Map.empty, ds)
         removeTmpDirs logger (Map.elems ds)
 
--- | Delete all files in @tmp_files_to_clean@.
+-- | Delete all paths in @tmp_files_to_clean@ and @tmp_subdirs_to_clean@.
 cleanTempFiles :: Logger -> TmpFs -> IO ()
 cleanTempFiles logger tmpfs
    = mask_
-   $ do let ref = tmp_files_to_clean tmpfs
-        to_delete <- atomicModifyIORef' ref $
-            \FilesToClean
-                { ftcCurrentModule = cm_files
-                , ftcGhcSession = gs_files
-                } -> ( emptyFilesToClean
-                     , Set.toList cm_files ++ Set.toList gs_files)
-        removeTmpFiles logger to_delete
+   $ do removeWith (removeTmpFiles logger) (tmp_files_to_clean tmpfs)
+        removeWith (removeTmpSubdirs logger) (tmp_subdirs_to_clean tmpfs)
+  where
+    removeWith remove ref = do
+      to_delete <- atomicModifyIORef' ref $
+        \PathsToClean
+            { ptcCurrentModule = cm_paths
+            , ptcGhcSession = gs_paths
+            } -> ( emptyPathsToClean
+                  , Set.toList cm_paths ++ Set.toList gs_paths)
+      remove to_delete
 
--- | Delete all files in @tmp_files_to_clean@. That have lifetime
--- TFL_CurrentModule.
+-- | Delete all paths in @tmp_files_to_clean@ and @tmp_subdirs_to_clean@
+-- That have lifetime TFL_CurrentModule.
 -- If a file must be cleaned eventually, but must survive a
 -- cleanCurrentModuleTempFiles, ensure it has lifetime TFL_GhcSession.
 cleanCurrentModuleTempFiles :: Logger -> TmpFs -> IO ()
 cleanCurrentModuleTempFiles logger tmpfs
    = mask_
-   $ do let ref = tmp_files_to_clean tmpfs
+   $ do removeWith (removeTmpFiles logger) (tmp_files_to_clean tmpfs)
+        removeWith (removeTmpSubdirs logger) (tmp_subdirs_to_clean tmpfs)
+  where
+    removeWith remove ref = do
         to_delete <- atomicModifyIORef' ref $
-            \ftc@FilesToClean{ftcCurrentModule = cm_files} ->
-                (ftc {ftcCurrentModule = Set.empty}, Set.toList cm_files)
-        removeTmpFiles logger to_delete
+            \ptc@PathsToClean{ptcCurrentModule = cm_paths} ->
+                (ptc {ptcCurrentModule = Set.empty}, Set.toList cm_paths)
+        remove to_delete
 
 -- | Ensure that new_files are cleaned on the next call of
 -- 'cleanTempFiles' or 'cleanCurrentModuleTempFiles', depending on lifetime.
 -- If any of new_files are already tracked, they will have their lifetime
 -- updated.
 addFilesToClean :: TmpFs -> TempFileLifetime -> [FilePath] -> IO ()
-addFilesToClean tmpfs lifetime new_files = modifyIORef' (tmp_files_to_clean tmpfs) $
-  \FilesToClean
-    { ftcCurrentModule = cm_files
-    , ftcGhcSession = gs_files
+addFilesToClean tmpfs lifetime new_files =
+  addToClean (tmp_files_to_clean tmpfs) lifetime new_files
+
+addSubdirsToClean :: TmpFs -> TempFileLifetime -> [FilePath] -> IO ()
+addSubdirsToClean tmpfs lifetime new_subdirs =
+  addToClean (tmp_subdirs_to_clean tmpfs) lifetime new_subdirs
+
+addToClean :: IORef PathsToClean -> TempFileLifetime -> [FilePath] -> IO ()
+addToClean ref lifetime new_filepaths = modifyIORef' ref $
+  \PathsToClean
+    { ptcCurrentModule = cm_paths
+    , ptcGhcSession = gs_paths
     } -> case lifetime of
-      TFL_CurrentModule -> FilesToClean
-        { ftcCurrentModule = cm_files `Set.union` new_files_set
-        , ftcGhcSession = gs_files `Set.difference` new_files_set
+      TFL_CurrentModule -> PathsToClean
+        { ptcCurrentModule = cm_paths `Set.union` new_filepaths_set
+        , ptcGhcSession = gs_paths `Set.difference` new_filepaths_set
         }
-      TFL_GhcSession -> FilesToClean
-        { ftcCurrentModule = cm_files `Set.difference` new_files_set
-        , ftcGhcSession = gs_files `Set.union` new_files_set
+      TFL_GhcSession -> PathsToClean
+        { ptcCurrentModule = cm_paths `Set.difference` new_filepaths_set
+        , ptcGhcSession = gs_paths `Set.union` new_filepaths_set
         }
   where
-    new_files_set = Set.fromList new_files
+    new_filepaths_set = Set.fromList new_filepaths
 
 -- | Update the lifetime of files already being tracked. If any files are
 -- not being tracked they will be discarded.
 changeTempFilesLifetime :: TmpFs -> TempFileLifetime -> [FilePath] -> IO ()
 changeTempFilesLifetime tmpfs lifetime files = do
-  FilesToClean
-    { ftcCurrentModule = cm_files
-    , ftcGhcSession = gs_files
+  PathsToClean
+    { ptcCurrentModule = cm_paths
+    , ptcGhcSession = gs_paths
     } <- readIORef (tmp_files_to_clean tmpfs)
   let old_set = case lifetime of
-        TFL_CurrentModule -> gs_files
-        TFL_GhcSession -> cm_files
+        TFL_CurrentModule -> gs_paths
+        TFL_GhcSession -> cm_paths
       existing_files = [f | f <- files, f `Set.member` old_set]
   addFilesToClean tmpfs lifetime existing_files
 
@@ -224,20 +252,32 @@ newTempName logger tmpfs tmp_dir lifetime extn
                         addFilesToClean tmpfs lifetime [filename]
                         return filename
 
-newTempDir :: Logger -> TmpFs -> TempDir -> IO FilePath
-newTempDir logger tmpfs tmp_dir
+-- | Create a new temporary subdirectory that doesn't already exist
+-- The temporary subdirectory is automatically removed at the end of the
+-- GHC session, but its contents aren't. Make sure to leave the directory
+-- empty before the end of the session, either by removing content
+-- directly or by using @addFilesToClean@.
+--
+-- If the created subdirectory is not empty, it will not be removed (along
+-- with its parent temporary directory) and a warning message will be
+-- printed at verbosity 2 and higher.
+newTempSubDir :: Logger -> TmpFs -> TempDir -> IO FilePath
+newTempSubDir logger tmpfs tmp_dir
   = do d <- getTempDir logger tmpfs tmp_dir
        findTempDir (d </> "ghc_")
   where
     findTempDir :: FilePath -> IO FilePath
     findTempDir prefix
       = do n <- newTempSuffix tmpfs
-           let filename = prefix ++ show n
-           b <- doesDirectoryExist filename
+           let name = prefix ++ show n
+           b <- doesDirectoryExist name
            if b then findTempDir prefix
-                else do createDirectory filename
-                        -- see mkTempDir below; this is wrong: -> consIORef (tmp_dirs_to_clean tmpfs) filename
-                        return filename
+                else (do
+                  createDirectory name
+                  addSubdirsToClean tmpfs TFL_GhcSession [name]
+                  return name)
+            `Exception.catchIO` \e -> if isAlreadyExistsError e
+                  then findTempDir prefix else ioError e
 
 newTempLibName :: Logger -> TmpFs -> TempDir -> TempFileLifetime -> Suffix
   -> IO (FilePath, FilePath, String)
@@ -337,6 +377,12 @@ removeTmpFiles logger fs
         act
 
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
+
+removeTmpSubdirs :: Logger -> [FilePath] -> IO ()
+removeTmpSubdirs logger fs
+  = traceCmd logger "Deleting temp subdirs"
+             ("Deleting: " ++ unwords fs)
+             (mapM_ (removeWith logger removeDirectory) fs)
 
 removeWith :: Logger -> (FilePath -> IO ()) -> FilePath -> IO ()
 removeWith logger remover f = remover f `Exception.catchIO`
