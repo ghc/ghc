@@ -13,12 +13,16 @@ letrec {
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x; } in
 GHC.Base.returnIO
-  @[()]
+  @[GHC.Types.Any]
   (GHC.Types.:
-     @()
+     @GHC.Types.Any
      (Unsafe.Coerce.unsafeCoerce#
-        @GHC.Types.LiftedRep @GHC.Types.LiftedRep @[GHC.Types.Int] @() x)
-     (GHC.Types.[] @()))
+        @GHC.Types.LiftedRep
+        @GHC.Types.LiftedRep
+        @[GHC.Types.Int]
+        @GHC.Types.Any
+        x)
+     (GHC.Types.[] @GHC.Types.Any))
 
 
 
@@ -36,11 +40,15 @@ letrec {
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x; } in
 GHC.Base.returnIO
-  @[()]
+  @[GHC.Types.Any]
   (GHC.Types.:
-     @()
+     @GHC.Types.Any
      (Unsafe.Coerce.unsafeCoerce#
-        @GHC.Types.LiftedRep @GHC.Types.LiftedRep @[GHC.Types.Int] @() x)
-     (GHC.Types.[] @()))
+        @GHC.Types.LiftedRep
+        @GHC.Types.LiftedRep
+        @[GHC.Types.Int]
+        @GHC.Types.Any
+        x)
+     (GHC.Types.[] @GHC.Types.Any))
 
 

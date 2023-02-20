@@ -104,7 +104,7 @@ import GHC.Iface.Env     ( externaliseName )
 import GHC.Iface.Make   ( coAxiomToIfaceDecl )
 import GHC.Iface.Load
 
-import GHC.Builtin.Types ( unitTy, mkListTy )
+import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )
 import GHC.Builtin.Names
 import GHC.Builtin.Utils
 
@@ -2283,8 +2283,8 @@ We don't bother with the tcl_th_bndrs environment either.
 -- | The returned [Id] is the list of new Ids bound by this statement. It can
 -- be used to extend the InteractiveContext via extendInteractiveContext.
 --
--- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
--- values, coerced to ().
+-- The returned TypecheckedHsExpr is of type IO [ Any ], a list of the bound
+-- values, coerced to Any.
 tcRnStmt :: HscEnv -> GhciLStmt GhcPs
          -> IO (Messages TcRnMessage, Maybe ([Id], LHsExpr GhcTc, FixityEnv))
 tcRnStmt hsc_env rdr_stmt
@@ -2578,13 +2578,16 @@ The reason for -fno-it is explained in #14336. `it` can lead to the repl
 leaking memory as it is repeatedly queried.
 -}
 
+any_lifted :: Type
+any_lifted = anyTypeOfKind liftedTypeKind
+
 -- | Typecheck the statements given and then return the results of the
--- statement in the form 'IO [()]'.
+-- statement in the form 'IO [Any]'.
 tcGhciStmts :: [GhciLStmt GhcRn] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName
       ; ret_id  <- tcLookupId returnIOName             -- return @ IO
-      ; let ret_ty      = mkListTy unitTy
+      ; let ret_ty      = mkListTy any_lifted
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty]
             tc_io_stmts = tcStmtsAndThen (HsDoStmt GhciStmtCtxt) tcDoStmt stmts
                                          (mkCheckExpType io_ret_ty)
@@ -2607,28 +2610,31 @@ tcGhciStmts stmts
       ; traceTc "GHC.Tc.Module.tcGhciStmts: done" empty
 
       -- ret_expr is the expression
-      --      returnIO @[()] [unsafeCoerce# () x, ..,  unsafeCoerce# () z]
+      --      returnIO @[Any] [unsafeCoerce# @Any x, ..,  unsafeCoerce# @Any z]
       --
       -- Despite the inconvenience of building the type applications etc,
       -- this *has* to be done in type-annotated post-typecheck form
       -- because we are going to return a list of *polymorphic* values
-      -- coerced to type (). If we built a *source* stmt
+      -- coerced to type Any. If we built a *source* stmt
       --      return [coerce x, ..., coerce z]
       -- then the type checker would instantiate x..z, and we wouldn't
       -- get their *polymorphic* values.  (And we'd get ambiguity errs
       -- if they were overloaded, since they aren't applied to anything.)
+      --
+      -- We use Any rather than a dummy type such as () because of
+      -- the rules of unsafeCoerce#; see Unsafe/Coerce.hs for the details.
 
       ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoercePrimName
            -- We use unsafeCoerce# here because of (U11) in
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
       ; let ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) $
-                       noLocA $ ExplicitList unitTy $
+                       noLocA $ ExplicitList any_lifted $
                        map mk_item ids
 
             mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
-                                                      , getRuntimeRep unitTy
-                                                      , idType id, unitTy]
+                                                      , getRuntimeRep any_lifted
+                                                      , idType id, any_lifted]
                                           `nlHsApp` nlHsVar id
             stmts = tc_stmts ++ [noLocA (mkLastStmt ret_expr)]
 
