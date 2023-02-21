@@ -63,7 +63,7 @@ Wired-in units
 
 Certain libraries (ghc-prim, base, etc.) are known to the compiler and to the
 RTS as they provide some basic primitives.  Hence UnitIds of wired-in libraries
-are fixed. Instead of letting Cabal chose the UnitId for these libraries, their
+are fixed. Instead of letting Cabal choose the UnitId for these libraries, their
 .cabal file uses the following stanza to force it to a specific value:
 
    ghc-options: -this-unit-id ghc-prim    -- taken from ghc-prim.cabal

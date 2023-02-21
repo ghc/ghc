@@ -70,7 +70,7 @@ If an explicit deriving strategy is not given, multiple strategies may apply.
 In that case, GHC chooses the strategy as follows:
 
 1. Stock type classes, i.e. those specified in the report and those enabled by
-   `language extensions <#deriving-extra>`__, are derived using the ``stock``
+   :ref:`language extensions <deriving-extra>`, are derived using the ``stock``
    strategy, with the following exception:
 
    * For newtypes, ``Eq``, ``Ord``, ``Ix`` and ``Bounded`` are always derived
@@ -82,7 +82,7 @@ In that case, GHC chooses the strategy as follows:
      using the ``newtype`` strategy if ``GeneralizedNewtypeDeriving`` is
      enabled and the derivation succeeds.
 
-2. For other any type class:
+2. For any other type class:
 
    1. When :extension:`DeriveAnyClass` is enabled, use ``anyclass``.
 

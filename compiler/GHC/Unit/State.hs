@@ -1078,7 +1078,7 @@ pprTrustFlag flag = case flag of
 -- -----------------------------------------------------------------------------
 -- Wired-in units
 --
--- See Note [Wired-in units] in GHC.Unit.Module
+-- See Note [Wired-in units] in GHC.Unit.Types
 
 type WiringMap = Map UnitId UnitId
 
@@ -1094,7 +1094,7 @@ findWiredInUnits
 findWiredInUnits logger prec_map pkgs vis_map = do
   -- Now we must find our wired-in units, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
-  -- in Note [Wired-in units] in GHC.Unit.Module
+  -- in Note [Wired-in units] in GHC.Unit.Types
   let
         matches :: UnitInfo -> UnitId -> Bool
         pc `matches` pid = unitPackageName pc == PackageName (unitIdFS pid)
@@ -1177,7 +1177,7 @@ findWiredInUnits logger prec_map pkgs vis_map = do
 
 -- Helper functions for rewiring Module and Unit.  These
 -- rewrite Units of modules in wired-in packages to the form known to the
--- compiler, as described in Note [Wired-in units] in GHC.Unit.Module.
+-- compiler, as described in Note [Wired-in units] in GHC.Unit.Types.
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in GHC.Builtin.Names.
