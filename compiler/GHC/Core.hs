@@ -366,13 +366,88 @@ a Coercion, (sym c).
 
 Note [Core letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The right hand sides of all top-level and recursive @let@s
-/must/ be of lifted type (see "Type#type_classification" for
-the meaning of /lifted/ vs. /unlifted/).
+The Core letrec invariant:
 
-There is one exception to this rule, top-level @let@s are
-allowed to bind primitive string literals: see
-Note [Core top-level string literals].
+    The right hand sides of all
+      /top-level/ or /recursive/
+    bindings must be of lifted type
+
+    There is one exception to this rule, top-level @let@s are
+    allowed to bind primitive string literals: see
+    Note [Core top-level string literals].
+
+See "Type#type_classification" in GHC.Core.Type
+for the meaning of "lifted" vs. "unlifted").
+
+For the non-top-level, non-recursive case see Note [Core let-can-float invariant].
+
+Note [Compilation plan for top-level string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is a summary on how top-level string literals are handled by various
+parts of the compilation pipeline.
+
+* In the source language, there is no way to bind a primitive string literal
+  at the top level.
+
+* In Core, we have a special rule that permits top-level Addr# bindings. See
+  Note [Core top-level string literals]. Core-to-core passes may introduce
+  new top-level string literals.
+
+* In STG, top-level string literals are explicitly represented in the syntax
+  tree.
+
+* A top-level string literal may end up exported from a module. In this case,
+  in the object file, the content of the exported literal is given a label with
+  the _bytes suffix.
+
+Note [Core let-can-float invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The let-can-float invariant:
+
+    The right hand side of a /non-top-level/, /non-recursive/ binding
+    may be of unlifted type, but only if
+    the expression is ok-for-speculation
+    or the 'Let' is for a join point.
+
+    (For top-level or recursive lets see Note [Core letrec invariant].)
+
+This means that the let can be floated around
+without difficulty. For example, this is OK:
+
+   y::Int# = x +# 1#
+
+But this is not, as it may affect termination if the
+expression is floated out:
+
+   y::Int# = fac 4#
+
+In this situation you should use @case@ rather than a @let@. The function
+'GHC.Core.Utils.needsCaseBinding' can help you determine which to generate, or
+alternatively use 'GHC.Core.Make.mkCoreLet' rather than this constructor directly,
+which will generate a @case@ if necessary
+
+The let-can-float invariant is initially enforced by mkCoreLet in GHC.Core.Make.
+
+For discussion of some implications of the let-can-float invariant primops see
+Note [Checking versus non-checking primops] in GHC.Builtin.PrimOps.
+
+Historical Note [The let/app invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before 2022 GHC used the "let/app invariant", which applied the let-can-float rules
+to the argument of an application, as well as to the RHS of a let.  This made some
+kind of sense, because 'let' can always be encoded as application:
+   let x=rhs in b   =    (\x.b) rhs
+
+But the let/app invariant got in the way of RULES; see #19313.  For example
+  up :: Int# -> Int#
+  {-# RULES "up/down" forall x. up (down x) = x #-}
+The LHS of this rule doesn't satisfy the let/app invariant.
+
+Indeed RULES is a big reason that GHC doesn't use ANF, where the argument of an
+application is always a variable or a constant.  To allow RULES to work nicely
+we need to allow lots of things in the arguments of a call.
+
+TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -412,59 +487,14 @@ parts of the compilation pipeline.
   Note [Core top-level string literals]. Core-to-core passes may introduce
   new top-level string literals.
 
+  See GHC.Core.Utils.exprIsTopLevelBindable, and exprIsTickedString
+
 * In STG, top-level string literals are explicitly represented in the syntax
   tree.
 
 * A top-level string literal may end up exported from a module. In this case,
   in the object file, the content of the exported literal is given a label with
   the _bytes suffix.
-
-Note [Core let-can-float invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The let-can-float invariant:
-
-    The right hand side of a non-recursive 'Let'
-    /may/ be of unlifted type, but only if
-    the expression is ok-for-speculation
-    or the 'Let' is for a join point.
-
-This means that the let can be floated around
-without difficulty. For example, this is OK:
-
-   y::Int# = x +# 1#
-
-But this is not, as it may affect termination if the
-expression is floated out:
-
-   y::Int# = fac 4#
-
-In this situation you should use @case@ rather than a @let@. The function
-'GHC.Core.Utils.needsCaseBinding' can help you determine which to generate, or
-alternatively use 'GHC.Core.Make.mkCoreLet' rather than this constructor directly,
-which will generate a @case@ if necessary
-
-The let-can-float invariant is initially enforced by mkCoreLet in GHC.Core.Make.
-
-For discussion of some implications of the let-can-float invariant primops see
-Note [Checking versus non-checking primops] in GHC.Builtin.PrimOps.
-
-Historical Note [The let/app invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Before 2022 GHC used the "let/app invariant", which applied the let-can-float rules
-to the argument of an application, as well as to the RHS of a let.  This made some
-kind of sense, because 'let' can always be encoded as application:
-   let x=rhs in b   =    (\x.b) rhs
-
-But the let/app invariant got in the way of RULES; see #19313.  For example
-  up :: Int# -> Int#
-  {-# RULES "up/down" forall x. up (down x) = x #-}
-The LHS of this rule doesn't satisfy the let/app invariant.
-
-Indeed RULES is a big reason that GHC doesn't use ANF, where the argument of an
-application is always a variable or a constant.  To allow RULES to work nicely
-we need to allow lots of things in the arguments of a call.
-
-TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 
 Note [Case expression invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
