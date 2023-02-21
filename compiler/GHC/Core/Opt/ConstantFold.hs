@@ -1110,14 +1110,10 @@ doubleOp2 _ _ _ _ = Nothing
 --------------------------
 doubleDecodeOp :: RuleOpts -> Literal -> Maybe CoreExpr
 doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
-  = Just $ mkCoreUnboxedTuple [ Lit (mkLitINT64 (toInteger m))
+  = Just $ mkCoreUnboxedTuple [ Lit (mkLitInt64Wrap (toInteger m))
                               , mkIntVal platform (toInteger e) ]
   where
     platform = roPlatform env
-    mkLitINT64 | platformWordSizeInBits platform < 64
-               = mkLitInt64Wrap
-               | otherwise
-               = mkLitIntWrap platform
 doubleDecodeOp _   _
   = Nothing
 
