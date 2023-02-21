@@ -29,7 +29,8 @@ import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold.Make
 import GHC.Core
 import GHC.Core.Rules
-import GHC.Core.Utils     ( exprIsTrivial, getIdFromTrivialExpr_maybe
+import GHC.Core.Utils     ( exprIsTrivial, exprIsTopLevelBindable
+                          , getIdFromTrivialExpr_maybe
                           , mkCast, exprType )
 import GHC.Core.FVs
 import GHC.Core.TyCo.Rep (TyCoBinder (..))
@@ -1321,7 +1322,10 @@ specBind rhs_env (NonRec fn rhs) body_uds
                = [mkDB $ NonRec b r | (b,r) <- pairs]
                  ++ bagToList dump_dbs
 
-       ; if float_all then
+             can_float_this_one = exprIsTopLevelBindable rhs (idType fn)
+             -- exprIsTopLevelBindable: see Note [Care with unlifted bindings]
+
+       ; if float_all && can_float_this_one then
              -- Rather than discard the calls mentioning the bound variables
              -- we float this (dictionary) binding along with the others
               return ([], free_uds `snocDictBinds` final_binds)
@@ -1658,6 +1662,28 @@ Naively, we might generate an (expensive) specialisation
 even in the case that @x = False@! Instead, we add a dummy 'Void#' argument to
 the specialisation '$sfInt' ($sfInt :: Void# -> Array# Int) in order to
 preserve laziness.
+
+Note [Care with unlifted bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#22998)
+    f x = let x::ByteArray# = <some literal>
+              n::Natural    = NB x
+          in wombat @192827 (n |> co)
+where
+  co :: Natural ~ KnownNat 192827
+  wombat :: forall (n:Nat). KnownNat n => blah
+
+Left to itself, the specialiser would float the bindings for `x` and `n` to top
+level, so we can specialise `wombat`.  But we can't have a top-level ByteArray#
+(see Note [Core letrec invariant] in GHC.Core).  Boo.
+
+This is pretty exotic, so we take a simple way out: in specBind (the NonRec
+case) do not float the binding itself unless it satisfies exprIsTopLevelBindable.
+This is conservative: maybe the RHS of `x` has a free var that would stop it
+floating to top level anyway; but that is hard to spot (since we don't know what
+the non-top-level in-scope binders are) and rare (since the binding must satisfy
+Note [Core let-can-float invariant] in GHC.Core).
+
 
 Note [Specialising Calls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
