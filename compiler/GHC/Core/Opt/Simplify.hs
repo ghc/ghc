@@ -3065,9 +3065,11 @@ simplAlts env0 scrut case_bndr alts cont'
         ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env2 scrut
                                                        case_bndr case_bndr2 alts
 
-        ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr' alts
+        ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr alts
           -- NB: it's possible that the returned in_alts is empty: this is handled
           -- by the caller (rebuildCase) in the missingAlt function
+          -- NB: pass case_bndr::InId, not case_bndr' :: OutId, to prepareAlts
+          --     See Note [Shadowing in prepareAlts] in GHC.Core.Opt.Simplify.Utils
 
         ; alts' <- mapM (simplAlt alt_env' (Just scrut') imposs_deflt_cons case_bndr' cont') in_alts
 --      ; pprTrace "simplAlts" (ppr case_bndr $$ ppr alts $$ ppr cont') $ return ()

@@ -2168,26 +2168,37 @@ h y = case y of
 If we inline h into f, the default case of the inlined h can't happen.
 If we don't notice this, we may end up filtering out *all* the cases
 of the inner case y, which give us nowhere to go!
+
+Note [Shadowing in prepareAlts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note that we pass case_bndr::InId to prepareAlts; an /InId/, not an
+/OutId/.  This is vital, because `refineDefaultAlt` uses `tys` to build
+a new /InAlt/.  If you pass an OutId, we'll end up appling the
+substitution twice: disaster (#23012).
+
+However this does mean that filling in the default alt might be
+delayed by a simplifier cycle, because an InId has less info than an
+OutId.  Test simplCore/should_compile/simpl013 apparently shows this
+up, although I'm not sure exactly how..
 -}
 
-prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
-prepareAlts scrut case_bndr' alts
-  | Just (tc, tys) <- splitTyConApp_maybe (varType case_bndr')
-           -- Case binder is needed just for its type. Note that as an
-           --   OutId, it has maximum information; this is important.
-           --   Test simpl013 is an example
+--
+-- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
+prepareAlts scrut case_bndr alts
+  | Just (tc, tys) <- splitTyConApp_maybe (idType case_bndr)
   = do { us <- getUniquesM
-       ; let (idcs1, alts1)       = filterAlts tc tys imposs_cons alts
-             (yes2,  alts2)       = refineDefaultAlt us (idMult case_bndr') tc tys idcs1 alts1
-               -- the multiplicity on case_bndr's is the multiplicity of the
+       ; let (idcs1, alts1) = filterAlts tc tys imposs_cons alts
+             (yes2,  alts2) = refineDefaultAlt us (idMult case_bndr) tc tys idcs1 alts1
+               -- The multiplicity on case_bndr's is the multiplicity of the
                -- case expression The newly introduced patterns in
                -- refineDefaultAlt must be scaled by this multiplicity
              (yes3, idcs3, alts3) = combineIdenticalAlts idcs1 alts2
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
-       ; when yes2 $ tick (FillInCaseDefault case_bndr')
-       ; when yes3 $ tick (AltMerge case_bndr')
+       ; when yes2 $ tick (FillInCaseDefault case_bndr)
+       ; when yes3 $ tick (AltMerge case_bndr)
        ; return (idcs3, alts3) }
 
   | otherwise  -- Not a data type, so nothing interesting happens
