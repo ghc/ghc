@@ -20,7 +20,7 @@ Compiler
   (:ghc-ticket:`22491`).
 
 - Fix a compiler panic in the simplifier that manifests when compiling with
-  optimisations (:ghc-ticket:`19824`,:ghc-ticket:`22482`).
+  optimisations (:ghc-ticket:`19824`, :ghc-ticket:`22482`).
 
 - Fix a compiler panic in the demand analyser due to a bug involving shadowing
   (:ghc-ticket:`22718`).
