@@ -401,7 +401,7 @@ cprTransformDataConWork env con args
     in
       if rec_con
         then CprType 0 (ConCpr tag nested_cpr )
-        else CprType 0 (ConCpr tag $ map (trimCprToDepth 3) nested_cpr )
+        else CprType 0 (ConCpr tag $ map (trimCprToDepth 1) nested_cpr )
 
   | otherwise
   =
