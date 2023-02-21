@@ -715,14 +715,22 @@ emitPrimOp cfg primop =
     doCopyByteArrayOp src src_off dst dst_off n
   CopyMutableByteArrayOp -> \[src,src_off,dst,dst_off,n] -> opIntoRegs $ \[] ->
     doCopyMutableByteArrayOp src src_off dst dst_off n
+  CopyMutableByteArrayNonOverlappingOp -> \[src,src_off,dst,dst_off,n] -> opIntoRegs $ \[] ->
+    doCopyMutableByteArrayNonOverlappingOp src src_off dst dst_off n
   CopyByteArrayToAddrOp -> \[src,src_off,dst,n] -> opIntoRegs $ \[] ->
     doCopyByteArrayToAddrOp src src_off dst n
   CopyMutableByteArrayToAddrOp -> \[src,src_off,dst,n] -> opIntoRegs $ \[] ->
     doCopyMutableByteArrayToAddrOp src src_off dst n
   CopyAddrToByteArrayOp -> \[src,dst,dst_off,n] -> opIntoRegs $ \[] ->
     doCopyAddrToByteArrayOp src dst dst_off n
+  CopyAddrToAddrOp -> \[src,dst,n] -> opIntoRegs $ \[] ->
+    doCopyAddrToAddrOp src dst n
+  CopyAddrToAddrNonOverlappingOp -> \[src,dst,n] -> opIntoRegs $ \[] ->
+    doCopyAddrToAddrNonOverlappingOp src dst n
   SetByteArrayOp -> \[ba,off,len,c] -> opIntoRegs $ \[] ->
     doSetByteArrayOp ba off len c
+  SetAddrRangeOp -> \[dst,len,c] -> opIntoRegs $ \[] ->
+    doSetAddrRangeOp dst len c
 
 -- Comparing byte arrays
   CompareByteArraysOp -> \[ba1,ba1_off,ba2,ba2_off,n] -> opIntoRegs $ \[res] ->
@@ -2518,6 +2526,7 @@ doCopyByteArrayOp = emitCopyByteArray copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
+    -- TODO: Make -fcheck-prim-bounds check that the arrays are distinct
     copy _src _dst dst_p src_p bytes align =
         emitMemcpyCall dst_p src_p bytes align
 
@@ -2539,6 +2548,20 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
             (getCode $ emitMemmoveCall dst_p src_p bytes align)
             (getCode $ emitMemcpyCall  dst_p src_p bytes align)
         emit =<< mkCmmIfThenElse (cmmEqWord platform src dst) moveCall cpyCall
+
+-- | Takes a source 'MutableByteArray#', an offset in the source
+-- array, a destination 'MutableByteArray#', an offset into the
+-- destination array, and the number of bytes to copy.  Copies the
+-- given number of bytes from the source array to the destination
+-- array.  Assumes the two ranges are disjoint
+doCopyMutableByteArrayNonOverlappingOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                         -> FCode ()
+doCopyMutableByteArrayNonOverlappingOp = emitCopyByteArray copy
+  where
+    copy _src _dst dst_p src_p bytes align = do
+        -- TODO: Make -fcheck-prim-bounds verify no overlap here
+        emitMemcpyCall  dst_p src_p bytes align
+
 
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> Alignment -> FCode ())
@@ -2596,6 +2619,23 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
+-- | Takes a source 'Addr#', a destination 'Addr#', and the number of
+-- bytes to copy.  Copies the given number of bytes from the source
+-- memory region to the destination array.
+doCopyAddrToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToAddrOp src_p dst_p bytes = do
+    -- Use memmove; the ranges may overlap
+    emitMemmoveCall dst_p src_p bytes (mkAlignment 1)
+
+-- | Takes a source 'Addr#', a destination 'Addr#', and the number of
+-- bytes to copy.  Copies the given number of bytes from the source
+-- memory region to the destination region.  The regions may not overlap.
+doCopyAddrToAddrNonOverlappingOp :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+doCopyAddrToAddrNonOverlappingOp src_p dst_p bytes = do
+    -- Use memcpy; the ranges may not overlap
+    -- TODO: Make -fcheck-prim-bounds verify no overlap here
+    emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
+
 ifNonZero :: CmmExpr -> FCode () -> FCode ()
 ifNonZero e it = do
     platform <- getPlatform
@@ -2608,7 +2648,7 @@ ifNonZero e it = do
 
 -- | Takes a 'MutableByteArray#', an offset into the array, a length,
 -- and a byte, and sets each of the selected bytes in the array to the
--- character.
+-- given byte.
 doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
 doSetByteArrayOp ba off len c = do
@@ -2624,6 +2664,14 @@ doSetByteArrayOp ba off len c = do
 
     p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba (arrWordsHdrSize profile)) off
     emitMemsetCall p c len align
+
+-- | Takes an 'Addr#', a length, and a byte, and sets each of the
+-- selected bytes in memory to the given byte.
+doSetAddrRangeOp :: CmmExpr -> CmmExpr -> CmmExpr
+                 -> FCode ()
+doSetAddrRangeOp dst len c = do
+    emitMemsetCall dst c len (mkAlignment 1)
+
 
 -- ----------------------------------------------------------------------------
 -- Allocating arrays

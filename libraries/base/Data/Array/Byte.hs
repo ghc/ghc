@@ -134,7 +134,7 @@ unsafeCopyByteArray (MutableByteArray dst#) (I# doff#) (ByteArray src#) (I# soff
 -- | Copy a slice from one mutable byte array to another
 -- or to the same mutable byte array.
 --
--- /Note:/ this function does not do bounds checking.
+-- /Note:/ this function does not do bounds or overlap checking.
 unsafeCopyMutableByteArray
   :: MutableByteArray s -- ^ destination array
   -> Int                -- ^ offset into destination array
@@ -144,7 +144,7 @@ unsafeCopyMutableByteArray
   -> ST s ()
 {-# INLINE unsafeCopyMutableByteArray #-}
 unsafeCopyMutableByteArray (MutableByteArray dst#) (I# doff#) (MutableByteArray src#) (I# soff#) (I# sz#) =
-  ST (\s# -> case copyMutableByteArray# src# soff# dst# doff# sz# s# of
+  ST (\s# -> case copyMutableByteArrayNonOverlapping# src# soff# dst# doff# sz# s# of
     s'# -> (# s'#, () #))
 
 -- | @since 4.17.0.0

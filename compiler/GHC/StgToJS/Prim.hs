@@ -717,15 +717,19 @@ genPrim prof bound ty op = case op of
                  . boundsChecked bound a2 (Add o2 (Sub n 1))
                  $ appS "h$copyMutableByteArray" [a1,o1,a2,o2,n]
   CopyMutableByteArrayOp       -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
+  CopyMutableByteArrayNonOverlappingOp -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
   CopyByteArrayToAddrOp        -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
   CopyMutableByteArrayToAddrOp -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
   CopyAddrToByteArrayOp        -> \[] xs@[_ba,_bo,_aa,_ao,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
+  CopyAddrToAddrOp             -> \[] xs@[_ba,_bo,_aa,_ao,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
+  CopyAddrToAddrNonOverlappingOp -> \[] xs@[_ba,_bo,_aa,_ao,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
 
   SetByteArrayOp -> \[] [a,o,n,v] ->
       PrimInline . boundsChecked bound a (Add o (Sub n 1)) $ loopBlockS zero_ (.<. n) \i ->
         [ write_u8 a (Add o i) v
         , postIncrS i
         ]
+  SetAddrRangeOp -> \[] xs@[_a,_o,_n,_v] -> genPrim prof bound ty SetByteArrayOp [] xs
 
   AtomicReadByteArrayOp_Int  -> \[r]   [a,i]         -> PrimInline . boundsChecked bound a (Add i 3) $ r |= read_i32 a i
   AtomicWriteByteArrayOp_Int -> \[]    [a,i,v]       -> PrimInline . boundsChecked bound a (Add i 3) $ write_i32 a i v

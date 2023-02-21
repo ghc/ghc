@@ -1890,13 +1890,14 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
 
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {@'copyByteArray#' src src_ofs dst dst_ofs n@ copies the range
-   starting at offset @src_ofs@ of length @n@ from the
-   'ByteArray#' @src@ to the 'MutableByteArray#' @dst@
-   starting at offset @dst_ofs@.  Both arrays must fully contain
-   the specified ranges, but this is not checked.  The two arrays must
-   not be the same array in different states, but this is not checked
-   either.}
+  { @'copyByteArray#' src src_ofs dst dst_ofs len@ copies the range
+    starting at offset @src_ofs@ of length @len@ from the
+    'ByteArray#' @src@ to the 'MutableByteArray#' @dst@
+    starting at offset @dst_ofs@.  Both arrays must fully contain
+    the specified ranges, but this is not checked.  The two arrays must
+    not be the same array in different states, but this is not checked
+    either.
+  }
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4}
@@ -1904,10 +1905,30 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the first MutableByteArray\# to the specified region in the second MutableByteArray\#.
-   Both arrays must fully contain the specified ranges, but this is not checked. The regions are
-   allowed to overlap, although this is only possible when the same array is provided
-   as both the source and the destination.}
+  { @'copyMutableByteArray#' src src_ofs dst dst_ofs len@ copies the
+    range starting at offset @src_ofs@ of length @len@ from the
+    'MutableByteArray#' @src@ to the 'MutableByteArray#' @dst@
+    starting at offset @dst_ofs@.  Both arrays must fully contain the
+    specified ranges, but this is not checked.  The regions are
+    allowed to overlap, although this is only possible when the same
+    array is provided as both the source and the destination.
+  }
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail = True
+
+primop  CopyMutableByteArrayNonOverlappingOp "copyMutableByteArrayNonOverlapping#" GenPrimOp
+  MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  { @'copyMutableByteArrayNonOverlapping#' src src_ofs dst dst_ofs len@
+    copies the range starting at offset @src_ofs@ of length @len@ from
+    the 'MutableByteArray#' @src@ to the 'MutableByteArray#' @dst@
+    starting at offset @dst_ofs@.  Both arrays must fully contain the
+    specified ranges, but this is not checked.  The regions are /not/
+    allowed to overlap, but this is also not checked.
+
+    @since 0.11.0
+  }
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
@@ -1922,7 +1943,7 @@ primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
    either.}
   with
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4}
+  code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
 primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
@@ -1934,7 +1955,7 @@ primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
    pinned), but this is not checked either.}
   with
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4}
+  code_size = { primOpCodeSizeForeignCall + 4 }
   can_fail = True
 
 primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
@@ -1946,7 +1967,38 @@ primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
    but this is not checked either.}
   with
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall + 4}
+  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail = True
+
+primop  CopyAddrToAddrOp "copyAddrToAddr#" GenPrimOp
+  Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  { @'copyAddrToAddr#' src dest len@ copies @len@ bytes
+    from @src@ to @dest@.  These two memory ranges are allowed to overlap.
+
+    Analogous to the standard C function @memmove@, but with a different
+    argument order.
+
+    @since 0.11.0
+  }
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall }
+  can_fail = True
+
+primop  CopyAddrToAddrNonOverlappingOp "copyAddrToAddrNonOverlapping#" GenPrimOp
+  Addr# -> Addr# -> Int# -> State# RealWorld -> State# RealWorld
+  { @'copyAddrToAddrNonOverlapping#' src dest len@ copies @len@ bytes
+    from @src@ to @dest@.  As the name suggests, these two memory ranges
+    /must not overlap/, although this pre-condition is not checked.
+
+    Analogous to the standard C function @memcpy@, but with a different
+    argument order.
+
+    @since 0.11.0
+  }
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall }
   can_fail = True
 
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
@@ -1956,6 +2008,21 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail = True
+
+primop  SetAddrRangeOp "setAddrRange#" GenPrimOp
+  Addr# -> Int# -> Int# -> State# RealWorld -> State# RealWorld
+  { @'setAddrRange#' dest len c@ sets all of the bytes in
+    @[dest, dest+len)@ to the value @c@.
+
+    Analogous to the standard C function @memset@, but with a different
+    argument order.
+
+    @since 0.11.0
+  }
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall }
   can_fail = True
 
 -- Atomic operations

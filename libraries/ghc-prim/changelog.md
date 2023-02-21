@@ -14,6 +14,13 @@
     - `sameMutVar#`, `sameTVar#`, `sameMVar#`
     - `sameIOPort#`, `eqStableName#`.
 
+- Several new primops were added:
+
+  - `copyMutableByteArrayNonOverlapping#`
+  - `copyAddrToAddr#`
+  - `copyAddrToAddrNonOverlapping#`
+  - `setAddrRange#`
+
 ## 0.10.0
 
 - Shipped with GHC 9.6.1

@@ -1,6 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Utils
@@ -50,13 +53,11 @@ module Foreign.Marshal.Utils (
 ) where
 
 import Data.Maybe
-import Foreign.Ptr              ( Ptr, nullPtr )
+import GHC.Ptr                  ( Ptr(..), nullPtr )
 import Foreign.Storable         ( Storable(poke) )
-import Foreign.C.Types          ( CSize(..), CInt(..) )
 import Foreign.Marshal.Alloc    ( malloc, alloca )
-import Data.Word                ( Word8 )
+import GHC.Word                 ( Word8(..) )
 
-import GHC.Real                 ( fromIntegral )
 import GHC.Num
 import GHC.Base
 
@@ -158,9 +159,8 @@ copyBytes
   -> Ptr a -- ^ Source
   -> Int -- ^ Size in bytes
   -> IO ()
-copyBytes dest src size = do
-  _ <- memcpy dest src (fromIntegral size)
-  return ()
+copyBytes = coerce $ \(Ptr dest#) (Ptr src#) (I# size#) s
+  -> (# copyAddrToAddrNonOverlapping# src# dest# size# s, () #)
 
 -- |Copies the given number of bytes from the second area (source) into the
 -- first (destination); the copied areas /may/ overlap
@@ -170,9 +170,8 @@ moveBytes
   -> Ptr a -- ^ Source
   -> Int -- ^ Size in bytes
   -> IO ()
-moveBytes dest src size = do
-  _ <- memmove dest src (fromIntegral size)
-  return ()
+moveBytes = coerce $ \(Ptr dest#) (Ptr src#) (I# size#) s
+  -> (# copyAddrToAddr# src# dest# size# s, () #)
 
 -- Filling up memory area with required values
 -- -------------------------------------------
@@ -180,16 +179,6 @@ moveBytes dest src size = do
 -- |Fill a given number of bytes in memory area with a byte value.
 --
 -- @since 4.8.0.0
-fillBytes               :: Ptr a -> Word8 -> Int -> IO ()
-fillBytes dest char size = do
-  _ <- memset dest (fromIntegral char) (fromIntegral size)
-  return ()
-
--- auxiliary routines
--- -------------------
-
--- |Basic C routines needed for memory copying
---
-foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
-foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
-foreign import ccall unsafe "string.h" memset  :: Ptr a -> CInt  -> CSize -> IO (Ptr a)
+fillBytes :: Ptr a -> Word8 -> Int -> IO ()
+fillBytes = coerce $ \(Ptr dest#) (W8# byte#) (I# size#) s
+  -> (# setAddrRange# dest# size# (word2Int# (word8ToWord# byte#)) s, () #)
