@@ -293,7 +293,10 @@ isElfTarget = anyTargetOs elfOSes
 -- TODO: Windows supports lazy binding (but GHC doesn't currently support
 --       dynamic way on Windows anyways).
 hostSupportsRPaths :: Action Bool
-hostSupportsRPaths = anyHostOs (elfOSes ++ machoOSes)
+hostSupportsRPaths = do
+  -- https://gitlab.haskell.org/ghc/ghc/-/issues/23011
+  isOpenBSD <- anyHostOs ["openbsd"]
+  if not isOpenBSD then anyHostOs (elfOSes ++ machoOSes) else pure False
 
 -- | Check whether the target supports GHCi.
 ghcWithInterpreter :: Action Bool
