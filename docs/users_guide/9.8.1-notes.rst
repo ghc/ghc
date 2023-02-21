@@ -44,6 +44,17 @@ Runtime system
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+- Primitive pointer comparison functions are now levity-polymorphic, e.g. ::
+
+      sameArray# :: forall {l} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
+
+  This change affects the following functions:
+
+    - ``sameArray#``, ``sameMutableArray#``,
+    - ``sameSmallArray#``, ``sameSmallMutableArray#``,
+    - ``sameMutVar#``, ``sameTVar#``, ``sameMVar#``
+    - ``sameIOPort#``, ``eqStableName#``.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

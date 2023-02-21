@@ -1,3 +1,19 @@
+## 0.11.0
+
+- Shipped with GHC 9.8.1
+
+- Primitive pointer comparison functions are now levity-polymorphic, e.g.
+
+  ```haskell
+  sameArray# :: forall {l} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
+  ```
+
+  This change affects the following functions:
+    - `sameArray#`, `sameMutableArray#`,
+    - `sameSmallArray#`, `sameSmallMutableArray#`,
+    - `sameMutVar#`, `sameTVar#`, `sameMVar#`
+    - `sameIOPort#`, `eqStableName#`.
+
 ## 0.10.0
 
 - Shipped with GHC 9.6.1

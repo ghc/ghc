@@ -3,6 +3,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -38,7 +40,8 @@ module GHC.Prim.PtrEq
   ) where
 
 import GHC.Prim
-import GHC.Types (UnliftedType) -- Also make implicit dependency known to build system
+import GHC.Types -- Also make implicit dependency known to build system
+  ( RuntimeRep(BoxedRep), UnliftedType )
 default () -- Double and Integer aren't available yet
 
 {- **********************************************************************
@@ -91,19 +94,19 @@ unsafePtrEquality# = reallyUnsafePtrEquality#
 --   in primops.txt.pp
 
 -- | Compare the underlying pointers of two arrays.
-sameArray# :: Array# a -> Array# a -> Int#
+sameArray# :: forall {l} (a :: TYPE (BoxedRep l)). Array# a -> Array# a -> Int#
 sameArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two mutable arrays.
-sameMutableArray# :: MutableArray# s a -> MutableArray# s a -> Int#
+sameMutableArray# :: forall {l} s (a :: TYPE (BoxedRep l)). MutableArray# s a -> MutableArray# s a -> Int#
 sameMutableArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two small arrays.
-sameSmallArray# :: SmallArray# a -> SmallArray# a -> Int#
+sameSmallArray# :: forall {l} (a :: TYPE (BoxedRep l)). SmallArray# a -> SmallArray# a -> Int#
 sameSmallArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two small mutable arrays.
-sameSmallMutableArray# :: SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
+sameSmallMutableArray# :: forall {l} s (a :: TYPE (BoxedRep l)). SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
 sameSmallMutableArray# = unsafePtrEquality#
 
 -- | Compare the pointers of two byte arrays.
@@ -115,23 +118,23 @@ sameMutableByteArray# :: MutableByteArray# s -> MutableByteArray# s -> Int#
 sameMutableByteArray# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'MutVar#'s.
-sameMutVar# :: MutVar# s a -> MutVar# s a -> Int#
+sameMutVar# :: forall {l} s (a :: TYPE (BoxedRep l)). MutVar# s a -> MutVar# s a -> Int#
 sameMutVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'TVar#'s.
-sameTVar# :: TVar# s a -> TVar# s a -> Int#
+sameTVar# :: forall {l} s (a :: TYPE (BoxedRep l)). TVar# s a -> TVar# s a -> Int#
 sameTVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'MVar#'s.
-sameMVar# :: MVar# s a -> MVar# s a -> Int#
+sameMVar# :: forall {l} s (a :: TYPE (BoxedRep l)). MVar# s a -> MVar# s a -> Int#
 sameMVar# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'IOPort#'s.
-sameIOPort# :: IOPort# s a -> IOPort# s a -> Int#
+sameIOPort# :: forall {l} s (a :: TYPE (BoxedRep l)). IOPort# s a -> IOPort# s a -> Int#
 sameIOPort# = unsafePtrEquality#
 
 -- | Compare the underlying pointers of two 'PromptTag#'s.
-samePromptTag# :: PromptTag# a -> PromptTag# a -> Int#
+samePromptTag# :: forall a. PromptTag# a -> PromptTag# a -> Int#
 samePromptTag# = unsafePtrEquality#
 
 -- Note [Comparing stable names]
@@ -145,5 +148,6 @@ samePromptTag# = unsafePtrEquality#
 -- does the trick.
 
 -- | Compare two stable names for equality.
-eqStableName# :: StableName# a -> StableName# b -> Int#
+eqStableName# :: forall {k} {l} (a :: TYPE (BoxedRep k)) (b :: TYPE (BoxedRep l))
+              . StableName# a -> StableName# b -> Int#
 eqStableName# = unsafePtrEquality#
