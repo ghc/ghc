@@ -3,7 +3,7 @@ T20666.hs:13:10: warning: [GHC-36038] [-Wloopy-superclass-solve (in -Wdefault)]
     I am solving the constraint ‘Show (T c)’,
       arising from the superclasses of an instance declaration,
     in a way that might turn out to loop at runtime.
-    Future versions of GHC will turn this warning into an error.
+    Starting from GHC 9.10, this warning will turn into an error.
     See the user manual, § Undecidable instances and loopy superclasses.
     Suggested fix:
       Add the constraint ‘Show (T c)’ to the instance context,
@@ -13,7 +13,7 @@ T20666.hs:17:10: warning: [GHC-36038] [-Wloopy-superclass-solve (in -Wdefault)]
     I am solving the constraint ‘Show (T c)’,
       arising from the superclasses of an instance declaration,
     in a way that might turn out to loop at runtime.
-    Future versions of GHC will turn this warning into an error.
+    Starting from GHC 9.10, this warning will turn into an error.
     See the user manual, § Undecidable instances and loopy superclasses.
     Suggested fix:
       Add the constraint ‘Show (T c)’ to the instance context,

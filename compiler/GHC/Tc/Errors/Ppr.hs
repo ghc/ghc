@@ -1231,7 +1231,7 @@ instance Diagnostic TcRnMessage where
                  , nest 2 $ pprCtOrigin (ctLocOrigin wtd_loc) <> comma
                  , text "in a way that might turn out to loop at runtime." ]
         warning
-          = vcat [ text "Future versions of GHC will turn this warning into an error." ]
+          = vcat [ text "Starting from GHC 9.10, this warning will turn into an error." ]
         user_manual =
           vcat [ text "See the user manual, § Undecidable instances and loopy superclasses." ]
 
