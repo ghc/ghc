@@ -362,32 +362,28 @@ deSugarExpr hsc_env tc_expr = do
 addExportFlagsAndRules
     :: Backend -> NameSet -> NameSet -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
-addExportFlagsAndRules bcknd exports keep_alive rules = mapFst add_one
-  where
-    add_one bndr = add_rules name (add_export name bndr)
-       where
-         name = idName bndr
-
-    ---------- Rules --------
-        -- See Note [Attach rules to local ids]
+addExportFlagsAndRules bcknd exports keep_alive rules
+  = mapFst (addRulesToId rule_base . add_export_flag)
+        -- addRulesToId: see Note [Attach rules to local ids]
         -- NB: the binder might have some existing rules,
         -- arising from specialisation pragmas
-    add_rules name bndr
-        | Just rules <- lookupNameEnv rule_base name
-        = bndr `addIdSpecialisations` rules
-        | otherwise
-        = bndr
+
+  where
+
+    ---------- Rules --------
     rule_base = extendRuleBaseList emptyRuleBase rules
 
     ---------- Export flag --------
     -- See Note [Adding export flags]
-    add_export name bndr
-        | dont_discard name = setIdExported bndr
+    add_export_flag bndr
+        | dont_discard bndr = setIdExported bndr
         | otherwise         = bndr
 
-    dont_discard :: Name -> Bool
-    dont_discard name = is_exported name
+    dont_discard :: Id -> Bool
+    dont_discard bndr = is_exported name
                      || name `elemNameSet` keep_alive
+       where
+         name = idName bndr
 
         -- In interactive mode, we don't want to discard any top-level
         -- entities at all (eg. do not inline them away during
