@@ -108,3 +108,4 @@ test('T18614', normal, compile, [''])
 test('mk-big-obj',
      [unless(opsys('mingw32'), skip), pre_cmd('$PYTHON mk-big-obj.py > mk-big-obj.c')],
      multimod_compile, ['mk-big-obj.c', '-c -v0 -no-hs-main'])
+test('T23002', normal, compile, ['-fregs-graph'])
