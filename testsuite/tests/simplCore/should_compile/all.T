@@ -474,3 +474,4 @@ test('T15205', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress
 test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
 
 test('RewriteHigherOrderPatterns', normal, compile, ['-O -ddump-rule-rewrites -dsuppress-all -dsuppress-uniques'])
+test('T23024', normal, multimod_compile, ['T23024', '-O -v0'])

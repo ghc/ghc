@@ -22,7 +22,7 @@ module GHC.Core.Rules (
 
         -- ** Manipulating 'RuleInfo' rules
         extendRuleInfo, addRuleInfo,
-        addIdSpecialisations,
+        addIdSpecialisations, addRulesToId,
 
         -- ** RuleBase and RuleEnv
 
@@ -348,6 +348,14 @@ addIdSpecialisations id rules
   | otherwise
   = setIdSpecialisation id $
     extendRuleInfo (idSpecialisation id) rules
+
+addRulesToId :: RuleBase -> Id -> Id
+-- Add rules in the RuleBase to the rules in the Id
+addRulesToId rule_base bndr
+  | Just rules <- lookupNameEnv rule_base (idName bndr)
+  = bndr `addIdSpecialisations` rules
+  | otherwise
+  = bndr
 
 -- | Gather all the rules for locally bound identifiers from the supplied bindings
 rulesOfBinds :: [CoreBind] -> [CoreRule]

@@ -64,6 +64,7 @@ import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts
 import GHC.Core.Unfold
 
+import Data.List( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
 
 {-
@@ -726,6 +727,33 @@ specialisation (see canSpecImport):
     Specialise even INLINE things; it hasn't inlined yet, so perhaps
     it never will.  Moreover it may have calls inside it that we want
     to specialise
+
+Wrinkle (W1): If we specialise an imported Id M.foo, we make a /local/
+binding $sfoo.  But specImports may further specialise $sfoo. So we end up
+with RULES for both M.foo (imported) and $sfoo (local).  Rules for local
+Ids should be attached to the Ids themselves (see GHC.HsToCore
+Note [Attach rules to local ids]); so we must partition the rules and
+attach the local rules.  That is done in specImports, via addRulesToId.
+
+Note [Glom the bindings if imported functions are specialised]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have an imported, *recursive*, INLINABLE function
+   f :: Eq a => a -> a
+   f = /\a \d x. ...(f a d)...
+In the module being compiled we have
+   g x = f (x::Int)
+Now we'll make a specialised function
+   f_spec :: Int -> Int
+   f_spec = \x -> ...(f Int dInt)...
+   {-# RULE  f Int _ = f_spec #-}
+   g = \x. f Int dInt x
+Note that f_spec doesn't look recursive
+After rewriting with the RULE, we get
+   f_spec = \x -> ...(f_spec)...
+BUT since f_spec was non-recursive before it'll *stay* non-recursive.
+The occurrence analyser never turns a NonRec into a Rec.  So we must
+make sure that f_spec is recursive.  Easiest thing is to make all
+the specialisations for imported bindings recursive.
 -}
 
 specImports :: SpecEnv
@@ -740,16 +768,24 @@ specImports top_env (MkUD { ud_binds = dict_binds, ud_calls = calls })
   = do { let env_w_dict_bndrs = top_env `bringFloatedDictsIntoScope` dict_binds
        ; (_env, spec_rules, spec_binds) <- spec_imports env_w_dict_bndrs [] dict_binds calls
 
-             -- Don't forget to wrap the specialized bindings with
-             -- bindings for the needed dictionaries.
-             -- See Note [Wrap bindings returned by specImports]
-             -- and Note [Glom the bindings if imported functions are specialised]
-       ; let final_binds
+             -- Make a Rec: see Note [Glom the bindings if imported functions are specialised]
+             --
+             -- wrapDictBinds: don't forget to wrap the specialized bindings with
+             --   bindings for the needed dictionaries.
+             --   See Note [Wrap bindings returned by specImports]
+             --
+             -- addRulesToId: see Wrinkle (W1) in Note [Specialising imported functions]
+             --               c.f. GHC.HsToCore.addExportFlagsAndRules
+       ; let (rules_for_locals, rules_for_imps) = partition isLocalRule spec_rules
+             local_rule_base = extendRuleBaseList emptyRuleBase rules_for_locals
+             final_binds
                | null spec_binds = wrapDictBinds dict_binds []
-               | otherwise       = [Rec $ flattenBinds $
-                                    wrapDictBinds dict_binds spec_binds]
+               | otherwise       = [Rec $ mapFst (addRulesToId local_rule_base) $
+                                          flattenBinds                          $
+                                          wrapDictBinds dict_binds              $
+                                          spec_binds]
 
-       ; return (spec_rules, final_binds)
+       ; return (rules_for_imps, final_binds)
     }
 
 -- | Specialise a set of calls to imported bindings
@@ -1110,27 +1146,6 @@ recursive yet-more-specialised call, so we'd diverge in that case.
 And if the call is to the same type, one specialisation is enough.
 Avoiding this recursive specialisation loop is one reason for the
 'callers' stack passed to specImports and specImport.
-
-Note [Glom the bindings if imported functions are specialised]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an imported, *recursive*, INLINABLE function
-   f :: Eq a => a -> a
-   f = /\a \d x. ...(f a d)...
-In the module being compiled we have
-   g x = f (x::Int)
-Now we'll make a specialised function
-   f_spec :: Int -> Int
-   f_spec = \x -> ...(f Int dInt)...
-   {-# RULE  f Int _ = f_spec #-}
-   g = \x. f Int dInt x
-Note that f_spec doesn't look recursive
-After rewriting with the RULE, we get
-   f_spec = \x -> ...(f_spec)...
-BUT since f_spec was non-recursive before it'll *stay* non-recursive.
-The occurrence analyser never turns a NonRec into a Rec.  So we must
-make sure that f_spec is recursive.  Easiest thing is to make all
-the specialisations for imported bindings recursive.
-
 
 
 ************************************************************************
