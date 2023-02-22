@@ -104,3 +104,4 @@ test('T15570',
    #   warning: integer constant is so large that it is unsigned
 
 test('T18614', normal, compile, [''])
+test('T23002', normal, compile, ['-fregs-graph'])

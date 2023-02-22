@@ -74,6 +74,7 @@ regUsageOfInstr :: Platform -> Instr -> RegUsage
 regUsageOfInstr platform instr = case instr of
   ANN _ i                  -> regUsageOfInstr platform i
   COMMENT{}                -> usage ([], [])
+  MULTILINE_COMMENT{}      -> usage ([], [])
   PUSH_STACK_FRAME         -> usage ([], [])
   POP_STACK_FRAME          -> usage ([], [])
   DELTA{}                  -> usage ([], [])
@@ -208,11 +209,12 @@ callerSavedRegisters
 patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 patchRegsOfInstr instr env = case instr of
     -- 0. Meta Instructions
-    ANN d i          -> ANN d (patchRegsOfInstr i env)
-    COMMENT{}        -> instr
-    PUSH_STACK_FRAME -> instr
-    POP_STACK_FRAME  -> instr
-    DELTA{}          -> instr
+    ANN d i             -> ANN d (patchRegsOfInstr i env)
+    COMMENT{}           -> instr
+    MULTILINE_COMMENT{} -> instr
+    PUSH_STACK_FRAME    -> instr
+    POP_STACK_FRAME     -> instr
+    DELTA{}             -> instr
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
     CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
