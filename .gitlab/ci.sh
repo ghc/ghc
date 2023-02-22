@@ -455,7 +455,7 @@ function push_perf_notes() {
     return
   fi
 
-  if [[ -n "${CROSS_TARGET:-}" ]]; then
+  if [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" != "js-emulator" ]; then
     info "Can't test cross-compiled build."
     return
   fi
