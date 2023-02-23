@@ -134,6 +134,8 @@ library
         -- ^ see Note [Packaging libffi headers] in
         -- GHC.Driver.CodeOutput.
 
+      extra-libraries: stdc++
+
       -- Here we declare several flavours to be available when passing the
       -- suitable (combination of) flag(s) when configuring the RTS from hadrian,
       -- using Cabal.
