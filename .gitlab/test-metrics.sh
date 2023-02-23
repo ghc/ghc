@@ -65,6 +65,10 @@ function push() {
     echo ""
     echo "Failed to push git notes. Fetching, appending, and retrying... $MAX_RETRY retries left."
   done
+
+  if [ "$MAX_RETRY" -le 0 ]; then
+    fail "Failed to push git notes, and no more retries remain."
+  fi
 }
 
 case $1 in
