@@ -480,7 +480,7 @@ cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 EXTERN_INLINE StgWord
 cas_seq_cst_relaxed(StgVolatilePtr p, StgWord o, StgWord n) {
 #if defined(HAVE_C11_ATOMICS)
-    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
     return o;
 #else
     return __sync_val_compare_and_swap(p, o, n);
@@ -626,13 +626,13 @@ load_load_barrier(void) {
 #define VOLATILE_LOAD(p) (*((StgVolatilePtr)(p)))
 
 // Relaxed atomic operations.
-#define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
-#define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
-#define RELAXED_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_RELAXED)
+#define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+#define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+#define RELAXED_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
 
 // Acquire/release atomic operations
-#define ACQUIRE_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
-#define RELEASE_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+#define ACQUIRE_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+#define RELEASE_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
 
 // Sequentially consistent atomic operations
 #define SEQ_CST_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
