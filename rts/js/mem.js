@@ -531,12 +531,17 @@ function h$sliceArray(a, start, n) {
   return r;
 }
 
+//////////////////////////////////////////////////////////
+//
 // copy between two mutable arrays. Range may overlap
+// so we check which offset is bigger to make a front-to-back or
+// back-to-front traversal of the arrays.
+
 function h$copyMutableArray(a1,o1,a2,o2,n) {
   if (n <= 0) return;
 
   if (o1 < o2) {
-    for (var i=n-1;i>=0;i--) { // start from the end to handle potential overlap
+    for (var i=n-1;i>=0;i--) {
       a2[o2+i] = a1[o1+i];
     }
   } else {
@@ -545,6 +550,22 @@ function h$copyMutableArray(a1,o1,a2,o2,n) {
     }
   }
 }
+
+function h$copyMutableByteArray(a1,o1,a2,o2,n) {
+  if (n <= 0) return;
+
+  if (o1 < o2) {
+    for (var i=n-1;i>=0;i--) {
+      a2.u8[o2+i] = a1.u8[o1+i];
+    }
+  } else {
+    for (var i=0;i<n;i++) {
+      a2.u8[o2+i] = a1.u8[o1+i];
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////
 
 function h$memcpy() {
   if(arguments.length === 3) {  // ByteArray# -> ByteArray# copy

@@ -573,11 +573,7 @@ genPrim prof bound ty op = case op of
         [ d .! (Add di i) |= s .! (Add si i)
         , postDecrS i
         ]
-  CopySmallMutableArrayOp    -> \[]    [s,si,d,di,n] -> PrimInline $
-      loopBlockS (Sub n one_) (.>=. zero_) \i ->
-        [ d .! (Add di i) |= s .! (Add si i)
-        , postDecrS i
-        ]
+  CopySmallMutableArrayOp    -> \[]    [s,si,d,di,n] -> PrimInline $ appS "h$copyMutableArray" [s,si,d,di,n]
   CloneSmallArrayOp          -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
   CloneSmallMutableArrayOp   -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
   FreezeSmallArrayOp         -> \[r]   [a,o,n]       -> PrimInline $ cloneArray r a (Just o) n
@@ -719,10 +715,7 @@ genPrim prof bound ty op = case op of
   CopyByteArrayOp -> \[] [a1,o1,a2,o2,n] ->
       PrimInline . boundsChecked bound a1 (Add o1 (Sub n 1))
                  . boundsChecked bound a2 (Add o2 (Sub n 1))
-                $ loopBlockS (Sub n one_) (.>=. zero_) \i ->
-                    [ write_u8 a2 (Add i o2) (read_u8 a1 (Add i o1))
-                    , postDecrS i
-                    ]
+                 $ appS "h$copyMutableByteArray" [a1,o1,a2,o2,n]
   CopyMutableByteArrayOp       -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
   CopyByteArrayToAddrOp        -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
   CopyMutableByteArrayToAddrOp -> \[] xs@[_a1,_o1,_a2,_o2,_n] -> genPrim prof bound ty CopyByteArrayOp [] xs
