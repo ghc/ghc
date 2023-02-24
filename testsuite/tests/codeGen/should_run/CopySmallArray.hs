@@ -76,12 +76,21 @@ test_copyMutableArray =
 -- Perform a copy where the source and destination part overlap.
 test_copyMutableArrayOverlap :: String
 test_copyMutableArrayOverlap =
-    let arr = runST $ do
+    let arr1 = runST $ do
             marr <- fromList inp
             -- Overlap of two elements
             copyMutableArray marr 5 marr 7 8
             unsafeFreezeArray marr
-    in shows (toList arr (length inp)) "\n"
+        arr2 = runST $ do
+            marr <- fromList inp
+            -- Overlap of two elements
+            -- Offset 1 > offset 2 (cf #23033)
+            copyMutableArray marr 7 marr 5 8
+            unsafeFreezeArray marr
+    in shows (toList arr1 (length inp))
+       . showChar '\n'
+       . shows (toList arr2 (length inp))
+       $ "\n"
   where
      -- This case was known to fail at some point.
      inp = [0,169,196,9,16,25,36,16,25,81,100,121,144,169,196]
