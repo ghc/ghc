@@ -40,18 +40,13 @@ mv ../../../../../../windows/doc/html/libraries/Win32-* . || \
 
 sh gen_contents_index
 cd ..
-for i in */
+for i in haddock libraries users_guide
 do
-    dir=${i%*/}
-    tar -Jcf ../../../../../$dir.html.tar.xz $dir
+    tar -Jcf ../../../../../$i.html.tar.xz $i
 done
 mv index.html ../../../../..
 cd ..
-# make
-mv ./*.pdf ../../../.. || \
-# hadrian
-  mv ./pdfs/*.pdf ../../../.. || \
-    die "failed to find PDFs"
+mv ./*.pdf ../../../..
 cd ../../../..
 [ "$NO_CLEAN" -eq 0 ] && rm -r inst
 [ "$NO_CLEAN" -eq 0 ] && rm -r windows
