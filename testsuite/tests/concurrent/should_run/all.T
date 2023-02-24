@@ -241,7 +241,8 @@ test('setnumcapabilities001',
        extra_run_opts('8 12 2000'),
        when(have_thread_sanitizer(), expect_broken(18808)),
        req_target_smp,
-       req_ghc_smp
+       req_ghc_smp,
+       fragile(22989)
      ],
      compile_and_run, [''])
 
