@@ -857,7 +857,9 @@ job_groups =
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , modifyValidateJobs manual tsan_jobs
+     , -- Nightly allowed to fail: #22520
+       modifyNightlyJobs allowFailure
+         (modifyValidateJobs manual tsan_jobs)
      , -- Nightly allowed to fail: #22343
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
