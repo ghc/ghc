@@ -2,7 +2,7 @@
 ExplicitForAllRules2.hs:6:41: error: [GHC-76037]
     Not in scope: type variable ‘b’
 
-ExplicitForAllRules2.hs:7:11: error:
+ExplicitForAllRules2.hs:7:11: error: [GHC-65669]
     Rule "new5":
     Forall'd variable ‘x’ does not appear on left hand side
 

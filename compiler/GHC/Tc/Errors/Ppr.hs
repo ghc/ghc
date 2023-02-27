@@ -1324,6 +1324,88 @@ instance Diagnostic TcRnMessage where
           = vcat [ text "Starting from GHC 9.10, this warning will turn into an error." ]
         user_manual =
           vcat [ text "See the user manual, § Undecidable instances and loopy superclasses." ]
+    TcRnIllegalInstanceHeadDecl head_ty -> mkSimpleDecorated $
+      hang (text "Illegal head of an instance declaration:"
+              <+> quotes (ppr head_ty))
+        2 (vcat [ text "Instance heads must be of the form"
+                , nest 2 $ text "C ty_1 ... ty_n"
+                , text "where" <+> quotes (char 'C')
+                  <+> text "is a class"
+                ])
+    TcRnUnexpectedStandaloneDerivingDecl -> mkSimpleDecorated $
+      text "Illegal standalone deriving declaration"
+    TcRnUnusedVariableInRuleDecl name var -> mkSimpleDecorated $
+      sep [text "Rule" <+> doubleQuotes (ftext name) <> colon,
+          text "Forall'd variable" <+> quotes (ppr var) <+>
+                  text "does not appear on left hand side"]
+    TcRnUnexpectedStandaloneKindSig -> mkSimpleDecorated $
+      text "Illegal standalone kind signature"
+    TcRnIllegalRuleLhs errReason name lhs bad_e -> mkSimpleDecorated $
+      sep [text "Rule" <+> pprRuleName name <> colon,
+           nest 2 (vcat [err,
+                         text "in left-hand side:" <+> ppr lhs])]
+      $$
+      text "LHS must be of form (f e1 .. en) where f is not forall'd"
+      where
+        err = case errReason of
+          UnboundVariable uv nis -> pprScopeError uv nis
+          IllegalExpression -> text "Illegal expression:" <+> ppr bad_e
+    TcRnBadAssocRhs ns -> mkSimpleDecorated $
+      hang (text "The RHS of an associated type declaration mentions"
+                <+> text "out-of-scope variable" <> plural ns
+                <+> pprWithCommas (quotes . ppr) ns)
+              2 (text "All such variables must be bound on the LHS")
+    TcRnDuplicateRoleAnnot list -> mkSimpleDecorated $
+      hang (text "Duplicate role annotations for" <+>
+            quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
+        2 (vcat $ map pp_role_annot $ NE.toList sorted_list)
+      where
+        sorted_list = NE.sortBy cmp_loc list
+        ((L _ first_decl) :| _) = sorted_list
+
+        pp_role_annot (L loc decl) = hang (ppr decl)
+                                        4 (text "-- written at" <+> ppr (locA loc))
+
+        cmp_loc = leftmost_smallest `on` getLocA
+    TcRnDuplicateKindSig list -> mkSimpleDecorated $
+      hang (text "Duplicate standalone kind signatures for" <+>
+            quotes (ppr $ standaloneKindSigName first_decl) <> colon)
+        2 (vcat $ map pp_kisig $ NE.toList sorted_list)
+      where
+        sorted_list = NE.sortBy cmp_loc list
+        ((L _ first_decl) :| _) = sorted_list
+
+        pp_kisig (L loc decl) =
+          hang (ppr decl) 4 (text "-- written at" <+> ppr (locA loc))
+
+        cmp_loc = leftmost_smallest `on` getLocA
+    TcRnIllegalDerivStrategy ds -> mkSimpleDecorated $
+      text "Illegal deriving strategy" <> colon <+> derivStrategyName ds
+    TcRnIllegalMultipleDerivClauses -> mkSimpleDecorated $
+      text "Illegal use of multiple, consecutive deriving clauses"
+    TcRnNoDerivStratSpecified{} -> mkSimpleDecorated $ text
+      "No deriving strategy specified. Did you want stock, newtype, or anyclass?"
+    TcRnStupidThetaInGadt{} -> mkSimpleDecorated $
+      vcat [text "No context is allowed on a GADT-style data declaration",
+            text "(You can put a context on each constructor, though.)"]
+    TcRnBadImplicitSplice -> mkSimpleDecorated $
+         text "Parse error: module header, import declaration"
+      $$ text "or top-level declaration expected."
+    TcRnShadowedTyVarNameInFamResult resName -> mkSimpleDecorated $
+       hsep [ text "Type variable", quotes (ppr resName) <> comma
+            , text "naming a type family result,"
+            ] $$
+      text "shadows an already bound type variable"
+    TcRnIncorrectTyVarOnLhsOfInjCond resName injFrom -> mkSimpleDecorated $
+        vcat [ text $ "Incorrect type variable on the LHS of "
+                   ++ "injectivity condition"
+      , nest 5
+      ( vcat [ text "Expected :" <+> ppr resName
+             , text "Actual   :" <+> ppr injFrom ])]
+    TcRnUnknownTyVarsOnRhsOfInjCond errorVars -> mkSimpleDecorated $
+      hsep [ text "Unknown type variable" <> plural errorVars
+           , text "on the RHS of injectivity condition:"
+           , interpp'SP errorVars ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1756,6 +1838,38 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnLoopySuperclassSolve{}
       -> WarningWithFlag Opt_WarnLoopySuperclassSolve
+    TcRnIllegalInstanceHeadDecl{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedStandaloneDerivingDecl{}
+      -> ErrorWithoutFlag
+    TcRnUnusedVariableInRuleDecl{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedStandaloneKindSig{}
+      -> ErrorWithoutFlag
+    TcRnIllegalRuleLhs{}
+      -> ErrorWithoutFlag
+    TcRnBadAssocRhs{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateRoleAnnot{}
+      -> ErrorWithoutFlag
+    TcRnDuplicateKindSig{}
+      -> ErrorWithoutFlag
+    TcRnIllegalDerivStrategy{}
+      -> ErrorWithoutFlag
+    TcRnIllegalMultipleDerivClauses{}
+      -> ErrorWithoutFlag
+    TcRnNoDerivStratSpecified{}
+      -> WarningWithFlag Opt_WarnMissingDerivingStrategies
+    TcRnStupidThetaInGadt{}
+      -> ErrorWithoutFlag
+    TcRnBadImplicitSplice{}
+      -> ErrorWithoutFlag
+    TcRnShadowedTyVarNameInFamResult{}
+      -> ErrorWithoutFlag
+    TcRnIncorrectTyVarOnLhsOfInjCond{}
+      -> ErrorWithoutFlag
+    TcRnUnknownTyVarsOnRhsOfInjCond{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2204,6 +2318,40 @@ instance Diagnostic TcRnMessage where
         cls_or_qc = case ctLocOrigin wtd_loc of
           ScOrigin c_or_q _ -> c_or_q
           _                 -> IsClsInst -- shouldn't happen
+    TcRnIllegalInstanceHeadDecl{}
+      -> noHints
+    TcRnUnexpectedStandaloneDerivingDecl{}
+      -> [suggestExtension LangExt.StandaloneDeriving]
+    TcRnUnusedVariableInRuleDecl{}
+      -> noHints
+    TcRnUnexpectedStandaloneKindSig{}
+      -> [suggestExtension LangExt.StandaloneKindSignatures]
+    TcRnIllegalRuleLhs{}
+      -> noHints
+    TcRnBadAssocRhs{}
+      -> noHints
+    TcRnDuplicateRoleAnnot{}
+      -> noHints
+    TcRnDuplicateKindSig{}
+      -> noHints
+    TcRnIllegalDerivStrategy ds -> case ds of
+      ViaStrategy{} -> [suggestExtension LangExt.DerivingVia]
+      _ -> [suggestExtension LangExt.DerivingStrategies]
+    TcRnIllegalMultipleDerivClauses{}
+      -> [suggestExtension LangExt.DerivingStrategies]
+    TcRnNoDerivStratSpecified isDSEnabled -> if isDSEnabled
+      then noHints
+      else [suggestExtension LangExt.DerivingStrategies]
+    TcRnStupidThetaInGadt{}
+      -> noHints
+    TcRnBadImplicitSplice{}
+      -> noHints
+    TcRnShadowedTyVarNameInFamResult{}
+      -> noHints
+    TcRnIncorrectTyVarOnLhsOfInjCond{}
+      -> noHints
+    TcRnUnknownTyVarsOnRhsOfInjCond{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

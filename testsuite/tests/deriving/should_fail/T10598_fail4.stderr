@@ -1,4 +1,4 @@
 
-T10598_fail4.hs:4:12: error:
+T10598_fail4.hs:4:12: error: [GHC-87139]
     Illegal deriving strategy: stock
-    Use DerivingStrategies to enable this extension
+    Suggested fix: Perhaps you intended to use DerivingStrategies

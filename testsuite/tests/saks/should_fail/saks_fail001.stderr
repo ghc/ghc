@@ -1,4 +1,4 @@
 
-saks_fail001.hs:8:1: error:
+saks_fail001.hs:8:1: error: [GHC-45906]
     Illegal standalone kind signature
-      Did you mean to enable StandaloneKindSignatures?
+    Suggested fix: Perhaps you intended to use StandaloneKindSignatures

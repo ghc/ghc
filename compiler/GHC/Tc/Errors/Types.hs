@@ -90,6 +90,7 @@ module GHC.Tc.Errors.Types (
   , UnexpectedStatement(..)
   , DeclSort(..)
   , NonStandardGuards(..)
+  , RuleLhsErrReason(..)
   ) where
 
 import GHC.Prelude
@@ -2959,6 +2960,224 @@ data TcRnMessage where
                            -> PredType -- ^ Wanted 'PredType'
                            -> TcRnMessage
 
+  {-| TcRnIllegalInstanceHeadDecl is an error triggered by malformed head of
+      type class instance
+
+      Examples:
+
+        instance 42
+
+        instance !Show D
+
+      Test cases: parser/should_fail/T3811c
+                  rename/should_fail/T18240a
+  -}
+  TcRnIllegalInstanceHeadDecl :: LHsType GhcRn -> TcRnMessage
+
+  {-| TcRnUnexpectedStandaloneDerivingDecl is an error thrown when a user uses
+      standalone deriving without enabling the StandaloneDeriving extension.
+
+      Example:
+
+        deriving instance Eq Foo
+
+      Test cases: rename/should_fail/RnUnexpectedStandaloneDeriving
+  -}
+  TcRnUnexpectedStandaloneDerivingDecl :: TcRnMessage
+
+  {-| TcRnUnusedVariableInRuleDecl is an error triggered by forall'd variable in
+      rewrite rule that does not appear on left-hand side
+
+      Example:
+
+        {-# RULES "rule" forall a. id = id #-}
+
+      Test cases: rename/should_fail/ExplicitForAllRules2
+  -}
+  TcRnUnusedVariableInRuleDecl :: FastString -> Name -> TcRnMessage
+
+  {-| TcRnUnexpectedStandaloneKindSig is an error thrown when a user uses standalone
+      kind signature without enabling the StandaloneKindSignatures extension.
+
+      Example:
+
+        type D :: Type
+        data D = D
+
+      Test cases: saks/should_fail/saks_fail001
+  -}
+  TcRnUnexpectedStandaloneKindSig :: TcRnMessage
+
+  {-| TcRnIllegalRuleLhs is an error triggered by malformed left-hand side
+      of rewrite rule
+
+      Examples:
+
+        {-# RULES "test" forall x. f x = x #-}
+
+        {-# RULES "test" forall x. case x of = x #-}
+
+      Test cases: rename/should_fail/T15659
+  -}
+  TcRnIllegalRuleLhs
+    :: RuleLhsErrReason
+    -> FastString -- Rule name
+    -> LHsExpr GhcRn -- Full expression
+    -> HsExpr GhcRn -- Bad expression
+    -> TcRnMessage
+
+  {-| TcRnBadAssocRhs is an error triggered by out-of-scope type variables
+      occurred in right-hand side of an associated type declaration
+
+      Example:
+
+        instance forall a. C Int where
+          data instance D Int = MkD1 a
+
+       cases: indexed-types/should_fail/T5515
+                  polykinds/T9574
+                  rename/should_fail/T18021
+  -}
+  TcRnBadAssocRhs :: [Name] -> TcRnMessage
+
+  {-| TcRnDuplicateRoleAnnot is an error triggered by two or more role
+      annotations for one type
+
+      Example:
+
+        data D a
+        type role D phantom
+        type role D phantom
+
+      Test cases: roles/should_fail/Roles8
+  -}
+  TcRnDuplicateRoleAnnot :: NE.NonEmpty (LRoleAnnotDecl GhcPs) -> TcRnMessage
+
+  {-| TcRnDuplicateKindSig is an error triggered by two or more standalone
+      kind signatures for one type
+
+      Example:
+
+        type D :: Type
+        type D :: Type
+        data D
+
+      Test cases: saks/should_fail/saks_fail002
+  -}
+  TcRnDuplicateKindSig :: NE.NonEmpty (LStandaloneKindSig GhcPs) -> TcRnMessage
+
+  {-| TcRnIllegalDerivStrategy  is an error thrown when a user uses deriving
+      strategy without enabling the DerivingStrategies extension or uses deriving
+      via without enabling the DerivingVia extension.
+
+      Examples:
+
+        data T = T deriving stock Eq
+
+        data T = T deriving via Eq T
+
+      Test cases: deriving/should_fail/deriving-via-fail3
+                  deriving/should_fail/T10598_fail4
+  -}
+  TcRnIllegalDerivStrategy :: DerivStrategy GhcPs -> TcRnMessage
+
+  {-| TcRnIllegalMultipleDerivClauses is an error thrown when a user uses two or more
+      deriving clauses without enabling the DerivingStrategies extension.
+
+      Example:
+
+        data T = T
+          deriving Eq
+          deriving Ord
+
+      Test cases: deriving/should_fail/T10598_fail5
+  -}
+  TcRnIllegalMultipleDerivClauses :: TcRnMessage
+
+  {-| TcRnNoDerivStratSpecified is a warning implied by -Wmissing-deriving-strategies
+      and triggered by deriving clause without specified deriving strategy.
+
+      Example:
+
+        data T = T
+          deriving Eq
+
+      Test cases: rename/should_compile/T15798a
+                  rename/should_compile/T15798b
+                  rename/should_compile/T15798c
+  -}
+  TcRnNoDerivStratSpecified
+    :: Bool -- True if DerivingStrategies is enabled
+    -> TcRnMessage
+
+  {-| TcRnStupidThetaInGadt is an error triggered by data contexts in GADT-style
+      data declaration
+
+      Example:
+
+        data (Eq a) => D a where
+          MkD :: D Int
+
+      Test cases: rename/should_fail/RnStupidThetaInGadt
+  -}
+  TcRnStupidThetaInGadt :: HsDocContext -> TcRnMessage
+
+  {-| TcRnBadImplicitSplice is an error thrown when a user uses top-level implicit
+      TH-splice without enabling the TemplateHaskell extension.
+
+      Example:
+
+        pure [] -- on top-level
+
+      Test cases: ghci/prog019/prog019
+                  ghci/scripts/T1914
+                  ghci/scripts/T6106
+                  rename/should_fail/T4042
+                  rename/should_fail/T12146
+  -}
+  TcRnBadImplicitSplice :: TcRnMessage
+
+  {-| TcRnShadowedTyVarNameInFamResult is an error triggered by type variable in
+      type family result that shadows type variable from left hand side
+
+      Example:
+
+        type family F a b c = b
+
+      Test cases: ghci/scripts/T6018ghcirnfail
+                  rename/should_fail/T6018rnfail
+  -}
+  TcRnShadowedTyVarNameInFamResult :: IdP GhcPs -> TcRnMessage
+
+  {-| TcRnIncorrectTyVarOnRhsOfInjCond is an error caused by a situation where the
+      left-hand side of an injectivity condition of a type family is not a variable
+      referring to the type family result.
+      See Note [Renaming injectivity annotation] for more details.
+
+      Example:
+
+        type family F a = r | a -> a
+
+      Test cases: ghci/scripts/T6018ghcirnfail
+                  rename/should_fail/T6018rnfail
+  -}
+  TcRnIncorrectTyVarOnLhsOfInjCond
+    :: IdP GhcRn -- Expected
+    -> LIdP GhcPs -- Actual
+    -> TcRnMessage
+
+  {-| TcRnUnknownTyVarsOnRhsOfInjCond is an error triggered by out-of-scope type
+      variables on the right-hand side of a of an injectivity condition of a type family
+
+      Example:
+
+        type family F a = res | res -> b
+
+      Test cases: ghci/scripts/T6018ghcirnfail
+                  rename/should_fail/T6018rnfail
+  -}
+  TcRnUnknownTyVarsOnRhsOfInjCond :: [Name] -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -4196,3 +4415,7 @@ data NonStandardGuards where
         Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
     => [LStmtLR GhcRn GhcRn body]
     -> NonStandardGuards
+
+data RuleLhsErrReason
+  = UnboundVariable RdrName NotInScopeError
+  | IllegalExpression

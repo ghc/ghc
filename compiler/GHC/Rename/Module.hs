@@ -38,7 +38,6 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
-import GHC.Tc.Errors.Ppr (pprScopeError)
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
@@ -56,7 +55,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Utils.Outputable
 import GHC.Data.Bag
-import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
+import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
@@ -75,11 +74,9 @@ import Control.Monad
 import Control.Arrow ( first )
 import Data.Foldable ( toList )
 import Data.List ( mapAccumL )
-import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..), head )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
-import Data.Function ( on )
 import GHC.Types.ConInfo (ConInfo, mkConInfo, conInfoFields)
 
 {- | @rnSourceDecl@ "renames" declarations.
@@ -619,14 +616,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                Just (L _ cls) -> Right cls
                Nothing        -> Left
                  ( getLocA head_ty'
-                 , mkTcRnUnknownMessage $ mkPlainError noHints $
-                   hang (text "Illegal head of an instance declaration:"
-                           <+> quotes (ppr head_ty'))
-                      2 (vcat [ text "Instance heads must be of the form"
-                              , nest 2 $ text "C ty_1 ... ty_n"
-                              , text "where" <+> quotes (char 'C')
-                                <+> text "is a class"
-                              ])
+                 , TcRnIllegalInstanceHeadDecl head_ty'
                  )
          -- ...finally, attempt to retrieve the class type constructor, failing
          -- with an error message if there isn't one. To avoid excessive
@@ -798,7 +788,7 @@ rnFamEqn doc atfi extra_kvars
                && not (cls_tkv `elemNameSet` lhs_bound_vars)
                     -- ...but not bound on the LHS.
              bad_tvs = filter improperly_scoped inst_head_tvs
-       ; unless (null bad_tvs) (badAssocRhs bad_tvs)
+       ; unless (null bad_tvs) (addErr (TcRnBadAssocRhs bad_tvs))
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
              -- See Note [Type family equations and occurrences]
@@ -844,14 +834,6 @@ rnFamEqn doc atfi extra_kvars
       []         -> panic "rnFamEqn.lhs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
-
-    badAssocRhs :: [Name] -> RnM ()
-    badAssocRhs ns
-      = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-           (hang (text "The RHS of an associated type declaration mentions"
-                      <+> text "out-of-scope variable" <> plural ns
-                      <+> pprWithCommas (quotes . ppr) ns)
-                   2 (text "All such variables must be bound on the LHS"))
 
 rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
@@ -1190,7 +1172,7 @@ simplistic solution above, as it fixes the egregious bug in #18470.
 rnSrcDerivDecl :: DerivDecl GhcPs -> RnM (DerivDecl GhcRn, FreeVars)
 rnSrcDerivDecl (DerivDecl _ ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
-       ; unless standalone_deriv_ok (addErr standaloneDerivErr)
+       ; unless standalone_deriv_ok (addErr TcRnUnexpectedStandaloneDerivingDecl)
        ; checkInferredVars ctxt inf_err nowc_ty
        ; (mds', ty', fvs) <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt ty
          -- Check if there are any nested `forall`s or contexts, which are
@@ -1207,12 +1189,6 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
     inf_err = Just (text "Inferred type variables are not allowed")
     loc = getLocA nowc_ty
     nowc_ty = dropWildCards ty
-
-standaloneDerivErr :: TcRnMessage
-standaloneDerivErr
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Illegal standalone deriving declaration")
-       2 (text "Use StandaloneDeriving to enable this extension")
 
 {-
 *********************************************************
@@ -1316,7 +1292,7 @@ checkValidRule rule_name ids lhs' fv_lhs'
 
                 -- Check that LHS vars are all bound
         ; let bad_vars = [var | var <- ids, not (var `elemNameSet` fv_lhs')]
-        ; mapM_ (addErr . badRuleVar rule_name) bad_vars }
+        ; mapM_ (addErr . TcRnUnusedVariableInRuleDecl rule_name) bad_vars }
 
 validRuleLhs :: [Name] -> LHsExpr GhcRn -> Maybe (HsExpr GhcRn)
 -- Nothing => OK
@@ -1353,27 +1329,15 @@ validRuleLhs foralls lhs
     checkl_es es = foldr (mplus . checkl_e) Nothing es
 -}
 
-badRuleVar :: FastString -> Name -> TcRnMessage
-badRuleVar name var
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [text "Rule" <+> doubleQuotes (ftext name) <> colon,
-         text "Forall'd variable" <+> quotes (ppr var) <+>
-                text "does not appear on left hand side"]
 
 badRuleLhsErr :: FastString -> LHsExpr GhcRn -> HsExpr GhcRn -> TcRnMessage
 badRuleLhsErr name lhs bad_e
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [text "Rule" <+> pprRuleName name <> colon,
-         nest 2 (vcat [err,
-                       text "in left-hand side:" <+> ppr lhs])]
-    $$
-    text "LHS must be of form (f e1 .. en) where f is not forall'd"
+  = TcRnIllegalRuleLhs errReason name lhs bad_e
   where
-    err =
-      case bad_e of
-        HsUnboundVar _ uv ->
-          pprScopeError uv $ notInScopeErr WL_Global uv
-        _ -> text "Illegal expression:" <+> ppr bad_e
+    errReason = case bad_e of
+      HsUnboundVar _ uv ->
+        UnboundVariable uv $ notInScopeErr WL_Global uv
+      _ -> IllegalExpression
 
 {- **************************************************************
          *                                                      *
@@ -1618,17 +1582,12 @@ rnStandaloneKindSignature
   -> RnM (StandaloneKindSig GhcRn, FreeVars)
 rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
-        ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
+        ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
         ; new_v <- lookupSigCtxtOccRnN (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
-  where
-    standaloneKiSigErr :: TcRnMessage
-    standaloneKiSigErr = mkTcRnUnknownMessage $ mkPlainError noHints $
-      hang (text "Illegal standalone kind signature")
-         2 (text "Did you mean to enable StandaloneKindSignatures?")
 
 depAnalTyClDecls :: GlobalRdrEnv
                  -> KindSig_FV_Env
@@ -1698,34 +1657,12 @@ rnRoleAnnots tc_names role_annots
            ; return $ RoleAnnotDecl noExtField tycon' roles }
 
 dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
-dupRoleAnnotErr list
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Duplicate role annotations for" <+>
-          quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
-       2 (vcat $ map pp_role_annot $ NE.toList sorted_list)
-    where
-      sorted_list = NE.sortBy cmp_loc list
-      ((L loc first_decl) :| _) = sorted_list
-
-      pp_role_annot (L loc decl) = hang (ppr decl)
-                                      4 (text "-- written at" <+> ppr (locA loc))
-
-      cmp_loc = SrcLoc.leftmost_smallest `on` getLocA
+dupRoleAnnotErr list@(L loc _ :| _)
+  = addErrAt (locA loc) (TcRnDuplicateRoleAnnot list)
 
 dupKindSig_Err :: NonEmpty (LStandaloneKindSig GhcPs) -> RnM ()
-dupKindSig_Err list
-  = addErrAt (locA loc) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Duplicate standalone kind signatures for" <+>
-          quotes (ppr $ standaloneKindSigName first_decl) <> colon)
-       2 (vcat $ map pp_kisig $ NE.toList sorted_list)
-    where
-      sorted_list = NE.sortBy cmp_loc list
-      ((L loc first_decl) :| _) = sorted_list
-
-      pp_kisig (L loc decl) =
-        hang (ppr decl) 4 (text "-- written at" <+> ppr (locA loc))
-
-      cmp_loc = SrcLoc.leftmost_smallest `on` getLocA
+dupKindSig_Err list@(L loc _ :| _)
+  = addErrAt (locA loc) (TcRnDuplicateKindSig list)
 
 {- Note [Role annotations in the renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1955,7 +1892,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
   = do  { -- DatatypeContexts (i.e., stupid contexts) can't be combined with
           -- GADT syntax. See Note [The stupid context] in GHC.Core.DataCon.
           checkTc (h98_style || null (fromMaybeContext context))
-                  (badGadtStupidTheta doc)
+                  (TcRnStupidThetaInGadt doc)
 
         -- Check restrictions on "type data" declarations.
         -- See Note [Type data declarations].
@@ -1991,7 +1928,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
     rn_derivs ds
       = do { deriv_strats_ok <- xoptM LangExt.DerivingStrategies
            ; failIfTc (lengthExceeds ds 1 && not deriv_strats_ok)
-               multipleDerivClausesErr
+               TcRnIllegalMultipleDerivClauses
            ; (ds', fvs) <- mapFvRn (rnLHsDerivingClause doc) ds
            ; return (ds', fvs) }
 
@@ -2213,21 +2150,10 @@ warnNoDerivStrat mds loc
   = do { dyn_flags <- getDynFlags
        ; case mds of
            Nothing ->
-             let dia = mkTcRnUnknownMessage $
-                   mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingDerivingStrategies) noHints $
-                     (if xopt LangExt.DerivingStrategies dyn_flags
-                       then no_strat_warning
-                       else no_strat_warning $+$ deriv_strat_nenabled
-                     )
-             in addDiagnosticAt loc dia
+             addDiagnosticAt loc $ TcRnNoDerivStratSpecified
+              (xopt LangExt.DerivingStrategies dyn_flags)
            _ -> pure ()
        }
-  where
-    no_strat_warning :: SDoc
-    no_strat_warning = text "No deriving strategy specified. Did you want stock"
-                       <> text ", newtype, or anyclass?"
-    deriv_strat_nenabled :: SDoc
-    deriv_strat_nenabled = text "Use DerivingStrategies to specify a strategy."
 
 rnLHsDerivingClause :: HsDocContext -> LHsDerivingClause GhcPs
                     -> RnM (LHsDerivingClause GhcRn, FreeVars)
@@ -2291,7 +2217,7 @@ rnLDerivStrategy doc mds thing_inside
             = LangExt.DerivingStrategies
 
       unlessXOptM extNeeded $
-        failWith $ illegalDerivStrategyErr ds
+        failWith $ TcRnIllegalDerivStrategy ds
 
       case ds of
         StockStrategy    _ -> boring_case (StockStrategy noExtField)
@@ -2318,32 +2244,6 @@ rnLDerivStrategy doc mds thing_inside
     boring_case ds = do
       (thing, fvs) <- thing_inside
       pure (ds, thing, fvs)
-
-badGadtStupidTheta :: HsDocContext -> TcRnMessage
-badGadtStupidTheta _
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [text "No context is allowed on a GADT-style data declaration",
-          text "(You can put a context on each constructor, though.)"]
-
-illegalDerivStrategyErr :: DerivStrategy GhcPs -> TcRnMessage
-illegalDerivStrategyErr ds
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal deriving strategy" <> colon <+> derivStrategyName ds
-         , text enableStrategy ]
-
-  where
-    enableStrategy :: String
-    enableStrategy
-      | ViaStrategy{} <- ds
-      = "Use DerivingVia to enable this extension"
-      | otherwise
-      = "Use DerivingStrategies to enable this extension"
-
-multipleDerivClausesErr :: TcRnMessage
-multipleDerivClausesErr
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Illegal use of multiple, consecutive deriving clauses"
-         , text "Use DerivingStrategies to allow this" ]
 
 rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
                         --             inside an *class decl* for cls
@@ -2407,11 +2307,8 @@ rnFamResultSig doc (TyVarSig _ tvbndr)
           rdr_env <- getLocalRdrEnv
        ;  let resName = hsLTyVarName tvbndr
        ;  when (resName `elemLocalRdrEnv` rdr_env) $
-          addErrAt (getLocA tvbndr) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                     (hsep [ text "Type variable", quotes (ppr resName) <> comma
-                           , text "naming a type family result,"
-                           ] $$
-                      text "shadows an already bound type variable")
+          addErrAt (getLocA tvbndr) $
+            TcRnShadowedTyVarNameInFamResult resName
 
        ; bindLHsTyVarBndr doc Nothing -- This might be a lie, but it's used for
                                       -- scoping checks that are irrelevant here
@@ -2481,20 +2378,13 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
    -- not-in-scope variables) don't check the validity of injectivity
    -- annotation. This gives better error messages.
    ; when (noRnErrors && not lhsValid) $
-        addErrAt (getLocA injFrom) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-              ( vcat [ text $ "Incorrect type variable on the LHS of "
-                           ++ "injectivity condition"
-              , nest 5
-              ( vcat [ text "Expected :" <+> ppr resName
-                     , text "Actual   :" <+> ppr injFrom ])])
+        addErrAt (getLocA injFrom) $
+          TcRnIncorrectTyVarOnLhsOfInjCond resName injFrom
 
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
-         ; addErrAt (locA srcSpan) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                        ( hsep
-                        [ text "Unknown type variable" <> plural errorVars
-                        , text "on the RHS of injectivity condition:"
-                        , interpp'SP errorVars ] ) }
+         ; addErrAt (locA srcSpan) $
+              TcRnUnknownTyVarsOnRhsOfInjCond errorVars }
 
    ; return injDecl' }
 
@@ -2783,9 +2673,7 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
        ; return (gp, Just (splice, ds)) }
   where
     badImplicitSplice :: TcRnMessage
-    badImplicitSplice = mkTcRnUnknownMessage $ mkPlainError noHints $
-                        text "Parse error: module header, import declaration"
-                     $$ text "or top-level declaration expected."
+    badImplicitSplice = TcRnBadImplicitSplice
                      -- The compiler should suggest the above, and not using
                      -- TemplateHaskell since the former suggestion is more
                      -- relevant to the larger base of users.

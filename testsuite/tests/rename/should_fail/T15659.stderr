@@ -1,5 +1,5 @@
 
-T15659.hs:3:11: error:
+T15659.hs:3:11: error: [GHC-63294]
     Rule "test":
       Not in scope: ‘f’
       in left-hand side: f x

@@ -1,4 +1,4 @@
 
-T10598_fail5.hs:3:1: error:
+T10598_fail5.hs:3:1: error: [GHC-30281]
     Illegal use of multiple, consecutive deriving clauses
-    Use DerivingStrategies to allow this
+    Suggested fix: Perhaps you intended to use DerivingStrategies

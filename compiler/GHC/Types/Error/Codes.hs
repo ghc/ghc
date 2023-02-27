@@ -514,6 +514,22 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
   GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = 36038
+  GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = 12222
+  GhcDiagnosticCode "TcRnUnexpectedStandaloneDerivingDecl"          = 95159
+  GhcDiagnosticCode "TcRnUnusedVariableInRuleDecl"                  = 65669
+  GhcDiagnosticCode "TcRnUnexpectedStandaloneKindSig"               = 45906
+  GhcDiagnosticCode "TcRnIllegalRuleLhs"                            = 63294
+  GhcDiagnosticCode "TcRnBadAssocRhs"                               = 53634
+  GhcDiagnosticCode "TcRnDuplicateRoleAnnot"                        = 97170
+  GhcDiagnosticCode "TcRnDuplicateKindSig"                          = 43371
+  GhcDiagnosticCode "TcRnIllegalDerivStrategy"                      = 87139
+  GhcDiagnosticCode "TcRnIllegalMultipleDerivClauses"               = 30281
+  GhcDiagnosticCode "TcRnNoDerivStratSpecified"                     = 55631
+  GhcDiagnosticCode "TcRnStupidThetaInGadt"                         = 18403
+  GhcDiagnosticCode "TcRnBadImplicitSplice"                         = 25277
+  GhcDiagnosticCode "TcRnShadowedTyVarNameInFamResult"              = 99412
+  GhcDiagnosticCode "TcRnIncorrectTyVarOnLhsOfInjCond"              = 88333
+  GhcDiagnosticCode "TcRnUnknownTyVarsOnRhsOfInjCond"               = 48254
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
