@@ -6,7 +6,7 @@ test('HooplPostorder',
 test('cmp64',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    js_skip
+     ,    req_cmm
      ],
      multi_compile_and_run,
      ['cmp64', [('cmp64_cmm.cmm', '')], '-O'])
@@ -21,7 +21,7 @@ test('cmp64',
 test('ByteSwitch',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    js_skip
+     ,    req_cmm
      ],
      multi_compile_and_run,
      ['ByteSwitch', [('ByteSwitch_cmm.cmm', '')], ''])
@@ -29,7 +29,7 @@ test('ByteSwitch',
 test('T22871',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    omit_ways(['ghci'])
-     ,    js_skip
+     ,    req_cmm
      ,    when(arch('i386'), skip) # x86 NCG panics with "iselExpr64(i386)"
      ],
      multi_compile_and_run,

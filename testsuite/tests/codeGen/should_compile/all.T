@@ -29,7 +29,7 @@ test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, 
 
 test('debug',
   [ normal,
-    js_skip # requires Cmm
+    req_cmm
   ],
   makefile_test, [])
 
@@ -72,7 +72,7 @@ test('T17334', [ unless(have_ncg() and (arch('x86_64') or arch('i386')), skip)
                ], compile, ['-O'])
 
 test('T14373',
-      [ js_skip # JS backend doesn't produce Cmm
+      [ req_cmm
       ],
      multimod_compile_filter, ['T14373', '-fasm -O2 -c -ddump-cmm-from-stg',
      r'grep -e "const T14373\.._closure+.;"'])
@@ -80,17 +80,17 @@ test('T14373',
 switch_skeleton_only = r'grep -e "switch \[" -e "case " -e "default: " | sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g"'
 
 test('T14373a',
-      [ js_skip # JS backend doesn't produce Cmm
+      [ req_cmm
       ],
      multimod_compile_filter, ['T14373a', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
 test('T14373b',
-      [ js_skip # JS backend doesn't produce Cmm
+      [ req_cmm
       ],
      multimod_compile_filter, ['T14373b', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
 test('T14373c',
-      [ js_skip # JS backend doesn't produce Cmm
+      [ req_cmm
       ],
      multimod_compile_filter, ['T14373c', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_only])
@@ -99,7 +99,7 @@ switch_skeleton_and_entries_only = (r'grep -e "switch \[" -e "case " -e "default
                                     r'| sed -e "s|\] .*|\]|g" -e "s|goto .*|goto |g" -e "s|R1 = .*_closure+2;.*|R1 = XYZ_closure+2;|g" -e "s|//.*|//|g"')
 
 test('T14373d',
-      [ js_skip # JS backend doesn't produce Cmm
+      [ req_cmm
       ],
      multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_and_entries_only])

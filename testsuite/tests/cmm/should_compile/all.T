@@ -1,5 +1,5 @@
 setTestOpts(
-  [ js_skip # Cmm not supported by the JS backend
+  [ req_cmm
   ])
 
 test('selfloop', [cmm_src], compile, ['-no-hs-main'])
