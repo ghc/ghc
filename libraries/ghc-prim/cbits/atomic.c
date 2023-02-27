@@ -308,8 +308,8 @@ hs_cmpxchg32(StgWord x, StgWord old, StgWord new)
   return __sync_val_compare_and_swap((volatile StgWord32 *) x, (StgWord32) old, (StgWord32) new);
 }
 
-extern StgWord hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new);
-StgWord
+extern StgWord64 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new);
+StgWord64
 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 {
   return __sync_val_compare_and_swap((volatile StgWord64 *) x, old, new);
