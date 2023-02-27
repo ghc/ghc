@@ -3,6 +3,9 @@ import Data.Int
 
 main :: IO ()
 main = do
+  -- This test aims to track #18964, the fix of which had to be reverted in the
+  -- wake of #23021. The comments below apply to a world where #18964 is fixed.
+  --------------------
   -- drop should fuse away and the program should consume O(1) space
   -- If fusion fails, this allocates about 640MB.
   print $ sum $ drop 10 [0..10000000::Int64]

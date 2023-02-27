@@ -411,4 +411,7 @@ test('T21839r',
     compile_and_run,
     ['-O'])
 
+# #18964 should be marked expect_broken, but it's still useful to track that
+# perf doesn't regress further, so it is not marked as such.
 test('T18964', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O'])
+test('T23021', [collect_stats('bytes allocated', 1), only_ways(['normal'])], compile_and_run, ['-O2'])
