@@ -886,22 +886,11 @@ takeWhileFB p c n = \x r -> if p x then x `c` r else n
 -- []
 -- >>> dropWhile (< 0) [1,2,3]
 -- [1,2,3]
-{-# NOINLINE [1] dropWhile #-}
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
-
-{-# INLINE [0] dropWhileFB #-} -- See Note [Inline FB functions]
-dropWhileFB :: (a -> Bool) -> (a -> b -> b) -> b -> a -> (Bool -> b) -> Bool -> b
-dropWhileFB p c _n x xs = \drp -> if drp && p x then xs True else x `c` xs False
-
-{-# RULES
-"dropWhile"     [~1] forall p xs. dropWhile p xs =
-                                build (\c n -> foldr (dropWhileFB p c n) (flipSeq n) xs True)
-"dropWhileList" [1]  forall p xs. foldr (dropWhileFB p (:) []) (flipSeq []) xs True = dropWhile p xs
- #-}
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
 -- of length @n@, or @xs@ itself if @n >= 'length' xs@.
@@ -998,31 +987,17 @@ drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
 #else /* hack away */
-{-# INLINE[1] drop #-} -- Why [1]? See justification on take! => RULES
+{-# INLINE drop #-}
 drop n ls
   | n <= 0     = ls
   | otherwise  = unsafeDrop n ls
-
--- A version of drop that drops the whole list if given an argument
--- less than 1
-{-# NOINLINE [0] unsafeDrop #-} -- See Note [Inline FB functions]
-unsafeDrop :: Int -> [a] -> [a]
-unsafeDrop !_ []     = []
-unsafeDrop 1  (_:xs) = xs
-unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
-
-{-# RULES
-"drop"     [~1] forall n xs . drop n xs =
-  build (\c nil -> if n <= 0
-                   then foldr c nil xs
-                   else foldr (dropFB c nil) (flipSeq nil) xs n)
-"unsafeDropList"  [1] forall n xs . foldr (dropFB (:) []) (flipSeq []) xs n
-                                        = unsafeDrop n xs
- #-}
-
-{-# INLINE [0] dropFB #-} -- See Note [Inline FB functions]
-dropFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
-dropFB c _n x xs = \ m -> if m <= 0 then x `c` xs m else xs (m-1)
+  where
+    -- A version of drop that drops the whole list if given an argument
+    -- less than 1
+    unsafeDrop :: Int -> [a] -> [a]
+    unsafeDrop !_ []     = []
+    unsafeDrop 1  (_:xs) = xs
+    unsafeDrop m  (_:xs) = unsafeDrop (m - 1) xs
 #endif
 
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
