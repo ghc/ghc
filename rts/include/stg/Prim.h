@@ -41,7 +41,7 @@ StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val);
 StgWord hs_cmpxchg8(StgWord x, StgWord old, StgWord new_);
 StgWord hs_cmpxchg16(StgWord x, StgWord old, StgWord new_);
 StgWord hs_cmpxchg32(StgWord x, StgWord old, StgWord new_);
-StgWord hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new_);
+StgWord64 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new_);
 StgWord hs_atomicread8(StgWord x);
 StgWord hs_atomicread16(StgWord x);
 StgWord hs_atomicread32(StgWord x);
