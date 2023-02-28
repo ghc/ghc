@@ -44,6 +44,13 @@ import Control.Monad   ( zipWithM )
 %*                                                                      *
 %************************************************************************
 
+This module does coercion optimisation.  See the paper
+
+   Evidence normalization in Systtem FV (RTA'13)
+   https://simon.peytonjones.org/evidence-normalization/
+
+The paper is also in the GHC repo, in docs/opt-coercion.
+
 Note [Optimising coercion optimisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Looking up a coercion's role or kind is linear in the size of the
