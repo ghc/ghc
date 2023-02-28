@@ -581,10 +581,7 @@ toIfaceTickish :: CoreTickish -> Maybe IfaceTickish
 toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
 toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
 toIfaceTickish (SourceNote src names)  = Just (IfaceSource src names)
-toIfaceTickish (Breakpoint _ i names)  = Just (IfaceBreak i (map go names))
-  where
-    go v | isExternalName (idName v) = Left (idName v)
-    go v = Right (occNameFS (getOccName v))
+toIfaceTickish (Breakpoint {})         = Nothing
    -- Ignore breakpoints, since they are relevant only to GHCi, and
    -- should not be serialised (#8333)
 

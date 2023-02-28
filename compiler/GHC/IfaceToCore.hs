@@ -130,7 +130,6 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
-import Language.Haskell.Syntax.Extension
 
 {-
 This module takes
@@ -1638,14 +1637,10 @@ tcIfaceExpr (IfaceTick tickish expr) = do
         return (Tick tickish' expr')
 
 -------------------------
-tcIfaceTickish :: IfaceTickish -> IfL CoreTickish
+tcIfaceTickish :: IfaceTickish -> IfM lcl CoreTickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
-tcIfaceTickish (IfaceBreak i names)   = Breakpoint noExtField i <$> mapM go names
-  where
-  go (Left name) = tcIfaceExtId name
-  go (Right lcl_name) = tcIfaceLclId lcl_name
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal
