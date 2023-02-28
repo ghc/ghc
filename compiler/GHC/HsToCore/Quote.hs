@@ -1899,12 +1899,18 @@ rep_bind (L loc (FunBind
                    fun_matches = MG { mg_alts
                            = (L _ [L _ (Match
                                    { m_pats = []
-                                   , m_grhss = GRHSs _ guards wheres }
-                                      )]) } }))
+                                   , m_grhss = GRHSs _ guards wheres
+                                   -- For a variable declaration I'm pretty
+                                   -- sure we always have a FunRhs
+                                   , m_ctxt = FunRhs { mc_strictness = strictessAnn }
+                                   } )]) } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupNBinder fn
-        ; p    <- repPvar fn'
+        ; p    <- repPvar fn' >>= case strictessAnn of
+                                    SrcLazy -> repPtilde
+                                    SrcStrict -> repPbang
+                                    NoSrcStrict -> pure
         ; ans  <- repVal p guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
         ; return (locA loc, ans') }
