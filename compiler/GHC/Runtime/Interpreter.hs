@@ -11,7 +11,6 @@ module GHC.Runtime.Interpreter
   ( module GHC.Runtime.Interpreter.Types
 
   -- * High-level interface to the interpreter
-  , BCOOpts (..)
   , evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
   , abandonStmt
@@ -329,26 +328,11 @@ mkCostCentres :: Interp -> String -> [(String,String)] -> IO [RemotePtr CostCent
 mkCostCentres interp mod ccs =
   interpCmd interp (MkCostCentres mod ccs)
 
-newtype BCOOpts = BCOOpts
-  { bco_n_jobs :: Int -- ^ Number of parallel jobs doing BCO serialization
-  }
-
 -- | Create a set of BCOs that may be mutually recursive.
-createBCOs :: Interp -> BCOOpts -> [ResolvedBCO] -> IO [HValueRef]
-createBCOs interp opts rbcos = do
-  let n_jobs = bco_n_jobs opts
-  -- Serializing ResolvedBCO is expensive, so if we support doing it in parallel
-  if (n_jobs == 1)
-    then
-      interpCmd interp (CreateBCOs [runPut (put rbcos)])
-    else do
-      old_caps <- getNumCapabilities
-      if old_caps == n_jobs
-         then void $ evaluate puts
-         else bracket_ (setNumCapabilities n_jobs)
-                       (setNumCapabilities old_caps)
-                       (void $ evaluate puts)
-      interpCmd interp (CreateBCOs puts)
+createBCOs :: Interp -> [ResolvedBCO] -> IO [HValueRef]
+createBCOs interp rbcos = do
+  -- Serializing ResolvedBCO is expensive, so we do it in parallel
+  interpCmd interp (CreateBCOs puts)
  where
   puts = parMap doChunk (chunkList 100 rbcos)
 

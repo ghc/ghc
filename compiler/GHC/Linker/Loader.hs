@@ -43,7 +43,6 @@ import GHC.Driver.Phases
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Ppr
-import GHC.Driver.Config
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Finder
 
@@ -598,8 +597,7 @@ loadExpr interp hsc_env span root_ul_bco = do
             nobreakarray = error "no break array"
             bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
         resolved <- linkBCO interp le bco_ix nobreakarray root_ul_bco
-        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
-        [root_hvref] <- createBCOs interp bco_opts [resolved]
+        [root_hvref] <- createBCOs interp [resolved]
         fhv <- mkFinalizedHValue interp root_hvref
         return (pls, fhv)
   where
@@ -946,8 +944,7 @@ loadDecls interp hsc_env span cbc@CompiledByteCode{..} = do
                        , addr_env = plusNameEnv (addr_env le) bc_strs }
 
           -- Link the necessary packages and linkables
-          bco_opts <- initBCOOpts (hsc_dflags hsc_env)
-          new_bindings <- linkSomeBCOs bco_opts interp le2 [cbc]
+          new_bindings <- linkSomeBCOs interp le2 [cbc]
           nms_fhvs <- makeForeignNamedHValueRefs interp new_bindings
           let ce2  = extendClosureEnv (closure_env le2) nms_fhvs
               !pls2 = pls { linker_env = le2 { closure_env = ce2 } }
@@ -995,7 +992,6 @@ loadModuleLinkables interp hsc_env pls linkables
 
         let (objs, bcos) = partition isObjectLinkable
                               (concatMap partitionLinkable linkables)
-        bco_opts <- initBCOOpts (hsc_dflags hsc_env)
 
                 -- Load objects first; they can't depend on BCOs
         (pls1, ok_flag) <- loadObjects interp hsc_env pls objs
@@ -1003,7 +999,7 @@ loadModuleLinkables interp hsc_env pls linkables
         if failed ok_flag then
                 return (pls1, Failed)
           else do
-                pls2 <- dynLinkBCOs bco_opts interp pls1 bcos
+                pls2 <- dynLinkBCOs interp pls1 bcos
                 return (pls2, Succeeded)
 
 
@@ -1156,8 +1152,8 @@ rmDupLinkables already ls
   ********************************************************************* -}
 
 
-dynLinkBCOs :: BCOOpts -> Interp -> LoaderState -> [Linkable] -> IO LoaderState
-dynLinkBCOs bco_opts interp pls bcos = do
+dynLinkBCOs :: Interp -> LoaderState -> [Linkable] -> IO LoaderState
+dynLinkBCOs interp pls bcos = do
 
         let (bcos_loaded', new_bcos) = rmDupLinkables (bcos_loaded pls) bcos
             pls1                     = pls { bcos_loaded = bcos_loaded' }
@@ -1173,7 +1169,7 @@ dynLinkBCOs bco_opts interp pls bcos = do
             ae2 = foldr plusNameEnv (addr_env le1) (map bc_strs cbcs)
             le2 = le1 { itbl_env = ie2, addr_env = ae2 }
 
-        names_and_refs <- linkSomeBCOs bco_opts interp le2 cbcs
+        names_and_refs <- linkSomeBCOs interp le2 cbcs
 
         -- We only want to add the external ones to the ClosureEnv
         let (to_add, to_drop) = partition (isExternalName.fst) names_and_refs
@@ -1187,8 +1183,7 @@ dynLinkBCOs bco_opts interp pls bcos = do
         return $! pls1 { linker_env = le2 { closure_env = ce2 } }
 
 -- Link a bunch of BCOs and return references to their values
-linkSomeBCOs :: BCOOpts
-             -> Interp
+linkSomeBCOs :: Interp
              -> LinkerEnv
              -> [CompiledByteCode]
              -> IO [(Name,HValueRef)]
@@ -1196,7 +1191,7 @@ linkSomeBCOs :: BCOOpts
                         -- the incoming unlinked BCOs.  Each gives the
                         -- value of the corresponding unlinked BCO
 
-linkSomeBCOs bco_opts interp le mods = foldr fun do_link mods []
+linkSomeBCOs interp le mods = foldr fun do_link mods []
  where
   fun CompiledByteCode{..} inner accum =
     case bc_breaks of
@@ -1211,7 +1206,7 @@ linkSomeBCOs bco_opts interp le mods = foldr fun do_link mods []
         bco_ix = mkNameEnv (zip names [0..])
     resolved <- sequence [ linkBCO interp le bco_ix breakarray bco
                          | (breakarray, bco) <- flat ]
-    hvrefs <- createBCOs interp bco_opts resolved
+    hvrefs <- createBCOs interp resolved
     return (zip names hvrefs)
 
 -- | Useful to apply to the result of 'linkSomeBCOs'
