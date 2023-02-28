@@ -124,7 +124,7 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         sORTKind_maybe, typeTypeOrConstraint,
-        typeLevity_maybe,
+        typeLevity_maybe, tyConIsTYPEorCONSTRAINT,
         isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep, runtimeRepLevity_maybe,
         isBoxedRuntimeRep,
@@ -2638,12 +2638,17 @@ isPredTy ty = case typeTypeOrConstraint ty of
                   TypeLike       -> False
                   ConstraintLike -> True
 
------------------------------------------
 -- | Does this classify a type allowed to have values? Responds True to things
 -- like *, TYPE Lifted, TYPE IntRep, TYPE v, Constraint.
 isTYPEorCONSTRAINT :: Kind -> Bool
 -- ^ True of a kind `TYPE _` or `CONSTRAINT _`
 isTYPEorCONSTRAINT k = isJust (sORTKind_maybe k)
+
+tyConIsTYPEorCONSTRAINT :: TyCon -> Bool
+tyConIsTYPEorCONSTRAINT tc
+  = tc_uniq == tYPETyConKey || tc_uniq == cONSTRAINTTyConKey
+  where
+    !tc_uniq = tyConUnique tc
 
 isConstraintLikeKind :: Kind -> Bool
 -- True of (CONSTRAINT _)
