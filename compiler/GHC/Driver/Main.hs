@@ -204,7 +204,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Uniques ( mkPseudoUniqueE )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
+import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos, LambdaFormInfo(..))
 
 import GHC.Cmm
 import GHC.Cmm.Info.Build
@@ -230,6 +230,7 @@ import GHC.Types.Id
 import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
+import GHC.Types.Name.Env      ( mkNameEnv )
 import GHC.Types.Var.Env       ( emptyTidyEnv )
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
@@ -1872,7 +1873,19 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             JSCodeOutput ->
               do
               let js_config = initStgToJSConfig dflags
-                  cmm_cg_infos  = Nothing
+
+                  -- The JavaScript backend does not create CmmCgInfos like the Cmm backend,
+                  -- but it is needed for writing the interface file. Here we compute a very
+                  -- conservative but correct value.
+                  lf_infos (StgTopLifted (StgNonRec b _)) = [(idName b, LFUnknown True)]
+                  lf_infos (StgTopLifted (StgRec bs))     = map (\(b,_) -> (idName b, LFUnknown True)) bs
+                  lf_infos (StgTopStringLit b _)          = [(idName b, LFUnlifted)]
+
+                  cmm_cg_infos  = CmmCgInfos
+                    { cgNonCafs = mempty
+                    , cgLFInfos = mkNameEnv (concatMap lf_infos stg_binds)
+                    , cgIPEStub = mempty
+                    }
                   stub_c_exists = Nothing
                   foreign_fps   = []
 
@@ -1881,7 +1894,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
               -- do the unfortunately effectual business
               stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs0 cost_centre_info output_filename
-              return (output_filename, stub_c_exists, foreign_fps, Just stg_cg_infos, cmm_cg_infos)
+              return (output_filename, stub_c_exists, foreign_fps, Just stg_cg_infos, Just cmm_cg_infos)
 
             _          ->
               do

@@ -278,7 +278,7 @@ test('T13604a',
   ], makefile_test, [])
 # omitting hpc and profasm because they affect the
 # inlining and unfoldings
-test('inline-check', [omit_ways(['hpc', 'profasm']), js_broken(22576)]
+test('inline-check', [omit_ways(['hpc', 'profasm'])]
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
 
