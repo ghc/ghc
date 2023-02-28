@@ -3105,7 +3105,7 @@ etaExpandToJoinPointRule join_arity rule@(Rule { ru_bndrs = bndrs, ru_rhs = rhs
 -- Adds as many binders as asked for; assumes expr is not a lambda
 etaBodyForJoinPoint :: Int -> CoreExpr -> ([CoreBndr], CoreExpr)
 etaBodyForJoinPoint need_args body
-  = go need_args (exprType body) (init_subst body) [] body
+  = go need_args body_ty (mkEmptySubst in_scope) [] body
   where
     go 0 _  _     rev_bs e
       = (reverse rev_bs, e)
@@ -3124,9 +3124,16 @@ etaBodyForJoinPoint need_args body
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
                                          ppr body $$ ppr (exprType body)
 
-    init_subst e = mkEmptySubst (mkInScopeSet (exprFreeVars e))
-
-
+    body_ty = exprType body
+    in_scope = mkInScopeSet (exprFreeVars body `unionVarSet` tyCoVarsOfType body_ty)
+    -- in_scope is a bit tricky.
+    -- - We are wrapping `body` in some value lambdas, so must not shadow
+    --   any free vars of `body`
+    -- - We are wrapping `body` in some type lambdas, so must not shadow any
+    --   tyvars in body_ty.  Example: body is just a variable
+    --            (g :: forall (a::k). T k a -> Int)
+    --   We must not shadown that `k` when adding the /\a. So treat the free vars
+    --   of body_ty as in-scope.  Showed up in #23026.
 
 --------------
 freshEtaId :: Int -> Subst -> Scaled Type -> (Subst, Id)
