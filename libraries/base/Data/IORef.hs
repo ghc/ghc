@@ -85,21 +85,45 @@ modifyIORef' ref f = do
 -- is recommended that if you need to do anything more complicated
 -- then using 'Control.Concurrent.MVar.MVar' instead is a good idea.
 --
--- 'atomicModifyIORef' does not apply the function strictly.  This is important
--- to know even if all you are doing is replacing the value.  For example, this
--- will leak memory:
+-- Conceptually,
 --
--- >ref <- newIORef '1'
--- >forever $ atomicModifyIORef ref (\_ -> ('2', ()))
+-- @
+-- atomicModifyIORef ref f = do
+--   -- Begin atomic block
+--   old <- 'readIORef' ref
+--   let r = f old
+--       new = fst r
+--   'writeIORef' ref new
+--   -- End atomic block
+--   case r of
+--     (_new, res) -> pure res
+-- @
 --
--- Use 'atomicModifyIORef'' or 'atomicWriteIORef' to avoid this problem.
+-- The actions in the section labeled \"atomic block\" are not subject to
+-- interference from other threads. In particular, it is impossible for the
+-- value in the 'IORef' to change between the 'readIORef' and 'writeIORef'
+-- invocations.
 --
--- This function imposes a memory barrier, preventing reordering;
--- see "Data.IORef#memmodel" for details.
+-- The user-supplied function is applied to the value stored in the 'IORef',
+-- yielding a new value to store in the 'IORef' and a value to return. After
+-- the new value is (lazily) stored in the 'IORef', @atomicModifyIORef@ forces
+-- the result pair, but does not force either component of the result. To force
+-- /both/ components, use 'atomicModifyIORef''.
+--
+-- Note that
+--
+-- @atomicModifyIORef ref (\_ -> undefined)@
+--
+-- will raise an exception in the calling thread, but will /also/
+-- install the bottoming value in the 'IORef', where it may be read by
+-- other threads.
+--
+-- This function imposes a memory barrier, preventing reordering around the
+-- \"atomic block\"; see "Data.IORef#memmodel" for details.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef ref f = do
-  (_old, ~(_new, res)) <- atomicModifyIORef2 ref f
+  (_old, (_new, res)) <- atomicModifyIORef2 ref f
   pure res
 
 -- | Variant of 'writeIORef'. The prefix "atomic" relates to a fact that

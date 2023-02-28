@@ -134,9 +134,28 @@ atomicSwapIORef (IORef (STRef ref)) new = IO $ \s ->
 
 data Box a = Box a
 
--- | Strict version of 'Data.IORef.atomicModifyIORef'. This forces both
--- the value stored in the 'IORef' and the value returned. The new value
--- is installed in the 'IORef' before the returned value is forced.
+-- | A strict version of 'Data.IORef.atomicModifyIORef'.  This forces both the
+-- value stored in the 'IORef' and the value returned.
+--
+-- Conceptually,
+--
+-- @
+-- atomicModifyIORef' ref f = do
+--   -- Begin atomic block
+--   old <- 'readIORef' ref
+--   let r = f old
+--       new = fst r
+--   'writeIORef' ref new
+--   -- End atomic block
+--   case r of
+--     (!_new, !res) -> pure res
+-- @
+--
+-- The actions in the \"atomic block\" are not subject to interference
+-- by other threads. In particular, the value in the 'IORef' cannot
+-- change between the 'readIORef' and 'writeIORef' invocations.
+--
+-- The new value is installed in the 'IORef' before either value is forced.
 -- So
 --
 -- @atomicModifyIORef' ref (\x -> (x+1, undefined))@
@@ -144,8 +163,18 @@ data Box a = Box a
 -- will increment the 'IORef' and then throw an exception in the calling
 -- thread.
 --
--- This function imposes a memory barrier, preventing reordering;
--- see "Data.IORef#memmodel" for details.
+-- @atomicModifyIORef' ref (\x -> (undefined, x))@
+--
+-- and
+--
+-- @atomicModifyIORef' ref (\_ -> undefined)@
+--
+-- will each raise an exception in the calling thread, but will /also/
+-- install the bottoming value in the 'IORef', where it may be read by
+-- other threads.
+--
+-- This function imposes a memory barrier, preventing reordering around
+-- the \"atomic block\"; see "Data.IORef#memmodel" for details.
 --
 -- @since 4.6.0.0
 atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
