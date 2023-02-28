@@ -903,19 +903,30 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     con1 = assert (not (null cons_w_field)) $ head cons_w_field
 
     -- Selector type; Note [Polymorphic selectors]
-    field_ty    = conLikeFieldType con1 lbl
-    data_tv_set = tyCoVarsOfTypes (data_ty : req_theta)
-    data_tvbs   = filter (\tvb -> binderVar tvb `elemVarSet` data_tv_set) $
-                  conLikeUserTyVarBinders con1
+    (univ_tvs, _, _, _, req_theta, _, data_ty) = conLikeFullSig con1
+
+    field_ty     = conLikeFieldType con1 lbl
+    field_ty_tvs = tyCoVarsOfType field_ty
+    data_ty_tvs  = tyCoVarsOfType data_ty
+    sel_tvs      = field_ty_tvs `unionVarSet` data_ty_tvs
+    sel_tvbs     = filter (\tvb -> binderVar tvb `elemVarSet` sel_tvs) $
+                   conLikeUserTyVarBinders con1
 
     -- is_naughty: see Note [Naughty record selectors]
-    is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
-              || has_sel == NoFieldSelectors  -- No field selectors => all are naughty
-                                              -- thus suppressing making a binding
-                                              -- A slight hack!
+    is_naughty = not ok_scoping || no_selectors
+    ok_scoping = case con1 of
+                   RealDataCon {} -> field_ty_tvs `subVarSet` data_ty_tvs
+                   PatSynCon {}   -> field_ty_tvs `subVarSet` mkVarSet univ_tvs
+       -- In the PatSynCon case, the selector type is (data_ty -> field_ty), but
+       -- fvs(data_ty) are all universals (see Note [Pattern synonym result type] in
+       -- GHC.Core.PatSyn, so no need to check them.
+
+    no_selectors   = has_sel == NoFieldSelectors  -- No field selectors => all are naughty
+                                                  -- thus suppressing making a binding
+                                                  -- A slight hack!
 
     sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
-           | otherwise  = mkForAllTys (tyVarSpecToBinders data_tvbs) $
+           | otherwise  = mkForAllTys (tyVarSpecToBinders sel_tvbs) $
                           -- Urgh! See Note [The stupid context] in GHC.Core.DataCon
                           mkPhiTy (conLikeStupidTheta con1) $
                           -- req_theta is empty for normal DataCon
@@ -926,7 +937,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                             -- fields in all the constructor have multiplicity Many.
                           field_ty
 
-    -- Make the binding: sel (C2 { fld = x }) = x
+    -- make the binding: sel (C2 { fld = x }) = x
     --                   sel (C7 { fld = x }) = x
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind Generated sel_lname alts
@@ -975,8 +986,6 @@ mkOneRecordSelector all_cons idDetails fl has_sel
       = con `elem` cons_w_field || dataConCannotMatch inst_tys dc
       where
         inst_tys = dataConResRepTyArgs dc
-
-    (_, _, _, _, req_theta, _, data_ty) = conLikeFullSig con1
 
     unit_rhs = mkLHsTupleExpr [] noExtField
     msg_lit = HsStringPrim NoSourceText (bytesFS (field_label lbl))
@@ -1036,35 +1045,41 @@ so that if the user tries to use 'x' as a selector we can bleat
 helpfully, rather than saying unhelpfully that 'x' is not in scope.
 Hence the sel_naughty flag, to identify record selectors that don't really exist.
 
-In general, a field is "naughty" if its type mentions a type variable that
-isn't in
-  * the (original, user-written) result type of the constructor, or
-  * the "required theta" for the constructor
-
-Note that this *allows* GADT record selectors (Note [GADT record
-selectors]) whose types may look like sel :: T [a] -> a
-
-The "required theta" part is illustrated by test patsyn/should_run/records_run
-where we have
-
-  pattern ReadP :: Read a => a -> String
-  pattern ReadP {readp} <- (read -> readp)
-
-The selector is defined like this:
-
-  $selreadp :: ReadP a => String -> a
-  $selReadP s = readp s
-
-Perfectly fine!  The (ReadP a) constraint lets us contructor a value
-of type 'a' from a bare String.  NB: "required theta" is empty for
-data cons (see conLikeFullSig), so this reasoning only bites for
-patttern synonyms.
-
 For naughty selectors we make a dummy binding
    sel = ()
 so that the later type-check will add them to the environment, and they'll be
 exported.  The function is never called, because the typechecker spots the
 sel_naughty field.
+
+To determine naughtiness we distingish two cases:
+
+* For RealDataCons, a field is "naughty" if its type mentions a
+  type variable that isn't in the (original, user-written) result type
+  of the constructor. Note that this *allows* GADT record selectors
+  (Note [GADT record selectors]) whose types may look like sel :: T [a] -> a
+
+* For a PatSynCon, a field is "naughty" if its type mentions a type variable
+  that isn't in the universal type variables.
+
+  This is a bit subtle. Consider test patsyn/should_run/records_run:
+    pattern ReadP :: forall a. ReadP a => a -> String
+    pattern ReadP {fld} <- (read -> readp)
+  The selector is defined like this:
+    $selReadPfld :: forall a. ReadP a => String -> a
+    $selReadPfld @a (d::ReadP a) s = readp @a d s
+  Perfectly fine!  The (ReadP a) constraint lets us contruct a value of type
+  'a' from a bare String.
+
+  Another curious case (#23038):
+     pattern N :: forall a. () => forall. () => a -> Any
+     pattern N { fld } <- ( unsafeCoerce -> fld1 ) where N = unsafeCoerce
+  The selector looks like this
+     $selNfld :: forall a. Any -> a
+     $selNfld @a x = unsafeCoerce @Any @a x
+  Pretty strange (but used in the `cleff` package).
+
+  TL;DR for pattern synonyms, the selector is OK if the field type mentions only
+  the universal type variables of the pattern synonym.
 
 Note [NoFieldSelectors and naughty record selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
