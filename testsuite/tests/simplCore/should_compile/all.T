@@ -476,3 +476,4 @@ test('T23012', normal, compile, ['-O'])
 
 test('RewriteHigherOrderPatterns', normal, compile, ['-O -ddump-rule-rewrites -dsuppress-all -dsuppress-uniques'])
 test('T23024', normal, multimod_compile, ['T23024', '-O -v0'])
+test('T23026', normal, compile, ['-O'])
