@@ -32,6 +32,9 @@ Compiler
   the specification described in the documentation of the `INCOHERENT` pragma. See GHC ticket
   #22448 for further details.
 
+- Fix a bug in TH causing excessive calls to ``setNumCapabilities`` when ``-j`` is greater than ``-N``.
+  See GHC ticket #23049.
+
 
 GHCi
 ~~~~
