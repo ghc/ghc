@@ -612,14 +612,40 @@ eqTyConRole tc
   | otherwise
   = pprPanic "eqTyConRole: unknown tycon" (ppr tc)
 
--- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
---   (or CONSTRAINT instead of TYPE)
--- produce a coercion @rep_co :: r1 ~ r2@.
+-- | Given a coercion `co :: (t1 :: TYPE r1) ~ (t2 :: TYPE r2)`
+-- produce a coercion `rep_co :: r1 ~ r2`
+-- But actually it is possible that
+--     co :: (t1 :: CONSTRAINT r1) ~ (t2 :: CONSTRAINT r2)
+-- or  co :: (t1 :: TYPE r1)       ~ (t2 :: CONSTRAINT r2)
+-- or  co :: (t1 :: CONSTRAINT r1) ~ (t2 :: TYPE r2)
+-- See Note [mkRuntimeRepCo]
 mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co
-  = mkSelCo (SelTyCon 0 Nominal) kind_co
+  = assert (isTYPEorCONSTRAINT k1 && isTYPEorCONSTRAINT k2) $
+    mkSelCo (SelTyCon 0 Nominal) kind_co
   where
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
+    Pair k1 k2 = coercionKind kind_co
+
+{- Note [mkRuntimeRepCo]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+   class C a where { op :: Maybe a }
+we will get an axiom
+   axC a :: (C a :: CONSTRAINT r1) ~ (Maybe a :: TYPE r2)
+(See Note [Type and Constraint are not apart] in GHC.Builtin.Types.Prim.)
+
+Then we may call mkRuntimeRepCo on (axC ty), and that will return
+   mkSelCo (SelTyCon 0 Nominal) (Kind (axC ty)) :: r1 ~ r2
+
+So mkSelCo needs to be happy with decomposing a coercion of kind
+   CONSTRAINT r1 ~ TYPE r2
+
+Hence the use of `tyConIsTYPEorCONSTRAINT` in the assertion `good_call`
+in `mkSelCo`. See #23018 for a concrete example.  (In this context it's
+important that TYPE and CONSTRAINT have the same arity and kind, not
+merely that they are not-apart; otherwise SelCo would not make sense.)
+-}
 
 isReflCoVar_maybe :: Var -> Maybe Coercion
 -- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
@@ -1173,7 +1199,8 @@ mkSelCo_maybe cs co
        , Just (tc2, tys2) <- splitTyConApp_maybe ty2
        , let { len1 = length tys1
              ; len2 = length tys2 }
-       =  tc1 == tc2
+       =  (tc1 == tc2 || (tyConIsTYPEorCONSTRAINT tc1 && tyConIsTYPEorCONSTRAINT tc2))
+                      -- tyConIsTYPEorCONSTRAINT: see Note [mkRuntimeRepCo]
        && len1 == len2
        && n < len1
        && r == tyConRole (coercionRole co) tc1 n
