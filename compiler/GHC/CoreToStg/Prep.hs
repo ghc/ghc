@@ -667,11 +667,12 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
        -- See if we are allowed to float this stuff out of the RHS
        ; (floats2, rhs2) <- float_from_rhs floats1 rhs1
 
+--       ; pprTraceM "CorePrep: arguments" (ppr bndr $$ ppr (manifestArity rhs1) $$ ppr arity $$ ppr rhs1)
        -- Make the arity match up
        ; (floats3, rhs3)
             <- if manifestArity rhs1 <= arity
                then return (floats2, cpeEtaExpand arity rhs2)
-               else warnPprTrace True "CorePrep: silly extra arguments:" (ppr bndr) $
+               else warnPprTrace True "CorePrep: silly extra arguments:" (ppr bndr $$ ppr (manifestArity rhs1) $$ ppr arity $$ ppr rhs1) $
                                -- Note [Silly extra arguments]
                     (do { v <- newVar (idType bndr)
                         ; let float = mkFloat env topDmd False v rhs2

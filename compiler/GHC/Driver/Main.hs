@@ -1010,7 +1010,7 @@ initWholeCoreBindings hsc_env mod_iface details (LM utc_time this_mod uls) = LM 
         -- recompilation checking the bytecode will be generated (which slows things down a lot)
         -- the laziness is OK because generateByteCode just depends on things already loaded
         -- in the interface file.
-        LoadedBCOs <$> (unsafeInterleaveIO $ do
+        LoadedBCOs <$> (do
                   trace_if (hsc_logger hsc_env) (text "Generating ByteCode for" <+> (ppr this_mod))
                   generateByteCode hsc_env cgi_guts (wcb_mod_location fi))
     go ul = return ul
