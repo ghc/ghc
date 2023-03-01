@@ -1473,10 +1473,6 @@ def compile_cmp_asm(name: TestName,
     if badResult(result):
         return result
 
-    # the actual stderr should always match the expected, regardless
-    # of whether we expected the compilation to fail or not (successful
-    # compilations may generate warnings).
-
     expected_asm_file = find_expected_file(name, 'asm')
     actual_asm_file = add_suffix(name, 's')
 
