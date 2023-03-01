@@ -134,7 +134,7 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  , unless(have_dynamic(), skip)
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
-                 , omit_ways(['ghci'])
+                 , omit_ghci
                  , js_broken(22374)
                  ],
      compile_and_run, ['-rdynamic -package ghc'])

@@ -31,7 +31,7 @@ test('T3742', normal, compile, [''])
 test('cc015', normal, compile, [''])
 test('cc016', normal, compile, [''])
 test('T10460', normal, compile, [''])
-test('T11983', [omit_ways(['ghci'])], compile, ['T11983.c'])
+test('T11983', normal, compile, ['T11983.c'])
 test('T14125', normal, compile, [''])
 test(
     'cc017',
@@ -43,7 +43,7 @@ test(
     ],
 )
 test('T15531', normal, compile, ['-Wall'])
-test('T22043', [omit_ways(['ghci'])], compile, [''])
+test('T22043', normal, compile, [''])
 
-test('T22774', when(not js_arch(), expect_fail), compile, [''])
+test('T22774', unless(js_arch(), expect_fail), compile, [''])
 

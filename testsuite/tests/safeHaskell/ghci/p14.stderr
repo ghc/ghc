@@ -1,7 +1,4 @@
 
-when making flags consistent: warning: [GHC-74335]
-    Ignoring optimization flags since they are experimental for the byte-code interpreter. Pass -fno-unoptimized-core-for-interpreter to enable this feature.
-
 <interactive>:10:25: error: [GHC-39999]
     • No instance for ‘Num a’ arising from a use of ‘f’
       Possible fix: add (Num a) to the context of the RULE "id/Int"

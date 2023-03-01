@@ -116,7 +116,7 @@ test('T2047',
 
 # Blackhole-detection test.
 # Skip GHCi due to #2786
-test('T2783', [ omit_ways(['ghci']), exit_code(1)
+test('T2783', [ omit_ghci, exit_code(1)
               , fragile_for(2783, ['threaded1'])
               ], compile_and_run, [''])
 
@@ -136,13 +136,14 @@ test('stack002', [extra_files(['stack001.hs']),
 
 # run this test with very small stack chunks to exercise the stack
 # overflow/underflow machinery.
-test('stack003', [ omit_ways(['ghci']), # uses unboxed tuples
+test('stack003', [ omit_ghci, # parameter 50000 is not passed
                    extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
                  compile_and_run, [''])
 
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
                  , js_broken(22374)
+                 , expect_broken_for(23272, ['ghci-opt'])
                  , expect_broken_for(14913, ['ghci'])
                  ], compile_and_run, [''])
 
@@ -170,13 +171,13 @@ test('rtsflags002', [ only_ways(['normal']), js_broken(22261) ], compile_and_run
 
 # omit dyn and profiling ways, because we don't build dyn_l or p_l
 # variants of the RTS by default
-test('traceEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
+test('traceEvent', [ omit_ways(['dyn'] + ghci_ways + prof_ways),
                      extra_run_opts('+RTS -ls -RTS'),
                      js_skip # JS backend has no payload size limit
                    ],
                    compile_and_run, [''])
 
-test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
+test('traceBinaryEvent', [ omit_ways(['dyn'] + ghci_ways + prof_ways),
                            extra_run_opts('+RTS -ls -RTS'),
                            js_skip # traceBinaryEvent not supported
                            ],
@@ -185,7 +186,7 @@ test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
 # Test that -ol flag works as expected
 test('EventlogOutput1',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways),
+       omit_ways(['dyn'] + prof_ways),
        js_skip
      ],
      makefile_test, ['EventlogOutput1'])
@@ -193,14 +194,14 @@ test('EventlogOutput1',
 # Test that -ol flag defaults to <program>.eventlog
 test('EventlogOutput2',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways),
+       omit_ways(['dyn'] + prof_ways),
        js_skip
      ],
      makefile_test, ['EventlogOutput2'])
 
 test('EventlogOutputNull',
      [ extra_files(["EventlogOutput.hs"]),
-       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+       omit_ways(['dyn'] + prof_ways) ],
      makefile_test, ['EventlogOutputNull'])
 
 # Test that Info Table Provenance (IPE) events are emitted.
@@ -243,15 +244,14 @@ test('T5250', [extra_files(['spalign.c']),
                 # stack ptr is not 16-byte aligned on 32-bit Windows
                 when(platform('i386-unknown-mingw32'), expect_fail),
                 when(platform('i386-unknown-linux'),
-                            expect_broken_for(4211,['llvm'])),
-                omit_ways(['ghci']) ],
+                            expect_broken_for(4211,['llvm']))],
               compile_and_run, ['spalign.c'])
 
 test('T5423', cmm_src, makefile_test, ['T5423'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
-test('T6006', [ omit_ways(prof_ways + ['ghci']),
+test('T6006', [ omit_ways(prof_ways + ghci_ways),
                  pre_cmd('$MAKE -s --no-print-directory T6006_setup'),
                  req_c
                  ],
@@ -265,10 +265,11 @@ test('T7037', req_c, makefile_test, ['T7037'])
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', [ # finalization order is different in the nonmoving
                 omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc', 'nonmoving_thr_sanity'])
+              , expect_broken_for(23272, ['ghci-opt'])
               , js_broken(22261)
               ], compile_and_run, [''])
 
-test('T7040', [omit_ways(['ghci']), req_c], compile_and_run, ['T7040_c.c'])
+test('T7040', [req_c], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
      [extra_files(['T7040_c.h']),
@@ -284,7 +285,7 @@ test('T7227', [extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS')],
 
 test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )
 
-test('stablename001', expect_fail_for(['hpc']), compile_and_run, [''])
+test('stablename001', [expect_fail_for(['hpc']), expect_broken_for(23272, ['ghci-opt'])], compile_and_run, [''])
 # hpc should fail this, because it tags every variable occurrence with
 # a different tick.  It's probably a bug if it works, hence expect_fail.
 
@@ -301,7 +302,7 @@ test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
 # Times out in ghci way.
 # Also times out on x86_64-linux from time to time.
 test('T7919', [ when(fast(), skip)
-              , omit_ways(['ghci'])
+              , omit_ghci
               , req_th
               , when(platform('x86_64-unknown-linux'), fragile(22283))
               ]
@@ -315,7 +316,7 @@ test('T8209', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_st
 test('T8242', [ req_target_smp, req_ghc_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
+test('T8124', [ only_ways(threaded_ways), omit_ghci,
                  when(opsys('mingw32'), skip), # uses pthreads
                  pre_cmd('$MAKE -s --no-print-directory T8124_setup') ],
                  # The T8124_setup hack is to ensure that we generate
@@ -325,7 +326,7 @@ test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
 
 # +RTS -A8k makes it fail faster
 # The ghci way gets confused by the RTS options
-test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
+test('T9045', [ omit_ghci, extra_run_opts('10000 +RTS -A8k -RTS') ], compile_and_run, [''])
 
 # T9078 needs to be compiled with -debug, which threaded1 does for us.
 # Assert failure is reproducible with ghc-7.8.2.
@@ -365,7 +366,7 @@ def grep_stderr(pattern):
 
 # The ghci way gets confused by the RTS options
 test('T9839_01',
-     [ omit_ways(['ghci']), extra_run_opts('+RTS -T-s'), no_check_hp
+     [ omit_ghci, extra_run_opts('+RTS -T-s'), no_check_hp
      , grep_stderr('given an argument when none was expected')
      , js_broken(22261)
      ],
@@ -400,7 +401,7 @@ test('T10590', [ ignore_stderr
                ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
-test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000'), req_c ],
+test('T10904', [ extra_run_opts('20000'), req_c ],
                compile_and_run, ['T10904lib.c'])
 
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
@@ -505,7 +506,7 @@ test('keep-cafs',
 test('T11829', [ req_c, check_errmsg("This is a test"), when(arch('wasm32'), fragile(23244)) ], compile_and_run,
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
-test('T16514', req_c, compile_and_run, ['T16514_c.c'])
+test('T16514', [req_c, omit_ghci], compile_and_run, ['T16514_c.c'])
 test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
 
 test('T13676',
@@ -536,7 +537,7 @@ test('T19481',
       # allocator on wasm] in rts
       when(arch('wasm32'), skip),
       # memory behavior changes appreciably with the nonmoving collector
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'] + ghci_ways)],
      compile_and_run, [''])
 test('T19381',
      [extra_run_opts('+RTS -T -RTS'),
@@ -545,7 +546,7 @@ test('T19381',
       # allocator on wasm] in rts
       when(arch('wasm32'), skip),
       # memory behavior changes appreciably with the nonmoving collector
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'] + ghci_ways)],
      compile_and_run, [''])
 test('T20199', [ grep_errmsg('Hello'), req_c ]
       , makefile_test, [])
@@ -566,14 +567,14 @@ test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), 
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c']), req_ghc_with_threaded_rts], compile_and_run, ['cloneStackLib.c -threaded'])
 
 test('decodeMyStack',
-  [ js_broken(22261) # cloneMyStack# not yet implemented
+  [ omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, ['-finfo-table-map'])
 
 # Options:
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.
 test('decodeMyStack_underflowFrames',
   [ extra_run_opts('+RTS -kc8K -RTS')
-  , js_broken(22261) # cloneMyStack# not yet implemented
+  , omit_ghci, js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, ['-finfo-table-map -rtsopts'])
 
 # -finfo-table-map intentionally missing
@@ -590,6 +591,6 @@ test('T22795c', [only_ways(['normal']), js_skip], compile_and_run, ['-threaded -
 
 test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
 
-test('T23221', [js_skip, high_memory_usage, extra_run_opts('1500000'), unless(wordsize(64), skip)], compile_and_run, ['-O -with-rtsopts -T'])
+test('T23221', [js_skip, high_memory_usage, extra_run_opts('1500000'), unless(wordsize(64), skip), omit_ghci], compile_and_run, ['-O -with-rtsopts -T'])
 
 test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])

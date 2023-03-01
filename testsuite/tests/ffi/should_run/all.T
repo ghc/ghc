@@ -8,10 +8,10 @@ test( 'fed001', js_broken(22374) # qsort not yet implemented in JavaScript backe
     , compile_and_run, [''])
 
 # Omit GHCi for these two, as they use foreign export
-test('ffi001', [ omit_ways(['ghci'])
+test('ffi001', [ omit_ghci
                , js_skip # JS backend doesn't support foreign export yet
                ], compile_and_run, [''])
-test('ffi002', [ omit_ways(['ghci'])
+test('ffi002', [ omit_ghci
                , js_skip # JS backend doesn't support foreign export yet
                , pre_cmd('$MAKE -s --no-print-directory ffi002_setup') ],
                  # The ffi002_setup hack is to ensure that we generate
@@ -31,7 +31,7 @@ test('ffi004', skip, compile_and_run, [''])
 # On x86, the test suffers from floating-point differences due to the
 # use of 80-bit internal precision when using the native code generator.
 #
-test('ffi005', [ omit_ways(prof_ways + ['ghci']),
+test('ffi005', [ omit_ways(prof_ways),
                  when(arch('i386'), skip),
                  when(platform('i386-apple-darwin'), expect_broken(4105)),
                  exit_code(3),
@@ -47,10 +47,10 @@ test('ffi006', [normal, js_broken(22363)], compile_and_run, [''])
 # Sometimes we end up with the wrong exit code, or get an extra
 # 'interrupted' message from the GHCi thread shutting down.
 
-test('ffi007', [ omit_ways(['ghci'])
+test('ffi007', [ omit_ghci
                , js_skip # foreign "dynamic" call
                ], compile_and_run, [''])
-test('ffi008', [exit_code(1), omit_ways(['ghci']), js_broken(22363)], compile_and_run, [''])
+test('ffi008', [exit_code(1), omit_ghci, js_broken(22363)], compile_and_run, [''])
 
 # On i386, we need -msse2 to get reliable floating point results
 if config.platform.startswith('i386-'):
@@ -78,17 +78,16 @@ test('ffi013', [normal, js_broken(22363)], compile_and_run, [''])
 test('ffi014', [only_ways(['threaded1', 'threaded2'])], compile_and_run,
      ['ffi014_cbits.c'])
 
-# GHCi can't handle the separate C file (ToDo: fix this somehow)
-test('ffi015', [req_c,omit_ways(['ghci'])], compile_and_run, ['ffi015_cbits.c'])
+test('ffi015', [req_c], compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
-test('ffi016', [ omit_ways(['ghci'])
+test('ffi016', [ omit_ghci
                , js_skip # foreign exports
                ], compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
 
-test('ffi018', [req_c,omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
+test('ffi018', [req_c], compile_and_run, ['ffi018_c.c'])
 
 test('ffi018_ghci',
      [extra_files(['ffi018.h']),
@@ -103,27 +102,27 @@ test('ffi019', [normal, js_broken(22363)], compile_and_run, [''])
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
 test('T1679', js_broken(22261), compile_and_run, [''])
 
-test('T1288', [omit_ways(['ghci']), req_c], compile_and_run, ['T1288_c.c'])
+test('T1288', [req_c], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
-     [only_ways(['ghci']),
+     [only_ghci,
       when(unregisterised(), fragile(16085)),
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 
-test('T2276', [omit_ways(['ghci']), req_c], compile_and_run, ['T2276_c.c'])
-test('T2276_ghci', [ only_ways(['ghci']),
+test('T2276', [req_c], compile_and_run, ['T2276_c.c'])
+test('T2276_ghci', [ only_ghci,
                      when(opsys('darwin'), skip), # stdcall not supported on OS X
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
 test('T2469', js_broken(22261), compile_and_run, ['-optc-std=gnu99'])
 
-test('T2594', [omit_ways(['ghci']), req_c], compile_and_run, ['T2594_c.c'])
+test('T2594', [req_c], compile_and_run, ['T2594_c.c'])
 
-test('fptr01', [omit_ways(['ghci']), req_c], compile_and_run, ['fptr01_c.c'])
+test('fptr01', [req_c], compile_and_run, ['fptr01_c.c'])
 test('fptr02', normal, compile_and_run, [''])
 
-test('fptrfail01', [omit_ways(['ghci']), exit_code(1), req_c], compile_and_run,
+test('fptrfail01', [exit_code(1), req_c, omit_ghci], compile_and_run,
      ['fptrfail01_c.c'])
 
 test('T2917a', normal, compile_and_run, [''])
@@ -146,9 +145,9 @@ else:
 	flagsForT4038 = ['']
 test('T4038', [js_broken(22261), when(arch('wasm32'), fragile(22606))], compile_and_run, flagsForT4038)
 
-test('T4221', [omit_ways(['ghci']),req_c, when(arch('wasm32'), fragile(22606))], compile_and_run, ['T4221_c.c'])
+test('T4221', [req_c, when(arch('wasm32'), fragile(22606))], compile_and_run, ['T4221_c.c'])
 
-test('T5402', [ omit_ways(['ghci']),
+test('T5402', [ omit_ghci,
                 exit_code(42),
                   # The T5402_setup hack is to ensure that we generate
                   # T5402_stub.h before compiling T5402_main.c, which
@@ -158,7 +157,7 @@ test('T5402', [ omit_ways(['ghci']),
               ],
               compile_and_run, ["-no-hs-main T5402_main.c"])
 
-test('T5594', [ omit_ways(['ghci']),
+test('T5594', [ omit_ghci,
                 pre_cmd('$MAKE -s --no-print-directory T5594_setup'),
                 # The T5594_setup hack is to ensure that we generate
                 # T5594_stub.h before compiling T5594_c.c, which
@@ -173,24 +172,23 @@ test('Capi_Ctype_001', [extra_files(['Capi_Ctype_A_001.hsc', 'capi_ctype_001.h',
 test('Capi_Ctype_002', [extra_files(['Capi_Ctype_A_002.hsc', 'capi_ctype_002_A.h', 'capi_ctype_002_B.h']), req_c],
      makefile_test, ['Capi_Ctype_002'])
 
-test('ffi_parsing_001', [omit_ways(['ghci']), req_c], compile_and_run,
+test('ffi_parsing_001', [req_c], compile_and_run,
      ['ffi_parsing_001_c.c'])
 
-test('capi_value', [omit_ways(['ghci']), req_c], compile_and_run, ['capi_value_c.c'])
+test('capi_value', [req_c], compile_and_run, ['capi_value_c.c'])
 
 test('T7170',
      [when(opsys('mingw32'), fragile(16801)),
       exit_code(1)],
      compile_and_run, [''])
 
-test('T4012', [expect_broken_for(7388, ['ghci']), js_broken(22374)], multimod_compile_and_run,
-     ['T4012', ''])
+test('T4012', [js_broken(22374)], multimod_compile_and_run, ['T4012', ''])
 
-test('T8083', [omit_ways(['ghci']), req_c], compile_and_run, ['T8083_c.c'])
+test('T8083', [req_c], compile_and_run, ['T8083_c.c'])
 
-test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
+test('T9274', normal, compile_and_run, [''])
 
-test('ffi023', [ omit_ways(['ghci']),
+test('ffi023', [ omit_ghci,
                 extra_run_opts('1000 4'),
                 req_c,
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
@@ -211,39 +209,39 @@ test('rts_clearMemory', [
      # Same hack as ffi023
      compile_and_run, ['rts_clearMemory_c.c -no-hs-main'])
 
-test('T12134', [omit_ways(['ghci']), req_c], compile_and_run, ['T12134_c.c'])
+test('T12134', [req_c], compile_and_run, ['T12134_c.c'])
 
-test('T12614', [omit_ways(['ghci']), req_c], compile_and_run, ['T12614_c.c'])
+test('T12614', [req_c], compile_and_run, ['T12614_c.c'])
 
-test('T14624', [omit_ways(['ghci']), req_c], compile_and_run, ['T14624_c.c'])
+test('T14624', [req_c], compile_and_run, ['T14624_c.c'])
 
 test('T15933', [extra_files(['T15933_c.c', 'T15933.h']), req_c], makefile_test, ['T15933'])
 
-test('T16650a', [omit_ways(['ghci']), req_c], compile_and_run, ['T16650a_c.c'])
+test('T16650a', [req_c], compile_and_run, ['T16650a_c.c'])
 
-test('T16650b', [omit_ways(['ghci']), req_c], compile_and_run, ['T16650b_c.c'])
+test('T16650b', [req_c], compile_and_run, ['T16650b_c.c'])
 
-test('T16650c', [omit_ways(['ghci']), req_c], compile_and_run, ['T16650c_c.c'])
+test('T16650c', [req_c], compile_and_run, ['T16650c_c.c'])
 
-test('T16650d', [omit_ways(['ghci']), req_c], compile_and_run, ['T16650d_c.c'])
+test('T16650d', [req_c], compile_and_run, ['T16650d_c.c'])
 
-test('PrimFFIInt8', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIInt8_c.c'])
+test('PrimFFIInt8', [req_c], compile_and_run, ['PrimFFIInt8_c.c'])
 
-test('PrimFFIWord8', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIWord8_c.c'])
+test('PrimFFIWord8', [req_c], compile_and_run, ['PrimFFIWord8_c.c'])
 
-test('PrimFFIInt16', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIInt16_c.c'])
+test('PrimFFIInt16', [req_c], compile_and_run, ['PrimFFIInt16_c.c'])
 
-test('PrimFFIWord16', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIWord16_c.c'])
+test('PrimFFIWord16', [req_c], compile_and_run, ['PrimFFIWord16_c.c'])
 
-test('PrimFFIInt32', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIInt32_c.c'])
+test('PrimFFIInt32', [req_c], compile_and_run, ['PrimFFIInt32_c.c'])
 
-test('PrimFFIWord32', [omit_ways(['ghci']), req_c], compile_and_run, ['PrimFFIWord32_c.c'])
+test('PrimFFIWord32', [req_c], compile_and_run, ['PrimFFIWord32_c.c'])
 
-test('T493', [omit_ways(['ghci']), req_c], compile_and_run, ['T493_c.c'])
+test('T493', [ req_c], compile_and_run, ['T493_c.c'])
 
-test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci']), req_c], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
+test('UnliftedNewtypesByteArrayOffset', [req_c], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
 
-test('T17471', [omit_ways(['ghci']), req_c], compile_and_run,
+test('T17471', [req_c], compile_and_run,
      ['T17471_c.c -optc-D -optcFOO'])
 
 test('IncallAffinity',
@@ -256,7 +254,7 @@ test('IncallAffinity',
 
 test('T19237', req_c, compile_and_run, ['T19237_c.c'])
 
-test('T21305', [cmm_src,omit_ways(['ghci'])], multi_compile_and_run,
+test('T21305', [cmm_src], multi_compile_and_run,
                  ['T21305', [('T21305_cmm.cmm', '')], ''])
 
 test('T22159',

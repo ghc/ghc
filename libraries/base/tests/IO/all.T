@@ -4,24 +4,27 @@ def expect_fail_if_windows(name, opts):
    f = when(opsys('mingw32'), expect_fail);
    return f(normal, opts);
 
-test('IOError001', [omit_ways(['ghci']), set_stdin('IOError001.hs')],
-	compile_and_run, [''])
+test('IOError001', [set_stdin('IOError001.hs')], compile_and_run, [''])
 
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001', [], compile_and_run, [''])
 test('hClose002', [normalise_win32_io_errors, js_broken(22261)], compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
-test('hFileSize002', [omit_ways(['ghci']), js_broken(22261)], compile_and_run, [''])
+test('hFileSize002',
+     [omit_ghci, # different output
+      js_broken(22261)],
+     compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
 test('hGetBuffering001',
-	[omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')],
+	[omit_ghci, # can't use stdin
+   set_stdin('hGetBuffering001.hs')],
 	compile_and_run, [''])
 
 test('hGetContentsS001', normal, compile_and_run, [''])
 test('hGetChar001', normal, compile_and_run, [''])
-test('hGetLine001', set_stdin('hGetLine001.hs'), compile_and_run, ['-cpp'])
+test('hGetLine001', [set_stdin('hGetLine001.hs')], compile_and_run, ['-cpp'])
 test('hGetLine002', normal, compile_and_run, [''])
 test('hGetLine003', normal, compile_and_run, [''])
 test('hGetPosn001', [], compile_and_run, ['-cpp'])
@@ -33,9 +36,13 @@ test('hReady001', js_broken(22374), compile_and_run, ['-cpp'])
 # hReady002 tests that hReady returns False for a pipe that has no
 # data to read.  It relies on piping input from 'sleep 1', which doesn't
 # work for the 'ghci' way because in that case we already pipe input from
-# a script, so hence omit_ways(['ghci'])
-test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci']),
-                   multi_cpu_race, js_broken(22374), when(arch('wasm32'), fragile(23275))],
+# a script, so hence omit_ghci
+test('hReady002',
+     [cmd_prefix('sleep 1 |'),
+      omit_ghci,
+      multi_cpu_race,
+      js_broken(22374),
+      when(arch('wasm32'), fragile(23275))],
      compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
@@ -43,10 +50,10 @@ test('hSeek002', normal, compile_and_run, ['-cpp'])
 test('hSeek003', normal, compile_and_run, ['-cpp'])
 test('hSeek004', [], compile_and_run, ['-cpp'])
 
-test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
+test('hSetBuffering002', [set_stdin('hSetBuffering002.hs')], compile_and_run, [''])
 
 test('hSetBuffering003',
-    [ omit_ways(['ghci'])
+    [ omit_ghci # ghci's initial buffering setting is different, and this test checks that
     , set_stdin('hSetBuffering003.hs')
     , js_broken(22261)
     ],
@@ -77,7 +84,10 @@ test('readFile001', js_broken(22261), compile_and_run, [''])
 test('readwrite001', [], compile_and_run, ['-cpp'])
 
 
-test('readwrite002', [omit_ways(['ghci']), set_stdin('readwrite002.hs'), js_broken(22374)],
+test('readwrite002',
+     [omit_ghci, # can't use stdin
+      set_stdin('readwrite002.hs'),
+      js_broken(22374)],
      compile_and_run, ['-cpp'])
 
 test('readwrite003', [], compile_and_run, [''])
@@ -86,6 +96,7 @@ test('hGetBuf001',
      [ when(fast(), skip)
      , expect_fail_if_windows
      , js_broken(22374)
+     , expect_broken_for(23272, ['ghci-opt'])
      , req_process
      ],
      compile_and_run, ['-package unix'])

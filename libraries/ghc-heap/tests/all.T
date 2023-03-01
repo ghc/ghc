@@ -4,7 +4,7 @@ test('heap_all',
      [when(have_profiling(), extra_ways(['prof'])),
       # These ways produce slightly different heap representations.
       # Currently we don't test them.
-      omit_ways(['ghci', 'hpc',
+      omit_ways(ghci_ways + ['hpc',
                  'nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc',
                  'nonmoving_thr_sanity']),
       # The debug RTS initializes some fields with 0xaa and so
@@ -17,7 +17,8 @@ test('heap_weak',
      [when(have_profiling(), extra_ways(['prof'])),
       # These ways produce slightly different heap representations.
       # Currently we don't test them.
-      omit_ways(['ghci', 'hpc'])
+      omit_ways(['hpc']),
+      expect_broken_for(23272, ['ghci-opt'])
      ],
      compile_and_run, [''])
 
@@ -27,7 +28,7 @@ test('closure_size',
       when(have_profiling(), extra_ways(['prof'])),
       # These ways produce slightly different heap representations.
       # Currently we don't test them.
-      omit_ways(['hpc'])
+      omit_ways(ghci_ways + ['hpc'])
      ],
      compile_and_run, [''])
 

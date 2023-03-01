@@ -11,7 +11,7 @@ setTestOpts(req_interp)
 # TH should work with -fexternal-interpreter too
 if config.have_ext_interp :
      setTestOpts(extra_ways(['ext-interp']))
-     setTestOpts(only_ways(['normal','ghci','ext-interp']))
+     setTestOpts(only_ways(['normal','ext-interp'] + ghci_ways))
 
      if llvm_build():
          setTestOpts(fragile_for(16087, ['ext-interp']))
@@ -326,11 +326,9 @@ test('T10596', normal, compile, ['-v0'])
 test('T10598_TH', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T10620', normal, compile_and_run, ['-v0'])
 test('T10638', normal, compile_fail, ['-v0'])
-test('T10697_decided_1', normal, compile_and_run, ['-v0'])
-test('T10697_decided_2', normal, compile_and_run, ['-XStrictData -v0'])
-test('T10697_decided_3', omit_ways(['ghci']),  # ghci doesn't support -O(2)
-                         compile_and_run,
-                         ['-XStrictData -funbox-strict-fields -O2 -v0'])
+test('T10697_decided_1', expect_broken_for(23272, ['ghci-opt']), compile_and_run, ['-v0'])
+test('T10697_decided_2', expect_broken_for(23272, ['ghci-opt']), compile_and_run, ['-XStrictData -v0'])
+test('T10697_decided_3', normal, compile_and_run, ['-XStrictData -funbox-strict-fields -O2 -v0'])
 test('T10697_source', [], multimod_compile_and_run,
      ['T10697_source', '-w ' + config.ghc_th_way_flags])
 test('T10704', [], multimod_compile_and_run,
@@ -380,18 +378,17 @@ test('T12130', [], multimod_compile,
      ['T12130', '-v0 ' + config.ghc_th_way_flags])
 test('T12387', normal, compile_fail, ['-v0'])
 test('T12387a', normal, compile_fail, ['-v0'])
-test('T12403', omit_ways(['ghci']),
+test('T12403', normal,
               compile_and_run, ['-v0 -ddump-splices -dsuppress-uniques'])
-test('T12407', omit_ways(['ghci']), compile, ['-v0'])
+test('T12407', normal, compile, ['-v0'])
 test('T12411', normal, compile_fail, [''])
-test('T12478_1', omit_ways(['ghci']), compile_and_run,
-     ['-v0 -dsuppress-uniques'])
-test('T12478_2', omit_ways(['ghci']), compile_and_run, ['-v0'])
-test('T12478_3', omit_ways(['ghci']), compile, ['-v0'])
-test('T12478_4', omit_ways(['ghci']), compile_fail, ['-v0'])
-test('T12478_5', omit_ways(['ghci']), compile, ['-v0'])
+test('T12478_1', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
+test('T12478_2', normal, compile_and_run, ['-v0'])
+test('T12478_3', normal, compile, ['-v0'])
+test('T12478_4', normal, compile_fail, ['-v0'])
+test('T12478_5', normal, compile, ['-v0'])
 test('T12503', normal, compile, ['-v0'])
-test('T12513', omit_ways(['ghci']), compile_fail, ['-v0'])
+test('T12513', normal, compile_fail, ['-v0'])
 test('T12530', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12646', normal, compile, ['-v0'])
 test('T12788', [], multimod_compile_fail,
@@ -403,16 +400,19 @@ test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366C',
-     [expect_broken_for(13366, ['ghci'])],
+     [expect_broken_for(13366, ghci_ways)],
      compile_and_run,
      ['-v0'])
 test('T13366Cxx',
-     [expect_broken_for(13366, ['ghci'])],
+     [expect_broken_for(13366, ghci_ways)],
      compile_and_run,
      ['-package system-cxx-std-lib -v0'])
 test('T13473', normal, multimod_compile_and_run,
      ['T13473.hs', '-v0 ' + config.ghc_th_way_flags])
-test('T13587', expect_broken(13587), compile_and_run, ['-v0'])
+test('T13587',
+     [omit_ghci # fails during compilation phase, remove after !10563
+     , expect_broken(13587)],
+     compile_and_run, ['-v0'])
 test('T13618', normal, compile_and_run, ['-v0'])
 test('T13642', normal, compile, ['-v0'])
 test('T13781', normal, compile, ['-v0'])
@@ -435,7 +435,7 @@ test('T14888', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 # There is a phasing issue in the ghci way which prevents us from being
 # able to compile and link the foreign file while compiling the haskell module.
-test('T14298', expect_broken_for(15161, ['ghci']), compile_and_run, ['-v0'])
+test('T14298', expect_broken_for(15161, ghci_ways), compile_and_run, ['-v0'])
 test('T14875', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14885a', normal, compile, [''])
 test('T14885b', normal, compile, [''])
@@ -487,7 +487,7 @@ test('T16180',
       # Ideally OpenBSD should have expect_broken_for(14012, ['ext-interp']).
       # Except the failure is in compilation so skip seems the best we can do.
       when(opsys('openbsd'), skip),
-      expect_broken_for(16541, ['ghci'])],
+      expect_broken_for(16541, ghci_ways)],
      compile_and_run, ['-package ghc'])
 test('T16183', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T16195', normal, multimod_compile, ['T16195.hs', '-v0'])

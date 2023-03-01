@@ -20,7 +20,7 @@ seq s ()
 :p s
 
 
-:set -funbox-strict-fields -O
+:set -funbox-strict-fields -fno-unoptimized-core-for-interpreter -O
 :l
 :l Test
 

@@ -1,4 +1,4 @@
-test('ipeMap', [extra_files(['ipe_lib.c', 'ipe_lib.h']), c_src], compile_and_run, ['ipe_lib.c'])
+test('ipeMap', [extra_files(['ipe_lib.c', 'ipe_lib.h']), c_src, omit_ghci], compile_and_run, ['ipe_lib.c'])
 
 # Manually create IPE entries and dump them to event log (stderr).
 test('ipeEventLog',

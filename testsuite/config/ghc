@@ -42,6 +42,7 @@ if ghc_with_native_codegen:
 
 if config.have_interp:
     config.run_ways.append('ghci')
+    config.run_ways.append('ghci-opt')
 
 # we read the 'Support SMP' setting from the ghcconfig file. This dictates
 # whether the target supports smp
@@ -97,7 +98,8 @@ config.way_flags = {
     'prof_no_auto' : ['-prof', '-static', '-fasm'],
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
-    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
+    'ghci'         : ['--interactive', '-fno-unoptimized-core-for-interpreter', '-O0', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
+    'ghci-opt'     : ['--interactive', '-fno-unoptimized-core-for-interpreter', '-O', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
     'sanity'       : ['-debug'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
@@ -144,6 +146,7 @@ config.way_rts_flags = {
     'profasm'      : ['-hc', '-p'], # test heap profiling too
     'profthreaded' : ['-p'],
     'ghci'         : [],
+    'ghci-opt'     : [],
     'sanity'       : ['-DS'],
     'threaded1'    : [],
     'threaded1_ls' : ['-ls'],
@@ -181,15 +184,18 @@ config.way_rts_flags = {
 prof_ways     = [x[0] for x in config.way_flags.items()
                       if '-prof' in x[1]]
 
+ghci_ways     =  [x[0] for x in config.way_flags.items()
+                      if '--interactive' in x[1]]
+
 debug_ways     = [x[0] for x in config.way_flags.items()
                       if '-debug' in x[1]]
 
 threaded_ways = [x[0] for x in config.way_flags.items()
-                      if '-threaded' in x[1] or 'ghci' == x[0]]
+                      if '-threaded' in x[1] or 'ghci' == x[0] or 'ghci-opt' == x[0]]
 
 # Ways which run with multiple capabilities
 concurrent_ways = [name for name, flags in config.way_flags.items()
-                        if '-threaded' in flags or 'ghci' == name
+                        if '-threaded' in flags or 'ghci' == name or 'ghci-opt' == name
                         if '-N2' in config.way_rts_flags.get(name, [])]
 
 opt_ways      = [x[0] for x in config.way_flags.items()
