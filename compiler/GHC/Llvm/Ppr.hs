@@ -51,11 +51,11 @@ import GHC.Types.Unique
 -- | Print out a whole LLVM module.
 ppLlvmModule :: IsDoc doc => LlvmCgConfig -> LlvmModule -> doc
 ppLlvmModule opts (LlvmModule comments aliases meta globals decls funcs)
-  = ppLlvmComments comments $$ newLine
-    $$ ppLlvmAliases aliases $$ newLine
-    $$ ppLlvmMetas opts meta $$ newLine
-    $$ ppLlvmGlobals opts globals $$ newLine
-    $$ ppLlvmFunctionDecls decls $$ newLine
+  = ppLlvmComments comments $$ empty
+    $$ ppLlvmAliases aliases $$ empty
+    $$ ppLlvmMetas opts meta $$ empty
+    $$ ppLlvmGlobals opts globals $$ empty
+    $$ ppLlvmFunctionDecls decls $$ empty
     $$ ppLlvmFunctions opts funcs
 {-# SPECIALIZE ppLlvmModule :: LlvmCgConfig -> LlvmModule -> SDoc #-}
 {-# SPECIALIZE ppLlvmModule :: LlvmCgConfig -> LlvmModule -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
@@ -164,8 +164,8 @@ ppLlvmFunction opts fun =
         , line lbrace
         , ppLlvmBlocks opts (funcBody fun)
         , line rbrace
-        , newLine
-        , newLine]
+        , empty
+        , empty]
 {-# SPECIALIZE ppLlvmFunction :: LlvmCgConfig -> LlvmFunction -> SDoc #-}
 {-# SPECIALIZE ppLlvmFunction :: LlvmCgConfig -> LlvmFunction -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
@@ -713,12 +713,6 @@ pprStaticArith opts s1 s2 int_op float_op op_name =
 --------------------------------------------------------------------------------
 -- * Misc functions
 --------------------------------------------------------------------------------
-
--- | Blank line.
-newLine :: IsDoc doc => doc
-newLine = empty
-{-# SPECIALIZE newLine :: SDoc #-}
-{-# SPECIALIZE newLine :: HDoc #-}
 
 -- | Exclamation point.
 exclamation :: IsLine doc => doc
