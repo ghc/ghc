@@ -340,6 +340,7 @@ data GeneralFlag
    | Opt_BuildingCabalPackage
    | Opt_IgnoreDotGhci
    | Opt_GhciSandbox
+   | Opt_AllowOptimisedByteCode
    | Opt_InsertBreakpoints
    | Opt_GhciHistory
    | Opt_GhciLeakCheck

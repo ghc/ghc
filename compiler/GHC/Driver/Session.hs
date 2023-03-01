@@ -3512,6 +3512,7 @@ fFlagsDeps = [
   flagSpec "show-error-context"               Opt_ShowErrorContext,
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
   flagSpec "split-sections"                   Opt_SplitSections,
+  flagSpec "allow-optimised-byte-code"        Opt_AllowOptimisedByteCode,
   flagSpec "break-points"                     Opt_InsertBreakpoints
   ]
   ++ fHoleFlags
@@ -4847,6 +4848,8 @@ makeDynFlagsConsistent dflags
            "Enabling -fPIC as it is always on for this platform"
 
  | backendForcesOptimization0 (backend dflags)
+  -- Override this force to -O0 if you know what you are doing
+ , not (gopt Opt_AllowOptimisedByteCode dflags)
  , let (dflags', changed) = updOptLevelChanged 0 dflags
  , changed
     = loop dflags' ("Optimization flags are incompatible with the " ++
