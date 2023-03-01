@@ -1,0 +1,8 @@
+
+T7023.hs:5:11: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘Int’ with ‘[Char]’
+      Expected: String
+        Actual: Int
+    • In the expression: 1 :: Int
+      In the expression: ["x", 1 :: Int]
+      In an equation for ‘a’: a = ["x", 1 :: Int]

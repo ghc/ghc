@@ -1,0 +1,21 @@
+
+T5462Yes2.hs:26:28: warning: [GHC-20042] [-Wderiving-defaults (in -Wdefault)]
+    • Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled
+      Defaulting to the DeriveAnyClass strategy for instantiating C1
+    • In the newtype declaration for ‘D’
+    Suggested fix:
+      Use DerivingStrategies
+      to pick a different strategy
+
+T5462Yes2.hs:31:42: warning: [GHC-20042] [-Wderiving-defaults (in -Wdefault)]
+    • Both DeriveAnyClass and GeneralizedNewtypeDeriving are enabled
+      Defaulting to the DeriveAnyClass strategy for instantiating GFunctor
+    • In the newtype declaration for ‘F’
+    Suggested fix:
+      Use DerivingStrategies
+      to pick a different strategy
+
+T5462Yes2.hs:34:23: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘c21’ or ‘c22’
+    • In the instance declaration for ‘C2 H’

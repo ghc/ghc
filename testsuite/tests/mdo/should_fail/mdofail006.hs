@@ -1,4 +1,4 @@
-{-# LANGUAGE DoRec #-}
+{-# LANGUAGE RecursiveDo #-}
 
 -- check that do-rec does not perform segmentation
 t :: IO [Int]

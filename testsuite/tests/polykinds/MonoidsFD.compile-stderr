@@ -1,0 +1,13 @@
+
+MonoidsFD.hs:92:3: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative Wrapper’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+MonoidsFD.hs:97:4: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad Wrapper’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return

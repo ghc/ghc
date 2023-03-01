@@ -1,0 +1,31 @@
+
+T3731-short.hs:4:15: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T3731-short.hs:33:10: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Data Expression’ matches
+        instance (Data [Expression], Sat Expression) => Data Expression
+          -- Defined at T3731-short.hs:36:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘Data Proposition’
+
+T3731-short.hs:36:10: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Sat Expression’ matches
+        instance Default t => Sat t -- Defined at T3731-short.hs:24:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘Data Expression’
+
+T3731-short.hs:36:10: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Data [Expression]’ matches
+        instance (Sat [a], Data a) => Data [a]
+          -- Defined at T3731-short.hs:17:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘Data Expression’
+
+T3731-short.hs:47:15: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
+    This binding for ‘exp’ shadows the existing binding
+      imported from ‘Prelude’ at T3731-short.hs:9:8-11
+      (and originally defined in ‘GHC.Float’)

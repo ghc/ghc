@@ -1,0 +1,8 @@
+
+ParserMultiWayIf.hs:12:24: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | False -> ...
+
+ParserMultiWayIf.hs:15:26: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | False -> ...

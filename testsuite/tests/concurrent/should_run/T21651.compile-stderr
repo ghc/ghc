@@ -1,0 +1,4 @@
+
+T21651.hs:25:14: warning: [GHC-68441] [-Wdeprecations (in -Wdefault)]
+    In the use of ‘fdRead’ (imported from System.Posix.IO):
+    Deprecated: "This function is scheduled to be dropped in favor of 'System.Posix.IO.ByteString.fdRead', because decoding e.g. UTF-8 streams partially is unsafe."

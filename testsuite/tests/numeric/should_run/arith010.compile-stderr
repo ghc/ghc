@@ -1,0 +1,6 @@
+
+arith010.hs:5:15: warning: [GHC-10190] [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+arith010.hs:9:15: warning: [GHC-10190] [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty

@@ -1,0 +1,3 @@
+
+hasfieldrun01.hs:2:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.

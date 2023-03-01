@@ -1,0 +1,10 @@
+
+T2722.hs:19:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘first’ or ‘***’
+    • In the instance declaration for ‘Arrow IOSLA’
+
+T2722.hs:22:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘.’
+    • In the instance declaration for ‘Category IOSLA’

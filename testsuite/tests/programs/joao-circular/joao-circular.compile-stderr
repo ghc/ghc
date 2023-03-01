@@ -1,0 +1,4 @@
+
+Funcs_Parser_Lazy.hs:10:1: warning: [GHC-94817] [-Wtabs (in -Wdefault)]
+    Tab character found here, and in 346 further locations.
+    Suggested fix: Please use spaces instead.

@@ -1,0 +1,18 @@
+
+T2276_c.c:4:1: error:
+     warning: ‘stdcall’ attribute ignored [-Wattributes]
+        4 | {
+          | ^
+
+T2276.hs:4:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "&test" ptest :: FunPtr (CInt -> IO ())
+
+T2276.hs:5:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "dynamic" ctest
+          :: FunPtr (CInt -> IO ()) -> CInt -> IO ()

@@ -1,0 +1,4 @@
+
+DsStrictFail.hs:4:12: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: False = ...

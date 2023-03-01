@@ -1,0 +1,23 @@
+
+A.hs:8:7: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘QuasiQuoter’ not initialised:
+        quoteExp :: String -> Q Exp
+        quoteType :: String -> Q Type
+        quoteDec :: String -> Q [Dec]
+    • In the expression:
+        QuasiQuoter
+          {quotePat = \ s -> viewP [| (* 2) |] (varP . mkName $ s)}
+      In an equation for ‘foo’:
+          foo
+            = QuasiQuoter
+                {quotePat = \ s -> viewP [| (...) |] (varP . mkName $ s)}
+
+A.hs:11:7: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘QuasiQuoter’ not initialised:
+        quoteExp :: String -> Q Exp
+        quoteType :: String -> Q Type
+        quoteDec :: String -> Q [Dec]
+    • In the expression:
+        QuasiQuoter {quotePat = \ _ -> [p| ((* 3) -> fixed_var) |]}
+      In an equation for ‘bar’:
+          bar = QuasiQuoter {quotePat = \ _ -> [p| ((...) -> fixed_var) |]}

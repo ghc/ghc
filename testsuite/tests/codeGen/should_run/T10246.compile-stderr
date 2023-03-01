@@ -1,0 +1,12 @@
+
+T10246.hs:2:8: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 18446744073709551616 is out of the Int range -9223372036854775808..9223372036854775807
+
+T10246.hs:10:16: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 18446744073709551616 is out of the Int range -9223372036854775808..9223372036854775807
+
+T10246.hs:15:8: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 18446744073709551616 is out of the Int range -9223372036854775808..9223372036854775807
+
+T10246.hs:22:16: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 18446744073709551616 is out of the Int range -9223372036854775808..9223372036854775807

@@ -1,0 +1,5 @@
+T12403.hs:9:2-12: Splicing declarations return [] ======>
+T12403.hs:12:18-49: Splicing expression
+    reify ''T >>= stringE . pprint
+  ======>
+    "data Main.T = Main.T ((# , #) GHC.Types.Int GHC.Types.Int)"

@@ -1,0 +1,4 @@
+
+DsMultiWayIf.hs:13:14: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | False -> ...

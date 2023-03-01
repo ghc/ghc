@@ -1,0 +1,28 @@
+
+T1735.hs:5:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T1735_Help/Xml.hs:4:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T1735_Help/Instances.hs:2:36: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T1735_Help/Basics.hs:1:36: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T1735_Help/Context.hs:1:36: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T1735_Help/State.hs:10:5: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad (StateT s m)’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T1735_Help/State.hs:22:5: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative (StateT s m)’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return

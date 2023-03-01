@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -#include "ffi015_cbits.h" #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 
 import Foreign

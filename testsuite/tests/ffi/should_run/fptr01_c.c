@@ -23,6 +23,6 @@ void h( HsInt *i )
 
 void f_env( HsInt *env, HsInt *i )
 {
-    printf( "f_env %d %d\n", *env, (int)*i );
+    printf( "f_env %ld %d\n", *env, (int)*i );
     fflush( stdout );
 }

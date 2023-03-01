@@ -1,0 +1,29 @@
+
+T3591.hs:24:33: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T3591.hs:78:5: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative Identity’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T3591.hs:82:5: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad Identity’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T3591.hs:92:3: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative (Trampoline m s)’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T3591.hs:96:4: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad (Trampoline m s)’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return

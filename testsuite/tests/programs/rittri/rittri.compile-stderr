@@ -1,0 +1,5 @@
+
+Main.hs:21:16: warning: [GHC-47082] [-Woperator-whitespace-ext-conflict (in -Wdefault)]
+    The prefix use of a ‘$’ would denote an untyped splice
+      were the TemplateHaskell extension enabled.
+    Suggested fix: Add whitespace after the ‘$’.

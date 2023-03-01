@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
   hs_init(&argc, &argv);
 
   for (i = 0; i < 5; i++) {
-    printf("%d\n", foo(2500));
+    printf("%ld\n", foo(2500));
   }
 
   hs_exit();

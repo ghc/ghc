@@ -1,0 +1,52 @@
+
+T2917a.hs:22:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        (either ‘peek’
+                or
+                ‘peekElemOff’
+                or
+                ‘peekByteOff’) and (either ‘poke’
+                                           or
+                                           ‘pokeElemOff’
+                                           or
+                                           ‘pokeByteOff’)
+    • In the instance declaration for ‘Storable Align32’
+
+T2917a.hs:28:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        (either ‘peek’
+                or
+                ‘peekElemOff’
+                or
+                ‘peekByteOff’) and (either ‘poke’
+                                           or
+                                           ‘pokeElemOff’
+                                           or
+                                           ‘pokeByteOff’)
+    • In the instance declaration for ‘Storable Align64’
+
+T2917a.hs:34:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        (either ‘peek’
+                or
+                ‘peekElemOff’
+                or
+                ‘peekByteOff’) and (either ‘poke’
+                                           or
+                                           ‘pokeElemOff’
+                                           or
+                                           ‘pokeByteOff’)
+    • In the instance declaration for ‘Storable Align128’
+
+T2917a.hs:40:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        (either ‘peek’
+                or
+                ‘peekElemOff’
+                or
+                ‘peekByteOff’) and (either ‘poke’
+                                           or
+                                           ‘pokeElemOff’
+                                           or
+                                           ‘pokeByteOff’)
+    • In the instance declaration for ‘Storable Align256’

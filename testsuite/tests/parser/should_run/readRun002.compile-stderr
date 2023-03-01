@@ -1,0 +1,4 @@
+
+readRun002.hs:28:24: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: -1# -> ...

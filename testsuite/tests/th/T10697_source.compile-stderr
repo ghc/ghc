@@ -1,0 +1,15 @@
+
+T10697_sourceUtil.hs:35:11: warning:
+    • UNPACK pragma lacks '!' on the first argument of ‘E9’
+    • In the definition of data constructor ‘E9’
+      In the data type declaration for ‘E9’
+
+T10697_source.hs:15:2: warning:
+    • UNPACK pragma lacks '!' on the first argument of ‘A9’
+    • In the definition of data constructor ‘A9’
+      In the data type declaration for ‘A9’
+
+T10697_source.hs:17:2: warning:
+    • UNPACK pragma lacks '!' on the first argument of ‘C9’
+    • In the definition of data constructor ‘C9’
+      In the data type declaration for ‘B9’

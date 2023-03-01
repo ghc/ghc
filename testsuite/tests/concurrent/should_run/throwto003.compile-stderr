@@ -1,0 +1,3 @@
+
+throwto003.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XDoRec is deprecated: use -XRecursiveDo or pragma {-# LANGUAGE RecursiveDo #-} instead

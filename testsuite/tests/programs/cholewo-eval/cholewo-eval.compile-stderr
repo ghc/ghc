@@ -1,0 +1,20 @@
+
+Arr.lhs:62:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘*’ and ‘fromInteger’
+    • In the instance declaration for ‘Num (Vector b)’
+
+Arr.lhs:133:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘fromInteger’
+    • In the instance declaration for ‘Num (Matrix b)’
+
+Arr.lhs:204:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘*’ and ‘fromInteger’
+    • In the instance declaration for ‘Num [a]’
+
+Arr.lhs:260:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘*’ and ‘fromInteger’
+    • In the instance declaration for ‘Num (Array a b)’

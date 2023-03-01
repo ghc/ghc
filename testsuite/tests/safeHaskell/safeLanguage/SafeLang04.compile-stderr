@@ -1,0 +1,5 @@
+
+SafeLang04.hs:12:11: warning: [GHC-95396] [-Winline-rule-shadowing (in -Wdefault)]
+    Rule "lookupx/T" may never fire
+      because ‘lookupx’ might inline first
+    Suggested fix: Add an INLINE[n] or NOINLINE[n] pragma for ‘lookupx’

@@ -1,0 +1,63 @@
+
+Basic.hs:207:7: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘Foo’ not initialised:
+        x :: a
+        y :: b
+    • In the expression: Foo {}
+      In an equation for ‘foo’: foo = Foo {}
+
+Main.hs:18:10: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘Overshoot’ not initialised:
+        start_delay :: Time
+    • In the ‘over’ field of a record
+      In the first argument of ‘toSig’, namely
+        ‘Pulse_dc
+           {start_delay = (Sec 1.0), rise_time = (Sec 0.2),
+            pulse_width = (Sec 3.0), fall_time = (Sec 0.3),
+            dc_offset = (V (- 1.0)), period = (Sec 10.0), amplitude = (V 5.0),
+            over = Overshoot
+                     {ringing = (V 0.2), pulse_width = (Sec 3.0),
+                      oscillation = (Hz 2.0), damp_fac = 1.0},
+            under = Overshoot
+                      {ringing = (V (- 0.25)), pulse_width = (Sec 3.0),
+                       oscillation = (Hz 2.10), damp_fac = 1.10}}’
+      In the expression:
+        toSig
+          Pulse_dc
+            {start_delay = (Sec 1.0), rise_time = (Sec 0.2),
+             pulse_width = (Sec 3.0), fall_time = (Sec 0.3),
+             dc_offset = (V (- 1.0)), period = (Sec 10.0), amplitude = (V 5.0),
+             over = Overshoot
+                      {ringing = (V 0.2), pulse_width = (Sec 3.0),
+                       oscillation = (Hz 2.0), damp_fac = 1.0},
+             under = Overshoot
+                       {ringing = (V (- 0.25)), pulse_width = (Sec 3.0),
+                        oscillation = (Hz 2.10), damp_fac = 1.10}}
+
+Main.hs:22:11: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘Overshoot’ not initialised:
+        start_delay :: Time
+    • In the ‘under’ field of a record
+      In the first argument of ‘toSig’, namely
+        ‘Pulse_dc
+           {start_delay = (Sec 1.0), rise_time = (Sec 0.2),
+            pulse_width = (Sec 3.0), fall_time = (Sec 0.3),
+            dc_offset = (V (- 1.0)), period = (Sec 10.0), amplitude = (V 5.0),
+            over = Overshoot
+                     {ringing = (V 0.2), pulse_width = (Sec 3.0),
+                      oscillation = (Hz 2.0), damp_fac = 1.0},
+            under = Overshoot
+                      {ringing = (V (- 0.25)), pulse_width = (Sec 3.0),
+                       oscillation = (Hz 2.10), damp_fac = 1.10}}’
+      In the expression:
+        toSig
+          Pulse_dc
+            {start_delay = (Sec 1.0), rise_time = (Sec 0.2),
+             pulse_width = (Sec 3.0), fall_time = (Sec 0.3),
+             dc_offset = (V (- 1.0)), period = (Sec 10.0), amplitude = (V 5.0),
+             over = Overshoot
+                      {ringing = (V 0.2), pulse_width = (Sec 3.0),
+                       oscillation = (Hz 2.0), damp_fac = 1.0},
+             under = Overshoot
+                       {ringing = (V (- 0.25)), pulse_width = (Sec 3.0),
+                        oscillation = (Hz 2.10), damp_fac = 1.10}}

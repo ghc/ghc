@@ -1,0 +1,35 @@
+testwsdeque.c: In function ‘work’:
+
+testwsdeque.c:117:23: error:
+     warning: format ‘%ld’ expects argument of type ‘long int’, but argument 2 has type ‘void *’ [-Wformat=]
+      117 |         barf("FAIL: %ld %d %d", p, n, val);
+          |                     ~~^         ~
+          |                       |         |
+          |                       long int  void *
+          |                     %p
+
+testwsdeque.c:117:29: error:
+     warning: format ‘%d’ expects argument of type ‘int’, but argument 4 has type ‘StgWord’ {aka ‘long unsigned int’} [-Wformat=]
+      117 |         barf("FAIL: %ld %d %d", p, n, val);
+          |                            ~^         ~~~
+          |                             |         |
+          |                             int       StgWord {aka long unsigned int}
+          |                            %ld
+testwsdeque.c: In function ‘main’:
+
+testwsdeque.c:155:42: error:
+     warning: passing argument 3 of ‘createOSThread’ from incompatible pointer type [-Wincompatible-pointer-types]
+      155 |         createOSThread(&ids[n], "thief", thief, (void*)(StgWord)n);
+          |                                          ^~~~~
+          |                                          |
+          |                                          void (*)(void *)
+In file included from /home/matt/ghc-9.6-backports/_debug_clean/stage1/lib/../lib/x86_64-linux-ghc-9.6.0.20230201/rts-1.0.2/include/Rts.h:238,
+
+                 from testwsdeque.c:3:0: error: 
+
+/home/matt/ghc-9.6-backports/_debug_clean/stage1/lib/../lib/x86_64-linux-ghc-9.6.0.20230201/rts-1.0.2/include/rts/OSThreads.h:193:51: error:
+     note: expected ‘void * (*)(void *)’ but argument is of type ‘void (*)(void *)’
+      193 |                                     OSThreadProc *startProc, void *param);
+          |                                     ~~~~~~~~~~~~~~^~~~~~~~~
+Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main.
+    Call hs_init_ghc() from your main() function to set these options.

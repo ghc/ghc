@@ -84,7 +84,7 @@ test1 = do { print (mjoin (munit (), Sum 2))
 
 -- We can even provide a special binary operator for the appropriate monoids as follows:
 
-(<+>) :: (Monoidy (→) m, MId (→) m ~ (), MComp (→) m ~ (,)) 
+(<+>) :: (Monoidy (→) m, MId (→) m ~ (), MComp (→) m ~ (,))
        ⇒ m → m → m
 (<+>) = curry mjoin
 
@@ -103,17 +103,16 @@ instance (MId (→) m ~ (), MComp (→) m ~ (,), Monoidy (→) m)
   mempty = munit ()
 
 instance Applicative Wrapper where
-  pure  = return
+  pure  x = runNT munit $ Id x
   (<*>) = ap
 
 instance Monad Wrapper where
-  return x = runNT munit $ Id x
   x >>= f = runNT mjoin $ FC (f `fmap` x)
 
 -- And so the following works:
 
 test3
- = do { print (mappend mempty (Sum 2))  
+ = do { print (mappend mempty (Sum 2))
              -- Sum 2
       ; print (mappend (Product 2) (Product 3))
              -- Product 6

@@ -1,0 +1,24 @@
+
+T17744A.hs:19:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘<*>’ or ‘liftA2’
+    • In the instance declaration for ‘Applicative (Parser t)’
+
+T17744A.hs:20:4: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative (Parser t)’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T17744A.hs:23:4: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘Monad (Parser t)’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T17744A.hs:29:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘empty’ and ‘<|>’
+    • In the instance declaration for
+        ‘Alternative (Parser LeftBiasedLocal)’

@@ -1,0 +1,8 @@
+
+overloadedrecfldsrun01.hs:22:9: warning: [GHC-02256] [-Wambiguous-fields (in -Wdefault)]
+    The record update s {x = 3} with type S is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+
+overloadedrecfldsrun01.hs:23:16: warning: [GHC-02256] [-Wambiguous-fields (in -Wdefault)]
+    The record update (t :: T) {x = False} with type T is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.

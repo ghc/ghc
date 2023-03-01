@@ -1,0 +1,12 @@
+
+T5751.hs:1:79: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T5751.hs:31:8: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Widgets m’ matches
+        instance (XMLGenerator m, MonadRender m) => Widgets m
+          -- Defined at T5751.hs:28:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the type signature:
+        web :: (MonadIO m, Widgets m, XMLGenerator m) => m ()

@@ -1,0 +1,8 @@
+
+T10846.hs:10:30: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘String’
+    • In the type signature: f2 :: (?loc :: CallStack) => _
+
+T10846.hs:13:27: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
+    • Found extra-constraints wildcard standing for ‘() :: Constraint’
+    • In the type signature: f3 :: (?loc :: CallStack, _) => String

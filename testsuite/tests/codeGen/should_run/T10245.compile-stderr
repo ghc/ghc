@@ -1,0 +1,6 @@
+
+T10245.hs:6:7: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 9223372036854775808 is out of the Int range -9223372036854775808..9223372036854775807
+    Suggested fix:
+      Perhaps you intended to use NegativeLiterals
+      If you are trying to write a large negative literal

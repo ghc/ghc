@@ -1,0 +1,17 @@
+hs_try_putmvar001_c.c: In function ‘scheduleCallback’:
+
+hs_try_putmvar001_c.c:30:30: error:
+     warning: passing argument 3 of ‘pthread_create’ from incompatible pointer type [-Wincompatible-pointer-types]
+       30 |     pthread_create(&t, NULL, callback, p);
+          |                              ^~~~~~~~
+          |                              |
+          |                              void * (*)(struct callback *)
+In file included from /home/matt/ghc-9.6-backports/_debug_clean/stage1/lib/../lib/x86_64-linux-ghc-9.6.0.20230201/rts-1.0.2/include/rts/OSThreads.h:27,
+                 from /home/matt/ghc-9.6-backports/_debug_clean/stage1/lib/../lib/x86_64-linux-ghc-9.6.0.20230201/rts-1.0.2/include/Rts.h:238,
+
+                 from hs_try_putmvar001_c.c:2:0: error: 
+
+/nix/store/sxdx80lmk4zkhb51f4x5dgqvxgmx55wl-gcc-11.3.0/lib/gcc/x86_64-unknown-linux-gnu/11.3.0/include-fixed/pthread.h:213:36: error:
+     note: expected ‘void * (*)(void *)’ but argument is of type ‘void * (*)(struct callback *)’
+      213 |                            void *(*__start_routine) (void *),
+          |                            ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~

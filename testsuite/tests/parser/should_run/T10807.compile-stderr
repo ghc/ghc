@@ -1,0 +1,8 @@
+
+T10807.hs:28:48: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | otherwise -> ...
+
+T10807.hs:35:16: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a multi-way if alternative: | otherwise -> ...

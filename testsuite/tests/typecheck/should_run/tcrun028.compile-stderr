@@ -1,0 +1,16 @@
+
+tcrun028.hs:36:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘ccat’
+    • In the instance declaration for ‘ConcatPS Id a a’
+
+tcrun028.hs:37:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘ccat’
+    • In the instance declaration for ‘ConcatPS (Pop t a) b (Pop t c)’
+
+tcrun028.hs:38:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘ccat’
+    • In the instance declaration for
+        ‘ConcatPS (Push t a) b (Push t c)’

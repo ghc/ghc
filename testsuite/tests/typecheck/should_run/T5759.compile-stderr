@@ -1,0 +1,8 @@
+
+T5759.hs:1:56: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T5759.hs:14:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘+’, ‘*’, ‘abs’, ‘signum’, and (either ‘negate’ or ‘-’)
+    • In the instance declaration for ‘Num a’

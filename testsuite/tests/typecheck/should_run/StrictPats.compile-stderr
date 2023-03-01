@@ -1,0 +1,24 @@
+
+StrictPats.hs:64:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: !True = ...
+
+StrictPats.hs:68:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: True = ...
+
+StrictPats.hs:72:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: 3# = ...
+
+StrictPats.hs:76:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: !3# = ...
+
+StrictPats.hs:88:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: (# _ | #) = ...
+
+StrictPats.hs:96:9: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: (# _x | #) = ...

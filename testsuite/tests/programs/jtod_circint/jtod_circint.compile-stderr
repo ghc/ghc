@@ -1,0 +1,5 @@
+
+Signal.hs:129:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘showSig’ and ‘initial’
+    • In the instance declaration for ‘Signal (Stream a)’

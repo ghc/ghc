@@ -1,0 +1,3 @@
+
+T2594.hs:1:13: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -fffi is deprecated: use -XForeignFunctionInterface or pragma {-# LANGUAGE ForeignFunctionInterface #-} instead

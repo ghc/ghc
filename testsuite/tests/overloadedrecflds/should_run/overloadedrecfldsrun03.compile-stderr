@@ -1,0 +1,4 @@
+
+overloadedrecfldsrun03.hs:20:9: warning: [GHC-02256] [-Wambiguous-fields (in -Wdefault)]
+    The record update x {bar = True} with type Main.R:FBool is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.

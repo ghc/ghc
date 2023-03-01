@@ -16,7 +16,7 @@ f wxHigh@(W# xHigh) wxLow@(W# xLow) wy@(W# y)
     = do when debugging $ putStrLn "-----"
          when debugging $ putStrLn ("Doing " ++ show (wxHigh, wxLow)
                                              ++ " `quotRem` " ++ show wy)
-         let ix = (toInteger wxHigh `shiftL` bitSize wxHigh)
+         let ix = (toInteger wxHigh `shiftL` finiteBitSize wxHigh)
               .|. toInteger wxLow
              wanted = ix `quotRem` toInteger wy
          when debugging $ putStrLn ("Wanted: " ++ show wanted)

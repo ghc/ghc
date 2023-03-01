@@ -1,0 +1,8 @@
+
+Illumination.hs:128:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘showBitmap’: showBitmap _ _ _ = ...
+
+Illumination.hs:142:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘showBitmap'’: showBitmap' _ _ _ = ...

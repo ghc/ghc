@@ -1,0 +1,10 @@
+
+Main.hs:5:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘==’ or ‘/=’
+    • In the instance declaration for ‘Eq (a -> b)’
+
+Main.hs:11:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘abs’ and ‘signum’
+    • In the instance declaration for ‘Num (a -> b)’

@@ -1,0 +1,5 @@
+
+unpack_sums_8.hs:25:16: warning:
+    • UNPACK pragma lacks '!' on the first argument of ‘BoxVoid’
+    • In the definition of data constructor ‘BoxVoid’
+      In the data type declaration for ‘BoxVoid’

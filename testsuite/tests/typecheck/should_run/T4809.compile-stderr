@@ -1,0 +1,24 @@
+
+T4809_XMLGenerator.hs:2:66: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+T4809_XMLGenerator.hs:41:3: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘Applicative (XMLGenT m)’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+T4809_XMLGenerator.hs:44:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘empty’ and ‘<|>’
+    • In the instance declaration for ‘Alternative (XMLGenT m)’
+
+T4809_IdentityT.hs:24:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘pure’ and (either ‘<*>’ or ‘liftA2’)
+    • In the instance declaration for ‘Applicative (IdentityT m)’
+
+T4809_IdentityT.hs:25:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘empty’ and ‘<|>’
+    • In the instance declaration for ‘Alternative (IdentityT m)’

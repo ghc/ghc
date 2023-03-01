@@ -1,0 +1,6 @@
+
+fptrfail01.hs:8:12: warning: [GHC-28007] [-Wmisplaced-pragmas (in -Wdefault)]
+    Misplaced INCLUDE pragma
+    Suggested fix:
+      Perhaps you meant to place it in the module header?
+      The module header is the section at the top of the file, before the ‘module’ keyword

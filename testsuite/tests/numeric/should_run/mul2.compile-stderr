@@ -1,0 +1,5 @@
+
+mul2.hs:21:55: warning: [GHC-68441] [-Wdeprecations (in -Wdefault)]
+    In the use of ‘bitSize’
+    (imported from Data.Bits, but defined in GHC.Bits):
+    Deprecated: "Use 'bitSizeMaybe' or 'finiteBitSize' instead"

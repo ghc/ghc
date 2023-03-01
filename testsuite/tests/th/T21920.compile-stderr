@@ -1,0 +1,12 @@
+
+T21920.hs:8:29: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘Num Char’ arising from a use of ‘+’
+    • In the second argument of ‘const’, namely ‘('a' + 'a')’
+      In the expression: const [| True |] ('a' + 'a')
+      In the untyped splice: $(const [| True |] ('a' + 'a'))
+
+T21920.hs:11:32: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for ‘Num Char’ arising from a use of ‘+’
+    • In the second argument of ‘const’, namely ‘('a' + 'a')’
+      In the expression: const [|| True ||] ('a' + 'a')
+      In the Template Haskell splice $$(const [|| True ||] ('a' + 'a'))

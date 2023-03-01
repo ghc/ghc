@@ -1443,12 +1443,21 @@ def do_compile(name: TestName,
 
     expected_stderr_file = find_expected_file(name, 'stderr')
     actual_stderr_file = add_suffix(name, 'comp.stderr')
+    result = check_compile_stderr(way, name, expected_stderr_file, actual_stderr_file)
+    if badResult(result):
+        return result
+
+
+    # no problems found, this test passed
+    return passed()
+
+def check_compile_stderr(way, name, expected, actual):
     diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
     if not compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
-                           expected_stderr_file, actual_stderr_file,
+                           expected, actual,
                            diff_file=diff_file_name,
                            whitespace_normaliser=getattr(getTestOpts(),
                                                          "whitespace_normaliser",
@@ -1456,9 +1465,6 @@ def do_compile(name: TestName,
         stderr = diff_file_name.read_text()
         diff_file_name.unlink()
         return failBecause('stderr mismatch', stderr=stderr)
-
-
-    # no problems found, this test passed
     return passed()
 
 def compile_cmp_asm(name: TestName,
@@ -1544,13 +1550,19 @@ def compile_and_run__(name: TestName,
     result = extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
        return result
-    extra_hc_opts = result.hc_opts
+    extra_hc_opts = "-v0 " + result.hc_opts
     assert extra_hc_opts is not None
 
     if way.startswith('ghci'): # interpreted...
         return interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
         result = simple_build(name, way, extra_hc_opts, False, top_mod, [], True, True, backpack = backpack)
+        if badResult(result):
+            return result
+
+        expected_stderr_file = find_expected_file(name, 'compile-stderr')
+        actual_stderr_file = add_suffix(name, 'comp.stderr')
+        result = check_compile_stderr(way, name, expected_stderr_file, actual_stderr_file)
         if badResult(result):
             return result
 

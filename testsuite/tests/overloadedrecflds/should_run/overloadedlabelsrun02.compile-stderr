@@ -1,0 +1,3 @@
+
+overloadedlabelsrun02.hs:12:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS

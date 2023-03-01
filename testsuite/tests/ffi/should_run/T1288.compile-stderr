@@ -1,0 +1,11 @@
+
+T1288_c.c:4:1: error:
+     warning: ‘stdcall’ attribute ignored [-Wattributes]
+        4 | {
+          | ^
+
+T1288.hs:4:1: warning: [GHC-01245] [-Wunsupported-calling-conventions (in -Wdefault)]
+    • the 'stdcall' calling convention is unsupported on this platform,
+      treating as ccall
+    • When checking declaration:
+        foreign import stdcall safe "test" ctest :: CInt -> IO ()

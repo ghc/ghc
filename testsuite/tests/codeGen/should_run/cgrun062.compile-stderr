@@ -1,0 +1,4 @@
+
+cgrun062.hs:14:19: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: C {f = v} -> ...

@@ -1,0 +1,4 @@
+
+T20024.hs:2:20: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding guards: | False = ...

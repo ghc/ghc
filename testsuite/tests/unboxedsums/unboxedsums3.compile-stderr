@@ -1,0 +1,10 @@
+
+unboxedsums3.hs:11:16: warning: [GHC-68441] [-Wdeprecations (in -Wdefault)]
+    In the use of type constructor or class ‘Void#’
+    (imported from GHC.Types):
+    Deprecated: "Void# is now an alias for the unboxed tuple (# #)."
+
+unboxedsums3.hs:19:23: warning: [GHC-68441] [-Wdeprecations (in -Wdefault)]
+    In the use of type constructor or class ‘Void#’
+    (imported from GHC.Types):
+    Deprecated: "Void# is now an alias for the unboxed tuple (# #)."

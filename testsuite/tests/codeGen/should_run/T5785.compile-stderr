@@ -1,0 +1,45 @@
+
+T5785.hs:12:13: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+T5785.hs:13:13: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word16 range 0..65535
+
+T5785.hs:14:13: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word32 range 0..4294967295
+
+T5785.hs:15:13: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word64 range 0..18446744073709551615
+
+T5785.hs:22:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 2316287658 is out of the Word8 range 0..255
+
+T5785.hs:23:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 2316287658 is out of the Word16 range 0..65535
+
+T5785.hs:26:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 2316287658 is out of the Int8 range -128..127
+
+T5785.hs:27:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 2316287658 is out of the Int16 range -32768..32767
+
+T5785.hs:28:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 2316287658 is out of the Int32 range -2147483648..2147483647
+
+T5785.hs:32:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Word8 range 0..255
+
+T5785.hs:33:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Word16 range 0..65535
+
+T5785.hs:34:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Word32 range 0..4294967295
+
+T5785.hs:36:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Int8 range -128..127
+
+T5785.hs:37:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Int16 range -32768..32767
+
+T5785.hs:38:12: warning: [GHC-97441] [-Woverflowed-literals (in -Wdefault)]
+    Literal 32342316287658 is out of the Int32 range -2147483648..2147483647

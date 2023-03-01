@@ -18,7 +18,7 @@ f wx@(W# x) wy@(W# y)
              (# h, l #) ->
                  do let wh = W# h
                         wl = W# l
-                        r = shiftL (fromIntegral wh) (bitSize wh)
+                        r = shiftL (fromIntegral wh) (finiteBitSize wh)
                           + fromIntegral wl
                     putStrLn ("High: " ++ show wh)
                     putStrLn ("Low: " ++ show wl)

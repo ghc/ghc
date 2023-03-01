@@ -1,0 +1,6 @@
+
+dsrun007.hs:5:23: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘C’ not initialised
+    • In the first argument of ‘unpick’, namely ‘(C {})’
+      In the first argument of ‘print’, namely ‘(unpick (C {}))’
+      In the expression: print (unpick (C {}))

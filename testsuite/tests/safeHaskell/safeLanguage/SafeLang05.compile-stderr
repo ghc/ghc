@@ -1,0 +1,7 @@
+
+<no location info>: warning:
+    -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
+
+SafeLang05.hs:14:11: warning: [GHC-56147]
+    Rule "lookupx/T" ignored
+    Defining user rules is disabled under Safe Haskell

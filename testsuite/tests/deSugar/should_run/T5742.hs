@@ -1,10 +1,10 @@
-{-# LANGUAGE DoRec #-}
+{-# LANGUAGE RecursiveDo #-}
 
 module Main where
 
 main = do { x <- foo; print x }
 foo :: IO Int
-foo = do rec 
+foo = do rec
              a1 <- return a2
              a2 <- return a3
              a3 <- return a4

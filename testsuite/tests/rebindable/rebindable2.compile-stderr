@@ -1,0 +1,20 @@
+
+rebindable2.hs:27:13: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘pure = return’ definition detected
+    in the instance declaration for ‘(Applicative TM)’.
+    Move definition from ‘return’ to ‘pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+rebindable2.hs:32:17: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘return’ definition detected
+    in the instance declaration for ‘(Monad TM)’.
+    ‘return’ will eventually be removed in favour of ‘pure’
+    Either remove definition for ‘return’ (recommended) or define as ‘return = pure’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return
+
+rebindable2.hs:36:17: warning: [-Wnoncanonical-monad-instances (in -Wdefault)]
+    Noncanonical ‘(>>)’ definition detected
+    in the instance declaration for ‘(Monad TM)’.
+    ‘(>>)’ will eventually be removed in favour of ‘(*>)’
+    Either remove definition for ‘(>>)’ (recommended) or define as ‘(>>) = (*>)’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return

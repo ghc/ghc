@@ -1,0 +1,15 @@
+
+T11230.hs:15:24: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘Char’ with ‘Bool’
+      Expected: Representational Char -> Representational Bool
+        Actual: Representational Char -> Representational Char
+    • In the expression: id
+      In an equation for ‘testRepresentational’:
+          testRepresentational = id
+
+T11230.hs:19:15: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘Char’ with ‘Bool’
+      Expected: Phantom Char -> Phantom Bool
+        Actual: Phantom Char -> Phantom Char
+    • In the expression: id
+      In an equation for ‘testPhantom’: testPhantom = id

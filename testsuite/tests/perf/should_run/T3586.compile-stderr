@@ -1,0 +1,3 @@
+
+T3586.hs:2:13: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -fvia-C is deprecated: The -fvia-C flag does nothing; it will be removed in a future GHC release

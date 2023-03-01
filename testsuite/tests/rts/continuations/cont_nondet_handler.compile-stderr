@@ -1,0 +1,5 @@
+
+cont_nondet_handler.hs:30:45: warning: [GHC-58008] [-Wgadt-mono-local-binds (in -Wdefault)]
+    Pattern matching on GADTs without MonoLocalBinds is fragile.
+    Suggested fix:
+      Enable any of the following extensions: GADTs, TypeFamilies

@@ -1,0 +1,16 @@
+
+T5315.hs:48:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘hHead’: hHead _ = ...
+
+T5315.hs:52:1: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘hTail’: hTail _ = ...
+
+T5315.hs:78:3: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+
+T5315.hs:87:3: warning: [GHC-53633] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a case alternative: _ -> ...

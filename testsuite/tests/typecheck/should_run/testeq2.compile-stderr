@@ -1,0 +1,21 @@
+
+testeq2.hs:4:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+testeq2.hs:29:11: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘TypeEq t t' b’ matches
+        instance forall k1 k2 k3 (x :: k1) (y :: k2) (b :: k3).
+                 TypeEq' () x y b =>
+                 TypeEq x y b
+          -- Defined at testeq2.hs:51:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the type signature: typeEq :: TypeEq t t' b => t -> t' -> b
+
+testeq2.hs:56:10: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘TypeCast b HTrue’ matches
+        instance TypeCast' () a b => TypeCast a b
+          -- Defined at testeq2.hs:39:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘TypeEq' () x x b’

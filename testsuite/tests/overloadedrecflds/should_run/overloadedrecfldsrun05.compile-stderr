@@ -1,0 +1,4 @@
+
+overloadedrecfldsrun05.hs:15:26: warning: [GHC-02256] [-Wambiguous-fields (in -Wdefault)]
+    The record update e {foo} with type S is ambiguous.
+    This will not be supported by -XDuplicateRecordFields in future releases of GHC.

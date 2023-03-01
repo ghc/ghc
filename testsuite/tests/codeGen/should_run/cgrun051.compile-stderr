@@ -1,0 +1,4 @@
+
+cgrun051.hs:7:45: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In a case alternative: T2 x y -> ...

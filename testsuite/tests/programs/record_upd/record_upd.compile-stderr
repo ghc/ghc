@@ -1,0 +1,21 @@
+
+Main.hs:22:15: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘MkT3’ not initialised:
+        op5 :: d0
+    • In the second argument of ‘($)’, namely
+        ‘MkT3 {op4 = op2 $ update1 (1 :: Int) $ MkT1 {op1 = True}}’
+      In the second argument of ‘($)’, namely
+        ‘update2 True
+           $ MkT3 {op4 = op2 $ update1 (1 :: Int) $ MkT1 {op1 = True}}’
+      In the first argument of ‘print’, namely
+        ‘(op4
+            $ update2 True
+                $ MkT3 {op4 = op2 $ update1 (1 :: Int) $ MkT1 {op1 = True}})’
+
+Main.hs:24:28: warning: [GHC-20125] [-Wmissing-fields (in -Wdefault)]
+    • Fields of ‘MkT1’ not initialised:
+        op2 :: a0
+    • In the second argument of ‘($)’, namely ‘MkT1 {op1 = True}’
+      In the second argument of ‘($)’, namely
+        ‘update1 (1 :: Int) $ MkT1 {op1 = True}’
+      In the ‘op4’ field of a record
