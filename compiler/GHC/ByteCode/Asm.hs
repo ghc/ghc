@@ -395,10 +395,7 @@ assembleI platform i = case i of
   PUSH_BCO proto           -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit bci_PUSH_G [Op p]
-  PUSH_ALTS proto          -> do let ul_bco = assembleBCO platform proto
-                                 p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit bci_PUSH_ALTS [Op p]
-  PUSH_ALTS_UNLIFTED proto pk
+  PUSH_ALTS proto pk
                            -> do let ul_bco = assembleBCO platform proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
                                  emit (push_alts pk) [Op p]
@@ -504,8 +501,7 @@ assembleI platform i = case i of
   SWIZZLE   stkoff n       -> emit bci_SWIZZLE [SmallOp stkoff, SmallOp n]
   JMP       l              -> emit bci_JMP [LabelOp l]
   ENTER                    -> emit bci_ENTER []
-  RETURN                   -> emit bci_RETURN []
-  RETURN_UNLIFTED rep      -> emit (return_unlifted rep) []
+  RETURN rep               -> emit (return_non_tuple rep) []
   RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
                                  emit bci_CCALL [SmallOp off, Op np, SmallOp i]
@@ -574,16 +570,16 @@ push_alts V16 = error "push_alts: vector"
 push_alts V32 = error "push_alts: vector"
 push_alts V64 = error "push_alts: vector"
 
-return_unlifted :: ArgRep -> Word16
-return_unlifted V   = bci_RETURN_V
-return_unlifted P   = bci_RETURN_P
-return_unlifted N   = bci_RETURN_N
-return_unlifted L   = bci_RETURN_L
-return_unlifted F   = bci_RETURN_F
-return_unlifted D   = bci_RETURN_D
-return_unlifted V16 = error "return_unlifted: vector"
-return_unlifted V32 = error "return_unlifted: vector"
-return_unlifted V64 = error "return_unlifted: vector"
+return_non_tuple :: ArgRep -> Word16
+return_non_tuple V   = bci_RETURN_V
+return_non_tuple P   = bci_RETURN_P
+return_non_tuple N   = bci_RETURN_N
+return_non_tuple L   = bci_RETURN_L
+return_non_tuple F   = bci_RETURN_F
+return_non_tuple D   = bci_RETURN_D
+return_non_tuple V16 = error "return_non_tuple: vector"
+return_non_tuple V32 = error "return_non_tuple: vector"
+return_non_tuple V64 = error "return_non_tuple: vector"
 
 {-
   we can only handle up to a fixed number of words on the stack,
