@@ -17,6 +17,7 @@
 
 module Data.Tuple
   ( Solo (..)
+  , getSolo
   , fst
   , snd
   , curry
@@ -25,7 +26,7 @@ module Data.Tuple
   ) where
 
 import GHC.Base ()      -- Note [Depend on GHC.Tuple]
-import GHC.Tuple (Solo (..))
+import GHC.Tuple (Solo (..), getSolo)
 
 default ()              -- Double isn't available yet
 

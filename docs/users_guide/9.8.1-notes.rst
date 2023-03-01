@@ -46,6 +46,7 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- ``Data.Tuple`` now exports ``getSolo :: Solo a -> a``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

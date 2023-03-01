@@ -7,6 +7,8 @@
   * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
       ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
   * Add INLINABLE pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
+  * Export `getSolo` from `Data.Tuple`.
+      ([CLC proposal #113](https://github.com/haskell/core-libraries-committee/issues/113))
 
 ## 4.18.0.0 *TBA*
 
