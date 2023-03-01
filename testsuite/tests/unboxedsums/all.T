@@ -5,7 +5,7 @@ test('unboxedsums_unit_tests',
 
 test('unarise',       normal, compile_and_run, [''])
 test('unboxedsums1',  normal, compile_and_run, [''])
-test('unboxedsums2',  omit_ways(['ghci']), compile_and_run, [''])  # broken on ghci because of #23412
+test('unboxedsums2',  normal, compile_and_run, [''])
 test('unboxedsums3',  normal, compile_and_run, [''])
 test('unboxedsums4',  normal, compile_fail, [''])
 test('unboxedsums5',  normal, compile, [''])

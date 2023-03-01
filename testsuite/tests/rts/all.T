@@ -566,14 +566,14 @@ test('cloneMyStack_retBigStackFrame', [req_c, extra_files(['cloneStackLib.c']), 
 test('cloneThreadStack', [req_c, only_ways(['threaded1']), extra_ways(['threaded1']), extra_files(['cloneStackLib.c']), req_ghc_with_threaded_rts], compile_and_run, ['cloneStackLib.c -threaded'])
 
 test('decodeMyStack',
-  [ js_broken(22261) # cloneMyStack# not yet implemented
+  [ omit_ways(["ghci"]), js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, ['-finfo-table-map'])
 
 # Options:
 #   - `-kc8K`: Set stack chunk size to it's minimum to provoke underflow stack frames.
 test('decodeMyStack_underflowFrames',
   [ extra_run_opts('+RTS -kc8K -RTS')
-  , js_broken(22261) # cloneMyStack# not yet implemented
+  , omit_ways(["ghci"]), js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, ['-finfo-table-map -rtsopts'])
 
 # -finfo-table-map intentionally missing

@@ -281,6 +281,7 @@ def req_cmm( name, opts ):
     """
     # JS backend doesn't support Cmm
     js_skip(name, opts)
+    omit_ways(["ghci"])(name, opts)
 
 def req_ffi_exports( name, opts):
     """
@@ -461,7 +462,7 @@ def only_ways( ways: List[WayName] ):
 # -----
 
 def valid_way( way: WayName ) -> bool:
-    if way in {'ghci', 'ghci-ext'}:
+    if way in {'ghci', 'ghci_opt', 'ghci-ext'}:
         return config.have_RTS_linker
     if way == 'ghci-ext-prof':
         return config.have_RTS_linker and config.have_profiling
@@ -1137,8 +1138,8 @@ async def test_common_work(name: TestName, opts,
         elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
         elif func == ghci_script:
-            if WayName('ghci') in config.run_ways:
-                all_ways = [WayName('ghci')]
+            if config.have_interp:
+                all_ways = [WayName('ghci'), WayName('ghci_opt')]
             else:
                 all_ways = []
             if isCross():
@@ -1956,6 +1957,9 @@ async def interpreter_run(name: TestName,
 
     delimiter = '===== program output begins here\n'
 
+    pat = re.compile(r'-main-is (\w+)')
+    res = pat.search(extra_hc_opts)
+    main_is = res.group(1) if res else "main"
     with script.open('w', encoding='UTF-8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
@@ -1969,7 +1973,7 @@ async def interpreter_run(name: TestName,
         f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
+        f.write('GHC.TopHandler.runIOFastExit {main_is} Prelude.>> Prelude.return ()\n'.format(main_is=main_is))
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
     if stdin.exists():
