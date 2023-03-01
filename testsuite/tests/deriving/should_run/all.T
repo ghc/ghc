@@ -41,7 +41,9 @@ test('T10104', normal, compile_and_run, [''])
 test('T10447', normal, compile_and_run, [''])
 test('T10598_bug', normal, compile_and_run, [''])
 test('T10598_run', normal, compile_and_run, [''])
-test('T11535', when(opsys('mingw32'), expect_broken_for(12210, ['ghci'])),
+test('T11535',
+     [when(opsys('mingw32'), expect_broken_for(12210, ghci_ways)),
+      omit_ghci], # withExecBuffer: Too large
      compile_and_run, [''])
 test('T14918', normal, compile_and_run, [''])
 test('T20371', normal, compile_and_run, ['-dppr-debug'])

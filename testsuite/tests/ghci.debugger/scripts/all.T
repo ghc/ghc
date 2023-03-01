@@ -1,6 +1,7 @@
 setTestOpts([extra_run_opts('-ignore-dot-ghci'),
              when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
-             normalise_slashes])
+             normalise_slashes,
+             expect_broken_for(23272, ['ghci-opt'])]) # breakpoints are broken with optimizations, remove when !10448 is merged
 
 
 test('print001', normal, ghci_script, ['print001.script'])

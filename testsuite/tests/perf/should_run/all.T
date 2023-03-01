@@ -86,9 +86,7 @@ if config.arch == 'i386':
 else:
    sse2_opts = ''
 
-test('T4321',
-     omit_ways(['ghci']),
-     compile_and_run, ['-O ' + sse2_opts])
+test('T4321', normal, compile_and_run, ['-O ' + sse2_opts])
 
 test('T3736', [], makefile_test, ['T3736'])
 test('T3738',
@@ -189,7 +187,7 @@ test('Conversions',
      ],
     compile_and_run, ['-O -msse2'])
 
-test('T7507', omit_ways(['ghci']), compile_and_run, ['-O'])
+test('T7507', normal, compile_and_run, ['-O'])
 # For 7507, stack overflow is the bad case
 
 test('T7436',

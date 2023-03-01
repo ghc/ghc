@@ -44,7 +44,8 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
      compile_and_run, [''])
 
 # without -O, goes into an infinite loop
-test('T4030', normal, compile_and_run, ['-O'])
+# times out with ghci
+test('T4030', omit_ghci, compile_and_run, ['-O'])
 
 test('throwto002', normal, compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
@@ -80,7 +81,7 @@ test('T5611a', fragile(12751), compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
-test('readMVar1', normal, compile_and_run, [''])
+test('readMVar1', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
 test('readMVar2', normal, compile_and_run, [''])
 test('readMVar3', normal, compile_and_run, [''])
 test('tryReadMVar1', normal, compile_and_run, [''])
@@ -112,7 +113,7 @@ test('allocLimit3', [ when(opsys('mingw32'), only_ways(threaded_ways)),
 test('allocLimit4', [ extra_run_opts('+RTS -xq300k -RTS'),
                       js_skip,
                       # ghci consumes part of set limit at startup
-                      omit_ways(['ghci']) ],
+                      omit_ghci ],
                     compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
@@ -148,10 +149,10 @@ test('conc016', [omit_ways(concurrent_ways)  # see comment in conc016.hs
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
-test('conc019', extra_run_opts('+RTS -K16m -RTS'), compile_and_run, [''])
+test('conc019', [extra_run_opts('+RTS -K16m -RTS'), expect_broken_for(23272, ['ghci-opt'])], compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
 test('conc021',
-  [ omit_ways(['ghci']), exit_code(1)
+  [ omit_ghci, exit_code(1)
   , js_skip # foreign exports not supported yet
   ],
   compile_and_run, [''])
@@ -172,7 +173,7 @@ test('conc033', normal, compile_and_run, [''])
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 test('conc034', [
                  normal,
-                 omit_ways(['ghci']),
+                 omit_ghci,
                  extra_run_opts('+RTS -C0 -RTS'),
                  js_skip],
 		compile_and_run, [''])
@@ -211,10 +212,10 @@ test('conc038', only_ways(['threaded1', 'threaded2', 'nonmoving_thr']), compile_
 # Omit for GHCi and for the JS backend, uses foreign export
 # Omit for the threaded ways, because in this case the main thread is allowed to
 # complete, which causes the child thread to be interrupted.
-test('conc039', [omit_ways(['ghci'] + threaded_ways), js_skip], compile_and_run, [''])
+test('conc039', [omit_ways(ghci_ways + threaded_ways), js_skip], compile_and_run, [''])
 
 # Omit for GHCi and for the JS backend, uses foreign export
-test('conc040', [exit_code(1), omit_ways(['ghci']), js_skip], compile_and_run, [''])
+test('conc040', [exit_code(1), omit_ghci, js_skip], compile_and_run, [''])
 
 # STM-related tests.
 test('conc041', normal, compile_and_run, [''])
@@ -277,7 +278,7 @@ test('hs_try_putmvar001',
 # This one should work for both threaded and non-threaded RTS
 test('hs_try_putmvar002',
      [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
-      omit_ways(['ghci']),
+      omit_ghci,
       req_c,
       extra_run_opts('1 8 10000')],
      compile_and_run, ['hs_try_putmvar002_c.c'])

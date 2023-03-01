@@ -5,7 +5,6 @@ test('HooplPostorder',
 
 test('cmp64',
      [    extra_run_opts('"' + config.libdir + '"')
-     ,    omit_ways(['ghci'])
      ,    req_cmm
      ],
      multi_compile_and_run,
@@ -20,7 +19,6 @@ test('cmp64',
 
 test('ByteSwitch',
      [    extra_run_opts('"' + config.libdir + '"')
-     ,    omit_ways(['ghci'])
      ,    req_cmm
      ],
      multi_compile_and_run,
@@ -28,7 +26,6 @@ test('ByteSwitch',
 
 test('T22871',
      [    extra_run_opts('"' + config.libdir + '"')
-     ,    omit_ways(['ghci'])
      ,    req_cmm
      ,    when(arch('i386'), skip) # x86 NCG panics with "iselExpr64(i386)"
      ],
@@ -37,7 +34,6 @@ test('T22871',
 
 test('AtomicFetch',
      [    extra_run_opts('"' + config.libdir + '"')
-     ,    omit_ways(['ghci'])
      ,    req_cmm
      ,    when(arch('i386'), skip) # https://gitlab.haskell.org/ghc/ghc/-/issues/23217
      ],

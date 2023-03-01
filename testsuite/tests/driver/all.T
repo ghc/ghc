@@ -167,8 +167,8 @@ fobject_code = when(doing_ghci(), extra_hc_opts('-fobject-code'))
 
 test( 'T4114a', fobject_code, compile_and_run, ['-cpp'])
 test( 'T4114b', fobject_code, compile_and_run, ['-no-keep-hi-files'])
-test( 'T4114c', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_run, ['-no-keep-o-files'])
-test( 'T4114d', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_run,
+test( 'T4114c', [fobject_code, expect_broken_for(4114, ghci_ways)], compile_and_run, ['-no-keep-o-files'])
+test( 'T4114d', [fobject_code, expect_broken_for(4114, ghci_ways)], compile_and_run,
      ['-hisuf .myhi -osuf .myo -no-keep-o-files'])
 
 test('T5584', [], makefile_test, [])
@@ -288,7 +288,7 @@ test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
      [extra_files(['T16737include/']),
       req_th,
-      expect_broken_for(16541, ['ghci'])],
+      expect_broken_for(16541, ghci_ways)],
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
 
 test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])

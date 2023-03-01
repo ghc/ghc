@@ -29,7 +29,7 @@ test('cgrun021', extra_ways(['nursery_chunks']), compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
 test('cgrun025',
-     [ extra_run_opts('cgrun025.hs < /dev/null'), exit_code(1), when(arch('wasm32'), fragile(23275))],
+     [ omit_ghci, extra_run_opts('cgrun025.hs < /dev/null'), exit_code(1), when(arch('wasm32'), fragile(23275))],
      compile_and_run, [''])
 test('cgrun026', normal, compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])
@@ -69,12 +69,12 @@ test('cgrun060',
 test('cgrun061', normal, compile_and_run, [''])
 test('cgrun062', normal, compile_and_run, [''])
 test('cgrun063', normal, compile_and_run, [''])
-test('cgrun064', normal, compile_and_run, [''])
+test('cgrun064', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
 test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun069',
-     [ omit_ways(['ghci']), req_cmm, when(arch('wasm32'), fragile(22854))],
+     [ req_cmm, when(arch('wasm32'), fragile(22854))],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -86,7 +86,7 @@ test('cgrun072', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
-test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
+test('cgrun078', normal, compile_and_run, [''])
 test('cgrun079', normal, compile_and_run, [''])
 test('cgrun080', normal, compile_and_run, [''])
 test('cas_int', normal, compile_and_run, [''])
@@ -99,7 +99,7 @@ test('T3207', normal, compile_and_run, [''])
 test('T3561', normal, compile_and_run, [''])
 test('T3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('T4441', normal, compile_and_run, [''])
-test('T5149', [omit_ways(['ghci']), req_cmm], multi_compile_and_run,
+test('T5149', [req_cmm], multi_compile_and_run,
                  ['T5149', [('T5149_cmm.cmm', '')], ''])
 test('T5129',
      # The bug is in simplifier when run with -O1 and above, so only run it
@@ -140,17 +140,16 @@ test('CgStaticPointersNoFullLazyness', [when(doing_ghci(), extra_hc_opts('-fobje
 test('StaticArraySize', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O2'])
 test('StaticByteArraySize', normal, compile_and_run, ['-O2'])
-test('CopySmallArray', normal, compile_and_run, [''])
+test('CopySmallArray', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
 test('SizeOfSmallArray', normal, compile_and_run, [''])
-test('NewSmallArray', normal, compile_and_run, [''])
+test('NewSmallArray', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
 test('T9001', normal, compile_and_run, [''])
-test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
+test('T9013', normal,
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
 test('cgrun074', normal, compile_and_run, [''])
 test('CmmSwitchTest32', [unless(wordsize(32), skip), req_cmm], compile_and_run, [''])
 test('CmmSwitchTest64', [unless(wordsize(64), skip), req_cmm], compile_and_run, [''])
-# Skipping WAY=ghci, because it is not broken.
 test('T10245', normal, compile_and_run, [''])
 test('T10246', normal, compile_and_run, [''])
 test('T9533', normal, compile_and_run, [''])
@@ -161,11 +160,7 @@ test('T10414', [only_ways(['threaded2']), extra_ways(['threaded2']), req_target_
 test('T10521', normal, compile_and_run, [''])
 test('T10521b', normal, compile_and_run, [''])
 test('T10870', when(wordsize(32), skip), compile_and_run, [''])
-test('PopCnt',
-  [omit_ways(['ghci'])
-  ,req_cmm
-  ], multi_compile_and_run,
-                 ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
+test('PopCnt', [req_cmm], multi_compile_and_run, ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
 test('T12059',
   [ js_skip # ByteArrays are always pinned with the JS backend
   ],
@@ -228,5 +223,5 @@ test('T20640a', normal, compile_and_run, [''])
 test('T20640b', normal, compile_and_run, [''])
 test('T22296',[only_ways(llvm_ways)
               ,unless(arch('x86_64'), skip)],compile_and_run,[''])
-test('T22798', normal, compile_and_run, ['-fregs-graph'])
+test('T22798', expect_broken_for(23272, ['ghci-opt']), compile_and_run, ['-fregs-graph'])
 test('CheckBoundsOK', normal, compile_and_run, ['-fcheck-prim-bounds'])

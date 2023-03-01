@@ -91,3 +91,4 @@ test('T23229', just_ghci + [extra_hc_opts("-this-unit-id my-package -Wno-missing
 test('T22958a', just_ghci, compile_and_run, [''])
 test('T22958b', just_ghci, compile_and_run, [''])
 test('T22958c', just_ghci, compile_and_run, [''])
+test('GhciMainIs', just_ghci, compile_and_run, ['-main-is otherMain'])

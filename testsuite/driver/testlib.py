@@ -281,6 +281,7 @@ def req_cmm( name, opts ):
     """
     # JS backend doesn't support Cmm
     js_skip(name, opts)
+    omit_ghci(name, opts)
 
 def req_ffi_exports( name, opts):
     """
@@ -449,6 +450,8 @@ def _omit_ways( name: TestName, opts, ways: List[WayName] ):
     _lint_ways(name, ways)
     opts.omit_ways += ways
 
+omit_ghci = omit_ways([WayName('ghci'), WayName('ghci-opt')])
+
 # -----
 
 def only_ways( ways: List[WayName] ):
@@ -458,10 +461,12 @@ def only_ways( ways: List[WayName] ):
 
     return helper
 
+only_ghci = only_ways([WayName('ghci'), WayName('ghci-opt')])
+
 # -----
 
 def valid_way( way: WayName ) -> bool:
-    if way in {'ghci', 'ghci-ext'}:
+    if way in {'ghci', 'ghci-opt', 'ghci-ext'}:
         return config.have_RTS_linker
     if way == 'ghci-ext-prof':
         return config.have_RTS_linker and config.have_profiling
@@ -637,7 +642,7 @@ def unless(b: bool, f):
     return when(not b, f)
 
 def doing_ghci() -> bool:
-    return 'ghci' in config.run_ways
+    return 'ghci' in config.run_ways or 'ghci-opt' in config.run_ways
 
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
@@ -1139,8 +1144,8 @@ async def test_common_work(name: TestName, opts,
         elif func in [compile_and_run, multi_compile_and_run, multimod_compile_and_run]:
             all_ways = config.run_ways
         elif func == ghci_script:
-            if WayName('ghci') in config.run_ways:
-                all_ways = [WayName('ghci')]
+            if config.have_interp:
+                all_ways = [WayName('ghci'), WayName('ghci-opt')]
             else:
                 all_ways = []
             if isCross():
@@ -1880,7 +1885,7 @@ async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: st
     # isStatsTest and way == 'ghci':
     #   assume we are running a program via ghci. Collect stats
     stats_file = None # type: Optional[str]
-    if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci'):
+    if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci' or way == 'ghci-opt'):
         stats_file = name + '.stats'
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
@@ -1953,7 +1958,7 @@ async def interpreter_run(name: TestName,
 
     if opts.combined_output:
         framework_fail(name, WayName('unsupported'),
-                       'WAY=ghci and combined_output together is not supported')
+                       'WAY=ghci[-opt] and combined_output together is not supported')
 
     if top_mod is None:
         srcname = add_hs_lhs_suffix(name)
@@ -1962,6 +1967,9 @@ async def interpreter_run(name: TestName,
 
     delimiter = '===== program output begins here\n'
 
+    pat = re.compile(r'-main-is (\w+)')
+    res = pat.search(extra_hc_opts)
+    main_is = res.group(1) if res else "Main.main"
     with script.open('w', encoding='UTF-8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
@@ -1975,7 +1983,7 @@ async def interpreter_run(name: TestName,
         f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
+        f.write('GHC.TopHandler.runIOFastExit {main_is} Prelude.>> Prelude.return ()\n'.format(main_is=main_is))
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
     if stdin.exists():
@@ -2015,10 +2023,14 @@ async def interpreter_run(name: TestName,
     # ToDo: if the sub-shell was killed by ^C, then exit
 
     if not (opts.ignore_stderr or await stderr_ok(name, way)):
+        if _expect_pass(way):
+            dump_stderr_for('comp', name)
         return failBecause('bad stderr',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
     elif not (opts.ignore_stdout or await stdout_ok(name, way)):
+        if _expect_pass(way):
+            dump_stderr_for('comp', name)
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -2090,18 +2102,32 @@ async def stderr_ok(name: TestName, way: WayName) -> bool:
                           expected_stderr_file, actual_stderr_file,
                           whitespace_normaliser=normalise_whitespace)
 
-def read_stderr( name: TestName ) -> str:
-    path = in_testdir(name, 'run.stderr')
+def read_comp_stderr( name: TestName ) -> str:
+    path = in_testdir(name, 'comp.stderr')
     if path.exists():
         return path.read_text(encoding='UTF-8')
     else:
         return ''
 
-def dump_stderr( name: TestName ) -> None:
-    s = read_stderr(name).strip()
+def read_stderr_for( phase: str, name: TestName ) -> str:
+    path = in_testdir(name, phase + '.stderr')
+    if path.exists():
+        return path.read_text(encoding='UTF-8')
+    else:
+        return ''
+
+def read_stderr( name: TestName ) -> str:
+    return read_stderr_for('run', name)
+
+def dump_stderr_for( phase: str, name: TestName ) -> None:
+    s = read_stderr_for(phase, name).strip()
     if s:
-        print("Stderr (", name, "):")
+        print("Stderr ", phase, " (", name, "):")
         safe_print(s)
+
+def dump_stderr( name: TestName ) -> None:
+    dump_stderr_for('comp', name)
+    dump_stderr_for('run', name)
 
 def read_no_crs(f: Path) -> str:
     s = ''

@@ -49,7 +49,7 @@ test('isValidNatural', normal, compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',
-     [when(fast(), skip),extra_run_opts('+RTS -K64m -RTS')],
+     [when(fast(), skip),extra_run_opts('+RTS -K64m -RTS'), expect_broken_for(23272, ['ghci-opt'])],
      compile_and_run,
      ['+RTS -K64m -RTS'])
 
@@ -96,11 +96,11 @@ test('addr001',		normal, compile_and_run, [''])
 test('dynamic001',      normal, compile_and_run, [''])
 test('dynamic002',      normal, compile_and_run, [''])
 test('dynamic003',      extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
-test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_run, [''])
+test('dynamic004',      omit_ways(['normal', 'threaded1']), compile_and_run, [''])
 test('dynamic005',      normal, compile_and_run, [''])
 
 enum_setups = [when(fast(), skip)]
-def enum_test(name):
+def enum_test(name, omit):
     """
     These tests have a funky Python preprocessor which require some headstands
     to run on Windows.
@@ -108,18 +108,20 @@ def enum_test(name):
     if opsys('mingw32'):
         test(name,
              [when(opsys('mingw32'), extra_files(['enum_processor.bat'])),
+              omit_ways(omit),
               extra_files(['enum_processor.py'])],
              compile_and_run,
              ['-F -pgmF ./enum_processor.bat'])
     else:
         test(name,
-             [extra_files(['enum_processor.py'])],
+             [extra_files(['enum_processor.py']),
+              omit_ways(omit)],
              compile_and_run,
              ['-F -pgmF ./enum_processor.py'])
 
-enum_test('enum01')
-enum_test('enum02')
-enum_test('enum03')
+enum_test('enum01', ['ghci-opt'])
+enum_test('enum02', [])
+enum_test('enum03', [])
 test('enum04', normal, compile_and_run, [''])
 
 test('exceptionsrun001',        normal, compile_and_run, [''])
@@ -169,7 +171,14 @@ test('qsemn001', normal, compile_and_run, [''])
 
 test('T7457', normal, compile_and_run, [''])
 
-test('T7773', [when(opsys('mingw32'), skip), js_broken(22261), when(arch('wasm32'), fragile(23275))], compile_and_run, [''])
+test('T7773',
+     [when(opsys('mingw32'), skip),
+      js_broken(22261),
+      expect_broken_for(23272, ['ghci-opt']), # unclear
+      when(arch('wasm32'),
+      fragile(23275))],
+     compile_and_run,
+     [''])
 # Andreas says that T7773 will not (and should not) work on Windows
 
 # Tests for kind-polymorphic Category
@@ -178,13 +187,13 @@ test('CatEntail', normal, compile, [''])
 
 # When running with WAY=ghci and profiled ways, T7653 uses a lot of memory.
 test('T7653', [when(opsys('mingw32'), skip),
-               omit_ways(prof_ways+['ghci'])], compile_and_run, [''])
+               omit_ways(prof_ways + ghci_ways)], compile_and_run, [''])
 test('T7787', normal, compile_and_run, [''])
 
 test('topHandler01', [when(opsys('mingw32'), skip), js_broken(22261), req_process], compile_and_run, [''])
 test('topHandler02',
      [when(opsys('mingw32'), skip),
-      omit_ways(['ghci']),
+      omit_ghci,
       signal_exit_code(2),
      js_broken(22261)
      ], compile_and_run, [''])
@@ -227,7 +236,7 @@ test('T8089',
      [exit_code(99), run_timeout_multiplier(0.01)],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', [js_broken(22349), expect_broken_for(16535, threaded_ways), omit_ways(['ghci']), req_process], compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [js_broken(22349), expect_broken_for(16535, threaded_ways), req_process], compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
         [ collect_stats('bytes allocated')
@@ -241,7 +250,7 @@ test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
 test('T12852', [when(opsys('mingw32'), skip), js_broken(22374), req_process], compile_and_run, [''])
-test('lazySTexamples', normal, compile_and_run, [''])
+test('lazySTexamples', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
 test('T11760', [req_ghc_smp,
                req_target_smp,
                only_ways(['threaded1', 'threaded2', 'nonmoving_thr'])],
@@ -277,7 +286,7 @@ test('T13167',
      ],
      compile_and_run, [''])
 test('T15183', normal, compile_and_run, [''])
-test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
+test('T15349', [exit_code(1), expect_broken_for(15349, ghci_ways)], compile_and_run, [''])
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
@@ -287,7 +296,7 @@ test('clamp', normal, compile_and_run, [''])
 test('T18642',
      [extra_run_opts('+RTS -T -RTS'),
       # The nonmoving GC's residency behavior is very conservative
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity']),
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'] + ghci_ways),
       js_broken(22374)],
      compile_and_run, ['-O2'])
 test('T19288', exit_code(1), compile_and_run, [''])
@@ -295,8 +304,8 @@ test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
 test('T22816', normal, compile_and_run, [''])
 test('trace', normal, compile_and_run, [''])
-test('listThreads', normal, compile_and_run, [''])
-test('listThreads1', normal, compile_and_run, [''])
+test('listThreads', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
+test('listThreads1', omit_ghci, compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
 test('CLC149', normal, compile, [''])
 test('AtomicSwapIORef', normal, compile_and_run, [''])

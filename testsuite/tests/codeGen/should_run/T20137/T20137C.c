@@ -3,7 +3,7 @@
 #include <inttypes.h>
 
 int
-runInteractiveProcess (char *const * args,
+functionNameThatDoesntClash (char *const * args,
                        char *workingDirectory, char **environment,
                        // handles to use for the standard handles. -1 indicates
                        // create pipe, -2 indicates close.

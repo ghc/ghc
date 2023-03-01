@@ -14,7 +14,7 @@ import Foreign.C.Types
 type FD = CInt
 type CString = Ptr CChar
 
-foreign import ccall unsafe "runInteractiveProcess"
+foreign import ccall unsafe "functionNameThatDoesntClash"
   c_runInteractiveProcess
         :: Ptr CString
         -> CString

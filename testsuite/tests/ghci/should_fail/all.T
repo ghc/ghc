@@ -1,4 +1,4 @@
-test('T10549', [], ghci_script, ['T10549.script'])
+test('T10549', [extra_hc_opts('-funoptimized-core-for-interpreter')], ghci_script, ['T10549.script'])
 test('T10549a', [], ghci_script, ['T10549a.script'])
 test('T15055', normalise_version('ghc'), ghci_script, ['T15055.script'])
 test('T16013', [], ghci_script, ['T16013.script'])
