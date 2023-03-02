@@ -489,3 +489,5 @@ test('decodeMyStack', normal, compile_and_run, ['-finfo-table-map'])
 test('decodeMyStack_underflowFrames', [extra_run_opts('+RTS -kc8K -RTS')], compile_and_run, ['-finfo-table-map -rtsopts'])
 # -finfo-table-map intentionally missing
 test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
+
+test('T17574', [], compile_and_run, ['-with-rtsopts -T'])
