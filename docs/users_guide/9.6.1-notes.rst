@@ -155,6 +155,8 @@ Compiler
   modules for execution (e.g. when evaluating TH splices). This avoids the
   considerable code generation and linking costs of native code, which is often
   unnecessary for one-off Template Haskell splices.
+  See this `blog post <https://well-typed.com/blog/2023/02/interface-files-with-core/>`_
+  for details.
 
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
