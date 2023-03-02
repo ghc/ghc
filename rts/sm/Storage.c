@@ -42,6 +42,7 @@
 #include "GC.h"
 #include "Evac.h"
 #include "NonMovingAllocate.h"
+#include "sm/NonMovingMark.h"
 #if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
 #endif
@@ -1615,7 +1616,12 @@ W_ genLiveWords (generation *gen)
 
 W_ genLiveBlocks (generation *gen)
 {
-    return gen->n_blocks + gen->n_large_blocks + gen->n_compact_blocks;
+  W_ nonmoving_blocks = 0;
+  // The nonmoving heap contains some blocks that live outside the regular generation structure.
+  if (gen == oldest_gen && RtsFlags.GcFlags.useNonmoving){
+    nonmoving_blocks = n_nonmoving_large_blocks + n_nonmoving_marked_large_blocks + n_nonmoving_compact_blocks + n_nonmoving_marked_compact_blocks;
+  }
+  return gen->n_blocks + gen->n_large_blocks + gen->n_compact_blocks + nonmoving_blocks;
 }
 
 W_ gcThreadLiveWords (uint32_t i, uint32_t g)
@@ -1711,6 +1717,9 @@ StgWord calcTotalLargeObjectsW (void)
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         totalW += generations[g].n_large_words;
     }
+
+    totalW += nonmoving_large_words;
+
     return totalW;
 }
 
@@ -1722,6 +1731,9 @@ StgWord calcTotalCompactW (void)
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         totalW += generations[g].n_compact_blocks * BLOCK_SIZE_W;
     }
+
+    totalW += nonmoving_compact_words;
+
     return totalW;
 }
 
