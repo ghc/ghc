@@ -55,7 +55,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon
    ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
    , isNewTyCon, tyConDataCons
-   , tyConFamilySize )
+   , tyConFamilySize, isTypeDataTyCon )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 
 import GHC.Builtin.PrimOps ( PrimOp(..), tagToEnumKey )
@@ -3184,6 +3184,8 @@ caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
   | Just DataToTagOp <- isPrimOpId_maybe f
   , Just (tc, _) <- tcSplitTyConApp_maybe ty
   , isAlgTyCon tc
+  , not (isTypeDataTyCon tc) -- See wrinkle (W2c) in GHC.Rename.Module
+                             -- Note [Type data declarations]
   = Just (v, tx_con_dtt ty
            , \v -> App (App (Var f) (Type ty)) (Var v))
 

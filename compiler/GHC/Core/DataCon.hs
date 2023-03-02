@@ -1669,13 +1669,25 @@ dataConOtherTheta dc = dcOtherTheta dc
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
 dataConRepArgTys :: DataCon -> [Scaled Type]
-dataConRepArgTys (MkData { dcRep = rep
-                         , dcEqSpec = eq_spec
+dataConRepArgTys (MkData { dcRep        = rep
+                         , dcEqSpec     = eq_spec
                          , dcOtherTheta = theta
-                         , dcOrigArgTys = orig_arg_tys })
+                         , dcOrigArgTys = orig_arg_tys
+                         , dcRepTyCon   = tc })
   = case rep of
-      NoDataConRep -> assert (null eq_spec) $ map unrestricted theta ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
+      NoDataConRep
+        | isTypeDataTyCon tc -> assert (null theta)   $
+                                orig_arg_tys
+          -- `type data` declarations can be GADTs (and hence have an eq_spec)
+          -- but no wrapper.  They cannot have a theta.
+          -- See Note [Type data declarations] in GHC.Rename.Module
+          -- You might wonder why we ever call dataConRepArgTys for `type data`;
+          -- I think it's because of the call in mkDataCon, which in turn feeds
+          -- into dcRepArity, which in turn is used in mkDataConWorkId.
+          -- c.f. #23022
+        | otherwise          -> assert (null eq_spec) $
+                                map unrestricted theta ++ orig_arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler

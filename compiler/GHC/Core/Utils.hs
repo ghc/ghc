@@ -845,7 +845,8 @@ There are two exceptions where we avoid refining a DEFAULT case:
            __DEFAULT -> ()
 
   Namely, we do _not_ want to match on `A`, as it doesn't exist at the value
-  level!
+  level! See wrinkle (W2b) in Note [Type data declarations] in GHC.Rename.Module
+
 
 Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

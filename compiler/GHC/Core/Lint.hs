@@ -1021,6 +1021,9 @@ lintIdOcc var nargs
 
         ; checkDeadIdOcc var
         ; checkJoinOcc var nargs
+        ; case isDataConId_maybe var of
+             Nothing -> return ()
+             Just dc -> checkTypeDataConOcc "expression" dc
 
         ; usage <- varCallSiteUsage var
 
@@ -1106,6 +1109,13 @@ checkJoinOcc var n_args
 
   | otherwise
   = return ()
+
+checkTypeDataConOcc :: String -> DataCon -> LintM ()
+-- Check that the Id is not a data constructor of a `type data` declaration
+-- Invariant (I1) of Note [Type data declarations] in GHC.Rename.Module
+checkTypeDataConOcc what dc
+  = checkL (not (isTypeDataTyCon (dataConTyCon dc))) $
+    (text "type data constructor found in a" <+> text what <> colon <+> ppr dc)
 
 -- | This function checks that we are able to perform eta expansion for
 -- functions with no binding, in order to satisfy invariant I3
@@ -1561,10 +1571,11 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
   = addLoc (CaseAlt alt) $  do
-    {   -- First instantiate the universally quantified
-        -- type variables of the data constructor
-        -- We've already check
-      lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
+    { checkTypeDataConOcc "pattern" con
+    ; lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
+
+      -- Instantiate the universally quantified
+      -- type variables of the data constructor
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
           ; binderMult (Named _)   = ManyTy
           ; binderMult (Anon st _) = scaledMult st
