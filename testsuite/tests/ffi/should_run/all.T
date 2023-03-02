@@ -103,10 +103,15 @@ test('ffi019', [normal, js_broken(22363)], compile_and_run, [''])
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
 test('T1679', js_broken(22261), compile_and_run, [''])
 
-test('T1288', [omit_ways(['ghci']), req_c], compile_and_run, ['T1288_c.c'])
+# Testing stdcall which is only a thing on windows, also whether this test is
+# just bogus or not, see #12890
+test('T1288', [unless(opsys('mingw32'), skip)
+              , omit_ways(['ghci'])
+              , req_c], compile_and_run, ['T1288_c.c'])
 test('T1288_ghci',
      [only_ways(['ghci']),
       when(unregisterised(), fragile(16085)),
+      unless(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 
