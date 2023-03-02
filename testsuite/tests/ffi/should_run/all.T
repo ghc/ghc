@@ -115,9 +115,9 @@ test('T1288_ghci',
       pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
      compile_and_run, ['T1288_ghci_c.o'])
 
-test('T2276', [omit_ways(['ghci']), req_c], compile_and_run, ['T2276_c.c'])
+test('T2276', [ unless(opsys('mingw32'), skip), omit_ways(['ghci']), req_c], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
-                     when(opsys('darwin'), skip), # stdcall not supported on OS X
+                     unless(opsys('mingw32'), skip),
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup') ],
                    compile_and_run, ['-fobject-code T2276_ghci_c.o'])
 
