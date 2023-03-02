@@ -150,6 +150,12 @@ Compiler
   on the GHC wiki for the current status, project roadmap, build instructions
   and demos.
 
+- GHC now offers a new flag, :ghc-flag:`-fprefer-byte-code`, which instructs
+  the compiler to to use byte-code when available when loading home package
+  modules for execution (e.g. when evaluating TH splices). This avoids the
+  considerable code generation and linking costs of native code, which is often
+  unnecessary for one-off Template Haskell splices.
+
 - The :extension:`TypeInType` is now marked as deprecated. Its meaning has been included
   in :extension:`PolyKinds` and :extension:`DataKinds`.
 
