@@ -152,8 +152,8 @@ vanillaCompleteMatchTC tc =
                tc == tYPETyCon    = Just []
              | -- Similarly, treat `type data` declarations as empty data types on
                -- the term level, as `type data` data constructors only exist at
-               -- the type level (#22964).
-               -- See Note [Type data declarations] in GHC.Rename.Module.
+               -- the type level (#22964).  See wrinkle (W2a) in
+               -- Note [Type data declarations] in GHC.Rename.Module.
                isTypeDataTyCon tc = Just []
              | otherwise          = tyConDataCons_maybe tc
   in vanillaCompleteMatch . mkUniqDSet . map RealDataCon <$> mb_dcs
