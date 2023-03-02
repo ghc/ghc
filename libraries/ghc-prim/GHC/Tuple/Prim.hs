@@ -79,6 +79,26 @@ data () = ()
 -- implementations of lazy and strict mapping functions.
 data Solo a = MkSolo a
 
+-- | Extract the value from a 'Solo'. Very often, values should be extracted
+-- directly using pattern matching, to control just what gets evaluated when.
+-- @getSolo@ is for convenience in situations where that is not the case:
+--
+-- When the result is passed to a /strict/ function, it makes no difference
+-- whether the pattern matching is done on the \"outside\" or on the
+-- \"inside\":
+--
+-- @
+-- Data.Set.insert (getSolo sol) set === case sol of Solo v -> Data.Set.insert v set
+-- @
+--
+-- A traversal may be performed in 'Solo' in order to control evaluation
+-- internally, while using @getSolo@ to extract the final result. A strict
+-- mapping function, for example, could be defined
+--
+-- @
+-- map' :: Traversable t => (a -> b) -> t a -> t b
+-- map' f = getSolo . traverse ((Solo $!) . f)
+-- @
 getSolo :: Solo a -> a
 -- getSolo is a standalone function, rather than a record field of Solo,
 -- because Solo is a wired-in TyCon, and a wired-in TyCon that  has
