@@ -76,12 +76,19 @@ static bool is_nonmoving_weak(StgWeak *weak);
  * consequently will trace the pointers of only one object per block. However,
  * this is okay since the only type of pinned object supported by GHC is the
  * pinned ByteArray#, which has no pointers.
+ *
+ * We need to take care that the stats department is made aware of the amount of
+ * live large (and compact) objects, since they no longer live on gen[i]->large_objects.
+ * Failing to do so caused #17574.
  */
 
 bdescr *nonmoving_large_objects = NULL;
 bdescr *nonmoving_marked_large_objects = NULL;
 memcount n_nonmoving_large_blocks = 0;
 memcount n_nonmoving_marked_large_blocks = 0;
+
+memcount nonmoving_large_words = 0;
+memcount nonmoving_compact_words = 0;
 
 bdescr *nonmoving_compact_objects = NULL;
 bdescr *nonmoving_marked_compact_objects = NULL;
@@ -1745,7 +1752,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
         nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
         nonmovingSetMark(seg, block_idx);
-        nonmoving_live_words += nonmovingSegmentBlockSize(seg) / sizeof(W_);
+        nonmoving_segment_live_words += nonmovingSegmentBlockSize(seg) / sizeof(W_);
     }
 
     // If we found a indirection to shortcut keep going.
