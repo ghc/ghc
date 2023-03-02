@@ -133,9 +133,6 @@ infixr 0 `par`, `pseq`
 -----------------------------------------------------------------------------
 
 data ThreadId = ThreadId ThreadId#
--- ToDo: data ThreadId = ThreadId (Weak ThreadId#)
--- But since ThreadId# is unlifted, the Weak type must use open
--- type variables.
 {- ^
 A 'ThreadId' is an abstract type representing a handle to a thread.
 'ThreadId' is an instance of 'Eq', 'Ord' and 'Show', where
@@ -146,10 +143,9 @@ useful when debugging or diagnosing the behaviour of a concurrent
 program.
 
 /Note/: in GHC, if you have a 'ThreadId', you essentially have
-a pointer to the thread itself.  This means the thread itself can\'t be
-garbage collected until you drop the 'ThreadId'.
-This misfeature will hopefully be corrected at a later date.
-
+a pointer to the thread itself. This means the thread itself can\'t be
+garbage collected until you drop the 'ThreadId'. This misfeature would
+be difficult to correct while continuing to support 'threadStatus'.
 -}
 
 -- | @since 4.2.0.0
