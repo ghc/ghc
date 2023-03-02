@@ -57,6 +57,7 @@ compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , (hasVanilla && hasDynamic) ? builder (Ghc CompileHs) ?
               platformSupportsSharedLibs ? way vanilla ?
               arg "-dynamic-too"
+            , hostNeedsAsmShortcuttingWorkaround ? stage0 ? arg "-fno-asm-shortcutting"
             , commonGhcArgs
             , ghcLinkArgs
             , defaultGhcWarningsArgs

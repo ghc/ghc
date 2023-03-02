@@ -7,7 +7,7 @@ module Oracles.Setting (
 
     -- * Helpers
     ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
-    libsuf, ghcVersionStage, bashPath,
+    libsuf, ghcVersionStage, bashPath, hostNeedsAsmShortcuttingWorkaround,
 
     -- ** Target platform things
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
@@ -271,6 +271,11 @@ anyTargetArch = matchSetting TargetArch
 -- | Check whether the host OS setting matches one of the given strings.
 anyHostOs :: [String] -> Action Bool
 anyHostOs = matchSetting HostOs
+
+-- | Workaround for #21972. It can be removed once the minimal bootstrapping
+-- compiler has a fix for this bug.
+hostNeedsAsmShortcuttingWorkaround :: Action Bool
+hostNeedsAsmShortcuttingWorkaround = anyHostOs [ "darwin" ]
 
 -- | List of OSes that use the ELF object format.
 elfOSes :: [String]
