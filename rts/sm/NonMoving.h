@@ -120,7 +120,7 @@ struct NonmovingHeap {
 
 extern struct NonmovingHeap nonmovingHeap;
 
-extern memcount nonmoving_live_words;
+extern memcount nonmoving_segment_live_words;
 
 #if defined(THREADED_RTS)
 extern bool concurrent_coll_running;

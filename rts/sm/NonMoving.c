@@ -396,7 +396,8 @@ Mutex concurrent_coll_finished_lock;
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * The nonmoving collector uses an approximate heuristic for reporting live
  * data quantity. Specifically, during mark we record how much live data we
- * find in nonmoving_live_words. At the end of mark we declare this amount to
+ * find in nonmoving_segment_live_words. At the end of mark this is combined with nonmoving_large_words
+ * and nonmoving_compact_words, and we declare this amount to
  * be how much live data we have on in the nonmoving heap (by setting
  * oldest_gen->live_estimate).
  *
@@ -541,7 +542,7 @@ Mutex concurrent_coll_finished_lock;
  *
  */
 
-memcount nonmoving_live_words = 0;
+memcount nonmoving_segment_live_words = 0;
 
 // See Note [Sync phase marking budget].
 MarkBudget sync_phase_marking_budget = 200000;
@@ -683,10 +684,11 @@ static void nonmovingPrepareMark(void)
         dbl_link_onto(bd, &nonmoving_large_objects);
     }
     n_nonmoving_large_blocks += oldest_gen->n_large_blocks;
+    nonmoving_large_words += oldest_gen->n_large_words;
     oldest_gen->large_objects = NULL;
     oldest_gen->n_large_words = 0;
     oldest_gen->n_large_blocks = 0;
-    nonmoving_live_words = 0;
+    nonmoving_segment_live_words = 0;
 
     // Clear compact object mark bits
     for (bdescr *bd = nonmoving_compact_objects; bd; bd = bd->link) {
@@ -701,6 +703,7 @@ static void nonmovingPrepareMark(void)
         dbl_link_onto(bd, &nonmoving_compact_objects);
     }
     n_nonmoving_compact_blocks += oldest_gen->n_compact_blocks;
+    nonmoving_compact_words += oldest_gen->n_compact_blocks * BLOCK_SIZE_W;
     oldest_gen->n_compact_blocks = 0;
     oldest_gen->compact_objects = NULL;
     // TODO (osa): what about "in import" stuff??
@@ -1054,7 +1057,9 @@ concurrent_marking:
     freeMarkQueue(mark_queue);
     stgFree(mark_queue);
 
-    oldest_gen->live_estimate = nonmoving_live_words;
+    nonmoving_large_words = countOccupied(nonmoving_marked_large_objects);
+    nonmoving_compact_words = n_nonmoving_marked_compact_blocks * BLOCK_SIZE_W;
+    oldest_gen->live_estimate = nonmoving_segment_live_words + nonmoving_large_words + nonmoving_compact_words;
     oldest_gen->n_old_blocks = 0;
     resizeGenerations();
 
