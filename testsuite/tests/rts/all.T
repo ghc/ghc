@@ -568,3 +568,5 @@ test('decodeMyStack_emptyListForMissingFlag',
   , ignore_stderr
   , js_broken(22261) # cloneMyStack# not yet implemented
   ], compile_and_run, [''])
+
+test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
