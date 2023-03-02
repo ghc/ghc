@@ -573,3 +573,5 @@ test('decodeMyStack_emptyListForMissingFlag',
 test('T22795a', [only_ways(['normal']), js_skip], compile_and_run, ['-threaded'])
 test('T22795b', [only_ways(['normal']), js_skip], compile_and_run, ['-single-threaded'])
 test('T22795c', [only_ways(['normal']), js_skip], compile_and_run, ['-threaded -single-threaded'])
+
+test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
