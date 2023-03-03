@@ -1,5 +1,12 @@
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+
+-- Workaround for #21972. It can be removed once the minimal bootstrapping
+-- compiler has a fix for this bug.
+#if defined(darwin_HOST_OS)
+{-# OPTIONS_GHC -fno-asm-shortcutting #-}
+#endif
 
 --------------------------------------------------------------------------------
 -- | The LLVM Type System.
