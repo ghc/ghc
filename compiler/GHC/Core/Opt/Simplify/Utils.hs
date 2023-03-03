@@ -1855,8 +1855,7 @@ tryEtaExpandRhs :: SimplEnv -> BindContext -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 tryEtaExpandRhs env bind_cxt bndr rhs
-  | pprTrace "tryeta" (ppr bndr $$ ppr do_eta_expand $$ ppr (seEtaExpand env) $$ ppr (wantEtaExpansion rhs)) $
-    do_eta_expand           -- If the current manifest arity isn't enough
+  | do_eta_expand           -- If the current manifest arity isn't enough
                             --    (never true for join points)
   , seEtaExpand env         -- and eta-expansion is on
   , wantEtaExpansion rhs
@@ -1890,8 +1889,7 @@ wantEtaExpansion e = go e []
     go (Lam b e)  [] | isTyVar b = go e []
                      | otherwise = True
 
-    go (Var f) args = pprTrace "wantEtaExpansion" (ppr f $$ ppr args $$ ppr (isInlineUnfolding (idUnfolding f)) $$ ppr (any interesting args)) $
-                      isInlineUnfolding (idUnfolding f)
+    go (Var f) args = isInlineUnfolding (idUnfolding f)
                       && any interesting args
 
     go _ _ = True
