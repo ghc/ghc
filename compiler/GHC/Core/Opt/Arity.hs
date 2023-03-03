@@ -898,6 +898,7 @@ findRhsArity opts is_rec bndr rhs
     -- to the top of the RHS
   where
     old_arity = exprArity rhs
+    arity_increased = arityTypeArity non_join_arity_type > manifestArity rhs
 
     init_env :: ArityEnv
     init_env = findRhsArityEnv opts (isJoinId bndr)
@@ -906,7 +907,6 @@ findRhsArity opts is_rec bndr rhs
     non_join_arity_type = case is_rec of
                              Recursive    -> go 0 botArityType
                              NonRecursive -> step init_env
-    arity_increased = arityTypeArity non_join_arity_type > old_arity
 
     -- Join-points only
     -- See Note [Arity for non-recursive join bindings]

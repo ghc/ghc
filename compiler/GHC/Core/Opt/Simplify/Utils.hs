@@ -1859,7 +1859,8 @@ tryEtaExpandRhs :: SimplEnv -> BindContext -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 tryEtaExpandRhs env bind_cxt bndr rhs
-  | do_eta_expand           -- If the current manifest arity isn't enough
+  | pprTrace "tryeta" (ppr bndr $$ ppr do_eta_expand $$ ppr (seEtaExpand env) $$ ppr (wantEtaExpansion rhs)) $
+    do_eta_expand           -- If the current manifest arity isn't enough
                             --    (never true for join points)
   , seEtaExpand env         -- and eta-expansion is on
   , wantEtaExpansion rhs
@@ -1882,13 +1883,30 @@ tryEtaExpandRhs env bind_cxt bndr rhs
 wantEtaExpansion :: CoreExpr -> Bool
 -- Mostly True; but False of PAPs which will immediately eta-reduce again
 -- See Note [Which RHSs do we eta-expand?]
-wantEtaExpansion (Cast e _)             = wantEtaExpansion e
-wantEtaExpansion (Tick _ e)             = wantEtaExpansion e
-wantEtaExpansion (Lam b e) | isTyVar b  = wantEtaExpansion e
-wantEtaExpansion (App e _)              = wantEtaExpansion e
-wantEtaExpansion (Var {})               = False
-wantEtaExpansion (Lit {})               = False
-wantEtaExpansion _                      = True
+wantEtaExpansion e = go e []
+  where
+    go (Cast e _) args = go e args
+    go (Tick _ e) args = go e args
+    go (Lit {})   _    = False
+
+    go (App e a)  args           = go e (a:args)
+    go (Lam _ e)  (_:args)       = go e args
+    go (Lam b e)  [] | isTyVar b = go e []
+                     | otherwise = True
+
+    go (Var f) args = pprTrace "wantEtaExpansion" (ppr f $$ ppr args $$ ppr (isInlineUnfolding (idUnfolding f)) $$ ppr (any interesting args)) $
+                      isInlineUnfolding (idUnfolding f)
+                      && any interesting args
+
+    go _ _ = True
+
+
+    interesting (Type {})  = False
+    interesting (Var v)    = isConLikeUnfolding (idUnfolding v)
+    interesting (Lit {})   = True
+    interesting (Cast e _) = interesting e
+    interesting (Tick _ e) = interesting e
+    interesting _          = True
 
 {-
 Note [Eta-expanding at let bindings]
