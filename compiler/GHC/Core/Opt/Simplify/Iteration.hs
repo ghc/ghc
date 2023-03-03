@@ -39,7 +39,7 @@ import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
+import GHC.Core.Opt.Arity ( ArityType, manifestArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
                           , typeArity, arityTypeArity, etaExpandAT )
 import GHC.Core.SimpleOpt ( exprIsConApp_maybe, joinPointBinding_maybe, joinPointBindings_maybe )
@@ -4296,7 +4296,7 @@ simplStableUnfolding env bind_cxt id rhs_ty id_arity unf
     -- Use the arity from the main Id (in id_arity), rather than computing it from rhs
     -- Not used for join points
     eta_expand expr | seEtaExpand env
-                    , exprArity expr < arityTypeArity id_arity
+                    , manifestArity expr < arityTypeArity id_arity
                     , wantEtaExpansion expr
                     = etaExpandAT (getInScope env) id_arity expr
                     | otherwise
