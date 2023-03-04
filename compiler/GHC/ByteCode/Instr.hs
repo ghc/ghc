@@ -1,5 +1,6 @@
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -354,7 +355,10 @@ instance Outputable BCInstr where
    ppr RETURN                = text "RETURN"
    ppr (RETURN_UNLIFTED pk)  = text "RETURN_UNLIFTED  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
-   ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> ppr uniq <+> text "<cc>"
+   ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> mb_uniq <+> text "<cc>"
+     where mb_uniq = sdocOption sdocSuppressUniques $ \case
+             True  -> text "<uniq>"
+             False -> ppr uniq
 
 
 
