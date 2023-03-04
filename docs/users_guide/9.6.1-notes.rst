@@ -209,7 +209,7 @@ Runtime system
 
 - GHC now provides a set of operations for introspecting on the threads of a
   program, ``GHC.Conc.listThreads``, as well as operations for querying a thread's
-  label (:base-ref:`GHC.Conc.threadLabel`) and status
+  label (:base-ref:`GHC.Conc.Sync.threadLabel`) and status
   (:base-ref:`GHC.Conc.threadStatus`).
 
 - Change default ``Ord`` implementation of ``(>=)``, ``(>)``, and ``(<)`` to use
