@@ -1,0 +1,71 @@
+
+==================== Proto-BCOs ====================
+ProtoBCO T23068.g#1 []:
+   \r [ds] case of wild
+   bitmap:  1 [0]
+   PUSH_ALTS P
+     ProtoBCO wild#0 []:
+        { () -> let bcprep = ... in ...
+        bitmap:  1 [0]
+        ALLOC_PAP    1 0
+        PUSH_BCO
+          ProtoBCO bcprep#1 []:
+             \r [void] break<0>() let sat = ... in ...
+             bitmap:  0 []
+             BRK_FUN 0 <uniq> <cc>
+             PUSH_UBX (1) 0#
+             PACK     GHC.Types.I# 1
+             PUSH_L   0
+             PUSH_UBX (1) 0#
+             PUSH_UBX (1) 0#
+             SLIDE    3 1
+             PUSH_UBX (1) 7##
+             PUSH_BCO
+               ProtoBCO tuple#0 []:
+                  bitmap:  4 [7]
+                  SLIDE    0 1
+                  RETURN_TUPLE
+             RETURN_TUPLE
+        MKPAP    0 words, 1 stkoff
+        PUSH_APPLY_V
+        PUSH_L   1
+        SLIDE    2 5
+        ENTER
+   PUSH_L   2
+   ENTER
+ 
+ProtoBCO T23068.f#1 []:
+   \r [ds] case of wild
+   bitmap:  1 [0]
+   PUSH_ALTS P
+     ProtoBCO wild#0 []:
+        { () -> let bcprep = ... in ...
+        bitmap:  1 [0]
+        ALLOC_PAP    1 0
+        PUSH_BCO
+          ProtoBCO bcprep#1 []:
+             \r [void] break<1>() let sat = ... in ...
+             bitmap:  0 []
+             BRK_FUN 1 <uniq> <cc>
+             PUSH_UBX (1) 0#
+             PACK     GHC.Types.I# 1
+             PUSH_UBX (1) 0#
+             PACK     GHC.Types.I# 1
+             PUSH_LL  1 0
+             SLIDE    2 2
+             PUSH_UBX (1) 3##
+             PUSH_BCO
+               ProtoBCO tuple#0 []:
+                  bitmap:  3 [1]
+                  SLIDE    0 1
+                  RETURN_TUPLE
+             RETURN_TUPLE
+        MKPAP    0 words, 1 stkoff
+        PUSH_APPLY_V
+        PUSH_L   1
+        SLIDE    2 5
+        ENTER
+   PUSH_L   2
+   ENTER
+
+
