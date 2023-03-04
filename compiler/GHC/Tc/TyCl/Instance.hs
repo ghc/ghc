@@ -1655,7 +1655,7 @@ Answer:
     origin.  But if we apply an instance declaration, we can set the
     origin to (ScOrigin NotNakedSc), thus lifting any restrictions by
     making prohibitedSuperClassSolve return False. This happens
-    in GHC.Tc.Solver.Interact.checkInstanceOK.
+    in GHC.Tc.Solver.Dict.checkInstanceOK.
 
   * (sc2) ScOrigin wanted constraints can't be solved from a
     superclass selection, except at a smaller type.  This test is

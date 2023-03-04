@@ -12,7 +12,7 @@ module GHC.Data.Bag (
         Bag, -- abstract type
 
         emptyBag, unitBag, unionBags, unionManyBags,
-        mapBag,
+        mapBag, pprBag,
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
         concatBag, catBagMaybes, foldBag,
@@ -324,7 +324,10 @@ headMaybe (TwoBags b1 _) = headMaybe b1
 headMaybe (ListBag (v:|_)) = Just v
 
 instance (Outputable a) => Outputable (Bag a) where
-    ppr bag = braces (pprWithCommas ppr (bagToList bag))
+    ppr = pprBag
+
+pprBag :: Outputable a => Bag a -> SDoc
+pprBag bag = braces (pprWithCommas ppr (bagToList bag))
 
 instance Data a => Data (Bag a) where
   gfoldl k z b = z listToBag `k` bagToList b -- traverse abstract type abstractly

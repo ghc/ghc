@@ -8,7 +8,7 @@ module GHC.Tc.Solver.Types (
     addDictsByClass, delDict, foldDicts, filterDicts, findDict,
     dictsToBag, partitionDicts,
 
-    FunEqMap, emptyFunEqs, foldFunEqs, findFunEq, insertFunEq,
+    FunEqMap, emptyFunEqs, findFunEq, insertFunEq,
     findFunEqsByTyCon,
 
     TcAppMap, emptyTcAppMap, isEmptyTcAppMap,
@@ -16,6 +16,7 @@ module GHC.Tc.Solver.Types (
     tcAppMapToBag, foldTcAppMap,
 
     EqualCtList, filterEqualCtList, addToEqualCtList
+
   ) where
 
 import GHC.Prelude
@@ -241,11 +242,9 @@ findFunEqsByTyCon m tc
   | Just tm <- lookupDTyConEnv m tc = foldTM (:) tm []
   | otherwise                       = []
 
-foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
-foldFunEqs = foldTcAppMap
-
 insertFunEq :: FunEqMap a -> TyCon -> [Type] -> a -> FunEqMap a
 insertFunEq m tc tys val = insertTcApp m tc tys val
+
 
 {- *********************************************************************
 *                                                                      *
@@ -264,15 +263,15 @@ Accordingly, this list is either empty, contains one element, or
 contains a Given representational equality and a Wanted nominal one.
 -}
 
-type EqualCtList = [Ct]
+type EqualCtList = [EqCt]
   -- See Note [EqualCtList invariants]
 
-addToEqualCtList :: Ct -> EqualCtList -> EqualCtList
+addToEqualCtList :: EqCt -> EqualCtList -> EqualCtList
 -- See Note [EqualCtList invariants]
 addToEqualCtList ct old_eqs
   | debugIsOn
   = case ct of
-      CEqCan { cc_lhs = TyVarLHS tv } ->
+      EqCt { eq_lhs = TyVarLHS tv } ->
         assert (all (shares_lhs tv) old_eqs) $
         assertPpr (null bad_prs)
                   (vcat [ text "bad_prs" <+> ppr bad_prs
@@ -284,10 +283,11 @@ addToEqualCtList ct old_eqs
   | otherwise
   = ct : old_eqs
   where
-    shares_lhs tv (CEqCan { cc_lhs = TyVarLHS old_tv }) = tv == old_tv
+    shares_lhs tv (EqCt { eq_lhs = TyVarLHS old_tv }) = tv == old_tv
     shares_lhs _ _ = False
     bad_prs = filter is_bad_pair (distinctPairs (ct : old_eqs))
-    is_bad_pair (ct1,ct2) = ctFlavourRole ct1 `eqCanRewriteFR` ctFlavourRole ct2
+    is_bad_pair :: (EqCt, EqCt) -> Bool
+    is_bad_pair (ct1,ct2) = eqCtFlavourRole ct1 `eqCanRewriteFR` eqCtFlavourRole ct2
 
 distinctPairs :: [a] -> [(a,a)]
 -- distinctPairs [x1,...xn] is the list of all pairs [ ...(xi, xj)...]
@@ -298,7 +298,7 @@ distinctPairs []     = []
 distinctPairs (x:xs) = concatMap (\y -> [(x,y),(y,x)]) xs ++ distinctPairs xs
 
 -- returns Nothing when the new list is empty, to keep the environments smaller
-filterEqualCtList :: (Ct -> Bool) -> EqualCtList -> Maybe EqualCtList
+filterEqualCtList :: (EqCt -> Bool) -> EqualCtList -> Maybe EqualCtList
 filterEqualCtList pred cts
   | null new_list
   = Nothing

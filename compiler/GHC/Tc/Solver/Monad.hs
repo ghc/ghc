@@ -19,6 +19,7 @@ module GHC.Tc.Solver.Monad (
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
     emitImplicationTcS, emitTvImplicationTcS,
+    emitFunDepWanteds,
 
     selectNextWorkItem,
     getWorkList,
@@ -29,6 +30,9 @@ module GHC.Tc.Solver.Monad (
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
+
+    -- The pipeline
+    StopOrContinue(..), continueWith, stopWith, andWhenContinue,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -86,7 +90,11 @@ module GHC.Tc.Solver.Monad (
     lookupFamAppInert, lookupFamAppCache, extendFamAppCache,
     pprKicked,
 
-    instDFunType,                              -- Instantiation
+    -- Instantiation
+    instDFunType,
+
+    -- Unification
+    unifyWanted, unifyWanteds,
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexiX,
@@ -135,15 +143,21 @@ import qualified GHC.Tc.Utils.Env      as TcM
 import GHC.Driver.Session
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
+import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types
+import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Utils.Unify
 
 import GHC.Core.Type
-import qualified GHC.Core.TyCo.Rep as Rep  -- this needs to be used only very locally
+import GHC.Core.TyCo.Rep as Rep
 import GHC.Core.Coercion
+import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Class
 import GHC.Core.TyCon
@@ -152,35 +166,72 @@ import GHC.Types.Error ( mkPlainError, noHints )
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
+import GHC.Types.Var
+import GHC.Types.Var.Set
+import GHC.Types.Unique.Supply
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import qualified GHC.Rename.Env as TcM
-import GHC.Types.Var
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
+
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Logger
 import GHC.Utils.Misc (HasDebugCallStack)
-import GHC.Data.Bag as Bag
-import GHC.Types.Unique.Supply
-import GHC.Tc.Types
-import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Utils.Unify
-import GHC.Core.Predicate
-import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
-import Control.Monad
+import GHC.Data.Bag as Bag
+import GHC.Data.Pair
+
 import GHC.Utils.Monad
-import Data.IORef
+import GHC.Utils.Misc( equalLength )
+
 import GHC.Exts (oneShot)
-import Data.List ( mapAccumL, partition )
+import Control.Monad
+import Data.IORef
+import Data.List ( mapAccumL, partition, zip4 )
 import Data.Foldable
+import qualified Data.Semigroup as S
 
 #if defined(DEBUG)
 import GHC.Data.Graph.Directed
 #endif
+
+
+{- *********************************************************************
+*                                                                      *
+                   StopOrContinue
+*                                                                      *
+********************************************************************* -}
+
+data StopOrContinue a
+  = ContinueWith a    -- The constraint was not solved, although it may have
+                      --   been rewritten
+
+  | Stop CtEvidence   -- The (rewritten) constraint was solved
+         SDoc         -- Tells how it was solved
+                      -- Any new sub-goals have been put on the work list
+  deriving (Functor)
+
+instance Outputable a => Outputable (StopOrContinue a) where
+  ppr (Stop ev s)      = text "Stop" <> parens s <+> ppr ev
+  ppr (ContinueWith w) = text "ContinueWith" <+> ppr w
+
+continueWith :: a -> TcS (StopOrContinue a)
+continueWith = return . ContinueWith
+
+stopWith :: CtEvidence -> String -> TcS (StopOrContinue a)
+stopWith ev s = return (Stop ev (text s))
+
+andWhenContinue :: TcS (StopOrContinue a)
+                -> (a -> TcS (StopOrContinue b))
+                -> TcS (StopOrContinue b)
+andWhenContinue tcs1 tcs2
+  = do { r <- tcs1
+       ; case r of
+           Stop ev s       -> return (Stop ev s)
+           ContinueWith ct -> tcs2 ct }
+infixr 0 `andWhenContinue`    -- allow chaining with ($)
+
 
 {- *********************************************************************
 *                                                                      *
@@ -288,7 +339,7 @@ addInertCan ct =
 maybeKickOut :: InertCans -> Ct -> TcS InertCans
 -- For a CEqCan, kick out any inert that can be rewritten by the CEqCan
 maybeKickOut ics ct
-  | CEqCan { cc_lhs = lhs, cc_ev = ev, cc_eq_rel = eq_rel } <- ct
+  | CEqCan (EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel }) <- ct
   = do { (_, ics') <- kickOutRewritable (ctEvFlavour ev, eq_rel) lhs ics
        ; return ics' }
 
@@ -353,7 +404,7 @@ kickOutAfterUnification :: TcTyVar -> TcS Int
 kickOutAfterUnification new_tv
   = do { ics <- getInertCans
        ; (n_kicked, ics2) <- kickOutRewritable (Given,NomEq)
-                                                 (TyVarLHS new_tv) ics
+                                               (TyVarLHS new_tv) ics
                      -- Given because the tv := xi is given; NomEq because
                      -- only nominal equalities are solved by unification
 
@@ -385,14 +436,13 @@ kickOutAfterFillingCoercionHole hole
       where
         (eqs_to_kick, eqs_to_keep)       = partitionInertEqs kick_ct eqs
         (funeqs_to_kick, funeqs_to_keep) = partitionFunEqs kick_ct funeqs
-        kicked_out = extendWorkListCts (eqs_to_kick ++ funeqs_to_kick) emptyWorkList
+        kicked_out = extendWorkListCts (map CEqCan (eqs_to_kick ++ funeqs_to_kick)) emptyWorkList
 
-    kick_ct :: Ct -> Bool
+    kick_ct :: EqCt -> Bool
          -- True: kick out; False: keep.
-    kick_ct (CEqCan { cc_rhs = rhs, cc_ev = ctev })
+    kick_ct (EqCt { eq_rhs = rhs, eq_ev = ctev })
       = isWanted ctev &&    -- optimisation: givens don't have coercion holes anyway
         rhs `hasThisCoercionHoleTy` hole
-    kick_ct other = pprPanic "kick_ct (coercion hole)" (ppr other)
 
 --------------
 addInertSafehask :: InertCans -> Ct -> InertCans
@@ -507,9 +557,10 @@ getInertGivens :: TcS [Ct]
 getInertGivens
   = do { inerts <- getInertCans
        ; let all_cts = foldIrreds (:) (inert_irreds inerts)
-                     $ foldDicts (:) (inert_dicts inerts)
-                     $ foldFunEqs (++) (inert_funeqs inerts)
-                     $ foldDVarEnv (++) [] (inert_eqs inerts)
+                     $ foldDicts  (:) (inert_dicts inerts)
+                     $ foldFunEqs ((:) . CEqCan) (inert_funeqs inerts)
+                     $ foldTyEqs  ((:) . CEqCan) (inert_eqs inerts)
+                     $ []
        ; return (filter isGivenCt all_cts) }
 
 getPendingGivenScs :: TcS [Ct]
@@ -581,8 +632,8 @@ getUnsolvedInerts
            , inert_dicts   = idicts
            } <- getInertCans
 
-      ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved tv_eqs emptyCts
-            unsolved_fun_eqs = foldFunEqs add_if_unsolveds fun_eqs emptyCts
+      ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved_eq tv_eqs emptyCts
+            unsolved_fun_eqs = foldFunEqs add_if_unsolved_eq fun_eqs emptyCts
             unsolved_irreds  = Bag.filterBag isWantedCt irreds
             unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
             unsolved_others  = unionManyBags [ unsolved_irreds
@@ -604,8 +655,9 @@ getUnsolvedInerts
     add_if_unsolved ct cts | isWantedCt ct = ct `consCts` cts
                            | otherwise     = cts
 
-    add_if_unsolveds :: EqualCtList -> Cts -> Cts
-    add_if_unsolveds new_cts old_cts = foldr add_if_unsolved old_cts new_cts
+    add_if_unsolved_eq :: EqCt -> Cts -> Cts
+    add_if_unsolved_eq eq_ct cts | isWanted (eq_ev eq_ct) = CEqCan eq_ct `consCts` cts
+                                 | otherwise              = cts
 
 getHasGivenEqs :: TcLevel           -- TcLevel of this implication
                -> TcS ( HasGivenEqs -- are there Given equalities?
@@ -650,7 +702,7 @@ removeInertCt is ct =
     CDictCan  { cc_class = cl, cc_tyargs = tys } ->
       is { inert_dicts = delDict (inert_dicts is) cl tys }
 
-    CEqCan    { cc_lhs  = lhs, cc_rhs = rhs } -> delEq is lhs rhs
+    CEqCan    eq_ct  -> delEq is eq_ct
 
     CIrredCan {}     -> is { inert_irreds = filterBag (not . eqCt ct) $ inert_irreds is }
 
@@ -670,8 +722,8 @@ lookupFamAppInert rewrite_pred fam_tc tys
   where
     lookup_inerts inert_funeqs
       | Just ecl <- findFunEq inert_funeqs fam_tc tys
-      , Just (CEqCan { cc_ev = ctev, cc_rhs = rhs })
-          <- find (rewrite_pred . ctFlavourRole) ecl
+      , Just (EqCt { eq_ev = ctev, eq_rhs = rhs })
+          <- find (rewrite_pred . eqCtFlavourRole) ecl
       = Just (mkReduction (ctEvCoercion ctev) rhs, ctEvFlavourRole ctev)
       | otherwise = Nothing
 
@@ -1913,6 +1965,174 @@ solverDepthError loc ty
       , text " minor updates to GHC, so disabling the check is recommended if"
       , text " you're sure that type checking should terminate)" ]
 
+{-
+************************************************************************
+*                                                                      *
+              Emitting equalities arising from fundeps
+*                                                                      *
+************************************************************************
+-}
+
+emitFunDepWanteds :: RewriterSet  -- from the work item
+                  -> [FunDepEqn (CtLoc, RewriterSet)] -> TcS ()
+
+emitFunDepWanteds _ [] = return () -- common case noop
+-- See Note [FunDep and implicit parameter reactions]
+
+emitFunDepWanteds work_rewriters fd_eqns
+  = mapM_ do_one_FDEqn fd_eqns
+  where
+    do_one_FDEqn (FDEqn { fd_qtvs = tvs, fd_eqs = eqs, fd_loc = (loc, rewriters) })
+     | null tvs  -- Common shortcut
+     = do { traceTcS "emitFunDepWanteds 1" (ppr (ctl_depth loc) $$ ppr eqs $$ ppr (isGivenLoc loc))
+          ; mapM_ (\(Pair ty1 ty2) -> unifyWanted all_rewriters loc Nominal ty1 ty2)
+                  (reverse eqs) }
+             -- See Note [Reverse order of fundep equations]
+
+     | otherwise
+     = do { traceTcS "emitFunDepWanteds 2" (ppr (ctl_depth loc) $$ ppr tvs $$ ppr eqs)
+          ; subst <- instFlexiX emptySubst tvs  -- Takes account of kind substitution
+          ; mapM_ (do_one_eq loc all_rewriters subst) (reverse eqs) }
+               -- See Note [Reverse order of fundep equations]
+     where
+       all_rewriters = work_rewriters S.<> rewriters
+
+    do_one_eq loc rewriters subst (Pair ty1 ty2)
+       = unifyWanted rewriters loc Nominal (substTyUnchecked subst' ty1) ty2
+         -- ty2 does not mention fd_qtvs, so no need to subst it.
+         -- See GHC.Tc.Instance.Fundeps Note [Improving against instances]
+         --     Wrinkle (1)
+      where
+         subst' = extendSubstInScopeSet subst (tyCoVarsOfType ty1)
+         -- The free vars of ty1 aren't just fd_qtvs: ty1 is the result
+         -- of matching with the [W] constraint. So we add its free
+         -- vars to InScopeSet, to satisfy substTy's invariants, even
+         -- though ty1 will never (currently) be a poytype, so this
+         -- InScopeSet will never be looked at.
+
+
+{-
+************************************************************************
+*                                                                      *
+              Unification
+*                                                                      *
+************************************************************************
+
+Note [unifyWanted]
+~~~~~~~~~~~~~~~~~~
+When decomposing equalities we often create new wanted constraints for
+(s ~ t).  But what if s=t?  Then it'd be faster to return Refl right away.
+
+Rather than making an equality test (which traverses the structure of the
+type, perhaps fruitlessly), unifyWanted traverses the common structure, and
+bales out when it finds a difference by creating a new Wanted constraint.
+But where it succeeds in finding common structure, it just builds a coercion
+to reflect it.
+-}
+
+unifyWanted :: RewriterSet -> CtLoc
+            -> Role -> TcType -> TcType -> TcS Coercion
+-- Return coercion witnessing the equality of the two types,
+-- emitting new work equalities where necessary to achieve that
+-- Very good short-cut when the two types are equal, or nearly so
+-- See Note [unifyWanted]
+-- The returned coercion's role matches the input parameter
+unifyWanted rewriters loc Phantom ty1 ty2
+  = do { kind_co <- unifyWanted rewriters loc Nominal (typeKind ty1) (typeKind ty2)
+       ; return (mkPhantomCo kind_co ty1 ty2) }
+
+unifyWanted rewriters loc role orig_ty1 orig_ty2
+  = go orig_ty1 orig_ty2
+  where
+    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
+
+    go (FunTy af1 w1 s1 t1) (FunTy af2 w2 s2 t2)
+      | af1 == af2    -- Important!  See #21530
+      = do { co_s <- unifyWanted rewriters loc role s1 s2
+           ; co_t <- unifyWanted rewriters loc role t1 t2
+           ; co_w <- unifyWanted rewriters loc Nominal w1 w2
+           ; return (mkNakedFunCo1 role af1 co_w co_s co_t) }
+
+    go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+      | tc1 == tc2, tys1 `equalLength` tys2
+      , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
+      = do { cos <- zipWith3M (unifyWanted rewriters loc)
+                              (tyConRoleListX role tc1) tys1 tys2
+           ; return (mkTyConAppCo role tc1 cos) }
+
+    go ty1@(TyVarTy tv) ty2
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty1' -> go ty1' ty2
+                Nothing   -> bale_out ty1 ty2}
+    go ty1 ty2@(TyVarTy tv)
+      = do { mb_ty <- isFilledMetaTyVar_maybe tv
+           ; case mb_ty of
+                Just ty2' -> go ty1 ty2'
+                Nothing   -> bale_out ty1 ty2 }
+
+    go ty1@(CoercionTy {}) (CoercionTy {})
+      = return (mkReflCo role ty1) -- we just don't care about coercions!
+
+    go ty1 ty2 = bale_out ty1 ty2
+
+    bale_out ty1 ty2
+       | ty1 `tcEqType` ty2 = return (mkReflCo role ty1)
+        -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
+       | otherwise = emitNewWantedEq loc rewriters role orig_ty1 orig_ty2
+
+
+{-
+Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we decompose a dependent tycon we obtain a list of
+mixed wanted type and kind equalities. Ideally we want
+all the kind equalities to get solved first so that we avoid
+generating duplicate kind equalities
+
+For example, consider decomposing a TyCon equality
+
+    (0) [W] T k_fresh (t1::k_fresh) ~ T k1 (t2::k_fresh)
+
+This gives rise to 2 equalities in the solver worklist
+
+    (1) [W] k_fresh ~ k1
+    (2) [W] t1::k_fresh ~ t2::k1
+
+The solver worklist is processed in LIFO order:
+see GHC.Tc.Solver.InertSet.selectWorkItem.
+i.e. (2) is processed _before_ (1). Now, while solving (2)
+we would call `canEqCanLHSHetero` and that would emit a
+wanted kind equality
+
+    (3) [W] k_fresh ~ k1
+
+But (3) is exactly the same as (1)!
+
+To avoid such duplicate wanted constraints from being added to the worklist,
+we ensure that (2) is processed before (1). Since we are processing
+the worklist in a LIFO ordering, we do it by emitting (1) before (2).
+This is exactly what we do in `unifyWanteds`.
+
+NB: This ordering is not needed when we decompose FunTyCons as they are not dependently typed
+-}
+
+-- NB: Length of [CtLoc] and [Roles] may be infinite
+-- but list of RHS [TcType] and LHS [TcType] is finite and both are of equal length
+unifyWanteds :: RewriterSet -> [CtLoc] -> [Role]
+             -> [TcType] -- List of RHS types
+             -> [TcType] -- List of LHS types
+             -> TcS [Coercion]
+unifyWanteds rewriters ctlocs roles rhss lhss = unify_wanteds rewriters $ zip4 ctlocs roles rhss lhss
+  where
+    -- Order is important here
+    -- See Note [Decomposing Dependent TyCons and Processing Wanted Equalities]
+    unify_wanteds _ [] = return []
+    unify_wanteds rewriters ((new_loc, tc_role, ty1, ty2) : rest)
+       = do { cos <- unify_wanteds rewriters rest
+            ; co  <- unifyWanted rewriters new_loc tc_role ty1 ty2
+            ; return (co:cos) }
 
 {-
 ************************************************************************
