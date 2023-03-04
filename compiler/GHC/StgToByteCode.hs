@@ -486,8 +486,7 @@ returnUnliftedReps d s szb reps = do
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
                let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 (primRepCmmType platform) nv_reps
-                   args_ptrs = map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off)) args_offsets
-               tuple_bco <- emitBc (tupleBCO platform call_info args_ptrs)
+               tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
                return $ PUSH_UBX (mkNativeCallInfoLit platform call_info) 1 `consOL`
                         PUSH_BCO tuple_bco `consOL`
                         unitOL RETURN_TUPLE
@@ -1050,13 +1049,9 @@ doCase d s p scrut bndr alts
                            p scrut
      alt_bco' <- emitBc alt_bco
      if ubx_tuple_frame
-       then do
-              let args_ptrs =
-                    map (\(rep, off) -> (isFollowableArg (toArgRep platform rep), off))
-                        args_offsets
-              tuple_bco <- emitBc (tupleBCO platform call_info args_ptrs)
-              return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
-                      `consOL` scrut_code)
+       then do tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
+               return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
+                       `consOL` scrut_code)
        else let push_alts
                   | not ubx_frame
                   = PUSH_ALTS alt_bco'
@@ -1247,11 +1242,10 @@ usePlainReturn t
 
  -}
 
-tupleBCO :: Platform -> NativeCallInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
-tupleBCO platform info pointers =
+tupleBCO :: Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+tupleBCO platform args_info args =
   mkProtoBCO platform invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
-
   where
     {-
       The tuple BCO is never referred to by name, so we can get away
@@ -1263,18 +1257,16 @@ tupleBCO platform info pointers =
 
     -- the first word in the frame is the call_info word,
     -- which is not a pointer
-    bitmap_size = trunc16W $ 1 + nativeCallSize info
-    bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
-                  map ((+1) . fromIntegral . bytesToWords platform . snd)
-                      (filter fst pointers)
+    nptrs_prefix = 1
+    (bitmap_size, bitmap) = mkStackBitmap platform nptrs_prefix args_info args
+
     body_code = mkSlideW 0 1          -- pop frame header
                 `snocOL` RETURN_TUPLE -- and add it again
 
-primCallBCO ::  Platform -> NativeCallInfo -> [(Bool, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
-primCallBCO platform args_info pointers =
+primCallBCO ::  Platform -> NativeCallInfo -> [(PrimRep, ByteOff)] -> [FFIInfo] -> ProtoBCO Name
+primCallBCO platform args_info args =
   mkProtoBCO platform invented_name body_code (Left [])
              0{-no arity-} bitmap_size bitmap False{-is alts-}
-
   where
     {-
       The primcall BCO is never referred to by name, so we can get away
@@ -1284,19 +1276,51 @@ primCallBCO platform args_info pointers =
     -}
     invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "primcall")
 
-    -- the first three words in the frame are the BCO describing the
-    -- pointers in the frame, the call_info word and the pointer
-    -- to the Cmm function being called. None of these is a pointer that
-    -- should be followed by the garbage collector
-    bitmap_size = trunc16W $ 2 + nativeCallSize args_info
-    bitmap      = intsToReverseBitmap platform (fromIntegral bitmap_size) $
-                  map ((+2) . fromIntegral . bytesToWords platform . snd)
-                      (filter fst pointers)
+    -- The first two words in the frame (after the BCO) are the call_info word
+    -- and the pointer to the Cmm function being called. Neither of these is a
+    -- pointer that should be followed by the garbage collector.
+    nptrs_prefix = 2
+    (bitmap_size, bitmap) = mkStackBitmap platform nptrs_prefix args_info args
+
     -- if the primcall BCO is ever run it's a bug, since the BCO should only
     -- be pushed immediately before running the PRIMCALL bytecode instruction,
     -- which immediately leaves the interpreter to jump to the stg_primcall_info
     -- Cmm function
     body_code =  unitOL CASEFAIL
+
+-- | Builds a bitmap for a stack layout with a nonpointer prefix followed by
+-- some number of arguments.
+mkStackBitmap
+  :: Platform
+  -> WordOff
+  -- ^ The number of nonpointer words that prefix the arguments.
+  -> NativeCallInfo
+  -> [(PrimRep, ByteOff)]
+  -- ^ The stack layout of the arguments, where each offset is relative to the
+  -- /bottom/ of the stack space they occupy. Their offsets must be word-aligned,
+  -- and the list must be sorted in order of ascending offset (i.e. bottom to top).
+  -> (Word16, [StgWord])
+mkStackBitmap platform nptrs_prefix args_info args
+  = (bitmap_size, bitmap)
+  where
+    bitmap_size = trunc16W $ nptrs_prefix + arg_bottom
+    bitmap = intsToReverseBitmap platform (fromIntegral bitmap_size) ptr_offsets
+
+    arg_bottom = nativeCallSize args_info
+    ptr_offsets = reverse $ map (fromIntegral . convert_arg_offset)
+                $ mapMaybe get_ptr_offset args
+
+    get_ptr_offset :: (PrimRep, ByteOff) -> Maybe ByteOff
+    get_ptr_offset (rep, byte_offset)
+      | isFollowableArg (toArgRep platform rep) = Just byte_offset
+      | otherwise                               = Nothing
+
+    convert_arg_offset :: ByteOff -> WordOff
+    convert_arg_offset arg_offset =
+      -- The argument offsets are relative to `arg_bottom`, but
+      -- `intsToReverseBitmap` expects offsets from the top, so we need to flip
+      -- them around.
+      nptrs_prefix + (arg_bottom - bytesToWords platform arg_offset)
 
 -- -----------------------------------------------------------------------------
 -- Deal with a primitive call to native code.
@@ -1325,15 +1349,12 @@ generatePrimCall d s p target _mb_unit _result_ty args
          (args_info, args_offsets) =
               layoutNativeCall profile
                                NativePrimCall
-                               d
+                               0
                                (primRepCmmType platform . argPrimRep)
                                nv_args
 
-         args_ptrs :: [(Bool, ByteOff)]
-         args_ptrs =
-            map (\(r, off) ->
-                  (isFollowableArg (toArgRep platform . argPrimRep $ r), off))
-                args_offsets
+         prim_args_offsets = mapFst argPrimRep args_offsets
+         shifted_args_offsets = mapSnd (+ d) args_offsets
 
          push_target = PUSH_UBX (LitLabel target Nothing IsFunction) 1
          push_info = PUSH_UBX (mkNativeCallInfoLit platform args_info) 1
@@ -1350,8 +1371,8 @@ generatePrimCall d s p target _mb_unit _result_ty args
          go !dd pushes ((a, off):cs) = do (push, szb) <- pushAtom dd p a
                                           massert (off == dd + szb)
                                           go (dd + szb) (push:pushes) cs
-     push_args <- go d [] args_offsets
-     args_bco <- emitBc (primCallBCO platform args_info args_ptrs)
+     push_args <- go d [] shifted_args_offsets
+     args_bco <- emitBc (primCallBCO platform args_info prim_args_offsets)
      return $ mconcat push_args `appOL`
               (push_target `consOL`
                push_info `consOL`
