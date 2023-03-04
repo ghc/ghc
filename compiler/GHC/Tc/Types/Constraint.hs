@@ -10,10 +10,6 @@ module GHC.Tc.Types.Constraint (
         QCInst(..), pendingScInst_maybe,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts,
-        ExpansionFuel, doNotExpand, consumeFuel, pendingFuel,
-        assertFuelPrecondition, assertFuelPreconditionStrict,
-        emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts,
         isPendingScDict, pendingScDict_maybe,
@@ -30,6 +26,9 @@ module GHC.Tc.Types.Constraint (
         ctEvRewriters,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+
+        ExpansionFuel, doNotExpand, consumeFuel, pendingFuel,
+        assertFuelPrecondition, assertFuelPreconditionStrict,
 
         CtIrredReason(..), isInsolubleReason,
 
@@ -83,7 +82,7 @@ module GHC.Tc.Types.Constraint (
         wrapType,
 
         CtFlavour(..), ctEvFlavour,
-        CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
+        CtFlavourRole, ctEvFlavourRole, ctFlavourRole, eqCtFlavourRole,
         eqCanRewrite, eqCanRewriteFR,
 
         -- Pretty printing
@@ -252,39 +251,44 @@ data Ct
         --    a ~ [a]         occurs check
     }
 
-  | CEqCan {  -- CanEqLHS ~ rhs
-       -- Invariants:
-       --   * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet
-       --   * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
-       --   * (TyEq:OC) lhs does not occur in rhs (occurs check)
-       --               Note [CEqCan occurs check]
-       --   * (TyEq:F) rhs has no foralls
-       --       (this avoids substituting a forall for the tyvar in other types)
-       --   * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
-       --   * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
-       --     application of a newtype TyCon.
-       --     See Note [No top-level newtypes on RHS of representational equalities]
-       --     in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
-       --     in scope.)
-       --   * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
-       --     to give best chance of
-       --     unification happening; eg if rhs is touchable then lhs is too
-       --     Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
-      cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
-      cc_lhs    :: CanEqLHS,
-      cc_rhs    :: Xi,         -- See invariants above
-
-      cc_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
-    }
-
   | CNonCanonical {        -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
       cc_ev  :: CtEvidence
     }
+
+  | CEqCan EqCt         -- A canonical equality constraint
 
   | CQuantCan QCInst       -- A quantified constraint
       -- NB: I expect to make more of the cases in Ct
       --     look like this, with the payload in an
       --     auxiliary type
+
+{- Note [Invariants of EqCt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An EqCt carries a canonical equality constraint, that satisfies these invariants:
+  * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet
+  * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
+  * (TyEq:OC) lhs does not occur in rhs (occurs check)
+              Note [CEqCan occurs check]
+  * (TyEq:F) rhs has no foralls
+      (this avoids substituting a forall for the tyvar in other types)
+  * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
+  * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
+    application of a newtype TyCon.
+    See Note [No top-level newtypes on RHS of representational equalities]
+    in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
+    in scope.)
+  * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
+    to give best chance of unification happening; eg if rhs is touchable then lhs is too
+    Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
+-}
+
+data EqCt -- An equality constraint; see Note [Invariants of EqCt]
+  = EqCt {  -- CanEqLHS ~ rhs
+      eq_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
+      eq_lhs    :: CanEqLHS,
+      eq_rhs    :: Xi,         -- See invariants above
+      eq_eq_rel :: EqRel       -- INVARIANT: cc_eq_rel = ctEvEqRel cc_ev
+    }
 
 ------------
 -- | A 'CanEqLHS' is a type that can appear on the left of a canonical
@@ -653,7 +657,8 @@ mkGivens loc ev_ids
 
 ctEvidence :: Ct -> CtEvidence
 ctEvidence (CQuantCan (QCI { qci_ev = ev })) = ev
-ctEvidence ct = cc_ev ct
+ctEvidence (CEqCan (EqCt { eq_ev = ev }))    = ev
+ctEvidence ct                                = cc_ev ct
 
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
@@ -716,6 +721,9 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = psc })
             | psc > 0  -> text "CQuantCan"  <> parens (text "psc" <+> ppr psc)
             | otherwise -> text "CQuantCan"
+
+instance Outputable EqCt where
+  ppr (EqCt { eq_ev = ev }) = ppr ev
 
 -----------------------------------
 -- | Is a type a canonical LHS? That is, is it a tyvar or an exactly-saturated
@@ -1043,8 +1051,8 @@ emptyCts = emptyBag
 isEmptyCts :: Cts -> Bool
 isEmptyCts = isEmptyBag
 
-pprCts :: Cts -> SDoc
-pprCts cts = vcat (map ppr (bagToList cts))
+pprBag :: Outputable a => Bag a -> SDoc
+pprBag cts = vcat (map ppr (bagToList cts))
 
 {-
 ************************************************************************
@@ -2084,14 +2092,16 @@ ctEvFlavourRole :: CtEvidence -> CtFlavourRole
 ctEvFlavourRole ev = (ctEvFlavour ev, ctEvEqRel ev)
 
 -- | Extract the flavour and role from a 'Ct'
+eqCtFlavourRole :: EqCt -> CtFlavourRole
+eqCtFlavourRole (EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
+  = (ctEvFlavour ev, eq_rel)
+
+-- | Extract the flavour and role from a 'Ct'
 ctFlavourRole :: Ct -> CtFlavourRole
 -- Uses short-cuts to role for special cases
-ctFlavourRole (CDictCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)
-ctFlavourRole (CEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
-  = (ctEvFlavour ev, eq_rel)
-ctFlavourRole ct
-  = ctEvFlavourRole (ctEvidence ct)
+ctFlavourRole (CDictCan { cc_ev = ev }) = (ctEvFlavour ev, NomEq)
+ctFlavourRole (CEqCan eq_ct)            = eqCtFlavourRole eq_ct
+ctFlavourRole ct                        = ctEvFlavourRole (ctEvidence ct)
 
 {- Note [eqCanRewrite]
 ~~~~~~~~~~~~~~~~~~~~~~

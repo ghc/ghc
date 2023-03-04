@@ -1012,9 +1012,9 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
        ; case lookupDVarEnv ieqs tv of
            Just equal_ct_list
              | Just ct <- find can_rewrite equal_ct_list
-             , CEqCan { cc_ev = ctev, cc_lhs = TyVarLHS tv
-                      , cc_rhs = rhs_ty, cc_eq_rel = ct_eq_rel } <- ct
-             -> do { let wrw = isWantedCt ct
+             , EqCt { eq_ev = ctev, eq_lhs = TyVarLHS tv
+                    , eq_rhs = rhs_ty, eq_eq_rel = ct_eq_rel } <- ct
+             -> do { let wrw = isWanted ctev
                    ; traceRewriteM "Following inert tyvar" $
                         vcat [ ppr tv <+> equals <+> ppr rhs_ty
                              , ppr ctev
@@ -1035,8 +1035,8 @@ rewrite_tyvar2 tv fr@(_, eq_rel)
            _other -> return RTRNotFollowed }
 
   where
-    can_rewrite :: Ct -> Bool
-    can_rewrite ct = ctFlavourRole ct `eqCanRewriteFR` fr
+    can_rewrite :: EqCt -> Bool
+    can_rewrite ct = eqCtFlavourRole ct `eqCanRewriteFR` fr
       -- This is THE key call of eqCanRewriteFR
 
 {-

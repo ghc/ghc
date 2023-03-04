@@ -2412,7 +2412,7 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
        ; args' <- mapM zonkTcType args
        ; return $ ct { cc_ev = ev', cc_tyargs = args' } }
 
-zonkCt (CEqCan { cc_ev = ev })
+zonkCt (CEqCan (EqCt { eq_ev = ev }))
   = mkNonCanonical <$> zonkCtEvidence ev
 
 zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_reason flag
