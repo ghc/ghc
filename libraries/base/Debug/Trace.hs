@@ -173,7 +173,7 @@ Like 'trace', but outputs the result of calling a function on the argument.
 hello
 ("hello","world")
 
-@since 4.17.0.0
+@since 4.18.0.0
 -}
 traceWith :: (a -> String) -> a -> a
 traceWith f a = trace (f a) a
@@ -186,7 +186,7 @@ a 'String'.
 3
 [1,2,3]
 
-@since 4.17.0.0
+@since 4.18.0.0
 -}
 traceShowWith :: Show b => (a -> b) -> a -> a
 traceShowWith f = traceWith (show . f)
@@ -303,7 +303,7 @@ traceEventIO msg =
 -- | Like 'traceEvent', but emits the result of calling a function on its
 -- argument.
 --
--- @since 4.17.0.0
+-- @since 4.18.0.0
 traceEventWith :: (a -> String) -> a -> a
 traceEventWith f a = traceEvent (f a) a
 

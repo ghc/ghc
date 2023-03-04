@@ -83,6 +83,9 @@
     * `InfoProv` now has additional `ipSrcFile` and `ipSrcSpan` fields. `ipLoc`
       is now a function computed from these fields.
     * The `whereFrom` function has been moved
+  * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
+    `Debug.Trace`, per
+    [CLC proposal #36](https://github.com/haskell/core-libraries-committee/issues/36).
 
 ## 4.17.0.0 *August 2022*
 
