@@ -449,8 +449,10 @@ product                 =  foldl' (*) 1
 -- [100,99,97,94,90]
 -- >>> scanl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
 -- ["foo","afoo","bafoo","cbafoo","dcbafoo"]
--- >>> scanl (+) 0 [1..]
--- * Hangs forever *
+-- >>> take 10 (scanl (+) 0 [1..])
+-- [0,1,3,6,10,15,21,28,36,45]
+-- >>> take 1 (scanl undefined 'a' undefined)
+-- "a"
 
 -- This peculiar arrangement is necessary to prevent scanl being rewritten in
 -- its own right-hand side.
@@ -496,8 +498,10 @@ constScanl = const
 -- [True,False,False,False]
 -- >>> scanl1 (||) [False, False, True, True]
 -- [False,False,True,True]
--- >>> scanl1 (+) [1..]
--- * Hangs forever *
+-- >>> take 10 (scanl1 (+) [1..])
+-- [1,3,6,10,15,21,28,36,45,55]
+-- >>> take 1 (scanl1 undefined ('a' : undefined))
+-- "a"
 scanl1                  :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)         =  scanl f x xs
 scanl1 _ []             =  []
@@ -753,9 +757,12 @@ minimum xs              =  foldl1' min xs
 -- variant of this function.
 --
 -- >>> take 10 $ iterate not True
--- [True,False,True,False...
+-- [True,False,True,False,True,False,True,False,True,False]
 -- >>> take 10 $ iterate (+3) 42
--- [42,45,48,51,54,57,60,63...
+-- [42,45,48,51,54,57,60,63,66,69]
+-- >>> take 1 $ iterate undefined 42
+-- [42]
+--
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
@@ -776,6 +783,10 @@ iterateFB c f x0 = go x0
 -- It forces the result of each application of the function to weak head normal
 -- form (WHNF)
 -- before proceeding.
+--
+-- >>> take 1 $ iterate' undefined 42
+-- *** Exception: Prelude.undefined
+--
 {-# NOINLINE [1] iterate' #-}
 iterate' :: (a -> a) -> a -> [a]
 iterate' f x =
@@ -835,10 +846,13 @@ replicate n x           =  take n (repeat x)
 --
 -- >>> cycle []
 -- *** Exception: Prelude.cycle: empty list
--- >>> cycle [42]
--- [42,42,42,42,42,42,42,42,42,42...
--- >>> cycle [2, 5, 7]
--- [2,5,7,2,5,7,2,5,7,2,5,7...
+-- >>> take 10 (cycle [42])
+-- [42,42,42,42,42,42,42,42,42,42]
+-- >>> take 10 (cycle [2, 5, 7])
+-- [2,5,7,2,5,7,2,5,7,2]
+-- >>> take 1 (cycle (42 : undefined))
+-- [42]
+--
 cycle                   :: HasCallStack => [a] -> [a]
 cycle []                = errorEmptyList "cycle"
 cycle xs                = xs' where xs' = xs ++ xs'
@@ -852,6 +866,16 @@ cycle xs                = xs' where xs' = xs ++ xs'
 -- [1,2,3]
 -- >>> takeWhile (< 0) [1,2,3]
 -- []
+--
+-- Laziness:
+--
+-- >>> takeWhile (const False) undefined
+-- *** Exception: Prelude.undefined
+-- >>> takeWhile (const False) (undefined : undefined)
+-- []
+-- >>> take 1 (takeWhile (const True) (1 : undefined))
+-- [1]
+--
 {-# NOINLINE [1] takeWhile #-}
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
@@ -907,6 +931,13 @@ dropWhile p xs@(x:xs')
 -- []
 -- >>> take 0 [1,2]
 -- []
+--
+-- Laziness:
+--
+-- >>> take 0 undefined
+-- []
+-- >>> take 1 (1 : undefined)
+-- [1]
 --
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
@@ -1018,8 +1049,17 @@ drop n ls
 -- >>> splitAt (-1) [1,2,3]
 -- ([],[1,2,3])
 --
--- It is equivalent to @('take' n xs, 'drop' n xs)@ when @n@ is not @_|_@
--- (@splitAt _|_ xs = _|_@).
+-- It is equivalent to @('take' n xs, 'drop' n xs)@
+-- unless @n@ is @_|_@:
+-- @splitAt _|_ xs = _|_@, not @(_|_, _|_)@).
+--
+-- The first component of the tuple is produced lazily:
+--
+-- >>> fst (splitAt 0 undefined)
+-- []
+-- >>> take 1 (fst (splitAt 10 (1 : undefined)))
+-- [1]
+--
 -- 'splitAt' is an instance of the more general 'Data.List.genericSplitAt',
 -- in which @n@ may be of any integral type.
 splitAt                :: Int -> [a] -> ([a],[a])
@@ -1050,7 +1090,24 @@ splitAt n ls
 -- >>> span (< 0) [1,2,3]
 -- ([],[1,2,3])
 --
--- 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
+-- 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@, even if @p@ is @_|_@.
+--
+-- Laziness:
+--
+-- >>> span undefined []
+-- ([],[])
+-- >>> fst (span (const False) undefined)
+-- *** Exception: Prelude.undefined
+-- >>> fst (span (const False) (undefined : undefined))
+-- []
+-- >>> take 1 (fst (span (const True) (1 : undefined)))
+-- [1]
+--
+-- 'span' produces the first component of the tuple lazily:
+--
+-- >>> take 10 (fst (span (const True) [1..]))
+-- [1,2,3,4,5,6,7,8,9,10]
+--
 span                    :: (a -> Bool) -> [a] -> ([a],[a])
 span _ xs@[]            =  (xs, xs)
 span p xs@(x:xs')
@@ -1068,7 +1125,26 @@ span p xs@(x:xs')
 -- >>> break (> 9) [1,2,3]
 -- ([1,2,3],[])
 --
--- 'break' @p@ is equivalent to @'span' ('not' . p)@.
+-- 'break' @p@ is equivalent to @'span' ('not' . p)@
+-- and consequently to @('takeWhile' ('not' . p) xs, 'dropWhile' ('not' . p) xs)@,
+-- even if @p@ is @_|_@.
+--
+-- Laziness:
+--
+-- >>> break undefined []
+-- ([],[])
+-- >>> fst (break (const True) undefined)
+-- *** Exception: Prelude.undefined
+-- >>> fst (break (const True) (undefined : undefined))
+-- []
+-- >>> take 1 (fst (break (const False) (1 : undefined)))
+-- [1]
+--
+-- 'break' produces the first component of the tuple lazily:
+--
+-- >>> take 10 (fst (break (const False) [1..]))
+-- [1,2,3,4,5,6,7,8,9,10]
+--
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
 #if defined(USE_REPORT_PRELUDE)
 break p                 =  span (not . p)

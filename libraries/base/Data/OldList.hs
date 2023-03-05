@@ -233,11 +233,25 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 --
 -- >>> dropWhileEnd isSpace "foo\n"
 -- "foo"
---
 -- >>> dropWhileEnd isSpace "foo bar"
 -- "foo bar"
---
 -- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
+--
+-- This function is lazy in spine, but strict in elements,
+-- which makes it different from 'reverse' '.' 'dropWhile' @p@ '.' 'reverse',
+-- which is strict in spine, but lazy in elements. For instance:
+--
+-- >>> take 1 (dropWhileEnd (< 0) (1 : undefined))
+-- [1]
+-- >>> take 1 (reverse $ dropWhile (< 0) $ reverse (1 : undefined))
+-- *** Exception: Prelude.undefined
+--
+-- but on the other hand
+--
+-- >>> last (dropWhileEnd (< 0) [undefined, 1])
+-- *** Exception: Prelude.undefined
+-- >>> last (reverse $ dropWhile (< 0) $ reverse [undefined, 1])
+-- 1
 --
 -- @since 4.5.0.0
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
@@ -343,6 +357,11 @@ findIndices p ls = build $ \c n ->
 -- True
 -- >>> [0..] `isPrefixOf` [0..]
 -- * Hangs forever *
+--
+-- 'isPrefixOf' shortcuts when the first argument is empty:
+--
+-- >>> isPrefixOf [] undefined
+-- True
 --
 isPrefixOf              :: (Eq a) => [a] -> [a] -> Bool
 isPrefixOf [] _         =  True
@@ -600,6 +619,14 @@ intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 --
 -- >>> intersperse ',' "abcde"
 -- "a,b,c,d,e"
+--
+-- 'intersperse' has the following laziness properties:
+--
+-- >>> take 1 (intersperse undefined ('a' : undefined))
+-- "a"
+-- >>> take 2 (intersperse ',' ('a' : undefined))
+-- "a*** Exception: Prelude.undefined
+--
 intersperse             :: a -> [a] -> [a]
 intersperse _   []      = []
 intersperse sep (x:xs)  = x : prependToAll sep xs
@@ -619,6 +646,14 @@ prependToAll sep (x:xs) = sep : x : prependToAll sep xs
 --
 -- >>> intercalate ", " ["Lorem", "ipsum", "dolor"]
 -- "Lorem, ipsum, dolor"
+--
+-- 'intercalate' has the following laziness properties:
+--
+-- >>> take 5 (intercalate undefined ("Lorem" : undefined))
+-- "Lorem"
+-- >>> take 6 (intercalate ", " ("Lorem" : undefined))
+-- "Lorem*** Exception: Prelude.undefined
+--
 intercalate :: [a] -> [[a]] -> [a]
 intercalate xs xss = concat (intersperse xs xss)
 
@@ -637,6 +672,11 @@ intercalate xs xss = concat (intersperse xs xss)
 --
 -- >>> transpose (repeat [])
 -- * Hangs forever *
+--
+-- 'transpose' is lazy:
+--
+-- >>> take 1 (transpose ['a' : undefined, 'b' : undefined])
+-- ["ab"]
 --
 transpose :: [[a]] -> [[a]]
 transpose [] = []
@@ -708,6 +748,12 @@ select p x ~(ts,fs) | p x       = (x:ts,fs)
 -- 'foldl'; it applies a function to each element of a list, passing
 -- an accumulating parameter from left to right, and returning a final
 -- value of this accumulator together with the new list.
+--
+-- 'mapAccumL' does not force accumulator if it is unused:
+--
+-- >>> take 1 (snd (mapAccumL (\_ x -> (undefined, x)) undefined ('a' : undefined)))
+-- "a"
+--
 mapAccumL :: (acc -> x -> (acc, y)) -- Function of elt of input list
                                     -- and accumulator, returning new
                                     -- accumulator and elt of result list
@@ -1234,6 +1280,13 @@ tails lst               =  build (\c n ->
 -- >>> take 8 $ subsequences ['a'..]
 -- ["","a","b","ab","c","ac","bc","abc"]
 --
+-- 'subsequences' does not look ahead unless it must:
+--
+-- >>> take 1 (subsequences undefined)
+-- [[]]
+-- >>> take 2 (subsequences ('a' : undefined))
+-- ["","a"]
+--
 subsequences            :: [a] -> [[a]]
 subsequences xs         =  [] : nonEmptySubsequences xs
 
@@ -1549,6 +1602,11 @@ singleton x = [x]
 --
 -- >>> unfoldr (\b -> if b == 0 then Nothing else Just (b, b-1)) 10
 -- [10,9,8,7,6,5,4,3,2,1]
+--
+-- Laziness:
+--
+-- >>> take 1 (unfoldr (\x -> Just (x, undefined)) 'a')
+-- "a"
 --
 
 -- Note [INLINE unfoldr]
