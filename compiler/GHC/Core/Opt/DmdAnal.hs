@@ -1916,10 +1916,11 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
 
   -- Check for an OPAQUE function: see Note [OPAQUE pragma]
   -- In that case, trim off all boxity info from argument demands
+  -- and demand info on lambda binders
   -- See Note [The OPAQUE pragma and avoiding the reboxing of arguments]
   | isOpaquePragma (idInlinePragma fn)
   , let trimmed_rhs_dmds = map trimBoxity rhs_dmds
-  = (trimmed_rhs_dmds, add_demands trimmed_rhs_dmds rhs)
+  = (trimmed_rhs_dmds, set_lam_dmds trimmed_rhs_dmds rhs)
 
   -- Check that we have enough visible binders to match the
   -- threshold arity; if not, we won't do worker/wrapper
@@ -1939,8 +1940,8 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
     --   vcat [text "function:" <+> ppr fn
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
     --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
-    (arg_dmds', add_demands arg_dmds' rhs)
-    -- add_demands: we must attach the final boxities to the lambda-binders
+    (arg_dmds', set_lam_dmds arg_dmds' rhs)
+    -- set_lam_dmds: we must attach the final boxities to the lambda-binders
     -- of the function, both because that's kosher, and because CPR analysis
     -- uses the info on the binders directly.
   where
@@ -2032,17 +2033,18 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
                  | positiveTopBudget bg_inner' = (bg_inner', dmd')
                  | otherwise                   = (bg_inner,  trimBoxity dmd)
 
-    add_demands :: [Demand] -> CoreExpr -> CoreExpr
+    set_lam_dmds :: [Demand] -> CoreExpr -> CoreExpr
     -- Attach the demands to the outer lambdas of this expression
-    add_demands [] e = e
-    add_demands (dmd:dmds) (Lam v e)
-      | isTyVar v = Lam v (add_demands (dmd:dmds) e)
-      | otherwise = Lam (v `setIdDemandInfo` dmd) (add_demands dmds e)
-    add_demands dmds (Cast e co) = Cast (add_demands dmds e) co
+    set_lam_dmds (dmd:dmds) (Lam v e)
+      | isTyVar v = Lam v (set_lam_dmds (dmd:dmds) e)
+      | otherwise = Lam (v `setIdDemandInfo` dmd) (set_lam_dmds dmds e)
+    set_lam_dmds dmds (Cast e co) = Cast (set_lam_dmds dmds e) co
        -- This case happens for an OPAQUE function, which may look like
        --     f = (\x y. blah) |> co
        -- We give it strictness but no boxity (#22502)
-    add_demands dmds e = pprPanic "add_demands" (ppr dmds $$ ppr e)
+    set_lam_dmds _ e = e
+       -- In the OPAQUE case, the list of demands at this point might be
+       -- non-empty, e.g., when looking at a PAP. Hence don't panic (#22997).
 
 finaliseLetBoxity
   :: AnalEnv
