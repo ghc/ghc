@@ -23,6 +23,7 @@ Contents:
    hints
    utils
    win32-dlls
+   javascript
    wasm
    bugs
    eventlog-formats

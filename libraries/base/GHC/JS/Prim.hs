@@ -277,13 +277,13 @@ foreign import javascript unsafe "(($1) => { return ($1 === null); })"
 foreign import javascript unsafe "(($1) => { return ($1 === undefined); })"
   js_isUndefined :: JSVal -> Bool
 
-foreign import javascript unsafe "(($1) => { return ($r = typeof($1) === 'number' ? ($1|0) : 0;); })"
+foreign import javascript unsafe "(($1) => { return (typeof($1) === 'number' ? ($1|0) : 0); })"
   js_fromJSInt :: JSVal -> Int
 
-foreign import javascript unsafe "(($1) => { return ($r = $1;); })"
+foreign import javascript unsafe "(($1) => { return $1; })"
   js_toJSInt :: Int -> JSVal
 
-foreign import javascript unsafe "$r = null;"
+foreign import javascript unsafe "(() => { return null; })"
   js_null :: JSVal
 
 foreign import javascript unsafe "(($1,$2) => { return $1[h$fromHsString($2)]; })"
@@ -306,7 +306,6 @@ foreign import javascript unsafe "(($1,$2_1,$2_2) => { return $1[h$decodeUtf8z($
 
 foreign import javascript unsafe "(($1_1,$1_2) => { return h$decodeUtf8z($1_1, $1_2); })"
   js_unpackJSStringUtf8## :: Addr# -> State# s -> (# State# s, JSVal# #)
-
 
 foreign import javascript unsafe "(($1_1, $1_2) => { return h$decodeUtf8z($1_1,$1_2); })"
   js_unsafeUnpackJSStringUtf8## :: Addr# -> JSVal#
