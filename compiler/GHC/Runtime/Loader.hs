@@ -138,15 +138,17 @@ loadPlugins hsc_env
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
-    loadPlugin = loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName hsc_env
+    loadPlugin p = pluginTyConName >>= \pluginTyConName' -> loadPlugin' (mkVarOccFS (fsLit "plugin")) pluginTyConName' hsc_env p
 
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO (FrontendPlugin, [Linkable], PkgsLoaded)
 loadFrontendPlugin hsc_env mod_name = do
     checkExternalInterpreter hsc_env
     (plugin, _iface, links, pkgs)
-      <- loadPlugin' (mkVarOccFS (fsLit "frontendPlugin")) frontendPluginTyConName
-           hsc_env mod_name
+      <- frontendPluginTyConName >>=
+        \frontendPluginTCN -> 
+          loadPlugin' (mkVarOccFS (fsLit "frontendPlugin")) frontendPluginTCN
+            hsc_env mod_name
     return (plugin, links, pkgs)
 
 -- #14335
@@ -168,7 +170,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The module", ppr mod_name
                           , text "did not export the plugin name"
                           , ppr plugin_rdr_name ]) ;
-            Just (name, mod_iface) ->
+            Just (name, mod_iface) -> pprTrace "ROMES: Current unit" (ppr . ue_current_unit . hsc_unit_env $ hsc_env) $
 
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)

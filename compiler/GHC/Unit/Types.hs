@@ -24,6 +24,8 @@ module GHC.Unit.Types
    , pprInstantiatedModule
    , moduleFreeHoles
 
+   , workingThisOut
+
      -- * Units
    , IsUnitId
    , GenUnit (..)
@@ -79,7 +81,7 @@ module GHC.Unit.Types
    , interactiveUnit
 
    , isInteractiveModule
-   , wiredInUnitIds
+   , wiredInUnitNames
 
      -- * Boot modules
    , IsBootInterface (..)
@@ -105,11 +107,22 @@ import Data.Data
 import Data.List (sortBy )
 import Data.Function
 import Data.Bifunctor
+import Data.IORef
+import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
+import System.IO.Unsafe
+
 import Language.Haskell.Syntax.Module.Name
 import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
+
+-- Ref for an "unwireMap" which maps wired-in ids to actual units, created by
+-- identifying wired-in packages in the list of package-id flags
+workingThisOut :: IORef (Map UnitId UnitId)
+workingThisOut = unsafePerformIO (newIORef (Map.singleton (UnitId $ fsLit "ouch-version") (UnitId $ fsLit "ouch")))
+{-# NOINLINE workingThisOut #-}
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -587,19 +600,35 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 -}
 
+bignumUnitName, primUnitName, baseUnitName, rtsUnitName,
+  thUnitName, mainUnitName, thisGhcUnitName, interactiveUnitName :: FastString
+
 bignumUnitId, primUnitId, baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 
 bignumUnit, primUnit, baseUnit, rtsUnit,
   thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
 
-primUnitId        = UnitId (fsLit "ghc-prim")
-bignumUnitId      = UnitId (fsLit "ghc-bignum")
-baseUnitId        = UnitId (fsLit "base")
-rtsUnitId         = UnitId (fsLit "rts")
-thisGhcUnitId     = UnitId (fsLit "ghc")
-interactiveUnitId = UnitId (fsLit "interactive")
-thUnitId          = UnitId (fsLit "template-haskell")
+primUnitName        = fsLit "ghc-prim"
+bignumUnitName      = fsLit "ghc-bignum"
+baseUnitName        = fsLit "base"
+rtsUnitName         = fsLit "rts"
+thisGhcUnitName     = fsLit "ghc"
+interactiveUnitName = fsLit "interactive"
+thUnitName          = fsLit "template-haskell"
+
+primUnitId        = UnitId primUnitName
+bignumUnitId      = UnitId bignumUnitName
+baseUnitId        = UnitId baseUnitName
+rtsUnitId         = UnitId rtsUnitName
+thisGhcUnitId     = UnitId thisGhcUnitName
+interactiveUnitId = UnitId interactiveUnitName
+thUnitId          = mkWiredInUnitId thUnitName
+{-# INLINE bignumUnitId #-}
+{-# INLINE baseUnitId #-}
+{-# INLINE rtsUnitId #-}
+{-# INLINE thisGhcUnitId #-}
+{-# INLINE thUnitId #-}
 
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)
@@ -612,20 +641,28 @@ interactiveUnit   = RealUnit (Definite interactiveUnitId)
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainUnitId = UnitId (fsLit "main")
+mainUnitName = fsLit "main"
+mainUnitId = UnitId mainUnitName
 mainUnit = RealUnit (Definite mainUnitId)
+
+-- Make the actual unit id the result of looking up the wired-in unit package name in the wire map
+mkWiredInUnitId :: FastString -> UnitId
+mkWiredInUnitId x = case Map.lookup (UnitId x) $ unsafePerformIO (readIORef workingThisOut) of
+                      Nothing -> pprTrace "Romes:Couldn't find UnitId" (ppr (UnitId x,unsafePerformIO (readIORef workingThisOut))) (UnitId $ fsLit "rts") -- this is a fallback, in which situations do we need a fallback? perhaps when booting the compiler with the rts?
+                      Just y -> pprTrace "Romes:Found in wire map" (ppr x <+> text "->" <> ppr y) y
+
 
 isInteractiveModule :: Module -> Bool
 isInteractiveModule mod = moduleUnit mod == interactiveUnit
 
-wiredInUnitIds :: [UnitId]
-wiredInUnitIds =
-   [ primUnitId
-   , bignumUnitId
-   , baseUnitId
-   , rtsUnitId
-   , thUnitId
-   , thisGhcUnitId
+wiredInUnitNames :: [FastString]
+wiredInUnitNames =
+   [ primUnitName
+   , bignumUnitName
+   , baseUnitName
+   , rtsUnitName
+   , thUnitName
+   , thisGhcUnitName
    ]
 
 ---------------------------------------------------------------------

@@ -3,6 +3,7 @@ Binary serialization for .hie files.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Iface.Ext.Binary
    ( readHieFile
@@ -291,15 +292,18 @@ putName (HieSymbolTable next ref) bh name = do
       let hieName = ExternalName mod occ (nameSrcSpan name)
       writeIORef ref $! addToUFM symmap name (off, hieName)
       put_ bh (fromIntegral off :: Word32)
-    Just (off, LocalName _occ span)
-      | notLocal (toHieName name) || nameSrcSpan name /= span -> do
-      writeIORef ref $! addToUFM symmap name (off, toHieName name)
-      put_ bh (fromIntegral off :: Word32)
+    Just (off, LocalName _occ span) -> do
+      hieName <- toHieName name
+      if notLocal (hieName) || nameSrcSpan name /= span then do
+        writeIORef ref $! addToUFM symmap name (off, hieName)
+        put_ bh (fromIntegral off :: Word32)
+      else put_ bh (fromIntegral off :: Word32) -- ROMES:TODO can we not duplicate this here as below?
     Just (off, _) -> put_ bh (fromIntegral off :: Word32)
     Nothing -> do
+        hieName <- toHieName name
         off <- readFastMutInt next
         writeFastMutInt next (off+1)
-        writeIORef ref $! addToUFM symmap name (off, toHieName name)
+        writeIORef ref $! addToUFM symmap name (off, hieName)
         put_ bh (fromIntegral off :: Word32)
 
   where
@@ -328,7 +332,7 @@ fromHieName nc hie_name = do
       -- don't update the NameCache for local names
       pure $ mkInternalName uniq occ span
 
-    KnownKeyName u -> case lookupKnownKeyName u of
+    KnownKeyName u -> lookupKnownKeyName u >>= \case
       Nothing -> pprPanic "fromHieName:unknown known-key unique"
                           (ppr u)
       Just n -> pure n

@@ -113,7 +113,7 @@ Note [About wired-in things]
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in "GHC.Builtin.Names")
-knownKeyNames :: [Name]
+knownKeyNames :: IO [Name]
 knownKeyNames
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
@@ -123,7 +123,7 @@ knownKeyNames
        -- "<<details unavailable>>" error. (This seems to happen only in the
        -- stage 2 compiler, for reasons I [Richard] have no clue of.)
   | otherwise
-  = all_names
+  = (++) all_names <$> basicKnownKeyNames 
   where
     all_names =
       concat [ concatMap wired_tycon_kk_names primTyCons
@@ -132,7 +132,6 @@ knownKeyNames
              , map idName wiredInIds
              , map idName allThePrimOpIds
              , map (idName . primOpWrapperId) allThePrimOps
-             , basicKnownKeyNames
              , templateHaskellNames
              ]
     -- All of the names associated with a wired-in TyCon.
@@ -189,22 +188,22 @@ knownKeyNamesOkay all_names
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
-lookupKnownKeyName :: Unique -> Maybe Name
+lookupKnownKeyName :: Unique -> IO (Maybe Name)
 lookupKnownKeyName u =
-    knownUniqueName u <|> lookupUFM_Directly knownKeysMap u
+    (knownUniqueName u <|>) . flip lookupUFM_Directly u <$> knownKeysMap 
 
 -- | Is a 'Name' known-key?
-isKnownKeyName :: Name -> Bool
+isKnownKeyName :: Name -> IO Bool
 isKnownKeyName n =
-    isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
+    (isJust (knownUniqueName $ nameUnique n) ||) . elemUFM n <$> knownKeysMap
 
 -- | Maps 'Unique's to known-key names.
 --
 -- The type is @UniqFM Name Name@ to denote that the 'Unique's used
 -- in the domain are 'Unique's associated with 'Name's (as opposed
 -- to some other namespace of 'Unique's).
-knownKeysMap :: UniqFM Name Name
-knownKeysMap = listToIdentityUFM knownKeyNames
+knownKeysMap :: IO (UniqFM Name Name)
+knownKeysMap = listToIdentityUFM <$> knownKeyNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
