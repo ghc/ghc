@@ -3,4 +3,4 @@ RepPolyNPlusK.hs:22:1: error: [GHC-55287]
     The first pattern in the equation for ‘foo’
     does not have a fixed runtime representation.
     Its type is:
-      a :: TYPE rep1
+      a :: TYPE rep2

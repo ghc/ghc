@@ -45,8 +45,6 @@ module GHC.Tc.Utils.TcMType (
   unpackCoercionHole, unpackCoercionHole_maybe,
   checkCoercionHole,
 
-  ConcreteHole, newConcreteHole,
-
   newImplication,
 
   --------------------------------
@@ -414,23 +412,6 @@ checkCoercionHole cv co
              | otherwise
              = False
 
--- | A coercion hole used to store evidence for `Concrete#` constraints.
---
--- See Note [The Concrete mechanism].
-type ConcreteHole = CoercionHole
-
--- | Create a new (initially unfilled) coercion hole,
--- to hold evidence for a @'Concrete#' (ty :: ki)@ constraint.
-newConcreteHole :: Kind -- ^ Kind of the thing we want to ensure is concrete (e.g. 'runtimeRepTy')
-                -> Type -- ^ Thing we want to ensure is concrete (e.g. some 'RuntimeRep')
-                -> TcM (ConcreteHole, TcType)
-                  -- ^ where to put the evidence, and a metavariable to store
-                  -- the concrete type
-newConcreteHole ki ty
-  = do { concrete_ty <- newFlexiTyVarTy ki
-       ; let co_ty = mkHeteroPrimEqPred ki ki ty concrete_ty
-       ; hole <- newCoercionHole co_ty
-       ; return (hole, concrete_ty) }
 
 {- **********************************************************************
 *
@@ -840,11 +821,13 @@ cloneTyVarTyVar name kind
 --
 -- Invariant: the kind must be concrete, as per Note [ConcreteTv].
 -- This is checked with an assertion.
-newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin -> TcKind -> TcM TcTyVar
-newConcreteTyVar reason kind =
-  assertPpr (isConcrete kind)
-    (text "newConcreteTyVar: non-concrete kind" <+> ppr kind)
-  $ newAnonMetaTyVar (ConcreteTv reason) kind
+newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin
+                 -> FastString -> TcKind -> TcM TcTyVar
+newConcreteTyVar reason fs kind
+  = assertPpr (isConcrete kind) assert_msg $
+    newNamedAnonMetaTyVar fs (ConcreteTv reason) kind
+  where
+    assert_msg = text "newConcreteTyVar: non-concrete kind" <+> ppr kind
 
 newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
 newPatSigTyVar name kind
@@ -1242,14 +1225,14 @@ NB: this is all rather similar to, but sadly not the same as
 
 Wrinkle:
 
-We must make absolutely sure that alpha indeed is not
-from an outer context. (Otherwise, we might indeed learn more information
-about it.) This can be done easily: we just check alpha's TcLevel.
-That level must be strictly greater than the ambient TcLevel in order
-to treat it as naughty. We say "strictly greater than" because the call to
+We must make absolutely sure that alpha indeed is not from an outer
+context. (Otherwise, we might indeed learn more information about it.)
+This can be done easily: we just check alpha's TcLevel.  That level
+must be strictly greater than the ambient TcLevel in order to treat it
+as naughty. We say "strictly greater than" because the call to
 candidateQTyVars is made outside the bumped TcLevel, as stated in the
-comment to candidateQTyVarsOfType. The level check is done in go_tv
-in collect_cand_qtvs. Skipping this check caused #16517.
+comment to candidateQTyVarsOfType. The level check is done in go_tv in
+collect_cand_qtvs. Skipping this check caused #16517.
 
 -}
 
@@ -1349,8 +1332,9 @@ candidateQTyVarsWithBinders :: [TyVar] -> Type -> TcM CandidatesQTvs
 -- Because we are going to scoped-sort the quantified variables
 -- in among the tvs
 candidateQTyVarsWithBinders bound_tvs ty
-  = do { kvs <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
-       ; all_tvs <- collect_cand_qtvs ty False emptyVarSet kvs ty
+  = do { kvs     <- candidateQTyVarsOfKinds (map tyVarKind bound_tvs)
+       ; cur_lvl <- getTcLevel
+       ; all_tvs <- collect_cand_qtvs ty False cur_lvl emptyVarSet kvs ty
        ; return (all_tvs `delCandidates` bound_tvs) }
 
 -- | Gathers free variables to use as quantification candidates (in
@@ -1362,14 +1346,18 @@ candidateQTyVarsWithBinders bound_tvs ty
 -- See Note [Dependent type variables]
 candidateQTyVarsOfType :: TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfType ty = collect_cand_qtvs ty False emptyVarSet mempty ty
+candidateQTyVarsOfType ty
+  = do { cur_lvl <- getTcLevel
+       ; collect_cand_qtvs ty False cur_lvl emptyVarSet mempty ty }
 
 -- | Like 'candidateQTyVarsOfType', but over a list of types
 -- The variables to quantify must have a TcLevel strictly greater than
 -- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
 candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
-candidateQTyVarsOfTypes tys = foldlM (\acc ty -> collect_cand_qtvs ty False emptyVarSet acc ty)
-                                     mempty tys
+candidateQTyVarsOfTypes tys
+  = do { cur_lvl <- getTcLevel
+       ; foldlM (\acc ty -> collect_cand_qtvs ty False cur_lvl emptyVarSet acc ty)
+                mempty tys }
 
 -- | Like 'candidateQTyVarsOfType', but consider every free variable
 -- to be dependent. This is appropriate when generalizing a *kind*,
@@ -1377,16 +1365,21 @@ candidateQTyVarsOfTypes tys = foldlM (\acc ty -> collect_cand_qtvs ty False empt
 -- to Type.)
 candidateQTyVarsOfKind :: TcKind       -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKind ty = collect_cand_qtvs ty True emptyVarSet mempty ty
+candidateQTyVarsOfKind ty
+  = do { cur_lvl <- getTcLevel
+       ; collect_cand_qtvs ty True cur_lvl emptyVarSet mempty ty }
 
 candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKinds tys = foldM (\acc ty -> collect_cand_qtvs ty True emptyVarSet acc ty)
-                                    mempty tys
+candidateQTyVarsOfKinds tys
+  = do { cur_lvl <- getTcLevel
+       ; foldM (\acc ty -> collect_cand_qtvs ty True cur_lvl emptyVarSet acc ty)
+               mempty tys }
 
 collect_cand_qtvs
-  :: TcType          -- original type that we started recurring into; for errors
+  :: TcType          -- Original type that we started recurring into; for errors
   -> Bool            -- True <=> consider every fv in Type to be dependent
+  -> TcLevel         -- Current TcLevel; collect only tyvars whose level is greater
   -> VarSet          -- Bound variables (locals only)
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
@@ -1403,7 +1396,7 @@ collect_cand_qtvs
 --     so that subsequent dependency analysis (to build a well
 --     scoped telescope) works correctly
 
-collect_cand_qtvs orig_ty is_dep bound dvs ty
+collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
   = go dvs ty
   where
     is_bound tv = tv `elemVarSet` bound
@@ -1411,13 +1404,13 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
-    go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
-    go dv (TyConApp tc tys) = go_tc_args dv (tyConBinders tc) tys
+    go dv (AppTy t1 t2)       = foldlM go dv [t1, t2]
+    go dv (TyConApp tc tys)   = go_tc_args dv (tyConBinders tc) tys
     go dv (FunTy _ w arg res) = foldlM go dv [w, arg, res]
-    go dv (LitTy {})        = return dv
-    go dv (CastTy ty co)    = do dv1 <- go dv ty
-                                 collect_cand_qtvs_co orig_ty bound dv1 co
-    go dv (CoercionTy co)   = collect_cand_qtvs_co orig_ty bound dv co
+    go dv (LitTy {})          = return dv
+    go dv (CastTy ty co)      = do { dv1 <- go dv ty
+                                   ; collect_cand_qtvs_co orig_ty cur_lvl bound dv1 co }
+    go dv (CoercionTy co)     = collect_cand_qtvs_co orig_ty cur_lvl bound dv co
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv
@@ -1427,8 +1420,8 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
                              Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
-      = do { dv1 <- collect_cand_qtvs orig_ty True bound dv (tyVarKind tv)
-           ; collect_cand_qtvs orig_ty is_dep (bound `extendVarSet` tv) dv1 ty }
+      = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (tyVarKind tv)
+           ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` tv) dv1 ty }
 
       -- This makes sure that we default e.g. the alpha in Proxy alpha (Any alpha).
       -- Tested in polykinds/NestedProxies.
@@ -1437,7 +1430,7 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
       -- to look at kinds.
     go_tc_args dv (tc_bndr:tc_bndrs) (ty:tys)
       = do { dv1 <- collect_cand_qtvs orig_ty (is_dep || isNamedTyConBinder tc_bndr)
-                                      bound dv ty
+                                      cur_lvl bound dv ty
            ; go_tc_args dv1 tc_bndrs tys }
     go_tc_args dv _bndrs tys  -- _bndrs might be non-empty: undersaturation
                               -- tys might be non-empty: oversaturation
@@ -1446,6 +1439,21 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
+      | tcTyVarLevel tv <= cur_lvl
+      = return dv   -- This variable is from an outer context; skip
+                    -- See Note [Use level numbers for quantification]
+
+      | case tcTyVarDetails tv of
+          SkolemTv _ lvl _ -> lvl > pushTcLevel cur_lvl
+          _                -> False
+      = return dv  -- Skip inner skolems
+        -- This only happens for erroneous program with bad telescopes
+        -- e.g. BadTelescope2:  forall a k (b :: k). SameKind a b
+        --      We have (a::k), and at the outer we don't want to quantify
+        --      over the already-quantified skolem k.
+        -- (Apparently we /do/ want to quantify over skolems whose level sk_lvl is
+        -- sk_lvl > cur_lvl; you get lots of failures otherwise. A battle for another day.)
+
       | tv `elemDVarSet` kvs
       = return dv  -- We have met this tyvar already
 
@@ -1461,17 +1469,7 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
                  -- (which comes next) works correctly
 
            ; let tv_kind_vars = tyCoVarsOfType tv_kind
-           ; cur_lvl <- getTcLevel
-           ; if |  tcTyVarLevel tv <= cur_lvl
-                -> return dv   -- this variable is from an outer context; skip
-                               -- See Note [Use level numbers for quantification]
-
-                | case tcTyVarDetails tv of
-                     SkolemTv _ lvl _ -> lvl > pushTcLevel cur_lvl
-                     _                -> False
-                -> return dv  -- Skip inner skolems; ToDo: explain
-
-                |  intersectsVarSet bound tv_kind_vars
+           ; if | intersectsVarSet bound tv_kind_vars
                    -- the tyvar must not be from an outer context, but we have
                    -- already checked for this.
                    -- See Note [Naughty quantification candidates]
@@ -1490,25 +1488,26 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
                                 -- See Note [Order of accumulation]
 
                         -- See Note [Recurring into kinds for candidateQTyVars]
-                      ; collect_cand_qtvs orig_ty True bound dv' tv_kind } }
+                      ; collect_cand_qtvs orig_ty True cur_lvl bound dv' tv_kind } }
 
 collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
+                     -> TcLevel
                      -> VarSet -- bound variables
                      -> CandidatesQTvs -> Coercion
                      -> TcM CandidatesQTvs
-collect_cand_qtvs_co orig_ty bound = go_co
+collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
   where
-    go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True bound dv ty
-    go_co dv (GRefl _ ty mco)        = do dv1 <- collect_cand_qtvs orig_ty True bound dv ty
-                                          go_mco dv1 mco
+    go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True cur_lvl bound dv ty
+    go_co dv (GRefl _ ty mco)        = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
+                                          ; go_mco dv1 mco }
     go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
     go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
     go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2)   = do dv1 <- go_prov dv prov
-                                          dv2 <- collect_cand_qtvs orig_ty True bound dv1 t1
-                                          collect_cand_qtvs orig_ty True bound dv2 t2
+    go_co dv (UnivCo prov _ t1 t2)   = do { dv1 <- go_prov dv prov
+                                          ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t1
+                                          ; collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2 }
     go_co dv (SymCo co)              = go_co dv co
     go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (SelCo _ co)            = go_co dv co
@@ -1527,7 +1526,7 @@ collect_cand_qtvs_co orig_ty bound = go_co
 
     go_co dv (ForAllCo tcv kind_co co)
       = do { dv1 <- go_co dv kind_co
-           ; collect_cand_qtvs_co orig_ty (bound `extendVarSet` tcv) dv1 co }
+           ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
@@ -1543,7 +1542,7 @@ collect_cand_qtvs_co orig_ty bound = go_co
       | cv `elemVarSet` cvs = return dv
 
         -- See Note [Recurring into kinds for candidateQTyVars]
-      | otherwise           = collect_cand_qtvs orig_ty True bound
+      | otherwise           = collect_cand_qtvs orig_ty True cur_lvl bound
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
 
@@ -1810,15 +1809,28 @@ defaultTyVar def_strat tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
+
   | isLevityVar tv
   , default_ns_vars
   = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
        ; writeMetaTyVar tv liftedDataConTy
        ; return True }
+
   | isMultiplicityVar tv
   , default_ns_vars
   = do { traceTc "Defaulting a Multiplicity var to Many" (ppr tv)
        ; writeMetaTyVar tv manyDataConTy
+       ; return True }
+
+  | isConcreteTyVar tv
+    -- We don't want to quantify; but neither can we default to
+    -- anything sensible.  (If it has kind RuntimeRep or Levity, as is
+    -- often the case, it'll have been caught earlier by earlier
+    -- cases. So in this exotic situation we just promote.  Not very
+    -- satisfing, but it's very much a corner case: #23051
+    -- We should really implement the plan in #20686.
+  = do { lvl <- getTcLevel
+       ; _ <- promoteMetaTyVarTo lvl tv
        ; return True }
 
   | DefaultKindVars <- def_strat -- -XNoPolyKinds and this is a kind var: we must default it
@@ -1872,9 +1884,8 @@ defaultTyVars ns_strat dvs
        ; let
            def_tvs, def_kvs :: DefaultingStrategy
            def_tvs = NonStandardDefaulting ns_strat
-           def_kvs
-             | poly_kinds = def_tvs
-             | otherwise  = DefaultKindVars
+           def_kvs | poly_kinds = def_tvs
+                   | otherwise  = DefaultKindVars
              -- As -XNoPolyKinds precludes polymorphic kind variables, we default them.
              -- For example:
              --
@@ -1965,7 +1976,7 @@ What do do?
  D. We could error.
 
 We choose (D), as described in #17567, and implement this choice in
-doNotQuantifyTyVars.  Discussion of alternativs A-C is below.
+doNotQuantifyTyVars.  Discussion of alternatives A-C is below.
 
 NB: this is all rather similar to, but sadly not the same as
     Note [Naughty quantification candidates]

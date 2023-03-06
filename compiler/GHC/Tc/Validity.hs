@@ -475,7 +475,7 @@ This is not OK: we get
   MkT :: forall l. T @l :: TYPE (BoxedRep l)
 which is ill-kinded.
 
-For ordinary /user-written type signatures f :: blah, we make this
+For ordinary /user-written/ type signatures f :: blah, we make this
 check as part of kind-checking the type signature in tcHsSigType; see
 Note [Escaping kind in type signatures] in GHC.Tc.Gen.HsType.
 

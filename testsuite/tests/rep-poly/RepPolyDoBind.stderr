@@ -4,8 +4,8 @@ RepPolyDoBind.hs:26:3: error: [GHC-55287]
         arising from a do statement
       does not have a fixed runtime representation.
       Its type is:
-        ma0 :: TYPE c0
-      Cannot unify ‘rep’ with the type variable ‘c0’
+        ma0 :: TYPE rep0
+      Cannot unify ‘rep’ with the type variable ‘rep0’
       because it is not a concrete ‘RuntimeRep’.
     • In a stmt of a 'do' block: a <- undefined
       In the expression:

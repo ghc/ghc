@@ -37,8 +37,12 @@ import GHC.Tc.Utils.TcMType    ( newConcreteTyVar, isFilledMetaTyVar_maybe, writ
                                , emitWantedEq )
 
 import GHC.Types.Basic         ( TypeOrKind(..) )
+import GHC.Types.Name          ( getOccName )
+import GHC.Types.Name.Occurrence( occNameFS )
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
+import GHC.Data.FastString     ( fsLit )
+
 
 import Control.Monad      ( void )
 import Data.Functor       ( ($>) )
@@ -495,7 +499,7 @@ unifyConcrete frr_orig ty
            -- Create a new ConcreteTv metavariable @concrete_tv@
            -- and unify @ty ~# concrete_tv@.
          ; _  ->
-    do { conc_tv <- newConcreteTyVar (ConcreteFRR frr_orig) ki
+    do { conc_tv <- newConcreteTyVar (ConcreteFRR frr_orig) (fsLit "cx") ki
            -- NB: newConcreteTyVar asserts that 'ki' is concrete.
        ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (mkTyVarTy conc_tv) } } }
   where
@@ -647,9 +651,12 @@ makeTypeConcrete conc_orig ty =
                , TauTv <- metaTyVarInfo tv
                -> -- Change the MetaInfo to ConcreteTv, but retain the TcLevel
                do { kind <- go (tyVarKind tv)
+                  ; let occ_fs = occNameFS (getOccName tv)
+                        -- occ_fs: preserve the occurrence name of the original tyvar
+                        -- This helps in error messages
                   ; lift $
                     do { conc_tv <- setTcLevel (tcTyVarLevel tv) $
-                                    newConcreteTyVar conc_orig kind
+                                    newConcreteTyVar conc_orig occ_fs kind
                        ; let conc_ty = mkTyVarTy conc_tv
                        ; writeMetaTyVar tv conc_ty
                        ; return conc_ty } }
