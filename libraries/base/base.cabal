@@ -475,6 +475,7 @@ Library
             GHC.JS.Prim
             GHC.JS.Prim.Internal
             GHC.JS.Prim.Internal.Build
+            GHC.JS.Foreign.Callback
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
