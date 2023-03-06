@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -41,6 +42,8 @@ import Control.Applicative        ( (<|>) )
 import Data.Coerce                ( coerce  )
 import Data.Function              ( on )
 import qualified Data.Semigroup as S
+
+import System.IO.Unsafe ( unsafePerformIO )
 
 type Span = RealSrcSpan
 
@@ -581,10 +584,10 @@ newtype EvBindDeps = EvBindDeps { getEvBindDeps :: [Name] }
   deriving Outputable
 
 instance Eq EvBindDeps where
-  (==) = coerce ((==) `on` map toHieName)
+  (==) = coerce ((==) `on` map (unsafePerformIO . toHieName))
 
 instance Ord EvBindDeps where
-  compare = coerce (compare `on` map toHieName)
+  compare = coerce (compare `on` map (unsafePerformIO . toHieName))
 
 instance Binary EvBindDeps where
   put_ bh (EvBindDeps xs) = put_ bh xs
@@ -767,19 +770,25 @@ instance Outputable HieName where
   ppr (LocalName n sp) = text "LocalName" <+> ppr n <+> ppr sp
   ppr (KnownKeyName u) = text "KnownKeyName" <+> ppr u
 
-hieNameOcc :: HieName -> OccName
-hieNameOcc (ExternalName _ occ _) = occ
-hieNameOcc (LocalName occ _) = occ
+-- Why do we need IO? See Note [Looking up known key names]
+hieNameOcc :: HieName -> IO OccName
+hieNameOcc (ExternalName _ occ _) = pure occ
+hieNameOcc (LocalName occ _) = pure occ
 hieNameOcc (KnownKeyName u) =
-  case lookupKnownKeyName u of
-    Just n -> nameOccName n
+  lookupKnownKeyName u >>= \case
+    Just n -> pure (nameOccName n)
     Nothing -> pprPanic "hieNameOcc:unknown known-key unique"
                         (ppr u)
 
-toHieName :: Name -> HieName
-toHieName name
-  | isKnownKeyName name = KnownKeyName (nameUnique name)
-  | isExternalName name = ExternalName (nameModule name)
-                                       (nameOccName name)
-                                       (removeBufSpan $ nameSrcSpan name)
-  | otherwise = LocalName (nameOccName name) (removeBufSpan $ nameSrcSpan name)
+-- Why do we need IO? See Note [Looking up known key names]
+toHieName :: Name -> IO HieName
+toHieName name =
+  isKnownKeyName name >>= \case
+    True -> pure (KnownKeyName (nameUnique name))
+    False
+      | isExternalName name ->
+        pure $ ExternalName (nameModule name)
+                            (nameOccName name)
+                            (removeBufSpan $ nameSrcSpan name)
+      | otherwise ->
+        pure $ LocalName (nameOccName name) (removeBufSpan $ nameSrcSpan name)

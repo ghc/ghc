@@ -198,317 +198,319 @@ names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in GHC.Builtin.Types etc.
 -}
 
-basicKnownKeyNames :: [Name]  -- See Note [Known-key names]
+basicKnownKeyNames :: IO [Name]  -- See Note [Known-key names]
 basicKnownKeyNames
- = genericTyConNames
- ++ [   --  Classes.  *Must* include:
-        --      classes that are grabbed by key (e.g., eqClassKey)
-        --      classes in "Class.standardClassKeys" (quite a few)
-        eqClassName,                    -- mentioned, derivable
-        ordClassName,                   -- derivable
-        boundedClassName,               -- derivable
-        numClassName,                   -- mentioned, numeric
-        enumClassName,                  -- derivable
-        monadClassName,
-        functorClassName,
-        realClassName,                  -- numeric
-        integralClassName,              -- numeric
-        fractionalClassName,            -- numeric
-        floatingClassName,              -- numeric
-        realFracClassName,              -- numeric
-        realFloatClassName,             -- numeric
-        dataClassName,
-        isStringClassName,
-        applicativeClassName,
-        alternativeClassName,
-        foldableClassName,
-        traversableClassName,
-        semigroupClassName, sappendName,
-        monoidClassName, memptyName, mappendName, mconcatName,
-
-        -- The IO type
-        ioTyConName, ioDataConName,
-        runMainIOName,
-        runRWName,
-
-        -- Type representation types
-        trModuleTyConName, trModuleDataConName,
-        trNameTyConName, trNameSDataConName, trNameDDataConName,
-        trTyConTyConName, trTyConDataConName,
-
-        -- Typeable
-        typeableClassName,
-        typeRepTyConName,
-        someTypeRepTyConName,
-        someTypeRepDataConName,
-        kindRepTyConName,
-        kindRepTyConAppDataConName,
-        kindRepVarDataConName,
-        kindRepAppDataConName,
-        kindRepFunDataConName,
-        kindRepTYPEDataConName,
-        kindRepTypeLitSDataConName,
-        kindRepTypeLitDDataConName,
-        typeLitSortTyConName,
-        typeLitSymbolDataConName,
-        typeLitNatDataConName,
-        typeLitCharDataConName,
-        typeRepIdName,
-        mkTrTypeName,
-        mkTrConName,
-        mkTrAppName,
-        mkTrFunName,
-        typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
-        trGhcPrimModuleName,
-
-        -- KindReps for common cases
-        starKindRepName,
-        starArrStarKindRepName,
-        starArrStarArrStarKindRepName,
-        constraintKindRepName,
-
-        -- WithDict
-        withDictClassName,
-
-        -- Dynamic
-        toDynName,
-
-        -- Numeric stuff
-        negateName, minusName, geName, eqName,
-        mkRationalBase2Name, mkRationalBase10Name,
-
-        -- Conversion functions
-        rationalTyConName,
-        ratioTyConName, ratioDataConName,
-        fromRationalName, fromIntegerName,
-        toIntegerName, toRationalName,
-        fromIntegralName, realToFracName,
-
-        -- Int# stuff
-        divIntName, modIntName,
-
-        -- String stuff
-        fromStringName,
-
-        -- Enum stuff
-        enumFromName, enumFromThenName,
-        enumFromThenToName, enumFromToName,
-
-        -- Applicative stuff
-        pureAName, apAName, thenAName,
-
-        -- Functor stuff
-        fmapName,
-
-        -- Monad stuff
-        thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
-        returnMName, joinMName,
-
-        -- MonadFail
-        monadFailClassName, failMName,
-
-        -- MonadFix
-        monadFixClassName, mfixName,
-
-        -- Arrow stuff
-        arrAName, composeAName, firstAName,
-        appAName, choiceAName, loopAName,
-
-        -- Ix stuff
-        ixClassName,
-
-        -- Show stuff
-        showClassName,
-
-        -- Read stuff
-        readClassName,
-
-        -- Stable pointers
-        newStablePtrName,
-
-        -- GHC Extensions
-        considerAccessibleName,
-
-        -- Strings and lists
-        unpackCStringName, unpackCStringUtf8Name,
-        unpackCStringAppendName, unpackCStringAppendUtf8Name,
-        unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
-        cstringLengthName,
-
-        -- Overloaded lists
-        isListClassName,
-        fromListName,
-        fromListNName,
-        toListName,
-
-        -- Non-empty lists
-        nonEmptyTyConName,
-
-        -- Overloaded record dot, record update
-        getFieldName, setFieldName,
-
-        -- List operations
-        concatName, filterName, mapName,
-        zipName, foldrName, buildName, augmentName, appendName,
-
-        -- FFI primitive types that are not wired-in.
-        stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
-        int8TyConName, int16TyConName, int32TyConName, int64TyConName,
-        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
-
-        -- Others
-        otherwiseIdName, inlineIdName,
-        eqStringName, assertName,
-        assertErrorName, traceName,
-        printName,
-        dollarName,
-
-        -- ghc-bignum
-        integerFromNaturalName,
-        integerToNaturalClampName,
-        integerToNaturalThrowName,
-        integerToNaturalName,
-        integerToWordName,
-        integerToIntName,
-        integerToWord64Name,
-        integerToInt64Name,
-        integerFromWordName,
-        integerFromWord64Name,
-        integerFromInt64Name,
-        integerAddName,
-        integerMulName,
-        integerSubName,
-        integerNegateName,
-        integerAbsName,
-        integerPopCountName,
-        integerQuotName,
-        integerRemName,
-        integerDivName,
-        integerModName,
-        integerDivModName,
-        integerQuotRemName,
-        integerEncodeFloatName,
-        integerEncodeDoubleName,
-        integerGcdName,
-        integerLcmName,
-        integerAndName,
-        integerOrName,
-        integerXorName,
-        integerComplementName,
-        integerBitName,
-        integerTestBitName,
-        integerShiftLName,
-        integerShiftRName,
-
-        naturalToWordName,
-        naturalPopCountName,
-        naturalShiftRName,
-        naturalShiftLName,
-        naturalAddName,
-        naturalSubName,
-        naturalSubThrowName,
-        naturalSubUnsafeName,
-        naturalMulName,
-        naturalQuotRemName,
-        naturalQuotName,
-        naturalRemName,
-        naturalAndName,
-        naturalAndNotName,
-        naturalOrName,
-        naturalXorName,
-        naturalTestBitName,
-        naturalBitName,
-        naturalGcdName,
-        naturalLcmName,
-        naturalLog2Name,
-        naturalLogBaseWordName,
-        naturalLogBaseName,
-        naturalPowModName,
-        naturalSizeInBaseName,
-
-        bignatFromWordListName,
-        bignatEqName,
-
-        -- Float/Double
-        integerToFloatName,
-        integerToDoubleName,
-        naturalToFloatName,
-        naturalToDoubleName,
-        rationalToFloatName,
-        rationalToDoubleName,
-
-        -- Other classes
-        monadPlusClassName,
-
-        -- Type-level naturals
-        knownNatClassName, knownSymbolClassName, knownCharClassName,
-
-        -- Overloaded labels
-        fromLabelClassOpName,
-
-        -- Implicit Parameters
-        ipClassName,
-
-        -- Overloaded record fields
-        hasFieldClassName,
-
-        -- Call Stacks
-        callStackTyConName,
-        emptyCallStackName, pushCallStackName,
-
-        -- Source Locations
-        srcLocDataConName,
-
-        -- Annotation type checking
-        toAnnotationWrapperName
-
-        -- The SPEC type for SpecConstr
-        , specTyConName
-
-        -- The Either type
-        , eitherTyConName, leftDataConName, rightDataConName
-
-        -- The Void type
-        , voidTyConName
-
+ = sequence [
         -- Plugins
-        , pluginTyConName
+          pluginTyConName
         , frontendPluginTyConName
+  ] >>= \ioknownnames ->
+    pure (ioknownnames ++
+    genericTyConNames
+  ++ [   --  Classes.  *Must* include:
+          --      classes that are grabbed by key (e.g., eqClassKey)
+          --      classes in "Class.standardClassKeys" (quite a few)
+          eqClassName,                    -- mentioned, derivable
+          ordClassName,                   -- derivable
+          boundedClassName,               -- derivable
+          numClassName,                   -- mentioned, numeric
+          enumClassName,                  -- derivable
+          monadClassName,
+          functorClassName,
+          realClassName,                  -- numeric
+          integralClassName,              -- numeric
+          fractionalClassName,            -- numeric
+          floatingClassName,              -- numeric
+          realFracClassName,              -- numeric
+          realFloatClassName,             -- numeric
+          dataClassName,
+          isStringClassName,
+          applicativeClassName,
+          alternativeClassName,
+          foldableClassName,
+          traversableClassName,
+          semigroupClassName, sappendName,
+          monoidClassName, memptyName, mappendName, mconcatName,
 
-        -- Generics
-        , genClassName, gen1ClassName
-        , datatypeClassName, constructorClassName, selectorClassName
+          -- The IO type
+          ioTyConName, ioDataConName,
+          runMainIOName,
+          runRWName,
 
-        -- Monad comprehensions
-        , guardMName
-        , liftMName
-        , mzipName
+          -- Type representation types
+          trModuleTyConName, trModuleDataConName,
+          trNameTyConName, trNameSDataConName, trNameDDataConName,
+          trTyConTyConName, trTyConDataConName,
 
-        -- GHCi Sandbox
-        , ghciIoClassName, ghciStepIoMName
+          -- Typeable
+          typeableClassName,
+          typeRepTyConName,
+          someTypeRepTyConName,
+          someTypeRepDataConName,
+          kindRepTyConName,
+          kindRepTyConAppDataConName,
+          kindRepVarDataConName,
+          kindRepAppDataConName,
+          kindRepFunDataConName,
+          kindRepTYPEDataConName,
+          kindRepTypeLitSDataConName,
+          kindRepTypeLitDDataConName,
+          typeLitSortTyConName,
+          typeLitSymbolDataConName,
+          typeLitNatDataConName,
+          typeLitCharDataConName,
+          typeRepIdName,
+          mkTrTypeName,
+          mkTrConName,
+          mkTrAppName,
+          mkTrFunName,
+          typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
+          trGhcPrimModuleName,
 
-        -- StaticPtr
-        , makeStaticName
-        , staticPtrTyConName
-        , staticPtrDataConName, staticPtrInfoDataConName
-        , fromStaticPtrName
+          -- KindReps for common cases
+          starKindRepName,
+          starArrStarKindRepName,
+          starArrStarArrStarKindRepName,
+          constraintKindRepName,
 
-        -- Fingerprint
-        , fingerprintDataConName
+          -- WithDict
+          withDictClassName,
 
-        -- Custom type errors
-        , errorMessageTypeErrorFamName
-        , typeErrorTextDataConName
-        , typeErrorAppendDataConName
-        , typeErrorVAppendDataConName
-        , typeErrorShowTypeDataConName
+          -- Dynamic
+          toDynName,
 
-        -- Unsafe coercion proofs
-        , unsafeEqualityProofName
-        , unsafeEqualityTyConName
-        , unsafeReflDataConName
-        , unsafeCoercePrimName
-    ]
+          -- Numeric stuff
+          negateName, minusName, geName, eqName,
+          mkRationalBase2Name, mkRationalBase10Name,
+
+          -- Conversion functions
+          rationalTyConName,
+          ratioTyConName, ratioDataConName,
+          fromRationalName, fromIntegerName,
+          toIntegerName, toRationalName,
+          fromIntegralName, realToFracName,
+
+          -- Int# stuff
+          divIntName, modIntName,
+
+          -- String stuff
+          fromStringName,
+
+          -- Enum stuff
+          enumFromName, enumFromThenName,
+          enumFromThenToName, enumFromToName,
+
+          -- Applicative stuff
+          pureAName, apAName, thenAName,
+
+          -- Functor stuff
+          fmapName,
+
+          -- Monad stuff
+          thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
+          returnMName, joinMName,
+
+          -- MonadFail
+          monadFailClassName, failMName,
+
+          -- MonadFix
+          monadFixClassName, mfixName,
+
+          -- Arrow stuff
+          arrAName, composeAName, firstAName,
+          appAName, choiceAName, loopAName,
+
+          -- Ix stuff
+          ixClassName,
+
+          -- Show stuff
+          showClassName,
+
+          -- Read stuff
+          readClassName,
+
+          -- Stable pointers
+          newStablePtrName,
+
+          -- GHC Extensions
+          considerAccessibleName,
+
+          -- Strings and lists
+          unpackCStringName, unpackCStringUtf8Name,
+          unpackCStringAppendName, unpackCStringAppendUtf8Name,
+          unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
+          cstringLengthName,
+
+          -- Overloaded lists
+          isListClassName,
+          fromListName,
+          fromListNName,
+          toListName,
+
+          -- Non-empty lists
+          nonEmptyTyConName,
+
+          -- Overloaded record dot, record update
+          getFieldName, setFieldName,
+
+          -- List operations
+          concatName, filterName, mapName,
+          zipName, foldrName, buildName, augmentName, appendName,
+
+          -- FFI primitive types that are not wired-in.
+          stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
+          int8TyConName, int16TyConName, int32TyConName, int64TyConName,
+          word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+
+          -- Others
+          otherwiseIdName, inlineIdName,
+          eqStringName, assertName,
+          assertErrorName, traceName,
+          printName,
+          dollarName,
+
+          -- ghc-bignum
+          integerFromNaturalName,
+          integerToNaturalClampName,
+          integerToNaturalThrowName,
+          integerToNaturalName,
+          integerToWordName,
+          integerToIntName,
+          integerToWord64Name,
+          integerToInt64Name,
+          integerFromWordName,
+          integerFromWord64Name,
+          integerFromInt64Name,
+          integerAddName,
+          integerMulName,
+          integerSubName,
+          integerNegateName,
+          integerAbsName,
+          integerPopCountName,
+          integerQuotName,
+          integerRemName,
+          integerDivName,
+          integerModName,
+          integerDivModName,
+          integerQuotRemName,
+          integerEncodeFloatName,
+          integerEncodeDoubleName,
+          integerGcdName,
+          integerLcmName,
+          integerAndName,
+          integerOrName,
+          integerXorName,
+          integerComplementName,
+          integerBitName,
+          integerTestBitName,
+          integerShiftLName,
+          integerShiftRName,
+
+          naturalToWordName,
+          naturalPopCountName,
+          naturalShiftRName,
+          naturalShiftLName,
+          naturalAddName,
+          naturalSubName,
+          naturalSubThrowName,
+          naturalSubUnsafeName,
+          naturalMulName,
+          naturalQuotRemName,
+          naturalQuotName,
+          naturalRemName,
+          naturalAndName,
+          naturalAndNotName,
+          naturalOrName,
+          naturalXorName,
+          naturalTestBitName,
+          naturalBitName,
+          naturalGcdName,
+          naturalLcmName,
+          naturalLog2Name,
+          naturalLogBaseWordName,
+          naturalLogBaseName,
+          naturalPowModName,
+          naturalSizeInBaseName,
+
+          bignatFromWordListName,
+          bignatEqName,
+
+          -- Float/Double
+          integerToFloatName,
+          integerToDoubleName,
+          naturalToFloatName,
+          naturalToDoubleName,
+          rationalToFloatName,
+          rationalToDoubleName,
+
+          -- Other classes
+          monadPlusClassName,
+
+          -- Type-level naturals
+          knownNatClassName, knownSymbolClassName, knownCharClassName,
+
+          -- Overloaded labels
+          fromLabelClassOpName,
+
+          -- Implicit Parameters
+          ipClassName,
+
+          -- Overloaded record fields
+          hasFieldClassName,
+
+          -- Call Stacks
+          callStackTyConName,
+          emptyCallStackName, pushCallStackName,
+
+          -- Source Locations
+          srcLocDataConName,
+
+          -- Annotation type checking
+          toAnnotationWrapperName
+
+          -- The SPEC type for SpecConstr
+          , specTyConName
+
+          -- The Either type
+          , eitherTyConName, leftDataConName, rightDataConName
+
+          -- The Void type
+          , voidTyConName
+
+          -- Generics
+          , genClassName, gen1ClassName
+          , datatypeClassName, constructorClassName, selectorClassName
+
+          -- Monad comprehensions
+          , guardMName
+          , liftMName
+          , mzipName
+
+          -- GHCi Sandbox
+          , ghciIoClassName, ghciStepIoMName
+
+          -- StaticPtr
+          , makeStaticName
+          , staticPtrTyConName
+          , staticPtrDataConName, staticPtrInfoDataConName
+          , fromStaticPtrName
+
+          -- Fingerprint
+          , fingerprintDataConName
+
+          -- Custom type errors
+          , errorMessageTypeErrorFamName
+          , typeErrorTextDataConName
+          , typeErrorAppendDataConName
+          , typeErrorVAppendDataConName
+          , typeErrorShowTypeDataConName
+
+          -- Unsafe coercion proofs
+          , unsafeEqualityProofName
+          , unsafeEqualityTyConName
+          , unsafeReflDataConName
+          , unsafeCoercePrimName
+      ])
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -1631,12 +1633,12 @@ srcLocDataConName
   = dcQual gHC_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
 
 -- plugins
-pLUGINS :: Module
-pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
-pluginTyConName :: Name
-pluginTyConName = tcQual pLUGINS (fsLit "Plugin") pluginTyConKey
-frontendPluginTyConName :: Name
-frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
+pLUGINS :: IO Module
+pLUGINS = pure $ mkThisGhcModule (fsLit "GHC.Driver.Plugins")
+pluginTyConName :: IO Name
+pluginTyConName = pLUGINS >>= \plugin_mod -> pure (tcQual plugin_mod (fsLit "Plugin") pluginTyConKey)
+frontendPluginTyConName :: IO Name
+frontendPluginTyConName = pLUGINS >>= \plugin_mod -> pure (tcQual plugin_mod (fsLit "FrontendPlugin") frontendPluginTyConKey)
 
 -- Static pointers
 makeStaticName :: Name

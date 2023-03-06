@@ -235,8 +235,7 @@ withBkpSession cid insts deps session_type do_this = do
             , importPaths = []
             -- Synthesize the flags
             , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-              let uid = unwireUnit unit_state
-                        $ improveUnit unit_state
+              let uid = improveUnit unit_state
                         $ renameHoleUnit unit_state (listToUFM insts) uid0
               in ExposePackage
                 (showSDoc dflags
@@ -372,7 +371,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toUnitId . unwireUnit state)
+                        _ -> map toUnitId
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],

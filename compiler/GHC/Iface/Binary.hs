@@ -1,4 +1,4 @@
-{-# LANGUAGE BinaryLiterals, ScopedTypeVariables #-}
+{-# LANGUAGE BinaryLiterals, ScopedTypeVariables, LambdaCase #-}
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -336,18 +336,17 @@ putName _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
         bh name
-  | isKnownKeyName name
-  , let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- assert (u < 2^(22 :: Int))
-    put_ bh (0x80000000
-             .|. (fromIntegral (ord c) `shiftL` 22)
-             .|. (fromIntegral u :: Word32))
-
-  | otherwise
-  = do symtab_map <- readIORef symtab_map_ref
-       case lookupUFM symtab_map name of
-         Just (off,_) -> put_ bh (fromIntegral off :: Word32)
-         Nothing -> do
+  isKnownKeyName name >>= \case
+    True -> let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
+            in put_ bh (0x80000000
+                  .|. (fromIntegral (ord c) `shiftL` 22)
+                  .|. (fromIntegral u :: Word32))
+    False -> do
+      symtab_map <- readIORef symtab_map_ref
+      case lookupUFM symtab_map name of
+        Just (off,_) -> put_ bh (fromIntegral off :: Word32)
+        Nothing -> do
             off <- readFastMutInt symtab_next
             -- massert (off < 2^(30 :: Int))
             writeFastMutInt symtab_next (off+1)
@@ -370,10 +369,10 @@ getSymtabName _name_cache _dict symtab bh = do
           ix  = fromIntegral i .&. 0x003FFFFF
           u   = mkUnique tag ix
         in
-          return $! case lookupKnownKeyName u of
-                      Nothing -> pprPanic "getSymtabName:unknown known-key unique"
-                                          (ppr i $$ ppr u $$ char tag $$ ppr ix)
-                      Just n  -> n
+          lookupKnownKeyName u >>= \case
+            Nothing -> pprPanic "getSymtabName:unknown known-key unique"
+                                (ppr i $$ ppr u $$ char tag $$ ppr ix)
+            Just n  -> return $! n
 
       _ -> pprPanic "getSymtabName:unknown name tag" (ppr i)
 

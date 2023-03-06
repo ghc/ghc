@@ -69,7 +69,6 @@ module GHC.Unit.State (
         pprWithUnitState,
 
         -- * Utils
-        unwireUnit,
         implicitPackageDeps)
 where
 
@@ -108,6 +107,7 @@ import GHC.Utils.Exception
 import System.Directory
 import System.FilePath as FilePath
 import Control.Monad
+import Data.IORef
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List ( intersperse, partition, sortBy, isSuffixOf )
@@ -410,7 +410,7 @@ type ModuleNameProvidersMap =
     Map ModuleName (Map Module ModuleOrigin)
 
 data UnitState = UnitState {
-  -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
+  -- | A mapping of 'UnitId' to 'UnitInfo'.  This list is adjusted
   -- so that only valid units are here.  'UnitInfo' reflects
   -- what was stored *on disk*, except for the 'trusted' flag, which
   -- is adjusted at runtime.  (In particular, some units in this map
@@ -429,12 +429,6 @@ data UnitState = UnitState {
   -- This is used when users refer to packages in Backpack includes.
   -- And also to resolve package qualifiers with the PackageImports extension.
   packageNameMap            :: UniqFM PackageName UnitId,
-
-  -- | A mapping from database unit keys to wired in unit ids.
-  wireMap :: Map UnitId UnitId,
-
-  -- | A mapping from wired in unit ids to unit keys from the database.
-  unwireMap :: Map UnitId UnitId,
 
   -- | The units we're going to link in eagerly.  This list
   -- should be in reverse dependency order; that is, a unit
@@ -478,8 +472,6 @@ emptyUnitState = UnitState {
     unitInfoMap = Map.empty,
     preloadClosure = emptyUniqSet,
     packageNameMap = emptyUFM,
-    wireMap   = Map.empty,
-    unwireMap = Map.empty,
     preloadUnits = [],
     explicitUnits = [],
     homeUnitDepends = [],
@@ -671,13 +663,8 @@ mkHomeUnit
     -> Maybe UnitId           -- ^ Home unit instance of
     -> [(ModuleName, Module)] -- ^ Home unit instantiations
     -> HomeUnit
-mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations_ =
-    let
-        -- Some wired units can be used to instantiate the home unit. We need to
-        -- replace their unit keys with their wired unit ids.
-        wmap              = wireMap unit_state
-        hu_instantiations = map (fmap (upd_wired_in_mod wmap)) hu_instantiations_
-    in case (hu_instanceof, hu_instantiations) of
+mkHomeUnit unit_state hu_id hu_instanceof hu_instantiations =
+    case (hu_instanceof, hu_instantiations) of
       (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
       (Nothing, _) -> throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
       (Just _, []) -> throwGhcException $ CmdLineError ("Use of -this-component-id requires -instantiated-with")
@@ -1080,7 +1067,7 @@ pprTrustFlag flag = case flag of
 --
 -- See Note [Wired-in units] in GHC.Unit.Types
 
-type WiringMap = Map UnitId UnitId
+type WiringMap = Map WiredInPackageName UnitId
 
 findWiredInUnits
    :: Logger
@@ -1096,8 +1083,9 @@ findWiredInUnits logger prec_map pkgs vis_map = do
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Types
   let
-        matches :: UnitInfo -> UnitId -> Bool
-        pc `matches` pid = unitPackageName pc == PackageName (unitIdFS pid)
+        -- Match a package name against a UnitInfo
+        matches :: UnitInfo -> FastString -> Bool
+        pc `matches` pname = unitPackageName pc == PackageName pname
 
         -- find which package corresponds to each wired-in package
         -- delete any other packages with the same name
@@ -1116,10 +1104,10 @@ findWiredInUnits logger prec_map pkgs vis_map = do
         -- this works even when there is no exposed wired in package
         -- available.
         --
-        findWiredInUnit :: [UnitInfo] -> UnitId -> IO (Maybe (UnitId, UnitInfo))
-        findWiredInUnit pkgs wired_pkg = firstJustsM [try all_exposed_ps, try all_ps, notfound]
+        findWiredInUnitByName :: [UnitInfo] -> WiredInPackageName -> IO (Maybe (FastString, UnitInfo))
+        findWiredInUnitByName pkgs (WiredInPackageName wired_pkg_name) = firstJustsM [try all_exposed_ps, try all_ps, notfound] -- ROMES:TODO: In fact, here we ?
           where
-                all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
+                all_ps = [ p | p <- pkgs, p `matches` wired_pkg_name ]
                 all_exposed_ps = [ p | p <- all_ps, Map.member (mkUnit p) vis_map ]
 
                 try ps = case sortByPreference prec_map ps of
@@ -1129,27 +1117,28 @@ findWiredInUnits logger prec_map pkgs vis_map = do
                 notfound = do
                           debugTraceMsg logger 2 $
                             text "wired-in package "
-                                 <> ftext (unitIdFS wired_pkg)
+                                 <> ftext wired_pkg_name
                                  <> text " not found."
                           return Nothing
-                pick :: UnitInfo -> IO (UnitId, UnitInfo)
+
+                pick :: UnitInfo -> IO (FastString, UnitInfo)
                 pick pkg = do
                         debugTraceMsg logger 2 $
                             text "wired-in package "
-                                 <> ftext (unitIdFS wired_pkg)
+                                 <> ftext wired_pkg_name
                                  <> text " mapped to "
                                  <> ppr (unitId pkg)
-                        return (wired_pkg, pkg)
+                        return (wired_pkg_name, pkg)
 
 
-  mb_wired_in_pkgs <- mapM (findWiredInUnit pkgs) wiredInUnitIds
+  mb_wired_in_pkgs <- mapM (findWiredInUnitByName pkgs) wiredInUnitNames
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
 
-        wiredInMap :: Map UnitId UnitId
+        wiredInMap :: Map WiredInPackageName UnitId
         wiredInMap = Map.fromList
-          [ (unitId realUnitInfo, wiredInUnitId)
-          | (wiredInUnitId, realUnitInfo) <- wired_in_pkgs
+          [ (WiredInPackageName wiredInUnitName, unitId realUnitInfo)
+          | (wiredInUnitName, realUnitInfo) <- wired_in_pkgs
           , not (unitIsIndefinite realUnitInfo)
           ]
 
@@ -1199,6 +1188,7 @@ upd_wired_in wiredInMap key
     | Just key' <- Map.lookup key wiredInMap = key'
     | otherwise = key
 
+-- This function was updating the wired-in names in the visibility map to the actual wired-in names, no longer needed
 updateVisibilityMap :: WiringMap -> VisibilityMap -> VisibilityMap
 updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
   where f vm (from, to) = case Map.lookup (RealUnit (Definite from)) vis_map of
@@ -1597,7 +1587,7 @@ mkUnitState logger cfg = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- mayThrowUnitErr
+  vis_map <- mayThrowUnitErr
                 $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
                         (unitConfigHideAll cfg) pkgs1)
                             vis_map1 other_flags
@@ -1608,6 +1598,7 @@ mkUnitState logger cfg = do
   -- package arguments we need to key against the old versions.
   --
   (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
+
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
@@ -1691,11 +1682,11 @@ mkUnitState logger cfg = do
          , moduleNameProvidersMap       = mod_map
          , pluginModuleNameProvidersMap = mkModuleNameProvidersMap logger cfg pkg_db emptyUniqSet plugin_vis_map
          , packageNameMap               = pkgname_map
-         , wireMap                      = wired_map
-         , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
          , requirementContext           = req_ctx
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
+
+  writeIORef workingThisOut wired_map
   return (state, raw_dbs)
 
 selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool
@@ -1709,14 +1700,6 @@ selectHomeUnits home_units flags = foldl' go Set.empty flags
     go cur (ExposePackage _ (UnitIdArg uid) _) | toUnitId uid `Set.member` home_units = Set.insert (toUnitId uid) cur
     -- MP: This does not yet support thinning/renaming
     go cur _ = cur
-
-
--- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
--- that it was recorded as in the package database.
-unwireUnit :: UnitState -> Unit -> Unit
-unwireUnit state uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap state))
-unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
 -- | Makes the mapping from ModuleName to package info

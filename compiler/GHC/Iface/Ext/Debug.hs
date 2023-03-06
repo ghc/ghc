@@ -22,6 +22,8 @@ import qualified Data.Set as S
 import Data.Function    ( on )
 import Data.List        ( sortOn )
 
+import System.IO.Unsafe ( unsafePerformIO )
+
 type Diff a = a -> a -> [SDoc]
 
 diffFile :: Diff HieFile
@@ -64,10 +66,10 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
 type DiffIdent = Either ModuleName HieName
 
 normalizeIdents :: Ord a => NodeIdentifiers a -> [(DiffIdent,IdentifierDetails a)]
-normalizeIdents = sortOn go . map (first toHieName) . M.toList
+normalizeIdents = sortOn go . map (first (unsafePerformIO . toHieName)) . M.toList
   where
     first f (a,b) = (fmap f a, b)
-    go (a,b) = (hieNameOcc <$> a,identInfo b,identType b)
+    go (a,b) = (unsafePerformIO . hieNameOcc <$> a,identInfo b,identType b)
 
 diffList :: Diff a -> Diff [a]
 diffList f xs ys

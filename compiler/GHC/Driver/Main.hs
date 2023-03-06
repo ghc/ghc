@@ -305,7 +305,8 @@ newHscEnv top_dir dflags = newHscEnvWithHUG top_dir dflags (homeUnitId_ dflags) 
 
 newHscEnvWithHUG :: FilePath -> DynFlags -> UnitId -> HomeUnitGraph -> IO HscEnv
 newHscEnvWithHUG top_dir top_dynflags cur_unit home_unit_graph = do
-    nc_var  <- initNameCache 'r' knownKeyNames
+    knownKeyNames' <- knownKeyNames
+    nc_var  <- initNameCache 'r' knownKeyNames'
     fc_var  <- initFinderCache
     logger  <- initLogger
     tmpfs   <- initTmpFs

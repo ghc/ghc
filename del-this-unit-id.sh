@@ -1,0 +1,1 @@
+sed -i '' 's/ghc-options: -this-unit-id.*//i' compiler/ghc.cabal.in libraries/base/base.cabal libraries/ghc-bignum/ghc-bignum.cabal libraries/ghc-prim/ghc-prim.cabal rts/rts.cabal.in libraries/template-haskell/template-haskell.cabal.in
