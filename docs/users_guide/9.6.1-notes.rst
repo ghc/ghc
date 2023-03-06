@@ -13,7 +13,7 @@ The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
 
 
 Language
-~~~~~~~~
+--------
 
 - GHC is now more conservative when solving constraints that arise from
   superclass expansion in terms of other constraints that also arise from
@@ -123,7 +123,7 @@ Language
   - Arbitrary strings: `#"Hello, World!"` equivalent to `getLabel @"Hello, World!"`
 
 Compiler
-~~~~~~~~
+--------
 
 - The `WebAssembly backend
   <https://www.tweag.io/blog/2022-11-22-wasm-backend-merged-in-ghc>`_
@@ -167,7 +167,7 @@ Compiler
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0143-remove-star-kind.rst>`_.
 
 GHCi
-~~~~
+----
 
 - GHCi will now accept any file-header pragmas it finds, such as
   ``{-# OPTIONS_GHC ... #-}`` and ``{-# LANGUAGE ... #-}`` (see :ref:`pragmas`).  For example,
@@ -181,7 +181,7 @@ GHCi
 This can be convenient when pasting large multi-line blocks of code into GHCi.
 
 Runtime system
-~~~~~~~~~~~~~~
+--------------
 
 - The `Delimited continuation primops <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0313-delimited-continuation-primops.rst>`_
   proposal has been implemented, adding native support for first-class,
@@ -201,7 +201,7 @@ Runtime system
 
 
 ``base`` library
-~~~~~~~~~~~~~~~~
+----------------
 
 - Exceptions thrown by weak pointer finalizers can now be reported by setting
   a global exception handler, using ``GHC.Weak.Finalize.setFinalizerExceptionHandler``.
@@ -223,17 +223,12 @@ Runtime system
   case properties and are more intuitive than :base-ref:`Data.Char.isUpper` and
   :base-ref:`Data.Char.isLower`.
 
-``ghc-prim`` library
-~~~~~~~~~~~~~~~~~~~~
 
 ``ghc`` library
-~~~~~~~~~~~~~~~
+---------------
 
 - Add `Foreign.C.Types.ConstPtr` was added to encode ``const``-qualified pointer return
   types in foreign declarations when using ``CApiFFI`` extension.
-
-``ghc-heap`` library
-~~~~~~~~~~~~~~~~~~~~
 
 
 Included libraries
