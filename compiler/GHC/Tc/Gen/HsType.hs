@@ -2037,7 +2037,7 @@ typecheck/should_compile/tc170).
 Moreover in instance heads we get forall-types with
 kind Constraint.
 
-It's tempting to check that the body kind is either * or #. But this is
+It's tempting to check that the body kind is (TYPE _). But this is
 wrong. For example:
 
   class C a b
@@ -2046,7 +2046,7 @@ wrong. For example:
 We're doing newtype-deriving for C. But notice how `a` isn't in scope in
 the predicate `C a`. So we quantify, yielding `forall a. C a` even though
 `C a` has kind `* -> Constraint`. The `forall a. C a` is a bit cheeky, but
-convenient. Bottom line: don't check for * or # here.
+convenient. Bottom line: don't check for (TYPE _) here.
 
 Note [Body kind of a HsQualTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3547,8 +3547,12 @@ kindGeneralizeSome skol_info wanted kind_or_type
          -- here will already have all type variables quantified;
          -- thus, every free variable is really a kv, never a tv.
        ; dvs <- candidateQTyVarsOfKind kind_or_type
-       ; dvs <- filterConstrainedCandidates wanted dvs
-       ; quantifyTyVars skol_info DefaultNonStandardTyVars dvs }
+       ; filtered_dvs <- filterConstrainedCandidates wanted dvs
+       ; traceTc "kindGeneralizeSome" $
+         vcat [ text "type:" <+> ppr kind_or_type
+              , text "dvs:" <+> ppr dvs
+              , text "filtered_dvs:" <+> ppr filtered_dvs ]
+       ; quantifyTyVars skol_info DefaultNonStandardTyVars filtered_dvs }
 
 filterConstrainedCandidates
   :: WantedConstraints    -- Don't quantify over variables free in these

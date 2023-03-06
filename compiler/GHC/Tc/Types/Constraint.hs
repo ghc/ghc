@@ -15,7 +15,7 @@ module GHC.Tc.Types.Constraint (
         assertFuelPrecondition, assertFuelPreconditionStrict,
         emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
-        isEmptyCts,
+        isEmptyCts, ctsPreds,
         isPendingScDict, pendingScDict_maybe,
         superClassesMightHelp, getPendingWantedScs,
         isWantedCt, isGivenCt,
@@ -1042,6 +1042,9 @@ emptyCts = emptyBag
 
 isEmptyCts :: Cts -> Bool
 isEmptyCts = isEmptyBag
+
+ctsPreds :: Cts -> [PredType]
+ctsPreds cts = foldr ((:) . ctPred) [] cts
 
 pprCts :: Cts -> SDoc
 pprCts cts = vcat (map ppr (bagToList cts))

@@ -3,8 +3,8 @@ T19615.hs:17:21: error: [GHC-55287]
     • The argument ‘(f x)’ of ‘lift'’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE c0
-      Cannot unify ‘r'’ with the type variable ‘c0’
+        a0 :: TYPE r0
+      Cannot unify ‘r'’ with the type variable ‘r0’
       because it is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘lift'’, namely ‘(f x)’
       In the expression: lift' (f x) id

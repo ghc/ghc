@@ -903,15 +903,19 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
        ; let inferred_poly_ty = mkInvisForAllTys binders (mkPhiTy theta' mono_ty')
 
        ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr theta'
-                                          , ppr inferred_poly_ty])
+                                          , ppr inferred_poly_ty
+                                          , text "insoluble" <+> ppr insoluble ])
+
        ; unless insoluble $
          addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
          do { checkEscapingKind inferred_poly_ty
+                 -- See Note [Inferred type with escaping kind]
             ; checkValidType (InfSigCtxt poly_name) inferred_poly_ty }
-         -- See Note [Validity of inferred types]
-         -- If we found an insoluble error in the function definition, don't
-         -- do this check; otherwise (#14000) we may report an ambiguity
-         -- error for a rather bogus type.
+                 -- See Note [Validity of inferred types]
+         -- unless insoluble: if we found an insoluble error in the
+         -- function definition, don't do this check; otherwise
+         -- (#14000) we may report an ambiguity error for a rather
+         -- bogus type.
 
        ; return (mkLocalId poly_name ManyTy inferred_poly_ty) }
 
@@ -1175,6 +1179,33 @@ Examples that might fail:
  - an inferred theta that requires type equalities e.g. (F a ~ G b)
                                 or multi-parameter type classes
  - an inferred type that includes unboxed tuples
+
+Note [Inferred type with escaping kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check for an inferred type with an escaping kind; e.g. #23051
+   forall {k} {f :: k -> RuntimeRep} {g :: k} {a :: TYPE (f g)}. a
+where the kind of the body of the forall mentions `f` and `g` which
+are bound by the forall.  No no no.
+
+This check, mkInferredPolyId, is really in the wrong place:
+`inferred_poly_ty` doesn't obey the PKTI and it would be better not to
+generalise it in the first place; see #20686.  But for now it works.
+
+How else could we avoid generalising over escaping type variables? I
+considered:
+
+* Adjust the generalisation in GHC.Tc.Solver to directly check for
+  escaping kind variables; instead, promote or default them. But that
+  gets into the defaulting swamp and is a non-trivial and unforced
+  change, so I have left it alone for now.
+
+* When inferring the type of a binding, in `tcMonoBinds`, we create
+  an ExpSigmaType with `tcInfer`.  If we simply gave it an ir_frr field
+  that said "must have fixed runtime rep", then the kind would be made
+  Concrete; and we never generalise over Concrete variables.  A bit
+  more indirect, but we need the "don't generalise over Concrete variables"
+  stuff anyway.
+
 
 Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

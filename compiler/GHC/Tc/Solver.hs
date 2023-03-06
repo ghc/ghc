@@ -1279,10 +1279,6 @@ emitResidualConstraints rhs_tclvl ev_binds_var
     -- uniformly.
 
 --------------------
-ctsPreds :: Cts -> [PredType]
-ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
-                             , let ev = ctEvidence ct ]
-
 findInferredDiff :: TcThetaType -> TcThetaType -> TcM TcThetaType
 -- Given a partial type signature f :: (C a, D a, _) => blah
 -- and the inferred constraints (X a, D a, Y a, C a)
@@ -1397,7 +1393,7 @@ Note [Deciding quantification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the monomorphism restriction does not apply, then we quantify as follows:
 
-* Step 1: decideMonoTyVars.
+* Step 1: decidePromotedTyVars.
   Take the global tyvars, and "grow" them using functional dependencies
      E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
           happen because alpha is untouchable here) then do not quantify over
@@ -1408,10 +1404,11 @@ If the monomorphism restriction does not apply, then we quantify as follows:
   We also account for the monomorphism restriction; if it applies,
   add the free vars of all the constraints.
 
-  Result is mono_tvs; we will not quantify over these.
+  Result is mono_tvs; we will promote all of these to the outer levek,
+  and certainly not quantify over them.
 
 * Step 2: defaultTyVarsAndSimplify.
-  Default any non-mono tyvars (i.e ones that are definitely
+  Default any non-promoted tyvars (i.e ones that are definitely
   not going to become further constrained), and re-simplify the
   candidate constraints.
 
@@ -1431,7 +1428,7 @@ If the monomorphism restriction does not apply, then we quantify as follows:
   over are determined in Step 3 (not in Step 1), it is OK for
   the mono_tvs to be missing some variables free in the
   environment. This is why removing the psig_qtvs is OK in
-  decideMonoTyVars. Test case for this scenario: T14479.
+  decidePromotedTyVars. Test case for this scenario: T14479.
 
 * Step 3: decideQuantifiedTyVars.
   Decide which variables to quantify over, as follows:
@@ -1559,7 +1556,7 @@ and we are running simplifyInfer over
 
 These are two implication constraints, both of which contain a
 wanted for the class C. Neither constraint mentions the bound
-skolem. We might imagine that these constraint could thus float
+skolem. We might imagine that these constraints could thus float
 out of their implications and then interact, causing beta1 to unify
 with beta2, but constraints do not currently float out of implications.
 
@@ -1609,12 +1606,12 @@ decideQuantification
 -- See Note [Deciding quantification]
 decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
   = do { -- Step 1: find the mono_tvs
-       ; (mono_tvs, candidates, co_vars) <- decideMonoTyVars infer_mode
-                                              name_taus psigs candidates
+       ; (candidates, co_vars) <- decidePromotedTyVars infer_mode
+                                        name_taus psigs candidates
 
        -- Step 2: default any non-mono tyvars, and re-simplify
        -- This step may do some unification, but result candidates is zonked
-       ; candidates <- defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
+       ; candidates <- defaultTyVarsAndSimplify rhs_tclvl candidates
 
        -- Step 3: decide which kind/type variables to quantify over
        ; qtvs <- decideQuantifiedTyVars skol_info name_taus psigs candidates
@@ -1647,7 +1644,6 @@ decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
            (vcat [ text "infer_mode:" <+> ppr infer_mode
                  , text "candidates:" <+> ppr candidates
                  , text "psig_theta:" <+> ppr psig_theta
-                 , text "mono_tvs:"   <+> ppr mono_tvs
                  , text "co_vars:"    <+> ppr co_vars
                  , text "qtvs:"       <+> ppr qtvs
                  , text "theta:"      <+> ppr theta ])
@@ -1686,23 +1682,34 @@ ambiguous types.  Something like
 But that's a battle for another day.
 -}
 
-decideMonoTyVars :: InferMode
-                 -> [(Name,TcType)]
-                 -> [TcIdSigInst]
-                 -> [PredType]
-                 -> TcM (TcTyCoVarSet, [PredType], CoVarSet)
--- Decide which tyvars and covars cannot be generalised:
---   (a) Free in the environment
---   (b) Mentioned in a constraint we can't generalise
---   (c) Connected by an equality or fundep to (a) or (b)
+decidePromotedTyVars :: InferMode
+                     -> [(Name,TcType)]
+                     -> [TcIdSigInst]
+                     -> [PredType]
+                     -> TcM ([PredType], CoVarSet)
+-- We are about to generalise over type variables at level N
+-- Each must be either
+--    (P) promoted
+--    (D) defaulted
+--    (Q) quantified
+-- This function finds (P), the type variables that we are going to promote:
+--   (a) Mentioned in a constraint we can't generalise (the MR)
+--   (b) Mentioned in the kind of a CoVar; we can't quantify over a CoVar,
+--       so we must not quantify over a type variable free in its kind
+--   (c) Connected by an equality or fundep to
+--          * a type variable at level < N, or
+--          * A tyvar subject to (a), (b) or (c)
+-- Having found all such level-N tyvars that we can't generalise,
+-- promote them, to eliminate them from further consideration.
+--
 -- Also return CoVars that appear free in the final quantified types
 --   we can't quantify over these, and we must make sure they are in scope
-decideMonoTyVars infer_mode name_taus psigs candidates
+decidePromotedTyVars infer_mode name_taus psigs candidates
   = do { (no_quant, maybe_quant) <- pick infer_mode candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
-       ; psig_qtvs <-  zonkTcTyVarsToTcTyVars $ binderVars $
+       ; psig_qtvs <- zonkTcTyVarsToTcTyVars $ binderVars $
                       concatMap (map snd . sig_inst_skols) psigs
 
        ; psig_theta <- mapM TcM.zonkTcType $
@@ -1713,29 +1720,31 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; tc_lvl <- TcM.getTcLevel
        ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
 
+             -- (b) The co_var_tvs are tvs mentioned in the types of covars or
+             -- coercion holes. We can't quantify over these covars, so we
+             -- must include the variable in their types in the mono_tvs.
+             -- E.g.  If we can't quantify over co :: k~Type, then we can't
+             --       quantify over k either!  Hence closeOverKinds
+             -- Recall that coVarsOfTypes also returns coercion holes
              co_vars = coVarsOfTypes (psig_tys ++ taus ++ candidates)
              co_var_tvs = closeOverKinds co_vars
-               -- The co_var_tvs are tvs mentioned in the types of covars or
-               -- coercion holes. We can't quantify over these covars, so we
-               -- must include the variable in their types in the mono_tvs.
-               -- E.g.  If we can't quantify over co :: k~Type, then we can't
-               --       quantify over k either!  Hence closeOverKinds
 
              mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
                          tyCoVarsOfTypes candidates
                -- We need to grab all the non-quantifiable tyvars in the
                -- types so that we can grow this set to find other
-               -- non-quantifiable tyvars. This can happen with something
-               -- like
+               -- non-quantifiable tyvars. This can happen with something like
                --    f x y = ...
                --      where z = x 3
                -- The body of z tries to unify the type of x (call it alpha[1])
                -- with (beta[2] -> gamma[2]). This unification fails because
-               -- alpha is untouchable. But we need to know not to quantify over
-               -- beta or gamma, because they are in the equality constraint with
-               -- alpha. Actual test case: typecheck/should_compile/tc213
+               -- alpha is untouchable, leaving [W] alpha[1] ~ (beta[2] -> gamma[2]).
+               -- We need to know not to quantify over beta or gamma, because they
+               -- are in the equality constraint with alpha. Actual test case:
+               -- typecheck/should_compile/tc213
 
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
+
                -- mono_tvs1 is now the set of variables from an outer scope
                -- (that's mono_tvs0) and the set of covars, closed over kinds.
                -- Given this set of variables we know we will not quantify,
@@ -1749,9 +1758,8 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                -- (that is, we might have IP "c" Bool and IP "c" Int in different
                -- places within the same program), and
                -- skipping this causes implicit params to monomorphise too many
-               -- variables; see Note [Inheriting implicit parameters] in
-               -- GHC.Tc.Solver. Skipping causes typecheck/should_compile/tc219
-               -- to fail.
+               -- variables; see Note [Inheriting implicit parameters] in GHC.Tc.Solver.
+               -- Skipping causes typecheck/should_compile/tc219 to fail.
 
              mono_tvs2 = closeWrtFunDeps non_ip_candidates mono_tvs1
                -- mono_tvs2 now contains any variable determined by the "root
@@ -1761,7 +1769,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                                closeWrtFunDeps non_ip_candidates (tyCoVarsOfTypes no_quant)
                                 `minusVarSet` mono_tvs2
              -- constrained_tvs: the tyvars that we are not going to
-             -- quantify solely because of the monomorphism restriction
+             -- quantify /solely/ because of the monomorphism restriction
              --
              -- (`minusVarSet` mono_tvs2): a type variable is only
              --   "constrained" (so that the MR bites) if it is not
@@ -1783,7 +1791,12 @@ decideMonoTyVars infer_mode name_taus psigs candidates
            let dia = TcRnMonomorphicBindings (map fst name_taus)
            diagnosticTc (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus) dia
 
-       ; traceTc "decideMonoTyVars" $ vcat
+       -- Promote the mono_tvs
+       -- See Note [Promote monomorphic tyvars]
+       ; traceTc "decidePromotedTyVars: promotion:" (ppr mono_tvs)
+       ; _ <- promoteTyVarSet mono_tvs
+
+       ; traceTc "decidePromotedTyVars" $ vcat
            [ text "infer_mode =" <+> ppr infer_mode
            , text "mono_tvs0 =" <+> ppr mono_tvs0
            , text "no_quant =" <+> ppr no_quant
@@ -1791,7 +1804,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
            , text "mono_tvs =" <+> ppr mono_tvs
            , text "co_vars =" <+> ppr co_vars ]
 
-       ; return (mono_tvs, maybe_quant, co_vars) }
+       ; return (maybe_quant, co_vars) }
   where
     pick :: InferMode -> [PredType] -> TcM ([PredType], [PredType])
     -- Split the candidates into ones we definitely
@@ -1811,48 +1824,34 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
-                         -> TyCoVarSet          -- Promote these mono-tyvars
                          -> [PredType]          -- Assumed zonked
                          -> TcM [PredType]      -- Guaranteed zonked
--- Promote the known-monomorphic tyvars;
 -- Default any tyvar free in the constraints;
 -- and re-simplify in case the defaulting allows further simplification
-defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
-  = do {  -- Promote any tyvars that we cannot generalise
-          -- See Note [Promote monomorphic tyvars]
-       ; traceTc "decideMonoTyVars: promotion:" (ppr mono_tvs)
-       ; _ <- promoteTyVarSet mono_tvs
-
-       -- Default any kind/levity vars
+defaultTyVarsAndSimplify rhs_tclvl candidates
+  = do {  -- Default any kind/levity vars
        ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
                 <- candidateQTyVarsOfTypes candidates
-                -- any covars should already be handled by
-                -- the logic in decideMonoTyVars, which looks at
-                -- the constraints generated
+         -- NB1: decidePromotedTyVars has promoted any type variable fixed by the
+         --      type envt, so they won't be chosen by candidateQTyVarsOfTypes
+         -- NB2: Defaulting for variables free in tau_tys is done later, by quantifyTyVars
+         --      Hence looking only at 'candidates'
+         -- NB3: Any covars should already be handled by
+         --      the logic in decidePromotedTyVars, which looks at
+         --      the constraints generated
 
        ; poly_kinds  <- xoptM LangExt.PolyKinds
-       ; mapM_ (default_one poly_kinds True) (dVarSetElems cand_kvs)
-       ; mapM_ (default_one poly_kinds False) (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
+       ; let default_kv | poly_kinds = default_tv
+                        | otherwise  = defaultTyVar DefaultKindVars
+             default_tv = defaultTyVar (NonStandardDefaulting DefaultNonStandardTyVars)
+       ; mapM_ default_kv (dVarSetElems cand_kvs)
+       ; mapM_ default_tv (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
 
        ; simplify_cand candidates
        }
   where
-    default_one poly_kinds is_kind_var tv
-      | not (isMetaTyVar tv)
-      = return ()
-      | tv `elemVarSet` mono_tvs
-      = return ()
-      | otherwise
-      = void $ defaultTyVar
-          (if not poly_kinds && is_kind_var
-           then DefaultKindVars
-           else NonStandardDefaulting DefaultNonStandardTyVars)
-          -- NB: only pass 'DefaultKindVars' when we know we're dealing with a kind variable.
-          tv
-
-       -- this common case (no inferred constraints) should be fast
-    simplify_cand [] = return []
-       -- see Note [Unconditionally resimplify constraints when quantifying]
+    -- See Note [Unconditionally resimplify constraints when quantifying]
+    simplify_cand [] = return []  -- Fast path
     simplify_cand candidates
       = do { clone_wanteds <- newWanteds DefaultOrigin candidates
            ; WC { wc_simple = simples } <- setTcLevel rhs_tclvl $
@@ -2086,7 +2085,7 @@ sure to quantify over them.  This leads to several wrinkles:
 
   In the signature for 'g', we cannot quantify over 'b' because it turns out to
   get unified with 'a', which is free in g's environment.  So we carefully
-  refrain from bogusly quantifying, in GHC.Tc.Solver.decideMonoTyVars.  We
+  refrain from bogusly quantifying, in GHC.Tc.Solver.decidePromotedTyVars.  We
   report the error later, in GHC.Tc.Gen.Bind.chooseInferredQuantifiers.
 
 Note [growThetaTyVars vs closeWrtFunDeps]
@@ -2122,7 +2121,7 @@ constraint (transitively).
 
 We use closeWrtFunDeps in places where we need to know which variables are
 *always* determined by some seed set. This includes
-  * when determining the mono-tyvars in decideMonoTyVars. If `a`
+  * when determining the mono-tyvars in decidePromotedTyVars. If `a`
     is going to be monomorphic, we need b and c to be also: they
     are determined by the choice for `a`.
   * when checking instance coverage, in

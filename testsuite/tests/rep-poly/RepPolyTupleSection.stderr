@@ -3,8 +3,8 @@ RepPolyTupleSection.hs:11:7: error: [GHC-55287]
     • The second component of the tuple section
       does not have a fixed runtime representation.
       Its type is:
-        t0 :: TYPE c0
-      Cannot unify ‘r’ with the type variable ‘c0’
+        t1 :: TYPE t0
+      Cannot unify ‘r’ with the type variable ‘t0’
       because it is not a concrete ‘RuntimeRep’.
     • In the expression: (# 3#, #)
       In an equation for ‘foo’: foo = (# 3#, #)
