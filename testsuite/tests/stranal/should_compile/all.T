@@ -88,3 +88,5 @@ test('EtaExpansion', normal, compile, [''])
 test('T22039', normal, compile, [''])
 # T22388: Should see $winteresting but not $wboring
 test('T22388', [ grep_errmsg(r'^\S+\$w\S+') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# T22997: Just a panic that should not happen
+test('T22997', normal, compile, [''])
