@@ -1873,13 +1873,14 @@ mkPrimTyCon :: WiredIn Name
                        -- change tcHasFixedRuntimeRep, marshalablePrimTyCon, reifyTyCon for PrimTyCons.)
             -> [Role]
             -> WiredIn TyCon
-mkPrimTyCon name' binders res_kind' roles
-  = name' >>= \name ->
-    res_kind' >>= \res_kind ->
-    mkPrelTyConRepName name >>= \prelTyConRepName ->
-    pure $
-      mkTyCon name binders res_kind roles $
-      PrimTyCon { primRepName  = prelTyConRepName }
+mkPrimTyCon name' binders' res_kind' roles
+  = do name <- name'
+       binders <- binders'
+       res_kind <- res_kind'
+       prelTyConRepName <- mkPrelTyConRepName name
+       pure $
+         mkTyCon name binders res_kind roles $
+          PrimTyCon { primRepName  = prelTyConRepName }
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind

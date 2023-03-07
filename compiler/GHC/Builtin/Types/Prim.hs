@@ -462,36 +462,45 @@ mkTemplateAnonTyConBindersFrom n kinds
 alphaTyVars :: WiredIn [TyVar]
 alphaTyVars = mkTemplateTyVars <$> sequence (repeat liftedTypeKind)
 
-alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
-(alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
+alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: WiredIn TyVar
+alphaTyVar = (\case (alphaTyVar:_betaTyVar:_gammaTyVar:_deltaTyVar:_) -> alphaTyVar) <$> alphaTyVars
+betaTyVar  = (\case (_alphaTyVar:betaTyVar:_gammaTyVar:_deltaTyVar:_) -> betaTyVar)  <$> alphaTyVars
+gammaTyVar = (\case (_alphaTyVar:_betaTyVar:gammaTyVar:_deltaTyVar:_) -> gammaTyVar) <$> alphaTyVars
+deltaTyVar = (\case (_alphaTyVar:_betaTyVar:_gammaTyVar:deltaTyVar:_) -> deltaTyVar) <$> alphaTyVars
 
-alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: TyVarBinder
-(alphaTyVarSpec:betaTyVarSpec:gammaTyVarSpec:deltaTyVarSpec:_) = mkTyVarBinders Specified alphaTyVars
+alphaTyVarSpec, betaTyVarSpec, gammaTyVarSpec, deltaTyVarSpec :: WiredIn TyVarBinder
+alphaTyVarSpec = (\case (alphaTyVarSpec:_betaTyVarSpec:_gammaTyVarSpec:_deltaTyVarSpec:_) -> alphaTyVarSpec) . mkTyVarBinders Specified <$> alphaTyVars
+betaTyVarSpec  = (\case (_alphaTyVarSpec:betaTyVarSpec:_gammaTyVarSpec:_deltaTyVarSpec:_) -> betaTyVarSpec) . mkTyVarBinders Specified <$> alphaTyVars
+gammaTyVarSpec = (\case (_alphaTyVarSpec:_betaTyVarSpec:gammaTyVarSpec:_deltaTyVarSpec:_) -> gammaTyVarSpec) . mkTyVarBinders Specified <$> alphaTyVars
+deltaTyVarSpec = (\case (_alphaTyVarSpec:_betaTyVarSpec:_gammaTyVarSpec:deltaTyVarSpec:_) -> deltaTyVarSpec) . mkTyVarBinders Specified <$> alphaTyVars
+ 
+alphaConstraintTyVars :: WiredIn [TyVar]
+alphaConstraintTyVars = mkTemplateTyVars <$> sequence (repeat constraintKind)
 
-alphaConstraintTyVars :: [TyVar]
-alphaConstraintTyVars = mkTemplateTyVars $ repeat constraintKind
+alphaConstraintTyVar :: WiredIn TyVar
+alphaConstraintTyVar = (\case (alphaConstraintTyVar:_) -> alphaConstraintTyVar) <$> alphaConstraintTyVars
 
-alphaConstraintTyVar :: TyVar
-(alphaConstraintTyVar:_) = alphaConstraintTyVars
+alphaConstraintTy :: WiredIn Type
+alphaConstraintTy = mkTyVarTy <$> alphaConstraintTyVar
 
-alphaConstraintTy :: Type
-alphaConstraintTy = mkTyVarTy alphaConstraintTyVar
+alphaTys :: WiredIn [Type]
+alphaTys = mkTyVarTys <$> alphaTyVars
+alphaTy, betaTy, gammaTy, deltaTy :: WiredIn Type
+alphaTy = (\case (alphaTy:_betaTy:_gammaTy:_deltaTy:_) -> alphaTy) <$> alphaTys
+betaTy  = (\case (_alphaTy:betaTy:_gammaTy:_deltaTy:_) -> betaTy)  <$> alphaTys
+gammaTy = (\case (_alphaTy:_betaTy:gammaTy:_deltaTy:_) -> gammaTy) <$> alphaTys
+deltaTy = (\case (_alphaTy:_betaTy:_gammaTy:deltaTy:_) -> deltaTy) <$> alphaTys
 
-alphaTys :: [Type]
-alphaTys = mkTyVarTys alphaTyVars
-alphaTy, betaTy, gammaTy, deltaTy :: Type
-(alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
+alphaTyVarsUnliftedRep :: WiredIn [TyVar]
+alphaTyVarsUnliftedRep = mkTemplateTyVars <$> sequence (repeat unliftedTypeKind)
 
-alphaTyVarsUnliftedRep :: [TyVar]
-alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat unliftedTypeKind
+alphaTyVarUnliftedRep :: WiredIn TyVar
+alphaTyVarUnliftedRep = (\case (alphaTyVarUnliftedRep:_) -> alphaTyVarUnliftedRep) <$> alphaTyVarsUnliftedRep
 
-alphaTyVarUnliftedRep :: TyVar
-(alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
-
-alphaTysUnliftedRep :: [Type]
-alphaTysUnliftedRep = mkTyVarTys alphaTyVarsUnliftedRep
-alphaTyUnliftedRep :: Type
-(alphaTyUnliftedRep:_) = alphaTysUnliftedRep
+alphaTysUnliftedRep :: WiredIn [Type]
+alphaTysUnliftedRep = mkTyVarTys <$> alphaTyVarsUnliftedRep
+alphaTyUnliftedRep :: WiredIn Type
+alphaTyUnliftedRep = (\case (alphaTyUnliftedRep:_) -> alphaTyUnliftedRep) <$> alphaTysUnliftedRep
 
 runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: WiredIn TyVar
 (runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
@@ -528,9 +537,12 @@ openAlphaTy = mkTyVarTy <$> openAlphaTyVar
 openBetaTy  = mkTyVarTy <$> openBetaTyVar
 openGammaTy = mkTyVarTy <$> openGammaTyVar
 
+levityTyVars :: WiredIn [TyVar]
+levityTyVars = drop 10 . mkTemplateTyVars <$> sequence (repeat levityTy) -- selects 'k', 'l'
 levity1TyVar, levity2TyVar :: WiredIn TyVar
-(levity2TyVar : levity1TyVar : _) -- NB: levity2TyVar before levity1TyVar
-  = drop 10 . mkTemplateTyVars <$> sequence (repeat levityTy) -- selects 'k', 'l'
+-- NB: levity2TyVar before levity1TyVar
+levity2TyVar = (\case (levity2TyVar : _levity1TyVar : _) -> levity2TyVar) <$> levityTyVars
+levity1TyVar = (\case (_levity2TyVar : levity1TyVar : _) -> levity1TyVar) <$> levityTyVars
 -- The ordering of levity2TyVar before levity1TyVar is chosen so that
 -- the more common levity1TyVar uses the levity variable 'l'.
 
@@ -561,9 +573,12 @@ levPolyAlphaTy, levPolyBetaTy :: WiredIn Type
 levPolyAlphaTy = mkTyVarTy <$> levPolyAlphaTyVar
 levPolyBetaTy  = mkTyVarTy <$> levPolyBetaTyVar
 
-multiplicityTyVar1, multiplicityTyVar2  :: WiredIn TyVar
-(multiplicityTyVar1 : multiplicityTyVar2 : _)
+multiplicityTyVars :: WiredIn [TyVar]
+multiplicityTyVars
    = drop 13 . mkTemplateTyVars <$> sequence (repeat multiplicityTy)  -- selects 'n', 'm'
+multiplicityTyVar1, multiplicityTyVar2  :: WiredIn TyVar
+multiplicityTyVar1 = (\case (multiplicityTyVar1 : _multiplicityTyVar2 : _) -> multiplicityTyVar1) <$> multiplicityTyVars
+multiplicityTyVar2 = (\case (_multiplicityTyVar1 : multiplicityTyVar2 : _) -> multiplicityTyVar2) <$> multiplicityTyVars
 
 
 {-
