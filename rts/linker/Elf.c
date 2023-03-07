@@ -807,12 +807,14 @@ ocGetNames_ELF ( ObjectCode* oc )
           else if (!oc->imageMapped || size < getPageSize() / 3) {
               bool executable = kind == SECTIONKIND_CODE_OR_RODATA;
               m32_allocator *allocator = executable ? oc->rx_m32 : oc->rw_m32;
-              // align on 16 bytes. The reason being that llvm will emit see
-              // paddq statements for x86_64 under optimisation and load from
-              // RODATA sections. Specifically .rodata.cst16. However we don't
-              // handle the cst part in any way what so ever, so 16 seems
-              // better than 8.
-              start = m32_alloc(allocator, size, 16);
+              // Correctly align the section. This is particularly important for
+              // the alignment of .rodata.cstNN sections.
+              //
+              // llvm will emit see paddq statements for x86_64 under
+              // optimisation and load from RODATA sections, specifically
+              // .rodata.cst16. Also we may encounter .rodata.cst32 sections
+              // in objects using AVX instructions (see #23066).
+              start = m32_alloc(allocator, size, align);
               if (start == NULL) goto fail;
               memcpy(start, oc->image + offset, size);
               alloc = SECTION_M32;

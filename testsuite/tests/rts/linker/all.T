@@ -17,6 +17,14 @@ test('section_alignment',
      makefile_test, [])
 
 ######################################
+test('T23066',
+     [ unless(arch('x86_64'), skip)
+     , unless(opsys('linux'), skip)
+     , extra_files(['runner.c', 'T23066_c.c'])
+     ],
+     makefile_test, [])
+
+######################################
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
