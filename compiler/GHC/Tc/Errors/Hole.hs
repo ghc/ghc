@@ -597,7 +597,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; traceTc "hole_lvl is:" $ ppr hole_lvl
      ; traceTc "simples are: " $ ppr simples
      ; traceTc "locals are: " $ ppr lclBinds
-     ; builtIns' <- liftIO builtIns
+     ; builtIns' <- builtIns
      ; let (lcl, gbl) = partition gre_lcl (globalRdrEnvElts rdr_env)
            -- We remove binding shadowings here, but only for the local level.
            -- this is so we e.g. suggest the global fmap from the Functor class
@@ -664,8 +664,8 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
     hole_lvl = ctLocLevel ct_loc
 
     -- BuiltInSyntax names like (:) and []
-    builtIns :: IO [Name]
-    builtIns = filter isBuiltInSyntax <$> knownKeyNames
+    builtIns :: [Name]
+    builtIns = filter isBuiltInSyntax knownKeyNames
 
     -- We make a refinement type by adding a new type variable in front
     -- of the type of t h hole, going from e.g. [Integer] -> Integer

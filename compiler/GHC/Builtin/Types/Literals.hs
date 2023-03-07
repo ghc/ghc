@@ -145,7 +145,7 @@ Built-in type constructors for functions on type-level nats
 -- The list of built-in type family TyCons that GHC uses.
 -- If you define a built-in type family, make sure to add it to this list.
 -- See Note [Adding built-in type families]
-typeNatTyCons :: [TyCon]
+typeNatTyCons :: [WiredIn TyCon]
 typeNatTyCons =
   [ typeNatAddTyCon
   , typeNatMulTyCon
@@ -164,7 +164,7 @@ typeNatTyCons =
   , typeNatToCharTyCon
   ]
 
-typeNatAddTyCon :: TyCon
+typeNatAddTyCon :: WiredIn TyCon
 typeNatAddTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamAdd
@@ -175,7 +175,7 @@ typeNatAddTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "+")
             typeNatAddTyFamNameKey typeNatAddTyCon
 
-typeNatSubTyCon :: TyCon
+typeNatSubTyCon :: WiredIn TyCon
 typeNatSubTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamSub
@@ -186,7 +186,7 @@ typeNatSubTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "-")
             typeNatSubTyFamNameKey typeNatSubTyCon
 
-typeNatMulTyCon :: TyCon
+typeNatMulTyCon :: WiredIn TyCon
 typeNatMulTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamMul
@@ -197,7 +197,7 @@ typeNatMulTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "*")
             typeNatMulTyFamNameKey typeNatMulTyCon
 
-typeNatDivTyCon :: TyCon
+typeNatDivTyCon :: WiredIn TyCon
 typeNatDivTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamDiv
@@ -208,7 +208,7 @@ typeNatDivTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Div")
             typeNatDivTyFamNameKey typeNatDivTyCon
 
-typeNatModTyCon :: TyCon
+typeNatModTyCon :: WiredIn TyCon
 typeNatModTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamMod
@@ -219,7 +219,7 @@ typeNatModTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Mod")
             typeNatModTyFamNameKey typeNatModTyCon
 
-typeNatExpTyCon :: TyCon
+typeNatExpTyCon :: WiredIn TyCon
 typeNatExpTyCon = mkTypeNatFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamExp
@@ -230,7 +230,7 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "^")
                 typeNatExpTyFamNameKey typeNatExpTyCon
 
-typeNatLogTyCon :: TyCon
+typeNatLogTyCon :: WiredIn TyCon
 typeNatLogTyCon = mkTypeNatFunTyCon1 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamLog
@@ -243,7 +243,7 @@ typeNatLogTyCon = mkTypeNatFunTyCon1 name
 
 
 
-typeNatCmpTyCon :: TyCon
+typeNatCmpTyCon :: WiredIn TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
@@ -262,7 +262,7 @@ typeNatCmpTyCon =
     , sfInteractInert = \_ _ _ _ -> []
     }
 
-typeSymbolCmpTyCon :: TyCon
+typeSymbolCmpTyCon :: WiredIn TyCon
 typeSymbolCmpTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ typeSymbolKind, typeSymbolKind ])
@@ -281,7 +281,7 @@ typeSymbolCmpTyCon =
     , sfInteractInert = \_ _ _ _ -> []
     }
 
-typeSymbolAppendTyCon :: TyCon
+typeSymbolAppendTyCon :: WiredIn TyCon
 typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
   BuiltInSynFamily
     { sfMatchFam      = matchFamAppendSymbol
@@ -292,7 +292,7 @@ typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "AppendSymbol")
                 typeSymbolAppendFamNameKey typeSymbolAppendTyCon
 
-typeConsSymbolTyCon :: TyCon
+typeConsSymbolTyCon :: WiredIn TyCon
 typeConsSymbolTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ charTy, typeSymbolKind ])
@@ -310,7 +310,7 @@ typeConsSymbolTyCon =
       , sfInteractInert = interactInertConsSymbol
       }
 
-typeUnconsSymbolTyCon :: TyCon
+typeUnconsSymbolTyCon :: WiredIn TyCon
 typeUnconsSymbolTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ typeSymbolKind ])
@@ -328,7 +328,7 @@ typeUnconsSymbolTyCon =
       , sfInteractInert = interactInertUnconsSymbol
       }
 
-typeCharToNatTyCon :: TyCon
+typeCharToNatTyCon :: WiredIn TyCon
 typeCharToNatTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ charTy ])
@@ -347,7 +347,7 @@ typeCharToNatTyCon =
       }
 
 
-typeNatToCharTyCon :: TyCon
+typeNatToCharTyCon :: WiredIn TyCon
 typeNatToCharTyCon =
   mkFamilyTyCon name
     (mkTemplateAnonTyConBinders [ naturalTy ])
@@ -366,7 +366,7 @@ typeNatToCharTyCon =
       }
 
 -- Make a unary built-in constructor of kind: Nat -> Nat
-mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> WiredIn TyCon
 mkTypeNatFunTyCon1 op tcb =
   mkFamilyTyCon op
     (mkTemplateAnonTyConBinders [ naturalTy ])
@@ -377,7 +377,7 @@ mkTypeNatFunTyCon1 op tcb =
     NotInjective
 
 -- Make a binary built-in constructor of kind: Nat -> Nat -> Nat
-mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> WiredIn TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
     (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
@@ -388,7 +388,7 @@ mkTypeNatFunTyCon2 op tcb =
     NotInjective
 
 -- Make a binary built-in constructor of kind: Symbol -> Symbol -> Symbol
-mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> WiredIn TyCon
 mkTypeSymbolFunTyCon2 op tcb =
   mkFamilyTyCon op
     (mkTemplateAnonTyConBinders [ typeSymbolKind, typeSymbolKind ])
@@ -435,7 +435,7 @@ axAddDef
   , axModDef
   , axMod1
   , axLogDef
-  :: CoAxiomRule
+  :: WiredIn CoAxiomRule
 
 axAddDef = mkBinAxiom "AddDef" typeNatAddTyCon isNumLitTy isNumLitTy $
               \x y -> Just $ num (x + y)

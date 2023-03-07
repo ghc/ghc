@@ -1686,16 +1686,17 @@ All these are original names; hence mkOrig
 {-# INLINE tcQual #-}
 {-# INLINE clsQual #-}
 {-# INLINE dcQual #-}
-varQual, tcQual, clsQual, dcQual :: WiredIn Module -> FastString -> Unique -> WiredIn Name
+-- ROMES:TODO: Factor the WiredIn logic to these functions if they are indeed local
+varQual, tcQual, clsQual, dcQual :: Module -> FastString -> Unique -> Name
 varQual  modu str unique = mk_known_key_name varName modu str unique
 tcQual   modu str unique = mk_known_key_name tcName modu str unique
 clsQual  modu str unique = mk_known_key_name clsName modu str unique
 dcQual   modu str unique = mk_known_key_name dataName modu str unique
 
-mk_known_key_name :: NameSpace -> WiredIn Module -> FastString -> Unique -> WiredIn Name
+mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
 {-# INLINE mk_known_key_name #-}
 mk_known_key_name space modu str unique
-  = space >>= \space' -> pure $ mkExternalName unique modu (mkOccNameFS space' str) noSrcSpan
+  = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
 
 
 {-

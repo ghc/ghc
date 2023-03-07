@@ -6,7 +6,7 @@
 
 module GHC.Builtin.Names.TH where
 
-import GHC.Prelude ()
+import GHC.Prelude ((<$>), (<*>), pure)
 
 import GHC.Builtin.Names( mk_known_key_name )
 import GHC.Unit.Types
@@ -25,7 +25,7 @@ import Language.Haskell.Syntax.Module.Name
 --  2) Make a "Name"
 --  3) Add the name to templateHaskellNames
 
-templateHaskellNames :: [Name]
+templateHaskellNames :: [WiredIn Name]
 -- The names that are implicitly mentioned by ``bracket''
 -- Should stay in sync with the import list of GHC.HsToCore.Quote
 
@@ -166,35 +166,35 @@ templateHaskellNames = [
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
 
-thSyn, thLib, qqLib :: Module
+thSyn, thLib, qqLib :: WiredIn Module
 thSyn = mkTHModule (fsLit "Language.Haskell.TH.Syntax")
 thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib.Internal")
 qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
-mkTHModule :: FastString -> Module
-mkTHModule m = mkModule thUnit (mkModuleNameFS m)
+mkTHModule :: FastString -> WiredIn Module
+mkTHModule m = mkModule <$> thUnit <*> pure (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
-libFun = mk_known_key_name varName  thLib
-libTc  = mk_known_key_name tcName   thLib
-thFun  = mk_known_key_name varName  thSyn
-thTc   = mk_known_key_name tcName   thSyn
-thCls  = mk_known_key_name clsName  thSyn
-thCon  = mk_known_key_name dataName thSyn
-qqFun  = mk_known_key_name varName  qqLib
+libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> WiredIn Name
+libFun fs uq = mk_known_key_name varName  <$> thLib <*> pure fs <*> pure uq
+libTc  fs uq = mk_known_key_name tcName   <$> thLib <*> pure fs <*> pure uq
+thFun  fs uq = mk_known_key_name varName  <$> thSyn <*> pure fs <*> pure uq
+thTc   fs uq = mk_known_key_name tcName   <$> thSyn <*> pure fs <*> pure uq
+thCls  fs uq = mk_known_key_name clsName  <$> thSyn <*> pure fs <*> pure uq
+thCon  fs uq = mk_known_key_name dataName <$> thSyn <*> pure fs <*> pure uq
+qqFun  fs uq = mk_known_key_name varName  <$> qqLib <*> pure fs <*> pure uq
 
 -------------------- TH.Syntax -----------------------
-liftClassName :: Name
+liftClassName :: WiredIn Name
 liftClassName = thCls (fsLit "Lift") liftClassKey
 
-quoteClassName :: Name
+quoteClassName :: WiredIn Name
 quoteClassName = thCls (fsLit "Quote") quoteClassKey
 
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
     codeTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
-    modNameTyConName :: Name
+    modNameTyConName :: WiredIn Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -216,7 +216,7 @@ modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
-    unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
+    unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: WiredIn Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -241,7 +241,7 @@ liftTypedName = thFun (fsLit "liftTyped") liftTypedIdKey
 -- data Lit = ...
 charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName, stringPrimLName,
-    charPrimLName :: Name
+    charPrimLName :: WiredIn Name
 charLName       = libFun (fsLit "charL")       charLIdKey
 stringLName     = libFun (fsLit "stringL")     stringLIdKey
 integerLName    = libFun (fsLit "integerL")    integerLIdKey
@@ -256,7 +256,7 @@ charPrimLName   = libFun (fsLit "charPrimL")   charPrimLIdKey
 -- data Pat = ...
 litPName, varPName, tupPName, unboxedTupPName, unboxedSumPName, conPName,
     infixPName, tildePName, bangPName, asPName, wildPName, recPName, listPName,
-    sigPName, viewPName :: Name
+    sigPName, viewPName :: WiredIn Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
@@ -274,15 +274,15 @@ sigPName   = libFun (fsLit "sigP")   sigPIdKey
 viewPName  = libFun (fsLit "viewP")  viewPIdKey
 
 -- type FieldPat = ...
-fieldPatName :: Name
+fieldPatName :: WiredIn Name
 fieldPatName = libFun (fsLit "fieldPat") fieldPatIdKey
 
 -- data Match = ...
-matchName :: Name
+matchName :: WiredIn Name
 matchName = libFun (fsLit "match") matchIdKey
 
 -- data Clause = ...
-clauseName :: Name
+clauseName :: WiredIn Name
 clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
@@ -290,7 +290,7 @@ varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
     sectionLName, sectionRName, lamEName, lamCaseEName, lamCasesEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
-    labelEName, implicitParamVarEName, getFieldEName, projectionEName :: Name
+    labelEName, implicitParamVarEName, getFieldEName, projectionEName :: WiredIn Name
 varEName              = libFun (fsLit "varE")              varEIdKey
 conEName              = libFun (fsLit "conE")              conEIdKey
 litEName              = libFun (fsLit "litE")              litEIdKey
@@ -314,13 +314,13 @@ doEName               = libFun (fsLit "doE")               doEIdKey
 mdoEName              = libFun (fsLit "mdoE")              mdoEIdKey
 compEName             = libFun (fsLit "compE")             compEIdKey
 -- ArithSeq skips a level
-fromEName, fromThenEName, fromToEName, fromThenToEName :: Name
+fromEName, fromThenEName, fromToEName, fromThenToEName :: WiredIn Name
 fromEName             = libFun (fsLit "fromE")             fromEIdKey
 fromThenEName         = libFun (fsLit "fromThenE")         fromThenEIdKey
 fromToEName           = libFun (fsLit "fromToE")           fromToEIdKey
 fromThenToEName       = libFun (fsLit "fromThenToE")       fromThenToEIdKey
 -- end ArithSeq
-listEName, sigEName, recConEName, recUpdEName :: Name
+listEName, sigEName, recConEName, recUpdEName :: WiredIn Name
 listEName             = libFun (fsLit "listE")             listEIdKey
 sigEName              = libFun (fsLit "sigE")              sigEIdKey
 recConEName           = libFun (fsLit "recConE")           recConEIdKey
@@ -333,21 +333,21 @@ getFieldEName         = libFun (fsLit "getFieldE")         getFieldEIdKey
 projectionEName       = libFun (fsLit "projectionE")       projectionEIdKey
 
 -- type FieldExp = ...
-fieldExpName :: Name
+fieldExpName :: WiredIn Name
 fieldExpName = libFun (fsLit "fieldExp") fieldExpIdKey
 
 -- data Body = ...
-guardedBName, normalBName :: Name
+guardedBName, normalBName :: WiredIn Name
 guardedBName = libFun (fsLit "guardedB") guardedBIdKey
 normalBName  = libFun (fsLit "normalB")  normalBIdKey
 
 -- data Guard = ...
-normalGEName, patGEName :: Name
+normalGEName, patGEName :: WiredIn Name
 normalGEName = libFun (fsLit "normalGE") normalGEIdKey
 patGEName    = libFun (fsLit "patGE")    patGEIdKey
 
 -- data Stmt = ...
-bindSName, letSName, noBindSName, parSName, recSName :: Name
+bindSName, letSName, noBindSName, parSName, recSName :: WiredIn Name
 bindSName   = libFun (fsLit "bindS")   bindSIdKey
 letSName    = libFun (fsLit "letS")    letSIdKey
 noBindSName = libFun (fsLit "noBindS") noBindSIdKey
@@ -362,7 +362,7 @@ funDName, valDName, dataDName, newtypeDName, typeDataDName, tySynDName, classDNa
     dataInstDName, newtypeInstDName, tySynInstDName, dataFamilyDName,
     openTypeFamilyDName, closedTypeFamilyDName, infixLDName, infixRDName,
     infixNDName, roleAnnotDName, patSynDName, patSynSigDName,
-    pragCompleteDName, implicitParamBindDName, pragOpaqueDName :: Name
+    pragCompleteDName, implicitParamBindDName, pragOpaqueDName :: WiredIn Name
 funDName                         = libFun (fsLit "funD")                         funDIdKey
 valDName                         = libFun (fsLit "valD")                         valDIdKey
 dataDName                        = libFun (fsLit "dataD")                        dataDIdKey
@@ -400,23 +400,23 @@ patSynSigDName                   = libFun (fsLit "patSynSigD")                  
 implicitParamBindDName           = libFun (fsLit "implicitParamBindD")           implicitParamBindDIdKey
 
 -- type Ctxt = ...
-cxtName :: Name
+cxtName :: WiredIn Name
 cxtName = libFun (fsLit "cxt") cxtIdKey
 
 -- data SourceUnpackedness = ...
-noSourceUnpackednessName, sourceNoUnpackName, sourceUnpackName :: Name
+noSourceUnpackednessName, sourceNoUnpackName, sourceUnpackName :: WiredIn Name
 noSourceUnpackednessName = libFun (fsLit "noSourceUnpackedness") noSourceUnpackednessKey
 sourceNoUnpackName       = libFun (fsLit "sourceNoUnpack")       sourceNoUnpackKey
 sourceUnpackName         = libFun (fsLit "sourceUnpack")         sourceUnpackKey
 
 -- data SourceStrictness = ...
-noSourceStrictnessName, sourceLazyName, sourceStrictName :: Name
+noSourceStrictnessName, sourceLazyName, sourceStrictName :: WiredIn Name
 noSourceStrictnessName = libFun (fsLit "noSourceStrictness") noSourceStrictnessKey
 sourceLazyName         = libFun (fsLit "sourceLazy")         sourceLazyKey
 sourceStrictName       = libFun (fsLit "sourceStrict")       sourceStrictKey
 
 -- data Con = ...
-normalCName, recCName, infixCName, forallCName, gadtCName, recGadtCName :: Name
+normalCName, recCName, infixCName, forallCName, gadtCName, recGadtCName :: WiredIn Name
 normalCName  = libFun (fsLit "normalC" ) normalCIdKey
 recCName     = libFun (fsLit "recC"    ) recCIdKey
 infixCName   = libFun (fsLit "infixC"  ) infixCIdKey
@@ -425,25 +425,25 @@ gadtCName    = libFun (fsLit "gadtC"   ) gadtCIdKey
 recGadtCName = libFun (fsLit "recGadtC") recGadtCIdKey
 
 -- data Bang = ...
-bangName :: Name
+bangName :: WiredIn Name
 bangName = libFun (fsLit "bang") bangIdKey
 
 -- type BangType = ...
-bangTypeName :: Name
+bangTypeName :: WiredIn Name
 bangTypeName = libFun (fsLit "bangType") bangTKey
 
 -- type VarBangType = ...
-varBangTypeName :: Name
+varBangTypeName :: WiredIn Name
 varBangTypeName = libFun (fsLit "varBangType") varBangTKey
 
 -- data PatSynDir = ...
-unidirPatSynName, implBidirPatSynName, explBidirPatSynName :: Name
+unidirPatSynName, implBidirPatSynName, explBidirPatSynName :: WiredIn Name
 unidirPatSynName    = libFun (fsLit "unidir")    unidirPatSynIdKey
 implBidirPatSynName = libFun (fsLit "implBidir") implBidirPatSynIdKey
 explBidirPatSynName = libFun (fsLit "explBidir") explBidirPatSynIdKey
 
 -- data PatSynArgs = ...
-prefixPatSynName, infixPatSynName, recordPatSynName :: Name
+prefixPatSynName, infixPatSynName, recordPatSynName :: WiredIn Name
 prefixPatSynName = libFun (fsLit "prefixPatSyn") prefixPatSynIdKey
 infixPatSynName  = libFun (fsLit "infixPatSyn")  infixPatSynIdKey
 recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
@@ -453,7 +453,7 @@ forallTName, forallVisTName, varTName, conTName, infixTName, tupleTName,
     unboxedTupleTName, unboxedSumTName, arrowTName, mulArrowTName, listTName,
     appTName, appKindTName, sigTName, equalityTName, litTName, promotedTName,
     promotedTupleTName, promotedNilTName, promotedConsTName,
-    wildCardTName, implicitParamTName :: Name
+    wildCardTName, implicitParamTName :: WiredIn Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
 forallVisTName      = libFun (fsLit "forallVisT")     forallVisTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
@@ -478,49 +478,49 @@ infixTName          = libFun (fsLit "infixT")         infixTIdKey
 implicitParamTName  = libFun (fsLit "implicitParamT") implicitParamTIdKey
 
 -- data TyLit = ...
-numTyLitName, strTyLitName, charTyLitName :: Name
+numTyLitName, strTyLitName, charTyLitName :: WiredIn Name
 numTyLitName = libFun (fsLit "numTyLit") numTyLitIdKey
 strTyLitName = libFun (fsLit "strTyLit") strTyLitIdKey
 charTyLitName = libFun (fsLit "charTyLit") charTyLitIdKey
 
 -- data TyVarBndr = ...
-plainTVName, kindedTVName :: Name
+plainTVName, kindedTVName :: WiredIn Name
 plainTVName  = libFun (fsLit "plainTV")  plainTVIdKey
 kindedTVName = libFun (fsLit "kindedTV") kindedTVIdKey
 
-plainInvisTVName, kindedInvisTVName :: Name
+plainInvisTVName, kindedInvisTVName :: WiredIn Name
 plainInvisTVName  = libFun (fsLit "plainInvisTV")  plainInvisTVIdKey
 kindedInvisTVName = libFun (fsLit "kindedInvisTV") kindedInvisTVIdKey
 
 -- data Specificity = ...
-specifiedSpecName, inferredSpecName :: Name
+specifiedSpecName, inferredSpecName :: WiredIn Name
 specifiedSpecName = libFun (fsLit "specifiedSpec") specifiedSpecKey
 inferredSpecName  = libFun (fsLit "inferredSpec")  inferredSpecKey
 
 -- data Role = ...
-nominalRName, representationalRName, phantomRName, inferRName :: Name
+nominalRName, representationalRName, phantomRName, inferRName :: WiredIn Name
 nominalRName          = libFun (fsLit "nominalR")          nominalRIdKey
 representationalRName = libFun (fsLit "representationalR") representationalRIdKey
 phantomRName          = libFun (fsLit "phantomR")          phantomRIdKey
 inferRName            = libFun (fsLit "inferR")            inferRIdKey
 
 -- data Kind = ...
-starKName, constraintKName :: Name
+starKName, constraintKName :: WiredIn Name
 starKName       = libFun (fsLit "starK")        starKIdKey
 constraintKName = libFun (fsLit "constraintK")  constraintKIdKey
 
 -- data FamilyResultSig = ...
-noSigName, kindSigName, tyVarSigName :: Name
+noSigName, kindSigName, tyVarSigName :: WiredIn Name
 noSigName    = libFun (fsLit "noSig")    noSigIdKey
 kindSigName  = libFun (fsLit "kindSig")  kindSigIdKey
 tyVarSigName = libFun (fsLit "tyVarSig") tyVarSigIdKey
 
 -- data InjectivityAnn = ...
-injectivityAnnName :: Name
+injectivityAnnName :: WiredIn Name
 injectivityAnnName = libFun (fsLit "injectivityAnn") injectivityAnnIdKey
 
 -- data Callconv = ...
-cCallName, stdCallName, cApiCallName, primCallName, javaScriptCallName :: Name
+cCallName, stdCallName, cApiCallName, primCallName, javaScriptCallName :: WiredIn Name
 cCallName = libFun (fsLit "cCall") cCallIdKey
 stdCallName = libFun (fsLit "stdCall") stdCallIdKey
 cApiCallName = libFun (fsLit "cApi") cApiCallIdKey
@@ -528,37 +528,37 @@ primCallName = libFun (fsLit "prim") primCallIdKey
 javaScriptCallName = libFun (fsLit "javaScript") javaScriptCallIdKey
 
 -- data Safety = ...
-unsafeName, safeName, interruptibleName :: Name
+unsafeName, safeName, interruptibleName :: WiredIn Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
 interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
 
 -- data RuleBndr = ...
-ruleVarName, typedRuleVarName :: Name
+ruleVarName, typedRuleVarName :: WiredIn Name
 ruleVarName      = libFun (fsLit ("ruleVar"))      ruleVarIdKey
 typedRuleVarName = libFun (fsLit ("typedRuleVar")) typedRuleVarIdKey
 
 -- data FunDep = ...
-funDepName :: Name
+funDepName :: WiredIn Name
 funDepName     = libFun (fsLit "funDep") funDepIdKey
 
 -- data TySynEqn = ...
-tySynEqnName :: Name
+tySynEqnName :: WiredIn Name
 tySynEqnName = libFun (fsLit "tySynEqn") tySynEqnIdKey
 
 -- data AnnTarget = ...
-valueAnnotationName, typeAnnotationName, moduleAnnotationName :: Name
+valueAnnotationName, typeAnnotationName, moduleAnnotationName :: WiredIn Name
 valueAnnotationName  = libFun (fsLit "valueAnnotation")  valueAnnotationIdKey
 typeAnnotationName   = libFun (fsLit "typeAnnotation")   typeAnnotationIdKey
 moduleAnnotationName = libFun (fsLit "moduleAnnotation") moduleAnnotationIdKey
 
 -- type DerivClause = ...
-derivClauseName :: Name
+derivClauseName :: WiredIn Name
 derivClauseName = libFun (fsLit "derivClause") derivClauseIdKey
 
 -- data DerivStrategy = ...
 stockStrategyName, anyclassStrategyName, newtypeStrategyName,
-  viaStrategyName :: Name
+  viaStrategyName :: WiredIn Name
 stockStrategyName    = libFun (fsLit "stockStrategy")    stockStrategyIdKey
 anyclassStrategyName = libFun (fsLit "anyclassStrategy") anyclassStrategyIdKey
 newtypeStrategyName  = libFun (fsLit "newtypeStrategy")  newtypeStrategyIdKey
@@ -570,7 +570,7 @@ patQTyConName, expQTyConName, stmtTyConName,
     decsQTyConName, ruleBndrTyConName, tySynEqnTyConName, roleTyConName,
     derivClauseTyConName, kindTyConName,
     tyVarBndrUnitTyConName, tyVarBndrSpecTyConName,
-    derivStrategyTyConName :: Name
+    derivStrategyTyConName :: WiredIn Name
 -- These are only used for the types of top-level splices
 expQTyConName           = libTc (fsLit "ExpQ")           expQTyConKey
 decsQTyConName          = libTc (fsLit "DecsQ")          decsQTyConKey  -- Q [Dec]
@@ -592,25 +592,25 @@ tyVarBndrSpecTyConName = libTc (fsLit "TyVarBndrSpec") tyVarBndrSpecTyConKey
 derivStrategyTyConName = thTc (fsLit "DerivStrategy") derivStrategyTyConKey
 
 -- quasiquoting
-quoteExpName, quotePatName, quoteDecName, quoteTypeName :: Name
+quoteExpName, quotePatName, quoteDecName, quoteTypeName :: WiredIn Name
 quoteExpName        = qqFun (fsLit "quoteExp")  quoteExpKey
 quotePatName        = qqFun (fsLit "quotePat")  quotePatKey
 quoteDecName        = qqFun (fsLit "quoteDec")  quoteDecKey
 quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
 
 -- data Inline = ...
-noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
+noInlineDataConName, inlineDataConName, inlinableDataConName :: WiredIn Name
 noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
 inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
 inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
 
 -- data RuleMatch = ...
-conLikeDataConName, funLikeDataConName :: Name
+conLikeDataConName, funLikeDataConName :: WiredIn Name
 conLikeDataConName = thCon (fsLit "ConLike") conLikeDataConKey
 funLikeDataConName = thCon (fsLit "FunLike") funLikeDataConKey
 
 -- data Phases = ...
-allPhasesDataConName, fromPhaseDataConName, beforePhaseDataConName :: Name
+allPhasesDataConName, fromPhaseDataConName, beforePhaseDataConName :: WiredIn Name
 allPhasesDataConName   = thCon (fsLit "AllPhases")   allPhasesDataConKey
 fromPhaseDataConName   = thCon (fsLit "FromPhase")   fromPhaseDataConKey
 beforePhaseDataConName = thCon (fsLit "BeforePhase") beforePhaseDataConKey
@@ -619,7 +619,7 @@ beforePhaseDataConName = thCon (fsLit "BeforePhase") beforePhaseDataConKey
 overlappableDataConName,
   overlappingDataConName,
   overlapsDataConName,
-  incoherentDataConName :: Name
+  incoherentDataConName :: WiredIn Name
 overlappableDataConName = thCon (fsLit "Overlappable") overlappableDataConKey
 overlappingDataConName  = thCon (fsLit "Overlapping")  overlappingDataConKey
 overlapsDataConName     = thCon (fsLit "Overlaps")     overlapsDataConKey
@@ -1114,27 +1114,27 @@ inferredSpecKey  = mkPreludeMiscIdUnique 499
 ************************************************************************
 -}
 
-lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, unsafeCodeCoerce_RDR :: RdrName
-lift_RDR     = nameRdrName liftName
-liftTyped_RDR = nameRdrName liftTypedName
-unsafeCodeCoerce_RDR = nameRdrName unsafeCodeCoerceName
-mkNameG_dRDR = nameRdrName mkNameG_dName
-mkNameG_vRDR = nameRdrName mkNameG_vName
+lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, unsafeCodeCoerce_RDR :: WiredIn RdrName
+lift_RDR      = nameRdrName <$> liftName
+liftTyped_RDR = nameRdrName <$> liftTypedName
+unsafeCodeCoerce_RDR = nameRdrName <$> unsafeCodeCoerceName
+mkNameG_dRDR = nameRdrName <$> mkNameG_dName
+mkNameG_vRDR = nameRdrName <$> mkNameG_vName
 
 -- data Exp = ...
-conE_RDR, litE_RDR, appE_RDR, infixApp_RDR :: RdrName
-conE_RDR     = nameRdrName conEName
-litE_RDR     = nameRdrName litEName
-appE_RDR     = nameRdrName appEName
-infixApp_RDR = nameRdrName infixAppName
+conE_RDR, litE_RDR, appE_RDR, infixApp_RDR :: WiredIn RdrName
+conE_RDR     = nameRdrName <$> conEName
+litE_RDR     = nameRdrName <$> litEName
+appE_RDR     = nameRdrName <$> appEName
+infixApp_RDR = nameRdrName <$> infixAppName
 
 -- data Lit = ...
 stringL_RDR, intPrimL_RDR, wordPrimL_RDR, floatPrimL_RDR,
-    doublePrimL_RDR, stringPrimL_RDR, charPrimL_RDR :: RdrName
-stringL_RDR     = nameRdrName stringLName
-intPrimL_RDR    = nameRdrName intPrimLName
-wordPrimL_RDR   = nameRdrName wordPrimLName
-floatPrimL_RDR  = nameRdrName floatPrimLName
-doublePrimL_RDR = nameRdrName doublePrimLName
-stringPrimL_RDR = nameRdrName stringPrimLName
-charPrimL_RDR   = nameRdrName charPrimLName
+    doublePrimL_RDR, stringPrimL_RDR, charPrimL_RDR :: WiredIn RdrName
+stringL_RDR     = nameRdrName <$> stringLName
+intPrimL_RDR    = nameRdrName <$> intPrimLName
+wordPrimL_RDR   = nameRdrName <$> wordPrimLName
+floatPrimL_RDR  = nameRdrName <$> floatPrimLName
+doublePrimL_RDR = nameRdrName <$> doublePrimLName
+stringPrimL_RDR = nameRdrName <$> stringPrimLName
+charPrimL_RDR   = nameRdrName <$> charPrimLName

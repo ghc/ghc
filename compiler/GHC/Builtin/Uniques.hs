@@ -61,13 +61,14 @@ import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Data.FastString
 
+import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Data.Maybe
 
 -- | Get the 'Name' associated with a known-key 'Unique'.
-knownUniqueName :: Unique -> Maybe Name
+knownUniqueName :: Unique -> Maybe (WiredIn Name)
 knownUniqueName u =
     case tag of
       'z' -> Just $ getUnboxedSumName n
@@ -121,19 +122,19 @@ mkSumDataConUnique alt arity
   | otherwise
   = mkUnique 'z' (arity `shiftL` 8 + alt `shiftL` 2) {- skip the tycon -}
 
-getUnboxedSumName :: Int -> Name
+getUnboxedSumName :: Int -> WiredIn Name
 getUnboxedSumName n
   | n .&. 0xfc == 0xfc
   = case tag of
-      0x0 -> tyConName $ sumTyCon arity
-      0x1 -> getRep $ sumTyCon arity
+      0x0 -> tyConName <$> sumTyCon arity
+      0x1 -> getRep <$> sumTyCon arity
       _   -> pprPanic "getUnboxedSumName: invalid tag" (ppr tag)
   | tag == 0x0
-  = dataConName $ sumDataCon (alt + 1) arity
+  = dataConName <$> sumDataCon (alt + 1) arity
   | tag == 0x1
-  = getName $ dataConWrapId $ sumDataCon (alt + 1) arity
+  = getName . dataConWrapId <$> sumDataCon (alt + 1) arity
   | tag == 0x2
-  = getRep $ promoteDataCon $ sumDataCon (alt + 1) arity
+  = getRep . promoteDataCon <$> sumDataCon (alt + 1) arity
   | otherwise
   = pprPanic "getUnboxedSumName" (ppr n)
   where
@@ -218,22 +219,22 @@ mkCTupleSelIdUnique sc_pos arity
   | otherwise
   = mkUnique 'j' (arity `shiftL` cTupleSelIdArityBits + sc_pos)
 
-getCTupleTyConName :: Int -> Name
+getCTupleTyConName :: Int -> WiredIn Name
 getCTupleTyConName n =
     case n `divMod` 2 of
       (arity, 0) -> cTupleTyConName arity
-      (arity, 1) -> mkPrelTyConRepName $ cTupleTyConName arity
+      (arity, 1) -> mkPrelTyConRepName =<< cTupleTyConName arity
       _          -> panic "getCTupleTyConName: impossible"
 
-getCTupleDataConName :: Int -> Name
+getCTupleDataConName :: Int -> WiredIn Name
 getCTupleDataConName n =
     case n `divMod` 3 of
       (arity,  0) -> cTupleDataConName arity
-      (arity,  1) -> getName $ dataConWrapId $ cTupleDataCon arity
-      (arity,  2) -> mkPrelTyConRepName $ cTupleDataConName arity
+      (arity,  1) -> getName . dataConWrapId <$> cTupleDataCon arity
+      (arity,  2) -> mkPrelTyConRepName =<< cTupleDataConName arity
       _           -> panic "getCTupleDataConName: impossible"
 
-getCTupleSelIdName :: Int -> Name
+getCTupleSelIdName :: Int -> WiredIn Name
 getCTupleSelIdName n = cTupleSelIdName (sc_pos + 1) arity
   where
     arity  = n `shiftR` cTupleSelIdArityBits
@@ -266,21 +267,21 @@ mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
 
-getTupleTyConName :: Boxity -> Int -> Name
+getTupleTyConName :: Boxity -> Int -> WiredIn Name
 getTupleTyConName boxity n =
     case n `divMod` 2 of
-      (arity, 0) -> tyConName $ tupleTyCon boxity arity
+      (arity, 0) -> tyConName <$> tupleTyCon boxity arity
       (arity, 1) -> fromMaybe (panic "getTupleTyConName")
-                    $ tyConRepName_maybe $ tupleTyCon boxity arity
+                    . tyConRepName_maybe <$> tupleTyCon boxity arity
       _          -> panic "getTupleTyConName: impossible"
 
-getTupleDataConName :: Boxity -> Int -> Name
+getTupleDataConName :: Boxity -> Int -> WiredIn Name
 getTupleDataConName boxity n =
     case n `divMod` 3 of
-      (arity, 0) -> dataConName $ tupleDataCon boxity arity
-      (arity, 1) -> idName $ dataConWorkId $ tupleDataCon boxity arity
+      (arity, 0) -> dataConName <$> tupleDataCon boxity arity
+      (arity, 1) -> idName . dataConWorkId <$> tupleDataCon boxity arity
       (arity, 2) -> fromMaybe (panic "getTupleDataCon")
-                    $ tyConRepName_maybe $ promotedTupleDataCon boxity arity
+                    . tyConRepName_maybe <$> promotedTupleDataCon boxity arity
       _          -> panic "getTupleDataConName: impossible"
 
 {-

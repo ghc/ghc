@@ -5,9 +5,10 @@ import GHC.Types.Unique
 import {-# SOURCE #-} GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Data.FastString
+import GHC.Unit.Types (WiredIn)
 
 -- Needed by GHC.Builtin.Types
-knownUniqueName :: Unique -> Maybe Name
+knownUniqueName :: Unique -> Maybe (WiredIn Name)
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique

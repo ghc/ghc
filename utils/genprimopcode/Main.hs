@@ -532,13 +532,13 @@ gen_primop_vector_tys (Info _ entries)
 
     mkVecTypes :: Entry -> [String]
     mkVecTypes i =
-        [ name_id ++ " :: Name"
-        , name_id ++ " = mkPrimTc (fsLit \"" ++ pprTy (ty i) ++ "\") " ++ key_id ++ " " ++ tycon_id
-        , ty_id ++ " :: Type"
-        , ty_id ++ " = mkTyConTy " ++ tycon_id
-        , tycon_id ++ " :: TyCon"
-        , tycon_id ++ " = pcPrimTyCon0 " ++ name_id ++
-                      " (TyConApp vecRepDataConTyCon [vec" ++ show (veclen i) ++ "DataConTy, " ++ elemrep i ++ "])"
+        [ name_id ++ " :: WiredIn Name"
+        , name_id ++ " = mkPrimTc (fsLit \"" ++ pprTy (ty i) ++ "\") " ++ key_id ++ " =<< " ++ tycon_id
+        , ty_id ++ " :: WiredIn Type"
+        , ty_id ++ " = mkTyConTy <$> " ++ tycon_id
+        , tycon_id ++ " :: WiredIn TyCon"
+        , tycon_id ++ " = flip pcPrimTyCon0 " ++
+                      " (TyConApp vecRepDataConTyCon [vec" ++ show (veclen i) ++ "DataConTy, " ++ elemrep i ++ "]) =<< " ++ name_id
         ]
       where
         key_id   = prefix i ++ "PrimTyConKey"

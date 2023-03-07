@@ -4,6 +4,7 @@ import GHC.Prelude
 import GHC.Types.Unique ( Uniquable )
 import {-# SOURCE #-} GHC.Types.Name
 import GHC.Utils.Outputable
+import GHC.Unit.Types ( WiredIn )
 
 data TyCon
 
@@ -16,5 +17,5 @@ isTupleTyCon        :: TyCon -> Bool
 isUnboxedTupleTyCon :: TyCon -> Bool
 
 tyConRepName_maybe  :: TyCon -> Maybe TyConRepName
-mkPrelTyConRepName  :: Name -> TyConRepName
+mkPrelTyConRepName  :: Name -> WiredIn TyConRepName
 tyConName :: TyCon -> Name

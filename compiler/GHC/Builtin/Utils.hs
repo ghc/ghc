@@ -113,7 +113,7 @@ Note [About wired-in things]
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in "GHC.Builtin.Names")
-knownKeyNames :: IO [Name]
+knownKeyNames :: [WiredIn Name]
 knownKeyNames
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
@@ -188,12 +188,12 @@ knownKeyNamesOkay all_names
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
-lookupKnownKeyName :: Unique -> IO (Maybe Name)
+lookupKnownKeyName :: Unique -> Maybe (WiredIn Name)
 lookupKnownKeyName u =
     (knownUniqueName u <|>) . flip lookupUFM_Directly u <$> knownKeysMap 
 
 -- | Is a 'Name' known-key?
-isKnownKeyName :: Name -> IO Bool
+isKnownKeyName :: Name -> WiredIn Bool
 isKnownKeyName n =
     (isJust (knownUniqueName $ nameUnique n) ||) . elemUFM n <$> knownKeysMap
 
@@ -202,7 +202,7 @@ isKnownKeyName n =
 -- The type is @UniqFM Name Name@ to denote that the 'Unique's used
 -- in the domain are 'Unique's associated with 'Name's (as opposed
 -- to some other namespace of 'Unique's).
-knownKeysMap :: IO (UniqFM Name Name)
+knownKeysMap :: WiredIn (UniqFM Name Name)
 knownKeysMap = listToIdentityUFM <$> knownKeyNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by

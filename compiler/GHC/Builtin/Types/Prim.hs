@@ -6,6 +6,7 @@ Wired-in knowledge about primitive types
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
@@ -151,25 +152,27 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import Data.Char
 
+import GHC.Unit.Types (WiredIn)
+
 {- *********************************************************************
 *                                                                      *
              Building blocks
 *                                                                      *
 ********************************************************************* -}
 
-mk_TYPE_app :: Type -> Type
-mk_TYPE_app rep = mkTyConApp tYPETyCon [rep]
+mk_TYPE_app :: Type -> WiredIn Type
+mk_TYPE_app rep = mkTyConApp <$> tYPETyCon <*> pure [rep]
 
-mk_CONSTRAINT_app :: Type -> Type
-mk_CONSTRAINT_app rep = mkTyConApp cONSTRAINTTyCon [rep]
+mk_CONSTRAINT_app :: Type -> WiredIn Type
+mk_CONSTRAINT_app rep = mkTyConApp <$> cONSTRAINTTyCon <*> pure [rep]
 
-mkPrimTc :: FastString -> Unique -> TyCon -> Name
+mkPrimTc :: FastString -> Unique -> TyCon -> WiredIn Name
 mkPrimTc = mkGenPrimTc UserSyntax
 
-mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
+mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> WiredIn Name
 mkBuiltInPrimTc = mkGenPrimTc BuiltInSyntax
 
-mkGenPrimTc :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
+mkGenPrimTc :: BuiltInSyntax -> FastString -> Unique -> TyCon -> WiredIn Name
 mkGenPrimTc built_in_syntax occ key tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS occ)
                   key
@@ -181,20 +184,20 @@ mkGenPrimTc built_in_syntax occ key tycon
 -- and the given result kind representation.
 --
 -- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon :: Name
-            -> [Role] -> RuntimeRepType -> TyCon
+pcPrimTyCon :: WiredIn Name
+            -> [Role] -> WiredIn RuntimeRepType -> WiredIn TyCon
 pcPrimTyCon name roles res_rep
   = mkPrimTyCon name binders result_kind roles
   where
-    bndr_kis    = liftedTypeKind <$ roles
-    binders     = mkTemplateAnonTyConBinders bndr_kis
-    result_kind = mk_TYPE_app res_rep
+    bndr_kis    = sequence $ liftedTypeKind <$ roles
+    binders     = mkTemplateAnonTyConBinders <$> bndr_kis
+    result_kind = mk_TYPE_app =<< res_rep
 
 -- | Create a primitive nullary 'TyCon' with the given 'Name'
 -- and result kind representation.
 --
 -- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon0 :: Name -> RuntimeRepType -> TyCon
+pcPrimTyCon0 :: WiredIn Name -> WiredIn RuntimeRepType -> WiredIn TyCon
 pcPrimTyCon0 name res_rep
   = pcPrimTyCon name [] res_rep
 
@@ -203,24 +206,23 @@ pcPrimTyCon0 name res_rep
 -- implicit and comes before other arguments
 --
 -- Only use this in "GHC.Builtin.Types.Prim".
-pcPrimTyCon_LevPolyLastArg :: Name
+pcPrimTyCon_LevPolyLastArg :: WiredIn Name
                            -> [Role] -- ^ roles of the arguments (must be non-empty),
                                      -- not including the implicit argument of kind 'Levity',
                                      -- which always has 'Nominal' role
-                           -> RuntimeRepType  -- ^ representation of the fully-applied type
-                           -> TyCon
+                           -> WiredIn RuntimeRepType  -- ^ representation of the fully-applied type
+                           -> WiredIn TyCon
 pcPrimTyCon_LevPolyLastArg name roles res_rep
-  = mkPrimTyCon name binders result_kind (Nominal : roles)
+  = do
+    mkPrimTyCon name binders result_kind (Nominal : roles)
     where
-      result_kind = mk_TYPE_app res_rep
-      lev_bndr = mkNamedTyConBinder Inferred levity1TyVar
-      binders  = lev_bndr : mkTemplateAnonTyConBinders anon_bndr_kis
-      lev_tv   = mkTyVarTy (binderVar lev_bndr)
+      result_kind = mk_TYPE_app =<< res_rep
+      lev_bndr = mkNamedTyConBinder Inferred <$> levity1TyVar
+      lev_tv   = mkTyVarTy . binderVar <$> lev_bndr
+      binders = liftA2 (:) lev_bndr (mkTemplateAnonTyConBinders <$> sequence anon_bndr_kis)
 
       -- [ Type, ..., Type, TYPE (BoxedRep l) ]
-      anon_bndr_kis = changeLast (liftedTypeKind <$ roles) $
-                      mk_TYPE_app $
-                      mkTyConApp boxedRepDataConTyCon [lev_tv]
+      anon_bndr_kis = changeLast (liftedTypeKind <$ roles) $ mk_TYPE_app =<< (mkTyConApp <$> boxedRepDataConTyCon <*> sequence [lev_tv])
 
 
 {- *********************************************************************
@@ -239,12 +241,12 @@ A few primitive TyCons are "unexposed", meaning:
 * We don't want users to see them in GHCi's @:browse@ output (see #12023).
 -}
 
-primTyCons :: [TyCon]
+primTyCons :: [WiredIn TyCon]
 primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
 
 -- | Primitive 'TyCon's that are defined in GHC.Prim but not "exposed".
 -- See Note [Unexposed TyCons]
-unexposedPrimTyCons :: [TyCon]
+unexposedPrimTyCons :: [WiredIn TyCon]
 unexposedPrimTyCons
   = [ eqPrimTyCon      -- (~#)
     , eqReprPrimTyCon  -- (~R#)
@@ -257,7 +259,7 @@ unexposedPrimTyCons
     ]
 
 -- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
-exposedPrimTyCons :: [TyCon]
+exposedPrimTyCons :: [WiredIn TyCon]
 exposedPrimTyCons
   = [ addrPrimTyCon
     , arrayPrimTyCon
@@ -313,45 +315,45 @@ charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int3
   stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName,
   weakPrimTyConName, threadIdPrimTyConName,
   eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName,
-  stackSnapshotPrimTyConName, promptTagPrimTyConName :: Name
-charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
-intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
-int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
-int16PrimTyConName            = mkPrimTc (fsLit "Int16#") int16PrimTyConKey int16PrimTyCon
-int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
-int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey int64PrimTyCon
-wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey wordPrimTyCon
-word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey word8PrimTyCon
-word16PrimTyConName           = mkPrimTc (fsLit "Word16#") word16PrimTyConKey word16PrimTyCon
-word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey word32PrimTyCon
-word64PrimTyConName           = mkPrimTc (fsLit "Word64#") word64PrimTyConKey word64PrimTyCon
-addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey addrPrimTyCon
-floatPrimTyConName            = mkPrimTc (fsLit "Float#") floatPrimTyConKey floatPrimTyCon
-doublePrimTyConName           = mkPrimTc (fsLit "Double#") doublePrimTyConKey doublePrimTyCon
-statePrimTyConName            = mkPrimTc (fsLit "State#") statePrimTyConKey statePrimTyCon
-proxyPrimTyConName            = mkPrimTc (fsLit "Proxy#") proxyPrimTyConKey proxyPrimTyCon
-eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey eqPrimTyCon
-eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey eqReprPrimTyCon
-eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKey eqPhantPrimTyCon
-realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
-arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
-byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
-smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey smallArrayPrimTyCon
-mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
-mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
-smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey smallMutableArrayPrimTyCon
-mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
-ioPortPrimTyConName           = mkPrimTc (fsLit "IOPort#") ioPortPrimTyConKey ioPortPrimTyCon
-mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey mVarPrimTyCon
-tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPrimTyCon
-stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
-stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
-compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
-stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotPrimTyConKey stackSnapshotPrimTyCon
-bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
-weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
-threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
-promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey promptTagPrimTyCon
+  stackSnapshotPrimTyConName, promptTagPrimTyConName :: WiredIn Name
+charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey   =<< charPrimTyCon
+intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey     =<< intPrimTyCon
+int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey   =<< int8PrimTyCon
+int16PrimTyConName            = mkPrimTc (fsLit "Int16#") int16PrimTyConKey =<< int16PrimTyCon
+int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey =<< int32PrimTyCon
+int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey =<< int64PrimTyCon
+wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey   =<< wordPrimTyCon
+word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey =<< word8PrimTyCon
+word16PrimTyConName           = mkPrimTc (fsLit "Word16#") word16PrimTyConKey =<< word16PrimTyCon
+word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey =<< word32PrimTyCon
+word64PrimTyConName           = mkPrimTc (fsLit "Word64#") word64PrimTyConKey =<< word64PrimTyCon
+addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey   =<< addrPrimTyCon
+floatPrimTyConName            = mkPrimTc (fsLit "Float#") floatPrimTyConKey =<< floatPrimTyCon
+doublePrimTyConName           = mkPrimTc (fsLit "Double#") doublePrimTyConKey =<< doublePrimTyCon
+statePrimTyConName            = mkPrimTc (fsLit "State#") statePrimTyConKey =<< statePrimTyCon
+proxyPrimTyConName            = mkPrimTc (fsLit "Proxy#") proxyPrimTyConKey =<< proxyPrimTyCon
+eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey =<< eqPrimTyCon
+eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey  =<< eqReprPrimTyCon
+eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKey =<< eqPhantPrimTyCon
+realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey =<< realWorldTyCon
+arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey =<< arrayPrimTyCon
+byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey   =<< byteArrayPrimTyCon
+smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey =<< smallArrayPrimTyCon
+mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey =<< mutableArrayPrimTyCon
+mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey =<< mutableByteArrayPrimTyCon
+smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey =<< smallMutableArrayPrimTyCon
+mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey =<< mutVarPrimTyCon
+ioPortPrimTyConName           = mkPrimTc (fsLit "IOPort#") ioPortPrimTyConKey =<< ioPortPrimTyCon
+mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey =<< mVarPrimTyCon
+tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey =<< tVarPrimTyCon
+stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey =<< stablePtrPrimTyCon
+stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey =<< stableNamePrimTyCon
+compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey =<< compactPrimTyCon
+stackSnapshotPrimTyConName    = mkPrimTc (fsLit "StackSnapshot#") stackSnapshotPrimTyConKey =<< stackSnapshotPrimTyCon
+bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey =<< bcoPrimTyCon
+weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey =<< weakPrimTyCon
+threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey =<< threadIdPrimTyCon
+promptTagPrimTyConName        = mkPrimTc (fsLit "PromptTag#") promptTagPrimTyConKey =<< promptTagPrimTyCon
 
 {- *********************************************************************
 *                                                                      *
@@ -457,8 +459,8 @@ mkTemplateAnonTyConBindersFrom :: Int -> [Kind] -> [TyConBinder]
 mkTemplateAnonTyConBindersFrom n kinds
   = mkAnonTyConBinders (mkTemplateTyVarsFrom n kinds)
 
-alphaTyVars :: [TyVar]
-alphaTyVars = mkTemplateTyVars $ repeat liftedTypeKind
+alphaTyVars :: WiredIn [TyVar]
+alphaTyVars = mkTemplateTyVars <$> sequence (repeat liftedTypeKind)
 
 alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
@@ -491,70 +493,77 @@ alphaTysUnliftedRep = mkTyVarTys alphaTyVarsUnliftedRep
 alphaTyUnliftedRep :: Type
 (alphaTyUnliftedRep:_) = alphaTysUnliftedRep
 
-runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: TyVar
+runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: WiredIn TyVar
 (runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
-  = drop 16 (mkTemplateTyVars (repeat runtimeRepTy))  -- selects 'q','r'
+  = drop 16 . mkTemplateTyVars <$> sequence (repeat runtimeRepTy)  -- selects 'q','r'
 
-runtimeRep1TyVarInf, runtimeRep2TyVarInf :: TyVarBinder
-runtimeRep1TyVarInf = mkTyVarBinder Inferred runtimeRep1TyVar
-runtimeRep2TyVarInf = mkTyVarBinder Inferred runtimeRep2TyVar
+runtimeRep1TyVarInf, runtimeRep2TyVarInf :: WiredIn TyVarBinder
+runtimeRep1TyVarInf = mkTyVarBinder Inferred <$> runtimeRep1TyVar
+runtimeRep2TyVarInf = mkTyVarBinder Inferred <$> runtimeRep2TyVar
 
-runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: RuntimeRepType
-runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
-runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
-runtimeRep3Ty = mkTyVarTy runtimeRep3TyVar
-openAlphaTyVar, openBetaTyVar, openGammaTyVar :: TyVar
+runtimeRep1Ty, runtimeRep2Ty, runtimeRep3Ty :: WiredIn RuntimeRepType
+runtimeRep1Ty = mkTyVarTy <$> runtimeRep1TyVar
+runtimeRep2Ty = mkTyVarTy <$> runtimeRep2TyVar
+runtimeRep3Ty = mkTyVarTy <$> runtimeRep3TyVar
+openAlphaTyVar, openBetaTyVar, openGammaTyVar :: WiredIn TyVar
 -- alpha :: TYPE r1
 -- beta  :: TYPE r2
 -- gamma :: TYPE r3
-[openAlphaTyVar,openBetaTyVar,openGammaTyVar]
-  = mkTemplateTyVars [ mk_TYPE_app runtimeRep1Ty
-                     , mk_TYPE_app runtimeRep2Ty
-                     , mk_TYPE_app runtimeRep3Ty]
+openAlphaTyVar = (\case [openAlphaTyVar,_openBetaTyVar,_openGammaTyVar] -> openAlphaTyVar) <$> openTyVars 
+openBetaTyVar  = (\case [_openAlphaTyVar,openBetaTyVar,_openGammaTyVar] -> openBetaTyVar)  <$> openTyVars
+openGammaTyVar = (\case [_openAlphaTyVar,_openBetaTyVar,openGammaTyVar] -> openGammaTyVar) <$> openTyVars
+openTyVars :: WiredIn [TyVar]
+openTyVars
+  =  mkTemplateTyVars <$> sequence [ mk_TYPE_app =<< runtimeRep1Ty
+                                   , mk_TYPE_app =<< runtimeRep2Ty
+                                   , mk_TYPE_app =<< runtimeRep3Ty]
 
-openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: TyVarBinder
-openAlphaTyVarSpec = mkTyVarBinder Specified openAlphaTyVar
-openBetaTyVarSpec  = mkTyVarBinder Specified openBetaTyVar
-openGammaTyVarSpec = mkTyVarBinder Specified openGammaTyVar
+openAlphaTyVarSpec, openBetaTyVarSpec, openGammaTyVarSpec :: WiredIn TyVarBinder
+openAlphaTyVarSpec = mkTyVarBinder Specified <$> openAlphaTyVar
+openBetaTyVarSpec  = mkTyVarBinder Specified <$> openBetaTyVar
+openGammaTyVarSpec = mkTyVarBinder Specified <$> openGammaTyVar
 
-openAlphaTy, openBetaTy, openGammaTy :: Type
-openAlphaTy = mkTyVarTy openAlphaTyVar
-openBetaTy  = mkTyVarTy openBetaTyVar
-openGammaTy = mkTyVarTy openGammaTyVar
+openAlphaTy, openBetaTy, openGammaTy :: WiredIn Type
+openAlphaTy = mkTyVarTy <$> openAlphaTyVar
+openBetaTy  = mkTyVarTy <$> openBetaTyVar
+openGammaTy = mkTyVarTy <$> openGammaTyVar
 
-levity1TyVar, levity2TyVar :: TyVar
+levity1TyVar, levity2TyVar :: WiredIn TyVar
 (levity2TyVar : levity1TyVar : _) -- NB: levity2TyVar before levity1TyVar
-  = drop 10 (mkTemplateTyVars (repeat levityTy)) -- selects 'k', 'l'
+  = drop 10 . mkTemplateTyVars <$> sequence (repeat levityTy) -- selects 'k', 'l'
 -- The ordering of levity2TyVar before levity1TyVar is chosen so that
 -- the more common levity1TyVar uses the levity variable 'l'.
 
-levity1TyVarInf, levity2TyVarInf :: TyVarBinder
-levity1TyVarInf = mkTyVarBinder Inferred levity1TyVar
-levity2TyVarInf = mkTyVarBinder Inferred levity2TyVar
+levity1TyVarInf, levity2TyVarInf :: WiredIn TyVarBinder
+levity1TyVarInf = mkTyVarBinder Inferred <$> levity1TyVar
+levity2TyVarInf = mkTyVarBinder Inferred <$> levity2TyVar
 
-levity1Ty, levity2Ty :: Type
-levity1Ty = mkTyVarTy levity1TyVar
-levity2Ty = mkTyVarTy levity2TyVar
+levity1Ty, levity2Ty :: WiredIn Type
+levity1Ty = mkTyVarTy <$> levity1TyVar
+levity2Ty = mkTyVarTy <$> levity2TyVar
 
-levPolyAlphaTyVar, levPolyBetaTyVar :: TyVar
-[levPolyAlphaTyVar, levPolyBetaTyVar] =
-  mkTemplateTyVars
-    [ mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity1Ty])
-    , mk_TYPE_app (mkTyConApp boxedRepDataConTyCon [levity2Ty])]
+levPolyAlphaTyVar, levPolyBetaTyVar :: WiredIn TyVar
+levPolyAlphaTyVar = (\case [levPolyAlphaTy,_levPolyBetaTyVar] -> levPolyAlphaTy) <$> levPolyTyVars
+levPolyBetaTyVar  = (\case [_levPolyAlphaTy,levPolyBetaTyVar] -> levPolyBetaTyVar) <$> levPolyTyVars
+levPolyTyVars :: WiredIn [TyVar]
+levPolyTyVars =
+  mkTemplateTyVars <$> sequence
+    [ mk_TYPE_app =<< (mkTyConApp <$> boxedRepDataConTyCon <*> sequence [levity1Ty])
+    , mk_TYPE_app =<< (mkTyConApp <$> boxedRepDataConTyCon <*> sequence [levity2Ty])]
 -- alpha :: TYPE ('BoxedRep l)
 -- beta  :: TYPE ('BoxedRep k)
 
-levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec :: TyVarBinder
-levPolyAlphaTyVarSpec = mkTyVarBinder Specified levPolyAlphaTyVar
-levPolyBetaTyVarSpec  = mkTyVarBinder Specified levPolyBetaTyVar
+levPolyAlphaTyVarSpec, levPolyBetaTyVarSpec :: WiredIn TyVarBinder
+levPolyAlphaTyVarSpec = mkTyVarBinder Specified <$> levPolyAlphaTyVar
+levPolyBetaTyVarSpec  = mkTyVarBinder Specified <$> levPolyBetaTyVar
 
-levPolyAlphaTy, levPolyBetaTy :: Type
-levPolyAlphaTy = mkTyVarTy levPolyAlphaTyVar
-levPolyBetaTy  = mkTyVarTy levPolyBetaTyVar
+levPolyAlphaTy, levPolyBetaTy :: WiredIn Type
+levPolyAlphaTy = mkTyVarTy <$> levPolyAlphaTyVar
+levPolyBetaTy  = mkTyVarTy <$> levPolyBetaTyVar
 
-multiplicityTyVar1, multiplicityTyVar2  :: TyVar
+multiplicityTyVar1, multiplicityTyVar2  :: WiredIn TyVar
 (multiplicityTyVar1 : multiplicityTyVar2 : _)
-   = drop 13 (mkTemplateTyVars (repeat multiplicityTy))  -- selects 'n', 'm'
+   = drop 13 . mkTemplateTyVars <$> sequence (repeat multiplicityTy)  -- selects 'n', 'm'
 
 
 {-
@@ -611,7 +620,7 @@ rather than by using a TyConApp.
   Use them!
 -}
 
-funTyFlagTyCon :: FunTyFlag -> TyCon
+funTyFlagTyCon :: FunTyFlag -> WiredIn TyCon
 -- `anonArgTyCon af` gets the TyCon that corresponds to the `FunTyFlag`
 -- But be careful: fUNTyCon has a different kind to the others!
 -- See Note [Function type constructors and FunTy]
@@ -628,11 +637,11 @@ isArrowTyCon tc
     getUnique tc `elem`
     [fUNTyConKey, ctArrowTyConKey, ccArrowTyConKey, tcArrowTyConKey]
 
-fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: Name
-fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey       fUNTyCon
-ctArrowTyConName = mkBuiltInPrimTc (fsLit "=>")  ctArrowTyConKey ctArrowTyCon
-ccArrowTyConName = mkBuiltInPrimTc (fsLit "==>") ccArrowTyConKey ccArrowTyCon
-tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
+fUNTyConName, ctArrowTyConName, ccArrowTyConName, tcArrowTyConName :: WiredIn Name
+fUNTyConName     = mkPrimTc        (fsLit "FUN") fUNTyConKey     =<< fUNTyCon
+ctArrowTyConName = mkBuiltInPrimTc (fsLit "=>")  ctArrowTyConKey =<< ctArrowTyCon
+ccArrowTyConName = mkBuiltInPrimTc (fsLit "==>") ccArrowTyConKey =<< ccArrowTyCon
+tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey =<< tcArrowTyCon
 
 -- | The @FUN@ type constructor.
 --
@@ -647,51 +656,59 @@ tcArrowTyConName = mkBuiltInPrimTc (fsLit "-=>") tcArrowTyConKey tcArrowTyCon
 --
 -- This is a deliberate choice to allow future extensions to the
 -- function arrow.
-fUNTyCon :: TyCon
-fUNTyCon = mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
+fUNTyCon :: WiredIn TyCon
+fUNTyCon = do
+  mkPrimTyCon fUNTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar1
-               , mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app runtimeRep1Ty
-                                             , mk_TYPE_app runtimeRep2Ty ]
+    tc_bndrs = liftA2 (++)
+                (sequence
+                  [ mkNamedTyConBinder Required <$> multiplicityTyVar1
+                  , mkNamedTyConBinder Inferred <$> runtimeRep1TyVar
+                  , mkNamedTyConBinder Inferred <$> runtimeRep2TyVar
+                  ])
+                (mkTemplateAnonTyConBinders <$> sequence [ mk_TYPE_app =<< runtimeRep1Ty
+                                                         , mk_TYPE_app =<< runtimeRep2Ty ])
     tc_roles = [Nominal, Nominal, Nominal, Representational, Representational]
 
 -- (=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         CONSTRAINT rep1 -> TYPE rep2 -> Type
-ctArrowTyCon :: TyCon
+ctArrowTyCon :: WiredIn TyCon
 ctArrowTyCon = mkPrimTyCon ctArrowTyConName tc_bndrs liftedTypeKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
-                                             , mk_TYPE_app       runtimeRep2Ty ]
+    tc_bndrs = liftA2 (++)
+                (sequence
+                  [ mkNamedTyConBinder Inferred <$> runtimeRep1TyVar
+                  , mkNamedTyConBinder Inferred <$> runtimeRep2TyVar ])
+               (mkTemplateAnonTyConBinders <$> sequence [ mk_CONSTRAINT_app =<< runtimeRep1Ty
+                                                        , mk_TYPE_app       =<< runtimeRep2Ty ])
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (==>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --          CONSTRAINT rep1 -> CONSTRAINT rep2 -> Constraint
-ccArrowTyCon :: TyCon
+ccArrowTyCon :: WiredIn TyCon
 ccArrowTyCon = mkPrimTyCon ccArrowTyConName tc_bndrs constraintKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mk_CONSTRAINT_app runtimeRep1Ty
-                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
+    tc_bndrs = liftA2 (++)
+                (sequence [ mkNamedTyConBinder Inferred <$> runtimeRep1TyVar
+                          , mkNamedTyConBinder Inferred <$> runtimeRep2TyVar ])
+               (mkTemplateAnonTyConBinders <$> sequence [ mk_CONSTRAINT_app =<< runtimeRep1Ty
+                                                        , mk_CONSTRAINT_app =<< runtimeRep2Ty ])
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 -- (-=>) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --          TYPE rep1 -> CONSTRAINT rep2 -> Constraint
-tcArrowTyCon :: TyCon
+tcArrowTyCon :: WiredIn TyCon
 tcArrowTyCon = mkPrimTyCon tcArrowTyConName tc_bndrs constraintKind tc_roles
   where
     -- See also unrestrictedFunTyCon
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
-               , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
-               ++ mkTemplateAnonTyConBinders [ mk_TYPE_app       runtimeRep1Ty
-                                             , mk_CONSTRAINT_app runtimeRep2Ty ]
+    tc_bndrs = liftA2 (++)
+                (sequence [ mkNamedTyConBinder Inferred <$> runtimeRep1TyVar
+                          , mkNamedTyConBinder Inferred <$> runtimeRep2TyVar ])
+                (mkTemplateAnonTyConBinders <$> sequence [ mk_TYPE_app       =<< runtimeRep1Ty
+                                                         , mk_CONSTRAINT_app =<< runtimeRep2Ty ])
     tc_roles = [Nominal, Nominal, Representational, Representational]
 
 {-
@@ -866,30 +883,30 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 -}
 
 ----------------------
-tYPETyCon :: TyCon
+tYPETyCon :: WiredIn TyCon
 tYPETyCon = mkPrimTyCon tYPETyConName
-                        (mkTemplateAnonTyConBinders [runtimeRepTy])
+                        (mkTemplateAnonTyConBinders <$> sequence [runtimeRepTy])
                         liftedTypeKind
                         [Nominal]
 
-tYPETyConName :: Name
-tYPETyConName = mkPrimTc (fsLit "TYPE") tYPETyConKey tYPETyCon
+tYPETyConName :: WiredIn Name
+tYPETyConName = mkPrimTc (fsLit "TYPE") tYPETyConKey =<< tYPETyCon
 
-tYPEKind :: Type
-tYPEKind = mkTyConTy tYPETyCon
+tYPEKind :: WiredIn Type
+tYPEKind = mkTyConTy <$> tYPETyCon
 
 ----------------------
-cONSTRAINTTyCon :: TyCon
+cONSTRAINTTyCon :: WiredIn TyCon
 cONSTRAINTTyCon = mkPrimTyCon cONSTRAINTTyConName
-                              (mkTemplateAnonTyConBinders [runtimeRepTy])
+                              (mkTemplateAnonTyConBinders <$> sequence [runtimeRepTy])
                               liftedTypeKind
                               [Nominal]
 
-cONSTRAINTTyConName :: Name
-cONSTRAINTTyConName = mkPrimTc (fsLit "CONSTRAINT") cONSTRAINTTyConKey cONSTRAINTTyCon
+cONSTRAINTTyConName :: WiredIn Name
+cONSTRAINTTyConName = mkPrimTc (fsLit "CONSTRAINT") cONSTRAINTTyConKey =<< cONSTRAINTTyCon
 
-cONSTRAINTKind :: Type
-cONSTRAINTKind = mkTyConTy cONSTRAINTTyCon
+cONSTRAINTKind :: WiredIn Type
+cONSTRAINTKind = mkTyConTy <$> cONSTRAINTTyCon
 
 
 {- *********************************************************************
@@ -898,75 +915,76 @@ cONSTRAINTKind = mkTyConTy cONSTRAINTTyCon
 *                                                                      *
 ********************************************************************* -}
 
-charPrimTy :: Type
-charPrimTy      = mkTyConTy charPrimTyCon
-charPrimTyCon :: TyCon
+charPrimTy :: WiredIn Type
+charPrimTy      = mkTyConTy <$> charPrimTyCon
+charPrimTyCon :: WiredIn TyCon
 charPrimTyCon   = pcPrimTyCon0 charPrimTyConName wordRepDataConTy
 
-intPrimTy :: Type
-intPrimTy       = mkTyConTy intPrimTyCon
-intPrimTyCon :: TyCon
+intPrimTy :: WiredIn Type
+intPrimTy       = mkTyConTy <$> intPrimTyCon
+intPrimTyCon :: WiredIn TyCon
 intPrimTyCon    = pcPrimTyCon0 intPrimTyConName intRepDataConTy
 
-int8PrimTy :: Type
-int8PrimTy     = mkTyConTy int8PrimTyCon
-int8PrimTyCon :: TyCon
+int8PrimTy :: WiredIn Type
+int8PrimTy     = mkTyConTy <$> int8PrimTyCon
+int8PrimTyCon :: WiredIn TyCon
 int8PrimTyCon  = pcPrimTyCon0 int8PrimTyConName int8RepDataConTy
 
-int16PrimTy :: Type
-int16PrimTy    = mkTyConTy int16PrimTyCon
-int16PrimTyCon :: TyCon
+int16PrimTy :: WiredIn Type
+int16PrimTy    = mkTyConTy <$> int16PrimTyCon
+int16PrimTyCon :: WiredIn TyCon
 int16PrimTyCon = pcPrimTyCon0 int16PrimTyConName int16RepDataConTy
 
-int32PrimTy :: Type
-int32PrimTy     = mkTyConTy int32PrimTyCon
-int32PrimTyCon :: TyCon
+int32PrimTy :: WiredIn Type
+int32PrimTy     = mkTyConTy <$> int32PrimTyCon
+int32PrimTyCon :: WiredIn TyCon
 int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName int32RepDataConTy
 
-int64PrimTy :: Type
-int64PrimTy     = mkTyConTy int64PrimTyCon
-int64PrimTyCon :: TyCon
+int64PrimTy :: WiredIn Type
+int64PrimTy     = mkTyConTy <$> int64PrimTyCon
+int64PrimTyCon :: WiredIn TyCon
 int64PrimTyCon  = pcPrimTyCon0 int64PrimTyConName int64RepDataConTy
 
-wordPrimTy :: Type
-wordPrimTy      = mkTyConTy wordPrimTyCon
-wordPrimTyCon :: TyCon
+wordPrimTy :: WiredIn Type
+wordPrimTy      = mkTyConTy <$> wordPrimTyCon
+wordPrimTyCon :: WiredIn TyCon
 wordPrimTyCon   = pcPrimTyCon0 wordPrimTyConName wordRepDataConTy
 
-word8PrimTy :: Type
-word8PrimTy     = mkTyConTy word8PrimTyCon
-word8PrimTyCon :: TyCon
+word8PrimTy :: WiredIn Type
+word8PrimTy     = mkTyConTy <$> word8PrimTyCon
+word8PrimTyCon :: WiredIn TyCon
 word8PrimTyCon  = pcPrimTyCon0 word8PrimTyConName word8RepDataConTy
 
-word16PrimTy :: Type
-word16PrimTy    = mkTyConTy word16PrimTyCon
-word16PrimTyCon :: TyCon
+word16PrimTy :: WiredIn Type
+word16PrimTy    = mkTyConTy <$> word16PrimTyCon
+word16PrimTyCon :: WiredIn TyCon
 word16PrimTyCon = pcPrimTyCon0 word16PrimTyConName word16RepDataConTy
 
-word32PrimTy :: Type
-word32PrimTy    = mkTyConTy word32PrimTyCon
-word32PrimTyCon :: TyCon
+word32PrimTy :: WiredIn Type
+word32PrimTy    = mkTyConTy <$> word32PrimTyCon
+word32PrimTyCon :: WiredIn TyCon
 word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName word32RepDataConTy
 
-word64PrimTy :: Type
-word64PrimTy    = mkTyConTy word64PrimTyCon
-word64PrimTyCon :: TyCon
+word64PrimTy :: WiredIn Type
+word64PrimTy    = mkTyConTy <$> word64PrimTyCon
+word64PrimTyCon :: WiredIn TyCon
 word64PrimTyCon = pcPrimTyCon0 word64PrimTyConName word64RepDataConTy
 
-addrPrimTy :: Type
-addrPrimTy      = mkTyConTy addrPrimTyCon
-addrPrimTyCon :: TyCon
+addrPrimTy :: WiredIn Type
+addrPrimTy      = mkTyConTy <$> addrPrimTyCon
+addrPrimTyCon :: WiredIn TyCon
 addrPrimTyCon   = pcPrimTyCon0 addrPrimTyConName addrRepDataConTy
 
-floatPrimTy     :: Type
-floatPrimTy     = mkTyConTy floatPrimTyCon
-floatPrimTyCon :: TyCon
+floatPrimTy     :: WiredIn Type
+floatPrimTy     = mkTyConTy <$> floatPrimTyCon
+floatPrimTyCon :: WiredIn TyCon
 floatPrimTyCon  = pcPrimTyCon0 floatPrimTyConName floatRepDataConTy
 
-doublePrimTy :: Type
-doublePrimTy    = mkTyConTy doublePrimTyCon
-doublePrimTyCon :: TyCon
+doublePrimTy :: WiredIn Type
+doublePrimTy    = mkTyConTy <$> doublePrimTyCon
+doublePrimTyCon :: WiredIn TyCon
 doublePrimTyCon = pcPrimTyCon0 doublePrimTyConName doubleRepDataConTy
+
 
 {-
 ************************************************************************
@@ -1153,10 +1171,10 @@ Even though this parameter is not used in the definition of State#, it is
 given role Nominal to enforce its intended use.
 -}
 
-mkStatePrimTy :: Type -> Type
-mkStatePrimTy ty = TyConApp statePrimTyCon [ty]
+mkStatePrimTy :: Type -> WiredIn Type
+mkStatePrimTy ty = TyConApp <$> statePrimTyCon <*> pure [ty]
 
-statePrimTyCon :: TyCon   -- See Note [The State# TyCon]
+statePrimTyCon :: WiredIn TyCon   -- See Note [The State# TyCon]
 statePrimTyCon   = pcPrimTyCon statePrimTyConName [Nominal] zeroBitRepTy
 
 {-
@@ -1165,22 +1183,22 @@ RealWorld is deeply magical.  It is *primitive*, but it is not
 RealWorld; it's only used in the type system, to parameterise State#.
 -}
 
-realWorldTyCon :: TyCon
-realWorldTyCon = mkPrimTyCon realWorldTyConName [] liftedTypeKind []
-realWorldTy :: Type
-realWorldTy          = mkTyConTy realWorldTyCon
-realWorldStatePrimTy :: Type
-realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
+realWorldTyCon :: WiredIn TyCon
+realWorldTyCon = mkPrimTyCon realWorldTyConName (pure []) liftedTypeKind []
+realWorldTy :: WiredIn Type
+realWorldTy          = mkTyConTy <$> realWorldTyCon
+realWorldStatePrimTy :: WiredIn Type
+realWorldStatePrimTy = mkStatePrimTy =<< realWorldTy        -- State# RealWorld
 
 
-mkProxyPrimTy :: Type -> Type -> Type
-mkProxyPrimTy k ty = TyConApp proxyPrimTyCon [k, ty]
+mkProxyPrimTy :: Type -> Type -> WiredIn Type
+mkProxyPrimTy k ty = TyConApp <$> proxyPrimTyCon <*> pure [k, ty]
 
-proxyPrimTyCon :: TyCon
+proxyPrimTyCon :: WiredIn TyCon
 proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Phantom]
   where
      -- Kind: forall k. k -> TYPE (TupleRep '[])
-     binders = mkTemplateTyConBinders [liftedTypeKind] id
+     binders = mkTemplateTyConBinders <$> sequence [liftedTypeKind] <*> pure id
      res_kind = unboxedTupleKind []
 
 
@@ -1191,39 +1209,39 @@ proxyPrimTyCon = mkPrimTyCon proxyPrimTyConName binders res_kind [Nominal,Phanto
 *                                                                      *
 ********************************************************************* -}
 
-eqPrimTyCon :: TyCon  -- The representation type for equality predicates
+eqPrimTyCon :: WiredIn TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
   where
     -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
+    binders  = mkTemplateTyConBinders <$> sequence [liftedTypeKind, liftedTypeKind] <*> pure id
+    res_kind = TyConApp <$> cONSTRAINTTyCon <*> sequence [zeroBitRepTy]
     roles    = [Nominal, Nominal, Nominal, Nominal]
 
 -- like eqPrimTyCon, but the type for *Representational* coercions
 -- this should only ever appear as the type of a covar. Its role is
 -- interpreted in coercionRole
-eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
+eqReprPrimTyCon :: WiredIn TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
   where
     -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
+    binders  = mkTemplateTyConBinders <$> sequence [liftedTypeKind, liftedTypeKind] <*> pure id
+    res_kind = TyConApp <$> cONSTRAINTTyCon <*> sequence [zeroBitRepTy]
     roles    = [Nominal, Nominal, Representational, Representational]
 
 -- like eqPrimTyCon, but the type for *Phantom* coercions.
 -- This is only used to make higher-order equalities. Nothing
 -- should ever actually have this type!
-eqPhantPrimTyCon :: TyCon
+eqPhantPrimTyCon :: WiredIn TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
   where
     -- Kind :: forall k1 k2. k1 -> k2 -> CONSTRAINT ZeroBitRep
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
-    res_kind = TyConApp cONSTRAINTTyCon [zeroBitRepTy]
+    binders  = mkTemplateTyConBinders <$> sequence [liftedTypeKind, liftedTypeKind] <*> pure id
+    res_kind = TyConApp <$> cONSTRAINTTyCon <*> sequence [zeroBitRepTy]
     roles    = [Nominal, Nominal, Phantom, Phantom]
 
 -- | Given a Role, what TyCon is the type of equality predicates at that role?
-equalityTyCon :: Role -> TyCon
+equalityTyCon :: Role -> WiredIn TyCon
 equalityTyCon Nominal          = eqPrimTyCon
 equalityTyCon Representational = eqReprPrimTyCon
 equalityTyCon Phantom          = eqPhantPrimTyCon
@@ -1236,7 +1254,7 @@ equalityTyCon Phantom          = eqPhantPrimTyCon
 
 arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
     byteArrayPrimTyCon,
-    smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: TyCon
+    smallArrayPrimTyCon, smallMutableArrayPrimTyCon :: WiredIn TyCon
 arrayPrimTyCon             = pcPrimTyCon_LevPolyLastArg arrayPrimTyConName        [Representational]          unliftedRepTy
 mutableArrayPrimTyCon      = pcPrimTyCon_LevPolyLastArg mutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 mutableByteArrayPrimTyCon  = pcPrimTyCon mutableByteArrayPrimTyConName  [Nominal] unliftedRepTy
@@ -1244,18 +1262,18 @@ byteArrayPrimTyCon         = pcPrimTyCon0 byteArrayPrimTyConName        unlifted
 smallArrayPrimTyCon        = pcPrimTyCon_LevPolyLastArg smallArrayPrimTyConName        [Representational]          unliftedRepTy
 smallMutableArrayPrimTyCon = pcPrimTyCon_LevPolyLastArg smallMutableArrayPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkArrayPrimTy :: Type -> Type
-mkArrayPrimTy elt           = TyConApp arrayPrimTyCon [getLevity elt, elt]
-byteArrayPrimTy :: Type
-byteArrayPrimTy             = mkTyConTy byteArrayPrimTyCon
-mkSmallArrayPrimTy :: Type -> Type
-mkSmallArrayPrimTy elt = TyConApp smallArrayPrimTyCon [getLevity elt, elt]
-mkMutableArrayPrimTy :: Type -> Type -> Type
-mkMutableArrayPrimTy s elt  = TyConApp mutableArrayPrimTyCon [getLevity elt, s, elt]
-mkMutableByteArrayPrimTy :: Type -> Type
-mkMutableByteArrayPrimTy s  = TyConApp mutableByteArrayPrimTyCon [s]
-mkSmallMutableArrayPrimTy :: Type -> Type -> Type
-mkSmallMutableArrayPrimTy s elt = TyConApp smallMutableArrayPrimTyCon [getLevity elt, s, elt]
+mkArrayPrimTy :: Type -> WiredIn Type
+mkArrayPrimTy elt           = TyConApp <$> arrayPrimTyCon <*> pure [getLevity elt, elt]
+byteArrayPrimTy :: WiredIn Type
+byteArrayPrimTy             = mkTyConTy <$> byteArrayPrimTyCon
+mkSmallArrayPrimTy :: Type -> WiredIn Type
+mkSmallArrayPrimTy elt = TyConApp <$> smallArrayPrimTyCon <*> pure [getLevity elt, elt]
+mkMutableArrayPrimTy :: Type -> Type -> WiredIn Type
+mkMutableArrayPrimTy s elt  = TyConApp <$> mutableArrayPrimTyCon <*> pure [getLevity elt, s, elt]
+mkMutableByteArrayPrimTy :: Type -> WiredIn Type
+mkMutableByteArrayPrimTy s  = TyConApp <$> mutableByteArrayPrimTyCon <*> pure [s]
+mkSmallMutableArrayPrimTy :: Type -> Type -> WiredIn Type
+mkSmallMutableArrayPrimTy s elt = TyConApp <$> smallMutableArrayPrimTyCon <*> pure [getLevity elt, s, elt]
 
 
 {- *********************************************************************
@@ -1264,11 +1282,11 @@ mkSmallMutableArrayPrimTy s elt = TyConApp smallMutableArrayPrimTyCon [getLevity
 *                                                                      *
 ********************************************************************* -}
 
-mutVarPrimTyCon :: TyCon
+mutVarPrimTyCon :: WiredIn TyCon
 mutVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mutVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkMutVarPrimTy :: Type -> Type -> Type
-mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [getLevity elt, s, elt]
+mkMutVarPrimTy :: Type -> Type -> WiredIn Type
+mkMutVarPrimTy s elt        = TyConApp <$> mutVarPrimTyCon <*> pure [getLevity elt, s, elt]
 
 {-
 ************************************************************************
@@ -1278,11 +1296,11 @@ mkMutVarPrimTy s elt        = TyConApp mutVarPrimTyCon [getLevity elt, s, elt]
 ************************************************************************
 -}
 
-ioPortPrimTyCon :: TyCon
+ioPortPrimTyCon :: WiredIn TyCon
 ioPortPrimTyCon = pcPrimTyCon_LevPolyLastArg ioPortPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkIOPortPrimTy :: Type -> Type -> Type
-mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [getLevity elt, s, elt]
+mkIOPortPrimTy :: Type -> Type -> WiredIn Type
+mkIOPortPrimTy s elt          = TyConApp <$> ioPortPrimTyCon <*> pure [getLevity elt, s, elt]
 
 {-
 ************************************************************************
@@ -1293,11 +1311,11 @@ mkIOPortPrimTy s elt          = TyConApp ioPortPrimTyCon [getLevity elt, s, elt]
 ************************************************************************
 -}
 
-mVarPrimTyCon :: TyCon
+mVarPrimTyCon :: WiredIn TyCon
 mVarPrimTyCon = pcPrimTyCon_LevPolyLastArg mVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkMVarPrimTy :: Type -> Type -> Type
-mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [getLevity elt, s, elt]
+mkMVarPrimTy :: Type -> Type -> WiredIn Type
+mkMVarPrimTy s elt          = TyConApp <$> mVarPrimTyCon <*> pure [getLevity elt, s, elt]
 
 {-
 ************************************************************************
@@ -1307,11 +1325,11 @@ mkMVarPrimTy s elt          = TyConApp mVarPrimTyCon [getLevity elt, s, elt]
 ************************************************************************
 -}
 
-tVarPrimTyCon :: TyCon
+tVarPrimTyCon :: WiredIn TyCon
 tVarPrimTyCon = pcPrimTyCon_LevPolyLastArg tVarPrimTyConName [Nominal, Representational] unliftedRepTy
 
-mkTVarPrimTy :: Type -> Type -> Type
-mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [getLevity elt, s, elt]
+mkTVarPrimTy :: Type -> Type -> WiredIn Type
+mkTVarPrimTy s elt = TyConApp <$> tVarPrimTyCon <*> pure [getLevity elt, s, elt]
 
 {-
 ************************************************************************
@@ -1321,11 +1339,11 @@ mkTVarPrimTy s elt = TyConApp tVarPrimTyCon [getLevity elt, s, elt]
 ************************************************************************
 -}
 
-stablePtrPrimTyCon :: TyCon
+stablePtrPrimTyCon :: WiredIn TyCon
 stablePtrPrimTyCon = pcPrimTyCon_LevPolyLastArg stablePtrPrimTyConName [Representational] addrRepDataConTy
 
-mkStablePtrPrimTy :: Type -> Type
-mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [getLevity ty, ty]
+mkStablePtrPrimTy :: Type -> WiredIn Type
+mkStablePtrPrimTy ty = TyConApp <$> stablePtrPrimTyCon <*> pure [getLevity ty, ty]
 
 {-
 ************************************************************************
@@ -1335,11 +1353,11 @@ mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [getLevity ty, ty]
 ************************************************************************
 -}
 
-stableNamePrimTyCon :: TyCon
+stableNamePrimTyCon :: WiredIn TyCon
 stableNamePrimTyCon = pcPrimTyCon_LevPolyLastArg stableNamePrimTyConName [Phantom] unliftedRepTy
 
-mkStableNamePrimTy :: Type -> Type
-mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [getLevity ty, ty]
+mkStableNamePrimTy :: Type -> WiredIn Type
+mkStableNamePrimTy ty = TyConApp <$> stableNamePrimTyCon <*> pure [getLevity ty, ty]
 
 {-
 ************************************************************************
@@ -1349,11 +1367,11 @@ mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [getLevity ty, ty]
 ************************************************************************
 -}
 
-compactPrimTyCon :: TyCon
+compactPrimTyCon :: WiredIn TyCon
 compactPrimTyCon = pcPrimTyCon0 compactPrimTyConName unliftedRepTy
 
-compactPrimTy :: Type
-compactPrimTy = mkTyConTy compactPrimTyCon
+compactPrimTy :: WiredIn Type
+compactPrimTy = mkTyConTy <$> compactPrimTyCon
 
 {-
 ************************************************************************
@@ -1363,11 +1381,11 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 ************************************************************************
 -}
 
-stackSnapshotPrimTyCon :: TyCon
+stackSnapshotPrimTyCon :: WiredIn TyCon
 stackSnapshotPrimTyCon = pcPrimTyCon0 stackSnapshotPrimTyConName unliftedRepTy
 
-stackSnapshotPrimTy :: Type
-stackSnapshotPrimTy = mkTyConTy stackSnapshotPrimTyCon
+stackSnapshotPrimTy :: WiredIn Type
+stackSnapshotPrimTy = mkTyConTy <$> stackSnapshotPrimTyCon
 
 
 {-
@@ -1381,9 +1399,9 @@ stackSnapshotPrimTy = mkTyConTy stackSnapshotPrimTyCon
 -- Unlike most other primitive types, BCO is lifted. This is because in
 -- general a BCO may be a thunk for the reasons given in Note [Updatable CAF
 -- BCOs] in GHCi.CreateBCO.
-bcoPrimTy    :: Type
-bcoPrimTy    = mkTyConTy bcoPrimTyCon
-bcoPrimTyCon :: TyCon
+bcoPrimTy    :: WiredIn Type
+bcoPrimTy    = mkTyConTy <$> bcoPrimTyCon
+bcoPrimTyCon :: WiredIn TyCon
 bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName liftedRepTy
 
 {-
@@ -1394,11 +1412,11 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName liftedRepTy
 ************************************************************************
 -}
 
-weakPrimTyCon :: TyCon
+weakPrimTyCon :: WiredIn TyCon
 weakPrimTyCon = pcPrimTyCon_LevPolyLastArg weakPrimTyConName [Representational] unliftedRepTy
 
-mkWeakPrimTy :: Type -> Type
-mkWeakPrimTy v = TyConApp weakPrimTyCon [getLevity v, v]
+mkWeakPrimTy :: Type -> WiredIn Type
+mkWeakPrimTy v = TyConApp <$> weakPrimTyCon <*> pure [getLevity v, v]
 
 {-
 ************************************************************************
@@ -1417,9 +1435,9 @@ Hence the programmer API for thread manipulation uses a weak pointer
 to the thread id internally.
 -}
 
-threadIdPrimTy :: Type
-threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
-threadIdPrimTyCon :: TyCon
+threadIdPrimTy :: WiredIn Type
+threadIdPrimTy    = mkTyConTy <$> threadIdPrimTyCon
+threadIdPrimTyCon :: WiredIn TyCon
 threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName unliftedRepTy
 
 {-
@@ -1430,11 +1448,11 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName unliftedRepTy
 ************************************************************************
 -}
 
-promptTagPrimTyCon :: TyCon
+promptTagPrimTyCon :: WiredIn TyCon
 promptTagPrimTyCon = pcPrimTyCon promptTagPrimTyConName [Representational] unliftedRepTy
 
-mkPromptTagPrimTy :: Type -> Type
-mkPromptTagPrimTy v = TyConApp promptTagPrimTyCon [v]
+mkPromptTagPrimTy :: Type -> WiredIn Type
+mkPromptTagPrimTy v = TyConApp <$> promptTagPrimTyCon <*> pure [v]
 
 {-
 ************************************************************************

@@ -179,6 +179,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Unit.Module
+import GHC.Unit.Types (WiredIn)
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
@@ -1427,29 +1428,33 @@ tyConRepName_maybe (TyCon { tyConDetails = details }) = get_rep_nm details
     get_rep_nm _ = Nothing
 
 -- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
-mkPrelTyConRepName :: Name -> TyConRepName
+mkPrelTyConRepName :: Name -> WiredIn TyConRepName
 -- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
                             -- so nameModule will work
-  = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
+  = do
+    rep_mod <- rep_mod_wire
+    pure $ mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
   where
     name_occ  = nameOccName tc_name
     name_mod  = nameModule  tc_name
     name_uniq = nameUnique  tc_name
     rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
              | otherwise        = dataConTyRepNameUnique name_uniq
-    (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
+    (rep_mod_wire, rep_occ) = tyConRepModOcc name_mod name_occ
 
 -- | The name (and defining module) for the Typeable representation (TyCon) of a
 -- type constructor.
 --
 -- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
-tyConRepModOcc :: Module -> OccName -> (Module, OccName)
-tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
-  where
-    rep_module
-      | tc_module == gHC_PRIM = gHC_TYPES
-      | otherwise             = tc_module
+tyConRepModOcc :: Module -> OccName -> (WiredIn Module, OccName)
+tyConRepModOcc tc_module tc_occ =
+  let rep_module = do
+        ghcprim <- gHC_PRIM
+        if ghcprim == tc_module
+           then gHC_TYPES
+           else pure tc_module
+   in (rep_module, mkTyConRepOcc tc_occ)
 
 
 {- *********************************************************************
@@ -1860,16 +1865,21 @@ noTcTyConScopedTyVars = []
 -- | Create an primitive 'TyCon', such as @Int#@, @Type@ or @RealWorld#@
 -- Primitive TyCons are marshalable iff not lifted.
 -- If you'd like to change this, modify marshalablePrimTyCon.
-mkPrimTyCon :: Name -> [TyConBinder]
-            -> Kind    -- ^ /result/ kind
+mkPrimTyCon :: WiredIn Name
+            -> WiredIn [TyConBinder]
+            -> WiredIn Kind    -- ^ /result/ kind
                        -- Must answer 'True' to 'isFixedRuntimeRepKind' (i.e., no representation polymorphism).
                        -- (If you need a representation-polymorphic PrimTyCon,
                        -- change tcHasFixedRuntimeRep, marshalablePrimTyCon, reifyTyCon for PrimTyCons.)
             -> [Role]
-            -> TyCon
-mkPrimTyCon name binders res_kind roles
-  = mkTyCon name binders res_kind roles $
-    PrimTyCon { primRepName  = mkPrelTyConRepName name }
+            -> WiredIn TyCon
+mkPrimTyCon name' binders res_kind' roles
+  = name' >>= \name ->
+    res_kind' >>= \res_kind ->
+    mkPrelTyConRepName name >>= \prelTyConRepName ->
+    pure $
+      mkTyCon name binders res_kind roles $
+      PrimTyCon { primRepName  = prelTyConRepName }
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind

@@ -6,56 +6,57 @@ import {-# SOURCE #-} GHC.Core.DataCon  ( DataCon )
 
 import GHC.Types.Basic (Arity, TupleSort, Boxity, ConTag)
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import GHC.Unit.Types (WiredIn)
 
 listTyCon :: TyCon
-typeSymbolKind :: Type
-charTy :: Type
+typeSymbolKind :: WiredIn Type
+charTy :: WiredIn Type
 mkBoxedTupleTy :: [Type] -> Type
 
 coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type
 
-liftedTypeKindTyConName :: Name
-constraintKindTyConName :: Name
+liftedTypeKindTyConName :: WiredIn Name
+constraintKindTyConName :: WiredIn Name
 
-liftedTypeKind, unliftedTypeKind, zeroBitTypeKind :: Kind
+liftedTypeKind, unliftedTypeKind, zeroBitTypeKind :: WiredIn Kind
 
-liftedTypeKindTyCon, unliftedTypeKindTyCon :: TyCon
+liftedTypeKindTyCon, unliftedTypeKindTyCon :: WiredIn TyCon
 
-liftedRepTyCon, unliftedRepTyCon :: TyCon
+liftedRepTyCon, unliftedRepTyCon :: WiredIn TyCon
 
-constraintKind :: Kind
+constraintKind :: WiredIn Kind
 
-runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon
-runtimeRepTy, levityTy :: Type
+runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: WiredIn TyCon
+runtimeRepTy, levityTy :: WiredIn Type
 
-boxedRepDataConTyCon, liftedDataConTyCon :: TyCon
-vecRepDataConTyCon, tupleRepDataConTyCon :: TyCon
+boxedRepDataConTyCon, liftedDataConTyCon :: WiredIn TyCon
+vecRepDataConTyCon, tupleRepDataConTyCon :: WiredIn TyCon
 
-liftedRepTy, unliftedRepTy, zeroBitRepTy :: RuntimeRepType
-liftedDataConTy, unliftedDataConTy :: Type
+liftedRepTy, unliftedRepTy, zeroBitRepTy :: WiredIn RuntimeRepType
+liftedDataConTy, unliftedDataConTy :: WiredIn Type
 
 intRepDataConTy,
   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
   addrRepDataConTy,
-  floatRepDataConTy, doubleRepDataConTy :: RuntimeRepType
+  floatRepDataConTy, doubleRepDataConTy :: WiredIn RuntimeRepType
 
 vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
-  vec64DataConTy :: Type
+  vec64DataConTy :: WiredIn Type
 
 int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
   int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
   word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-  doubleElemRepDataConTy :: Type
+  doubleElemRepDataConTy :: WiredIn Type
 
-anyTypeOfKind :: Kind -> Type
-unboxedTupleKind :: [Type] -> Type
+anyTypeOfKind :: Kind -> WiredIn Type
+unboxedTupleKind :: [Type] -> WiredIn Type
 
-multiplicityTyCon :: TyCon
-multiplicityTy :: Type
+multiplicityTyCon :: WiredIn TyCon
+multiplicityTy :: WiredIn Type
 oneDataConTy :: Type
 oneDataConTyCon :: TyCon
 manyDataConTy :: Type
@@ -68,15 +69,15 @@ tupleDataConName :: Boxity -> Arity -> Name
 
 integerTy, naturalTy :: Type
 
-promotedTupleDataCon :: Boxity -> Arity -> TyCon
+promotedTupleDataCon :: Boxity -> Arity -> WiredIn TyCon
 
-tupleDataCon :: Boxity -> Arity -> DataCon
-tupleTyCon   :: Boxity -> Arity -> TyCon
+tupleDataCon :: Boxity -> Arity -> WiredIn DataCon
+tupleTyCon   :: Boxity -> Arity -> WiredIn TyCon
 
-cTupleDataCon :: Arity -> DataCon
-cTupleDataConName :: Arity -> Name
-cTupleTyConName :: Arity -> Name
-cTupleSelIdName :: ConTag -> Arity -> Name
+cTupleDataCon :: Arity -> WiredIn DataCon
+cTupleDataConName :: Arity -> WiredIn Name
+cTupleTyConName :: Arity -> WiredIn Name
+cTupleSelIdName :: ConTag -> Arity -> WiredIn Name
 
-sumDataCon :: ConTag -> Arity -> DataCon
-sumTyCon :: Arity -> TyCon
+sumDataCon :: ConTag -> Arity -> WiredIn DataCon
+sumTyCon :: Arity -> WiredIn TyCon
