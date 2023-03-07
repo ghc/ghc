@@ -2357,6 +2357,7 @@ fFlagsDeps = [
       Opt_DmdTxDictSel "effect is now unconditionally enabled",
   flagSpec "do-eta-reduction"                 Opt_DoEtaReduction,
   flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
+  flagSpec "do-clever-arg-eta-expansion"      Opt_DoCleverArgEtaExpansion, -- See Note [Eta expansion of arguments in CorePrep]
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "orig-thunk-info"                  Opt_OrigThunkInfo,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
@@ -2851,8 +2852,6 @@ impliedXFlags
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
   ]
-
-
 
 -- | Things you get with `-dlint`.
 enableDLint :: DynP ()
