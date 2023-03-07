@@ -498,9 +498,8 @@ zeroSlop (StgClosure *p,
 #endif
         ;
 
-    const bool can_zero_immutable_slop =
-        // Only if we're running single threaded.
-        RTS_DEREF(RtsFlags).ParFlags.nCapabilities <= 1;
+    // Only if we're running single threaded.
+    const bool can_zero_immutable_slop = getNumCapabilities() == 1;
 
     const bool zero_slop_immutable =
         want_to_zero_immutable_slop && can_zero_immutable_slop;
