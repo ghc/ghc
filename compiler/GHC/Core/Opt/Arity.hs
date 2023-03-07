@@ -1881,9 +1881,8 @@ inside the RHS of the join as well as into the body.  AND if j
 has an unfolding we have to push it into there too.  AND j might
 be recursive...
 
-So for now I'm abandoning the no-crap rule in this case. I think
-that for the use in CorePrep it really doesn't matter; and if
-it does, then CoreToStg.myCollectArgs will fall over.
+So for now I'm abandoning the no-crap rule in this case, conscious that this
+causes the ugly Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep].
 
 (Moreover, I think that casts can make the no-crap rule fail too.)
 

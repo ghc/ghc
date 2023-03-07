@@ -1,0 +1,47 @@
+
+==================== CorePrep ====================
+Result size of CorePrep = {terms: 34, types: 34, coercions: 0, joins: 0/1}
+
+-- RHS size: {terms: 6, types: 5, coercions: 0, joins: 0/0}
+(T23083.$$) [InlPrag=NOINLINE] :: forall a b. (a -> b) -> a -> b
+[GblId, Arity=2, Str=<1C(1,L)><L>, Unf=OtherCon []]
+(T23083.$$) = \ (@a) (@b) (f [Occ=Once1!] :: a -> b) (x [Occ=Once1] :: a) -> f x
+
+-- RHS size: {terms: 12, types: 12, coercions: 0, joins: 0/1}
+T23083.g :: ((GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer) -> (GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer
+[GblId, Arity=2, Str=<1C(1,L)><ML>, Unf=OtherCon []]
+T23083.g
+  = \ (f [Occ=Once1!] :: (GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) -> GHC.Num.Integer.Integer) (h [Occ=OnceL1] :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer) ->
+      let {
+        sat [Occ=Once1] :: GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer
+        [LclId]
+        sat = \ (eta [Occ=Once1] :: GHC.Num.Integer.Integer) -> case h of h1 [Occ=Once1] { __DEFAULT -> T23083.$$ @GHC.Num.Integer.Integer @GHC.Num.Integer.Integer h1 eta } } in
+      f sat
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T23083.$trModule4 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+T23083.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T23083.$trModule3 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+T23083.$trModule3 = GHC.Types.TrNameS T23083.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T23083.$trModule2 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+T23083.$trModule2 = "T23083"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T23083.$trModule1 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+T23083.$trModule1 = GHC.Types.TrNameS T23083.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T23083.$trModule :: GHC.Types.Module
+[GblId, Unf=OtherCon []]
+T23083.$trModule = GHC.Types.Module T23083.$trModule3 T23083.$trModule1
+
+
+

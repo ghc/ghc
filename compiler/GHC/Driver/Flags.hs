@@ -270,6 +270,7 @@ data GeneralFlag
    | Opt_SpecConstrKeen
    | Opt_SpecialiseIncoherents
    | Opt_DoLambdaEtaExpansion
+   | Opt_DoCleverArgEtaExpansion        -- See Note [Eta expansion of arguments in CorePrep]
    | Opt_IgnoreAsserts
    | Opt_DoEtaReduction
    | Opt_CaseMerge

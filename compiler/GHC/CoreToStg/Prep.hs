@@ -1476,12 +1476,42 @@ cpeArg env dmd arg
        ; if exprIsTrivial arg2
          then return (floats2, arg2)
          else do { v <- newVar arg_ty
-                 ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
+                 -- See Note [Eta expansion of arguments in CorePrep]
+                 ; let arg3 = cpeEtaExpandArg env arg2
                        arg_float = mkFloat env dmd is_unlifted v arg3
                  ; return (addFloat floats2 arg_float, varToCoreExpr v) }
        }
 
+cpeEtaExpandArg :: CorePrepEnv -> CoreArg -> CoreArg
+-- ^ See Note [Eta expansion of arguments in CorePrep]
+cpeEtaExpandArg env arg = cpeEtaExpand arity arg
+  where
+    arity | Just ao <- cp_arityOpts (cpe_config env) -- Just <=> -O1 or -O2
+          , not (has_join_in_tail_context arg)
+            -- See Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep]
+          = case exprEtaExpandArity ao arg of
+              Nothing -> 0
+              Just at -> arityTypeArity at
+          | otherwise
+          = exprArity arg -- this is cheap enough for -O0
+
+has_join_in_tail_context :: CoreExpr -> Bool
+-- ^ Identify the cases where we'd generate invalid `CpeApp`s as described in
+-- Wrinkle (EA1) of Note [Eta expansion of arguments in CorePrep]
+has_join_in_tail_context (Let bs e)            = isJoinBind bs || has_join_in_tail_context e
+has_join_in_tail_context (Lam b e) | isTyVar b = has_join_in_tail_context e
+has_join_in_tail_context (Cast e _)            = has_join_in_tail_context e
+has_join_in_tail_context (Tick _ e)            = has_join_in_tail_context e
+has_join_in_tail_context (Case _ _ _ alts)     = any has_join_in_tail_context (rhssOfAlts alts)
+has_join_in_tail_context _                     = False
+
 {-
+Note [Eta expansion of arguments with join heads]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See Note [Eta expansion for join points] in GHC.Core.Opt.Arity
+Eta expanding the join point would introduce crap that we can't
+generate code for
+
 Note [Floating unlifted arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider    C (let v* = expensive in v)
@@ -1598,6 +1628,72 @@ and now we do NOT want eta expansion to give
 Instead GHC.Core.Opt.Arity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
 
+Note [Eta expansion of arguments in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose `g = \x y. blah` and consider the expression `f (g x)`; we ANFise to
+
+  let t = g x
+  in f t
+
+We really don't want that `t` to be a thunk! That just wastes runtime, updating
+a thunk with a PAP etc. The code generator could in principle allocate a PAP,
+but in fact it does not know how to do that -- it's easier just to eta-expand:
+
+  let t = \y. g x y
+  in f t
+
+To what arity should we eta-expand the argument? `cpeArg` uses two strategies,
+governed by the presence of `-fdo-clever-arg-eta-expansion` (implied by -O):
+
+  1. Cheap, with -O0: just use `exprArity`.
+  2. More clever but expensive, with -O1 -O2: use `exprEtaExpandArity`,
+     same function the Simplifier uses to eta expand RHSs and lambda bodies.
+
+The only reason for using (1) rather than (2) is to keep compile times down.
+Using (2) in -O0 bumped up compiler allocations by 2-3% in tests T4801 and
+T5321*. However, Plan (2) catches cases that (1) misses.
+For example (#23083, assuming -fno-pedantic-bottoms):
+
+  let t = case z of __DEFAULT -> g x
+  in f t
+
+to
+
+  let t = \y -> case z of __DEFAULT -> g x y
+  in f t
+
+Note that there is a missed opportunity in eta expanding `t` earlier, in the
+Simplifier: It would allow us to inline `g`, potentially enabling further
+simplification. But then we could have inlined `g` into the PAP to begin with,
+and that is discussed in #23150; hence we needn't worry about that in CorePrep.
+
+There is a nasty Wrinkle:
+
+(EA1) When eta expanding an argument headed by a join point, we might get
+      "crap", as Note [Eta expansion for join points] in GHC.Core.Opt.Arity puts
+      it.
+      Consider
+
+        f (join j x = rhs in ...(j 1)...(j 2)...)
+
+      where the argument has arity 1. We might be tempted to eta expand, to
+
+        f (\y -> (join j x = rhs in ...(j 1)...(j 2)...) y)
+
+      Why hasn't the App to `y` been pushed into the join point? That's exactly
+      the crap of Note [Eta expansion for join points], so we have to put up
+      with it here.
+      In our case, (join j x = rhs in ...(j 1)...(j 2)...) is not a valid
+      `CpeApp` (see Note [CorePrep invariants]) and we'd get a crash in the App
+      case of `coreToStgExpr`.
+      Hence we simply check for the cases where an intervening join point
+      binding in the tail context of the argument would lead to the introduction
+      of such crap via `has_join_in_tail_context`, in which case we abstain from
+      eta expansion.
+
+      This scenario occurs rarely; hence it's OK to generate sub-optimal code.
+      The alternative would be to fix Note [Eta expansion for join points], but
+      that's quite challenging due to unfoldings of (recursive) join points.
 -}
 
 cpeEtaExpand :: Arity -> CpeRhs -> CpeRhs
@@ -1988,6 +2084,11 @@ data CorePrepConfig = CorePrepConfig
   , cp_convertNumLit           :: !(LitNumType -> Integer -> Maybe CoreExpr)
   -- ^ Convert some numeric literals (Integer, Natural) into their final
   -- Core form.
+
+  , cp_arityOpts               :: !(Maybe ArityOpts)
+  -- ^ Configuration for arity analysis ('exprEtaExpandArity').
+  -- See Note [Eta expansion of arguments in CorePrep]
+  -- When 'Nothing' (e.g., -O0, -O1), use the cheaper 'exprArity' instead
   }
 
 data CorePrepEnv
@@ -1998,6 +2099,7 @@ data CorePrepEnv
         -- enabled we instead produce an 'error' expression to catch
         -- the case where a function we think should bottom
         -- unexpectedly returns.
+
         , cpe_env             :: IdEnv CoreExpr   -- Clone local Ids
         -- ^ This environment is used for three operations:
         --
