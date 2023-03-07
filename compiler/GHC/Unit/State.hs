@@ -641,7 +641,7 @@ initUnits logger dflags cached_dbs home_units = do
   -- Try to find platform constants
   --
   -- See Note [Platform constants] in GHC.Platform
-  mconstants <- if homeUnitId_ dflags == rtsUnitId
+  mconstants <- pprTrace "initUnits" (ppr (homeUnitId_ dflags, rtsUnitId)) $ if homeUnitId_ dflags == rtsUnitId
     then do
       -- we're building the RTS! Lookup DerivedConstants.h in the include paths
       lookupPlatformConstants (includePathsGlobal (includePaths dflags))
@@ -1142,9 +1142,9 @@ findWiredInUnits logger prec_map pkgs vis_map = do
           , not (unitIsIndefinite realUnitInfo)
           ]
 
-        updateWiredInDependencies pkgs = map (upd_deps . upd_pkg) pkgs
+        updateWiredInDependencies pkgs = map upd_pkg pkgs
           where upd_pkg pkg
-                  | Just wiredInUnitId <- Map.lookup (unitId pkg) wiredInMap
+                  | Just wiredInUnitId <- Map.lookup (WiredInPackageName $ unitIdFS $ unitId pkg) wiredInMap
                   = pkg { unitId         = wiredInUnitId
                         , unitInstanceOf = wiredInUnitId
                            -- every non instantiated unit is an instance of
@@ -1154,12 +1154,11 @@ findWiredInUnits logger prec_map pkgs vis_map = do
                         }
                   | otherwise
                   = pkg
-                upd_deps pkg = pkg {
-                      unitDepends = map (upd_wired_in wiredInMap) (unitDepends pkg),
-                      unitExposedModules
-                        = map (\(k,v) -> (k, fmap (upd_wired_in_mod wiredInMap) v))
-                              (unitExposedModules pkg)
-                    }
+                -- upd_deps pkg = pkg {
+                --       unitExposedModules
+                --         = map (\(k,v) -> (k, fmap (upd_wired_in_mod wiredInMap) v))
+                --               (unitExposedModules pkg)
+                --     }
 
 
   return (updateWiredInDependencies pkgs, wiredInMap)
@@ -1171,31 +1170,26 @@ findWiredInUnits logger prec_map pkgs vis_map = do
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in GHC.Builtin.Names.
 
-upd_wired_in_mod :: WiringMap -> Module -> Module
-upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
+-- upd_wired_in_mod :: WiringMap -> Module -> Module
+-- upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
+-- 
+-- upd_wired_in_uid :: WiringMap -> Unit -> Unit
+-- upd_wired_in_uid wiredInMap u = case u of
+--    HoleUnit -> HoleUnit
+--    RealUnit (Definite uid) -> RealUnit (Definite uid)
+--    VirtUnit indef_uid ->
+--       VirtUnit $ mkInstantiatedUnit
+--         (instUnitInstanceOf indef_uid)
+--         (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
 
-upd_wired_in_uid :: WiringMap -> Unit -> Unit
-upd_wired_in_uid wiredInMap u = case u of
-   HoleUnit -> HoleUnit
-   RealUnit (Definite uid) -> RealUnit (Definite (upd_wired_in wiredInMap uid))
-   VirtUnit indef_uid ->
-      VirtUnit $ mkInstantiatedUnit
-        (instUnitInstanceOf indef_uid)
-        (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (instUnitInsts indef_uid))
-
-upd_wired_in :: WiringMap -> UnitId -> UnitId
-upd_wired_in wiredInMap key
-    | Just key' <- Map.lookup key wiredInMap = key'
-    | otherwise = key
-
--- This function was updating the wired-in names in the visibility map to the actual wired-in names, no longer needed
-updateVisibilityMap :: WiringMap -> VisibilityMap -> VisibilityMap
-updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
-  where f vm (from, to) = case Map.lookup (RealUnit (Definite from)) vis_map of
-                    Nothing -> vm
-                    Just r -> Map.insert (RealUnit (Definite to)) r
-                                (Map.delete (RealUnit (Definite from)) vm)
-
+-- This function was updating the wired-in names in the visibility map to the
+-- actual wired-in names, no longer needed. It wasn't actually changing the visibility of anything
+-- updateVisibilityMap :: WiringMap -> VisibilityMap -> VisibilityMap
+-- updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
+--   where f vm (from, to) = case Map.lookup (RealUnit (Definite from)) vis_map of
+--                     Nothing -> vm
+--                     Just r -> Map.insert (RealUnit (Definite to)) r
+--                                 (Map.delete (RealUnit (Definite from)) vm)
 
 -- ----------------------------------------------------------------------------
 
@@ -1597,14 +1591,11 @@ mkUnitState logger cfg = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map2
+  (pkgs2, !wired_map) <- findWiredInUnits logger prec_map pkgs1 vis_map
 
   let pkg_db = mkUnitInfoMap pkgs2
 
-  -- Update the visibility map, so we treat wired packages as visible.
-  let vis_map = updateVisibilityMap wired_map vis_map2
-
-  let hide_plugin_pkgs = unitConfigHideAllPlugins cfg
+      hide_plugin_pkgs = unitConfigHideAllPlugins cfg
   plugin_vis_map <-
     case unitConfigFlagsPlugins cfg of
         -- common case; try to share the old vis_map
@@ -1615,22 +1606,20 @@ mkUnitState logger cfg = do
                         -- Use the vis_map PRIOR to wired in,
                         -- because otherwise applyPackageFlag
                         -- won't work.
-                        | otherwise = vis_map2
-                plugin_vis_map2
+                        -- ROMES:TODO: update applyPackageFlag st it doesn't expected the previous wired-in names
+                        | otherwise = vis_map
+                plugin_vis_map
                     <- mayThrowUnitErr
                         $ foldM (applyPackageFlag prec_map prelim_pkg_db emptyUniqSet unusable
                                 hide_plugin_pkgs pkgs1)
                              plugin_vis_map1
                              (reverse (unitConfigFlagsPlugins cfg))
-                -- Updating based on wired in packages is mostly
-                -- good hygiene, because it won't matter: no wired in
-                -- package has a compiler plugin.
                 -- TODO: If a wired in package had a compiler plugin,
                 -- and you tried to pick different wired in packages
                 -- with the plugin flags and the normal flags... what
                 -- would happen?  I don't know!  But this doesn't seem
                 -- likely to actually happen.
-                return (updateVisibilityMap wired_map plugin_vis_map2)
+                return (plugin_vis_map)
 
   let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
                               | p <- pkgs2
@@ -1686,7 +1675,7 @@ mkUnitState logger cfg = do
          , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
 
-  writeIORef workingThisOut wired_map
+  pprTrace "findWiredInUnits" (ppr wired_map) $ writeIORef workingThisOut wired_map
   return (state, raw_dbs)
 
 selectHptFlag :: Set.Set UnitId -> PackageFlag -> Bool

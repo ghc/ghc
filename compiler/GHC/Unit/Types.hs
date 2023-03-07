@@ -624,13 +624,14 @@ thisGhcUnitName     = WiredInPackageName $ fsLit "ghc"
 interactiveUnitName = WiredInPackageName $ fsLit "interactive"
 thUnitName          = WiredInPackageName $ fsLit "template-haskell"
 
-primUnitId        = mkWiredInUnitId primUnitName
-bignumUnitId      = mkWiredInUnitId bignumUnitName
-baseUnitId        = mkWiredInUnitId baseUnitName
-rtsUnitId         = mkWiredInUnitId rtsUnitName
+primUnitId        = UnitId $ wiredInPackageNameFS primUnitName
+bignumUnitId      = UnitId $ wiredInPackageNameFS bignumUnitName
+baseUnitId        = UnitId $ wiredInPackageNameFS baseUnitName
+rtsUnitId         = UnitId $ wiredInPackageNameFS rtsUnitName
 thisGhcUnitId     = mkWiredInUnitId thisGhcUnitName
 interactiveUnitId = UnitId $ wiredInPackageNameFS interactiveUnitName
 thUnitId          = mkWiredInUnitId thUnitName
+{-# INLINE primUnitId #-}
 {-# INLINE bignumUnitId #-}
 {-# INLINE baseUnitId #-}
 {-# INLINE rtsUnitId #-}
@@ -644,6 +645,12 @@ baseUnit          = RealUnit (Definite baseUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
+{-# INLINE primUnit #-}
+{-# INLINE bignumUnit #-}
+{-# INLINE baseUnit #-}
+{-# INLINE rtsUnit #-}
+{-# INLINE thisGhcUnit #-}
+{-# INLINE thUnit #-}
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
@@ -655,7 +662,13 @@ mainUnit = RealUnit (Definite mainUnitId)
 -- Make the actual unit id the result of looking up the wired-in unit package name in the wire map
 mkWiredInUnitId :: WiredInPackageName -> UnitId
 mkWiredInUnitId x = case Map.lookup x $ unsafePerformIO (readIORef workingThisOut) of
-                      Nothing -> pprTrace "Romes:Couldn't find UnitId" (ppr (x,unsafePerformIO (readIORef workingThisOut))) (UnitId $ fsLit "rts") -- this is a fallback, in which situations do we need a fallback? perhaps when booting the compiler with the rts?
+                      Nothing -> pprTrace "Romes:Couldn't find UnitId" (ppr (x,unsafePerformIO (readIORef workingThisOut))) $ UnitId $ wiredInPackageNameFS x
+                        -- case x of
+                        --   rtsUnitName -> (UnitId $ fsLit "rts")
+                        --   primUnitName -> (UnitId $ fsLit "ghc-prim")
+                                  -- this is a fallback, in which situations do
+                                  -- we need a fallback? perhaps when booting
+                                  -- the compiler with the rts?
                       Just y -> pprTrace "Romes:Found in wire map" (ppr x <+> text "->" <> ppr y) y
 
 
