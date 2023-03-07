@@ -195,6 +195,7 @@ import GHC.Types.Unique.Set
 
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
+import GHC.Unit.Types         ( WiredIn )
 
 import Data.Array
 import GHC.Data.FastString
@@ -327,63 +328,63 @@ wiredInTyCons = map (dataConTyCon . snd) boxingDataCons
                 , zeroBitTypeTyCon
                 ]
 
-mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
+mkWiredInTyConName :: BuiltInSyntax -> WiredIn Module -> FastString -> Unique -> TyCon -> WiredIn Name
 mkWiredInTyConName built_in modu fs unique tycon
   = mkWiredInName modu (mkTcOccFS fs) unique
                   (ATyCon tycon)        -- Relevant TyCon
                   built_in
 
-mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name
+mkWiredInDataConName :: BuiltInSyntax -> WiredIn Module -> FastString -> Unique -> DataCon -> WiredIn Name
 mkWiredInDataConName built_in modu fs unique datacon
   = mkWiredInName modu (mkDataOccFS fs) unique
                   (AConLike (RealDataCon datacon))    -- Relevant DataCon
                   built_in
 
-mkWiredInIdName :: Module -> FastString -> Unique -> Id -> Name
+mkWiredInIdName :: WiredIn Module -> FastString -> Unique -> Id -> WiredIn Name
 mkWiredInIdName mod fs uniq id
  = mkWiredInName mod (mkOccNameFS Name.varName fs) uniq (AnId id) UserSyntax
 
 -- See Note [Kind-changing of (~) and Coercible]
 -- in libraries/ghc-prim/GHC/Types.hs
-eqTyConName, eqDataConName, eqSCSelIdName :: Name
+eqTyConName, eqDataConName, eqSCSelIdName :: WiredIn Name
 eqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~")   eqTyConKey   eqTyCon
 eqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Eq#") eqDataConKey eqDataCon
 eqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "eq_sel") eqSCSelIdKey eqSCSelId
 
-eqTyCon_RDR :: RdrName
-eqTyCon_RDR = nameRdrName eqTyConName
+eqTyCon_RDR :: WiredIn RdrName
+eqTyCon_RDR = nameRdrName <$> eqTyConName
 
 -- See Note [Kind-changing of (~) and Coercible]
 -- in libraries/ghc-prim/GHC/Types.hs
-heqTyConName, heqDataConName, heqSCSelIdName :: Name
+heqTyConName, heqDataConName, heqSCSelIdName :: WiredIn Name
 heqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~~")   heqTyConKey      heqTyCon
 heqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "HEq#") heqDataConKey heqDataCon
 heqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "heq_sel") heqSCSelIdKey heqSCSelId
 
 -- See Note [Kind-changing of (~) and Coercible] in libraries/ghc-prim/GHC/Types.hs
-coercibleTyConName, coercibleDataConName, coercibleSCSelIdName :: Name
+coercibleTyConName, coercibleDataConName, coercibleSCSelIdName :: WiredIn Name
 coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercible")  coercibleTyConKey   coercibleTyCon
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
 coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "coercible_sel") coercibleSCSelIdKey coercibleSCSelId
 
-charTyConName, charDataConName, intTyConName, intDataConName, stringTyConName :: Name
+charTyConName, charDataConName, intTyConName, intDataConName, stringTyConName :: WiredIn Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char")   charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#")     charDataConKey charDataCon
 stringTyConName   = mkWiredInTyConName   UserSyntax gHC_BASE  (fsLit "String") stringTyConKey stringTyCon
 intTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int")    intTyConKey   intTyCon
 intDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#")     intDataConKey  intDataCon
 
-boolTyConName, falseDataConName, trueDataConName :: Name
+boolTyConName, falseDataConName, trueDataConName :: WiredIn Name
 boolTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
 falseDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "False") falseDataConKey falseDataCon
 trueDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "True")  trueDataConKey  trueDataCon
 
-listTyConName, nilDataConName, consDataConName :: Name
+listTyConName, nilDataConName, consDataConName :: WiredIn Name
 listTyConName     = mkWiredInTyConName   UserSyntax    gHC_TYPES (fsLit "List") listTyConKey listTyCon
 nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") nilDataConKey nilDataCon
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
-maybeTyConName, nothingDataConName, justDataConName :: Name
+maybeTyConName, nothingDataConName, justDataConName :: WiredIn Name
 maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_MAYBE (fsLit "Maybe")
                                           maybeTyConKey maybeTyCon
 nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
@@ -391,12 +392,12 @@ nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
 justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
-wordTyConName, wordDataConName, word8DataConName :: Name
+wordTyConName, wordDataConName, word8DataConName :: WiredIn Name
 wordTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Word")   wordTyConKey     wordTyCon
 wordDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "W#")     wordDataConKey   wordDataCon
 word8DataConName   = mkWiredInDataConName UserSyntax gHC_WORD  (fsLit "W8#")    word8DataConKey  word8DataCon
 
-floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
+floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: WiredIn Name
 floatTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float")  floatTyConKey    floatTyCon
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#")     floatDataConKey  floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey   doubleTyCon
@@ -465,12 +466,13 @@ bit of history.
 -}
 
 
-anyTyConName :: Name
+anyTyConName :: WiredIn Name
 anyTyConName =
     mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Any") anyTyConKey anyTyCon
 
-anyTyCon :: TyCon
-anyTyCon = mkFamilyTyCon anyTyConName binders res_kind Nothing
+anyTyCon :: WiredIn TyCon
+anyTyCon = anyTyConName >>= \anyTyConName' -> pure $ 
+              mkFamilyTyCon anyTyConName' binders res_kind Nothing
                          (ClosedSynFamilyTyCon Nothing)
                          Nothing
                          NotInjective

@@ -25,8 +25,6 @@ module GHC.Unit.Types
    , pprInstantiatedModule
    , moduleFreeHoles
 
-   , workingThisOut
-
      -- * Units
    , IsUnitId
    , GenUnit (..)
@@ -38,6 +36,8 @@ module GHC.Unit.Types
    , DefUnitId
    , Instantiations
    , GenInstantiations
+   , WiredIn
+   , WiringMap
    , WiredInPackageName (..)
    , mkInstantiatedUnit
    , mkInstantiatedUnitHash
@@ -105,26 +105,18 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 
 import Control.DeepSeq
+import Control.Monad.Trans.Reader
 import Data.Data
 import Data.List (sortBy )
 import Data.Function
 import Data.Bifunctor
-import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import System.IO.Unsafe
-
 import Language.Haskell.Syntax.Module.Name
 import {-# SOURCE #-} Language.Haskell.Syntax.ImpExp (IsBootInterface(..))
-
--- Ref for an "unwireMap" which maps wired-in ids to actual units, created by
--- identifying wired-in packages in the list of package-id flags
-workingThisOut :: IORef (Map WiredInPackageName UnitId)
-workingThisOut = unsafePerformIO (newIORef (Map.singleton (WiredInPackageName $ fsLit "ouch-version") (UnitId $ fsLit "ouch")))
-{-# NOINLINE workingThisOut #-}
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -607,14 +599,19 @@ Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 -}
 
+type WiringMap = Map WiredInPackageName UnitId
+type WiredIn = Reader WiringMap
+
 bignumUnitName, primUnitName, baseUnitName, rtsUnitName,
   thUnitName, mainUnitName, thisGhcUnitName, interactiveUnitName :: WiredInPackageName
 
 bignumUnitId, primUnitId, baseUnitId, rtsUnitId,
-  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
+  thUnitId, thisGhcUnitId  :: WiredIn UnitId
+mainUnitId, interactiveUnitId :: UnitId
 
 bignumUnit, primUnit, baseUnit, rtsUnit,
-  thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
+  thUnit, thisGhcUnit  :: WiredIn Unit
+mainUnit, interactiveUnit :: Unit
 
 primUnitName        = WiredInPackageName $ fsLit "ghc-prim"
 bignumUnitName      = WiredInPackageName $ fsLit "ghc-bignum"
@@ -624,33 +621,21 @@ thisGhcUnitName     = WiredInPackageName $ fsLit "ghc"
 interactiveUnitName = WiredInPackageName $ fsLit "interactive"
 thUnitName          = WiredInPackageName $ fsLit "template-haskell"
 
-primUnitId        = UnitId $ wiredInPackageNameFS primUnitName
-bignumUnitId      = UnitId $ wiredInPackageNameFS bignumUnitName
-baseUnitId        = UnitId $ wiredInPackageNameFS baseUnitName
-rtsUnitId         = UnitId $ wiredInPackageNameFS rtsUnitName
+primUnitId        = mkWiredInUnitId primUnitName
+bignumUnitId      = mkWiredInUnitId bignumUnitName
+baseUnitId        = mkWiredInUnitId baseUnitName
+rtsUnitId         = mkWiredInUnitId rtsUnitName
 thisGhcUnitId     = mkWiredInUnitId thisGhcUnitName
 interactiveUnitId = UnitId $ wiredInPackageNameFS interactiveUnitName
 thUnitId          = mkWiredInUnitId thUnitName
-{-# INLINE primUnitId #-}
-{-# INLINE bignumUnitId #-}
-{-# INLINE baseUnitId #-}
-{-# INLINE rtsUnitId #-}
-{-# INLINE thisGhcUnitId #-}
-{-# INLINE thUnitId #-}
 
-thUnit            = RealUnit (Definite thUnitId)
-primUnit          = RealUnit (Definite primUnitId)
-bignumUnit        = RealUnit (Definite bignumUnitId)
-baseUnit          = RealUnit (Definite baseUnitId)
-rtsUnit           = RealUnit (Definite rtsUnitId)
-thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
+thUnit            = RealUnit . Definite <$> thUnitId
+primUnit          = RealUnit . Definite <$> primUnitId
+bignumUnit        = RealUnit . Definite <$> bignumUnitId
+baseUnit          = RealUnit . Definite <$> baseUnitId
+rtsUnit           = RealUnit . Definite <$> rtsUnitId
+thisGhcUnit       = RealUnit . Definite <$> thisGhcUnitId
 interactiveUnit   = RealUnit (Definite interactiveUnitId)
-{-# INLINE primUnit #-}
-{-# INLINE bignumUnit #-}
-{-# INLINE baseUnit #-}
-{-# INLINE rtsUnit #-}
-{-# INLINE thisGhcUnit #-}
-{-# INLINE thUnit #-}
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
@@ -660,16 +645,16 @@ mainUnitId = UnitId $ wiredInPackageNameFS mainUnitName
 mainUnit = RealUnit (Definite mainUnitId)
 
 -- Make the actual unit id the result of looking up the wired-in unit package name in the wire map
-mkWiredInUnitId :: WiredInPackageName -> UnitId
-mkWiredInUnitId x = case Map.lookup x $ unsafePerformIO (readIORef workingThisOut) of
-                      Nothing -> pprTrace "Romes:Couldn't find UnitId" (ppr (x,unsafePerformIO (readIORef workingThisOut))) $ UnitId $ wiredInPackageNameFS x
+mkWiredInUnitId :: WiredInPackageName -> WiredIn UnitId
+mkWiredInUnitId name = ask >>= \wiring_map -> case Map.lookup name wiring_map of
+                      Nothing -> pure $ pprTrace "Romes:Couldn't find UnitId" (ppr (name,wiring_map)) $ UnitId $ wiredInPackageNameFS name
                         -- case x of
                         --   rtsUnitName -> (UnitId $ fsLit "rts")
                         --   primUnitName -> (UnitId $ fsLit "ghc-prim")
                                   -- this is a fallback, in which situations do
                                   -- we need a fallback? perhaps when booting
                                   -- the compiler with the rts?
-                      Just y -> pprTrace "Romes:Found in wire map" (ppr x <+> text "->" <> ppr y) y
+                      Just actual_name -> pure $ pprTrace "Romes:Found in wire map" (ppr name <+> text "->" <> ppr actual_name) actual_name
 
 
 isInteractiveModule :: Module -> Bool

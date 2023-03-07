@@ -29,6 +29,7 @@ pkgVersion = fmap version . readPackageData
 -- The Cabal file is tracked.
 pkgIdentifier :: Package -> Action String
 pkgIdentifier package = do
+  -- ROMES:TODO: besides the version, compute a simple hash
     cabal <- readPackageData package
     return $ if null (version cabal)
         then name cabal

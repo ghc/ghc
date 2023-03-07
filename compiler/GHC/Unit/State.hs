@@ -1067,8 +1067,6 @@ pprTrustFlag flag = case flag of
 --
 -- See Note [Wired-in units] in GHC.Unit.Types
 
-type WiringMap = Map WiredInPackageName UnitId
-
 findWiredInUnits
    :: Logger
    -> UnitPrecedenceMap

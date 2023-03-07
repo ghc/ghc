@@ -472,10 +472,11 @@ mkExternalName uniq mod occ loc
            n_occ = occ, n_loc = loc }
 
 -- | Create a name which is actually defined by the compiler itself
-mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
+mkWiredInName :: WiredIn Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> WiredIn Name
 {-# INLINE mkWiredInName #-}
-mkWiredInName mod occ uniq thing built_in
-  = Name { n_uniq = uniq,
+mkWiredInName wmod occ uniq thing built_in
+  = wmod >>= \mod -> pure
+    Name { n_uniq = uniq,
            n_sort = WiredIn mod thing built_in,
            n_occ = occ, n_loc = wiredInSrcSpan }
 

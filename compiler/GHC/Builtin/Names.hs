@@ -198,321 +198,319 @@ names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in GHC.Builtin.Types etc.
 -}
 
-basicKnownKeyNames :: IO [Name]  -- See Note [Known-key names]
+basicKnownKeyNames :: [WiredIn Name]  -- See Note [Known-key names]
 basicKnownKeyNames
- = sequence [
+ = genericTyConNames
+ ++ [   --  Classes.  *Must* include:
+        --      classes that are grabbed by key (e.g., eqClassKey)
+        --      classes in "Class.standardClassKeys" (quite a few)
+        eqClassName,                    -- mentioned, derivable
+        ordClassName,                   -- derivable
+        boundedClassName,               -- derivable
+        numClassName,                   -- mentioned, numeric
+        enumClassName,                  -- derivable
+        monadClassName,
+        functorClassName,
+        realClassName,                  -- numeric
+        integralClassName,              -- numeric
+        fractionalClassName,            -- numeric
+        floatingClassName,              -- numeric
+        realFracClassName,              -- numeric
+        realFloatClassName,             -- numeric
+        dataClassName,
+        isStringClassName,
+        applicativeClassName,
+        alternativeClassName,
+        foldableClassName,
+        traversableClassName,
+        semigroupClassName, sappendName,
+        monoidClassName, memptyName, mappendName, mconcatName,
+
+        -- The IO type
+        ioTyConName, ioDataConName,
+        runMainIOName,
+        runRWName,
+
+        -- Type representation types
+        trModuleTyConName, trModuleDataConName,
+        trNameTyConName, trNameSDataConName, trNameDDataConName,
+        trTyConTyConName, trTyConDataConName,
+
+        -- Typeable
+        typeableClassName,
+        typeRepTyConName,
+        someTypeRepTyConName,
+        someTypeRepDataConName,
+        kindRepTyConName,
+        kindRepTyConAppDataConName,
+        kindRepVarDataConName,
+        kindRepAppDataConName,
+        kindRepFunDataConName,
+        kindRepTYPEDataConName,
+        kindRepTypeLitSDataConName,
+        kindRepTypeLitDDataConName,
+        typeLitSortTyConName,
+        typeLitSymbolDataConName,
+        typeLitNatDataConName,
+        typeLitCharDataConName,
+        typeRepIdName,
+        mkTrTypeName,
+        mkTrConName,
+        mkTrAppName,
+        mkTrFunName,
+        typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
+        trGhcPrimModuleName,
+
+        -- KindReps for common cases
+        starKindRepName,
+        starArrStarKindRepName,
+        starArrStarArrStarKindRepName,
+        constraintKindRepName,
+
+        -- WithDict
+        withDictClassName,
+
+        -- Dynamic
+        toDynName,
+
+        -- Numeric stuff
+        negateName, minusName, geName, eqName,
+        mkRationalBase2Name, mkRationalBase10Name,
+
+        -- Conversion functions
+        rationalTyConName,
+        ratioTyConName, ratioDataConName,
+        fromRationalName, fromIntegerName,
+        toIntegerName, toRationalName,
+        fromIntegralName, realToFracName,
+
+        -- Int# stuff
+        divIntName, modIntName,
+
+        -- String stuff
+        fromStringName,
+
+        -- Enum stuff
+        enumFromName, enumFromThenName,
+        enumFromThenToName, enumFromToName,
+
+        -- Applicative stuff
+        pureAName, apAName, thenAName,
+
+        -- Functor stuff
+        fmapName,
+
+        -- Monad stuff
+        thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
+        returnMName, joinMName,
+
+        -- MonadFail
+        monadFailClassName, failMName,
+
+        -- MonadFix
+        monadFixClassName, mfixName,
+
+        -- Arrow stuff
+        arrAName, composeAName, firstAName,
+        appAName, choiceAName, loopAName,
+
+        -- Ix stuff
+        ixClassName,
+
+        -- Show stuff
+        showClassName,
+
+        -- Read stuff
+        readClassName,
+
+        -- Stable pointers
+        newStablePtrName,
+
+        -- GHC Extensions
+        considerAccessibleName,
+
+        -- Strings and lists
+        unpackCStringName, unpackCStringUtf8Name,
+        unpackCStringAppendName, unpackCStringAppendUtf8Name,
+        unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
+        cstringLengthName,
+
+        -- Overloaded lists
+        isListClassName,
+        fromListName,
+        fromListNName,
+        toListName,
+
+        -- Non-empty lists
+        nonEmptyTyConName,
+
+        -- Overloaded record dot, record update
+        getFieldName, setFieldName,
+
+        -- List operations
+        concatName, filterName, mapName,
+        zipName, foldrName, buildName, augmentName, appendName,
+
+        -- FFI primitive types that are not wired-in.
+        stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
+        int8TyConName, int16TyConName, int32TyConName, int64TyConName,
+        word8TyConName, word16TyConName, word32TyConName, word64TyConName,
+
+        -- Others
+        otherwiseIdName, inlineIdName,
+        eqStringName, assertName,
+        assertErrorName, traceName,
+        printName,
+        dollarName,
+
+        -- ghc-bignum
+        integerFromNaturalName,
+        integerToNaturalClampName,
+        integerToNaturalThrowName,
+        integerToNaturalName,
+        integerToWordName,
+        integerToIntName,
+        integerToWord64Name,
+        integerToInt64Name,
+        integerFromWordName,
+        integerFromWord64Name,
+        integerFromInt64Name,
+        integerAddName,
+        integerMulName,
+        integerSubName,
+        integerNegateName,
+        integerAbsName,
+        integerPopCountName,
+        integerQuotName,
+        integerRemName,
+        integerDivName,
+        integerModName,
+        integerDivModName,
+        integerQuotRemName,
+        integerEncodeFloatName,
+        integerEncodeDoubleName,
+        integerGcdName,
+        integerLcmName,
+        integerAndName,
+        integerOrName,
+        integerXorName,
+        integerComplementName,
+        integerBitName,
+        integerTestBitName,
+        integerShiftLName,
+        integerShiftRName,
+
+        naturalToWordName,
+        naturalPopCountName,
+        naturalShiftRName,
+        naturalShiftLName,
+        naturalAddName,
+        naturalSubName,
+        naturalSubThrowName,
+        naturalSubUnsafeName,
+        naturalMulName,
+        naturalQuotRemName,
+        naturalQuotName,
+        naturalRemName,
+        naturalAndName,
+        naturalAndNotName,
+        naturalOrName,
+        naturalXorName,
+        naturalTestBitName,
+        naturalBitName,
+        naturalGcdName,
+        naturalLcmName,
+        naturalLog2Name,
+        naturalLogBaseWordName,
+        naturalLogBaseName,
+        naturalPowModName,
+        naturalSizeInBaseName,
+
+        bignatFromWordListName,
+        bignatEqName,
+
+        -- Float/Double
+        integerToFloatName,
+        integerToDoubleName,
+        naturalToFloatName,
+        naturalToDoubleName,
+        rationalToFloatName,
+        rationalToDoubleName,
+
+        -- Other classes
+        monadPlusClassName,
+
+        -- Type-level naturals
+        knownNatClassName, knownSymbolClassName, knownCharClassName,
+
+        -- Overloaded labels
+        fromLabelClassOpName,
+
+        -- Implicit Parameters
+        ipClassName,
+
+        -- Overloaded record fields
+        hasFieldClassName,
+
+        -- Call Stacks
+        callStackTyConName,
+        emptyCallStackName, pushCallStackName,
+
+        -- Source Locations
+        srcLocDataConName,
+
+        -- Annotation type checking
+        toAnnotationWrapperName
+
+        -- The SPEC type for SpecConstr
+        , specTyConName
+
+        -- The Either type
+        , eitherTyConName, leftDataConName, rightDataConName
+
+        -- The Void type
+        , voidTyConName
+
         -- Plugins
-          pluginTyConName
+        , pluginTyConName
         , frontendPluginTyConName
-  ] >>= \ioknownnames ->
-    pure (ioknownnames ++
-    genericTyConNames
-  ++ [   --  Classes.  *Must* include:
-          --      classes that are grabbed by key (e.g., eqClassKey)
-          --      classes in "Class.standardClassKeys" (quite a few)
-          eqClassName,                    -- mentioned, derivable
-          ordClassName,                   -- derivable
-          boundedClassName,               -- derivable
-          numClassName,                   -- mentioned, numeric
-          enumClassName,                  -- derivable
-          monadClassName,
-          functorClassName,
-          realClassName,                  -- numeric
-          integralClassName,              -- numeric
-          fractionalClassName,            -- numeric
-          floatingClassName,              -- numeric
-          realFracClassName,              -- numeric
-          realFloatClassName,             -- numeric
-          dataClassName,
-          isStringClassName,
-          applicativeClassName,
-          alternativeClassName,
-          foldableClassName,
-          traversableClassName,
-          semigroupClassName, sappendName,
-          monoidClassName, memptyName, mappendName, mconcatName,
 
-          -- The IO type
-          ioTyConName, ioDataConName,
-          runMainIOName,
-          runRWName,
+        -- Generics
+        , genClassName, gen1ClassName
+        , datatypeClassName, constructorClassName, selectorClassName
 
-          -- Type representation types
-          trModuleTyConName, trModuleDataConName,
-          trNameTyConName, trNameSDataConName, trNameDDataConName,
-          trTyConTyConName, trTyConDataConName,
+        -- Monad comprehensions
+        , guardMName
+        , liftMName
+        , mzipName
 
-          -- Typeable
-          typeableClassName,
-          typeRepTyConName,
-          someTypeRepTyConName,
-          someTypeRepDataConName,
-          kindRepTyConName,
-          kindRepTyConAppDataConName,
-          kindRepVarDataConName,
-          kindRepAppDataConName,
-          kindRepFunDataConName,
-          kindRepTYPEDataConName,
-          kindRepTypeLitSDataConName,
-          kindRepTypeLitDDataConName,
-          typeLitSortTyConName,
-          typeLitSymbolDataConName,
-          typeLitNatDataConName,
-          typeLitCharDataConName,
-          typeRepIdName,
-          mkTrTypeName,
-          mkTrConName,
-          mkTrAppName,
-          mkTrFunName,
-          typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
-          trGhcPrimModuleName,
+        -- GHCi Sandbox
+        , ghciIoClassName, ghciStepIoMName
 
-          -- KindReps for common cases
-          starKindRepName,
-          starArrStarKindRepName,
-          starArrStarArrStarKindRepName,
-          constraintKindRepName,
+        -- StaticPtr
+        , makeStaticName
+        , staticPtrTyConName
+        , staticPtrDataConName, staticPtrInfoDataConName
+        , fromStaticPtrName
 
-          -- WithDict
-          withDictClassName,
+        -- Fingerprint
+        , fingerprintDataConName
 
-          -- Dynamic
-          toDynName,
+        -- Custom type errors
+        , errorMessageTypeErrorFamName
+        , typeErrorTextDataConName
+        , typeErrorAppendDataConName
+        , typeErrorVAppendDataConName
+        , typeErrorShowTypeDataConName
 
-          -- Numeric stuff
-          negateName, minusName, geName, eqName,
-          mkRationalBase2Name, mkRationalBase10Name,
+        -- Unsafe coercion proofs
+        , unsafeEqualityProofName
+        , unsafeEqualityTyConName
+        , unsafeReflDataConName
+        , unsafeCoercePrimName
+      ]
 
-          -- Conversion functions
-          rationalTyConName,
-          ratioTyConName, ratioDataConName,
-          fromRationalName, fromIntegerName,
-          toIntegerName, toRationalName,
-          fromIntegralName, realToFracName,
-
-          -- Int# stuff
-          divIntName, modIntName,
-
-          -- String stuff
-          fromStringName,
-
-          -- Enum stuff
-          enumFromName, enumFromThenName,
-          enumFromThenToName, enumFromToName,
-
-          -- Applicative stuff
-          pureAName, apAName, thenAName,
-
-          -- Functor stuff
-          fmapName,
-
-          -- Monad stuff
-          thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
-          returnMName, joinMName,
-
-          -- MonadFail
-          monadFailClassName, failMName,
-
-          -- MonadFix
-          monadFixClassName, mfixName,
-
-          -- Arrow stuff
-          arrAName, composeAName, firstAName,
-          appAName, choiceAName, loopAName,
-
-          -- Ix stuff
-          ixClassName,
-
-          -- Show stuff
-          showClassName,
-
-          -- Read stuff
-          readClassName,
-
-          -- Stable pointers
-          newStablePtrName,
-
-          -- GHC Extensions
-          considerAccessibleName,
-
-          -- Strings and lists
-          unpackCStringName, unpackCStringUtf8Name,
-          unpackCStringAppendName, unpackCStringAppendUtf8Name,
-          unpackCStringFoldrName, unpackCStringFoldrUtf8Name,
-          cstringLengthName,
-
-          -- Overloaded lists
-          isListClassName,
-          fromListName,
-          fromListNName,
-          toListName,
-
-          -- Non-empty lists
-          nonEmptyTyConName,
-
-          -- Overloaded record dot, record update
-          getFieldName, setFieldName,
-
-          -- List operations
-          concatName, filterName, mapName,
-          zipName, foldrName, buildName, augmentName, appendName,
-
-          -- FFI primitive types that are not wired-in.
-          stablePtrTyConName, ptrTyConName, funPtrTyConName, constPtrConName,
-          int8TyConName, int16TyConName, int32TyConName, int64TyConName,
-          word8TyConName, word16TyConName, word32TyConName, word64TyConName,
-
-          -- Others
-          otherwiseIdName, inlineIdName,
-          eqStringName, assertName,
-          assertErrorName, traceName,
-          printName,
-          dollarName,
-
-          -- ghc-bignum
-          integerFromNaturalName,
-          integerToNaturalClampName,
-          integerToNaturalThrowName,
-          integerToNaturalName,
-          integerToWordName,
-          integerToIntName,
-          integerToWord64Name,
-          integerToInt64Name,
-          integerFromWordName,
-          integerFromWord64Name,
-          integerFromInt64Name,
-          integerAddName,
-          integerMulName,
-          integerSubName,
-          integerNegateName,
-          integerAbsName,
-          integerPopCountName,
-          integerQuotName,
-          integerRemName,
-          integerDivName,
-          integerModName,
-          integerDivModName,
-          integerQuotRemName,
-          integerEncodeFloatName,
-          integerEncodeDoubleName,
-          integerGcdName,
-          integerLcmName,
-          integerAndName,
-          integerOrName,
-          integerXorName,
-          integerComplementName,
-          integerBitName,
-          integerTestBitName,
-          integerShiftLName,
-          integerShiftRName,
-
-          naturalToWordName,
-          naturalPopCountName,
-          naturalShiftRName,
-          naturalShiftLName,
-          naturalAddName,
-          naturalSubName,
-          naturalSubThrowName,
-          naturalSubUnsafeName,
-          naturalMulName,
-          naturalQuotRemName,
-          naturalQuotName,
-          naturalRemName,
-          naturalAndName,
-          naturalAndNotName,
-          naturalOrName,
-          naturalXorName,
-          naturalTestBitName,
-          naturalBitName,
-          naturalGcdName,
-          naturalLcmName,
-          naturalLog2Name,
-          naturalLogBaseWordName,
-          naturalLogBaseName,
-          naturalPowModName,
-          naturalSizeInBaseName,
-
-          bignatFromWordListName,
-          bignatEqName,
-
-          -- Float/Double
-          integerToFloatName,
-          integerToDoubleName,
-          naturalToFloatName,
-          naturalToDoubleName,
-          rationalToFloatName,
-          rationalToDoubleName,
-
-          -- Other classes
-          monadPlusClassName,
-
-          -- Type-level naturals
-          knownNatClassName, knownSymbolClassName, knownCharClassName,
-
-          -- Overloaded labels
-          fromLabelClassOpName,
-
-          -- Implicit Parameters
-          ipClassName,
-
-          -- Overloaded record fields
-          hasFieldClassName,
-
-          -- Call Stacks
-          callStackTyConName,
-          emptyCallStackName, pushCallStackName,
-
-          -- Source Locations
-          srcLocDataConName,
-
-          -- Annotation type checking
-          toAnnotationWrapperName
-
-          -- The SPEC type for SpecConstr
-          , specTyConName
-
-          -- The Either type
-          , eitherTyConName, leftDataConName, rightDataConName
-
-          -- The Void type
-          , voidTyConName
-
-          -- Generics
-          , genClassName, gen1ClassName
-          , datatypeClassName, constructorClassName, selectorClassName
-
-          -- Monad comprehensions
-          , guardMName
-          , liftMName
-          , mzipName
-
-          -- GHCi Sandbox
-          , ghciIoClassName, ghciStepIoMName
-
-          -- StaticPtr
-          , makeStaticName
-          , staticPtrTyConName
-          , staticPtrDataConName, staticPtrInfoDataConName
-          , fromStaticPtrName
-
-          -- Fingerprint
-          , fingerprintDataConName
-
-          -- Custom type errors
-          , errorMessageTypeErrorFamName
-          , typeErrorTextDataConName
-          , typeErrorAppendDataConName
-          , typeErrorVAppendDataConName
-          , typeErrorShowTypeDataConName
-
-          -- Unsafe coercion proofs
-          , unsafeEqualityProofName
-          , unsafeEqualityTyConName
-          , unsafeReflDataConName
-          , unsafeCoercePrimName
-      ])
-
-genericTyConNames :: [Name]
+genericTyConNames :: [WiredIn Name]
 genericTyConNames = [
     v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
     k1TyConName, m1TyConName, sumTyConName, prodTyConName,
@@ -542,7 +540,7 @@ genericTyConNames = [
 --MetaHaskell Extension Add a new module here
 -}
 
-pRELUDE :: Module
+pRELUDE :: WiredIn Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_PRIM_PANIC,
@@ -561,7 +559,7 @@ gHC_PRIM, gHC_PRIM_PANIC,
     aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS, gHC_IS_LIST,
     cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
-    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, fOREIGN_C_CONSTPTR :: Module
+    dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, fOREIGN_C_CONSTPTR :: WiredIn Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
@@ -632,26 +630,26 @@ dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
 uNSAFE_COERCE   = mkBaseModule (fsLit "Unsafe.Coerce")
 fOREIGN_C_CONSTPTR = mkBaseModule (fsLit "Foreign.C.ConstPtr")
 
-gHC_SRCLOC :: Module
+gHC_SRCLOC :: WiredIn Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
 
-gHC_STACK, gHC_STACK_TYPES :: Module
+gHC_STACK, gHC_STACK_TYPES :: WiredIn Module
 gHC_STACK = mkBaseModule (fsLit "GHC.Stack")
 gHC_STACK_TYPES = mkBaseModule (fsLit "GHC.Stack.Types")
 
-gHC_STATICPTR :: Module
+gHC_STATICPTR :: WiredIn Module
 gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
 
-gHC_STATICPTR_INTERNAL :: Module
+gHC_STATICPTR_INTERNAL :: WiredIn Module
 gHC_STATICPTR_INTERNAL = mkBaseModule (fsLit "GHC.StaticPtr.Internal")
 
-gHC_FINGERPRINT_TYPE :: Module
+gHC_FINGERPRINT_TYPE :: WiredIn Module
 gHC_FINGERPRINT_TYPE = mkBaseModule (fsLit "GHC.Fingerprint.Type")
 
-gHC_OVER_LABELS :: Module
+gHC_OVER_LABELS :: WiredIn Module
 gHC_OVER_LABELS = mkBaseModule (fsLit "GHC.OverloadedLabels")
 
-gHC_RECORDS :: Module
+gHC_RECORDS :: WiredIn Module
 gHC_RECORDS = mkBaseModule (fsLit "GHC.Records")
 
 rOOT_MAIN :: Module
@@ -665,23 +663,23 @@ pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
 mAIN_NAME      = mkModuleNameFS (fsLit "Main")
 
-mkPrimModule :: FastString -> Module
-mkPrimModule m = mkModule primUnit (mkModuleNameFS m)
+mkPrimModule :: FastString -> WiredIn Module
+mkPrimModule m = mkModule <$> primUnit <*> pure (mkModuleNameFS m)
 
-mkBignumModule :: FastString -> Module
-mkBignumModule m = mkModule bignumUnit (mkModuleNameFS m)
+mkBignumModule :: FastString -> WiredIn Module
+mkBignumModule m = mkModule <$> bignumUnit <*> pure (mkModuleNameFS m)
 
-mkBaseModule :: FastString -> Module
+mkBaseModule :: FastString -> WiredIn Module
 mkBaseModule m = mkBaseModule_ (mkModuleNameFS m)
 
-mkBaseModule_ :: ModuleName -> Module
-mkBaseModule_ m = mkModule baseUnit m
+mkBaseModule_ :: ModuleName -> WiredIn Module
+mkBaseModule_ m = mkModule <$> baseUnit <*> pure m
 
-mkThisGhcModule :: FastString -> Module
+mkThisGhcModule :: FastString -> WiredIn Module
 mkThisGhcModule m = mkThisGhcModule_ (mkModuleNameFS m)
 
-mkThisGhcModule_ :: ModuleName -> Module
-mkThisGhcModule_ m = mkModule thisGhcUnit m
+mkThisGhcModule_ :: ModuleName -> WiredIn Module
+mkThisGhcModule_ m = mkModule <$> thisGhcUnit <*> pure m
 
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainUnit (mkModuleNameFS m)
@@ -703,145 +701,146 @@ main_RDR_Unqual = mkUnqual varName (fsLit "main")
         -- main might, in principle, be imported into module Main
 
 eq_RDR, ge_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
-    ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
-eq_RDR                  = nameRdrName eqName
-ge_RDR                  = nameRdrName geName
-le_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<=")
-lt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<")
-gt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit ">")
-compare_RDR             = varQual_RDR  gHC_CLASSES (fsLit "compare")
-ltTag_RDR               = nameRdrName  ordLTDataConName
-eqTag_RDR               = nameRdrName  ordEQDataConName
-gtTag_RDR               = nameRdrName  ordGTDataConName
+  ltTag_RDR, eqTag_RDR, gtTag_RDR :: WiredIn RdrName
+eq_RDR                  = nameRdrName  <$> eqName
+ge_RDR                  = nameRdrName  <$> geName
+le_RDR                  = varQual_RDR  <$> gHC_CLASSES <*> pure (fsLit "<=")
+lt_RDR                  = varQual_RDR  <$> gHC_CLASSES <*> pure (fsLit "<")
+gt_RDR                  = varQual_RDR  <$> gHC_CLASSES <*> pure (fsLit ">")
+compare_RDR             = varQual_RDR  <$> gHC_CLASSES <*> pure (fsLit "compare")
+ltTag_RDR               = nameRdrName  <$> ordLTDataConName
+eqTag_RDR               = nameRdrName  <$> ordEQDataConName
+gtTag_RDR               = nameRdrName  <$> ordGTDataConName
 
 eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
-    :: RdrName
-eqClass_RDR             = nameRdrName eqClassName
-numClass_RDR            = nameRdrName numClassName
-ordClass_RDR            = nameRdrName ordClassName
-enumClass_RDR           = nameRdrName enumClassName
-monadClass_RDR          = nameRdrName monadClassName
+    :: WiredIn RdrName
+eqClass_RDR             = nameRdrName <$> eqClassName
+numClass_RDR            = nameRdrName <$> numClassName
+ordClass_RDR            = nameRdrName <$> ordClassName
+enumClass_RDR           = nameRdrName <$> enumClassName
+monadClass_RDR          = nameRdrName <$> monadClassName
 
-map_RDR, append_RDR :: RdrName
-map_RDR                 = nameRdrName mapName
-append_RDR              = nameRdrName appendName
+map_RDR, append_RDR :: WiredIn RdrName
+map_RDR                 = nameRdrName <$> mapName
+append_RDR              = nameRdrName <$> appendName
 
 foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
-    :: RdrName
-foldr_RDR               = nameRdrName foldrName
-build_RDR               = nameRdrName buildName
-returnM_RDR             = nameRdrName returnMName
-bindM_RDR               = nameRdrName bindMName
-failM_RDR               = nameRdrName failMName
+    :: WiredIn RdrName
+foldr_RDR               = nameRdrName <$> foldrName
+build_RDR               = nameRdrName <$> buildName
+returnM_RDR             = nameRdrName <$> returnMName
+bindM_RDR               = nameRdrName <$> bindMName
+failM_RDR               = nameRdrName <$> failMName
 
-left_RDR, right_RDR :: RdrName
-left_RDR                = nameRdrName leftDataConName
-right_RDR               = nameRdrName rightDataConName
+left_RDR, right_RDR :: WiredIn RdrName
+left_RDR                = nameRdrName <$> leftDataConName
+right_RDR               = nameRdrName <$> rightDataConName
 
-fromEnum_RDR, toEnum_RDR :: RdrName
-fromEnum_RDR            = varQual_RDR gHC_ENUM (fsLit "fromEnum")
-toEnum_RDR              = varQual_RDR gHC_ENUM (fsLit "toEnum")
+fromEnum_RDR, toEnum_RDR :: WiredIn RdrName
+fromEnum_RDR            = varQual_RDR <$> gHC_ENUM <*> pure (fsLit "fromEnum")
+toEnum_RDR              = varQual_RDR <$> gHC_ENUM <*> pure (fsLit "toEnum")
 
-enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: RdrName
-enumFrom_RDR            = nameRdrName enumFromName
-enumFromTo_RDR          = nameRdrName enumFromToName
-enumFromThen_RDR        = nameRdrName enumFromThenName
-enumFromThenTo_RDR      = nameRdrName enumFromThenToName
+enumFrom_RDR, enumFromTo_RDR, enumFromThen_RDR, enumFromThenTo_RDR :: WiredIn RdrName
+enumFrom_RDR            = nameRdrName <$> enumFromName
+enumFromTo_RDR          = nameRdrName <$> enumFromToName
+enumFromThen_RDR        = nameRdrName <$> enumFromThenName
+enumFromThenTo_RDR      = nameRdrName <$> enumFromThenToName
 
-ratioDataCon_RDR, integerAdd_RDR, integerMul_RDR :: RdrName
-ratioDataCon_RDR        = nameRdrName ratioDataConName
-integerAdd_RDR          = nameRdrName integerAddName
-integerMul_RDR          = nameRdrName integerMulName
+ratioDataCon_RDR, integerAdd_RDR, integerMul_RDR :: WiredIn RdrName
+ratioDataCon_RDR        = nameRdrName <$> ratioDataConName
+integerAdd_RDR          = nameRdrName <$> integerAddName
+integerMul_RDR          = nameRdrName <$> integerMulName
 
-ioDataCon_RDR :: RdrName
-ioDataCon_RDR           = nameRdrName ioDataConName
+ioDataCon_RDR :: WiredIn RdrName
+ioDataCon_RDR           = nameRdrName <$> ioDataConName
 
-newStablePtr_RDR :: RdrName
-newStablePtr_RDR        = nameRdrName newStablePtrName
+newStablePtr_RDR :: WiredIn RdrName
+newStablePtr_RDR        = nameRdrName <$> newStablePtrName
 
-bindIO_RDR, returnIO_RDR :: RdrName
-bindIO_RDR              = nameRdrName bindIOName
-returnIO_RDR            = nameRdrName returnIOName
+bindIO_RDR, returnIO_RDR :: WiredIn RdrName
+bindIO_RDR              = nameRdrName <$> bindIOName
+returnIO_RDR            = nameRdrName <$> returnIOName
 
-fromInteger_RDR, fromRational_RDR, minus_RDR, times_RDR, plus_RDR :: RdrName
-fromInteger_RDR         = nameRdrName fromIntegerName
-fromRational_RDR        = nameRdrName fromRationalName
-minus_RDR               = nameRdrName minusName
-times_RDR               = varQual_RDR  gHC_NUM (fsLit "*")
-plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
+fromInteger_RDR, fromRational_RDR, minus_RDR,
+  times_RDR, plus_RDR :: WiredIn RdrName
+fromInteger_RDR         = nameRdrName <$> fromIntegerName
+fromRational_RDR        = nameRdrName <$> fromRationalName
+minus_RDR               = nameRdrName <$> minusName
+times_RDR               = varQual_RDR <$> gHC_NUM <*> pure (fsLit "*")
+plus_RDR                = varQual_RDR <$> gHC_NUM <*> pure (fsLit "+")
 
-toInteger_RDR, toRational_RDR, fromIntegral_RDR :: RdrName
-toInteger_RDR           = nameRdrName toIntegerName
-toRational_RDR          = nameRdrName toRationalName
-fromIntegral_RDR        = nameRdrName fromIntegralName
+toInteger_RDR, toRational_RDR, fromIntegral_RDR :: WiredIn RdrName
+toInteger_RDR           = nameRdrName <$> toIntegerName
+toRational_RDR          = nameRdrName <$> toRationalName
+fromIntegral_RDR        = nameRdrName <$> fromIntegralName
 
-fromString_RDR :: RdrName
-fromString_RDR          = nameRdrName fromStringName
+fromString_RDR :: WiredIn RdrName
+fromString_RDR          = nameRdrName <$> fromStringName
 
-fromList_RDR, fromListN_RDR, toList_RDR :: RdrName
-fromList_RDR = nameRdrName fromListName
-fromListN_RDR = nameRdrName fromListNName
-toList_RDR = nameRdrName toListName
+fromList_RDR, fromListN_RDR, toList_RDR :: WiredIn RdrName
+fromList_RDR  = nameRdrName <$> fromListName
+fromListN_RDR = nameRdrName <$> fromListNName
+toList_RDR    = nameRdrName <$> toListName
 
-compose_RDR :: RdrName
-compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
+compose_RDR :: WiredIn RdrName
+compose_RDR             = varQual_RDR <$> gHC_BASE <*> pure (fsLit ".")
 
 not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     and_RDR, range_RDR, inRange_RDR, index_RDR,
-    unsafeIndex_RDR, unsafeRangeSize_RDR :: RdrName
-and_RDR                 = varQual_RDR gHC_CLASSES (fsLit "&&")
-not_RDR                 = varQual_RDR gHC_CLASSES (fsLit "not")
-dataToTag_RDR           = varQual_RDR gHC_PRIM (fsLit "dataToTag#")
-succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
-pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
-minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
-maxBound_RDR            = varQual_RDR gHC_ENUM (fsLit "maxBound")
-range_RDR               = varQual_RDR gHC_IX (fsLit "range")
-inRange_RDR             = varQual_RDR gHC_IX (fsLit "inRange")
-index_RDR               = varQual_RDR gHC_IX (fsLit "index")
-unsafeIndex_RDR         = varQual_RDR gHC_IX (fsLit "unsafeIndex")
-unsafeRangeSize_RDR     = varQual_RDR gHC_IX (fsLit "unsafeRangeSize")
+    unsafeIndex_RDR, unsafeRangeSize_RDR :: WiredIn RdrName
+and_RDR                 = varQual_RDR <$> gHC_CLASSES <*> pure (fsLit "&&")
+not_RDR                 = varQual_RDR <$> gHC_CLASSES <*> pure (fsLit "not")
+dataToTag_RDR           = varQual_RDR <$> gHC_PRIM    <*> pure (fsLit "dataToTag#")
+succ_RDR                = varQual_RDR <$> gHC_ENUM    <*> pure (fsLit "succ")
+pred_RDR                = varQual_RDR <$> gHC_ENUM    <*> pure (fsLit "pred")
+minBound_RDR            = varQual_RDR <$> gHC_ENUM    <*> pure (fsLit "minBound")
+maxBound_RDR            = varQual_RDR <$> gHC_ENUM    <*> pure (fsLit "maxBound")
+range_RDR               = varQual_RDR <$> gHC_IX      <*> pure (fsLit "range")
+inRange_RDR             = varQual_RDR <$> gHC_IX      <*> pure (fsLit "inRange")
+index_RDR               = varQual_RDR <$> gHC_IX      <*> pure (fsLit "index")
+unsafeIndex_RDR         = varQual_RDR <$> gHC_IX      <*> pure (fsLit "unsafeIndex")
+unsafeRangeSize_RDR     = varQual_RDR <$> gHC_IX      <*> pure (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
-    readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
-readList_RDR            = varQual_RDR gHC_READ (fsLit "readList")
-readListDefault_RDR     = varQual_RDR gHC_READ (fsLit "readListDefault")
-readListPrec_RDR        = varQual_RDR gHC_READ (fsLit "readListPrec")
-readListPrecDefault_RDR = varQual_RDR gHC_READ (fsLit "readListPrecDefault")
-readPrec_RDR            = varQual_RDR gHC_READ (fsLit "readPrec")
-parens_RDR              = varQual_RDR gHC_READ (fsLit "parens")
-choose_RDR              = varQual_RDR gHC_READ (fsLit "choose")
-lexP_RDR                = varQual_RDR gHC_READ (fsLit "lexP")
-expectP_RDR             = varQual_RDR gHC_READ (fsLit "expectP")
+    readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: WiredIn RdrName
+readList_RDR            = varQual_RDR <$> gHC_READ <*> pure (fsLit "readList")
+readListDefault_RDR     = varQual_RDR <$> gHC_READ <*> pure (fsLit "readListDefault")
+readListPrec_RDR        = varQual_RDR <$> gHC_READ <*> pure (fsLit "readListPrec")
+readListPrecDefault_RDR = varQual_RDR <$> gHC_READ <*> pure (fsLit "readListPrecDefault")
+readPrec_RDR            = varQual_RDR <$> gHC_READ <*> pure (fsLit "readPrec")
+parens_RDR              = varQual_RDR <$> gHC_READ <*> pure (fsLit "parens")
+choose_RDR              = varQual_RDR <$> gHC_READ <*> pure (fsLit "choose")
+lexP_RDR                = varQual_RDR <$> gHC_READ <*> pure (fsLit "lexP")
+expectP_RDR             = varQual_RDR <$> gHC_READ <*> pure (fsLit "expectP")
 
-readField_RDR, readFieldHash_RDR, readSymField_RDR :: RdrName
-readField_RDR           = varQual_RDR gHC_READ (fsLit "readField")
-readFieldHash_RDR       = varQual_RDR gHC_READ (fsLit "readFieldHash")
-readSymField_RDR        = varQual_RDR gHC_READ (fsLit "readSymField")
+readField_RDR, readFieldHash_RDR, readSymField_RDR :: WiredIn RdrName
+readField_RDR           = varQual_RDR <$> gHC_READ <*> pure (fsLit "readField")
+readFieldHash_RDR       = varQual_RDR <$> gHC_READ <*> pure (fsLit "readFieldHash")
+readSymField_RDR        = varQual_RDR <$> gHC_READ <*> pure (fsLit "readSymField")
 
-punc_RDR, ident_RDR, symbol_RDR :: RdrName
-punc_RDR                = dataQual_RDR lEX (fsLit "Punc")
-ident_RDR               = dataQual_RDR lEX (fsLit "Ident")
-symbol_RDR              = dataQual_RDR lEX (fsLit "Symbol")
+punc_RDR, ident_RDR, symbol_RDR :: WiredIn RdrName
+punc_RDR                = dataQual_RDR <$> lEX <*> pure (fsLit "Punc")
+ident_RDR               = dataQual_RDR <$> lEX <*> pure (fsLit "Ident")
+symbol_RDR              = dataQual_RDR <$> lEX <*> pure (fsLit "Symbol")
 
-step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: RdrName
-step_RDR                = varQual_RDR  rEAD_PREC (fsLit "step")
-alt_RDR                 = varQual_RDR  rEAD_PREC (fsLit "+++")
-reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
-prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
-pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
+step_RDR, alt_RDR, reset_RDR, prec_RDR, pfail_RDR :: WiredIn RdrName
+step_RDR                = varQual_RDR  <$> rEAD_PREC <*> pure (fsLit "step")
+alt_RDR                 = varQual_RDR  <$> rEAD_PREC <*> pure (fsLit "+++")
+reset_RDR               = varQual_RDR  <$> rEAD_PREC <*> pure (fsLit "reset")
+prec_RDR                = varQual_RDR  <$> rEAD_PREC <*> pure (fsLit "prec")
+pfail_RDR               = varQual_RDR  <$> rEAD_PREC <*> pure (fsLit "pfail")
 
 showsPrec_RDR, shows_RDR, showString_RDR,
-    showSpace_RDR, showCommaSpace_RDR, showParen_RDR :: RdrName
-showsPrec_RDR           = varQual_RDR gHC_SHOW (fsLit "showsPrec")
-shows_RDR               = varQual_RDR gHC_SHOW (fsLit "shows")
-showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
-showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
-showCommaSpace_RDR      = varQual_RDR gHC_SHOW (fsLit "showCommaSpace")
-showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen")
+    showSpace_RDR, showCommaSpace_RDR, showParen_RDR :: WiredIn RdrName
+showsPrec_RDR           = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "showsPrec")
+shows_RDR               = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "shows")
+showString_RDR          = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "showString")
+showSpace_RDR           = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "showSpace")
+showCommaSpace_RDR      = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "showCommaSpace")
+showParen_RDR           = varQual_RDR <$> gHC_SHOW <*> pure (fsLit "showParen")
 
-error_RDR :: RdrName
-error_RDR = varQual_RDR gHC_ERR (fsLit "error")
+error_RDR :: WiredIn RdrName
+error_RDR = varQual_RDR <$> gHC_ERR <*> pure (fsLit "error")
 
 -- Generics (constructors and functions)
 u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
@@ -856,74 +855,74 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   uAddrDataCon_RDR, uCharDataCon_RDR, uDoubleDataCon_RDR,
   uFloatDataCon_RDR, uIntDataCon_RDR, uWordDataCon_RDR,
   uAddrHash_RDR, uCharHash_RDR, uDoubleHash_RDR,
-  uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: RdrName
+  uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: WiredIn RdrName
 
-u1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "U1")
-par1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Par1")
-rec1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Rec1")
-k1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "K1")
-m1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "M1")
+u1DataCon_RDR    = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "U1")
+par1DataCon_RDR  = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "Par1")
+rec1DataCon_RDR  = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "Rec1")
+k1DataCon_RDR    = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "K1")
+m1DataCon_RDR    = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "M1")
 
-l1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "L1")
-r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
+l1DataCon_RDR     = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "L1")
+r1DataCon_RDR     = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "R1")
 
-prodDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
-comp1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Comp1")
+prodDataCon_RDR   = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit ":*:")
+comp1DataCon_RDR  = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "Comp1")
 
-unPar1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unPar1")
-unRec1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unRec1")
-unK1_RDR    = varQual_RDR gHC_GENERICS (fsLit "unK1")
-unComp1_RDR = varQual_RDR gHC_GENERICS (fsLit "unComp1")
+unPar1_RDR  = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "unPar1")
+unRec1_RDR  = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "unRec1")
+unK1_RDR    = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "unK1")
+unComp1_RDR = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "unComp1")
 
-from_RDR  = varQual_RDR gHC_GENERICS (fsLit "from")
-from1_RDR = varQual_RDR gHC_GENERICS (fsLit "from1")
-to_RDR    = varQual_RDR gHC_GENERICS (fsLit "to")
-to1_RDR   = varQual_RDR gHC_GENERICS (fsLit "to1")
+from_RDR  = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "from")
+from1_RDR = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "from1")
+to_RDR    = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "to")
+to1_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "to1")
 
-datatypeName_RDR  = varQual_RDR gHC_GENERICS (fsLit "datatypeName")
-moduleName_RDR    = varQual_RDR gHC_GENERICS (fsLit "moduleName")
-packageName_RDR   = varQual_RDR gHC_GENERICS (fsLit "packageName")
-isNewtypeName_RDR = varQual_RDR gHC_GENERICS (fsLit "isNewtype")
-selName_RDR       = varQual_RDR gHC_GENERICS (fsLit "selName")
-conName_RDR       = varQual_RDR gHC_GENERICS (fsLit "conName")
-conFixity_RDR     = varQual_RDR gHC_GENERICS (fsLit "conFixity")
-conIsRecord_RDR   = varQual_RDR gHC_GENERICS (fsLit "conIsRecord")
+datatypeName_RDR  = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "datatypeName")
+moduleName_RDR    = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "moduleName")
+packageName_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "packageName")
+isNewtypeName_RDR = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "isNewtype")
+selName_RDR       = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "selName")
+conName_RDR       = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "conName")
+conFixity_RDR     = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "conFixity")
+conIsRecord_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "conIsRecord")
 
-prefixDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Prefix")
-infixDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Infix")
-leftAssocDataCon_RDR  = nameRdrName leftAssociativeDataConName
-rightAssocDataCon_RDR = nameRdrName rightAssociativeDataConName
-notAssocDataCon_RDR   = nameRdrName notAssociativeDataConName
+prefixDataCon_RDR     = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "Prefix")
+infixDataCon_RDR      = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "Infix")
+leftAssocDataCon_RDR  = nameRdrName  <$> leftAssociativeDataConName
+rightAssocDataCon_RDR = nameRdrName  <$> rightAssociativeDataConName
+notAssocDataCon_RDR   = nameRdrName  <$> notAssociativeDataConName
 
-uAddrDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UAddr")
-uCharDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UChar")
-uDoubleDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "UDouble")
-uFloatDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "UFloat")
-uIntDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "UInt")
-uWordDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UWord")
+uAddrDataCon_RDR   = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UAddr")
+uCharDataCon_RDR   = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UChar")
+uDoubleDataCon_RDR = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UDouble")
+uFloatDataCon_RDR  = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UFloat")
+uIntDataCon_RDR    = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UInt")
+uWordDataCon_RDR   = dataQual_RDR <$> gHC_GENERICS <*> pure (fsLit "UWord")
 
-uAddrHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uAddr#")
-uCharHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uChar#")
-uDoubleHash_RDR = varQual_RDR gHC_GENERICS (fsLit "uDouble#")
-uFloatHash_RDR  = varQual_RDR gHC_GENERICS (fsLit "uFloat#")
-uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
-uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
+uAddrHash_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uAddr#")
+uCharHash_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uChar#")
+uDoubleHash_RDR = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uDouble#")
+uFloatHash_RDR  = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uFloat#")
+uIntHash_RDR    = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uInt#")
+uWordHash_RDR   = varQual_RDR <$> gHC_GENERICS <*> pure (fsLit "uWord#")
 
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
-    mappend_RDR :: RdrName
-fmap_RDR                = nameRdrName fmapName
-replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
-pure_RDR                = nameRdrName pureAName
-ap_RDR                  = nameRdrName apAName
-liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")
-foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
-foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
-null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
-all_RDR                 = varQual_RDR dATA_FOLDABLE       (fsLit "all")
-traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
-mempty_RDR              = nameRdrName memptyName
-mappend_RDR             = nameRdrName mappendName
+    mappend_RDR :: WiredIn RdrName
+fmap_RDR                = nameRdrName <$> fmapName
+replace_RDR             = varQual_RDR <$> gHC_BASE <*> pure (fsLit "<$")
+pure_RDR                = nameRdrName <$> pureAName
+ap_RDR                  = nameRdrName <$> apAName
+liftA2_RDR              = varQual_RDR <$> gHC_BASE <*> pure (fsLit "liftA2")
+foldable_foldr_RDR      = varQual_RDR <$> dATA_FOLDABLE       <*> pure (fsLit "foldr")
+foldMap_RDR             = varQual_RDR <$> dATA_FOLDABLE       <*> pure (fsLit "foldMap")
+null_RDR                = varQual_RDR <$> dATA_FOLDABLE       <*> pure (fsLit "null")
+all_RDR                 = varQual_RDR <$> dATA_FOLDABLE       <*> pure (fsLit "all")
+traverse_RDR            = varQual_RDR <$> dATA_TRAVERSABLE    <*> pure (fsLit "traverse")
+mempty_RDR              = nameRdrName <$> memptyName
+mappend_RDR             = nameRdrName <$> mappendName
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -948,26 +947,26 @@ and it's convenient to write them all down in one place.
 wildCardName :: Name
 wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 
-runMainIOName, runRWName :: Name
-runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
-runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
+runMainIOName, runRWName :: WiredIn Name
+runMainIOName = varQual <$> gHC_TOP_HANDLER <*> pure (fsLit "runMainIO") <*> pure runMainKey
+runRWName     = varQual <$> gHC_MAGIC       <*> pure (fsLit "runRW#")    <*> pure runRWKey
 
-orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
-orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
-ordLTDataConName     = dcQual gHC_TYPES (fsLit "LT") ordLTDataConKey
-ordEQDataConName     = dcQual gHC_TYPES (fsLit "EQ") ordEQDataConKey
-ordGTDataConName     = dcQual gHC_TYPES (fsLit "GT") ordGTDataConKey
+orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: WiredIn Name
+orderingTyConName    = tcQual <$> gHC_TYPES <*> pure (fsLit "Ordering") <*> pure orderingTyConKey
+ordLTDataConName     = dcQual <$> gHC_TYPES <*> pure (fsLit "LT") <*> pure ordLTDataConKey
+ordEQDataConName     = dcQual <$> gHC_TYPES <*> pure (fsLit "EQ") <*> pure ordEQDataConKey
+ordGTDataConName     = dcQual <$> gHC_TYPES <*> pure (fsLit "GT") <*> pure ordGTDataConKey
 
-specTyConName :: Name
-specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
+specTyConName :: WiredIn Name
+specTyConName     = tcQual <$> gHC_TYPES <*> pure (fsLit "SPEC") <*> pure specTyConKey
 
-eitherTyConName, leftDataConName, rightDataConName :: Name
-eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
-leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
-rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
+eitherTyConName, leftDataConName, rightDataConName :: WiredIn Name
+eitherTyConName   = tcQual <$> dATA_EITHER <*> pure (fsLit "Either") <*> pure eitherTyConKey
+leftDataConName   = dcQual <$> dATA_EITHER <*> pure (fsLit "Left")   <*> pure leftDataConKey
+rightDataConName  = dcQual <$> dATA_EITHER <*> pure (fsLit "Right")  <*> pure rightDataConKey
 
-voidTyConName :: Name
-voidTyConName = tcQual gHC_BASE (fsLit "Void") voidTyConKey
+voidTyConName :: WiredIn Name
+voidTyConName = tcQual <$> gHC_BASE <*> pure (fsLit "Void") <*> pure voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -984,136 +983,136 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   noSourceUnpackednessDataConName, sourceLazyDataConName,
   sourceStrictDataConName, noSourceStrictnessDataConName,
   decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
-  metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
+  metaDataDataConName, metaConsDataConName, metaSelDataConName :: WiredIn Name
 
-v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
-u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
-par1TyConName  = tcQual gHC_GENERICS (fsLit "Par1") par1TyConKey
-rec1TyConName  = tcQual gHC_GENERICS (fsLit "Rec1") rec1TyConKey
-k1TyConName  = tcQual gHC_GENERICS (fsLit "K1") k1TyConKey
-m1TyConName  = tcQual gHC_GENERICS (fsLit "M1") m1TyConKey
+v1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "V1") <*> pure v1TyConKey
+u1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "U1") <*> pure u1TyConKey
+par1TyConName = tcQual <$> gHC_GENERICS <*> pure (fsLit "Par1") <*> pure par1TyConKey
+rec1TyConName = tcQual <$> gHC_GENERICS <*> pure (fsLit "Rec1") <*> pure rec1TyConKey
+k1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "K1") <*> pure k1TyConKey
+m1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "M1") <*> pure m1TyConKey
 
-sumTyConName    = tcQual gHC_GENERICS (fsLit ":+:") sumTyConKey
-prodTyConName   = tcQual gHC_GENERICS (fsLit ":*:") prodTyConKey
-compTyConName   = tcQual gHC_GENERICS (fsLit ":.:") compTyConKey
+sumTyConName    = tcQual <$> gHC_GENERICS <*> pure (fsLit ":+:") <*> pure sumTyConKey
+prodTyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit ":*:") <*> pure prodTyConKey
+compTyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit ":.:") <*> pure compTyConKey
 
-rTyConName  = tcQual gHC_GENERICS (fsLit "R") rTyConKey
-dTyConName  = tcQual gHC_GENERICS (fsLit "D") dTyConKey
-cTyConName  = tcQual gHC_GENERICS (fsLit "C") cTyConKey
-sTyConName  = tcQual gHC_GENERICS (fsLit "S") sTyConKey
+rTyConName  = tcQual <$> gHC_GENERICS <*> pure (fsLit "R") <*> pure rTyConKey
+dTyConName  = tcQual <$> gHC_GENERICS <*> pure (fsLit "D") <*> pure dTyConKey
+cTyConName  = tcQual <$> gHC_GENERICS <*> pure (fsLit "C") <*> pure cTyConKey
+sTyConName  = tcQual <$> gHC_GENERICS <*> pure (fsLit "S") <*> pure sTyConKey
 
-rec0TyConName  = tcQual gHC_GENERICS (fsLit "Rec0") rec0TyConKey
-d1TyConName  = tcQual gHC_GENERICS (fsLit "D1") d1TyConKey
-c1TyConName  = tcQual gHC_GENERICS (fsLit "C1") c1TyConKey
-s1TyConName  = tcQual gHC_GENERICS (fsLit "S1") s1TyConKey
+rec0TyConName = tcQual <$> gHC_GENERICS <*> pure (fsLit "Rec0") <*> pure rec0TyConKey
+d1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "D1") <*> pure d1TyConKey
+c1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "C1") <*> pure c1TyConKey
+s1TyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "S1") <*> pure s1TyConKey
 
-repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
-rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
+repTyConName  = tcQual <$> gHC_GENERICS <*> pure (fsLit "Rep")  <*> pure repTyConKey
+rep1TyConName = tcQual <$> gHC_GENERICS <*> pure (fsLit "Rep1") <*> pure rep1TyConKey
 
-uRecTyConName      = tcQual gHC_GENERICS (fsLit "URec") uRecTyConKey
-uAddrTyConName     = tcQual gHC_GENERICS (fsLit "UAddr") uAddrTyConKey
-uCharTyConName     = tcQual gHC_GENERICS (fsLit "UChar") uCharTyConKey
-uDoubleTyConName   = tcQual gHC_GENERICS (fsLit "UDouble") uDoubleTyConKey
-uFloatTyConName    = tcQual gHC_GENERICS (fsLit "UFloat") uFloatTyConKey
-uIntTyConName      = tcQual gHC_GENERICS (fsLit "UInt") uIntTyConKey
-uWordTyConName     = tcQual gHC_GENERICS (fsLit "UWord") uWordTyConKey
+uRecTyConName      = tcQual <$> gHC_GENERICS <*> pure (fsLit "URec") <*> pure uRecTyConKey
+uAddrTyConName     = tcQual <$> gHC_GENERICS <*> pure (fsLit "UAddr") <*> pure uAddrTyConKey
+uCharTyConName     = tcQual <$> gHC_GENERICS <*> pure (fsLit "UChar") <*> pure uCharTyConKey
+uDoubleTyConName   = tcQual <$> gHC_GENERICS <*> pure (fsLit "UDouble") <*> pure uDoubleTyConKey
+uFloatTyConName    = tcQual <$> gHC_GENERICS <*> pure (fsLit "UFloat") <*> pure uFloatTyConKey
+uIntTyConName      = tcQual <$> gHC_GENERICS <*> pure (fsLit "UInt") <*> pure uIntTyConKey
+uWordTyConName     = tcQual <$> gHC_GENERICS <*> pure (fsLit "UWord") <*> pure uWordTyConKey
 
-prefixIDataConName = dcQual gHC_GENERICS (fsLit "PrefixI")  prefixIDataConKey
-infixIDataConName  = dcQual gHC_GENERICS (fsLit "InfixI")   infixIDataConKey
-leftAssociativeDataConName  = dcQual gHC_GENERICS (fsLit "LeftAssociative")   leftAssociativeDataConKey
-rightAssociativeDataConName = dcQual gHC_GENERICS (fsLit "RightAssociative")  rightAssociativeDataConKey
-notAssociativeDataConName   = dcQual gHC_GENERICS (fsLit "NotAssociative")    notAssociativeDataConKey
+prefixIDataConName = dcQual <$> gHC_GENERICS <*> pure (fsLit "PrefixI")  <*> pure prefixIDataConKey
+infixIDataConName  = dcQual <$> gHC_GENERICS <*> pure (fsLit "InfixI")   <*> pure infixIDataConKey
+leftAssociativeDataConName  = dcQual <$> gHC_GENERICS <*> pure (fsLit "LeftAssociative")   <*> pure leftAssociativeDataConKey
+rightAssociativeDataConName = dcQual <$> gHC_GENERICS <*> pure (fsLit "RightAssociative")  <*> pure rightAssociativeDataConKey
+notAssociativeDataConName   = dcQual <$> gHC_GENERICS <*> pure (fsLit "NotAssociative")    <*> pure notAssociativeDataConKey
 
-sourceUnpackDataConName         = dcQual gHC_GENERICS (fsLit "SourceUnpack")         sourceUnpackDataConKey
-sourceNoUnpackDataConName       = dcQual gHC_GENERICS (fsLit "SourceNoUnpack")       sourceNoUnpackDataConKey
-noSourceUnpackednessDataConName = dcQual gHC_GENERICS (fsLit "NoSourceUnpackedness") noSourceUnpackednessDataConKey
-sourceLazyDataConName           = dcQual gHC_GENERICS (fsLit "SourceLazy")           sourceLazyDataConKey
-sourceStrictDataConName         = dcQual gHC_GENERICS (fsLit "SourceStrict")         sourceStrictDataConKey
-noSourceStrictnessDataConName   = dcQual gHC_GENERICS (fsLit "NoSourceStrictness")   noSourceStrictnessDataConKey
-decidedLazyDataConName          = dcQual gHC_GENERICS (fsLit "DecidedLazy")          decidedLazyDataConKey
-decidedStrictDataConName        = dcQual gHC_GENERICS (fsLit "DecidedStrict")        decidedStrictDataConKey
-decidedUnpackDataConName        = dcQual gHC_GENERICS (fsLit "DecidedUnpack")        decidedUnpackDataConKey
+sourceUnpackDataConName         = dcQual <$> gHC_GENERICS <*> pure (fsLit "SourceUnpack")         <*> pure sourceUnpackDataConKey
+sourceNoUnpackDataConName       = dcQual <$> gHC_GENERICS <*> pure (fsLit "SourceNoUnpack")       <*> pure sourceNoUnpackDataConKey
+noSourceUnpackednessDataConName = dcQual <$> gHC_GENERICS <*> pure (fsLit "NoSourceUnpackedness") <*> pure noSourceUnpackednessDataConKey
+sourceLazyDataConName           = dcQual <$> gHC_GENERICS <*> pure (fsLit "SourceLazy")           <*> pure sourceLazyDataConKey
+sourceStrictDataConName         = dcQual <$> gHC_GENERICS <*> pure (fsLit "SourceStrict")         <*> pure sourceStrictDataConKey
+noSourceStrictnessDataConName   = dcQual <$> gHC_GENERICS <*> pure (fsLit "NoSourceStrictness")   <*> pure noSourceStrictnessDataConKey
+decidedLazyDataConName          = dcQual <$> gHC_GENERICS <*> pure (fsLit "DecidedLazy")          <*> pure decidedLazyDataConKey
+decidedStrictDataConName        = dcQual <$> gHC_GENERICS <*> pure (fsLit "DecidedStrict")        <*> pure decidedStrictDataConKey
+decidedUnpackDataConName        = dcQual <$> gHC_GENERICS <*> pure (fsLit "DecidedUnpack")        <*> pure decidedUnpackDataConKey
 
-metaDataDataConName  = dcQual gHC_GENERICS (fsLit "MetaData")  metaDataDataConKey
-metaConsDataConName  = dcQual gHC_GENERICS (fsLit "MetaCons")  metaConsDataConKey
-metaSelDataConName   = dcQual gHC_GENERICS (fsLit "MetaSel")   metaSelDataConKey
+metaDataDataConName  = dcQual <$> gHC_GENERICS <*> pure (fsLit "MetaData")  <*> pure metaDataDataConKey
+metaConsDataConName  = dcQual <$> gHC_GENERICS <*> pure (fsLit "MetaCons")  <*> pure metaConsDataConKey
+metaSelDataConName   = dcQual <$> gHC_GENERICS <*> pure (fsLit "MetaSel")   <*> pure metaSelDataConKey
 
 -- Primitive Int
-divIntName, modIntName :: Name
-divIntName = varQual gHC_CLASSES (fsLit "divInt#") divIntIdKey
-modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
+divIntName, modIntName :: WiredIn Name
+divIntName = varQual <$> gHC_CLASSES <*> pure (fsLit "divInt#") <*> pure divIntIdKey
+modIntName = varQual <$> gHC_CLASSES <*> pure (fsLit "modInt#") <*> pure modIntIdKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
     unpackCStringUtf8Name, unpackCStringFoldrUtf8Name,
     unpackCStringAppendName, unpackCStringAppendUtf8Name,
-    eqStringName, cstringLengthName :: Name
-cstringLengthName       = varQual gHC_CSTRING (fsLit "cstringLength#") cstringLengthIdKey
-eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+    eqStringName, cstringLengthName :: WiredIn Name
+cstringLengthName       = varQual <$> gHC_CSTRING <*> pure (fsLit "cstringLength#") <*> pure cstringLengthIdKey
+eqStringName            = varQual <$> gHC_BASE <*> pure (fsLit "eqString")  <*> pure eqStringIdKey
 
-unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
-unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
-unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
+unpackCStringName       = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackCString#") <*> pure unpackCStringIdKey
+unpackCStringAppendName = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackAppendCString#") <*> pure unpackCStringAppendIdKey
+unpackCStringFoldrName  = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackFoldrCString#") <*> pure unpackCStringFoldrIdKey
 
-unpackCStringUtf8Name       = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
-unpackCStringAppendUtf8Name = varQual gHC_CSTRING (fsLit "unpackAppendCStringUtf8#") unpackCStringAppendUtf8IdKey
-unpackCStringFoldrUtf8Name  = varQual gHC_CSTRING (fsLit "unpackFoldrCStringUtf8#") unpackCStringFoldrUtf8IdKey
+unpackCStringUtf8Name       = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackCStringUtf8#") <*> pure unpackCStringUtf8IdKey
+unpackCStringAppendUtf8Name = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackAppendCStringUtf8#") <*> pure unpackCStringAppendUtf8IdKey
+unpackCStringFoldrUtf8Name  = varQual <$> gHC_CSTRING <*> pure (fsLit "unpackFoldrCStringUtf8#") <*> pure unpackCStringFoldrUtf8IdKey
 
 
 -- The 'inline' function
-inlineIdName :: Name
-inlineIdName            = varQual gHC_MAGIC (fsLit "inline") inlineIdKey
+inlineIdName :: WiredIn Name
+inlineIdName            = varQual <$> gHC_MAGIC <*> pure (fsLit "inline") <*> pure inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
-fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
-eqClassName       = clsQual gHC_CLASSES (fsLit "Eq")      eqClassKey
-eqName            = varQual gHC_CLASSES (fsLit "==")      eqClassOpKey
-ordClassName      = clsQual gHC_CLASSES (fsLit "Ord")     ordClassKey
-geName            = varQual gHC_CLASSES (fsLit ">=")      geClassOpKey
-functorClassName  = clsQual gHC_BASE    (fsLit "Functor") functorClassKey
-fmapName          = varQual gHC_BASE    (fsLit "fmap")    fmapClassOpKey
+fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: WiredIn Name
+eqClassName       = clsQual <$> gHC_CLASSES <*> pure (fsLit "Eq")      <*> pure eqClassKey
+eqName            = varQual <$> gHC_CLASSES <*> pure (fsLit "==")      <*> pure eqClassOpKey
+ordClassName      = clsQual <$> gHC_CLASSES <*> pure (fsLit "Ord")     <*> pure ordClassKey
+geName            = varQual <$> gHC_CLASSES <*> pure (fsLit ">=")      <*> pure geClassOpKey
+functorClassName  = clsQual <$> gHC_BASE    <*> pure (fsLit "Functor") <*> pure functorClassKey
+fmapName          = varQual <$> gHC_BASE    <*> pure (fsLit "fmap")    <*> pure fmapClassOpKey
 
 -- Class Monad
-monadClassName, thenMName, bindMName, returnMName :: Name
-monadClassName     = clsQual gHC_BASE (fsLit "Monad")  monadClassKey
-thenMName          = varQual gHC_BASE (fsLit ">>")     thenMClassOpKey
-bindMName          = varQual gHC_BASE (fsLit ">>=")    bindMClassOpKey
-returnMName        = varQual gHC_BASE (fsLit "return") returnMClassOpKey
+monadClassName, thenMName, bindMName, returnMName :: WiredIn Name
+monadClassName     = clsQual <$> gHC_BASE <*> pure (fsLit "Monad")  <*> pure monadClassKey
+thenMName          = varQual <$> gHC_BASE <*> pure (fsLit ">>")     <*> pure thenMClassOpKey
+bindMName          = varQual <$> gHC_BASE <*> pure (fsLit ">>=")    <*> pure bindMClassOpKey
+returnMName        = varQual <$> gHC_BASE <*> pure (fsLit "return") <*> pure returnMClassOpKey
 
 -- Class MonadFail
-monadFailClassName, failMName :: Name
-monadFailClassName = clsQual mONAD_FAIL (fsLit "MonadFail") monadFailClassKey
-failMName          = varQual mONAD_FAIL (fsLit "fail")      failMClassOpKey
+monadFailClassName, failMName :: WiredIn Name
+monadFailClassName = clsQual <$> mONAD_FAIL <*> pure (fsLit "MonadFail") <*> pure monadFailClassKey
+failMName          = varQual <$> mONAD_FAIL <*> pure (fsLit "fail")      <*> pure failMClassOpKey
 
 -- Class Applicative
-applicativeClassName, pureAName, apAName, thenAName :: Name
-applicativeClassName = clsQual gHC_BASE (fsLit "Applicative") applicativeClassKey
-apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
-thenAName            = varQual gHC_BASE (fsLit "*>")          thenAClassOpKey
+applicativeClassName, pureAName, apAName, thenAName :: WiredIn Name
+applicativeClassName = clsQual <$> gHC_BASE <*> pure (fsLit "Applicative") <*> pure applicativeClassKey
+apAName              = varQual <$> gHC_BASE <*> pure (fsLit "<*>")         <*> pure apAClassOpKey
+pureAName            = varQual <$> gHC_BASE <*> pure (fsLit "pure")        <*> pure pureAClassOpKey
+thenAName            = varQual <$> gHC_BASE <*> pure (fsLit "*>")          <*> pure thenAClassOpKey
 
 -- Classes (Foldable, Traversable)
-foldableClassName, traversableClassName :: Name
-foldableClassName     = clsQual  dATA_FOLDABLE       (fsLit "Foldable")    foldableClassKey
-traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") traversableClassKey
+foldableClassName, traversableClassName :: WiredIn Name
+foldableClassName     = clsQual  <$> dATA_FOLDABLE       <*> pure (fsLit "Foldable")    <*> pure foldableClassKey
+traversableClassName  = clsQual  <$> dATA_TRAVERSABLE    <*> pure (fsLit "Traversable") <*> pure traversableClassKey
 
 -- Classes (Semigroup, Monoid)
-semigroupClassName, sappendName :: Name
-semigroupClassName = clsQual gHC_BASE       (fsLit "Semigroup") semigroupClassKey
-sappendName        = varQual gHC_BASE       (fsLit "<>")        sappendClassOpKey
-monoidClassName, memptyName, mappendName, mconcatName :: Name
-monoidClassName    = clsQual gHC_BASE       (fsLit "Monoid")    monoidClassKey
-memptyName         = varQual gHC_BASE       (fsLit "mempty")    memptyClassOpKey
-mappendName        = varQual gHC_BASE       (fsLit "mappend")   mappendClassOpKey
-mconcatName        = varQual gHC_BASE       (fsLit "mconcat")   mconcatClassOpKey
+semigroupClassName, sappendName :: WiredIn Name
+semigroupClassName = clsQual <$> gHC_BASE       <*> pure (fsLit "Semigroup") <*> pure semigroupClassKey
+sappendName        = varQual <$> gHC_BASE       <*> pure (fsLit "<>")        <*> pure sappendClassOpKey
+monoidClassName, memptyName, mappendName, mconcatName :: WiredIn Name
+monoidClassName    = clsQual <$> gHC_BASE       <*> pure (fsLit "Monoid")    <*> pure monoidClassKey
+memptyName         = varQual <$> gHC_BASE       <*> pure (fsLit "mempty")    <*> pure memptyClassOpKey
+mappendName        = varQual <$> gHC_BASE       <*> pure (fsLit "mappend")   <*> pure mappendClassOpKey
+mconcatName        = varQual <$> gHC_BASE       <*> pure (fsLit "mconcat")   <*> pure mconcatClassOpKey
 
 
 
 -- AMP additions
 
-joinMName, alternativeClassName :: Name
-joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
-alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
+joinMName, alternativeClassName :: WiredIn Name
+joinMName            = varQual <$> gHC_BASE <*> pure (fsLit "join")        <*> pure joinMIdKey
+alternativeClassName = clsQual <$> mONAD    <*> pure (fsLit "Alternative") <*> pure alternativeClassKey
 
 --
 joinMIdKey, apAClassOpKey, pureAClassOpKey, thenAClassOpKey,
@@ -1126,29 +1125,29 @@ alternativeClassKey = mkPreludeMiscIdUnique 754
 
 
 -- Functions for GHC extensions
-considerAccessibleName :: Name
-considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerAccessibleIdKey
+considerAccessibleName :: WiredIn Name
+considerAccessibleName = varQual <$> gHC_EXTS <*> pure (fsLit "considerAccessible") <*> pure considerAccessibleIdKey
 
 -- Random GHC.Base functions
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
-    dollarName :: Name
-dollarName        = varQual gHC_BASE (fsLit "$")          dollarIdKey
-otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
-foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
-buildName         = varQual gHC_BASE (fsLit "build")      buildIdKey
-augmentName       = varQual gHC_BASE (fsLit "augment")    augmentIdKey
-mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
-appendName        = varQual gHC_BASE (fsLit "++")         appendIdKey
-assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
-fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
+    dollarName :: WiredIn Name
+dollarName        = varQual <$> gHC_BASE <*> pure (fsLit "$")          <*> pure dollarIdKey
+otherwiseIdName   = varQual <$> gHC_BASE <*> pure (fsLit "otherwise")  <*> pure otherwiseIdKey
+foldrName         = varQual <$> gHC_BASE <*> pure (fsLit "foldr")      <*> pure foldrIdKey
+buildName         = varQual <$> gHC_BASE <*> pure (fsLit "build")      <*> pure buildIdKey
+augmentName       = varQual <$> gHC_BASE <*> pure (fsLit "augment")    <*> pure augmentIdKey
+mapName           = varQual <$> gHC_BASE <*> pure (fsLit "map")        <*> pure mapIdKey
+appendName        = varQual <$> gHC_BASE <*> pure (fsLit "++")         <*> pure appendIdKey
+assertName        = varQual <$> gHC_BASE <*> pure (fsLit "assert")     <*> pure assertIdKey
+fromStringName = varQual <$> dATA_STRING <*> pure (fsLit "fromString") <*> pure fromStringClassOpKey
 
 -- Module GHC.Num
-numClassName, fromIntegerName, minusName, negateName :: Name
-numClassName      = clsQual gHC_NUM (fsLit "Num")         numClassKey
-fromIntegerName   = varQual gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
-minusName         = varQual gHC_NUM (fsLit "-")           minusClassOpKey
-negateName        = varQual gHC_NUM (fsLit "negate")      negateClassOpKey
+numClassName, fromIntegerName, minusName, negateName :: WiredIn Name
+numClassName      = clsQual <$> gHC_NUM <*> pure (fsLit "Num")         <*> pure numClassKey
+fromIntegerName   = varQual <$> gHC_NUM <*> pure (fsLit "fromInteger") <*> pure fromIntegerClassOpKey
+minusName         = varQual <$> gHC_NUM <*> pure (fsLit "-")           <*> pure minusClassOpKey
+negateName        = varQual <$> gHC_NUM <*> pure (fsLit "negate")      <*> pure negateClassOpKey
 
 ---------------------------------
 -- ghc-bignum
@@ -1217,12 +1216,12 @@ integerFromNaturalName
    , bignatEqName
    , bignatCompareName
    , bignatCompareWordName
-   :: Name
+   :: WiredIn Name
 
-bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> Name
-bnbVarQual str key = varQual gHC_NUM_BIGNAT  (fsLit str) key
-bnnVarQual str key = varQual gHC_NUM_NATURAL (fsLit str) key
-bniVarQual str key = varQual gHC_NUM_INTEGER (fsLit str) key
+bnbVarQual, bnnVarQual, bniVarQual :: String -> Unique -> WiredIn Name
+bnbVarQual str key = varQual <$> gHC_NUM_BIGNAT  <*> pure (fsLit str) <*> pure key
+bnnVarQual str key = varQual <$> gHC_NUM_NATURAL <*> pure (fsLit str) <*> pure key
+bniVarQual str key = varQual <$> gHC_NUM_INTEGER <*> pure (fsLit str) <*> pure key
 
 -- Types and DataCons
 bignatFromWordListName    = bnbVarQual "bigNatFromWordList#"       bignatFromWordListIdKey
@@ -1302,40 +1301,40 @@ integerShiftRName         = bniVarQual "integerShiftR#"            integerShiftR
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
-    realToFracName, mkRationalBase2Name, mkRationalBase10Name :: Name
-rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
-ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
-ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
-realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
-integralClassName   = clsQual gHC_REAL (fsLit "Integral")     integralClassKey
-realFracClassName   = clsQual gHC_REAL (fsLit "RealFrac")     realFracClassKey
-fractionalClassName = clsQual gHC_REAL (fsLit "Fractional")   fractionalClassKey
-fromRationalName    = varQual gHC_REAL (fsLit "fromRational") fromRationalClassOpKey
-toIntegerName       = varQual gHC_REAL (fsLit "toInteger")    toIntegerClassOpKey
-toRationalName      = varQual gHC_REAL (fsLit "toRational")   toRationalClassOpKey
-fromIntegralName    = varQual  gHC_REAL (fsLit "fromIntegral")fromIntegralIdKey
-realToFracName      = varQual  gHC_REAL (fsLit "realToFrac")  realToFracIdKey
-mkRationalBase2Name  = varQual  gHC_REAL  (fsLit "mkRationalBase2")  mkRationalBase2IdKey
-mkRationalBase10Name = varQual  gHC_REAL  (fsLit "mkRationalBase10") mkRationalBase10IdKey
+    realToFracName, mkRationalBase2Name, mkRationalBase10Name :: WiredIn Name
+rationalTyConName   = tcQual  <$> gHC_REAL <*> pure (fsLit "Rational")     <*> pure rationalTyConKey
+ratioTyConName      = tcQual  <$> gHC_REAL <*> pure (fsLit "Ratio")        <*> pure ratioTyConKey
+ratioDataConName    = dcQual  <$> gHC_REAL <*> pure (fsLit ":%")           <*> pure ratioDataConKey
+realClassName       = clsQual <$> gHC_REAL <*> pure (fsLit "Real")         <*> pure realClassKey
+integralClassName   = clsQual <$> gHC_REAL <*> pure (fsLit "Integral")     <*> pure integralClassKey
+realFracClassName   = clsQual <$> gHC_REAL <*> pure (fsLit "RealFrac")     <*> pure realFracClassKey
+fractionalClassName = clsQual <$> gHC_REAL <*> pure (fsLit "Fractional")   <*> pure fractionalClassKey
+fromRationalName    = varQual <$> gHC_REAL <*> pure (fsLit "fromRational") <*> pure fromRationalClassOpKey
+toIntegerName       = varQual <$> gHC_REAL <*> pure (fsLit "toInteger")    <*> pure toIntegerClassOpKey
+toRationalName      = varQual <$> gHC_REAL <*> pure (fsLit "toRational")   <*> pure toRationalClassOpKey
+fromIntegralName    = varQual <$> gHC_REAL <*> pure (fsLit "fromIntegral") <*> pure fromIntegralIdKey
+realToFracName      = varQual <$> gHC_REAL <*> pure (fsLit "realToFrac")   <*> pure realToFracIdKey
+mkRationalBase2Name  = varQual <$> gHC_REAL <*> pure (fsLit "mkRationalBase2")  <*> pure mkRationalBase2IdKey
+mkRationalBase10Name = varQual <$> gHC_REAL <*> pure (fsLit "mkRationalBase10") <*> pure mkRationalBase10IdKey
 -- GHC.Float classes
-floatingClassName, realFloatClassName :: Name
-floatingClassName  = clsQual gHC_FLOAT (fsLit "Floating")  floatingClassKey
-realFloatClassName = clsQual gHC_FLOAT (fsLit "RealFloat") realFloatClassKey
+floatingClassName, realFloatClassName :: WiredIn Name
+floatingClassName  = clsQual <$> gHC_FLOAT <*> pure (fsLit "Floating")  <*> pure floatingClassKey
+realFloatClassName = clsQual <$> gHC_FLOAT <*> pure (fsLit "RealFloat") <*> pure realFloatClassKey
 
 -- other GHC.Float functions
 integerToFloatName, integerToDoubleName,
   naturalToFloatName, naturalToDoubleName,
-  rationalToFloatName, rationalToDoubleName :: Name
-integerToFloatName   = varQual gHC_FLOAT (fsLit "integerToFloat#") integerToFloatIdKey
-integerToDoubleName  = varQual gHC_FLOAT (fsLit "integerToDouble#") integerToDoubleIdKey
-naturalToFloatName   = varQual gHC_FLOAT (fsLit "naturalToFloat#") naturalToFloatIdKey
-naturalToDoubleName  = varQual gHC_FLOAT (fsLit "naturalToDouble#") naturalToDoubleIdKey
-rationalToFloatName  = varQual gHC_FLOAT (fsLit "rationalToFloat") rationalToFloatIdKey
-rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDoubleIdKey
+  rationalToFloatName, rationalToDoubleName :: WiredIn Name
+integerToFloatName   = varQual <$> gHC_FLOAT <*> pure (fsLit "integerToFloat#") <*> pure integerToFloatIdKey
+integerToDoubleName  = varQual <$> gHC_FLOAT <*> pure (fsLit "integerToDouble#") <*> pure integerToDoubleIdKey
+naturalToFloatName   = varQual <$> gHC_FLOAT <*> pure (fsLit "naturalToFloat#") <*> pure naturalToFloatIdKey
+naturalToDoubleName  = varQual <$> gHC_FLOAT <*> pure (fsLit "naturalToDouble#") <*> pure naturalToDoubleIdKey
+rationalToFloatName  = varQual <$> gHC_FLOAT <*> pure (fsLit "rationalToFloat") <*> pure rationalToFloatIdKey
+rationalToDoubleName = varQual <$> gHC_FLOAT <*> pure (fsLit "rationalToDouble") <*> pure rationalToDoubleIdKey
 
 -- Class Ix
-ixClassName :: Name
-ixClassName = clsQual gHC_IX (fsLit "Ix") ixClassKey
+ixClassName :: WiredIn Name
+ixClassName = clsQual <$> gHC_IX <*> pure (fsLit "Ix") <*> pure ixClassKey
 
 -- Typeable representation types
 trModuleTyConName
@@ -1345,14 +1344,14 @@ trModuleTyConName
   , trNameDDataConName
   , trTyConTyConName
   , trTyConDataConName
-  :: Name
-trModuleTyConName     = tcQual gHC_TYPES          (fsLit "Module")         trModuleTyConKey
-trModuleDataConName   = dcQual gHC_TYPES          (fsLit "Module")         trModuleDataConKey
-trNameTyConName       = tcQual gHC_TYPES          (fsLit "TrName")         trNameTyConKey
-trNameSDataConName    = dcQual gHC_TYPES          (fsLit "TrNameS")        trNameSDataConKey
-trNameDDataConName    = dcQual gHC_TYPES          (fsLit "TrNameD")        trNameDDataConKey
-trTyConTyConName      = tcQual gHC_TYPES          (fsLit "TyCon")          trTyConTyConKey
-trTyConDataConName    = dcQual gHC_TYPES          (fsLit "TyCon")          trTyConDataConKey
+  :: WiredIn Name
+trModuleTyConName     = tcQual <$> gHC_TYPES          <*> pure (fsLit "Module")         <*> pure trModuleTyConKey
+trModuleDataConName   = dcQual <$> gHC_TYPES          <*> pure (fsLit "Module")         <*> pure trModuleDataConKey
+trNameTyConName       = tcQual <$> gHC_TYPES          <*> pure (fsLit "TrName")         <*> pure trNameTyConKey
+trNameSDataConName    = dcQual <$> gHC_TYPES          <*> pure (fsLit "TrNameS")        <*> pure trNameSDataConKey
+trNameDDataConName    = dcQual <$> gHC_TYPES          <*> pure (fsLit "TrNameD")        <*> pure trNameDDataConKey
+trTyConTyConName      = tcQual <$> gHC_TYPES          <*> pure (fsLit "TyCon")          <*> pure trTyConTyConKey
+trTyConDataConName    = dcQual <$> gHC_TYPES          <*> pure (fsLit "TyCon")          <*> pure trTyConDataConKey
 
 kindRepTyConName
   , kindRepTyConAppDataConName
@@ -1362,25 +1361,25 @@ kindRepTyConName
   , kindRepTYPEDataConName
   , kindRepTypeLitSDataConName
   , kindRepTypeLitDDataConName
-  :: Name
-kindRepTyConName      = tcQual gHC_TYPES          (fsLit "KindRep")        kindRepTyConKey
-kindRepTyConAppDataConName = dcQual gHC_TYPES     (fsLit "KindRepTyConApp") kindRepTyConAppDataConKey
-kindRepVarDataConName = dcQual gHC_TYPES          (fsLit "KindRepVar")     kindRepVarDataConKey
-kindRepAppDataConName = dcQual gHC_TYPES          (fsLit "KindRepApp")     kindRepAppDataConKey
-kindRepFunDataConName = dcQual gHC_TYPES          (fsLit "KindRepFun")     kindRepFunDataConKey
-kindRepTYPEDataConName = dcQual gHC_TYPES         (fsLit "KindRepTYPE")    kindRepTYPEDataConKey
-kindRepTypeLitSDataConName = dcQual gHC_TYPES     (fsLit "KindRepTypeLitS") kindRepTypeLitSDataConKey
-kindRepTypeLitDDataConName = dcQual gHC_TYPES     (fsLit "KindRepTypeLitD") kindRepTypeLitDDataConKey
+  :: WiredIn Name
+kindRepTyConName           = tcQual <$> gHC_TYPES <*> pure (fsLit "KindRep")         <*> pure kindRepTyConKey
+kindRepTyConAppDataConName = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepTyConApp") <*> pure kindRepTyConAppDataConKey
+kindRepVarDataConName      = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepVar")      <*> pure kindRepVarDataConKey
+kindRepAppDataConName      = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepApp")      <*> pure kindRepAppDataConKey
+kindRepFunDataConName      = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepFun")      <*> pure kindRepFunDataConKey
+kindRepTYPEDataConName     = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepTYPE")     <*> pure kindRepTYPEDataConKey
+kindRepTypeLitSDataConName = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepTypeLitS") <*> pure kindRepTypeLitSDataConKey
+kindRepTypeLitDDataConName = dcQual <$> gHC_TYPES <*> pure (fsLit "KindRepTypeLitD") <*> pure kindRepTypeLitDDataConKey
 
 typeLitSortTyConName
   , typeLitSymbolDataConName
   , typeLitNatDataConName
   , typeLitCharDataConName
-  :: Name
-typeLitSortTyConName     = tcQual gHC_TYPES       (fsLit "TypeLitSort")    typeLitSortTyConKey
-typeLitSymbolDataConName = dcQual gHC_TYPES       (fsLit "TypeLitSymbol")  typeLitSymbolDataConKey
-typeLitNatDataConName    = dcQual gHC_TYPES       (fsLit "TypeLitNat")     typeLitNatDataConKey
-typeLitCharDataConName   = dcQual gHC_TYPES       (fsLit "TypeLitChar")    typeLitCharDataConKey
+  :: WiredIn Name
+typeLitSortTyConName     = tcQual <$> gHC_TYPES <*> pure (fsLit "TypeLitSort")   <*> pure typeLitSortTyConKey
+typeLitSymbolDataConName = dcQual <$> gHC_TYPES <*> pure (fsLit "TypeLitSymbol") <*> pure typeLitSymbolDataConKey
+typeLitNatDataConName    = dcQual <$> gHC_TYPES <*> pure (fsLit "TypeLitNat")    <*> pure typeLitNatDataConKey
+typeLitCharDataConName   = dcQual <$> gHC_TYPES <*> pure (fsLit "TypeLitChar")   <*> pure typeLitCharDataConKey
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 typeableClassName
@@ -1396,37 +1395,37 @@ typeableClassName
   , typeSymbolTypeRepName
   , typeCharTypeRepName
   , trGhcPrimModuleName
-  :: Name
-typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
-typeRepTyConName      = tcQual  tYPEABLE_INTERNAL (fsLit "TypeRep")        typeRepTyConKey
-someTypeRepTyConName   = tcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepTyConKey
-someTypeRepDataConName = dcQual tYPEABLE_INTERNAL (fsLit "SomeTypeRep")    someTypeRepDataConKey
-typeRepIdName         = varQual tYPEABLE_INTERNAL (fsLit "typeRep#")       typeRepIdKey
-mkTrTypeName          = varQual tYPEABLE_INTERNAL (fsLit "mkTrType")       mkTrTypeKey
-mkTrConName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrCon")        mkTrConKey
-mkTrAppName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrAppKey
-mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
-typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
-typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
-typeCharTypeRepName   = varQual tYPEABLE_INTERNAL (fsLit "typeCharTypeRep") typeCharTypeRepKey
+  :: WiredIn Name
+typeableClassName     = clsQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "Typeable")       <*> pure typeableClassKey
+typeRepTyConName      = tcQual  <$> tYPEABLE_INTERNAL <*> pure (fsLit "TypeRep")        <*> pure typeRepTyConKey
+someTypeRepTyConName   = tcQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "SomeTypeRep")    <*> pure someTypeRepTyConKey
+someTypeRepDataConName = dcQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "SomeTypeRep")    <*> pure someTypeRepDataConKey
+typeRepIdName         = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "typeRep#")       <*> pure typeRepIdKey
+mkTrTypeName          = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "mkTrType")       <*> pure mkTrTypeKey
+mkTrConName           = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "mkTrCon")        <*> pure mkTrConKey
+mkTrAppName           = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "mkTrApp")        <*> pure mkTrAppKey
+mkTrFunName           = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "mkTrFun")        <*> pure mkTrFunKey
+typeNatTypeRepName    = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "typeNatTypeRep") <*> pure typeNatTypeRepKey
+typeSymbolTypeRepName = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "typeSymbolTypeRep") <*> pure typeSymbolTypeRepKey
+typeCharTypeRepName   = varQual <$> tYPEABLE_INTERNAL <*> pure (fsLit "typeCharTypeRep") <*> pure typeCharTypeRepKey
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
-trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
+trGhcPrimModuleName   = varQual <$> gHC_TYPES         <*> pure (fsLit "tr$ModuleGHCPrim")  <*> pure trGhcPrimModuleKey
 
 -- Typeable KindReps for some common cases
 starKindRepName, starArrStarKindRepName,
-  starArrStarArrStarKindRepName, constraintKindRepName :: Name
-starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")          starKindRepKey
-starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")      starArrStarKindRepKey
-starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")    starArrStarArrStarKindRepKey
-constraintKindRepName  = varQual gHC_TYPES         (fsLit "krep$Constraint") constraintKindRepKey
+  starArrStarArrStarKindRepName, constraintKindRepName :: WiredIn Name
+starKindRepName        = varQual <$> gHC_TYPES         <*> pure (fsLit "krep$*")          <*> pure starKindRepKey
+starArrStarKindRepName = varQual <$> gHC_TYPES         <*> pure (fsLit "krep$*Arr*")      <*> pure starArrStarKindRepKey
+starArrStarArrStarKindRepName = varQual <$> gHC_TYPES  <*> pure (fsLit "krep$*->*->*")    <*> pure starArrStarArrStarKindRepKey
+constraintKindRepName  = varQual <$> gHC_TYPES         <*> pure (fsLit "krep$Constraint") <*> pure constraintKindRepKey
 
 -- WithDict
-withDictClassName :: Name
-withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
+withDictClassName :: WiredIn Name
+withDictClassName = clsQual <$> gHC_MAGIC_DICT <*> pure (fsLit "WithDict") <*> pure withDictClassKey
 
-nonEmptyTyConName :: Name
-nonEmptyTyConName = tcQual gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey
+nonEmptyTyConName :: WiredIn Name
+nonEmptyTyConName = tcQual <$> gHC_BASE <*> pure (fsLit "NonEmpty") <*> pure nonEmptyTyConKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -1434,244 +1433,244 @@ errorMessageTypeErrorFamName
   , typeErrorAppendDataConName
   , typeErrorVAppendDataConName
   , typeErrorShowTypeDataConName
-  :: Name
+  :: WiredIn Name
 
 errorMessageTypeErrorFamName =
-  tcQual gHC_TYPEERROR (fsLit "TypeError") errorMessageTypeErrorFamKey
+  tcQual <$> gHC_TYPEERROR <*> pure (fsLit "TypeError") <*> pure errorMessageTypeErrorFamKey
 
 typeErrorTextDataConName =
-  dcQual gHC_TYPEERROR (fsLit "Text") typeErrorTextDataConKey
+  dcQual <$> gHC_TYPEERROR <*> pure (fsLit "Text") <*> pure typeErrorTextDataConKey
 
 typeErrorAppendDataConName =
-  dcQual gHC_TYPEERROR (fsLit ":<>:") typeErrorAppendDataConKey
+  dcQual <$> gHC_TYPEERROR <*> pure (fsLit ":<>:") <*> pure typeErrorAppendDataConKey
 
 typeErrorVAppendDataConName =
-  dcQual gHC_TYPEERROR (fsLit ":$$:") typeErrorVAppendDataConKey
+  dcQual <$> gHC_TYPEERROR <*> pure (fsLit ":$$:") <*> pure typeErrorVAppendDataConKey
 
 typeErrorShowTypeDataConName =
-  dcQual gHC_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
+  dcQual <$> gHC_TYPEERROR <*> pure (fsLit "ShowType") <*> pure typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
-  unsafeReflDataConName :: Name
-unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
-unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
-unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
-unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
+  unsafeReflDataConName :: WiredIn Name
+unsafeEqualityProofName = varQual <$> uNSAFE_COERCE <*> pure (fsLit "unsafeEqualityProof") <*> pure unsafeEqualityProofIdKey
+unsafeEqualityTyConName = tcQual  <$> uNSAFE_COERCE <*> pure (fsLit "UnsafeEquality") <*> pure unsafeEqualityTyConKey
+unsafeReflDataConName   = dcQual  <$> uNSAFE_COERCE <*> pure (fsLit "UnsafeRefl")     <*> pure unsafeReflDataConKey
+unsafeCoercePrimName    = varQual <$> uNSAFE_COERCE <*> pure (fsLit "unsafeCoerce#") <*> pure unsafeCoercePrimIdKey
 
 -- Dynamic
-toDynName :: Name
-toDynName = varQual dYNAMIC (fsLit "toDyn") toDynIdKey
+toDynName :: WiredIn Name
+toDynName = varQual <$> dYNAMIC <*> pure (fsLit "toDyn") <*> pure toDynIdKey
 
 -- Class Data
-dataClassName :: Name
-dataClassName = clsQual gENERICS (fsLit "Data") dataClassKey
+dataClassName :: WiredIn Name
+dataClassName = clsQual <$> gENERICS <*> pure (fsLit "Data") <*> pure dataClassKey
 
 -- Error module
-assertErrorName    :: Name
-assertErrorName   = varQual gHC_IO_Exception (fsLit "assertError") assertErrorIdKey
+assertErrorName    :: WiredIn Name
+assertErrorName   = varQual <$> gHC_IO_Exception <*> pure (fsLit "assertError") <*> pure assertErrorIdKey
 
 -- Debug.Trace
-traceName          :: Name
-traceName         = varQual dEBUG_TRACE (fsLit "trace") traceKey
+traceName          :: WiredIn Name
+traceName         = varQual <$> dEBUG_TRACE <*> pure (fsLit "trace") <*> pure traceKey
 
 -- Enum module (Enum, Bounded)
 enumClassName, enumFromName, enumFromToName, enumFromThenName,
-    enumFromThenToName, boundedClassName :: Name
-enumClassName      = clsQual gHC_ENUM (fsLit "Enum")           enumClassKey
-enumFromName       = varQual gHC_ENUM (fsLit "enumFrom")       enumFromClassOpKey
-enumFromToName     = varQual gHC_ENUM (fsLit "enumFromTo")     enumFromToClassOpKey
-enumFromThenName   = varQual gHC_ENUM (fsLit "enumFromThen")   enumFromThenClassOpKey
-enumFromThenToName = varQual gHC_ENUM (fsLit "enumFromThenTo") enumFromThenToClassOpKey
-boundedClassName   = clsQual gHC_ENUM (fsLit "Bounded")        boundedClassKey
+    enumFromThenToName, boundedClassName :: WiredIn Name
+enumClassName      = clsQual <$> gHC_ENUM <*> pure (fsLit "Enum")           <*> pure enumClassKey
+enumFromName       = varQual <$> gHC_ENUM <*> pure (fsLit "enumFrom")       <*> pure enumFromClassOpKey
+enumFromToName     = varQual <$> gHC_ENUM <*> pure (fsLit "enumFromTo")     <*> pure enumFromToClassOpKey
+enumFromThenName   = varQual <$> gHC_ENUM <*> pure (fsLit "enumFromThen")   <*> pure enumFromThenClassOpKey
+enumFromThenToName = varQual <$> gHC_ENUM <*> pure (fsLit "enumFromThenTo") <*> pure enumFromThenToClassOpKey
+boundedClassName   = clsQual <$> gHC_ENUM <*> pure (fsLit "Bounded")        <*> pure boundedClassKey
 
 -- List functions
-concatName, filterName, zipName :: Name
-concatName        = varQual gHC_LIST (fsLit "concat") concatIdKey
-filterName        = varQual gHC_LIST (fsLit "filter") filterIdKey
-zipName           = varQual gHC_LIST (fsLit "zip")    zipIdKey
+concatName, filterName, zipName :: WiredIn Name
+concatName        = varQual <$> gHC_LIST <*> pure (fsLit "concat") <*> pure concatIdKey
+filterName        = varQual <$> gHC_LIST <*> pure (fsLit "filter") <*> pure filterIdKey
+zipName           = varQual <$> gHC_LIST <*> pure (fsLit "zip")    <*> pure zipIdKey
 
 -- Overloaded lists
-isListClassName, fromListName, fromListNName, toListName :: Name
-isListClassName = clsQual gHC_IS_LIST (fsLit "IsList")    isListClassKey
-fromListName    = varQual gHC_IS_LIST (fsLit "fromList")  fromListClassOpKey
-fromListNName   = varQual gHC_IS_LIST (fsLit "fromListN") fromListNClassOpKey
-toListName      = varQual gHC_IS_LIST (fsLit "toList")    toListClassOpKey
+isListClassName, fromListName, fromListNName, toListName :: WiredIn Name
+isListClassName = clsQual <$> gHC_IS_LIST <*> pure (fsLit "IsList")    <*> pure isListClassKey
+fromListName    = varQual <$> gHC_IS_LIST <*> pure (fsLit "fromList")  <*> pure fromListClassOpKey
+fromListNName   = varQual <$> gHC_IS_LIST <*> pure (fsLit "fromListN") <*> pure fromListNClassOpKey
+toListName      = varQual <$> gHC_IS_LIST <*> pure (fsLit "toList")    <*> pure toListClassOpKey
 
 -- HasField class ops
-getFieldName, setFieldName :: Name
-getFieldName   = varQual gHC_RECORDS (fsLit "getField") getFieldClassOpKey
-setFieldName   = varQual gHC_RECORDS (fsLit "setField") setFieldClassOpKey
+getFieldName, setFieldName :: WiredIn Name
+getFieldName   = varQual <$> gHC_RECORDS <*> pure (fsLit "getField") <*> pure getFieldClassOpKey
+setFieldName   = varQual <$> gHC_RECORDS <*> pure (fsLit "setField") <*> pure setFieldClassOpKey
 
 -- Class Show
-showClassName :: Name
-showClassName   = clsQual gHC_SHOW (fsLit "Show")      showClassKey
+showClassName :: WiredIn Name
+showClassName   = clsQual <$> gHC_SHOW <*> pure (fsLit "Show")      <*> pure showClassKey
 
 -- Class Read
-readClassName :: Name
-readClassName   = clsQual gHC_READ (fsLit "Read")      readClassKey
+readClassName :: WiredIn Name
+readClassName   = clsQual <$> gHC_READ <*> pure (fsLit "Read")      <*> pure readClassKey
 
 -- Classes Generic and Generic1, Datatype, Constructor and Selector
 genClassName, gen1ClassName, datatypeClassName, constructorClassName,
-  selectorClassName :: Name
-genClassName  = clsQual gHC_GENERICS (fsLit "Generic")  genClassKey
-gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
+  selectorClassName :: WiredIn Name
+genClassName  = clsQual <$> gHC_GENERICS <*> pure (fsLit "Generic")  <*> pure genClassKey
+gen1ClassName = clsQual <$> gHC_GENERICS <*> pure (fsLit "Generic1") <*> pure gen1ClassKey
 
-datatypeClassName    = clsQual gHC_GENERICS (fsLit "Datatype")    datatypeClassKey
-constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
-selectorClassName    = clsQual gHC_GENERICS (fsLit "Selector")    selectorClassKey
+datatypeClassName    = clsQual <$> gHC_GENERICS <*> pure (fsLit "Datatype")    <*> pure datatypeClassKey
+constructorClassName = clsQual <$> gHC_GENERICS <*> pure (fsLit "Constructor") <*> pure constructorClassKey
+selectorClassName    = clsQual <$> gHC_GENERICS <*> pure (fsLit "Selector")    <*> pure selectorClassKey
 
-genericClassNames :: [Name]
+genericClassNames :: [WiredIn Name]
 genericClassNames = [genClassName, gen1ClassName]
 
 -- GHCi things
-ghciIoClassName, ghciStepIoMName :: Name
-ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
-ghciStepIoMName = varQual gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
+ghciIoClassName, ghciStepIoMName :: WiredIn Name
+ghciIoClassName = clsQual <$> gHC_GHCI <*> pure (fsLit "GHCiSandboxIO") <*> pure ghciIoClassKey
+ghciStepIoMName = varQual <$> gHC_GHCI <*> pure (fsLit "ghciStepIO") <*> pure ghciStepIoMClassOpKey
 
 -- IO things
 ioTyConName, ioDataConName,
-  thenIOName, bindIOName, returnIOName, failIOName :: Name
-ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
-ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
-thenIOName        = varQual gHC_BASE  (fsLit "thenIO")   thenIOIdKey
-bindIOName        = varQual gHC_BASE  (fsLit "bindIO")   bindIOIdKey
-returnIOName      = varQual gHC_BASE  (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_IO    (fsLit "failIO")   failIOIdKey
+  thenIOName, bindIOName, returnIOName, failIOName :: WiredIn Name
+ioTyConName       = tcQual  <$> gHC_TYPES <*> pure (fsLit "IO")       <*> pure ioTyConKey
+ioDataConName     = dcQual  <$> gHC_TYPES <*> pure (fsLit "IO")       <*> pure ioDataConKey
+thenIOName        = varQual <$> gHC_BASE  <*> pure (fsLit "thenIO")   <*> pure thenIOIdKey
+bindIOName        = varQual <$> gHC_BASE  <*> pure (fsLit "bindIO")   <*> pure bindIOIdKey
+returnIOName      = varQual <$> gHC_BASE  <*> pure (fsLit "returnIO") <*> pure returnIOIdKey
+failIOName        = varQual <$> gHC_IO    <*> pure (fsLit "failIO")   <*> pure failIOIdKey
 
 -- IO things
-printName :: Name
-printName         = varQual sYSTEM_IO (fsLit "print") printIdKey
+printName :: WiredIn Name
+printName         = varQual <$> sYSTEM_IO <*> pure (fsLit "print") <*> pure printIdKey
 
 -- Int, Word, and Addr things
-int8TyConName, int16TyConName, int32TyConName, int64TyConName :: Name
-int8TyConName     = tcQual gHC_INT  (fsLit "Int8")  int8TyConKey
-int16TyConName    = tcQual gHC_INT  (fsLit "Int16") int16TyConKey
-int32TyConName    = tcQual gHC_INT  (fsLit "Int32") int32TyConKey
-int64TyConName    = tcQual gHC_INT  (fsLit "Int64") int64TyConKey
+int8TyConName, int16TyConName, int32TyConName, int64TyConName :: WiredIn Name
+int8TyConName     = tcQual <$> gHC_INT  <*> pure (fsLit "Int8")  <*> pure int8TyConKey
+int16TyConName    = tcQual <$> gHC_INT  <*> pure (fsLit "Int16") <*> pure int16TyConKey
+int32TyConName    = tcQual <$> gHC_INT  <*> pure (fsLit "Int32") <*> pure int32TyConKey
+int64TyConName    = tcQual <$> gHC_INT  <*> pure (fsLit "Int64") <*> pure int64TyConKey
 
 -- Word module
-word8TyConName, word16TyConName, word32TyConName, word64TyConName :: Name
-word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
-word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
-word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
-word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
+word8TyConName, word16TyConName, word32TyConName, word64TyConName :: WiredIn Name
+word8TyConName    = tcQual  <$> gHC_WORD <*> pure (fsLit "Word8")  <*> pure word8TyConKey
+word16TyConName   = tcQual  <$> gHC_WORD <*> pure (fsLit "Word16") <*> pure word16TyConKey
+word32TyConName   = tcQual  <$> gHC_WORD <*> pure (fsLit "Word32") <*> pure word32TyConKey
+word64TyConName   = tcQual  <$> gHC_WORD <*> pure (fsLit "Word64") <*> pure word64TyConKey
 
 -- PrelPtr module
-ptrTyConName, funPtrTyConName :: Name
-ptrTyConName      = tcQual   gHC_PTR (fsLit "Ptr")    ptrTyConKey
-funPtrTyConName   = tcQual   gHC_PTR (fsLit "FunPtr") funPtrTyConKey
+ptrTyConName, funPtrTyConName :: WiredIn Name
+ptrTyConName      = tcQual  <$> gHC_PTR <*> pure (fsLit "Ptr")    <*> pure ptrTyConKey
+funPtrTyConName   = tcQual  <$> gHC_PTR <*> pure (fsLit "FunPtr") <*> pure funPtrTyConKey
 
 -- Foreign objects and weak pointers
-stablePtrTyConName, newStablePtrName :: Name
-stablePtrTyConName    = tcQual   gHC_STABLE (fsLit "StablePtr")    stablePtrTyConKey
-newStablePtrName      = varQual  gHC_STABLE (fsLit "newStablePtr") newStablePtrIdKey
+stablePtrTyConName, newStablePtrName :: WiredIn Name
+stablePtrTyConName    = tcQual   <$> gHC_STABLE <*> pure (fsLit "StablePtr")    <*> pure stablePtrTyConKey
+newStablePtrName      = varQual  <$> gHC_STABLE <*> pure (fsLit "newStablePtr") <*> pure newStablePtrIdKey
 
 -- Recursive-do notation
-monadFixClassName, mfixName :: Name
-monadFixClassName  = clsQual mONAD_FIX (fsLit "MonadFix") monadFixClassKey
-mfixName           = varQual mONAD_FIX (fsLit "mfix")     mfixIdKey
+monadFixClassName, mfixName :: WiredIn Name
+monadFixClassName  = clsQual <$> mONAD_FIX <*> pure (fsLit "MonadFix") <*> pure monadFixClassKey
+mfixName           = varQual <$> mONAD_FIX <*> pure (fsLit "mfix")     <*> pure mfixIdKey
 
 -- Arrow notation
-arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: Name
-arrAName           = varQual aRROW (fsLit "arr")       arrAIdKey
-composeAName       = varQual gHC_DESUGAR (fsLit ">>>") composeAIdKey
-firstAName         = varQual aRROW (fsLit "first")     firstAIdKey
-appAName           = varQual aRROW (fsLit "app")       appAIdKey
-choiceAName        = varQual aRROW (fsLit "|||")       choiceAIdKey
-loopAName          = varQual aRROW (fsLit "loop")      loopAIdKey
+arrAName, composeAName, firstAName, appAName, choiceAName, loopAName :: WiredIn Name
+arrAName           = varQual <$> aRROW <*> pure (fsLit "arr")       <*> pure arrAIdKey
+composeAName       = varQual <$> gHC_DESUGAR <*> pure (fsLit ">>>") <*> pure composeAIdKey
+firstAName         = varQual <$> aRROW <*> pure (fsLit "first")     <*> pure firstAIdKey
+appAName           = varQual <$> aRROW <*> pure (fsLit "app")       <*> pure appAIdKey
+choiceAName        = varQual <$> aRROW <*> pure (fsLit "|||")       <*> pure choiceAIdKey
+loopAName          = varQual <$> aRROW <*> pure (fsLit "loop")      <*> pure loopAIdKey
 
 -- Monad comprehensions
-guardMName, liftMName, mzipName :: Name
-guardMName         = varQual mONAD (fsLit "guard")    guardMIdKey
-liftMName          = varQual mONAD (fsLit "liftM")    liftMIdKey
-mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
+guardMName, liftMName, mzipName :: WiredIn Name
+guardMName         = varQual <$> mONAD <*> pure (fsLit "guard")    <*> pure guardMIdKey
+liftMName          = varQual <$> mONAD <*> pure (fsLit "liftM")    <*> pure liftMIdKey
+mzipName           = varQual <$> mONAD_ZIP <*> pure (fsLit "mzip") <*> pure mzipIdKey
 
 
 -- Annotation type checking
-toAnnotationWrapperName :: Name
-toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
+toAnnotationWrapperName :: WiredIn Name
+toAnnotationWrapperName = varQual <$> gHC_DESUGAR <*> pure (fsLit "toAnnotationWrapper") <*> pure toAnnotationWrapperIdKey
 
 -- Other classes, needed for type defaulting
-monadPlusClassName, isStringClassName :: Name
-monadPlusClassName  = clsQual mONAD (fsLit "MonadPlus")      monadPlusClassKey
-isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
+monadPlusClassName, isStringClassName :: WiredIn Name
+monadPlusClassName  = clsQual <$> mONAD <*> pure (fsLit "MonadPlus")      <*> pure monadPlusClassKey
+isStringClassName   = clsQual <$> dATA_STRING <*> pure (fsLit "IsString") <*> pure isStringClassKey
 
 -- Type-level naturals
-knownNatClassName :: Name
-knownNatClassName     = clsQual gHC_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
-knownSymbolClassName :: Name
-knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
-knownCharClassName :: Name
-knownCharClassName  = clsQual gHC_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
+knownNatClassName :: WiredIn Name
+knownNatClassName     = clsQual <$> gHC_TYPENATS <*> pure (fsLit "KnownNat") <*> pure knownNatClassNameKey
+knownSymbolClassName :: WiredIn Name
+knownSymbolClassName  = clsQual <$> gHC_TYPELITS <*> pure (fsLit "KnownSymbol") <*> pure knownSymbolClassNameKey
+knownCharClassName :: WiredIn Name
+knownCharClassName  = clsQual <$> gHC_TYPELITS <*> pure (fsLit "KnownChar") <*> pure knownCharClassNameKey
 
 -- Overloaded labels
-fromLabelClassOpName :: Name
+fromLabelClassOpName :: WiredIn Name
 fromLabelClassOpName
- = varQual gHC_OVER_LABELS (fsLit "fromLabel") fromLabelClassOpKey
+ = varQual <$> gHC_OVER_LABELS <*> pure (fsLit "fromLabel") <*> pure fromLabelClassOpKey
 
 -- Implicit Parameters
-ipClassName :: Name
+ipClassName :: WiredIn Name
 ipClassName
-  = clsQual gHC_CLASSES (fsLit "IP") ipClassKey
+  = clsQual <$> gHC_CLASSES <*> pure (fsLit "IP") <*> pure ipClassKey
 
 -- Overloaded record fields
-hasFieldClassName :: Name
+hasFieldClassName :: WiredIn Name
 hasFieldClassName
- = clsQual gHC_RECORDS (fsLit "HasField") hasFieldClassNameKey
+ = clsQual <$> gHC_RECORDS <*> pure (fsLit "HasField") <*> pure hasFieldClassNameKey
 
 -- Source Locations
 callStackTyConName, emptyCallStackName, pushCallStackName,
-  srcLocDataConName :: Name
+  srcLocDataConName :: WiredIn Name
 callStackTyConName
-  = tcQual gHC_STACK_TYPES  (fsLit "CallStack") callStackTyConKey
+  = tcQual <$> gHC_STACK_TYPES  <*> pure (fsLit "CallStack") <*> pure callStackTyConKey
 emptyCallStackName
-  = varQual gHC_STACK_TYPES (fsLit "emptyCallStack") emptyCallStackKey
+  = varQual <$> gHC_STACK_TYPES <*> pure (fsLit "emptyCallStack") <*> pure emptyCallStackKey
 pushCallStackName
-  = varQual gHC_STACK_TYPES (fsLit "pushCallStack") pushCallStackKey
+  = varQual <$> gHC_STACK_TYPES <*> pure (fsLit "pushCallStack") <*> pure pushCallStackKey
 srcLocDataConName
-  = dcQual gHC_STACK_TYPES  (fsLit "SrcLoc")    srcLocDataConKey
+  = dcQual <$> gHC_STACK_TYPES  <*> pure (fsLit "SrcLoc")    <*> pure srcLocDataConKey
 
 -- plugins
-pLUGINS :: IO Module
-pLUGINS = pure $ mkThisGhcModule (fsLit "GHC.Driver.Plugins")
-pluginTyConName :: IO Name
-pluginTyConName = pLUGINS >>= \plugin_mod -> pure (tcQual plugin_mod (fsLit "Plugin") pluginTyConKey)
-frontendPluginTyConName :: IO Name
-frontendPluginTyConName = pLUGINS >>= \plugin_mod -> pure (tcQual plugin_mod (fsLit "FrontendPlugin") frontendPluginTyConKey)
+pLUGINS :: WiredIn Module
+pLUGINS = mkThisGhcModule (fsLit "GHC.Driver.Plugins")
+pluginTyConName :: WiredIn Name
+pluginTyConName = tcQual <$> pLUGINS <*> pure (fsLit "Plugin") <*> pure pluginTyConKey
+frontendPluginTyConName :: WiredIn Name
+frontendPluginTyConName = tcQual <$> pLUGINS <*> pure (fsLit "FrontendPlugin") <*> pure frontendPluginTyConKey
 
 -- Static pointers
-makeStaticName :: Name
+makeStaticName :: WiredIn Name
 makeStaticName =
-    varQual gHC_STATICPTR_INTERNAL (fsLit "makeStatic") makeStaticKey
+    varQual <$> gHC_STATICPTR_INTERNAL <*> pure (fsLit "makeStatic") <*> pure makeStaticKey
 
-staticPtrInfoTyConName :: Name
+staticPtrInfoTyConName :: WiredIn Name
 staticPtrInfoTyConName =
-    tcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
+    tcQual <$> gHC_STATICPTR <*> pure (fsLit "StaticPtrInfo") <*> pure staticPtrInfoTyConKey
 
-staticPtrInfoDataConName :: Name
+staticPtrInfoDataConName :: WiredIn Name
 staticPtrInfoDataConName =
-    dcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoDataConKey
+    dcQual <$> gHC_STATICPTR <*> pure (fsLit "StaticPtrInfo") <*> pure staticPtrInfoDataConKey
 
-staticPtrTyConName :: Name
+staticPtrTyConName :: WiredIn Name
 staticPtrTyConName =
-    tcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrTyConKey
+    tcQual <$> gHC_STATICPTR <*> pure (fsLit "StaticPtr") <*> pure staticPtrTyConKey
 
-staticPtrDataConName :: Name
+staticPtrDataConName :: WiredIn Name
 staticPtrDataConName =
-    dcQual gHC_STATICPTR (fsLit "StaticPtr") staticPtrDataConKey
+    dcQual <$> gHC_STATICPTR <*> pure (fsLit "StaticPtr") <*> pure staticPtrDataConKey
 
-fromStaticPtrName :: Name
+fromStaticPtrName :: WiredIn Name
 fromStaticPtrName =
-    varQual gHC_STATICPTR (fsLit "fromStaticPtr") fromStaticPtrClassOpKey
+    varQual <$> gHC_STATICPTR <*> pure (fsLit "fromStaticPtr") <*> pure fromStaticPtrClassOpKey
 
-fingerprintDataConName :: Name
+fingerprintDataConName :: WiredIn Name
 fingerprintDataConName =
-    dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
+    dcQual <$> gHC_FINGERPRINT_TYPE <*> pure (fsLit "Fingerprint") <*> pure fingerprintDataConKey
 
-constPtrConName :: Name
+constPtrConName :: WiredIn Name
 constPtrConName =
-    tcQual fOREIGN_C_CONSTPTR (fsLit "ConstPtr") constPtrTyConKey
+    tcQual <$> fOREIGN_C_CONSTPTR <*> pure (fsLit "ConstPtr") <*> pure constPtrTyConKey
 
 {-
 ************************************************************************
@@ -1687,16 +1686,16 @@ All these are original names; hence mkOrig
 {-# INLINE tcQual #-}
 {-# INLINE clsQual #-}
 {-# INLINE dcQual #-}
-varQual, tcQual, clsQual, dcQual :: Module -> FastString -> Unique -> Name
+varQual, tcQual, clsQual, dcQual :: WiredIn Module -> FastString -> Unique -> WiredIn Name
 varQual  modu str unique = mk_known_key_name varName modu str unique
 tcQual   modu str unique = mk_known_key_name tcName modu str unique
 clsQual  modu str unique = mk_known_key_name clsName modu str unique
 dcQual   modu str unique = mk_known_key_name dataName modu str unique
 
-mk_known_key_name :: NameSpace -> Module -> FastString -> Unique -> Name
+mk_known_key_name :: NameSpace -> WiredIn Module -> FastString -> Unique -> WiredIn Name
 {-# INLINE mk_known_key_name #-}
 mk_known_key_name space modu str unique
-  = mkExternalName unique modu (mkOccNameFS space str) noSrcSpan
+  = space >>= \space' -> pure $ mkExternalName unique modu (mkOccNameFS space' str) noSrcSpan
 
 
 {-
@@ -2749,13 +2748,13 @@ derivableClassKeys
 -- These are the "interactive classes" that are consulted when doing
 -- defaulting. Does not include Num or IsString, which have special
 -- handling.
-interactiveClassNames :: [Name]
+interactiveClassNames :: [WiredIn Name]
 interactiveClassNames
   = [ showClassName, eqClassName, ordClassName, foldableClassName
     , traversableClassName ]
 
-interactiveClassKeys :: [Unique]
-interactiveClassKeys = map getUnique interactiveClassNames
+interactiveClassKeys :: [WiredIn Unique]
+interactiveClassKeys = map (fmap getUnique) interactiveClassNames
 
 {-
 ************************************************************************
