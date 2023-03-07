@@ -1520,7 +1520,7 @@ rebuild env expr cont
       ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag
                  , sc_cont = cont, sc_hole_ty = fun_ty }
         -- See Note [Avoid redundant simplification]
-        -> do { (_, _, arg') <- simplArg env dup_flag fun_ty se arg
+        -> do { (_, _, arg') <- simplLazyArg env dup_flag fun_ty Nothing se arg
               ; rebuild env (App expr arg') cont }
 
 completeBindX :: SimplEnv
@@ -1636,7 +1636,6 @@ simplCast env body co0 cont0
                                    , sc_hole_ty = coercionLKind co }) }
                                         -- NB!  As the cast goes past, the
                                         -- type of the hole changes (#16312)
-
         -- (f |> co) e   ===>   (f (e |> co1)) |> co2
         -- where   co :: (s1->s2) ~ (t1->t2)
         --         co1 :: t1 ~ s1
@@ -1655,7 +1654,7 @@ simplCast env body co0 cont0
                       -- See Note [Avoiding exponential behaviour]
 
                    MCo co1 ->
-            do { (dup', arg_se', arg') <- simplArg env dup fun_ty arg_se arg
+            do { (dup', arg_se', arg') <- simplLazyArg env dup fun_ty Nothing arg_se arg
                     -- When we build the ApplyTo we can't mix the OutCoercion
                     -- 'co' with the InExpr 'arg', so we simplify
                     -- to make it all consistent.  It's a bit messy.
@@ -1681,16 +1680,24 @@ simplCast env body co0 cont0
           -- See Note [Representation polymorphism invariants] in GHC.Core
           -- test: typecheck/should_run/EtaExpandLevPoly
 
-simplArg :: SimplEnv -> DupFlag
-         -> OutType                 -- Type of the function applied to this arg
-         -> StaticEnv -> CoreExpr   -- Expression with its static envt
-         -> SimplM (DupFlag, StaticEnv, OutExpr)
-simplArg env dup_flag fun_ty arg_env arg
+simplLazyArg :: SimplEnv -> DupFlag
+             -> OutType                 -- ^ Type of the function applied to this arg
+             -> Maybe ArgInfo           -- ^ Just <=> This arg `ai` occurs in an app
+                                        --   `f a1 ... an` where we have ArgInfo on
+                                        --   how `f` uses `ai`, affecting the Stop
+                                        --   continuation passed to 'simplExprC'
+             -> StaticEnv -> CoreExpr   -- ^ Expression with its static envt
+             -> SimplM (DupFlag, StaticEnv, OutExpr)
+simplLazyArg env dup_flag fun_ty mb_arg_info arg_env arg
   | isSimplified dup_flag
   = return (dup_flag, arg_env, arg)
   | otherwise
   = do { let arg_env' = arg_env `setInScopeFromE` env
-       ; arg' <- simplExprC arg_env' arg (mkBoringStop (funArgTy fun_ty))
+       ; let arg_ty = funArgTy fun_ty
+       ; let stop = case mb_arg_info of
+               Nothing -> mkBoringStop arg_ty
+               Just ai -> mkLazyArgStop arg_ty ai
+       ; arg' <- simplExprC arg_env' arg stop
        ; return (Simplified, zapSubstEnv arg_env', arg') }
          -- Return a StaticEnv that includes the in-scope set from 'env',
          -- because arg' may well mention those variables (#20639)
@@ -2286,12 +2293,8 @@ rebuildCall env fun_info
         -- There is no benefit (unlike in a let-binding), and we'd
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
-  = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
-                             (mkLazyArgStop arg_ty fun_info)
+  = do  { (_, _, arg') <- simplLazyArg env dup_flag fun_ty (Just fun_info) arg_se arg
         ; rebuildCall env (addValArgTo fun_info  arg' fun_ty) cont }
-  where
-    arg_ty = funArgTy fun_ty
-
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
@@ -3735,7 +3738,7 @@ mkDupableContWithDmds env dmds
     do  { let (dmd:cont_dmds) = dmds   -- Never fails
         ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
-        ; (_, se', arg') <- simplArg env' dup hole_ty se arg
+        ; (_, se', arg') <- simplLazyArg env' dup hole_ty Nothing se arg
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
         ; let all_floats = floats1 `addLetFloats` let_floats2
         ; return ( all_floats
