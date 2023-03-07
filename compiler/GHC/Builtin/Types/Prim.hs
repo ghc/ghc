@@ -503,8 +503,12 @@ alphaTyUnliftedRep :: WiredIn Type
 alphaTyUnliftedRep = (\case (alphaTyUnliftedRep:_) -> alphaTyUnliftedRep) <$> alphaTysUnliftedRep
 
 runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar :: WiredIn TyVar
-(runtimeRep1TyVar : runtimeRep2TyVar : runtimeRep3TyVar : _)
-  = drop 16 . mkTemplateTyVars <$> sequence (repeat runtimeRepTy)  -- selects 'q','r'
+runtimeRep1TyVar = (\case (runtimeRep1TyVar : _runtimeRep2TyVar : _runtimeRep3TyVar : _) -> runtimeRep1TyVar) <$> runtimeRepTyVars
+runtimeRep2TyVar = (\case (_runtimeRep1TyVar : runtimeRep2TyVar : _runtimeRep3TyVar : _) -> runtimeRep2TyVar) <$> runtimeRepTyVars
+runtimeRep3TyVar = (\case (_runtimeRep1TyVar : _runtimeRep2TyVar : runtimeRep3TyVar : _) -> runtimeRep3TyVar) <$> runtimeRepTyVars
+
+runtimeRepTyVars :: WiredIn [TyVar]
+runtimeRepTyVars = drop 16 . mkTemplateTyVars <$> sequence (repeat runtimeRepTy)  -- selects 'q','r'
 
 runtimeRep1TyVarInf, runtimeRep2TyVarInf :: WiredIn TyVarBinder
 runtimeRep1TyVarInf = mkTyVarBinder Inferred <$> runtimeRep1TyVar

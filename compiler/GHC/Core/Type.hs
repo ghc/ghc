@@ -3245,13 +3245,13 @@ coreView applied to (TyConApp LiftedRep [])
 -}
 
 
-mkTYPEapp :: RuntimeRepType -> Type
+mkTYPEapp :: RuntimeRepType -> WiredIn Type
 mkTYPEapp rr
   = case mkTYPEapp_maybe rr of
        Just ty -> ty
        Nothing -> TyConApp tYPETyCon [rr]
 
-mkTYPEapp_maybe :: RuntimeRepType -> Maybe Type
+mkTYPEapp_maybe :: RuntimeRepType -> Maybe (WiredIn Type)
 -- ^ Given a @RuntimeRep@, applies @TYPE@ to it.
 -- On the fly it rewrites
 --      TYPE LiftedRep      -->   liftedTypeKind    (a synonym)
@@ -3273,14 +3273,14 @@ mkTYPEapp_maybe (TyConApp tc args)
 mkTYPEapp_maybe _ = Nothing
 
 ------------------
-mkCONSTRAINTapp :: RuntimeRepType -> Type
+mkCONSTRAINTapp :: RuntimeRepType -> WiredIn Type
 -- ^ Just like mkTYPEapp
 mkCONSTRAINTapp rr
   = case mkCONSTRAINTapp_maybe rr of
        Just ty -> ty
        Nothing -> TyConApp cONSTRAINTTyCon [rr]
 
-mkCONSTRAINTapp_maybe :: RuntimeRepType -> Maybe Type
+mkCONSTRAINTapp_maybe :: RuntimeRepType -> Maybe (WiredIn Type)
 -- ^ Just like mkTYPEapp_maybe
 {-# NOINLINE mkCONSTRAINTapp_maybe #-}
 mkCONSTRAINTapp_maybe (TyConApp tc args)
@@ -3289,7 +3289,7 @@ mkCONSTRAINTapp_maybe (TyConApp tc args)
 mkCONSTRAINTapp_maybe _ = Nothing
 
 ------------------
-mkBoxedRepApp_maybe :: LevityType -> Maybe Type
+mkBoxedRepApp_maybe :: LevityType -> Maybe (WiredIn Type)
 -- ^ Given a `Levity`, apply `BoxedRep` to it
 -- On the fly, rewrite
 --      BoxedRep Lifted     -->   liftedRepTy    (a synonym)
@@ -3317,6 +3317,6 @@ mkTupleRepApp_maybe (TyConApp tc args)
     key = tyConUnique tc
 mkTupleRepApp_maybe _ = Nothing
 
-typeOrConstraintKind :: TypeOrConstraint -> RuntimeRepType -> Kind
+typeOrConstraintKind :: TypeOrConstraint -> RuntimeRepType -> WiredIn Kind
 typeOrConstraintKind TypeLike       rep = mkTYPEapp       rep
 typeOrConstraintKind ConstraintLike rep = mkCONSTRAINTapp rep

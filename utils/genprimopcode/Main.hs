@@ -537,8 +537,8 @@ gen_primop_vector_tys (Info _ entries)
         , ty_id ++ " :: WiredIn Type"
         , ty_id ++ " = mkTyConTy <$> " ++ tycon_id
         , tycon_id ++ " :: WiredIn TyCon"
-        , tycon_id ++ " = flip pcPrimTyCon0 " ++
-                      " (TyConApp vecRepDataConTyCon [vec" ++ show (veclen i) ++ "DataConTy, " ++ elemrep i ++ "]) =<< " ++ name_id
+        , tycon_id ++ " = pcPrimTyCon0 " ++ name_id ++
+                      " (TyConApp <$> vecRepDataConTyCon <*> sequence [vec" ++ show (veclen i) ++ "DataConTy, " ++ elemrep i ++ "])"
         ]
       where
         key_id   = prefix i ++ "PrimTyConKey"

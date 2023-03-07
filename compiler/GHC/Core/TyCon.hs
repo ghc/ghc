@@ -1794,11 +1794,15 @@ mkAlgTyCon name binders res_kind roles cType stupid rhs parent gadt_syn
              , algTcGadtSyntax  = gadt_syn }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
+-- ROMES:TODO: Comment Core with "Why WiredIn".
+-- Even consider moving out of Core?
+-- Classes are wired in
 mkClassTyCon :: Name -> [TyConBinder]
              -> [Role] -> AlgTyConRhs -> Class
-             -> Name -> TyCon
+             -> Name -> WiredIn TyCon
 mkClassTyCon name binders roles rhs clas tc_rep_name
-  = mkAlgTyCon name binders constraintKind roles Nothing [] rhs
+  = constraintKind >>= \wiredConstraintKind -> pure $
+    mkAlgTyCon name binders wiredConstraintKind roles Nothing [] rhs
                (ClassTyCon clas tc_rep_name)
                False
 
@@ -2279,17 +2283,20 @@ isDataKindsPromotedDataCon (TyCon { tyConDetails = details })
 
 -- | Is this tycon really meant for use at the kind level? That is,
 -- should it be permitted without -XDataKinds?
-isKindTyCon :: TyCon -> Bool
-isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
+isKindTyCon :: TyCon -> WiredIn Bool
+isKindTyCon tc = (getUnique tc `elementOfUniqSet`) <$> kindTyConKeys
 
 -- | These TyCons should be allowed at the kind level, even without
 -- -XDataKinds.
-kindTyConKeys :: UniqSet Unique
-kindTyConKeys = unionManyUniqSets
-  ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey ]
-  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, levityTyCon
-                                          , multiplicityTyCon
-                                          , vecCountTyCon, vecElemTyCon ] )
+-- ROMES:TODO: WiredIn UniqSet of WiredIn things
+kindTyConKeys :: WiredIn (UniqSet Unique)
+kindTyConKeys = do
+  tyCons <- sequence [ runtimeRepTyCon, levityTyCon
+                     , multiplicityTyCon
+                     , vecCountTyCon, vecElemTyCon ]
+  pure $ unionManyUniqSets
+    ( mkUniqSet [ liftedTypeKindTyConKey, liftedRepTyConKey, constraintKindTyConKey, tYPETyConKey ]
+    : map (mkUniqSet . tycon_with_datacons) tyCons )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
 

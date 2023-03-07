@@ -67,7 +67,7 @@ multMulTyCon :: TyCon
 tupleTyConName :: TupleSort -> Arity -> Name
 tupleDataConName :: Boxity -> Arity -> Name
 
-integerTy, naturalTy :: Type
+integerTy, naturalTy :: WiredIn Type
 
 promotedTupleDataCon :: Boxity -> Arity -> WiredIn TyCon
 
