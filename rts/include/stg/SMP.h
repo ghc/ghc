@@ -214,23 +214,22 @@ EXTERN_INLINE void load_load_barrier(void);
  * examining a thunk being updated can see the indirectee. Consequently, a
  * thunk update (see rts/Updates.h) does the following:
  *
- *  1. Use a release-fence to ensure that the indirectee is visible
- *  2. Use a relaxed-store to place the new indirectee into the thunk's
+ *  1. Use a relaxed-store to place the new indirectee into the thunk's
  *     indirectee field
- *  3. use a release-store to set the info table to stg_BLACKHOLE (which
+ *  2. use a release-store to set the info table to stg_BLACKHOLE (which
  *     represents an indirection)
  *
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
  * or lazily, by ThreadPaused.c:threadPaused) is done similarly.
  *
- * Conversely, thunk entry (see the entry code of stg_BLACKHOLE in
- * rts/StgMiscClosure) does the following:
+ * Conversely, indirection entry (see the entry code of stg_BLACKHOLE, stg_IND,
+ * and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the following:
  *
- *  1. We jump into the entry code for stg_BLACKHOLE; this of course implies
- *     that we have already read the thunk's info table pointer, which is done
- *     with a relaxed load.
+ *  1. We jump into the entry code for, e.g., stg_BLACKHOLE; this of course
+ *     implies that we have already read the thunk's info table pointer, which
+ *     is done with a relaxed load.
  *  2. use an acquire-fence to ensure that our view on the thunk is
- *     up-to-date. This synchronizes with step (3) in the update
+ *     up-to-date. This synchronizes with step (2) in the update
  *     procedure.
  *  3. relaxed-load the indirectee. Since thunks are updated at most
  *     once we know that the fence in the last step has given us
