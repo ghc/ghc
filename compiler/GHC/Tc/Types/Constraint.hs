@@ -10,8 +10,9 @@ module GHC.Tc.Types.Constraint (
         QCInst(..), pendingScInst_maybe,
 
         -- Canonical constraints
+        Xi, Ct(..), EqCt(..), Cts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
-        isEmptyCts,
+        isEmptyCts, emptyCts, andCts, pprBag,
         isPendingScDict, pendingScDict_maybe,
         superClassesMightHelp, getPendingWantedScs,
         isWantedCt, isGivenCt,
@@ -1041,9 +1042,6 @@ snocCts = snocBag
 extendCtsList :: Cts -> [Ct] -> Cts
 extendCtsList cts xs | null xs   = cts
                      | otherwise = cts `unionBags` listToBag xs
-
-andManyCts :: [Cts] -> Cts
-andManyCts = unionManyBags
 
 emptyCts :: Cts
 emptyCts = emptyBag

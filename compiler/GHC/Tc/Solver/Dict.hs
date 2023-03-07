@@ -1,4 +1,5 @@
-module GHC.Tc.Solver.Dict(
+-- | Solving Class constraints CDictCan
+module GHC.Tc.Solver.Dict (
   doTopReactDict,
   checkInstanceOK,
   matchLocalInst, chooseInstance
@@ -40,14 +41,6 @@ import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe ( listToMaybe, mapMaybe )
-
-
-------------------------------------------------------------
---           Solving Class constraints CDictCan
-------------------------------------------------------------
-
-
-
 
 
 {- *******************************************************************
