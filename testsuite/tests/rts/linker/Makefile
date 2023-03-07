@@ -12,6 +12,11 @@ section_alignment:
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
 	./runner section_alignment.o isAligned
 
+T23066:
+	'$(TEST_CC)' $(TEST_CC_OPTS) -c -o T23066_c.o T23066_c.c
+	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c -static
+	./runner T23066_c.o isAligned
+
 T2615-prep:
 	$(RM) libfoo_T2615.so
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fPIC -c libfoo_T2615.c -o libfoo_T2615.o
