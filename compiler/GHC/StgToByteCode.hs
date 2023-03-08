@@ -836,6 +836,8 @@ doCase d s p scrut bndr alts
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
 
+        ubx_frame = not ubx_tuple_frame && not (usePlainReturn bndr_ty)
+
         non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
 
         profiling
@@ -860,6 +862,7 @@ doCase d s p scrut bndr alts
         -- The size of the return frame info table pointer if one exists
         unlifted_itbl_size_b :: StackDepth
         unlifted_itbl_size_b | ubx_tuple_frame = wordSize platform
+                             | ubx_frame       = wordSize platform
                              | otherwise       = 0
 
         (bndr_size, call_info, args_offsets)
@@ -1055,7 +1058,7 @@ doCase d s p scrut bndr alts
               return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
                       `consOL` scrut_code)
        else let push_alts
-                  | usePlainReturn bndr_ty
+                  | not ubx_frame
                   = PUSH_ALTS alt_bco'
                   | otherwise
                   = let unlifted_rep =
@@ -1691,6 +1694,13 @@ The code we generate is this:
 
         L_exit: SLIDE 1 n
                 ENTER
+
+The 'bogus-word' push is because TESTEQ_I expects the top of the stack
+to have an info-table, and the next word to have the value to be
+tested.  This is very weird, but it's the way it is right now.  See
+Interpreter.c.  We don't actually need an info-table here; we just
+need to have the argument to be one-from-top on the stack, hence pushing
+a 1-word null. See #8383.
 -}
 
 
@@ -1716,10 +1726,14 @@ implement_tagToId d s p arg names
            slide_ws = bytesToWords platform (d - s + arg_bytes)
 
        return (push_arg
+               `appOL` unitOL (PUSH_UBX LitNullAddr 1)
+                   -- Push bogus word (see Note [Implementing tagToEnum#])
                `appOL` concatOL steps
                `appOL` toOL [ LABEL label_fail, CASEFAIL,
                               LABEL label_exit ]
-               `appOL` mkSlideW 1 slide_ws
+               `appOL` mkSlideW 1 (slide_ws + 1)
+                   -- "+1" to account for bogus word
+                   --      (see Note [Implementing tagToEnum#])
                `appOL` unitOL ENTER)
   where
         mkStep l_exit (my_label, next_label, n, name_for_n)
