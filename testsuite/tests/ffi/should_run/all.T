@@ -176,6 +176,7 @@ test('T8083', [omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
 test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi023', [ omit_ways(['ghci']),
+                expect_broken_for(23089, ['threaded2', 'nonmoving_thr', 'nonmoving_thr_sanity', 'nonmoving_thr_ghc']),
                 extra_run_opts('1000 4'),
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
                 # The ffi023_setup hack is to ensure that we generate
