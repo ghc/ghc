@@ -66,6 +66,7 @@ import GHC.Data.FastString
 import Control.Monad
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.Types
+import GHC.Data.Bitmap (mAX_SMALL_BITMAP_SIZE)
 
 ------------------------------------------------------------------------
 --                Call and return sequences
@@ -548,10 +549,11 @@ mkArgDescr :: Platform -> [Id] -> ArgDescr
 mkArgDescr platform args
   = let arg_bits = argBits platform arg_reps
         arg_reps = filter isNonV (map (idArgRep platform) args)
+        isLargeBitmap = mAX_SMALL_BITMAP_SIZE platform < length arg_bits
            -- Getting rid of voids eases matching of standard patterns
     in case stdPattern arg_reps of
          Just spec_id -> ArgSpec spec_id
-         Nothing      -> ArgGen  arg_bits
+         Nothing      -> (if isLargeBitmap then ArgGenBig else ArgGen) arg_bits
 
 argBits :: Platform -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
 argBits _         []           = []

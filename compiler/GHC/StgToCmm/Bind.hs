@@ -612,22 +612,28 @@ mkSlowEntryCode :: Id -> ClosureInfo -> [LocalReg] -> FCode ()
 -- Here, we emit the slow-entry code.
 mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = do cfg       <- getStgToCmmConfig
-       upd_frame <- getUpdFrameOff
-       let node = idToReg platform (NonVoid bndr)
-           profile  = stgToCmmProfile  cfg
-           platform = stgToCmmPlatform cfg
-           slow_lbl = closureSlowEntryLabel  platform cl_info
-           fast_lbl = closureLocalEntryLabel platform cl_info
-           -- mkDirectJump does not clobber `Node' containing function closure
-           jump = mkJump profile NativeNodeCall
-                                (mkLblExpr fast_lbl)
-                                (map (CmmReg . CmmLocal) (node : arg_regs))
-                                upd_frame
-       tscope <- getTickScope
-       emitProcWithConvention Slow Nothing slow_lbl
-         (node : arg_regs) (jump, tscope)
+    = mkSlowEntryCode' bndr cl_info arg_regs
+  | Just (_, ArgGenBig _) <- closureFunInfo cl_info
+    = mkSlowEntryCode' bndr cl_info arg_regs
   | otherwise = return ()
+
+mkSlowEntryCode' :: Id -> ClosureInfo -> [LocalReg] -> FCode ()
+mkSlowEntryCode' bndr cl_info arg_regs = do
+  cfg <- getStgToCmmConfig
+  upd_frame <- getUpdFrameOff
+  let node = idToReg platform (NonVoid bndr)
+      profile = stgToCmmProfile  cfg
+      platform = stgToCmmPlatform cfg
+      slow_lbl = closureSlowEntryLabel  platform cl_info
+      fast_lbl = closureLocalEntryLabel platform cl_info
+      -- mkDirectJump does not clobber `Node' containing function closure
+      jump = mkJump profile NativeNodeCall
+                            (mkLblExpr fast_lbl)
+                            (map (CmmReg . CmmLocal) (node : arg_regs))
+                            upd_frame
+  tscope <- getTickScope
+  emitProcWithConvention Slow Nothing slow_lbl
+    (node : arg_regs) (jump, tscope)
 
 -----------------------------------------
 thunkCode :: ClosureInfo -> [(NonVoid Id, ByteOff)] -> CostCentreStack

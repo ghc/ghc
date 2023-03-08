@@ -242,20 +242,29 @@ mkInfoTableContents profile
            ; return (Nothing, Nothing,  extra_bits, []) }
 
     mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
+      = mk_pieces_arg_gen arity arg_bits aRG_GEN srt_label
+
+    mk_pieces (Fun arity (ArgGenBig arg_bits)) srt_label
+      = mk_pieces_arg_gen arity arg_bits aRG_GEN_BIG srt_label
+
+    mk_pieces other _ = pprPanic "mk_pieces" (ppr other)
+
+    mk_pieces_arg_gen arity arg_bits fun_type srt_label
       = do { (liveness_lit, liveness_data) <- mkLivenessBits platform arg_bits
-           ; let fun_type | null liveness_data = aRG_GEN
-                          | otherwise          = aRG_GEN_BIG
+           ; let fun_type' | null liveness_data = aRG_GEN
+                           | otherwise          = aRG_GEN_BIG
                  extra_bits = [ packIntsCLit platform fun_type arity ]
-                           ++ (if inlineSRT platform then [] else [ srt_lit ])
+                           ++ ([ srt_lit | not (inlineSRT platform) ])
                            ++ [ liveness_lit, slow_entry ]
-           ; return (Nothing, Nothing, extra_bits, liveness_data) }
+           ; massert (fun_type == fun_type')
+           ; return (Nothing, Nothing, extra_bits, liveness_data)
+           }
       where
         slow_entry = CmmLabel (toSlowEntryLbl platform info_lbl)
         srt_lit = case srt_label of
                     []          -> mkIntCLit platform 0
                     (lit:_rest) -> assert (null _rest) lit
 
-    mk_pieces other _ = pprPanic "mk_pieces" (ppr other)
 
 mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 

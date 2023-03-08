@@ -214,13 +214,16 @@ type Liveness = [Bool]   -- One Bool per word; True  <=> non-ptr or dead
 -- | An ArgDescr describes the argument pattern of a function
 
 data ArgDescr
-  = ArgSpec             -- Fits one of the standard patterns
-        !Int            -- RTS type identifier ARG_P, ARG_N, ...
+  = ArgSpec             -- ^ Fits one of the standard patterns
+        !Int            -- ^ RTS type identifier ARG_P, ARG_N, ...
 
-  | ArgGen              -- General case
-        Liveness        -- Details about the arguments
+  | ArgGen              -- ^ General case (small bitmap)
+        Liveness        -- ^ Details about the arguments
 
-  | ArgUnknown          -- For imported binds.
+  | ArgGenBig           -- ^ General case (large bitmap)
+        Liveness        -- ^ Details about the arguments
+
+  | ArgUnknown          -- ^ For imported binds.
                         -- Invariant: Never Unknown for binds of the module
                         -- we are compiling.
   deriving (Eq)
@@ -228,6 +231,7 @@ data ArgDescr
 instance Outputable ArgDescr where
   ppr (ArgSpec n) = text "ArgSpec" <+> ppr n
   ppr (ArgGen ls) = text "ArgGen" <+> ppr ls
+  ppr (ArgGenBig ls) = text "ArgGenBig" <+> ppr ls
   ppr ArgUnknown = text "ArgUnknown"
 
 -----------------------------------------------------------------------------

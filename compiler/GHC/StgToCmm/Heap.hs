@@ -339,8 +339,9 @@ entryHeapCheck cl_info nodeSet arity args code = do
               Nothing -> CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
 
     is_fastf = case closureFunInfo cl_info of
-                 Just (_, ArgGen _) -> False
-                 _otherwise         -> True
+                 Just (_, ArgGen _)    -> False
+                 Just (_, ArgGenBig _) -> False
+                 _otherwise            -> True
 
   entryHeapCheck' is_fastf node arity args code
 
