@@ -37,11 +37,11 @@ mapBlockList :: (forall e' x'. n e' x' -> Block n e' x')
 mapBlockList f (BlockCO n rest  ) = f n `blockAppend` mapBlockList f rest
 mapBlockList f (BlockCC n rest m) = f n `blockAppend` mapBlockList f rest `blockAppend` f m
 mapBlockList f (BlockOC   rest m) = mapBlockList f rest `blockAppend` f m
-mapBlockList _ BNil = BNil
-mapBlockList f (BMiddle blk) = f blk
-mapBlockList f (BCat a b) = mapBlockList f a `blockAppend` mapBlockList f b
-mapBlockList f (BSnoc a n) = mapBlockList f a `blockAppend` f n
-mapBlockList f (BCons n a) = f n `blockAppend` mapBlockList f a
+mapBlockList _ BNil               = BNil
+mapBlockList f (BMiddle blk)      = f blk
+mapBlockList f (BCat a b)         = mapBlockList f a `blockAppend` mapBlockList f b
+mapBlockList f (BSnoc a n)        = mapBlockList f a `blockAppend` f n
+mapBlockList f (BCons n a)        = f n `blockAppend` mapBlockList f a
 
 annotateBlock :: Env -> Block CmmNode e x -> Block CmmNode e x
 annotateBlock env = mapBlockList (annotateNode env)
@@ -114,10 +114,10 @@ annotatePrim :: Env
              -> [CmmActual]     -- ^ arguments
              -> Maybe (Block CmmNode O O)
                                 -- ^ 'Just' a block of instrumentation, if applicable
-annotatePrim env (MO_AtomicRMW w aop)    [dest]   [addr, val] = Just $ tsanAtomicRMW env MemOrderSeqCst aop w addr val dest
-annotatePrim env (MO_AtomicRead w mord)  [dest]   [addr]      = Just $ tsanAtomicLoad env mord w addr dest
-annotatePrim env (MO_AtomicWrite w mord) []       [addr, val] = Just $ tsanAtomicStore env mord w val addr
-annotatePrim env (MO_Xchg w)             [dest]   [addr, val] = Just $ tsanAtomicExchange env MemOrderSeqCst w val addr dest
+annotatePrim env (MO_AtomicRMW w aop)    [dest]   [addr, val]  = Just $ tsanAtomicRMW env MemOrderSeqCst aop w addr val dest
+annotatePrim env (MO_AtomicRead w mord)  [dest]   [addr]       = Just $ tsanAtomicLoad env mord w addr dest
+annotatePrim env (MO_AtomicWrite w mord) []       [addr, val]  = Just $ tsanAtomicStore env mord w val addr
+annotatePrim env (MO_Xchg w)             [dest]   [addr, val]  = Just $ tsanAtomicExchange env MemOrderSeqCst w val addr dest
 annotatePrim env (MO_Cmpxchg w)          [dest]   [addr, expected, new]
                                                                = Just $ tsanAtomicCas env MemOrderSeqCst MemOrderSeqCst w addr expected new dest
 annotatePrim _    _                       _        _           = Nothing
