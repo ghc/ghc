@@ -8,7 +8,8 @@ module Expression (
     expr, exprIO, arg, remove, cabalFlag,
 
     -- ** Predicates
-    (?), stage, stage0, stage1, stage2, notStage0, threadedBootstrapper,
+    (?), stage, stage0, stage1, stage2, notStage0, buildingCompilerStage,
+    buildingCompilerStage', threadedBootstrapper,
      package, notPackage, packageOneOf, cross, notCross,
      libraryPackage, builder, way, input, inputs, output, outputs,
 
@@ -127,6 +128,16 @@ stage2 = stage Stage2
 -- | Is the build /not/ in stage 0 right now?
 notStage0 :: Predicate
 notStage0 = notM Expression.stage0
+
+-- | Are we currently building a compiler for a particular stage?
+buildingCompilerStage :: Stage -> Predicate
+buildingCompilerStage s = buildingCompilerStage' (== s)
+
+-- | Like 'buildingCompilerStage', but lifts an arbitrary predicate on 'Stage',
+-- which is useful for checking flavour fields like 'ghcProfiled' and
+-- 'ghcDebugged'.
+buildingCompilerStage' :: (Stage -> Bool) -> Predicate
+buildingCompilerStage' f = f . succStage <$> getStage
 
 
 -- | Whether or not the bootstrapping compiler provides a threaded RTS. We need

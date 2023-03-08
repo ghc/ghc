@@ -101,8 +101,10 @@ inTreeCompilerArgs stg = do
     unregisterised      <- flag GhcUnregisterised
     tables_next_to_code <- flag TablesNextToCode
     targetWithSMP       <- targetSupportsSMP
-    debugAssertions     <- ($ succStage stg) . ghcDebugAssertions <$> flavour
-    profiled            <- ghcProfiled        <$> flavour <*> pure stg
+
+    let ghcStage = succStage stg
+    debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
+    profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- setting HostOs
     arch        <- setting TargetArch

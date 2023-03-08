@@ -42,5 +42,5 @@ quickArgs = sourceArgs SourceArgs
 quickDebugFlavour :: Flavour
 quickDebugFlavour = quickFlavour
     { name = "quick-debug"
-    , ghcDebugged = (>= Stage1)
+    , ghcDebugged = (>= Stage2)
     }

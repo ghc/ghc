@@ -227,16 +227,20 @@ prefixes, and `*` matches an entire path component, excluding any separators.
 
 What was previously achieved by having `GhcDebugged=YES` in `mk/build.mk` can
 be done by defining a custom flavour in the user settings file, one that
-sets the `ghcDebugged` field of `Flavour` to `True`, e.g:
+sets the `ghcDebugged` field of `Flavour` to `const True`, e.g:
 
 ``` haskell
 quickDebug :: Flavour
-quickDebug = quickFlavour { name = "dbg", ghcDebugged = True }
+quickDebug = quickFlavour { name = "dbg", ghcDebugged = const True }
 ```
 
 Running `build --flavour=dbg` will build a `quick`-flavoured GHC and link
 GHC, iserv, iserv-proxy and remote-iserv against the debugged RTS, by passing
 `-debug` to the commands that link those executables.
+
+More generally, a predicate on `Stage` can be provided to specify which stages should be built debugged. For example, setting `ghcDebugged = (>= Stage2)` will build a debugged compiler at stage 2 or higher, but not stage 1.
+
+Finally, the `debug_ghc` and `debug_stage1_ghc` [flavour transformers](#flavour-transformers) provide a convenient way to enable `ghcDebugged` on the command line without the need to define a separate custom flavour.
 
 ### Packages
 

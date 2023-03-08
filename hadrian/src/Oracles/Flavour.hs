@@ -24,7 +24,8 @@ type instance RuleResult GhcProfiled = Bool
 oracles :: Rules ()
 oracles = do
   void $ addOracle $ \(DynGhcPrograms _) -> dynamicGhcPrograms =<< flavour
-  void $ addOracle $ \(GhcProfiled stage) -> ghcProfiled <$> flavour <*> pure stage
+  void $ addOracle $ \(GhcProfiled stage) ->
+    ghcProfiled <$> flavour <*> pure (succStage stage)
 
 askDynGhcPrograms :: Action Bool
 askDynGhcPrograms = askOracle $ DynGhcPrograms ()

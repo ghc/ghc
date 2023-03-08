@@ -116,7 +116,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     useSystemFfi <- expr (flag UseSystemFfi)
     buildPath <- getBuildPath
     libffiName' <- libffiName
-    debugged <- ghcDebugged <$> expr flavour <*> getStage
+    debugged <- buildingCompilerStage' . ghcDebugged =<< expr flavour
 
     osxTarget <- expr isOsxTarget
     winTarget <- expr isWinTarget

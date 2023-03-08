@@ -6,7 +6,6 @@ import Oracles.Setting
 import Oracles.Flag
 import Packages
 import Settings
-import Oracles.Flavour
 
 -- | Package-specific command-line arguments.
 packageArgs :: Args
@@ -24,14 +23,12 @@ packageArgs = do
         -- are building. This is used to build cross-compilers
         bootCross = (==) <$> ghcVersionStage (stage0InTree) <*> ghcVersionStage Stage1
 
+        compilerStageOption f = buildingCompilerStage' . f =<< expr flavour
+
     cursesIncludeDir <- getSetting CursesIncludeDir
     cursesLibraryDir <- getSetting CursesLibDir
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    debugAssertions  <- ( `ghcDebugAssertions` (succStage stage) ) <$> expr flavour
-      -- NB: in this function, "stage" is the stage of the compiler we are
-      -- using to build, but ghcDebugAssertions wants the stage of the compiler
-      -- we are building, which we get using succStage.
 
     mconcat
         --------------------------------- base ---------------------------------
@@ -54,7 +51,7 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ debugAssertions ? arg "-DDEBUG"
+            [ compilerStageOption ghcDebugAssertions ? arg "-DDEBUG"
 
             , inputs ["**/GHC.hs", "**/GHC/Driver/Make.hs"] ? arg "-fprof-auto"
             , input "**/Parser.hs" ?
@@ -71,7 +68,7 @@ packageArgs = do
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
-            , (getStage >>= expr . askGhcProfiled) ? arg "--ghc-pkg-option=--force" ]
+            , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
@@ -85,7 +82,7 @@ packageArgs = do
         , package ghc ? mconcat
           [ builder Ghc ? mconcat
              [ arg ("-I" ++ compilerPath)
-             , debugAssertions ? arg "-DDEBUG" ]
+             , compilerStageOption ghcDebugAssertions ? arg "-DDEBUG" ]
 
           , builder (Cabal Flags) ? mconcat
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
@@ -96,7 +93,7 @@ packageArgs = do
 
                   -- We build a threaded stage N, N>1 if the configuration calls
                   -- for it.
-                  ((ghcThreaded <$> expr flavour <*> getStage ) `cabalFlag` "threaded")
+                  (compilerStageOption ghcThreaded `cabalFlag` "threaded")
             ]
           ]
 

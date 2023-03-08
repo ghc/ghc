@@ -59,8 +59,8 @@ flavourTransformers = M.fromList
     , "fully_static"     =: fullyStatic
     , "collect_timings"  =: collectTimings
     , "assertions"       =: enableAssertions
-    , "debug_ghc"        =: debugGhc Stage1
-    , "debug_stage1_ghc" =: debugGhc stage0InTree
+    , "debug_ghc"        =: debugGhc Stage2
+    , "debug_stage1_ghc" =: debugGhc Stage1
     , "lint"             =: enableLinting
     , "haddock"          =: enableHaddock
     , "hi_core"          =: enableHiCore
@@ -215,18 +215,29 @@ enableThreadSanitizer = addArgs $ notStage0 ? mconcat
 viaLlvmBackend :: Flavour -> Flavour
 viaLlvmBackend = addArgs $ notStage0 ? builder Ghc ? arg "-fllvm"
 
--- | Build the GHC executable with profiling enabled in stages 1 and later. It
+-- | Build the GHC executable with profiling enabled in stages 2 and later. It
 -- is also recommended that you use this with @'dynamicGhcPrograms' = False@
 -- since GHC does not support loading of profiled libraries with the
 -- dynamically-linker.
 enableProfiledGhc :: Flavour -> Flavour
 enableProfiledGhc flavour =
-    enableLateCCS flavour { rtsWays = do
-                ws <- rtsWays flavour
-                pure $ (Set.map (\w -> if wayUnit Dynamic w then w else w <> profiling) ws) <> ws
-            , libraryWays = (Set.singleton profiling <>) <$> (libraryWays flavour)
-            , ghcProfiled = (>= Stage1)
-            }
+  enableLateCCS flavour
+    { rtsWays = do
+        ws <- rtsWays flavour
+        mconcat
+          [ pure ws
+          , buildingCompilerStage' (>= Stage2) ? pure (foldMap profiled_ways ws)
+          ]
+    , libraryWays = mconcat
+        [ libraryWays flavour
+        , buildingCompilerStage' (>= Stage2) ? pure (Set.singleton profiling)
+        ]
+    , ghcProfiled = (>= Stage2)
+    }
+    where
+      profiled_ways w
+        | wayUnit Dynamic w = Set.empty
+        | otherwise         = Set.singleton (w <> profiling)
 
 -- | Disable 'dynamicGhcPrograms'.
 disableDynamicGhcPrograms :: Flavour -> Flavour
@@ -350,11 +361,14 @@ collectTimings =
 
 -- | Build ghc with debug rts (i.e. -debug) in and after this stage
 debugGhc :: Stage -> Flavour -> Flavour
-debugGhc stage f = f
-  { ghcDebugged = (>= stage)
+debugGhc ghcStage f = f
+  { ghcDebugged = (>= ghcStage)
   , rtsWays = do
       ws <- rtsWays f
-      pure $ (Set.map (\w -> w <> debug) ws) <> ws
+      mconcat
+        [ pure ws
+        , buildingCompilerStage' (>= ghcStage) ? pure (Set.map (<> debug) ws)
+        ]
   }
 
 -- * CLI and <root>/hadrian.settings options
