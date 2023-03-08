@@ -3,7 +3,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NumericUnderscores #-}
 module GHC.CmmToAsm.AArch64.CodeGen (
       cmmTopCodeGen
     , generateJumpTableForInstr
@@ -771,12 +770,12 @@ getRegister' config plat expr
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isBitMaskImmediate (fromIntegral n) ->
+    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isBitMaskImmediate (fromIntegral n) ->
+    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isAArch64Bitmask (fromIntegral n) ->
       return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
@@ -965,19 +964,6 @@ getRegister' config plat expr
 
     isNbitEncodeable :: Int -> Integer -> Bool
     isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
-    -- This needs to check if n can be encoded as a bitmask immediate:
-    --
-    -- See https://stackoverflow.com/questions/30904718/range-of-immediate-values-in-armv8-a64-assembly
-    --
-    isBitMaskImmediate :: Integer -> Bool
-    isBitMaskImmediate i = i `elem` [0b0000_0001, 0b0000_0010, 0b0000_0100, 0b0000_1000, 0b0001_0000, 0b0010_0000, 0b0100_0000, 0b1000_0000
-                                    ,0b0000_0011, 0b0000_0110, 0b0000_1100, 0b0001_1000, 0b0011_0000, 0b0110_0000, 0b1100_0000
-                                    ,0b0000_0111, 0b0000_1110, 0b0001_1100, 0b0011_1000, 0b0111_0000, 0b1110_0000
-                                    ,0b0000_1111, 0b0001_1110, 0b0011_1100, 0b0111_1000, 0b1111_0000
-                                    ,0b0001_1111, 0b0011_1110, 0b0111_1100, 0b1111_1000
-                                    ,0b0011_1111, 0b0111_1110, 0b1111_1100
-                                    ,0b0111_1111, 0b1111_1110
-                                    ,0b1111_1111]
 
     -- N.B. MUL does not set the overflow flag.
     do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
@@ -1019,6 +1005,39 @@ getRegister' config plat expr
             mul (OpReg tmp_w tmp) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
             CMP (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) `snocOL`
             CSET (OpReg w dst) NE)
+
+-- | Is a given number encodable as a bitmask immediate?
+--
+-- https://stackoverflow.com/questions/30904718/range-of-immediate-values-in-armv8-a64-assembly
+isAArch64Bitmask :: Integer -> Bool
+-- N.B. zero and ~0 are not encodable as bitmask immediates
+isAArch64Bitmask 0  = False
+isAArch64Bitmask n
+  | n == bit 64 - 1 = False
+isAArch64Bitmask n  =
+    check 64 || check 32 || check 16 || check 8
+  where
+    -- Check whether @n@ can be represented as a subpattern of the given
+    -- width.
+    check width
+      | hasOneRun subpat =
+          let n' = fromIntegral (mkPat width subpat)
+          in n == n'
+      | otherwise = False
+      where
+        subpat :: Word64
+        subpat = fromIntegral (n .&. (bit width - 1))
+
+    -- Construct a bit-pattern from a repeated subpatterns the given width.
+    mkPat :: Int -> Word64 -> Word64
+    mkPat width subpat =
+        foldl' (.|.) 0 [ subpat `shiftL` p | p <- [0, width..63] ]
+
+    -- Does the given number's bit representation match the regular expression
+    -- @0*1*0*@?
+    hasOneRun :: Word64 -> Bool
+    hasOneRun m =
+        64 == popCount m + countLeadingZeros m + countTrailingZeros m
 
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
