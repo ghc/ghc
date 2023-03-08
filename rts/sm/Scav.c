@@ -68,6 +68,7 @@
 #include "sm/MarkWeak.h"
 #include "sm/NonMoving.h" // for nonmoving_set_closure_mark_bit
 #include "sm/NonMovingScav.h"
+#include "stg/Types.h"
 
 #include <string.h> /* for memset */
 
@@ -1982,16 +1983,14 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         continue;
 
     case RET_BCO: {
-        StgBCO *bco;
+        StgRetBCO* retBCO;
         StgWord size;
 
-        p++;
-        evacuate((StgClosure **)p);
-        bco = (StgBCO *)*p;
-        p++;
-        size = BCO_BITMAP_SIZE(bco);
-        scavenge_large_bitmap(p, BCO_BITMAP(bco), size);
-        p += size;
+        retBCO = (StgRetBCO*) p;
+        evacuate((StgClosure **)&retBCO->bco);
+        size = BCO_BITMAP_SIZE(retBCO->bco);
+        scavenge_large_bitmap((StgPtr) &retBCO->args, BCO_BITMAP(retBCO->bco), size);
+        p = retBCO->args + size;
         continue;
     }
 

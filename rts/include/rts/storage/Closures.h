@@ -242,90 +242,6 @@ typedef struct {
 
 
 /* ----------------------------------------------------------------------------
-   Stack frames
-   ------------------------------------------------------------------------- */
-
-
-/*
- * See also StgStack in TSO.h
- *
- * These do not appear alone on the heap but always inside an StgStack or a
- * StgAP_STACK.
- */
-
-// Thunk update frame
-//
-// Closure types: UPDATE_FRAME
-typedef struct _StgUpdateFrame {
-    StgHeader  header;
-    StgClosure *updatee;
-} StgUpdateFrame;
-
-
-// Closure types: RET_SMALL
-typedef struct {
-    StgHeader  header;
-    StgClosure *c;
-} StgKeepAliveFrame;
-
-// Stack frame, when we call catch one of these will be put on the stack so we
-// know to handle exceptions with the supplied handler
-//
-// Closure types: CATCH_FRAME
-typedef struct {
-    StgHeader  header;
-    StgWord    exceptions_blocked;
-    StgClosure *handler;
-} StgCatchFrame;
-
-
-// Stack underflow frame, placed on the bottom of a stack chunk and links to
-// the next chunk
-//
-// Closure types: UNDERFLOW_FRAME
-typedef struct {
-    const StgInfoTable* info;
-    struct StgStack_ *next_chunk;
-} StgUnderflowFrame;
-
-
-// Stack end frame, placed on the bottom of a stack chunk signifying the very
-// bottom of the stack
-//
-// Closure types: STOP_FRAME
-typedef struct {
-    StgHeader  header;
-} StgStopFrame;
-
-// Stack frame indicating that the stack's owning thread has finished.
-//
-// Closure types: RET_SMALL
-typedef struct {
-    StgHeader  header;
-    StgClosure *result;
-} StgDeadThreadFrame;
-
-// A function return stack frame: used when saving the state for a
-// garbage collection at a function entry point.  The function
-// arguments are on the stack, and we also save the function (its
-// info table describes the pointerhood of the arguments).
-//
-// The stack frame size is also cached in the frame for convenience.
-//
-// The only RET_FUN is stg_gc_fun, which is created by __stg_gc_fun,
-// both in HeapStackCheck.cmm.
-//
-// Closure types: RET_FUN
-typedef struct {
-    const StgInfoTable* info;
-    StgWord        size;
-    StgClosure *   fun;
-    StgClosure *   payload[];
-} StgRetFun;
-
-
-
-/* ----------------------------------------------------------------------------
    Special heap objects
    ------------------------------------------------------------------------- */
 
@@ -431,6 +347,93 @@ typedef struct {
                                 / BITS_IN(StgWord))
 
 
+/* ----------------------------------------------------------------------------
+   Stack frames
+   ------------------------------------------------------------------------- */
+
+
+/*
+ * See also StgStack in TSO.h
+ *
+ * These do not appear alone on the heap but always inside an StgStack or a
+ * StgAP_STACK.
+ */
+
+// Thunk update frame
+//
+// Closure types: UPDATE_FRAME
+typedef struct _StgUpdateFrame {
+    StgHeader  header;
+    StgClosure *updatee;
+} StgUpdateFrame;
+
+
+// Closure types: RET_SMALL
+typedef struct {
+    StgHeader  header;
+    StgClosure *c;
+} StgKeepAliveFrame;
+
+// Stack frame, when we call catch one of these will be put on the stack so we
+// know to handle exceptions with the supplied handler
+//
+// Closure types: CATCH_FRAME
+typedef struct {
+    StgHeader  header;
+    StgWord    exceptions_blocked;
+    StgClosure *handler;
+} StgCatchFrame;
+
+
+// Stack underflow frame, placed on the bottom of a stack chunk and links to
+// the next chunk
+//
+// Closure types: UNDERFLOW_FRAME
+typedef struct {
+    const StgInfoTable* info;
+    struct StgStack_ *next_chunk;
+} StgUnderflowFrame;
+
+
+// Stack end frame, placed on the bottom of a stack chunk signifying the very
+// bottom of the stack
+//
+// Closure types: STOP_FRAME
+typedef struct {
+    StgHeader  header;
+} StgStopFrame;
+
+// Stack frame indicating that the stack's owning thread has finished.
+//
+// Closure types: RET_SMALL
+typedef struct {
+    StgHeader  header;
+    StgClosure *result;
+} StgDeadThreadFrame;
+
+// A function return stack frame: used when saving the state for a
+// garbage collection at a function entry point.  The function
+// arguments are on the stack, and we also save the function (its
+// info table describes the pointerhood of the arguments).
+//
+// The stack frame size is also cached in the frame for convenience.
+//
+// The only RET_FUN is stg_gc_fun, which is created by __stg_gc_fun,
+// both in HeapStackCheck.cmm.
+//
+// Closure types: RET_FUN
+typedef struct {
+    const StgInfoTable* info;
+    StgWord        size;
+    StgClosure *   fun;
+    StgClosure *   payload[];
+} StgRetFun;
+
+typedef struct {
+  StgHeader header;
+  StgBCO* bco;
+  StgWord args[];
+} StgRetBCO;
 
 /* ----------------------------------------------------------------------------
    Concurrent communication objects
