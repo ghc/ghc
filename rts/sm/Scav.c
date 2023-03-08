@@ -1986,11 +1986,11 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         StgRetBCO* retBCO;
         StgWord size;
 
-        retBCO = (StgRetBCO*) p;
-        evacuate((StgClosure **)&retBCO->bco);
+        retBCO = (StgRetBCO *) p;
+        evacuate((StgClosure **) &retBCO->bco);
         size = BCO_BITMAP_SIZE(retBCO->bco);
         scavenge_large_bitmap((StgPtr) &retBCO->args, BCO_BITMAP(retBCO->bco), size);
-        p = retBCO->args + size;
+        p += sizeofW(StgRetBCO) + size;
         continue;
     }
 
