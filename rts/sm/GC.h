@@ -17,11 +17,20 @@
 
 #include "BeginPrivate.h"
 
-void GarbageCollect (uint32_t collect_gen,
-                     bool do_heap_census,
-                     bool is_overflow_gc,
-                     bool deadlock_detect,
-                     uint32_t gc_type,
+struct GcConfig {
+    // which generation are we requesting be collected?
+    uint32_t collect_gen;
+    // is a heap census requested?
+    bool do_heap_census;
+    // is this GC triggered by a heap overflow?
+    bool overflow_gc;
+    // is this GC triggered by a deadlock?
+    bool deadlock_detect;
+    // should we use parallel scavenging?
+    bool parallel;
+};
+
+void GarbageCollect (struct GcConfig config,
                      Capability *cap,
                      bool idle_cap[]);
 

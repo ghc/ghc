@@ -1873,14 +1873,22 @@ delete_threads_and_gc:
     // Do any remaining idle GC work from the previous GC
     doIdleGCWork(cap, true /* all of it */);
 
+    struct GcConfig config = {
+        .collect_gen = collect_gen,
+        .do_heap_census = heap_census,
+        .overflow_gc = is_overflow_gc,
+        .deadlock_detect = deadlock_detect,
+    };
+
 #if defined(THREADED_RTS)
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     RELAXED_STORE(&pending_sync, 0);
     signalCondition(&sync_finished_cond);
-    GarbageCollect(collect_gen, heap_census, is_overflow_gc, deadlock_detect, gc_type, cap, idle_cap);
+    config.parallel = gc_type == SYNC_GC_PAR;
+    GarbageCollect(config, cap, idle_cap);
 #else
-    GarbageCollect(collect_gen, heap_census, is_overflow_gc, deadlock_detect, 0, cap, NULL);
+    GarbageCollect(config, cap, NULL);
 #endif
 
     // If we're shutting down, don't leave any idle GC work to do.
