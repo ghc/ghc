@@ -278,11 +278,7 @@ addMutListScavStats(const MutListScavStats *src,
    -------------------------------------------------------------------------- */
 
 void
-GarbageCollect (uint32_t collect_gen,
-                const bool do_heap_census,
-                const bool is_overflow_gc,
-                const bool deadlock_detect,
-                uint32_t gc_type USED_IF_THREADS,
+GarbageCollect (struct GcConfig config,
                 Capability *cap,
                 bool idle_cap[])
 {
@@ -297,7 +293,7 @@ GarbageCollect (uint32_t collect_gen,
   // The time we should report our heap census as occurring at, if necessary.
   Time mut_time = 0;
 
-  if (do_heap_census) {
+  if (config.do_heap_census) {
       RTSStats stats;
       getRTSStats(&stats);
       mut_time = stats.mutator_cpu_ns;
@@ -306,6 +302,8 @@ GarbageCollect (uint32_t collect_gen,
   // necessary if we stole a callee-saves register for gct:
 #if defined(THREADED_RTS)
   saved_gct = gct;
+#else
+  ASSERT(!config.parallel);
 #endif
 
 #if defined(PROFILING)
@@ -348,11 +346,11 @@ GarbageCollect (uint32_t collect_gen,
 
   /* Figure out which generation to collect
    */
-  N = collect_gen;
+  N = config.collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
   /* See Note [Deadlock detection under the nonmoving collector]. */
-  deadlock_detect_gc = deadlock_detect;
+  deadlock_detect_gc = config.deadlock_detect;
 
 #if defined(THREADED_RTS)
   if (major_gc && RtsFlags.GcFlags.useNonmoving && RELAXED_LOAD(&concurrent_coll_running)) {
@@ -361,7 +359,7 @@ GarbageCollect (uint32_t collect_gen,
        * TODO: Catch heap-size runaway.
        */
       N--;
-      collect_gen--;
+      config.collect_gen--;
       major_gc = false;
   }
 #endif
@@ -396,7 +394,7 @@ GarbageCollect (uint32_t collect_gen,
    * we set n_gc_threads, work_stealing, n_gc_idle_threads, gc_running_threads
    * here
   */
-  if (gc_type == SYNC_GC_PAR) {
+  if (config.parallel) {
       n_gc_threads = getNumCapabilities();
       n_gc_idle_threads = 0;
       for (uint32_t i = 0; i < getNumCapabilities(); ++i) {
@@ -958,7 +956,7 @@ GarbageCollect (uint32_t collect_gen,
   // resurrectThreads(), for the same reason as checkSanity above:
   // resurrectThreads() will overwrite some closures and leave slop
   // behind.
-  if (do_heap_census) {
+  if (config.do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
       RELEASE_SM_LOCK;
       heapCensus(mut_time);
@@ -1004,7 +1002,7 @@ GarbageCollect (uint32_t collect_gen,
 #endif
 
       // Reset the counter if the major GC was caused by a heap overflow
-      consec_idle_gcs = is_overflow_gc ? 0 : consec_idle_gcs + 1;
+      consec_idle_gcs = config.overflow_gc ? 0 : consec_idle_gcs + 1;
 
       // See Note [Scaling retained memory]
       double scaled_factor =
