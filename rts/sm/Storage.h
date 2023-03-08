@@ -215,7 +215,7 @@ extern StgIndStatic * dyn_caf_list;
 extern StgIndStatic * debug_caf_list;
 extern StgIndStatic * revertible_caf_list;
 
-STATIC_INLINE void clear_blocks(bdescr *bd) {
+INLINE_HEADER void clear_blocks(bdescr *bd) {
    memset(bd->start, 0, BLOCK_SIZE * bd->blocks);
 }
 
