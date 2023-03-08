@@ -29,8 +29,6 @@ void *stgMallocBytes(size_t n, char *msg)
  * See: https://gitlab.haskell.org/ghc/ghc/-/issues/22380
  */
 
-void *stgMallocAlignedBytes(size_t n, size_t align, char *msg);
-
 void *stgReallocBytes(void *p, size_t n, char *msg);
 
 void *stgCallocBytes(size_t count, size_t size, char *msg)
