@@ -94,7 +94,7 @@ import CLOSURE stg_upd_frame_info;
         }                                                               \
         field = StgClosure_payload(UNTAG(selectee),offset);             \
         jump stg_ap_0_fast(field);                                      \
-     }                                                                  \
+      }                                                                 \
   }
   /* NOTE: no need to ENTER() here, we know the closure cannot
      evaluate to a function, because we're going to do a field
