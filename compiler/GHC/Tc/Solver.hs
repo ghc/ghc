@@ -2371,7 +2371,7 @@ any new unifications, and iterate the implications only if so.
 -}
 
 {- Note [Expanding Recursive Superclasses and ExpansionFuel]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the class declaration (T21909)
 
     class C [a] => C a where
@@ -2431,7 +2431,7 @@ There are two preconditions for the default fuel values:
 Precondition (1) ensures that we expand givens at least as many times as we expand wanted constraints
 preferably givenFuel > wantedsFuel to avoid issues like T21909 while
 the precondition (2) ensures that we do not reach the solver iteration limit and fail with a
-more meaningful error message
+more meaningful error message (see T19627)
 
 This also applies for quantified constraints; see `-fqcs-fuel` compiler flag and `QCI.qci_pend_sc` field.
 -}

@@ -671,3 +671,4 @@ test('T20666a', normal, compile, [''])  # To become compile_fail after migration
 test('T22924a', normal, compile_fail, [''])
 test('T22924b', normal, compile_fail, [''])
 test('T22940', normal, compile_fail, [''])
+test('T19627', normal, compile_fail, [''])
