@@ -1942,19 +1942,19 @@ void rts_clearMemory(void) {
     if (RtsFlags.GcFlags.useNonmoving)
     {
         for (struct NonmovingSegment *seg = nonmovingHeap.free; seg; seg = seg->link) {
-            clear_segment(seg);
+            nonmovingClearSegment(seg);
         }
 
         for (int i = 0; i < NONMOVING_ALLOCA_CNT; ++i) {
             struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[i];
 
             for (struct NonmovingSegment *seg = alloc->active; seg; seg = seg->link) {
-                clear_segment_free_blocks(seg);
+                nonmovingClearSegmentFreeBlocks(seg);
             }
 
             for (unsigned int j = 0; j < getNumCapabilities(); ++j) {
                 Capability *cap = getCapability(j);
-                clear_segment_free_blocks(cap->current_segments[i]);
+                nonmovingClearSegmentFreeBlocks(cap->current_segments[i]);
             }
         }
     }

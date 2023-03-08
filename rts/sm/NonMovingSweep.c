@@ -110,14 +110,14 @@ void nonmovingGcCafs()
 #endif
 
 void
-clear_segment(struct NonmovingSegment* seg)
+nonmovingClearSegment(struct NonmovingSegment* seg)
 {
     size_t end = ((size_t)seg) + NONMOVING_SEGMENT_SIZE;
     memset(&seg->bitmap, 0, end - (size_t)&seg->bitmap);
 }
 
 void
-clear_segment_free_blocks(struct NonmovingSegment* seg)
+nonmovingClearSegmentFreeBlocks(struct NonmovingSegment* seg)
 {
     unsigned int block_size = nonmovingSegmentBlockSize(seg);
     for (unsigned int p_idx = 0; p_idx < nonmovingSegmentBlockCount(seg); ++p_idx) {
@@ -142,11 +142,11 @@ GNUC_ATTR_HOT void nonmovingSweep(void)
 
         switch (ret) {
         case SEGMENT_FREE:
-            IF_DEBUG(sanity, clear_segment(seg));
+            IF_DEBUG(sanity, nonmovingClearSegment(seg));
             nonmovingPushFreeSegment(seg);
             break;
         case SEGMENT_PARTIAL:
-            IF_DEBUG(sanity, clear_segment_free_blocks(seg));
+            IF_DEBUG(sanity, nonmovingClearSegmentFreeBlocks(seg));
             nonmovingPushActiveSegment(seg);
             break;
         case SEGMENT_FILLED:

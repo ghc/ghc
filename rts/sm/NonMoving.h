@@ -361,9 +361,9 @@ void print_thread_list(StgTSO* tso);
 
 #endif
 
-RTS_PRIVATE void clear_segment(struct NonmovingSegment*);
+RTS_PRIVATE void nonmovingClearSegment(struct NonmovingSegment*);
 
-RTS_PRIVATE void clear_segment_free_blocks(struct NonmovingSegment*);
+RTS_PRIVATE void nonmovingClearSegmentFreeBlocks(struct NonmovingSegment*);
 
 #include "EndPrivate.h"
 
