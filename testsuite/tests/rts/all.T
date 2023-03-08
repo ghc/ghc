@@ -261,8 +261,8 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
 test('T7037', js_broken(22374), makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
-test('T7160', [ # finalization order is too nondeterministic in the concurrent GC
-                omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc', 'nonmoving_thr_sanity'])
+test('T7160', [ # finalization order is different in the nonmoving
+                omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc', 'nonmoving_thr_sanity'])
               , js_broken(22261)
               ], compile_and_run, [''])
 
