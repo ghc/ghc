@@ -446,9 +446,11 @@
    HP_CHK_P(bytes);                             \
    TICK_ALLOC_RTS(bytes);
 
+#define RELAXED_LOAD_FIELD(fld, ptr) REP_##fld![(ptr) + SIZEOF_StgHeader + OFFSET_##fld]
+
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
-   generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
+   RELAXED_LOAD_FIELD(generation_n_new_large_words, g0) >= TO_W_(CLong[large_alloc_lim]))
 
 // allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses
@@ -701,7 +703,7 @@
    -------------------------------------------------------------------------- */
 
 #if defined(TICKY_TICKY)
-#define TICK_BUMP_BY(ctr,n) %relaxed W_[ctr] = %relaxed W_[ctr] + n
+#define TICK_BUMP_BY(ctr,n) %relaxed W_[ctr] = W_![ctr] + n
 #else
 #define TICK_BUMP_BY(ctr,n) /* nothing */
 #endif
