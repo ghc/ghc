@@ -504,6 +504,9 @@ getRegister' _ _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _ _]) = do
     Amode addr addr_code <- getAmode DS mem
     return (Any II64 (\dst -> addr_code `snocOL` LA II32 dst addr))
 
+getRegister' config platform (CmmMachOp (MO_RelaxedRead w) [e]) =
+      getRegister' config platform (CmmLoad e (cmmBits w) NaturallyAligned)
+
 getRegister' config platform (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT

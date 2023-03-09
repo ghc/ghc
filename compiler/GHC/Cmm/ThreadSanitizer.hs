@@ -85,6 +85,7 @@ annotateExpr :: Env -> CmmExpr -> Block CmmNode O O
 annotateExpr env expr =
     annotateLoads env (collectExprLoads expr)
 
+-- | A load mentioned in a 'CmmExpr'.
 data Load = Load CmmType AlignmentSpec CmmExpr
 
 annotateLoads :: Env -> [Load] -> Block CmmNode O O
@@ -103,6 +104,9 @@ collectExprLoads :: CmmExpr -> [Load]
 collectExprLoads (CmmLit _)           = []
 collectExprLoads (CmmLoad e ty align) = [Load ty align e]
 collectExprLoads (CmmReg _)           = []
+-- N.B. we don't bother telling TSAN about MO_RelaxedReads
+-- since doing so would be inconvenient and they by
+-- definition can neither race nor introduce ordering.
 collectExprLoads (CmmMachOp _op args) = foldMap collectExprLoads args
 collectExprLoads (CmmStackSlot _ _)   = []
 collectExprLoads (CmmRegOff _ _)      = []
