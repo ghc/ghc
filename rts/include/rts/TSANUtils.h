@@ -28,6 +28,40 @@
  * In general it's best to add suppressions only as a last resort, when the
  * more precise annotation functions prove to be insufficient.
  *
+ * GHC can be configured with two extents of TSAN instrumentation:
+ *
+ *  - instrumenting the C RTS (by passing `-optc-fsanitize=thread`
+ *    when compiling the RTS)
+ *
+ *  - instrumenting both the C RTS and Cmm memory accesses (by passing
+ *    `-optc-fsanitize=thread -fcmm-thread-sanitizer` to all GHC invocations).
+ *
+ * These two modes can be realized in Hadrian using the `+thread_sanitizer`
+ * and `+thread_sanitizer_cmm` flavour transformers.
+ *
+ * Tips and tricks:
+ *
+ *  - One should generally run TSAN instrumented programs with the environment
+ *    variable
+ *
+ *      TSAN_OPTIONS=suppressions=$ghc_root/rts/.tsan-suppressions
+ *
+ *    to maximize signal-to-noise.
+ *
+ *  - One can set a breakpoint on `__tsan_on_report` in a debugger to pause when
+ *    a TSAN report is found.
+ *
+ *  - TSAN-instrumented will by default exit with code 66 when a violation has
+ *    been found. However, this can be disabled by setting
+ *    `TSAN_OPTIONS=exitcode=0`
+ *
+ *  - If TSAN is able to report useful stack traces it may help to set
+ *    `TSAN_OPTIONS=history_size=3` or greater (up to 7). This increases the
+ *    size of TSAN's per-thread memory access history buffer.
+ *
+ * - TSAN report messages can be redirected to a file using
+ *   `TSAN_OPTIONS=log_path=...`
+ *
  * Users guide: https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual
  */
 
