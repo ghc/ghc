@@ -732,6 +732,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/ffi/should_run/ffi021
 /tests/ffi/should_run/ffi022
 /tests/ffi/should_run/ffi023
+/tests/ffi/should_run/rts_clearMemory
 /tests/ffi/should_run/ffi_parsing_001
 /tests/ffi/should_run/fptr01
 /tests/ffi/should_run/fptr02

@@ -199,6 +199,18 @@ test('ffi023', [ omit_ways(['ghci']),
                 # needs it.
               compile_and_run, ['ffi023_c.c'])
 
+test('rts_clearMemory', [
+     # We only care about different GC configurations under the
+     # single-threaded RTS for the time being.
+     only_ways(['normal', 'optasm' ,'g1', 'nursery_chunks', 'nonmoving', 'compacting_gc']),
+     extra_ways(['g1', 'nursery_chunks', 'nonmoving', 'compacting_gc']),
+     # On windows, nonmoving way fails with bad exit code (2816)
+     when(opsys('mingw32'), fragile(23091)),
+     js_broken(22363),
+     pre_cmd('$MAKE -s --no-print-directory rts_clearMemory_setup') ],
+     # Same hack as ffi023
+     compile_and_run, ['rts_clearMemory_c.c -no-hs-main'])
+
 test('T12134', [omit_ways(['ghci']), req_c], compile_and_run, ['T12134_c.c'])
 
 test('T12614', [omit_ways(['ghci']), req_c], compile_and_run, ['T12614_c.c'])
