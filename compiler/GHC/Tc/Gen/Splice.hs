@@ -123,7 +123,7 @@ import GHC.Utils.Panic as Panic
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (throwIO, ErrorCall(..), SomeException(..))
+import GHC.Utils.Exception (throwIO, ErrorCall(..))
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
@@ -1269,7 +1269,7 @@ runMeta' show_code ppr_hs run_and_convert expr
     fail_with_exn phase exn = do
         exn_msg <- liftIO $ Panic.safeShowException exn
         failWithTc $ TcRnTHError $ THSpliceFailed $
-          SpliceThrewException phase (SomeException exn) exn_msg expr show_code
+          SpliceThrewException phase (toException exn) exn_msg expr show_code
 
 {-
 Note [Running typed splices in the zonker]
