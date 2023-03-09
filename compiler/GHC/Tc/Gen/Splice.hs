@@ -1266,7 +1266,7 @@ runMeta' show_code ppr_hs run_and_convert expr
     fail_with_exn phase exn = do
         exn_msg <- liftIO $ Panic.safeShowException exn
         failWithTc
-          $ TcRnSpliceThrewException phase (SomeException exn) exn_msg expr show_code
+          $ TcRnSpliceThrewException phase (toException exn) exn_msg expr show_code
 
 {-
 Note [Running typed splices in the zonker]
