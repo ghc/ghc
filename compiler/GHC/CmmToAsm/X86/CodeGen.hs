@@ -648,6 +648,9 @@ getRegister' _ is32Bit (CmmReg reg)
 getRegister' platform is32Bit (CmmRegOff r n)
   = getRegister' platform is32Bit $ mangleIndexTree r n
 
+getRegister' platform is32Bit (CmmMachOp (MO_RelaxedRead w) [e])
+  = getRegister' platform is32Bit (CmmLoad e (cmmBits w) NaturallyAligned)
+
 getRegister' platform is32Bit (CmmMachOp (MO_AlignmentCheck align _) [e])
   = addAlignmentCheck align <$> getRegister' platform is32Bit e
 

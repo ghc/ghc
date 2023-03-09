@@ -625,6 +625,12 @@ getRegister' config plat expr
 
     -- for MachOps, see GHC.Cmm.MachOp
     -- For CmmMachOp, see GHC.Cmm.Expr
+
+    -- Handle MO_RelaxedRead as a normal CmmLoad, to allow
+    -- non-trivial addressing modes to be used.
+    CmmMachOp (MO_RelaxedRead w) [e] ->
+      getRegister (CmmLoad e (cmmBits w) NaturallyAligned)
+
     CmmMachOp op [e] -> do
       (reg, _format, code) <- getSomeReg e
       case op of

@@ -628,6 +628,7 @@ lower_CmmMachOp ::
   WasmCodeGenM
     w
     (SomeWasmExpr w)
+lower_CmmMachOp lbl (MO_RelaxedRead w0) [x] = lower_CmmExpr lbl (CmmLoad x (cmmBits w0) NaturallyAligned)
 lower_CmmMachOp lbl (MO_Add w0) xs = lower_MO_Bin_Homo_Trunc WasmAdd lbl w0 xs
 lower_CmmMachOp lbl (MO_Sub w0) xs = lower_MO_Bin_Homo_Trunc WasmSub lbl w0 xs
 lower_CmmMachOp lbl (MO_Eq w0) xs = lower_MO_Bin_Rel WasmEq lbl (cmmBits w0) xs

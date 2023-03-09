@@ -198,8 +198,9 @@ Memory ordering
 ---------------
 
 Cmm respects the C11 memory model and distinguishes between non-atomic and
-atomic memory accesses. In C11 fashion, atomic accesses can provide a number of
-memory ordering guarantees. These are supported in Cmm syntax as follows:
+atomic memory accesses. In C11 fashion, atomic accesses can provide a variety of
+memory ordering guarantees. These supported as statements in Cmm syntax as
+follows:
 
     W_[ptr] = ...;            // a non-atomic store
     %relaxed W_[ptr] = ...;   // an atomic store with relaxed ordering semantics
@@ -213,6 +214,18 @@ memory ordering guarantees. These are supported in Cmm syntax as follows:
 
 Here we used W_ as an example but these operations can be used on all Cmm
 types.
+
+Sometimes it is also necessary to perform atomic but non-ordered loads in an
+expression context. For this we provide the MO_RelaxedRead MachOp, expressed in
+Cmm syntax as
+
+    x = W_![ptr];
+
+This operation and syntax was primarily added to support hand-written Cmm,
+where sometimes such atomic loads are unavoidable deep inside expressions (e.g.
+see the CHECK_GC macro). Since one should be explicit about program order when
+writing operations with ordered semantics, we do not provide similar MachOps
+for acquire and release reads.
 
 See Note [Heap memory barriers] in SMP.h for details.
 
@@ -837,13 +850,11 @@ expr0   :: { CmmParse CmmExpr }
         | STRING                 { do s <- code (newStringCLit $1);
                                       return (CmmLit s) }
         | reg                    { $1 }
-        | type dereference       { do (align, ptr) <- $2; return (CmmLoad ptr $1 align) }
+        | type '!' '[' expr ']'  { do ptr <- $4; return (CmmMachOp (MO_RelaxedRead (typeWidth $1)) [ptr]) }
+        | type '^' '[' expr ']'  { do ptr <- $4; return (CmmLoad ptr $1 Unaligned) }
+        | type '[' expr ']'      { do ptr <- $3; return (CmmLoad ptr $1 NaturallyAligned) }
         | '%' NAME '(' exprs0 ')' {% exprOp $2 $4 }
         | '(' expr ')'           { $2 }
-
-dereference :: { CmmParse (AlignmentSpec, CmmExpr) }
-        : '^' '[' expr ']'       { do ptr <- $3; return (Unaligned, ptr) }
-        | '[' expr ']'           { do ptr <- $2; return (NaturallyAligned, ptr) }
 
 -- leaving out the type of a literal gives you the native word size in C--
 maybe_ty :: { CmmType }
