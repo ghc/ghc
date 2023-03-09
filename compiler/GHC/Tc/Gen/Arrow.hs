@@ -263,7 +263,7 @@ tc_cmd env cmd@(HsCmdLam x lam_variant match) cmd_ty
         LamSingle -> id    -- Avoids clutter in the vanilla-lambda form
         _         -> addErrCtxt (cmdCtxt cmd)) $
     do { let match_ctxt = ArrowLamAlt lam_variant
-       ; checkArgCounts (ArrowMatchCtxt match_ctxt) match
+       ; checkArgCounts (Just (ArrowMatchCtxt match_ctxt)) match
        ; (wrap, match') <- tcCmdMatchLambda env match_ctxt match cmd_ty
        ; return (mkHsCmdWrap wrap (HsCmdLam x lam_variant match')) }
 
@@ -319,11 +319,9 @@ tcCmdMatches :: CmdEnv
              -> CmdType
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
-  = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
+  = tcMatchesCase match_body_checker (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
-    match_ctxt = MC { mc_what = ArrowMatchCtxt ArrowCaseAlt,
-                      mc_body = mc_body }
-    mc_body body res_ty' = do { res_ty' <- expTypeToType res_ty'
+    match_body_checker body res_ty' = do { res_ty' <- expTypeToType res_ty'
                               ; tcCmd env body (stk, res_ty') }
 
 -- | Typechecking for 'HsCmdLam' and 'HsCmdLamCase'.

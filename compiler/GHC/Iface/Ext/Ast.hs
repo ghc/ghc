@@ -743,8 +743,10 @@ instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
         RecordCon con_expr _ _ -> computeType con_expr
         ExprWithTySig _ e _ -> computeLType e
         HsPragE _ _ e -> computeLType e
-        XExpr (ExpansionExpr (HsExpanded (HsGetField _ _ _) e)) -> Just (hsExprType e) -- for record-dot-syntax
-        XExpr (ExpansionExpr (HsExpanded _ e)) -> computeType e
+        XExpr (ExpandedThingTc thing e)
+          | OrigExpr (HsGetField{}) <- thing -- for record-dot-syntax
+          -> Just (hsExprType e)
+          | otherwise -> computeType e
         XExpr (HsTick _ e) -> computeLType e
         XExpr (HsBinTick _ _ e) -> computeLType e
         e -> Just (hsExprType e)
@@ -1127,7 +1129,7 @@ the typechecker:
     to ol_from_fun.
   * HsDo, where we give the SrcSpan of the entire do block to each
     ApplicativeStmt.
-  * HsExpanded ExplicitList{}, where we give the SrcSpan of the original
+  * Expanded (via ExpandedThingRn) ExplicitList{}, where we give the SrcSpan of the original
     list expression to the 'fromListN' call.
 
 In order for the implicit function calls to not be confused for actual
@@ -1298,8 +1300,8 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
              WrapExpr (HsWrap w a)
                -> [ toHie $ L mspan a
                   , toHie (L mspan w) ]
-             ExpansionExpr (HsExpanded _ b)
-               -> [ toHie (L mspan b) ]
+             ExpandedThingTc _ e
+               -> [ toHie (L mspan e) ]
              ConLikeTc con _ _
                -> [ toHie $ C Use $ L mspan $ conLikeName con ]
              HsTick _ expr

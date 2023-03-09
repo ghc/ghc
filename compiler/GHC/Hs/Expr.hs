@@ -460,17 +460,104 @@ tupArgsPresent_maybe = traverse tupArgPresent_maybe
 ********************************************************************* -}
 
 type instance XXExpr GhcPs = DataConCantHappen
-type instance XXExpr GhcRn = HsExpansion (HsExpr GhcRn) (HsExpr GhcRn)
+type instance XXExpr GhcRn = XXExprGhcRn
 type instance XXExpr GhcTc = XXExprGhcTc
--- HsExpansion: see Note [Rebindable syntax and HsExpansion] below
+-- XXExprGhcRn: see Note [Rebindable syntax and XXExprGhcRn] below
+
+
+{- *********************************************************************
+*                                                                      *
+              Generating code for ExpandedThingRn
+      See Note [Handling overloaded and rebindable constructs]
+*                                                                      *
+********************************************************************* -}
+
+-- | The different source constructs that we use to instantiate the "original" field
+--   in an `XXExprGhcRn original expansion`
+data HsThingRn = OrigExpr (HsExpr GhcRn)
+               | OrigStmt (ExprLStmt GhcRn)
+               | OrigPat  (LPat GhcRn)
+
+isHsThingRnExpr, isHsThingRnStmt, isHsThingRnPat :: HsThingRn -> Bool
+isHsThingRnExpr (OrigExpr{}) = True
+isHsThingRnExpr _ = False
+
+isHsThingRnStmt (OrigStmt{}) = True
+isHsThingRnStmt _ = False
+
+isHsThingRnPat (OrigPat{}) = True
+isHsThingRnPat _ = False
+
+data XXExprGhcRn
+  = ExpandedThingRn { xrn_orig     :: HsThingRn       -- The original source thing
+                    , xrn_expanded :: HsExpr GhcRn }  -- The compiler generated expanded thing
+
+  | PopErrCtxt                                     -- A hint for typechecker to pop
+    {-# UNPACK #-} !(LHsExpr GhcRn)                -- the top of the error context stack
+                                                   -- Does not presist post renaming phase
+                                                   -- See Part 3. of Note [Expanding HsDo with XXExprGhcRn]
+                                                   -- in `GHC.Tc.Gen.Do`
+
+
+-- | Wrap a located expression with a `PopErrCtxt`
+mkPopErrCtxtExpr :: LHsExpr GhcRn -> HsExpr GhcRn
+mkPopErrCtxtExpr a = XExpr (PopErrCtxt a)
+
+-- | Wrap a located expression with a PopSrcExpr with an appropriate location
+mkPopErrCtxtExprAt :: SrcSpanAnnA ->  LHsExpr GhcRn -> LHsExpr GhcRn
+mkPopErrCtxtExprAt loc a = L loc $ mkPopErrCtxtExpr a
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original expression and
+--   expanded expressions.
+mkExpandedExpr
+  :: HsExpr GhcRn         -- ^ source expression
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExpr oExpr eExpr = XExpr (ExpandedThingRn (OrigExpr oExpr) eExpr)
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original do stmt and
+--   expanded expression
+mkExpandedStmt
+  :: ExprLStmt GhcRn      -- ^ source statement
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> HsExpr GhcRn         -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedStmt oStmt eExpr = XExpr (ExpandedThingRn (OrigStmt oStmt) eExpr)
+
+mkExpandedPatRn
+  :: LPat   GhcRn      -- ^ source pattern
+  -> HsExpr GhcRn      -- ^ expanded expression
+  -> HsExpr GhcRn      -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedPatRn oPat eExpr = XExpr (ExpandedThingRn (OrigPat oPat) eExpr)
+
+-- | Build an expression using the extension constructor `XExpr`,
+--   and the two components of the expansion: original do stmt and
+--   expanded expression an associate with a provided location
+mkExpandedStmtAt
+  :: SrcSpanAnnA          -- ^ Location for the expansion expression
+  -> ExprLStmt GhcRn      -- ^ source statement
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> LHsExpr GhcRn        -- ^ suitably wrapped located 'XXExprGhcRn'
+mkExpandedStmtAt loc oStmt eExpr = L loc $ mkExpandedStmt oStmt eExpr
+
+-- | Wrap the expanded version of the expression with a pop.
+mkExpandedStmtPopAt
+  :: SrcSpanAnnA          -- ^ Location for the expansion statement
+  -> ExprLStmt GhcRn      -- ^ source statement
+  -> HsExpr GhcRn         -- ^ expanded expression
+  -> LHsExpr GhcRn        -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedStmtPopAt loc oStmt eExpr = mkPopErrCtxtExprAt loc $ mkExpandedStmtAt loc oStmt eExpr
 
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
       {-# UNPACK #-} !(HsWrap HsExpr)
 
-  | ExpansionExpr   -- See Note [Rebindable syntax and HsExpansion] below
-      {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
+  | ExpandedThingTc                         -- See Note [Rebindable syntax and XXExprGhcRn]
+                                            -- See Note [Expanding HsDo with XXExprGhcRn] in `GHC.Tc.Gen.Do`
+         { xtc_orig     :: HsThingRn        -- The original user written thing
+         , xtc_expanded :: HsExpr GhcTc }   -- The expanded typechecked expression
 
   | ConLikeTc      -- Result of typechecking a data-con
                    -- See Note [Typechecking data constructors] in
@@ -491,6 +578,23 @@ data XXExprGhcTc
      Int                                -- module-local tick number for False
      (LHsExpr GhcTc)                    -- sub-expression
 
+-- | Build a 'XXExprGhcRn' out of an extension constructor,
+--   and the two components of the expansion: original and
+--   expanded typechecked expressions.
+mkExpandedExprTc
+  :: HsExpr GhcRn           -- ^ source expression
+  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedExprTc oExpr eExpr = XExpr (ExpandedThingTc (OrigExpr oExpr) eExpr)
+
+-- | Build a 'XXExprGhcRn' out of an extension constructor.
+--   The two components of the expansion are: original statement and
+--   expanded typechecked expression.
+mkExpandedStmtTc
+  :: ExprLStmt GhcRn        -- ^ source do statement
+  -> HsExpr GhcTc           -- ^ expanded typechecked expression
+  -> HsExpr GhcTc           -- ^ suitably wrapped 'XXExprGhcRn'
+mkExpandedStmtTc oStmt eExpr = XExpr (ExpandedThingTc (OrigStmt oStmt) eExpr)
 
 {- *********************************************************************
 *                                                                      *
@@ -727,14 +831,28 @@ ppr_expr (XExpr x) = case ghcPass @p of
   GhcRn -> ppr x
   GhcTc -> ppr x
 
+instance Outputable HsThingRn where
+  ppr thing
+    = case thing of
+        OrigExpr x -> ppr_builder "<OrigExpr>:" x
+        OrigStmt x -> ppr_builder "<OrigStmt>:" x
+        OrigPat x  -> ppr_builder "<OrigPat>:" x
+    where ppr_builder prefix x = ifPprDebug (braces (text prefix <+> parens (ppr x))) (ppr x)
+
+instance Outputable XXExprGhcRn where
+  ppr (ExpandedThingRn o e) = ifPprDebug (braces $ vcat [ppr o, ppr e]) (ppr o)
+  ppr (PopErrCtxt e)        = ifPprDebug (braces (text "<PopErrCtxt>" <+> ppr e)) (ppr e)
+
 instance Outputable XXExprGhcTc where
   ppr (WrapExpr (HsWrap co_fn e))
     = pprHsWrapper co_fn (\_parens -> pprExpr e)
 
-  ppr (ExpansionExpr e)
-    = ppr e -- e is an HsExpansion, we print the original
-            -- expression (LHsExpr GhcPs), not the
-            -- desugared one (LHsExpr GhcTc).
+  ppr (ExpandedThingTc o e)
+    = ifPprDebug (braces $ vcat [ppr o, ppr e]) (ppr o)
+            -- e is the expanded expression, we print the original
+            -- expression (HsExpr GhcRn), not the
+            -- expanded typechecked one (HsExpr GhcTc),
+            -- unless we are in ppr's debug mode printed both
 
   ppr (ConLikeTc con _ _) = pprPrefixOcc con
    -- Used in error messages generated by
@@ -762,15 +880,20 @@ ppr_infix_expr (XExpr x)            = case ghcPass @p of
                                         GhcTc -> ppr_infix_expr_tc x
 ppr_infix_expr _ = Nothing
 
-ppr_infix_expr_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Maybe SDoc
-ppr_infix_expr_rn (HsExpanded a _) = ppr_infix_expr a
+ppr_infix_expr_rn :: XXExprGhcRn -> Maybe SDoc
+ppr_infix_expr_rn (ExpandedThingRn thing _) = ppr_infix_hs_expansion thing
+ppr_infix_expr_rn (PopErrCtxt (L _ a)) = ppr_infix_expr a
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
-ppr_infix_expr_tc (WrapExpr (HsWrap _ e))          = ppr_infix_expr e
-ppr_infix_expr_tc (ExpansionExpr (HsExpanded a _)) = ppr_infix_expr a
-ppr_infix_expr_tc (ConLikeTc {})                   = Nothing
-ppr_infix_expr_tc (HsTick {})                      = Nothing
-ppr_infix_expr_tc (HsBinTick {})                   = Nothing
+ppr_infix_expr_tc (WrapExpr (HsWrap _ e))    = ppr_infix_expr e
+ppr_infix_expr_tc (ExpandedThingTc thing _)  = ppr_infix_hs_expansion thing
+ppr_infix_expr_tc (ConLikeTc {})             = Nothing
+ppr_infix_expr_tc (HsTick {})                = Nothing
+ppr_infix_expr_tc (HsBinTick {})             = Nothing
+
+ppr_infix_hs_expansion :: HsThingRn -> Maybe SDoc
+ppr_infix_hs_expansion (OrigExpr e) = ppr_infix_expr e
+ppr_infix_hs_expansion _            = Nothing
 
 ppr_apps :: (OutputableBndrId p)
          => HsExpr (GhcPass p)
@@ -787,7 +910,6 @@ ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
     --   = char '@' <> pprHsType arg
     pp (Right arg)
       = text "@" <> ppr arg
-
 
 pprDebugParendExpr :: (OutputableBndrId p)
                    => PprPrec -> LHsExpr (GhcPass p) -> SDoc
@@ -864,14 +986,18 @@ hsExprNeedsParens prec = go
 
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr (HsWrap _ e))          = hsExprNeedsParens prec e
-    go_x_tc (ExpansionExpr (HsExpanded a _)) = hsExprNeedsParens prec a
+    go_x_tc (ExpandedThingTc thing _)        = hsExpandedNeedsParens thing
     go_x_tc (ConLikeTc {})                   = False
     go_x_tc (HsTick _ (L _ e))               = hsExprNeedsParens prec e
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
 
-    go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
-    go_x_rn (HsExpanded a _) = hsExprNeedsParens prec a
+    go_x_rn :: XXExprGhcRn -> Bool
+    go_x_rn (ExpandedThingRn thing _)    = hsExpandedNeedsParens thing
+    go_x_rn (PopErrCtxt (L _ a))         = hsExprNeedsParens prec a
 
+    hsExpandedNeedsParens :: HsThingRn -> Bool
+    hsExpandedNeedsParens (OrigExpr e) = hsExprNeedsParens prec e
+    hsExpandedNeedsParens _            = False
 
 -- | Parenthesize an expression without token information
 gHsPar :: forall p. IsPass p => LHsExpr (GhcPass p) -> HsExpr (GhcPass p)
@@ -912,13 +1038,18 @@ isAtomicHsExpr (XExpr x)
   where
     go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr      (HsWrap _ e))     = isAtomicHsExpr e
-    go_x_tc (ExpansionExpr (HsExpanded a _)) = isAtomicHsExpr a
+    go_x_tc (ExpandedThingTc thing _)        = isAtomicExpandedThingRn thing
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False
     go_x_tc (HsBinTick {}) = False
 
-    go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
-    go_x_rn (HsExpanded a _) = isAtomicHsExpr a
+    go_x_rn :: XXExprGhcRn -> Bool
+    go_x_rn (ExpandedThingRn thing _)    = isAtomicExpandedThingRn thing
+    go_x_rn (PopErrCtxt (L _ a))         = isAtomicHsExpr a
+
+    isAtomicExpandedThingRn :: HsThingRn -> Bool
+    isAtomicExpandedThingRn (OrigExpr e) = isAtomicHsExpr e
+    isAtomicExpandedThingRn _            = False
 
 isAtomicHsExpr _ = False
 
@@ -932,11 +1063,11 @@ instance Outputable (HsPragE (GhcPass p)) where
 
 {- *********************************************************************
 *                                                                      *
-             HsExpansion and rebindable syntax
+             XXExprGhcRn and rebindable syntax
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Rebindable syntax and HsExpansion]
+{- Note [Rebindable syntax and XXExprGhcRn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We implement rebindable syntax (RS) support by performing a desugaring
 in the renamer. We transform GhcPs expressions and patterns affected by
@@ -970,12 +1101,12 @@ To remedy this, instead of transforming the original HsIf
 node into mere applications of 'ifThenElse', we keep the
 original 'if' expression around too, using the TTG
 XExpr extension point to allow GHC to construct an
-'HsExpansion' value that will keep track of the original
+'XXExprGhcRn' value that will keep track of the original
 expression in its first field, and the desugared one in the
 second field. The resulting renamed AST would look like:
 
     L locif (XExpr
-      (HsExpanded
+      (ExpandedThingRn
         (HsIf (L loca 'a')
               (L loctrue ())
               (L locfalse True)
@@ -997,7 +1128,7 @@ second field. The resulting renamed AST would look like:
 When comes the time to typecheck the program, we end up calling
 tcMonoExpr on the AST above. If this expression gives rise to
 a type error, then it will appear in a context line and GHC
-will pretty-print it using the 'Outputable (HsExpansion a b)'
+will pretty-print it using the 'Outputable (XXExprGhcRn a b)'
 instance defined below, which *only prints the original
 expression*. This is the gist of the idea, but is not quite
 enough to recover the error messages that we had with the
@@ -1048,12 +1179,12 @@ A general recipe to follow this approach for new constructs could go as follows:
       HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
     - take both the original node and that rebound-and-renamed result and wrap
       them into an expansion construct:
-        for expressions, XExpr (HsExpanded <original node> <desugared>)
+        for expressions, XExpr (ExpandedThingRn <original node> <desugared>)
         for patterns, XPat (HsPatExpanded <original node> <desugared>)
  - At typechecking-time:
     - remove any logic that was previously dealing with your rebindable
       construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
-    - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that we
+    - the XExpr (ExpandedThingRn ... ...) case in tcExpr already makes sure that we
       typecheck the desugared expression while reporting the original one in
       errors
 -}
@@ -1066,16 +1197,16 @@ syntax.
 The language extensions @OverloadedRecordDot@ and
 @OverloadedRecordUpdate@ (providing "record dot syntax") are
 implemented using the techniques of Note [Rebindable syntax and
-HsExpansion].
+XXExprGhcRn].
 
 When OverloadedRecordDot is enabled:
 - Field selection expressions
   - e.g. foo.bar.baz
   - Have abstract syntax HsGetField
-  - After renaming are XExpr (HsExpanded (HsGetField ...) (getField @"..."...)) expressions
+  - After renaming are XExpr (ExpandedThingRn (HsGetField ...) (getField @"..."...)) expressions
 - Field selector expressions e.g. (.x.y)
   - Have abstract syntax HsProjection
-  - After renaming are XExpr (HsExpanded (HsProjection ...) ((getField @"...") . (getField @"...") . ...) expressions
+  - After renaming are XExpr (ExpandedThingRn (HsProjection ...) ((getField @"...") . (getField @"...") . ...) expressions
 
 When OverloadedRecordUpdate is enabled:
 - Record update expressions
@@ -1083,7 +1214,7 @@ When OverloadedRecordUpdate is enabled:
   - Have abstract syntax RecordUpd
     - With rupd_flds containting a Right
     - See Note [RecordDotSyntax field updates] (in Language.Haskell.Syntax.Expr)
-  - After renaming are XExpr (HsExpanded (RecordUpd ...) (setField@"..." ...) expressions
+  - After renaming are XExpr (ExpandedThingRn (RecordUpd ...) (setField@"..." ...) expressions
     - Note that this is true for all record updates even for those that do not involve '.'
 
 When OverloadedRecordDot is enabled and RebindableSyntax is not
@@ -1098,17 +1229,6 @@ https://gitlab.haskell.org/ghc/ghc/-/issues/16232). When
 OverloadedRecordUpd is enabled and RebindableSyntax is enabled the
 names 'getField' and 'setField' are whatever in-scope names they are.
 -}
-
--- See Note [Rebindable syntax and HsExpansion] just above.
-data HsExpansion orig expanded
-  = HsExpanded orig expanded
-  deriving Data
-
--- | Just print the original expression (the @a@).
-instance (Outputable a, Outputable b) => Outputable (HsExpansion a b) where
-  ppr (HsExpanded orig expanded)
-    = ifPprDebug (vcat [ppr orig, braces (text "Expansion:" <+> ppr expanded)])
-                 (ppr orig)
 
 
 {-
@@ -1330,7 +1450,7 @@ instance (OutputableBndrId p) => Outputable (HsCmdTop (GhcPass p)) where
 -}
 
 type instance XMG         GhcPs b = Origin
-type instance XMG         GhcRn b = Origin
+type instance XMG         GhcRn b = Origin -- See Note [Generated code and pattern-match checking]
 type instance XMG         GhcTc b = MatchGroupTc
 
 data MatchGroupTc

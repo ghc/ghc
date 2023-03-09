@@ -29,7 +29,8 @@ import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Types.Basic ( Origin(..), requiresPMC )
+import GHC.Types.Basic ( Origin(..), requiresPMC, isDoExpansionGenerated )
+
 import GHC.Types.SourceText
     ( FractionalLit,
       IntegralLit(il_value),
@@ -41,6 +42,7 @@ import GHC.Hs.Syn.Type
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.Pmc
+import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Pmc.Types ( Nablas )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Binds
@@ -763,12 +765,20 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt scrs (MG { mg_alts = L _ matches
+matchWrapper ctxt scrs (MG { mg_alts = L _ matches'
                            , mg_ext = MatchGroupTc arg_tys rhs_ty origin
                            })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
-
+        ; let matches
+                = if any (is_pat_syn_match origin) matches'
+                  then filter (non_gen_wc origin) matches'
+                       -- filter out the wild pattern fail alternatives
+                       -- which have a do expansion origin
+                       -- They generate spurious overlapping warnings
+                       -- Due to pattern synonyms treated as refutable patterns
+                       -- See Part 1's Wrinkle 1 in Note [Expanding HsDo with XXExprGhcRn] in GHC.Tc.Gen.Do
+                  else matches'
         ; new_vars    <- case matches of
                            []    -> newSysLocalsDs arg_tys
                            (m:_) ->
@@ -780,12 +790,17 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
         -- Each Match will split off one Nablas for its RHSs from this.
+        ; tracePm "matchWrapper"
+          (vcat [ ppr ctxt
+                , text "scrs" <+> ppr scrs
+                , text "matches group" <+> ppr matches
+                , text "matchPmChecked" <+> ppr (isMatchContextPmChecked dflags origin ctxt)])
         ; matches_nablas <-
             if isMatchContextPmChecked dflags origin ctxt
 
             -- See Note [Long-distance information] in GHC.HsToCore.Pmc
             then addHsScrutTmCs (concat scrs) new_vars $
-                 pmcMatches (DsMatchContext ctxt locn) new_vars matches
+                 pmcMatches origin (DsMatchContext ctxt locn) new_vars matches
 
             -- When we're not doing PM checks on the match group,
             -- we still need to propagate long-distance information.
@@ -827,6 +842,14 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
       = expectJust "GRHSs non-empty"
       $ NEL.nonEmpty
       $ replicate (length (grhssGRHSs m)) ldi_nablas
+
+    is_pat_syn_match :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
+    is_pat_syn_match origin (L _ (Match _ _ [l_pat] _)) | isDoExpansionGenerated origin = isPatSyn l_pat
+    is_pat_syn_match _ _ = False
+    -- generated match pattern that is not a wildcard
+    non_gen_wc :: Origin -> LMatch GhcTc (LHsExpr GhcTc) -> Bool
+    non_gen_wc origin (L _ (Match _ _ ([L _ (WildPat _)]) _)) = not . isDoExpansionGenerated $ origin
+    non_gen_wc _ _ = True
 
 {- Note [Long-distance information in matchWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1141,8 +1164,10 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- we have to compare the wrappers
     exp (XExpr (WrapExpr (HsWrap h e))) (XExpr (WrapExpr (HsWrap  h' e'))) =
       wrap h h' && exp e e'
-    exp (XExpr (ExpansionExpr (HsExpanded _ b))) (XExpr (ExpansionExpr (HsExpanded _ b'))) =
-      exp b b'
+    exp (XExpr (ExpandedThingTc o x)) (XExpr (ExpandedThingTc o' x'))
+      | isHsThingRnExpr o
+      , isHsThingRnExpr o'
+      = exp x x'
     exp (HsVar _ i) (HsVar _ i') =  i == i'
     exp (XExpr (ConLikeTc c _ _)) (XExpr (ConLikeTc c' _ _)) = c == c'
     -- the instance for IPName derives using the id, so this works if the

@@ -40,11 +40,11 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-        isSimplePat,
+        isSimplePat, isPatSyn,
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat,
-        isIrrefutableHsPat, isBoringHsPat,
+        isIrrefutableHsPatHelper, isIrrefutableHsPatHelperM, isBoringHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
 
@@ -85,6 +85,7 @@ import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
 import Data.Data
 
+import Data.Functor.Identity
 
 type instance XWildPat GhcPs = NoExtField
 type instance XWildPat GhcRn = NoExtField
@@ -165,10 +166,10 @@ type instance XEmbTyPat GhcTc = Type
 type instance XXPat GhcPs = DataConCantHappen
 type instance XXPat GhcRn = HsPatExpansion (Pat GhcRn) (Pat GhcRn)
   -- Original pattern and its desugaring/expansion.
-  -- See Note [Rebindable syntax and HsExpansion].
+  -- See Note [Rebindable syntax and XXExprGhcRn].
 type instance XXPat GhcTc = XXPatGhcTc
-  -- After typechecking, we add extra constructors: CoPat and HsExpansion.
-  -- HsExpansion allows us to handle RebindableSyntax in pattern position:
+  -- After typechecking, we add extra constructors: CoPat and XXExprGhcRn.
+  -- XXExprGhcRn allows us to handle RebindableSyntax in pattern position:
   -- see "XXExpr GhcTc" for the counterpart in expressions.
 
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
@@ -216,11 +217,11 @@ data XXPatGhcTc
       }
   -- | Pattern expansion: original pattern, and desugared pattern,
   -- for RebindableSyntax and other overloaded syntax such as OverloadedLists.
-  -- See Note [Rebindable syntax and HsExpansion].
+  -- See Note [Rebindable syntax and XXExprGhcRn].
   | ExpansionPat (Pat GhcRn) (Pat GhcTc)
 
 
--- See Note [Rebindable syntax and HsExpansion].
+-- See Note [Rebindable syntax and XXExprGhcRn].
 data HsPatExpansion a b
   = HsPatExpanded a b
   deriving Data
@@ -295,7 +296,7 @@ instance (Outputable p, OutputableBndr p, Outputable arg)
 instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
--- See Note [Rebindable syntax and HsExpansion].
+-- See Note [Rebindable syntax and XXExprGhcRn].
 instance (Outputable a, Outputable b) => Outputable (HsPatExpansion a b) where
   ppr (HsPatExpanded a b) = ifPprDebug (vcat [ppr a, ppr b]) (ppr a)
 
@@ -512,7 +513,6 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-
 {-
 Note [-XStrict and irrefutability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -538,6 +538,21 @@ encounters a LazyPat and -XStrict is enabled.
 
 See also Note [decideBangHood] in GHC.HsToCore.Utils.
 -}
+
+type ConLikePIrrefutableCheck m p
+  = Bool                       -- ^ Are we in a @-XStrict@ context?
+                               -- See Note [-XStrict and irrefutability]
+    -> XRec p (ConLikeP p)     -- ^ ConLikeThing
+    -> HsConPatDetails p       -- ^ ConPattern details
+    -> m Bool                  -- ^ is it Irrefutable?
+
+type LPatIrrefutableCheck m p
+  = Bool                              -- ^ Are we in a @-XStrict@ context?
+                                      -- See Note [-XStrict and irrefutability]
+    -> ConLikePIrrefutableCheck m p   -- How should I check ConLikeP things
+    -> LPat p                         -- The LPat thing
+    -> m Bool                         -- Is it irrefutable?
+
 -- | (isIrrefutableHsPat p) is true if matching against p cannot fail
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -550,54 +565,69 @@ See also Note [decideBangHood] in GHC.HsToCore.Utils.
 -- tuple patterns are considered irrefutable at the renamer stage.
 --
 -- But if it returns True, the pattern is definitely irrefutable
-isIrrefutableHsPat :: forall p. (OutputableBndrId p)
-                    => Bool -- ^ Are we in a @-XStrict@ context?
-                            -- See Note [-XStrict and irrefutability]
-                    -> LPat (GhcPass p) -> Bool
-isIrrefutableHsPat is_strict = goL
+-- Instantiates `isIrrefutableHsPatHelperM` with a trivial identity monad
+isIrrefutableHsPatHelper :: forall p. (OutputableBndrId p)
+                         => Bool -- ^ Are we in a @-XStrict@ context?
+                                 -- See Note [-XStrict and irrefutability]
+                         -> LPat (GhcPass p) -> Bool
+isIrrefutableHsPatHelper is_strict pat = runIdentity $ doWork is_strict pat
   where
-    goL :: LPat (GhcPass p) -> Bool
-    goL = go . unLoc
+  doWork :: forall p. (OutputableBndrId p) => Bool -> LPat (GhcPass p) -> Identity Bool
+  doWork is_strict = isIrrefutableHsPatHelperM is_strict isConLikeIrr
 
-    go :: Pat (GhcPass p) -> Bool
-    go (WildPat {})        = True
-    go (VarPat {})         = True
+  isConLikeIrr :: forall p. (OutputableBndrId p) => ConLikePIrrefutableCheck Identity (GhcPass p)
+  isConLikeIrr is_strict con details
+    = case ghcPass @p of
+        GhcPs -> return False                   -- Conservative
+        GhcRn -> return False                   -- Conservative
+        GhcTc -> case con of
+          L _ (PatSynCon _pat)  -> return False -- Conservative
+          L _ (RealDataCon con) ->
+            do let b = isJust (tyConSingleDataCon_maybe (dataConTyCon con))
+               bs <- mapM (doWork is_strict) (hsConPatArgs details)
+               return $ b && and bs
+
+
+-- This function abstracts 2 things
+-- 1. How to compute irrefutability for a `ConLikeP` thing
+-- 2. The wrapper monad
+isIrrefutableHsPatHelperM :: forall m p. (Monad m, OutputableBndrId p)
+                          => LPatIrrefutableCheck m (GhcPass p)
+isIrrefutableHsPatHelperM is_strict isConLikeIrr pat = go (unLoc pat)
+  where
+    goL = isIrrefutableHsPatHelperM is_strict isConLikeIrr
+
+    go :: Pat (GhcPass p) -> m Bool
+    go (WildPat {})        = return True
+    go (VarPat {})         = return True
     go (LazyPat _ p')
       | is_strict
-      = isIrrefutableHsPat False p'
-      | otherwise          = True
+      = isIrrefutableHsPatHelperM False isConLikeIrr p'
+      | otherwise          = return True
     go (BangPat _ pat)     = goL pat
     go (ParPat _ pat)      = goL pat
     go (AsPat _ _ pat)     = goL pat
     go (ViewPat _ _ pat)   = goL pat
     go (SigPat _ pat _)    = goL pat
-    go (TuplePat _ pats _) = all goL pats
-    go (SumPat {})         = False
+    go (TuplePat _ pats _) = do { bs <- mapM goL pats; return $ and bs }
+    go (SumPat {})         = return False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
-    go (ListPat {})        = False
+    go (ListPat {})        = return False
 
     go (ConPat
         { pat_con  = con
-        , pat_args = details })
-                           = case ghcPass @p of
-       GhcPs -> False -- Conservative
-       GhcRn -> False -- Conservative
-       GhcTc -> case con of
-         L _ (PatSynCon _pat)  -> False -- Conservative
-         L _ (RealDataCon con) ->
-           isJust (tyConSingleDataCon_maybe (dataConTyCon con))
-           && all goL (hsConPatArgs details)
-    go (LitPat {})         = False
-    go (NPat {})           = False
-    go (NPlusKPat {})      = False
+        , pat_args = details }) = isConLikeIrr is_strict con details
+    go (LitPat {})         = return False
+    go (NPat {})           = return False
+    go (NPlusKPat {})      = return False
 
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
-    go (SplicePat {})      = False
+    go (SplicePat {})      = return False
 
     -- The behavior of this case is unimportant, as GHC will throw an error shortly
     -- after reaching this case for other reasons (see TcRnIllegalTypePattern).
-    go (EmbTyPat {})       = True
+    go (EmbTyPat {})       = return True
 
     go (XPat ext)          = case ghcPass @p of
       GhcRn -> case ext of
@@ -623,7 +653,7 @@ isSimplePat p = case unLoc p of
   _ -> Nothing
 
 -- | Is this pattern boring from the perspective of pattern-match checking,
--- i.e. introduces no new pieces of long-dinstance information
+-- i.e. introduces no new pieces of long-distance information
 -- which could influence pattern-match checking?
 --
 -- See Note [Boring patterns].
@@ -672,6 +702,10 @@ isBoringHsPat = goL
          GhcTc -> case ext of
            CoPat _ pat _      -> go pat
            ExpansionPat _ pat -> go pat
+
+isPatSyn :: LPat GhcTc -> Bool
+isPatSyn (L _ (ConPat {pat_con = L _ (PatSynCon{})})) = True
+isPatSyn _ = False
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

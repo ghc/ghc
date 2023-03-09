@@ -14,7 +14,4 @@ SafeLang17.hs:9:13: error: [GHC-36705]
         instance Pos [a] -- Defined at SafeLang17_A.hs:14:10
     • In the expression: res [(1 :: Int)]
       In an equation for ‘r’: r = res [(1 :: Int)]
-      In the expression:
-        do let r = res ...
-           putStrLn $ "Result: " ++ show r
-           putStrLn $ "Result: " ++ show function
+      In a stmt of a 'do' block: let r = res [(1 :: Int)]

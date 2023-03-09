@@ -1684,11 +1684,16 @@ repE (HsProjection _ xs) = repProjection (fmap (field_label . unLoc . dfoLabel .
 repE (HsEmbTy _ t) = do
   t1 <- repLTy (hswc_body t)
   rep2 typeEName [unC t1]
-repE (XExpr (HsExpanded orig_expr ds_expr))
+repE e@(XExpr (ExpandedThingRn o x))
+  | OrigExpr e <- o
   = do { rebindable_on <- lift $ xoptM LangExt.RebindableSyntax
        ; if rebindable_on  -- See Note [Quotation and rebindable syntax]
-         then repE ds_expr
-         else repE orig_expr }
+         then repE x
+         else repE e }
+  | otherwise
+  = notHandled (ThExpressionForm e)
+
+repE (XExpr (PopErrCtxt (L _ e))) = repE e
 repE e@(HsPragE _ (HsPragSCC {}) _) = notHandled (ThCostCentres e)
 repE e@(HsTypedBracket{})   = notHandled (ThExpressionForm e)
 repE e@(HsUntypedBracket{}) = notHandled (ThExpressionForm e)
@@ -1714,7 +1719,7 @@ Then, concerning the TH quotation,
       a type error from the splice.
 
 We consult the module-wide RebindableSyntax flag here. We could instead record
-the choice in HsExpanded, but it seems simpler to consult the flag (again).
+the choice in ExpandedThingRn, but it seems simpler to consult the flag (again).
 -}
 
 -----------------------------------------------------------------------------

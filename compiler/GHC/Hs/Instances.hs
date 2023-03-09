@@ -388,8 +388,6 @@ deriving instance Data (HsStmtContext GhcTc)
 
 deriving instance Data HsArrowMatchContext
 
-deriving instance Data HsDoFlavour
-
 deriving instance Data (HsMatchContext GhcPs)
 deriving instance Data (HsMatchContext GhcRn)
 deriving instance Data (HsMatchContext GhcTc)
@@ -564,6 +562,8 @@ deriving instance Eq (IE GhcTc)
 
 -- ---------------------------------------------------------------------
 
+deriving instance Data HsThingRn
+deriving instance Data XXExprGhcRn
 deriving instance Data XXExprGhcTc
 deriving instance Data XXPatGhcTc
 

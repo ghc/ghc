@@ -23,24 +23,3 @@ simpl017.hs:55:5: error: [GHC-83865]
         a :: arr i a (bound at simpl017.hs:50:11)
         liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
           (bound at simpl017.hs:50:1)
-
-simpl017.hs:71:10: error: [GHC-83865]
-    • Couldn't match type: forall v. [E (ST s) Int] -> E' v (ST s) Int
-                     with: [E (ST t0) Int] -> E (ST s) Int
-      Expected: E' RValue (ST s) ([E (ST t0) Int] -> E (ST s) Int)
-        Actual: E (ST s) (forall v. [E (ST s) Int] -> E' v (ST s) Int)
-    • In a stmt of a 'do' block: a <- liftArray ma
-      In the second argument of ‘($)’, namely
-        ‘do a <- liftArray ma
-            let one :: E (ST t) Int
-                one = return 1
-            a [one] `plus` a [one]’
-      In the expression:
-        runE
-          $ do a <- liftArray ma
-               let one :: E (ST t) Int
-                   one = return 1
-               a [one] `plus` a [one]
-    • Relevant bindings include
-        ma :: STArray s Int Int (bound at simpl017.hs:70:5)
-        foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:70:1)

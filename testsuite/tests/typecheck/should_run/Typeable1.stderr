@@ -23,9 +23,3 @@ Typeable1.hs:22:5: error: [GHC-40564] [-Winaccessible-code (in -Wdefault), Werro
     • Relevant bindings include
         y :: TypeRep b2 (bound at Typeable1.hs:19:11)
         x :: TypeRep a2 (bound at Typeable1.hs:19:9)
-
-Typeable1.hs:22:5: error: [GHC-94210] [-Woverlapping-patterns (in -Wdefault), Werror=overlapping-patterns]
-    Pattern match has inaccessible right hand side
-    In a pattern binding in
-         a 'do' block:
-        App x y <- ...

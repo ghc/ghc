@@ -314,7 +314,7 @@ Note [Handling overloaded and rebindable patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Overloaded patterns and rebindable patterns are desugared in the renamer
 using the HsPatExpansion mechanism detailed in:
-Note [Rebindable syntax and HsExpansion]
+Note [Rebindable syntax and XXExprGhcRn]
 The approach is similar to that of expressions, which is further detailed
 in Note [Handling overloaded and rebindable constructs] in GHC.Rename.Expr.
 
@@ -342,7 +342,7 @@ If OverloadedLists is enabled, we desugar a list pattern to a view pattern:
   toList -> [p1, p2, p3]
 
 This happens directly in the renamer, using the HsPatExpansion mechanism
-detailed in Note [Rebindable syntax and HsExpansion].
+detailed in Note [Rebindable syntax and XXExprGhcRn].
 
 Note that we emit a special view pattern: we additionally keep track of an
 inverse to the pattern.

@@ -90,7 +90,7 @@ data TcLclCtxt
   = TcLclCtxt {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and HsExpansion]
+        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and XXExprGhcRn]
         tcl_tclvl      :: TcLevel,
         tcl_bndrs      :: TcBinderStack,   -- Used for reporting relevant bindings,
                                            -- and for tidying type

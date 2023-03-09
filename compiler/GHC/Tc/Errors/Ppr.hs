@@ -4948,7 +4948,7 @@ pprWithArising (ct:cts)
 {- Note ["Arising from" messages in generated code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider code generated when we desugar code before typechecking;
-see Note [Rebindable syntax and HsExpansion].
+see Note [Rebindable syntax and XXExprGhcRn].
 
 In this code, constraints may be generated, but we don't want to
 say "arising from a call of foo" if 'foo' doesn't appear in the

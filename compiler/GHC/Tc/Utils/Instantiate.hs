@@ -706,7 +706,7 @@ newNonTrivialOverloadedLit
     orig = LiteralOrigin lit
 
 ------------
-mkOverLit ::OverLitVal -> TcM (HsLit GhcTc)
+mkOverLit :: OverLitVal -> TcM (HsLit (GhcPass p))
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
         ; return (HsInteger (il_text i)

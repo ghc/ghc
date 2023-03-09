@@ -239,7 +239,7 @@ this if both data types are declared in the same module.
 
 NB 2: The notation getField @"size" e is short for
 HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
-We track the original parsed syntax via HsExpanded.
+We track the original parsed syntax via ExpandedThingRn.
 
 -}
 
@@ -581,7 +581,7 @@ data HsExpr p
 
   | XExpr       !(XXExpr p)
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
-  -- general idea, and Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
+  -- general idea, and Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
   -- for an example of how we use it.
 
 -- ---------------------------------------------------------------------
@@ -1608,6 +1608,7 @@ data HsDoFlavour
   | GhciStmtCtxt                     -- ^A command-line Stmt in GHCi pat <- rhs
   | ListComp
   | MonadComp
+  deriving (Eq, Data)
 
 qualifiedDoModuleName_maybe :: HsStmtContext p -> Maybe ModuleName
 qualifiedDoModuleName_maybe ctxt = case ctxt of

@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Head
        , tyConOf, tyConOfET, fieldNotInType
        , nonBidirectionalErr
 
-       , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
+       , addHeadCtxt, addExprCtxt, addStmtCtxt, addFunResCtxt ) where
 
 import {-# SOURCE #-} GHC.Tc.Gen.Expr( tcExpr, tcCheckMonoExprNC, tcCheckPolyExprNC )
 
@@ -156,7 +156,7 @@ takes apart either an HsApp, or an infix OpApp, returning
 * The "user head" or "error head" of the application, to be reported to the
   user in case of an error.  Example:
          (`op` e)
-  expands (via HsExpanded) to
+  expands (via ExpandedThingRn) to
          (rightSection op e)
   but we don't want to see 'rightSection' in error messages. So we keep the
   innermost un-expanded head as the "error head".
@@ -184,7 +184,7 @@ data HsExprArg (p :: TcPass)
   | EWrap    EWrap
 
 data EWrap = EPar    AppCtxt
-           | EExpand (HsExpr GhcRn)
+           | EExpand HsThingRn
            | EHsWrap HsWrapper
 
 data EValArg (p :: TcPass) where  -- See Note [EValArg]
@@ -201,13 +201,9 @@ data EValArg (p :: TcPass) where  -- See Note [EValArg]
 
 data AppCtxt
   = VAExpansion
-       (HsExpr GhcRn)    -- Inside an expansion of this expression
-       SrcSpan           -- The SrcSpan of the expression
-                         --    noSrcSpan if outermost; see Note [AppCtxt]
-       SrcSpan           -- The SrcSpan of the application as specified
-                         -- inside the expansion.
-                         -- Used for accurately reconstructing the
-                         -- original SrcSpans in 'rebuildHsApps'.
+       HsThingRn
+       SrcSpan
+       SrcSpan
 
   | VACall
        (HsExpr GhcRn) Int  -- In the third argument of function f
@@ -247,11 +243,11 @@ appCtxtLoc (VACall _ _ l)    = l
 
 insideExpansion :: AppCtxt -> Bool
 insideExpansion (VAExpansion {}) = True
-insideExpansion (VACall {})      = False
+insideExpansion (VACall {})      = False -- but what if the VACall has a generated context?
 
 instance Outputable AppCtxt where
-  ppr (VAExpansion e _ _) = text "VAExpansion" <+> ppr e
-  ppr (VACall f n _)    = text "VACall" <+> int n <+> ppr f
+  ppr (VAExpansion e l _) = text "VAExpansion" <+> ppr e <+> ppr l
+  ppr (VACall f n l)    = text "VACall" <+> int n <+> ppr f  <+> ppr l
 
 type family XPass p where
   XPass 'TcpRn   = 'Renamed
@@ -299,7 +295,8 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_ctxt n (HsPragE _ _ fun)           = top_lctxt n fun
     top_ctxt n (HsAppType _ fun _)         = top_lctxt (n+1) fun
     top_ctxt n (HsApp _ fun _)             = top_lctxt (n+1) fun
-    top_ctxt n (XExpr (HsExpanded orig _)) = VACall orig      n noSrcSpan
+    top_ctxt n (XExpr (ExpandedThingRn o _))
+      | OrigExpr fun <- o                  = VACall fun  n noSrcSpan
     top_ctxt n other_fun                   = VACall other_fun n noSrcSpan
 
     top_lctxt n (L _ fun) = top_ctxt n fun
@@ -312,17 +309,12 @@ splitHsApps e = go e (top_ctxt 0 e) []
     go (HsAppType _ (L l fun) ty)    ctxt args = go fun (dec l ctxt) (mkETypeArg ctxt ty    : args)
     go (HsApp _ (L l fun) arg)       ctxt args = go fun (dec l ctxt) (mkEValArg  ctxt arg   : args)
 
-    -- See Note [Looking through HsExpanded]
-    go (XExpr (HsExpanded orig fun)) ctxt args
-      = go fun (VAExpansion orig (appCtxtLoc ctxt) (appCtxtLoc ctxt))
-               (EWrap (EExpand orig) : args)
-
     -- See Note [Looking through Template Haskell splices in splitHsApps]
     go e@(HsUntypedSplice splice_res splice) ctxt args
       = case splice_res of
           HsUntypedSpliceTop mod_finalizers fun
             -> do addModFinalizersWithLclEnv mod_finalizers
-                  go fun ctxt' (EWrap (EExpand e) : args)
+                  go fun ctxt' (EWrap (EExpand (OrigExpr e)) : args)
           HsUntypedSpliceNested {} -> panic "splitHsApps: invalid nested splice"
       where
         ctxt' :: AppCtxt
@@ -331,22 +323,45 @@ splitHsApps e = go e (top_ctxt 0 e) []
             HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
             HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
 
+    -- See Note [Looking through ExpandedThingRn]
+    go (XExpr (ExpandedThingRn o e)) ctxt args
+      | isHsThingRnExpr o
+      = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
+               (EWrap (EExpand o) : args)
+
+      | OrigStmt (L _ stmt) <- o                -- so that we set `(>>)` as generated
+      , BodyStmt{} <- stmt                      -- and get the right unused bind warnings
+      = go e (VAExpansion o generatedSrcSpan generatedSrcSpan)
+                                                -- See Part 3. in Note [Expanding HsDo with XXExprGhcRn]
+               (EWrap (EExpand o) : args)       -- in `GHC.Tc.Gen.Do`
+
+
+      | OrigPat (L loc _) <- o                              -- so that we set the compiler generated fail context
+      = go e (VAExpansion o (locA loc) (locA loc))          -- to be originating from a failable pattern
+                                                            -- See Part 1. Wrinkle 2. of
+               (EWrap (EExpand o) : args)                   -- Note [Expanding HsDo with XXExprGhcRn]
+                                                            -- in `GHC.Tc.Gen.Do`
+
+      | otherwise
+      = go e (VAExpansion o (appCtxtLoc ctxt) (appCtxtLoc ctxt))
+               (EWrap (EExpand o) : args)
+
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
       = pure ( (op, VACall op 0 (locA l))
              ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
                : mkEValArg (VACall op 2 generatedSrcSpan) arg2
-               : EWrap (EExpand e)
+               : EWrap (EExpand (OrigExpr e))
                : args )
 
     go e ctxt args = pure ((e,ctxt), args)
 
     set :: EpAnn ann -> AppCtxt -> AppCtxt
-    set l (VACall f n _)        = VACall f n (locA l)
+    set l (VACall f n _)          = VACall f n (locA l)
     set l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 
     dec :: EpAnn ann -> AppCtxt -> AppCtxt
-    dec l (VACall f n _)        = VACall f (n-1) (locA l)
+    dec l (VACall f n _)          = VACall f (n-1) (locA l)
     dec l (VAExpansion orig ol _) = VAExpansion orig ol (locA l)
 
 -- | Rebuild an application: takes a type-checked application head
@@ -390,7 +405,10 @@ rebuild_hs_apps fun ctxt (arg : args)
       EWrap (EPar ctxt')
         -> rebuild_hs_apps (gHsPar lfun) ctxt' args
       EWrap (EExpand orig)
-        -> rebuild_hs_apps (XExpr (ExpansionExpr (HsExpanded orig fun))) ctxt args
+        | OrigExpr oe <- orig
+        -> rebuild_hs_apps (mkExpandedExprTc oe fun) ctxt args
+        | otherwise
+        -> rebuild_hs_apps fun ctxt args
       EWrap (EHsWrap wrap)
         -> rebuild_hs_apps (mkHsWrap wrap fun) ctxt args
   where
@@ -765,25 +783,25 @@ pprHsExprArgTc arg = ppr arg
 Operator sections are desugared in the renamer; see GHC.Rename.Expr
 Note [Handling overloaded and rebindable constructs].
 But for reasons explained there, we rename OpApp to OpApp.  Then,
-here in the typechecker, we desugar it to a use of HsExpanded.
+here in the typechecker, we desugar it to a use of ExpandedThingRn.
 That makes it possible to typecheck something like
      e1 `f` e2
 where
    f :: forall a. t1 -> forall b. t2 -> t3
 
-Note [Looking through HsExpanded]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Looking through ExpandedThingRn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When creating an application chain in splitHsApps, we must deal with
-     HsExpanded f1 (f `HsApp` e1) `HsApp` e2 `HsApp` e3
+     ExpandedThingRn f1 (f `HsApp` e1) `HsApp` e2 `HsApp` e3
 
 as a single application chain `f e1 e2 e3`.  Otherwise stuff like overloaded
 labels (#19154) won't work.
 
-It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
+It's easy to achieve this: `splitHsApps` unwraps `ExpandedThingRn`.
 
 In order to be able to more accurately reconstruct the original `SrcSpan`s
 from the renamer in `rebuildHsApps`, we also have to track the `SrcSpan`
-of the current application in `VAExpansion` when unwrapping `HsExpanded`
+of the current application in `VAExpansion` when unwrapping `ExpandedThingRn`
 in `splitHsApps`, just as we track it in a non-expanded expression.
 
 Previously, `rebuildHsApps` substituted the location of the original
@@ -882,16 +900,21 @@ tcInferAppHead_maybe fun
       _                         -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a
+addHeadCtxt (VAExpansion (OrigStmt (L loc stmt)) _ _) thing_inside =
+  do setSrcSpanA loc $
+       addStmtCtxt stmt
+         thing_inside
 addHeadCtxt fun_ctxt thing_inside
   | not (isGoodSrcSpan fun_loc)   -- noSrcSpan => no arguments
   = thing_inside                  -- => context is already set
   | otherwise
   = setSrcSpan fun_loc $
-    case fun_ctxt of
-      VAExpansion orig _ _ -> addExprCtxt orig thing_inside
-      VACall {}          -> thing_inside
+    do case fun_ctxt of
+         VAExpansion (OrigExpr orig) _ _ -> addExprCtxt orig thing_inside
+         _                               -> thing_inside
   where
     fun_loc = appCtxtLoc fun_ctxt
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1610,6 +1633,17 @@ mis-match in the number of value arguments.
              Misc utility functions
 *                                                                      *
 ********************************************************************* -}
+
+addStmtCtxt :: ExprStmt GhcRn -> TcRn a -> TcRn a
+addStmtCtxt stmt thing_inside
+  = do let err_doc = pprStmtInCtxt (HsDoStmt (DoExpr Nothing)) stmt
+       addErrCtxt err_doc thing_inside
+  where
+    pprStmtInCtxt :: HsStmtContext GhcRn -> StmtLR GhcRn GhcRn (LHsExpr GhcRn) -> SDoc
+    pprStmtInCtxt ctxt stmt
+      = vcat [ hang (text "In a stmt of"
+                     <+> pprAStmtContext ctxt <> colon) 2 (pprStmt stmt)
+             ]
 
 addExprCtxt :: HsExpr GhcRn -> TcRn a -> TcRn a
 addExprCtxt e thing_inside

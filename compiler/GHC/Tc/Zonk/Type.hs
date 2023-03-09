@@ -1080,8 +1080,10 @@ zonkExpr (XExpr (WrapExpr (HsWrap co_fn expr)))
     do new_expr <- zonkExpr expr
        return (XExpr (WrapExpr (HsWrap new_co_fn new_expr)))
 
-zonkExpr (XExpr (ExpansionExpr (HsExpanded a b)))
-  = XExpr . ExpansionExpr . HsExpanded a <$> zonkExpr b
+zonkExpr (XExpr (ExpandedThingTc thing e))
+  = do e' <- zonkExpr e
+       return $ XExpr (ExpandedThingTc thing e')
+
 
 zonkExpr (XExpr (ConLikeTc con tvs tys))
   = XExpr . ConLikeTc con tvs <$> mapM zonk_scale tys

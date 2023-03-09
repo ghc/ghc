@@ -14,6 +14,8 @@ import Control.Concurrent
 -- With the Visible Type Application patch, this succeeds again.
 --
 -- Sept 16: fails again as it should
+--
+-- DoExpansion makes it pass again. RAE says this should typecheck
 
 foo = do var <- newEmptyMVar :: IO (MVar (forall a. Show a => a -> String))
          putMVar var (show :: forall b. Show b => b -> String)

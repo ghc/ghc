@@ -36,3 +36,16 @@ t6 :: forall m. MonadFix m => m Int
 t6 = mdo
   return (return 10 :: m Int)
   return 10
+
+unit :: ()
+unit = ()
+
+-- No warning
+t7 :: forall m. Monad m => m Int
+t7 = do
+  return unit
+  return 10
+
+-- No warning
+t8 :: Monad m => m Int
+t8 = return 10 >> return 10

@@ -1212,7 +1212,7 @@ Note [Error contexts in generated code]
 
 So typically it's better to do setSrcSpan /before/ addErrCtxt.
 
-See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr for
+See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr for
 more discussion of this fancy footwork, as well as
 Note [Generated code and pattern-match checking] in GHC.Types.Basic for the
 relation with pattern-match checks.
@@ -1256,13 +1256,14 @@ pushCtxt ctxt = updLclEnv (updCtxt ctxt)
 
 updCtxt :: ErrCtxt -> TcLclEnv -> TcLclEnv
 -- Do not update the context if we are in generated code
--- See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
+-- See Note [Rebindable syntax and XXExprGhcRn] in GHC.Hs.Expr
 updCtxt ctxt env
   | lclEnvInGeneratedCode env = env
   | otherwise = addLclEnvErrCtxt ctxt env
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env)
+popErrCtxt thing_inside = updLclEnv (\env -> setLclEnvErrCtxt (pop $ getLclEnvErrCtxt env) env) $
+                          thing_inside
            where
              pop []       = []
              pop (_:msgs) = msgs
@@ -1292,7 +1293,6 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
                      $ setLclEnvErrCtxt (ctl_ctxt lcl)
                      $ setLclEnvBinderStack (ctl_bndrs lcl)
                      $ env) thing_inside
-
 
 {- *********************************************************************
 *                                                                      *

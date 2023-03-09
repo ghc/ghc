@@ -1,78 +1,81 @@
-	Fri Nov 13 01:06 2020 Time and Allocation Profiling Report  (Final)
+	Thu Oct 12 08:47 2023 Time and Allocation Profiling Report  (Final)
 
 	   CallerCc2 +RTS -hc -p -RTS 7
 
-	total time  =        0.09 secs   (91 ticks @ 1000 us, 1 processor)
-	total alloc = 105,486,200 bytes  (excludes profiling overheads)
+	total time  =        0.13 secs   (127 ticks @ 1000 us, 1 processor)
+	total alloc = 104,890,152 bytes  (excludes profiling overheads)
 
 COST CENTRE    MODULE    SRC                        %time %alloc
 
-disin          Main      Main.hs:(74,1)-(83,11)      26.4   49.5
-clause.clause' Main      Main.hs:(63,12)-(65,57)     23.1   37.5
-insert         Main      Main.hs:(108,1)-(112,8)     18.7    1.7
-conjunct       Main      Main.hs:(70,1)-(71,18)       8.8    0.0
-unicl.unicl'   Main      Main.hs:(178,11)-(180,36)    5.5    2.6
-tautclause     Main      Main.hs:173:1-49             5.5    3.7
-unicl          Main      Main.hs:(176,1)-(180,36)     3.3    1.1
-split.split'   Main      Main.hs:(165,11)-(166,28)    3.3    2.3
-disin.dp       Main      Main.hs:80:3-14              3.3    0.0
-clause         Main      Main.hs:(61,1)-(65,57)       2.2    1.4
+disin          Main      Main.hs:(74,1)-(83,11)      32.3   49.8
+insert         Main      Main.hs:(108,1)-(112,8)     21.3    1.7
+clause.clause' Main      Main.hs:(63,12)-(65,57)     20.5   37.7
+conjunct       Main      Main.hs:(70,1)-(71,18)       8.7    0.0
+tautclause     Main      Main.hs:173:1-49             6.3    3.7
+disin.dp       Main      Main.hs:80:3-14              3.9    0.0
+disin.dq       Main      Main.hs:81:3-14              2.4    0.0
+split.split'   Main      Main.hs:(165,11)-(166,28)    1.6    2.3
+parse'         Main      Main.hs:(137,1)-(145,42)     1.6    0.0
+unicl.unicl'   Main      Main.hs:(178,11)-(180,36)    0.8    2.0
+unicl          Main      Main.hs:(176,1)-(180,36)     0.8    1.1
+clause         Main      Main.hs:(61,1)-(65,57)       0.0    1.4
 
 
                                                                                                                  individual      inherited
 COST CENTRE                                   MODULE                SRC                       no.     entries  %time %alloc   %time %alloc
 
-MAIN                                          MAIN                  <built-in>                128           0    0.0    0.0   100.0  100.0
- CAF                                          Main                  <entire-module>           255           0    0.0    0.0     0.0    0.0
-  clauses                                     Main                  Main.hs:68:1-74           261           1    0.0    0.0     0.0    0.0
-   Main.clauses(calling:Data.Foldable.concat) Main                  Main.hs:68:1-7            263           1    0.0    0.0     0.0    0.0
-  main                                        Main                  Main.hs:(42,1)-(44,23)    256           1    0.0    0.0     0.0    0.0
-  redstar                                     Main                  Main.hs:155:1-35          279           1    0.0    0.0     0.0    0.0
-  spaces                                      Main                  Main.hs:160:1-19          303           1    0.0    0.0     0.0    0.0
- CAF                                          GHC.Conc.Signal       <entire-module>           246           0    0.0    0.0     0.0    0.0
- CAF                                          GHC.IO.Encoding       <entire-module>           235           0    0.0    0.0     0.0    0.0
- CAF                                          GHC.IO.Encoding.Iconv <entire-module>           233           0    0.0    0.0     0.0    0.0
- CAF                                          GHC.IO.Handle.FD      <entire-module>           225           0    0.0    0.0     0.0    0.0
- main                                         Main                  Main.hs:(42,1)-(44,23)    257           0    0.0    0.0   100.0  100.0
-  res                                         Main                  Main.hs:(46,1)-(48,26)    258           1    0.0    0.0   100.0   99.9
-   Main.main(calling:Data.Foldable.concat)    Main                  Main.hs:42:1-4            259           1    0.0    0.0     0.0    0.0
-   res.xs                                     Main                  Main.hs:47:8-69           260           1    0.0    0.0     0.0    0.0
-   clauses                                    Main                  Main.hs:68:1-74           262           0    0.0    0.0   100.0   99.9
-    disin                                     Main                  Main.hs:(74,1)-(83,11)    267      857598   26.4   49.5    38.5   49.5
-     conjunct                                 Main                  Main.hs:(70,1)-(71,18)    291      759353    8.8    0.0     8.8    0.0
-     disin.dp                                 Main                  Main.hs:80:3-14           292      380009    3.3    0.0     3.3    0.0
-     disin.dq                                 Main                  Main.hs:81:3-14           293      380009    0.0    0.0     0.0    0.0
-    negin                                     Main                  Main.hs:(119,1)-(124,11)  268        1617    0.0    0.1     0.0    0.1
-    elim                                      Main                  Main.hs:(89,1)-(94,57)    269        1393    0.0    0.1     0.0    0.1
-    disp                                      Main                  Main.hs:86:1-71           301           7    0.0    0.0     0.0    0.0
-     interleave                               Main                  Main.hs:(115,1)-(116,25)  302          35    0.0    0.0     0.0    0.0
-    parse                                     Main                  Main.hs:135:1-39          270           7    0.0    0.0     0.0    0.0
-     parse.(...)                              Main                  Main.hs:135:19-39         272           7    0.0    0.0     0.0    0.0
-      parse'                                  Main                  Main.hs:(137,1)-(145,42)  273         280    0.0    0.0     0.0    0.0
-       opri                                   Main                  Main.hs:(127,1)-(132,12)  276          56    0.0    0.0     0.0    0.0
-       spri                                   Main                  Main.hs:(169,1)-(170,10)  274          56    0.0    0.0     0.0    0.0
-        opri                                  Main                  Main.hs:(127,1)-(132,12)  275          49    0.0    0.0     0.0    0.0
-       parse'.(...)                           Main                  Main.hs:142:20-49         278          21    0.0    0.0     0.0    0.0
-        redstar                               Main                  Main.hs:155:1-35          280           0    0.0    0.0     0.0    0.0
-         spri                                 Main                  Main.hs:(169,1)-(170,10)  282          63    0.0    0.0     0.0    0.0
-          opri                                Main                  Main.hs:(127,1)-(132,12)  283          63    0.0    0.0     0.0    0.0
-         while                                Main                  Main.hs:182:1-48          281          63    0.0    0.0     0.0    0.0
-          red                                 Main                  Main.hs:(148,1)-(152,43)  284          42    0.0    0.0     0.0    0.0
-       parse'.s'                              Main                  Main.hs:142:20-49         285          21    0.0    0.0     0.0    0.0
-       parse'.x                               Main                  Main.hs:142:20-49         277          21    0.0    0.0     0.0    0.0
-       redstar                                Main                  Main.hs:155:1-35          286           0    0.0    0.0     0.0    0.0
-        spri                                  Main                  Main.hs:(169,1)-(170,10)  288          21    0.0    0.0     0.0    0.0
-         opri                                 Main                  Main.hs:(127,1)-(132,12)  289          14    0.0    0.0     0.0    0.0
-        while                                 Main                  Main.hs:182:1-48          287          21    0.0    0.0     0.0    0.0
-         red                                  Main                  Main.hs:(148,1)-(152,43)  290          14    0.0    0.0     0.0    0.0
-     parse.f                                  Main                  Main.hs:135:19-39         271           7    0.0    0.0     0.0    0.0
-    split                                     Main                  Main.hs:(163,1)-(166,28)  265           7    0.0    0.0     3.3    2.3
-     split.split'                             Main                  Main.hs:(165,11)-(166,28) 266       74837    3.3    2.3     3.3    2.3
-    unicl                                     Main                  Main.hs:(176,1)-(180,36)  264           7    3.3    1.1    58.2   48.0
-     unicl.unicl'                             Main                  Main.hs:(178,11)-(180,36) 294       37422    5.5    2.6    54.9   46.9
-      tautclause                              Main                  Main.hs:173:1-49          295       37422    5.5    3.7     5.5    3.7
-      unicl.unicl'.cp                         Main                  Main.hs:180:24-36         296       37422    0.0    0.0    44.0   40.6
-       clause                                 Main                  Main.hs:(61,1)-(65,57)    297       37422    2.2    1.4    44.0   40.6
-        clause.clause'                        Main                  Main.hs:(63,12)-(65,57)   298      696150   23.1   37.5    41.8   39.2
-         insert                               Main                  Main.hs:(108,1)-(112,8)   299      366786   18.7    1.7    18.7    1.7
-      insert                                  Main                  Main.hs:(108,1)-(112,8)   300           7    0.0    0.0     0.0    0.0
+MAIN                                          MAIN                  <built-in>                137           0    0.0    0.0   100.0  100.0
+ CAF                                          Main                  <entire-module>           273           0    0.0    0.0     0.0    0.0
+  clauses                                     Main                  Main.hs:68:1-74           280           1    0.0    0.0     0.0    0.0
+   Main.clauses(calling:Data.Foldable.concat) Main                  Main.hs:68:1-7            282           1    0.0    0.0     0.0    0.0
+  main                                        Main                  Main.hs:(42,1)-(44,23)    274           1    0.0    0.0     0.0    0.0
+  redstar                                     Main                  Main.hs:155:1-35          298           1    0.0    0.0     0.0    0.0
+  spaces                                      Main                  Main.hs:160:1-19          322           1    0.0    0.0     0.0    0.0
+ CAF                                          GHC.Conc.Signal       <entire-module>           251           0    0.0    0.0     0.0    0.0
+ CAF                                          GHC.IO.Encoding       <entire-module>           232           0    0.0    0.0     0.0    0.0
+ CAF                                          GHC.IO.Encoding.Iconv <entire-module>           230           0    0.0    0.0     0.0    0.0
+ CAF                                          GHC.IO.Handle.FD      <entire-module>           221           0    0.0    0.0     0.0    0.0
+ main                                         Main                  Main.hs:(42,1)-(44,23)    275           0    0.0    0.0   100.0  100.0
+  main.\                                      Main                  Main.hs:44:3-23           276           1    0.0    0.0   100.0  100.0
+   res                                        Main                  Main.hs:(46,1)-(48,26)    277           1    0.0    0.0   100.0   99.9
+    Main.main(calling:Data.Foldable.concat)   Main                  Main.hs:42:1-4            278           1    0.0    0.0     0.0    0.0
+    res.xs                                    Main                  Main.hs:47:8-69           279           1    0.0    0.0     0.0    0.0
+    clauses                                   Main                  Main.hs:68:1-74           281           0    0.0    0.0   100.0   99.9
+     disin                                    Main                  Main.hs:(74,1)-(83,11)    286      857598   32.3   49.8    47.2   49.8
+      conjunct                                Main                  Main.hs:(70,1)-(71,18)    310      759353    8.7    0.0     8.7    0.0
+      disin.dp                                Main                  Main.hs:80:3-14           311      380009    3.9    0.0     3.9    0.0
+      disin.dq                                Main                  Main.hs:81:3-14           312      380009    2.4    0.0     2.4    0.0
+     negin                                    Main                  Main.hs:(119,1)-(124,11)  287        1617    0.0    0.1     0.0    0.1
+     elim                                     Main                  Main.hs:(89,1)-(94,57)    288        1393    0.0    0.1     0.0    0.1
+     disp                                     Main                  Main.hs:86:1-71           320           7    0.0    0.0     0.0    0.0
+      interleave                              Main                  Main.hs:(115,1)-(116,25)  321          35    0.0    0.0     0.0    0.0
+     parse                                    Main                  Main.hs:135:1-39          289           7    0.0    0.0     1.6    0.0
+      parse.(...)                             Main                  Main.hs:135:19-39         291           7    0.0    0.0     1.6    0.0
+       parse'                                 Main                  Main.hs:(137,1)-(145,42)  292         280    1.6    0.0     1.6    0.0
+        opri                                  Main                  Main.hs:(127,1)-(132,12)  295          56    0.0    0.0     0.0    0.0
+        spri                                  Main                  Main.hs:(169,1)-(170,10)  293          56    0.0    0.0     0.0    0.0
+         opri                                 Main                  Main.hs:(127,1)-(132,12)  294          49    0.0    0.0     0.0    0.0
+        parse'.(...)                          Main                  Main.hs:142:20-49         297          21    0.0    0.0     0.0    0.0
+         redstar                              Main                  Main.hs:155:1-35          299           0    0.0    0.0     0.0    0.0
+          spri                                Main                  Main.hs:(169,1)-(170,10)  301          63    0.0    0.0     0.0    0.0
+           opri                               Main                  Main.hs:(127,1)-(132,12)  302          63    0.0    0.0     0.0    0.0
+          while                               Main                  Main.hs:182:1-48          300          63    0.0    0.0     0.0    0.0
+           red                                Main                  Main.hs:(148,1)-(152,43)  303          42    0.0    0.0     0.0    0.0
+        parse'.s'                             Main                  Main.hs:142:20-49         304          21    0.0    0.0     0.0    0.0
+        parse'.x                              Main                  Main.hs:142:20-49         296          21    0.0    0.0     0.0    0.0
+        redstar                               Main                  Main.hs:155:1-35          305           0    0.0    0.0     0.0    0.0
+         spri                                 Main                  Main.hs:(169,1)-(170,10)  307          21    0.0    0.0     0.0    0.0
+          opri                                Main                  Main.hs:(127,1)-(132,12)  308          14    0.0    0.0     0.0    0.0
+         while                                Main                  Main.hs:182:1-48          306          21    0.0    0.0     0.0    0.0
+          red                                 Main                  Main.hs:(148,1)-(152,43)  309          14    0.0    0.0     0.0    0.0
+      parse.f                                 Main                  Main.hs:135:19-39         290           7    0.0    0.0     0.0    0.0
+     split                                    Main                  Main.hs:(163,1)-(166,28)  284           7    0.0    0.0     1.6    2.3
+      split.split'                            Main                  Main.hs:(165,11)-(166,28) 285       74837    1.6    2.3     1.6    2.3
+     unicl                                    Main                  Main.hs:(176,1)-(180,36)  283           7    0.8    1.1    49.6   47.7
+      unicl.unicl'                            Main                  Main.hs:(178,11)-(180,36) 313       37422    0.8    2.0    48.8   46.6
+       tautclause                             Main                  Main.hs:173:1-49          314       37422    6.3    3.7     6.3    3.7
+       unicl.unicl'.cp                        Main                  Main.hs:180:24-36         315       37422    0.0    0.0    41.7   40.9
+        clause                                Main                  Main.hs:(61,1)-(65,57)    316       37422    0.0    1.4    41.7   40.9
+         clause.clause'                       Main                  Main.hs:(63,12)-(65,57)   317      696150   20.5   37.7    41.7   39.5
+          insert                              Main                  Main.hs:(108,1)-(112,8)   318      366786   21.3    1.7    21.3    1.7
+       insert                                 Main                  Main.hs:(108,1)-(112,8)   319           7    0.0    0.0     0.0    0.0

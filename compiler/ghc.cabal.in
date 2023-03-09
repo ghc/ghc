@@ -760,6 +760,7 @@ Library
         GHC.Tc.Gen.Arrow
         GHC.Tc.Gen.Bind
         GHC.Tc.Gen.Default
+        GHC.Tc.Gen.Do
         GHC.Tc.Gen.Export
         GHC.Tc.Gen.Expr
         GHC.Tc.Gen.Foreign

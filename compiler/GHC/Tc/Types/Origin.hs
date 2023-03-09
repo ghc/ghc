@@ -740,7 +740,10 @@ exprCtOrigin (HsUntypedSplice {})  = Shouldn'tHappenOrigin "TH untyped splice"
 exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsEmbTy {})        = Shouldn'tHappenOrigin "type expression"
-exprCtOrigin (XExpr (HsExpanded a _)) = exprCtOrigin a
+exprCtOrigin (XExpr (ExpandedThingRn thing _)) | OrigExpr a <- thing = exprCtOrigin a
+                                               | OrigStmt _ <- thing = DoOrigin
+                                               | OrigPat p  <- thing = DoPatOrigin p
+exprCtOrigin (XExpr (PopErrCtxt {})) = Shouldn'tHappenOrigin "PopErrCtxt"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
@@ -1385,9 +1388,9 @@ data ExpectedFunTyOrigin
   --
   -- Test cases for representation-polymorphism checks:
   --   RepPolyDoBind, RepPolyDoBody{1,2}, RepPolyMc{Bind,Body,Guard}, RepPolyNPlusK
-  = ExpectedFunTySyntaxOp
-    !CtOrigin
-    !(HsExpr GhcRn)
+  = forall (p :: Pass)
+     . (OutputableBndrId p)
+    => ExpectedFunTySyntaxOp !CtOrigin !(HsExpr (GhcPass p))
       -- ^ rebindable syntax operator
 
   -- | A view pattern must have a function type.
@@ -1403,8 +1406,7 @@ data ExpectedFunTyOrigin
   -- Test cases for representation-polymorphism checks:
   --   RepPolyApp
   | forall (p :: Pass)
-      . (OutputableBndrId p)
-      => ExpectedFunTyArg
+     . Outputable (HsExpr (GhcPass p)) => ExpectedFunTyArg
           !TypedThing
             -- ^ function
           !(HsExpr (GhcPass p))

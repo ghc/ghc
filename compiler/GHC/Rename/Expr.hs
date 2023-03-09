@@ -24,7 +24,7 @@ free variables.
 -}
 
 module GHC.Rename.Expr (
-        rnLExpr, rnExpr, rnStmts, mkExpandedExpr,
+        rnLExpr, rnExpr, rnStmts,
         AnnoBody, UnexpectedStatement(..)
    ) where
 
@@ -47,7 +47,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , checkUnusedRecordWildcard
                         , wrapGenSpan, genHsIntegralLit, genHsTyLit
                         , genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps'
-                        , genAppType, isIrrefutableHsPatRn )
+                        , genAppType, isIrrefutableHsPat )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
@@ -87,18 +87,26 @@ import qualified Data.List.NonEmpty as NE
 
 {- Note [Handling overloaded and rebindable constructs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Nomenclature
+-------------
+* Expansion (`HsExpr GhcRn -> HsExpr GhcRn`): expand between renaming and
+  typechecking, using the `XXExprGhcRn` constructor of `HsExpr`.
+* Desugaring (`HsExpr GhcTc -> Core.Expr`): convert the typechecked `HsSyn` to Core.  This is done in GHC.HsToCore
+
+
 For overloaded constructs (overloaded literals, lists, strings), and
 rebindable constructs (e.g. if-then-else), our general plan is this,
 using overloaded labels #foo as an example:
 
 * In the RENAMER: transform
       HsOverLabel "foo"
-      ==> XExpr (HsExpansion (HsOverLabel #foo)
-                             (fromLabel `HsAppType` "foo"))
+      ==> XExpr (ExpandedThingRn (HsOverLabel #foo)
+                                 (fromLabel `HsAppType` "foo"))
   We write this more compactly in concrete-syntax form like this
       #foo  ==>  fromLabel @"foo"
 
-  Recall that in (HsExpansion orig expanded), 'orig' is the original term
+  Recall that in (ExpandedThingRn orig expanded), 'orig' is the original term
   the user wrote, and 'expanded' is the expanded or desugared version
   to be typechecked.
 
@@ -107,7 +115,7 @@ using overloaded labels #foo as an example:
   The typechecker (and desugarer) will never see HsOverLabel
 
 In effect, the renamer does a bit of desugaring. Recall GHC.Hs.Expr
-Note [Rebindable syntax and HsExpansion], which describes the use of HsExpansion.
+Note [Rebindable syntax and XXExprGhcRn], which describes the use of XXExprGhcRn.
 
 RebindableSyntax:
   If RebindableSyntax is off we use the built-in 'fromLabel', defined in
@@ -133,7 +141,7 @@ but several have a little bit of special treatment:
 * OverLabel (overloaded labels, #lbl)
      #lbl  ==>  fromLabel @"lbl"
   As ever, we use lookupSyntaxName to look up 'fromLabel'
-  See Note [Overloaded labels]
+  See Note [Overloaded labels] below
 
 * ExplicitList (explicit lists [a,b,c])
   When (and only when) OverloadedLists is on
@@ -147,13 +155,8 @@ but several have a little bit of special treatment:
   where `leftSection` and `rightSection` are representation-polymorphic
   wired-in Ids. See Note [Left and right sections]
 
-* It's a bit painful to transform `OpApp e1 op e2` to a `HsExpansion`
-  form, because the renamer does precedence rearrangement after name
-  resolution.  So the renamer leaves an OpApp as an OpApp.
-
-  The typechecker turns `OpApp` into a use of `HsExpansion`
-  on the fly, in GHC.Tc.Gen.Head.splitHsApps.  RebindableSyntax
-  does not affect this.
+* To understand why expansions for `OpApp` is done in `GHC.Tc.Gen.Head.splitHsApps`
+  see Note [Doing XXExprGhcRn in the Renamer vs Typechecker] below.
 
 * RecordUpd: we desugar record updates into case expressions,
   in GHC.Tc.Gen.Expr.tcExpr.
@@ -175,20 +178,24 @@ but several have a little bit of special treatment:
 
   See Note [Record Updates] in GHC.Tc.Gen.Expr for more details.
 
-  This is done in the typechecker, not the renamer, for two reasons:
+  To understand Why is this done in the typechecker, and not in the renamer
+  see Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
 
-    - (Until we implement GHC proposal #366)
-      We need to know the type of the record to disambiguate its fields.
+* HsDo: We expand `HsDo` statements in `Ghc.Tc.Gen.Do`.
 
-    - We use the type signature of the data constructor to provide IdSigs
-      to the let-bound variables (x', y' in the example above). This is
-      needed to accept programs such as
+    - For example, a user written code:
 
-        data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
-        foo r = r { f = \ k -> (k 3, k 'x') }
+                  do { x <- e1 ; g x ; return (f x) }
 
-      in which an updated field has a higher-rank type.
-      See Wrinkle [Using IdSig] in Note [Record Updates] in GHC.Tc.Gen.Expr.
+      is expanded to:
+
+                   (>>=) e1
+                         (\x -> ((>>) (g x)
+                                      (return (f x))))
+
+     See Note [Expanding HsDo with XXExprGhcRn] in `Ghc.Tc.Gen.Do` for more details.
+     To understand why is this done in the typechecker and not in the renamer.
+     See Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
 
 Note [Overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -208,6 +215,66 @@ type-applying to "foo", so we get
 
 And those inferred kind quantifiers will indeed be instantiated when we
 typecheck the renamed-syntax call (fromLabel @"foo").
+
+Note [Doing XXExprGhcRn in the Renamer vs Typechecker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We expand some `HsExpr GhcRn` code at various places, usually, on the fly,
+depending on when it is more convenient. It may be beneficial to have a
+separate `HsExpr GhcRn -> HsExpr GhcRn` pass that does this expansion uniformly
+in the future when we have enough cases to cater for. For the time being,
+this note documents which language feature is expanded at which phase,
+and the reasons for doing so.
+
+  ** `HsIf` Expansions
+  --------------------
+  `HsIf` expansions are expanded in the Renamer becuase it is more convinent
+  to do so there and then not worry about it in the later stage.
+  `-XRebindableSyntax` is used to decide whether we use the `HsIf` or user defined if
+
+
+  ** `OpApp` Expansions
+  ---------------------
+  The typechecker turns `OpApp` into a use of `XXExprGhcRn`
+  on the fly, in `GHC.Tc.Gen.Head.splitHsApps`.
+  The language extension `RebindableSyntax` does not affect this behaviour.
+
+  It's a bit painful to transform `OpApp e1 op e2` to a `XXExprGhcRn`
+  form, because the renamer does precedence rearrangement after name
+  resolution. So the renamer leaves an `OpApp` as an `OpApp`.
+
+  ** Record Update Syntax `RecordUpd` Expansions
+  ----------------------------------------------
+  This is done in the typechecker on the fly (`GHC.Tc.Expr.tcExpr`), and not the renamer, for two reasons:
+
+    - (Until we implement GHC proposal #366)
+      We need to know the type of the record to disambiguate its fields.
+
+    - We use the type signature of the data constructor to provide `IdSigs`
+      to the let-bound variables (x', y' in the example of
+      Note [Handling overloaded and rebindable constructs] above).
+      This is needed to accept programs such as
+
+          data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
+          foo r = r { f = \ k -> (k 3, k 'x') }
+
+      in which an updated field has a higher-rank type.
+      See Wrinkle [Using IdSig] in Note [Record Updates] in GHC.Tc.Gen.Expr.
+
+  ** `HsDo` Statement Expansions
+  -----------------------------------
+  The expansion for do block statements is done on the fly right before typechecking in `GHC.Tc.Gen.Expr`
+  using `GHC.Tc.Gen.Do.expandDoStmts`. There are 2 main reasons:
+
+  -  During the renaming phase, we may not have all the constructor details `HsConDetails` populated in the
+     data structure. This would result in an inaccurate irrefutability analysis causing
+     the continuation lambda body to be wrapped with `fail` alternatives when not needed.
+     See Part 1. of Note [Expanding HsDo with XXExprGhcRn] (test pattern-fails.hs)
+
+  -  If the expansion is done on the fly during renaming, expressions that
+     have explicit type applications using (-XTypeApplciations) will not work (cf. Let statements expansion)
+     as the name freshening happens from the root of the AST to the leaves,
+     but the expansion happens in the opposite direction (from leaves to the root),
+     causing the renamer to miss the scoped type variables.
 -}
 
 {-
@@ -436,7 +503,6 @@ rnExpr (HsDo _ do_or_lc (L l stmts))
             (\ _ -> return ((), emptyFVs))
       ; (pp_stmts, fvs2) <- postProcessStmtsForApplicativeDo do_or_lc stmts1
       ; return ( HsDo noExtField do_or_lc (L l pp_stmts), fvs1 `plusFV` fvs2 ) }
-
 -- ExplicitList: see Note [Handling overloaded and rebindable constructs]
 rnExpr (ExplicitList _ exps)
   = do  { (exps', fvs) <- rnExprs exps
@@ -526,24 +592,7 @@ rnExpr (ExprWithTySig _ expr pty)
 -- HsIf: see Note [Handling overloaded and rebindable constructs]
 -- Because of the coverage checker it is most convenient /not/ to
 -- expand HsIf; unless we are in rebindable syntax.
-rnExpr (HsIf _ p b1 b2)
-  = do { (p',  fvP)  <- rnLExpr p
-       ; (b1', fvB1) <- rnLExpr b1
-       ; (b2', fvB2) <- rnLExpr b2
-       ; let fvs_if = plusFVs [fvP, fvB1, fvB2]
-             rn_if  = HsIf noExtField  p' b1' b2'
-
-       -- Deal with rebindable syntax
-       -- See Note [Handling overloaded and rebindable constructs]
-       ; mb_ite <- lookupIfThenElse
-       ; case mb_ite of
-            Nothing  -- Non rebindable-syntax case
-              -> return (rn_if, fvs_if)
-
-            Just ite_name   -- Rebindable-syntax case
-              -> do { let ds_if = genHsApps ite_name [p', b1', b2']
-                          fvs   = plusFVs [fvs_if, unitFV ite_name]
-                    ; return (mkExpandedExpr rn_if ds_if, fvs) } }
+rnExpr (HsIf _ p b1 b2) = rnHsIf p b1 b2
 
 rnExpr (HsMultiIf _ alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
@@ -1177,7 +1226,7 @@ rnStmt ctxt rnBody (L loc (LastStmt _ (L lb body) noret _)) thing_inside
                             else return (noSyntaxExpr, emptyFVs)
                             -- The 'return' in a LastStmt is used only
                             -- for MonadComp; and we don't want to report
-                            -- "non in scope: return" in other cases
+                            -- "not in scope: return" in other cases
                             -- #15607
 
         ; (thing,  fvs3) <- thing_inside []
@@ -1823,7 +1872,7 @@ independent and do something like this:
      (y,z) <- (,) <$> B x <*> C
      return (f x y z)
 
-But this isn't enough! A and C were also independent, and this
+But this isn't enough! If A and C were also independent, then this
 transformation loses the ability to do A and C in parallel.
 
 The algorithm works by first splitting the sequence of statements into
@@ -2320,7 +2369,7 @@ of a refutable pattern, in order for the types to work out.
 hasRefutablePattern :: DynFlags -> ApplicativeArg GhcRn -> Bool
 hasRefutablePattern dflags (ApplicativeArgOne { app_arg_pattern = pat
                                               , is_body_stmt = False}) =
-                                         not (isIrrefutableHsPatRn dflags pat)
+                                         not (isIrrefutableHsPat dflags pat)
 hasRefutablePattern _ _ = False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
@@ -2632,7 +2681,7 @@ monadFailOp pat ctxt = do
     dflags <- getDynFlags
         -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
         -- we should not need to fail.
-    if | isIrrefutableHsPatRn dflags pat -> return (Nothing, emptyFVs)
+    if | isIrrefutableHsPat dflags pat -> return (Nothing, emptyFVs)
 
         -- For non-monadic contexts (e.g. guard patterns, list
         -- comprehensions, etc.) we should not need to fail, or failure is handled in
@@ -2707,19 +2756,31 @@ getMonadFailOp ctxt
 
 {- *********************************************************************
 *                                                                      *
-              Generating code for HsExpanded
+              Generating code for ExpandedThingRn
       See Note [Handling overloaded and rebindable constructs]
 *                                                                      *
 ********************************************************************* -}
 
--- | Build a 'HsExpansion' out of an extension constructor,
---   and the two components of the expansion: original and
---   desugared expressions.
-mkExpandedExpr
-  :: HsExpr GhcRn           -- ^ source expression
-  -> HsExpr GhcRn           -- ^ expanded expression
-  -> HsExpr GhcRn           -- ^ suitably wrapped 'HsExpansion'
-mkExpandedExpr a b = XExpr (HsExpanded a b)
+-- | Expand `HsIf` if rebindable syntax is turned on
+--   See Note [Handling overloaded and rebindable constructs]
+rnHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
+rnHsIf p b1 b2
+  = do { (p',  fvP)  <- rnLExpr p
+       ; (b1', fvB1) <- rnLExpr b1
+       ; (b2', fvB2) <- rnLExpr b2
+       ; let fvs_if = plusFVs [fvP, fvB1, fvB2]
+             rn_if  = HsIf noExtField  p' b1' b2'
+
+       -- Deal with rebindable syntax
+       ; mb_ite <- lookupIfThenElse
+       ; case mb_ite of
+            Nothing  -- Non rebindable-syntax case
+              -> return (rn_if, fvs_if)
+
+            Just ite_name   -- Rebindable-syntax case
+              -> do { let ds_if = genHsApps ite_name [p', b1', b2']
+                          fvs   = plusFVs [fvs_if, unitFV ite_name]
+                    ; return (mkExpandedExpr rn_if ds_if, fvs) } }
 
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.

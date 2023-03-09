@@ -810,7 +810,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLam noAnn LamCase
         (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated SkipPmc)
+            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated OtherExpansion SkipPmc)
             }))
 
       -- Replace the commands in the case with these tagged tuples,

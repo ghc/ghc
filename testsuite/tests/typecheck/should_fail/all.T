@@ -146,7 +146,7 @@ test('tcfail160', normal, compile_fail, [''])
 test('tcfail161', normal, compile_fail, [''])
 test('tcfail162', normal, compile_fail, [''])
 test('tcfail164', normal, compile_fail, [''])
-test('tcfail165', normal, compile_fail, [''])
+test('tcfail165', normal, compile, [''])
 test('tcfail166', normal, compile_fail, [''])
 test('tcfail167', normal, compile_fail, ['-Werror'])
 test('tcfail168', normal, compile_fail, [''])
@@ -712,3 +712,8 @@ test('ErrorIndexLinks', normal, compile_fail, ['-fprint-error-index-links=always
 test('T24064', normal, compile_fail, [''])
 test('T24298', normal, compile_fail, [''])
 test('T24279', normal, compile_fail, [''])
+
+# all the various do expansion fail messages
+test('DoExpansion1', normal, compile, ['-fdefer-type-errors'])
+test('DoExpansion2', normal, compile, ['-fdefer-type-errors'])
+test('DoExpansion3', normal, compile, ['-fdefer-type-errors'])

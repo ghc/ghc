@@ -20,11 +20,15 @@ module GHC.Rename.Utils (
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genLHsApp,
-        genAppType,
+        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genHsApps', genHsExpApps,
+        genLHsApp, genAppType,
         genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
+
+        genHsLamDoExp, genHsCaseAltDoExp, genSimpleMatch,
+
+        genHsLet,
 
         newLocalBndrRn, newLocalBndrsRn,
 
@@ -35,7 +39,7 @@ module GHC.Rename.Utils (
         checkInferredVars,
         noNestedForallsContextsErr, addNoNestedForallsContextsErr,
 
-        isIrrefutableHsPatRn
+        isIrrefutableHsPat
 )
 
 where
@@ -701,14 +705,14 @@ checkCTupSize tup_size
 
 {- *********************************************************************
 *                                                                      *
-              Generating code for HsExpanded
+              Generating code for ExpandedThingRn
       See Note [Handling overloaded and rebindable constructs]
 *                                                                      *
 ********************************************************************* -}
 
 wrapGenSpan :: (NoAnn an) => a -> LocatedAn an a
 -- Wrap something in a "generatedSrcSpan"
--- See Note [Rebindable syntax and HsExpansion]
+-- See Note [Rebindable syntax and XXExprGhcRn]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
 
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
@@ -718,6 +722,9 @@ genHsApps fun args = foldl genHsApp (genHsVar fun) args
 genHsApps' :: LocatedN Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps' (L _ fun) [] = genHsVar fun
 genHsApps' (L loc fun) (arg:args) = foldl genHsApp (unLoc $ mkHsApp (L (l2l loc) $ genHsVar fun) arg) args
+
+genHsExpApps :: HsExpr GhcRn -> [LHsExpr GhcRn] -> HsExpr GhcRn
+genHsExpApps fun arg = foldl genHsApp fun arg
 
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
@@ -773,11 +780,47 @@ genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup (Generated SkipPmc) (wrapGenSpan ms)
+            , fun_matches = mkMatchGroup (Generated OtherExpansion SkipPmc) (wrapGenSpan ms)
             , fun_ext = emptyNameSet
             }
 
-isIrrefutableHsPatRn :: forall p. (OutputableBndrId p)
-                  => DynFlags -> LPat (GhcPass p) -> Bool
-isIrrefutableHsPatRn dflags =
-    isIrrefutableHsPat (xopt LangExt.Strict dflags)
+isIrrefutableHsPat :: forall p. (OutputableBndrId p) => DynFlags -> LPat (GhcPass p) -> Bool
+isIrrefutableHsPat dflags =
+    isIrrefutableHsPatHelper (xopt LangExt.Strict dflags)
+
+genHsLet :: HsLocalBindsLR GhcRn GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
+genHsLet bindings body = HsLet noExtField bindings body
+
+genHsLamDoExp :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
+        => HsDoFlavour
+        -> [LPat (GhcPass p)]
+        -> LHsExpr (GhcPass p)
+        -> LHsExpr (GhcPass p)
+genHsLamDoExp doFlav pats body = mkHsPar (wrapGenSpan $ HsLam noAnn LamSingle matches)
+  where
+    matches = mkMatchGroup (doExpansionOrigin doFlav)
+                           (wrapGenSpan [genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) pats' body])
+    pats' = map (parenthesizePat appPrec) pats
+
+
+genHsCaseAltDoExp :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+                     ~ EpAnnCO,
+                 Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+                        ~ SrcSpanAnnA)
+            => HsDoFlavour -> LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
+            -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+genHsCaseAltDoExp doFlav pat expr
+  = genSimpleMatch (StmtCtxt (HsDoStmt doFlav)) [pat] expr
+
+
+genSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+                        ~ SrcSpanAnnA,
+                  Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+                        ~ EpAnnCO)
+              => HsMatchContext (GhcPass p)
+              -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
+              -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
+genSimpleMatch ctxt pats rhs
+  = wrapGenSpan $
+    Match { m_ext = noAnn, m_ctxt = ctxt, m_pats = pats
+          , m_grhss = unguardedGRHSs generatedSrcSpan rhs noAnn }

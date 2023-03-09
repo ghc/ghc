@@ -9,6 +9,9 @@ module Language.Haskell.Syntax.Expr where
 import Language.Haskell.Syntax.Extension ( XRec )
 import Data.Kind  ( Type )
 
+import GHC.Prelude (Eq)
+import Data.Data (Data)
+
 type role HsExpr nominal
 type role MatchGroup nominal nominal
 type role GRHSs nominal nominal
@@ -20,3 +23,7 @@ data GRHSs (a :: Type) (body :: Type)
 type family SyntaxExpr (i :: Type)
 
 type LHsExpr a = XRec a (HsExpr a)
+
+data HsDoFlavour
+instance Eq HsDoFlavour
+instance Data HsDoFlavour
