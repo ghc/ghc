@@ -182,6 +182,10 @@ data MachOp
   | MO_VF_Mul  Length Width
   | MO_VF_Quot Length Width
 
+  -- | An atomic read with no memory ordering. Address msut
+  -- be naturally aligned.
+  | MO_RelaxedRead Width
+
   -- Alignment check (for -falignment-sanitisation)
   | MO_AlignmentCheck Int Width
   deriving (Eq, Show)
@@ -498,6 +502,7 @@ machOpResultType platform mop tys =
     MO_VF_Quot l w      -> cmmVec l (cmmFloat w)
     MO_VF_Neg  l w      -> cmmVec l (cmmFloat w)
 
+    MO_RelaxedRead r    -> cmmBits r
     MO_AlignmentCheck _ _ -> ty1
   where
     (ty1:_) = tys
@@ -592,6 +597,7 @@ machOpArgReps platform op =
     MO_VF_Quot _ r      -> [r,r]
     MO_VF_Neg  _ r      -> [r]
 
+    MO_RelaxedRead _    -> [wordWidth platform]
     MO_AlignmentCheck _ r -> [r]
 
 -----------------------------------------------------------------------------

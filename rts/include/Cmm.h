@@ -449,11 +449,11 @@
 
 // Load a field out of structure with relaxed ordering.
 #define RELAXED_LOAD_FIELD(fld, ptr) \
-    REP_##fld[(ptr) + OFFSET_##fld]
+    REP_##fld![(ptr) + OFFSET_##fld]
 
 // Load a field out of an StgClosure with relaxed ordering.
 #define RELAXED_LOAD_CLOSURE_FIELD(fld, ptr) \
-    REP_##fld[(ptr) + SIZEOF_StgHeader + OFFSET_##fld]
+    REP_##fld![(ptr) + SIZEOF_StgHeader + OFFSET_##fld]
 
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \

@@ -438,6 +438,9 @@ pprMachOpApp platform op args
   where isMulMayOfloOp (MO_S_MulMayOflo _) = True
         isMulMayOfloOp _ = False
 
+pprMachOpApp platform (MO_RelaxedRead w) [x]
+  = pprExpr platform (CmmLoad x (cmmBits w) NaturallyAligned)
+
 pprMachOpApp platform mop args
   | Just ty <- machOpNeedsCast platform mop (map (cmmExprType platform) args)
   = ty <> parens (pprMachOpApp' platform mop args)
@@ -794,6 +797,11 @@ pprMachOp_for_C platform mop = case mop of
 
         MO_SF_Conv _from to -> parens (machRep_F_CType to)
         MO_FS_Conv _from to -> parens (machRep_S_CType platform to)
+
+        MO_RelaxedRead _ -> pprTrace "offending mop:"
+                                (text "MO_RelaxedRead")
+                                (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
+                                      ++ " should have been handled earlier!")
 
         MO_S_MulMayOflo _ -> pprTrace "offending mop:"
                                 (text "MO_S_MulMayOflo")
