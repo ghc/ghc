@@ -365,14 +365,7 @@ function h$printReg(r) {
     } else if(r.f.t === h$ct_blackhole && r.x) {
       return ("blackhole: -> " + h$printReg({ f: r.x.x1, d: r.d1.x2 }) + ")");
     } else {
-      var iv = "";
-      if(r.f.n === "integer-gmp:GHC.Integer.Type.Jp#" ||
-      r.f.n === "integer-gmp:GHC.Integer.Type.Jn#") {
-        iv = ' [' + r.d1.join(',') + '](' + h$ghcjsbn_showBase(r.d1, 10) + ')'
-      } else if(r.f.n === "integer-gmp:GHC.Integer.Type.S#") {
-        iv = ' (S: ' + r.d1 + ')';
-      }
-      return ((r.alloc ? r.alloc + ': ' : '') + r.f.n + " (" + h$closureTypeName(r.f.t) + ", " + r.f.a + ")" + iv);
+      return ((r.alloc ? r.alloc + ': ' : '') + r.f.n + " (" + h$closureTypeName(r.f.t) + ", " + r.f.a + ")");
     }
   } else if(typeof r === 'object') {
     var res = h$collectProps(r);
@@ -536,14 +529,7 @@ function h$dumpStackTop(stack, start, sp) {
           if(s.f.t === h$ct_blackhole && s.d1 && s.d1.x1 && s.d1.x1.n) {
             h$log("stack[" + i + "] = blackhole -> " + s.d1.x1.n);
           } else {
-            var iv = "";
-            if(s.f.n === "integer-gmp:GHC.Integer.Type.Jp#" ||
-            s.f.n === "integer-gmp:GHC.Integer.Type.Jn#") {
-              iv = ' [' + s.d1.join(',') + '](' + h$ghcjsbn_showBase(s.d1, 10) + ')'
-            } else if(s.f.n === "integer-gmp:GHC.Integer.Type.S#") {
-              iv = ' (S: ' + s.d1 + ')';
-            }
-            h$log("stack[" + i + "] = -> " + (s.alloc ? s.alloc + ': ' : '') + s.f.n + " (" + h$closureTypeName(s.f.t) + ", a: " + s.f.a + ")" + iv);
+            h$log("stack[" + i + "] = -> " + (s.alloc ? s.alloc + ': ' : '') + s.f.n + " (" + h$closureTypeName(s.f.t) + ", a: " + s.f.a + ")");
           }
         }
       } else if(h$isInstanceOf(s,h$MVar)) {
