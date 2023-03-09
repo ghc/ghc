@@ -1425,6 +1425,8 @@ genMachOp _ op [x] = case op of
             all0s = LMLitVar $ LMVectorLit (replicate len all0)
         in negateVec vecty all0s LM_MO_FSub
 
+    MO_RelaxedRead w -> exprToVar (CmmLoad x (cmmBits w) NaturallyAligned)
+
     MO_AlignmentCheck _ _ -> panic "-falignment-sanitisation is not supported by -fllvm"
 
     -- Handle unsupported cases explicitly so we get a warning
@@ -1681,6 +1683,8 @@ genMachOp_slow opt op [x, y] = case op of
     MO_VF_Insert  {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
+
+    MO_RelaxedRead {} -> panicOp
 
     MO_AlignmentCheck {} -> panicOp
 
