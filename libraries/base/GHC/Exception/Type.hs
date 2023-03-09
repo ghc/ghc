@@ -176,8 +176,8 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
-    backtraceDesired :: Bool
-    backtraceDesired = True
+    backtraceDesired :: e -> Bool
+    backtraceDesired _ = True
 
 -- | @since 4.8.0.0
 instance Exception Void
@@ -202,7 +202,7 @@ newtype NoBacktrace e = NoBacktrace e
 instance Exception e => Exception (NoBacktrace e) where
     fromException = fmap NoBacktrace . fromException
     toException (NoBacktrace e) = toException e
-    backtraceDesired = False
+    backtraceDesired _ = False
 
 -- | Wraps a particular exception exposing its 'ExceptionContext'. Intended to
 -- be used when 'catch'ing exceptions in cases where access to the context is
@@ -219,6 +219,7 @@ instance Exception a => Exception (ExceptionWithContext a) where
     fromException se = do
         e <- fromException se
         return (ExceptionWithContext (exceptionContext se) e)
+    backtraceDesired (ExceptionWithContext _ e) = backtraceDesired e
     displayException = displayException . toException
 
 -- |Arithmetic exceptions.

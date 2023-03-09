@@ -52,7 +52,6 @@ import GHC.Stack.Types ( HasCallStack )
 import Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Exception.Context ( ExceptionAnnotation )
-import {-# SOURCE #-} GHC.Exception.Backtrace ( collectBacktraces )
 import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )
 
 -- ---------------------------------------------------------------------------
@@ -257,15 +256,7 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 throwIO :: (HasCallStack, Exception e) => e -> IO a
 throwIO e = do
     se <- toExceptionWithBacktrace e
-    IO (raiseIO# exc)
-
-toExceptionWithBacktrace :: (HasCallStack, Exception e)
-                         => e -> IO SomeException
-toExceptionWithBacktrace e
-  | backtraceDesired e = do
-      bt <- collectBacktraces
-      return (addExceptionContext bt (toException e))
-  | otherwise = return (toException e)
+    IO (raiseIO# se)
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery

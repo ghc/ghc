@@ -15,4 +15,5 @@ data Backtraces
 
 instance ExceptionAnnotation Backtraces
 
+-- For GHC.Exception
 collectBacktraces :: HasCallStack => IO Backtraces

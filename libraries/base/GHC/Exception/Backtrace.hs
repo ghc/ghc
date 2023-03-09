@@ -20,9 +20,8 @@ import GHC.Base
 import Data.OldList
 import GHC.IORef
 import GHC.IO.Unsafe (unsafePerformIO)
-import GHC.Show (Show)
 import GHC.Exception.Context
-import GHC.Stack.Types (HasCallStack, CallStack)
+import GHC.Stack.Types (CallStack)
 import qualified GHC.Stack as CallStack
 import qualified GHC.ExecutionStack as ExecStack
 import qualified GHC.Stack.CloneStack as CloneStack
@@ -68,7 +67,7 @@ newtype Backtraces = Backtraces { getBacktrace :: forall a. BacktraceMechanism a
 displayBacktraces :: Backtraces -> String
 displayBacktraces (Backtraces f) = concat
     [ displayOne "Cost-centre stack backtrace" CostCentreBacktrace displayCc
-    , displayOne "Native stack backtrace" ExecutionStackBacktrace id
+    , displayOne "Native stack backtrace" ExecutionStackBacktrace displayExec
     , displayOne "IPE backtrace" IPEBacktrace displayIpe
     , displayOne "HasCallStack backtrace" HasCallStackBacktrace CallStack.prettyCallStack
     ]

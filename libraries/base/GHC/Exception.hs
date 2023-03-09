@@ -30,6 +30,7 @@ module GHC.Exception
        , ErrorCall(..,ErrorCall)
        , errorCallException
        , errorCallWithCallStackException
+       , toExceptionWithBacktrace
 
          -- * Re-exports from GHC.Types
        , CallStack, fromCallSiteList, getCallStack, prettyCallStack
