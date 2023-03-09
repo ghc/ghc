@@ -24,8 +24,8 @@ hs_set_argv(int argc, char *argv[])
 void
 hs_perform_gc(void)
 {
-    /* Hmmm, the FFI spec is a bit vague, but it seems to imply a major GC... */
-    performMajorGC();
+    /* Hmmm, the FFI spec is a bit vague, but it seems to imply a blocking major GC... */
+    performBlockingMajorGC();
 }
 
 // Lock the stable pointer table

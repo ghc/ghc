@@ -4,6 +4,6 @@
 
 HsInt out (HsInt x)
 {
-    performMajorGC();
+    hs_perform_gc();
     return incall(x);
 }
