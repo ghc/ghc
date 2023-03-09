@@ -205,7 +205,7 @@ memory ordering guarantees. These are supported in Cmm syntax as follows:
     %relaxed W_[ptr] = ...;   // an atomic store with relaxed ordering semantics
     %release W_[ptr] = ...;   // an atomic store with release ordering semantics
 
-    x = W_(ptr);              // a non-atomic load
+    x = W_[ptr];              // a non-atomic load
     x = %relaxed W_[ptr];     // an atomic load with relaxed ordering
     x = %acquire W_[ptr];     // an atomic load with acquire ordering
     // or equivalently...
