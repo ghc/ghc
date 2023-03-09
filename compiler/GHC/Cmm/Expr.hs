@@ -510,6 +510,8 @@ pprExpr9 platform e =
         CmmMachOp mop args  -> genMachOp platform mop args
 
 genMachOp :: Platform -> MachOp -> [CmmExpr] -> SDoc
+genMachOp platform (MO_RelaxedRead w) [x] =
+    ppr (cmmBits w) <> text "!" <> brackets (pdoc platform x)
 genMachOp platform mop args
    | Just doc <- infixMachOp mop = case args of
         -- dyadic
