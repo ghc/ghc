@@ -186,6 +186,7 @@ instance Exception Void
 instance Exception SomeException where
     toException se = se
     fromException = Just
+    backtraceDesired (SomeException e) = backtraceDesired e
     displayException (SomeException e) =
         displayException e ++ "\n" ++ displayContext ?exceptionContext
 

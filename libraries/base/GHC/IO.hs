@@ -256,9 +256,16 @@ mplusIO m n = m `catchException` \ (_ :: IOError) -> n
 --
 throwIO :: (HasCallStack, Exception e) => e -> IO a
 throwIO e = do
-    context <- collectBacktraces
-    let !exc = addExceptionContext context (toException e)
+    se <- toExceptionWithBacktrace e
     IO (raiseIO# exc)
+
+toExceptionWithBacktrace :: (HasCallStack, Exception e)
+                         => e -> IO SomeException
+toExceptionWithBacktrace e
+  | backtraceDesired e = do
+      bt <- collectBacktraces
+      return (addExceptionContext bt (toException e))
+  | otherwise = return (toException e)
 
 -- -----------------------------------------------------------------------------
 -- Controlling asynchronous exception delivery

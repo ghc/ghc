@@ -56,9 +56,16 @@ import GHC.Exception.Type
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
          (?callStack :: CallStack, Exception e) => e -> a
 throw e =
-    let !context = unsafePerformIO collectBacktraces
-        !exc = addExceptionContext context (toException e)
-    in raise# exc
+    let !se = unsafePerformIO (toExceptionWithBacktrace e)
+    in raise# se
+
+toExceptionWithBacktrace :: (HasCallStack, Exception e)
+                         => e -> IO SomeException
+toExceptionWithBacktrace e
+  | backtraceDesired e = do
+      bt <- collectBacktraces
+      return (addExceptionContext bt (toException e))
+  | otherwise = return (toException e)
 
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
@@ -92,7 +99,7 @@ errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
     implicitParamCallStack = prettyCallStackLines stk
     ccsCallStack = showCCSStack ccsStack
     stack = intercalate "\n" $ implicitParamCallStack ++ ccsCallStack
-  return $ toException (ErrorCallWithLocation s stack)
+  toExceptionWithBacktrace (ErrorCallWithLocation s stack)
 
 showCCSStack :: [String] -> [String]
 showCCSStack [] = []
