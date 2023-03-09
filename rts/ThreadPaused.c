@@ -304,7 +304,7 @@ threadPaused(Capability *cap, StgTSO *tso)
                 // the value to the frame underneath:
                 tso->stackobj->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
                 tso->stackobj->sp[1] = (StgWord)bh;
-                ASSERT(bh->header.info != &stg_TSO_info);
+                ASSERT(RELAXED_LOAD(&bh->header.info) != &stg_TSO_info);
                 tso->stackobj->sp[0] = (W_)&stg_enter_info;
 
                 // And continue with threadPaused; there might be
