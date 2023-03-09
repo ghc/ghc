@@ -54,11 +54,13 @@ annotateNode env node =
       CmmTick{}               -> BMiddle node
       CmmUnwind{}             -> BMiddle node
       CmmAssign{}             -> annotateNodeOO env node
-      CmmStore lhs rhs align  ->
+      -- TODO: Track unaligned stores
+      CmmStore _ _ Unaligned  -> annotateNodeOO env node
+      CmmStore lhs rhs NaturallyAligned  ->
           let ty = cmmExprType (platform env) rhs
               rhs_nodes = annotateLoads env (collectExprLoads rhs)
               lhs_nodes = annotateLoads env (collectExprLoads lhs)
-              st        = tsanStore env align ty lhs
+              st        = tsanStore env ty lhs
           in rhs_nodes `blockAppend` lhs_nodes `blockAppend` st `blockSnoc` node
       CmmUnsafeForeignCall (PrimTarget op) formals args ->
           let node' = fromMaybe (BMiddle node) (annotatePrim env op formals args)
@@ -197,17 +199,14 @@ tsanTarget fn formals args =
     lbl = mkForeignLabel fn Nothing ForeignLabelInExternalPackage IsFunction
 
 tsanStore :: Env
-          -> AlignmentSpec -> CmmType -> CmmExpr
+          -> CmmType -> CmmExpr
           -> Block CmmNode O O
-tsanStore env align ty addr =
+tsanStore env ty addr =
     mkUnsafeCall env ftarget [] [addr]
   where
     ftarget = tsanTarget fn [] [AddrHint]
     w = widthInBytes (typeWidth ty)
-    fn = case align of
-           Unaligned
-             | w > 1    -> fsLit $ "__tsan_unaligned_write" ++ show w
-           _            -> fsLit $ "__tsan_write" ++ show w
+    fn = fsLit $ "__tsan_write" ++ show w
 
 tsanLoad :: Env
          -> AlignmentSpec -> CmmType -> CmmExpr
