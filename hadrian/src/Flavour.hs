@@ -47,7 +47,8 @@ flavourTransformers = M.fromList
     , "ticky_ghc"        =: enableTickyGhc
     , "split_sections"   =: splitSections
     , "no_split_sections" =: noSplitSections
-    , "thread_sanitizer" =: enableThreadSanitizer
+    , "thread_sanitizer" =: enableThreadSanitizer False
+    , "thread_sanitizer_cmm" =: enableThreadSanitizer True
     , "llvm"             =: viaLlvmBackend
     , "profiled_ghc"     =: enableProfiledGhc
     , "no_dynamic_ghc"   =: disableDynamicGhcPrograms
@@ -203,10 +204,11 @@ noSplitSections f = f { ghcSplitSections = False }
 
 -- | Build GHC and libraries with ThreadSanitizer support. You likely want to
 -- configure with @--disable-large-address-space@ when using this.
-enableThreadSanitizer :: Flavour -> Flavour
-enableThreadSanitizer = addArgs $ notStage0 ? mconcat
+enableThreadSanitizer :: Bool -> Flavour -> Flavour
+enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
     [ builder (Ghc CompileHs) ? (arg "-optc-fsanitize=thread" <> arg "-fcmm-thread-sanitizer")
-    , builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
+    , instrumentCmm ? builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
+
     , builder (Ghc LinkHs) ? (arg "-optc-fsanitize=thread" <> arg "-optl-fsanitize=thread")
     , builder Cc ? arg "-fsanitize=thread"
     , builder (Cabal Flags) ? arg "thread-sanitizer"
