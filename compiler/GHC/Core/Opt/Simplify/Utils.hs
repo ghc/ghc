@@ -553,7 +553,7 @@ countArgs _                               = 0
 
 countValArgs :: SimplCont -> Int
 -- Count value arguments only
-countValArgs (ApplyToTy  { sc_cont = cont }) = 1 + countValArgs cont
+countValArgs (ApplyToTy  { sc_cont = cont }) = countValArgs cont
 countValArgs (ApplyToVal { sc_cont = cont }) = 1 + countValArgs cont
 countValArgs (CastIt _ cont)                 = countValArgs cont
 countValArgs _                               = 0
