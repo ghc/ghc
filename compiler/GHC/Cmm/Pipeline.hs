@@ -20,6 +20,7 @@ import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
 import GHC.Cmm.Switch.Implement
 import GHC.Cmm.ThreadSanitizer
+import GHC.Cmm.CLabel (CLabel)
 
 import GHC.Types.Unique.Supply
 
@@ -79,14 +80,15 @@ cpsTop logger platform cfg proc =
       --
       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
            return $ cmmCfgOptsProc splitting_proc_points proc
-      dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dumpL Opt_D_dump_cmm_cfg "Post control-flow optimisations(1)" l
+            (pdoc platform g)
 
       let !TopInfo {stack_info=StackInfo { arg_space = entry_off
                                          , do_layout = do_layout }} = h
 
       ----------- Eliminate common blocks -------------------------------------
       g <- {-# SCC "elimCommonBlocks" #-}
-           condPass (cmmOptElimCommonBlks cfg) elimCommonBlocks g
+           condPass (cmmOptElimCommonBlks cfg) elimCommonBlocks l g
                          Opt_D_dump_cmm_cbe "Post common block elimination"
 
       -- Any work storing block Labels must be performed _after_
@@ -97,14 +99,17 @@ cpsTop logger platform cfg proc =
              then {-# SCC "createSwitchPlans" #-}
                   runUniqSM $ cmmImplementSwitchPlans platform g
              else pure g
-      dump Opt_D_dump_cmm_switch "Post switch plan" g
+      dumpL Opt_D_dump_cmm_switch "Post switch plan" l (pdoc platform g)
 
       ----------- ThreadSanitizer instrumentation -----------------------------
       g <- {-# SCC "annotateTSAN" #-}
           if cmmOptThreadSanitizer cfg
-          then runUniqSM $ annotateTSAN platform g
+          then do
+              runUniqSM $ annotateTSAN platform g
           else return g
-      dump Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation" g
+      dumpL Opt_D_dump_cmm_thread_sanitizer "ThreadSanitizer instrumentation"
+            l (pdoc platform g)
+
 
       ----------- Proc points -------------------------------------------------
       let
@@ -115,8 +120,8 @@ cpsTop logger platform cfg proc =
             then do
               pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                  minimalProcPointSet platform call_pps g
-              dumpWith logger Opt_D_dump_cmm_proc "Proc points"
-                    FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
+              dumpL Opt_D_dump_cmm_proc "Proc points" l
+                    (ppr pp $$ pdoc platform g)
               return pp
             else
               return call_pps
@@ -127,11 +132,11 @@ cpsTop logger platform cfg proc =
            if do_layout
               then runUniqSM $ cmmLayoutStack cfg proc_points entry_off g
               else return (g, mapEmpty)
-      dump Opt_D_dump_cmm_sp "Layout Stack" g
+      dumpL Opt_D_dump_cmm_sp "Layout Stack" l (pdoc platform g)
 
       ----------- Sink and inline assignments  --------------------------------
       g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-           condPass (cmmOptSink cfg) (cmmSink platform) g
+           condPass (cmmOptSink cfg) (cmmSink platform) l g
                     Opt_D_dump_cmm_sink "Sink assignments"
 
       ------------- CAF analysis ----------------------------------------------
@@ -166,20 +171,22 @@ cpsTop logger platform cfg proc =
                     else g
       g <- return $ map (removeUnreachableBlocksProc platform) g
            -- See Note [unreachable blocks]
-      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
+      dumps Opt_D_dump_cmm_cfg "Post control-flow optimisations(2)" g
 
       return (Left (cafEnv, g))
 
-  where dump = dumpGraph logger platform (cmmDoLinting cfg)
+  where dumpL :: DumpFlag -> String -> CLabel -> SDoc -> IO ()
+        dumpL flag dumpname l doc =
+            dumpWith logger flag dumpname FormatCMM (pdoc platform l $$ doc)
 
         dumps flag name
            = mapM_ (dumpWith logger flag name FormatCMM . pdoc platform)
 
-        condPass do_opt pass g dumpflag dumpname =
+        condPass do_opt pass l g dumpflag dumpname =
             if do_opt
                then do
                     g <- return $ pass g
-                    dump dumpflag dumpname g
+                    dumpL dumpflag dumpname l (pdoc platform g)
                     return g
                else return g
 
