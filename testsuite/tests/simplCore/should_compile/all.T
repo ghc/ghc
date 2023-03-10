@@ -484,8 +484,8 @@ test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppres
 test('T23307b', normal, compile, ['-O'])
 test('T23307c', normal, compile, ['-O'])
 test('T23426', normal, compile, ['-O'])
-
 test('T23491a', [extra_files(['T23491.hs']), grep_errmsg(r'Float out')], multimod_compile, ['T23491', '-ffull-laziness -ddump-full-laziness'])
 test('T23491b', [extra_files(['T23491.hs']), grep_errmsg(r'Float inwards')], multimod_compile, ['T23491', '-ffloat-in -ddump-float-in'])
 test('T23491c', [extra_files(['T23491.hs']), grep_errmsg(r'Liberate case')], multimod_compile, ['T23491', '-fliberate-case -ddump-liberate-case'])
 test('T23491d', [extra_files(['T23491.hs']), grep_errmsg(r'Static argument')], multimod_compile, ['T23491', '-fstatic-argument-transformation -ddump-static-argument-transformation'])
+test('T23074', normal, compile, ['-O -ddump-rules'])

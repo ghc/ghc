@@ -14,8 +14,7 @@
 -- 'Semigroup' class some.
 --
 -- This module exists mostly to simplify or workaround import-graph
--- issues; there is also a .hs-boot file to allow "GHC.Base" and other
--- modules to import method default implementations for 'stimes'
+-- issues.
 --
 -- @since 4.11.0.0
 module Data.Semigroup.Internal where
@@ -67,42 +66,11 @@ stimesMonoid n x0 = case compare n 0 of
         | y == 1 = x `mappend` z
         | otherwise = g (x `mappend` x) (y `quot` 2) (x `mappend` z) -- See Note [Half of y - 1]
 
--- this is used by the class definition in GHC.Base;
--- it lives here to avoid cycles
-stimesDefault :: (Integral b, Semigroup a) => b -> a -> a
-stimesDefault y0 x0
-  | y0 <= 0   = errorWithoutStackTrace "stimes: positive multiplier expected"
-  | otherwise = f x0 y0
-  where
-    f x y
-      | even y = f (x <> x) (y `quot` 2)
-      | y == 1 = x
-      | otherwise = g (x <> x) (y `quot` 2) x        -- See Note [Half of y - 1]
-    g x y z
-      | even y = g (x <> x) (y `quot` 2) z
-      | y == 1 = x <> z
-      | otherwise = g (x <> x) (y `quot` 2) (x <> z) -- See Note [Half of y - 1]
-
 {- Note [Half of y - 1]
    ~~~~~~~~~~~~~~~~~~~~~
    Since y is guaranteed to be odd and positive here,
    half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
 -}
-
-stimesMaybe :: (Integral b, Semigroup a) => b -> Maybe a -> Maybe a
-stimesMaybe _ Nothing = Nothing
-stimesMaybe n (Just a) = case compare n 0 of
-    LT -> errorWithoutStackTrace "stimes: Maybe, negative multiplier"
-    EQ -> Nothing
-    GT -> Just (stimes n a)
-
-stimesList  :: Integral b => b -> [a] -> [a]
-stimesList n x
-  | n < 0 = errorWithoutStackTrace "stimes: [], negative multiplier"
-  | otherwise = rep n
-  where
-    rep 0 = []
-    rep i = x ++ rep (i - 1)
 
 -- | The dual of a 'Monoid', obtained by swapping the arguments of 'mappend'.
 --

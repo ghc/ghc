@@ -127,13 +127,9 @@ import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 import GHC.Tuple (Solo (MkSolo)) -- Note [Depend on GHC.Tuple]
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 
--- for 'class Semigroup'
-import {-# SOURCE #-} GHC.Real (Integral)
-import {-# SOURCE #-} Data.Semigroup.Internal ( stimesDefault
-                                              , stimesMaybe
-                                              , stimesList
-                                              , stimesIdempotentMonoid
-                                              )
+-- See Note [Semigroup stimes cycle]
+import {-# SOURCE #-} GHC.Num (Num (..))
+import {-# SOURCE #-} GHC.Real (Integral (..))
 
 -- $setup
 -- >>> import GHC.Num
@@ -181,6 +177,38 @@ GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
 GHC.Num.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
 
+
+Note [Semigroup stimes cycle]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Semigroup is defined in this module, GHC.Base, with the method
+stimes :: (Semigroup a, Integral b) => b -> a -> a
+
+This presents a problem.
+* We use Integral methods (quot, rem) and Num methods (-) in stimes definitions
+  in this module. Num is a superclass of Integral.
+* Num is defined in GHC.Num, which imports GHC.Base.
+* Enum is defined in GHC.Enum, which imports GHC.Base and GHC.Num. Enum is a
+  superclass of Integral. We don't use any Enum methods here, but it is relevant
+  (read on).
+* Integral is defined in GHC.Real, which imports GHC.Base, GHC.Num, and
+  GHC.Enum.
+
+We resolve this web of dependencies with hs-boot files. The rules
+https://ghc.gitlab.haskell.org/ghc/doc/users_guide/separate_compilation.html#how-to-compile-mutually-recursive-modules
+require us to put either the full declarations or only the instance head for
+classes in a hs-boot file.
+So we put the full class decls for Num and Integral in Num.hs-boot and
+Real.hs-boot respectively. This also forces us to have an Enum.hs-boot.
+
+An obvious alternative is to move the class decls for Num, Enum, Real, and
+Integral here. We don't do that because we would then need to move all the
+instances (for Int, Word, Integer, etc.) here as well, or leave those instances
+as orphans, which is generally bad.
+
+We previously resolved this problem in a different way, with an hs-boot for
+Semigroup.Internal that provided stimes implementations. This made them
+impossible to inline or specialize when used in this module. We no longer have
+that problem because we only import classes and not implementations.
 -}
 
 #if 0
@@ -282,10 +310,26 @@ class Semigroup a where
         -- >>> stimes 4 [1]
         -- [1,1,1,1]
         stimes :: Integral b => b -> a -> a
-        stimes = stimesDefault
+        stimes y0 x0
+          | y0 <= 0   = errorWithoutStackTrace "stimes: positive multiplier expected"
+          | otherwise = f x0 y0
+          where
+            f x y
+              | y `rem` 2 == 0 = f (x <> x) (y `quot` 2)
+              | y == 1 = x
+              | otherwise = g (x <> x) (y `quot` 2) x        -- See Note [Half of y - 1]
+            g x y z
+              | y `rem` 2 == 0 = g (x <> x) (y `quot` 2) z
+              | y == 1 = x <> z
+              | otherwise = g (x <> x) (y `quot` 2) (x <> z) -- See Note [Half of y - 1]
 
         {-# MINIMAL (<>) | sconcat #-}
 
+{- Note [Half of y - 1]
+   ~~~~~~~~~~~~~~~~~~~~~
+   Since y is guaranteed to be odd and positive here,
+   half of y - 1 can be computed as y `quot` 2, optimising subtraction away.
+-}
 
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following:
@@ -351,7 +395,12 @@ instance Semigroup [a] where
         (<>) = (++)
         {-# INLINE (<>) #-}
 
-        stimes = stimesList
+        stimes n x
+          | n < 0 = errorWithoutStackTrace "stimes: [], negative multiplier"
+          | otherwise = rep n
+          where
+            rep 0 = []
+            rep i = x ++ rep (i - 1)
 
 -- | @since 2.01
 instance Monoid [a] where
@@ -471,7 +520,10 @@ instance Semigroup Ordering where
     EQ <> y = y
     GT <> _ = GT
 
-    stimes = stimesIdempotentMonoid
+    stimes n x = case compare n 0 of
+      LT -> errorWithoutStackTrace "stimes: Ordering, negative multiplier"
+      EQ -> EQ
+      GT -> x
 
 -- lexicographical ordering
 -- | @since 2.01
@@ -484,7 +536,11 @@ instance Semigroup a => Semigroup (Maybe a) where
     a       <> Nothing = a
     Just a  <> Just b  = Just (a <> b)
 
-    stimes = stimesMaybe
+    stimes _ Nothing = Nothing
+    stimes n (Just a) = case compare n 0 of
+      LT -> errorWithoutStackTrace "stimes: Maybe, negative multiplier"
+      EQ -> Nothing
+      GT -> Just (stimes n a)
 
 -- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
 -- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
