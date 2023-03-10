@@ -34,7 +34,6 @@ import System.Posix.Types
 import Foreign
 import Foreign.C
 
--- import Data.Bits
 import Data.Maybe
 
 #if !defined(HTYPE_TCFLAG_T)
@@ -51,6 +50,9 @@ import GHC.IO.Device
 #if !defined(mingw32_HOST_OS)
 import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
+import GHC.Ptr
+#else
+import Data.OldList (elem)
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -164,13 +166,23 @@ fdGetMode fd = do
 
 #if defined(mingw32_HOST_OS)
 withFilePath :: FilePath -> (CWString -> IO a) -> IO a
-withFilePath = withCWString
+withFilePath fp f = do
+    checkForInteriorNuls fp
+    withCWString fp f
 
 newFilePath :: FilePath -> IO CWString
-newFilePath = newCWString
+newFilePath fp = do
+    checkForInteriorNuls fp
+    newCWString fp
 
 peekFilePath :: CWString -> IO FilePath
 peekFilePath = peekCWString
+
+-- | Check a 'FilePath' for internal NUL codepoints as these are
+-- disallowed in Windows filepaths. See #13660.
+checkForInteriorNuls :: FilePath -> IO ()
+checkForInteriorNuls fp = when ('\0' `elem` fp) (throwInternalNulError fp)
+
 #else
 
 withFilePath :: FilePath -> (CString -> IO a) -> IO a
@@ -178,12 +190,42 @@ newFilePath :: FilePath -> IO CString
 peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
-withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
-newFilePath fp = getFileSystemEncoding >>= \enc -> GHC.newCString enc fp
+withFilePath fp f = do
+    enc <- getFileSystemEncoding
+    GHC.withCStringLen0 enc fp $ \(str, len) -> do
+        checkForInteriorNuls fp (str, len)
+        f str
+newFilePath fp = do
+    enc <- getFileSystemEncoding
+    (str, len) <- GHC.newCStringLen0 enc fp
+    checkForInteriorNuls fp (str, len)
+    return str
 peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
 peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 
+-- | Check an encoded 'FilePath' for internal NUL octets as these are
+-- disallowed in POSIX filepaths. See #13660.
+checkForInteriorNuls :: FilePath -> CStringLen -> IO ()
+checkForInteriorNuls fp (str, len) =
+    when (len' /= len) (throwInternalNulError fp)
+    -- N.B. If the string contains internal NUL codeunits then the strlen will
+    -- indicate a size smaller than that returned by withCStringLen.
+  where
+    len' = case str of Ptr ptr -> I# (cstringLength# ptr)
 #endif
+
+throwInternalNulError :: FilePath -> IO a
+throwInternalNulError fp = ioError err
+  where
+    err =
+      IOError
+        { ioe_handle = Nothing
+        , ioe_type = InvalidArgument
+        , ioe_location = "checkForInteriorNuls"
+        , ioe_description = "FilePaths must not contain internal NUL code units."
+        , ioe_errno = Nothing
+        , ioe_filename = Just fp
+        }
 
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
