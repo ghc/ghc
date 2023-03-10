@@ -184,7 +184,7 @@ module GHC.Core.Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView,
+        coreView, coreFullView,
 
         tyConsOfType,
 

@@ -623,8 +623,6 @@ makeTypeConcrete :: ConcreteTvOrigin -> TcType -> TcM (TcType, [NotConcreteReaso
 -- that `TupleRep '[ beta[conc], F Int ]` is not concrete because of the
 -- type family application `F Int`. But we could decompose by setting
 -- alpha := TupleRep '[ beta, gamma[conc] ] and emitting `[W] gamma[conc] ~ F Int`.
---
--- This would be useful in startSolvingByUnification.
 makeTypeConcrete conc_orig ty =
   do { res@(ty', _) <- runWriterT $ go ty
      ; traceTc "makeTypeConcrete" $

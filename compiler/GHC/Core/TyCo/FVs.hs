@@ -1,4 +1,4 @@
-
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
@@ -836,24 +836,28 @@ injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
-    go ty                  | Just ty' <- coreView ty
-                           = go ty'
-    go (TyVarTy v)         = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)         = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)   =
-      case tyConInjectivityInfo tc of
-        Injective inj
-          |  look_under_tfs || not (isTypeFamilyTyCon tc)
-          -> mapUnionFV go $
-             filterByList (inj ++ repeat True) tys
+    go ty | Just ty' <- coreView ty = go ty'
+    go (TyVarTy v)                  = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)                  = go f `unionFV` go a
+    go (FunTy _ w ty1 ty2)          = go w `unionFV` go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)            = go_tc tc tys
+    go (ForAllTy (Bndr tv _) ty)    = go (tyVarKind tv) `unionFV` delFV tv (go ty)
+    go LitTy{}                      = emptyFV
+    go (CastTy ty _)                = go ty
+    go CoercionTy{}                 = emptyFV
+
+    go_tc tc tys
+      | isFamilyTyCon tc
+      = if | look_under_tfs, Injective flags <- tyConInjectivityInfo tc
+           -> mapUnionFV go $
+              filterByList (flags ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-        _ -> emptyFV
-    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `unionFV` delFV tv (go ty)
-    go LitTy{}                   = emptyFV
-    go (CastTy ty _)             = go ty
-    go CoercionTy{}              = emptyFV
+           | otherwise   -- No injectivity for thsi type family
+           -> emptyFV
+
+      | otherwise        -- Data type, injective in all positions
+      = mapUnionFV go tys
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:

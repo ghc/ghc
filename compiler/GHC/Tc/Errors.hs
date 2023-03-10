@@ -31,7 +31,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Unify ( checkTyVarEq )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
@@ -1805,10 +1804,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
 
     check_eq_result = case ei_m_reason item of
       Just (NonCanonicalReason result) -> result
-      _ -> checkTyVarEq tv1 ty2
-        -- in T2627b, we report an error for F (F a0) ~ a0. Note that the type
-        -- variable is on the right, so we don't get useful info for the CIrredCan,
-        -- and have to compute the result of checkTyVarEq here.
+      _                                -> cteOK
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 

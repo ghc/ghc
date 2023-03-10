@@ -653,7 +653,7 @@ data MetaDetails
   | Indirect TcType
 
 -- | What restrictions are on this metavariable around unification?
--- These are checked in GHC.Tc.Utils.Unify.startSolvingByUnification.
+-- These are checked in GHC.Tc.Utils.Unify.checkTopShape
 data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
@@ -714,6 +714,9 @@ Note [TcLevel invariants]
   and skolem (SkolemTv)
   and each Implication
   has a level number (of type TcLevel)
+
+* INVARIANT (KindInv) Given a type variable (tv::ki) at at level L,
+                      the free vars of `ki` all have level <= L
 
 * INVARIANTS.  In a tree of Implications,
 

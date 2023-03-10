@@ -1976,11 +1976,10 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
   where
     go _                             Phantom          = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
     go (AlgTyCon {})                 Nominal          = True
-    go (AlgTyCon {algTcRhs = rhs})   Representational
-      = isGenInjAlgRhs rhs
+    go (AlgTyCon {algTcRhs = rhs})   Representational = isGenInjAlgRhs rhs
     go (SynonymTyCon {})             _                = False
     go (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
-                                                  Nominal          = True
+                                                  Nominal = True
     go (FamilyTyCon { famTcInj = Injective inj }) Nominal = and inj
     go (FamilyTyCon {})              _                = False
     go (PrimTyCon {})                _                = True

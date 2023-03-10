@@ -36,7 +36,7 @@ module GHC.Tc.Solver.InertSet (
     -- * Cycle breaker vars
     CycleBreakerVarStack,
     pushCycleBreakerVarStack,
-    insertCycleBreakerBinding,
+    addCycleBreakerBindings,
     forAllCycleBreakerBindings_
 
   ) where
@@ -1633,13 +1633,13 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       | otherwise
       = False
 
-    -- like startSolvingByUnification, but allows cbv variables to unify
+    -- Like checkTopShape, but allows cbv variables to unify
     can_unify :: TcTyVar -> MetaInfo -> Type -> Bool
     can_unify _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
       | Just rhs_tv <- getTyVar_maybe rhs_ty
       = case tcTyVarDetails rhs_tv of
           MetaTv { mtv_info = TyVarTv } -> True
-          MetaTv {}                     -> False  -- could unify with anything
+          MetaTv {}                     -> False  -- Could unify with anything
           SkolemTv {}                   -> True
           RuntimeUnk                    -> True
       | otherwise  -- not a var on the RHS
@@ -1822,12 +1822,13 @@ pushCycleBreakerVarStack :: CycleBreakerVarStack -> CycleBreakerVarStack
 pushCycleBreakerVarStack = ([] <|)
 
 -- | Add a new cycle-breaker binding to the top environment on the stack.
-insertCycleBreakerBinding :: TcTyVar   -- ^ cbv, must be a CycleBreakerTv
-                          -> TcType    -- ^ cbv's expansion
-                          -> CycleBreakerVarStack -> CycleBreakerVarStack
-insertCycleBreakerBinding cbv expansion (top_env :| rest_envs)
-  = assert (isCycleBreakerTyVar cbv) $
-    ((cbv, expansion) : top_env) :| rest_envs
+addCycleBreakerBindings :: [(TcTyVar, Type)]   -- ^ (cbv,expansion) pairs
+                        -> InertSet -> InertSet
+addCycleBreakerBindings prs ics
+  = assertPpr (all (isCycleBreakerTyVar . fst) prs) (ppr prs) $
+    ics { inert_cycle_breakers = add_to (inert_cycle_breakers ics) }
+  where
+    add_to (top_env :| rest_envs) = (prs ++ top_env) :| rest_envs
 
 -- | Perform a monadic operation on all pairs in the top environment
 -- in the stack.

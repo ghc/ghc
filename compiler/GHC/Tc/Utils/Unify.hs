@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE RecursiveDo         #-}
+{-# LANGUAGE MultiWayIf          #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -20,7 +21,7 @@ module GHC.Tc.Utils.Unify (
   -- Various unifications
   unifyType, unifyKind, unifyExpectedType,
   uType, promoteTcType,
-  swapOverTyVars, startSolvingByUnification,
+  swapOverTyVars, touchabilityTest,
 
   --------------------------------
   -- Holes
@@ -32,7 +33,8 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  checkTyVarEq, checkTyFamEq, checkTypeEq
+  checkTyEqRhs, checkTvUnif, checkCoUnif, occursCheckTv,
+  PuResult(..), failCheckWith, okCheckRefl
 
   ) where
 
@@ -40,42 +42,46 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, makeTypeConcrete, hasFixedRuntimeRep_syntactic )
+import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep, hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-
-import GHC.Core.Type
-import GHC.Core.TyCo.Rep
-import GHC.Core.TyCo.Ppr( debugPprType )
-import GHC.Core.TyCon
-import GHC.Core.Coercion
-import GHC.Core.Multiplicity
-
-import qualified GHC.LanguageExtensions as LangExt
-
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Types.Name( Name, isSystemName )
 
+
+import GHC.Core.Type
+import GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.FVs( injectiveVarsOfType )
+import GHC.Core.TyCo.Ppr( debugPprType )
+import GHC.Core.TyCon
+import GHC.Core.Coercion
+import GHC.Core.Multiplicity
+import GHC.Core.Reduction
+
+import qualified GHC.LanguageExtensions as LangExt
+
 import GHC.Builtin.Types
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Utils.Error
-import GHC.Driver.Session
 import GHC.Types.Basic
-import GHC.Data.Bag
-import GHC.Data.FastString( fsLit )
+
+import GHC.Utils.FV( fvVarSet )
+import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
-import GHC.Exts      ( inline )
+import GHC.Driver.Session
+import GHC.Data.Bag
+import GHC.Data.FastString( fsLit )
+
 import Control.Monad
 import qualified Data.Semigroup as S ( (<>) )
 
@@ -1053,11 +1059,9 @@ definitely_poly ty
   | (tvs, theta, tau) <- tcSplitSigmaTy ty
   , (tv:_) <- tvs   -- At least one tyvar
   , null theta      -- No constraints; see (DP1)
-  , checkTyVarEq tv tau `cterHasProblem` cteInsolubleOccurs
+  , tv `elemVarSet` fvVarSet (injectiveVarsOfType True tau)
        -- The tyvar actually occurs (DP2),
-       --     and occurs in an injective position (DP3).
-       -- Fortunately checkTyVarEq, used for the occur check,
-       -- is just what we need.
+       -- and occurs in an injective position (DP3).
   = True
   | otherwise
   = False
@@ -2065,37 +2069,32 @@ uUnfilledVar2 :: CtOrigin
               -> TcM Coercion
 uUnfilledVar2 origin t_or_k swapped tv1 ty2
   = do { cur_lvl <- getTcLevel
-       ; go cur_lvl }
-  where
-    go cur_lvl
-      | isTouchableMetaTyVar cur_lvl tv1
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
-      , cterHasNoProblem (checkTyVarEq tv1 ty2)
-           -- See Note [Prevent unification with type families]
-      = do { can_continue_solving <- startSolvingByUnification (metaTyVarInfo tv1) ty2
-           ; if not can_continue_solving
-             then not_ok_so_defer
-             else
-        do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
-           ; traceTc "uUnfilledVar2 ok" $
-             vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
-                  , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
-                  , ppr (isReflCo co_k), ppr co_k ]
+       ; if not (touchabilityTest cur_lvl tv1 ty2)
+         then not_ok_so_defer
+         else
+    do { check_result <- uTypeCheckTouchableTyVarEq tv1 ty2
+       ; case check_result of {
+           PuFail {} -> not_ok_so_defer ;
+           PuOK {}   ->
+    do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
+       ; traceTc "uUnfilledVar2 ok" $
+         vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
+              , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
+              , ppr (isReflCo co_k), ppr co_k ]
 
-           ; if isReflCo co_k
-               -- Only proceed if the kinds match
-               -- NB: tv1 should still be unfilled, despite the kind unification
-               --     because tv1 is not free in ty2 (or, hence, in its kind)
-             then do { writeMetaTyVar tv1 ty2
-                     ; return (mkNomReflCo ty2) }
+       ; if isReflCo co_k
+           -- Only proceed if the kinds match
+           -- NB: tv1 should still be unfilled, despite the kind unification
+           --     because tv1 is not free in ty2 (or, hence, in its kind)
+         then do { writeMetaTyVar tv1 ty2
+                 ; return (mkNomReflCo ty2) }
 
-             else defer }} -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
-                           -- Note [Equalities with incompatible kinds] for how
-                           -- this will be dealt with in the solver
-
-      | otherwise
-      = not_ok_so_defer
-
+         else defer  -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
+                     -- Note [Equalities with incompatible kinds] for how
+                     -- this will be dealt with in the solver
+         }}}}
+  where
     ty1 = mkTyVarTy tv1
     kind_origin = KindEqOrigin ty1 ty2 origin (Just t_or_k)
 
@@ -2107,43 +2106,6 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occurred in type family parameter
           ; defer }
-
--- | Checks (TYVAR-TV), (COERCION-HOLE) and (CONCRETE) of
--- Note [Unification preconditions]; returns True if these conditions
--- are satisfied. But see the Note for other preconditions, too.
-startSolvingByUnification :: MetaInfo -> TcType  -- zonked
-                          -> TcM Bool
-startSolvingByUnification _ xi
-  | hasCoercionHoleTy xi  -- (COERCION-HOLE) check
-  = return False
-startSolvingByUnification info xi
-  = case info of
-      CycleBreakerTv -> return False
-      ConcreteTv conc_orig ->
-        do { (_, not_conc_reasons) <- makeTypeConcrete conc_orig xi
-                 -- NB: makeTypeConcrete has the side-effect of turning
-                 -- some TauTvs into ConcreteTvs, e.g.
-                 -- alpha[conc] ~# TYPE (TupleRep '[ beta[tau], IntRep ])
-                 -- will write `beta[tau] := beta[conc]`.
-                 --
-                 -- We don't need to track these unifications for the purposes
-                 -- of constraint solving (e.g. updating tcs_unified or tcs_unif_lvl),
-                 -- as they don't unlock any further progress.
-           ; case not_conc_reasons of
-               [] -> return True
-               _  -> return False }
-      TyVarTv ->
-        case getTyVar_maybe xi of
-           Nothing -> return False
-           Just tv ->
-             case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
-                SkolemTv {} -> return True
-                RuntimeUnk  -> return True
-                MetaTv { mtv_info = info } ->
-                  case info of
-                    TyVarTv -> return True
-                    _       -> return False
-      _ -> return True
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2
@@ -2562,8 +2524,7 @@ matchExpectedFunKind hs_ty n k = go n k
 
 {-  Note [Checking for foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Unless we have -XImpredicativeTypes (which is a totally unsupported
-feature), we do not want to unify
+We never want to unify
     alpha ~ (forall a. a->a) -> Int
 So we look for foralls hidden inside the type, and it's convenient
 to do that at the same time as the occurs check (which looks for
@@ -2592,7 +2553,7 @@ with (forall k. k->*)
 
 -}
 
-----------------
+{-
 {-# NOINLINE checkTyVarEq #-}  -- checkTyVarEq becomes big after the `inline` fires
 checkTyVarEq :: TcTyVar -> TcType -> CheckTyEqResult
 checkTyVarEq tv ty
@@ -2721,3 +2682,292 @@ checkTypeEq lhs ty
       | ghci_tv   = \ _tc -> cteOK
       | otherwise = \ tc  -> (if isTauTyCon tc then cteOK else impredicative) S.<>
                              (if isFamFreeTyCon tc then cteOK else type_family)
+-}
+
+{-
+Note [prepareForUnification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+alpha[2] ~ ty
+
+Occurs check
+~~~~~~~~~~~~
+* Phantom occurs check:
+    ty is Maybe (S alpha)
+    type S a = Int
+  Returns: (Maybe Int, Refl)
+
+* Occurs check with type family
+    ty is Maybe (F alpha)
+
+  Emits:  co :: F alpha[2] ~ gamma[2]
+  Returns (Maybe gamma[2], Maybe co)
+
+* Occurs check failure
+    ty is Maybe alpha
+
+  Fails with OccursCheck
+
+Level check
+~~~~~~~~~~~
+* Level check (meta):
+    ty is Maybe beta[3]
+
+  Unifies: beta'[3] := beta[2]
+  Returns (Maybe beta'[3], Refl)
+
+* Level check (skolem):
+    ty is Maybe b[3,sk]
+
+  Fail with SkolemEscapeReason
+
+* Level check with type family:
+    ty is Maybe (F beta[3])
+
+  Emits: co :: F beta[3] ~ gamma[2]
+  Returns (Maybe gamma[2], Maybe co)
+
+Concrete check
+~~~~~~~~~~~~~~
+* Concrete check (meta): alpha is [concrete-tv]
+    ty is Maybe (S beta[2])
+
+  Unifies: beta := beta'[concrete]
+  Returns (Maybe beta', Refl
+
+* Concrete check (skolem): alpha is [concrete-tv]
+    ty is Maybe b[sk]
+
+  Fail with ConcreteSkolemReason
+
+Forall check
+~~~~~~~~~~~~
+* Forall check:
+    ty contains a forall
+
+  Fail with ForAllReason
+
+-}
+
+data PuResult a b = PuFail CheckTyEqResult
+                  | PuOK b (Bag a)
+
+instance Functor (PuResult a) where
+  fmap _ (PuFail prob) = PuFail prob
+  fmap f (PuOK x cts)  = PuOK (f x) cts
+
+instance Applicative (PuResult a) where
+  pure x = PuOK x emptyBag
+  PuFail p1 <*> PuFail p2 = PuFail (p1 S.<> p2)
+  PuFail p1 <*> PuOK {}   = PuFail p1
+  PuOK {}   <*> PuFail p2 = PuFail p2
+  PuOK f c1 <*> PuOK x c2 = PuOK (f x) (c1 `unionBags` c2)
+
+okCheckRefl :: TcType -> TcM (PuResult a Reduction)
+okCheckRefl ty = return (PuOK (mkReflRedn Nominal ty) emptyBag)
+
+failCheckWith :: CheckTyEqResult -> TcM (PuResult a b)
+failCheckWith p = return (PuFail p)
+
+uTypeCheckTouchableTyVarEq :: TcTyVar -> TcType -> TcM (PuResult () ())
+uTypeCheckTouchableTyVarEq tv rhs
+  | MetaTv { mtv_info = tv_info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
+  = do { check_result <- checkTyEqRhs False dont_flatten
+                                      (checkTvUnif tv tv_info tv_lvl)
+                                      (checkCoUnif tv)
+                                      rhs
+             -- checkTvUnif will never do any promotion because tv_lvl is
+             -- the ambient level. But we still need the concreteness changes
+
+       ; case check_result of
+            PuFail reason -> return (PuFail reason)
+            PuOK redn _  -> assertPpr (isReflCo (reductionCoercion redn))
+                                      (ppr tv $$ ppr rhs $$ ppr redn) $
+                            return (PuOK () emptyBag) }
+
+  -- Only called on meta-tyvars
+  | otherwise = pprPanic "uTypeCHeckTouchableTyVarEq" (ppr tv)
+  where
+    dont_flatten :: TcType -> TcM (PuResult () Reduction)
+    dont_flatten _ = failCheckWith (cteProblem cteTypeFamily)
+     -- See Note [Prevent unification with type families]
+
+checkTyEqRhs :: forall a.
+                Bool   -- RuntimeUnk tyvar on the LHS; accept foralls
+             -> (TcType  -> TcM (PuResult a Reduction))
+             -> (TcTyVar -> TcM (PuResult a Reduction))
+             -> (TcCoercion -> TcM (PuResult a TcCoercion))
+             -> TcType
+             -> TcM (PuResult a Reduction)
+checkTyEqRhs ghci_tv flatten_fam_app check_tv check_co rhs
+  = case coreFullView rhs of
+      -- Special case for  lhs ~ F tys
+      -- We don't want to flatten that (F tys)
+      TyConApp tc tys | isTypeFamilyTyCon tc
+        -> do { tys_res <- go_tys tys
+              ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
+
+      -- Normal case
+      _other -> go rhs
+
+  where
+    go :: TcType -> TcM (PuResult a Reduction)
+    go ty@(LitTy {})        = okCheckRefl ty
+    go ty@(TyConApp tc tys) = go_tc ty tc tys
+    go (TyVarTy tv)         = check_tv tv
+        -- Don't worry about foralls inside the kind; see Note [Checking for foralls]
+        -- Nor can we expand synonyms; see Note [Occurrence checking: look inside kinds]
+        --                             in GHC.Core.FVs
+
+    go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
+       | not ghci_tv, isInvisibleFunArg af  -- e.g.  Num a => blah
+       = failCheckWith impredicativeProblem -- Not allowed (TyEq:F)
+       | otherwise
+       = do { w_res <- go w; a_res <- go a; r_res <- go r
+            ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
+
+    go (AppTy fun arg) = do { fun_res <- go fun
+                            ; arg_res <- go arg
+                            ; return (mkAppRedn <$> fun_res <*> arg_res) }
+
+    go (CastTy ty co)  = do { ty_res <- go ty
+                            ; co_res <- check_co co
+                            ; return (mkCastRedn1 Nominal ty <$> co_res <*> ty_res) }
+
+    go (CoercionTy co) = do { co_res <- check_co co
+                            ; return (mkReflCoRedn Nominal <$> co_res) }
+
+    go ty@(ForAllTy {})
+      | ghci_tv   = okCheckRefl ty
+      | otherwise = failCheckWith impredicativeProblem  -- Not allowed (TyEq:F)
+
+    go_tys :: [TcType] -> TcM (PuResult a Reductions)
+    go_tys tys = do { (ress :: [PuResult a Reduction]) <- mapM go tys
+                    ; return (unzipRedns <$> sequenceA ress) }
+                      -- sequenceA :: [PuResult a] -> PuResult [a]
+                      -- unzipRedns :: [Reduction] -> Reductions
+
+    go_tc :: TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
+    go_tc ty tc tys
+      | isTypeFamilyTyCon tc
+      = flatten_fam_app ty
+
+      | not (isFamFreeTyCon tc)  -- e.g. S a  where  type S a = F [a]
+      , Just ty' <- coreView ty  -- Only synonyms and type families reply
+      = go ty'                   --      False to isFamFreeTyCon
+
+      | otherwise
+      = do { tys_res <- go_tys tys
+           ; if | PuFail {} <- tys_res, Just ty' <- coreView ty
+                -> go ty'  -- Expand synonyms on failure
+                | not (isTauTyCon tc || ghci_tv)
+                -> failCheckWith impredicativeProblem
+                | otherwise
+                -> return (mkTyConAppRedn Nominal tc <$> tys_res) }
+
+-------------------------
+checkCoUnif :: TcTyVar -> TcCoercion -> TcM (PuResult a TcCoercion)
+-- No bother about impredicativity in coercions, as they're inferred
+-- Don't check coercions for type families; see commentary at top of function
+checkCoUnif lhs_tv co
+  | lhs_tv `elemVarSet` tyCoVarsOfCo co = failCheckWith insolubleOccursProblem
+  | hasCoercionHoleCo co                = failCheckWith (cteProblem cteCoercionHole)
+  | otherwise                           = return (PuOK co emptyBag)
+  -- ToDo: could combine these two folds
+  --       (free vars and coercion holes) into one
+
+-------------------------
+checkTvUnif :: TcTyVar -> MetaInfo -> TcLevel  -- The LHS tv, a touchable meta tvar
+            -> TcTyVar                         -- An occurrence of a tyvar in the RHS
+            -> TcM (PuResult a Reduction)
+checkTvUnif lhs_tv lhs_tv_info lhs_tv_lvl occ_tv
+  | occursCheckTv lhs_tv occ_tv
+  = failCheckWith insolubleOccursProblem
+     -- Unification is always Nominal, so no faffing
+     -- with Note [Occurs check and representational equality]
+
+  | MetaTv { mtv_info = info_occ, mtv_tclvl = lvl_occ } <- occ_details
+  = -- Check for unified. The type started zonked, but we may have
+    -- promoted one of its type variables, and we then encounter
+    -- it for the second time.  But if so, it'll definitely be another TyVar
+    do { mb_filled <- isFilledMetaTyVar_maybe occ_tv
+       ; case mb_filled of
+            Just ty | Just occ_tv2 <- getTyVar_maybe ty
+                    -> checkTvUnif lhs_tv lhs_tv_info lhs_tv_lvl occ_tv2
+                    | otherwise -> pprPanic "checkTouchableTyVarEq" (ppr occ_tv $$ ppr ty)
+            Nothing -> check_tv2 occ_tv info_occ lvl_occ }
+
+  | SkolemTv _ lvl_occ _ <- occ_details
+  , need_to_promote lvl_occ  -- Skolem tyvar that needs promotion; skolem escape
+  = failCheckWith (cteProblem cteSkolemEscape)
+
+  | otherwise
+  = okCheckRefl (mkTyVarTy occ_tv)
+  where
+    occ_details = tcTyVarDetails occ_tv
+
+    check_tv2 occ_tv info_occ lvl_occ
+      | not (need_to_promote lvl_occ)
+      , not (need_to_make_concrete info_occ)
+      = okCheckRefl (mkTyVarTy occ_tv)  -- No-op
+
+      | tv_is_concrete
+      , cant_make_concrete info_occ
+      = failCheckWith (cteProblem cteConcrete)   -- E.g.  alpha[conc] := Maybe beta[tv]
+
+      | otherwise
+      = do { let new_info | tv_is_concrete = lhs_tv_info
+                          | otherwise      = info_occ
+           ; new_tv <- cloneMetaTyVarWithInfo new_info lhs_tv_lvl occ_tv
+           ; writeMetaTyVar occ_tv (mkTyVarTy new_tv)
+           ; traceTc "promoteTyVar" (ppr occ_tv <+> text "-->" <+> ppr new_tv)
+           ; okCheckRefl (mkTyVarTy new_tv) }
+
+    need_to_promote       lvl_occ  = lvl_occ `strictlyDeeperThan` lhs_tv_lvl
+    need_to_make_concrete info_occ = is_concrete lhs_tv_info && not (is_concrete info_occ)
+
+    cant_make_concrete (ConcreteTv {}) = False
+    cant_make_concrete TauTv           = False
+    cant_make_concrete _               = True
+    -- Don't attempt to make other type variables concrete
+    -- (e.g. SkolemTv, TyVarTv, CycleBreakerTv, RuntimeUnkTv).
+
+    tv_is_concrete = is_concrete lhs_tv_info
+
+    is_concrete (ConcreteTv {}) = True
+    is_concrete _               = False
+
+occursCheckTv :: TcTyVar -> TcTyVar -> Bool
+occursCheckTv lhs_tv occ_tv
+  =  lhs_tv == occ_tv
+  || lhs_tv `elemVarSet` tyCoVarsOfType (tyVarKind occ_tv)
+
+-------------------------
+touchabilityTest :: TcLevel -> TcTyVar -> TcType -> Bool
+-- This is the key test for untouchability:
+-- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
+-- and Note [Solve by unification] in GHC.Tc.Solver.Interact
+touchabilityTest given_eq_lvl tv rhs
+  | MetaTv { mtv_info = info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
+  , checkTopShape info rhs
+  = tv_lvl `deeperThanOrSame` given_eq_lvl
+  | otherwise
+  = False
+
+-------------------------
+-- | checkTopShape checks (TYVAR-TV), (COERCION-HOLE) and (CONCRETE) of
+-- Note [Unification preconditions]; returns True if these conditions
+-- are satisfied. But see the Note for other preconditions, too.
+checkTopShape :: MetaInfo -> TcType -> Bool
+checkTopShape info xi
+  = case info of
+      CycleBreakerTv -> False
+      TyVarTv ->
+        case getTyVar_maybe xi of
+           Nothing -> False
+           Just tv -> case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
+                        SkolemTv {} -> True
+                        RuntimeUnk  -> True
+                        MetaTv { mtv_info = TyVarTv } -> True
+                        _                             -> False
+      _ -> True
+

@@ -34,8 +34,11 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily,
+        cteOK, cteImpredicative, cteTypeFamily, cteCoercionHole,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
+        cteConcrete, cteSkolemEscape,
+        impredicativeProblem, insolubleOccursProblem, solubleOccursProblem,
+        occursProblem,
 
         cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
@@ -494,16 +497,39 @@ cterHasNoProblem _        = False
 -- | An individual problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
-cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
-cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteInsolubleOccurs = CTEP (bit 2)   -- occurs-check
-cteSolubleOccurs   = CTEP (bit 3)   -- occurs-check under a type function or in a coercion
+cteImpredicative, cteTypeFamily, cteInsolubleOccurs,
+  cteSolubleOccurs, cteCoercionHole, cteConcrete,
+  cteSkolemEscape :: CheckTyEqProblem
+cteImpredicative   = CTEP (bit 0)   -- Forall or (=>) encountered
+cteTypeFamily      = CTEP (bit 1)   -- Type family encountered
+cteInsolubleOccurs = CTEP (bit 2)   -- Occurs-check
+cteSolubleOccurs   = CTEP (bit 3)   -- Occurs-check under a type function or in a coercion
                                     -- must be one bit to the left of cteInsolubleOccurs
--- See also Note [Insoluble occurs check] in GHC.Tc.Errors
+                                    -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
+cteCoercionHole    = CTEP (bit 4)   -- Coercion hole encountered
+cteConcrete        = CTEP (bit 5)   -- Type variable that can't be made concrete
+                                    --    e.g. alpha[conc] ~ Maybe beta[tv]
+cteSkolemEscape    = CTEP (bit 6)   -- Skolem escape e.g.  alpha[2] ~ b[sk,4]
 
 cteProblem :: CheckTyEqProblem -> CheckTyEqResult
 cteProblem (CTEP mask) = CTER mask
+
+impredicativeProblem, insolubleOccursProblem, solubleOccursProblem :: CheckTyEqResult
+impredicativeProblem   = cteProblem cteImpredicative
+insolubleOccursProblem = cteProblem cteInsolubleOccurs
+solubleOccursProblem   = cteProblem cteSolubleOccurs
+
+occursProblem :: EqRel -> CheckTyEqResult
+-- See Note [Occurs check and representational equality]
+occursProblem NomEq  = insolubleOccursProblem
+occursProblem ReprEq = solubleOccursProblem
+
+{- Note [Occurs check and representational equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(a ~R# b a) is soluble if b later turns out to be Identity
+So we treat this as a "soluble occurs check".
+-}
+
 
 occurs_mask :: Word8
 occurs_mask = insoluble_mask .|. soluble_mask

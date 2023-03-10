@@ -24,7 +24,8 @@ module GHC.Tc.Utils.TcMType (
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
-  newAnonMetaTyVar, newConcreteTyVar, cloneMetaTyVar,
+  newAnonMetaTyVar, newConcreteTyVar,
+  cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
 
   newMultiplicityVar,
@@ -900,6 +901,18 @@ cloneMetaTyVar tv
                            _ -> pprPanic "cloneMetaTyVar" (ppr tv)
               tyvar = mkTcTyVar name' (tyVarKind tv) details'
         ; traceTc "cloneMetaTyVar" (ppr tyvar)
+        ; return tyvar }
+
+cloneMetaTyVarWithInfo :: MetaInfo -> TcLevel -> TcTyVar -> TcM TcTyVar
+cloneMetaTyVarWithInfo info tc_lvl tv
+  = assert (isTcTyVar tv) $
+    do  { ref  <- newMutVar Flexi
+        ; name' <- cloneMetaTyVarName (tyVarName tv)
+        ; let details = MetaTv { mtv_info  = info
+                               , mtv_ref   = ref
+                               , mtv_tclvl = tc_lvl }
+              tyvar = mkTcTyVar name' (tyVarKind tv) details
+        ; traceTc "cloneMetaTyVarWithInfo" (ppr tyvar)
         ; return tyvar }
 
 -- Works for both type and kind variables
