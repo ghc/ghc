@@ -639,7 +639,7 @@ jsResultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey = do
 --    result_id <- newSysLocalDs boolTy
     ccall_uniq <- newUnique
-    let forceBool e = mkJsCall ccall_uniq "$r = !(!$1)" [e] boolTy
+    let forceBool e = mkJsCall ccall_uniq "((x) => { return !(!x); })" [e] boolTy
     return
      (Just intPrimTy, \e -> forceBool e)
 
