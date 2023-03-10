@@ -32,7 +32,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Unify ( checkTyVarEq )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
@@ -1532,13 +1531,9 @@ any more.  So we don't assert that it is.
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
 mkEqErr :: SolverReportErrCtxt -> NonEmpty ErrorItem -> TcM SolverReport
-mkEqErr ctxt items@(item:|_)
-  | item:_ <- filter (not . ei_suppress) (toList items)
-  = mkEqErr1 ctxt item
-
-  | otherwise  -- they're all suppressed. still need an error message
-                     -- for -fdefer-type-errors though
-  = mkEqErr1 ctxt item
+mkEqErr ctxt items
+  | item1 :| _ <- tryFilter (not . ei_suppress) items
+  = mkEqErr1 ctxt item1
 
 mkEqErr1 :: SolverReportErrCtxt -> ErrorItem -> TcM SolverReport
 mkEqErr1 ctxt item   -- Wanted only
@@ -1601,12 +1596,14 @@ mkEqErr_help :: SolverReportErrCtxt
 mkEqErr_help ctxt item ty1 ty2
   | Just casted_tv1 <- getCastedTyVar_maybe ty1
   = mkTyVarEqErr ctxt item casted_tv1 ty2
+
+  -- ToDo: explain..  Cf T2627b   Dual (Dual a) ~ a
   | Just casted_tv2 <- getCastedTyVar_maybe ty2
   = mkTyVarEqErr ctxt item casted_tv2 ty1
+
   | otherwise
-  = do
-    err <- reportEqErr ctxt item ty1 ty2
-    return (err, noHints)
+  = do { err <- reportEqErr ctxt item ty1 ty2
+       ; return (err, noHints) }
 
 reportEqErr :: SolverReportErrCtxt
             -> ErrorItem
@@ -1614,16 +1611,16 @@ reportEqErr :: SolverReportErrCtxt
             -> TcM TcSolverReportMsg
 reportEqErr ctxt item ty1 ty2
   = do
-    mb_coercible_info <-
-      if errorItemEqRel item == ReprEq
-      then coercible_msg ty1 ty2
-      else return Nothing
-    return $
-      Mismatch
-       { mismatchMsg           = mismatch
-       , mismatchTyVarInfo     = Nothing
-       , mismatchAmbiguityInfo = eqInfos
-       , mismatchCoercibleInfo = mb_coercible_info }
+    mb_coercible_info <- if errorItemEqRel item == ReprEq
+                         then coercible_msg ty1 ty2
+                         else return Nothing
+    tv_info <- case getTyVar_maybe ty2 of
+                 Nothing  -> return Nothing
+                 Just tv2 -> Just <$> extraTyVarEqInfo (tv2, Nothing) ty1
+    return $ Mismatch { mismatchMsg           = mismatch
+                      , mismatchTyVarInfo     = tv_info
+                      , mismatchAmbiguityInfo = eqInfos
+                      , mismatchCoercibleInfo = mb_coercible_info }
   where
     mismatch = misMatchOrCND False ctxt item ty1 ty2
     eqInfos  = eqInfoMsgs ty1 ty2
@@ -1653,8 +1650,8 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
       (_, infos) <- zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
       return (FixedRuntimeRepError infos, [])
 
-  -- Impredicativity is a simple error to understand; try it before
-  -- anything more complicated.
+  -- Impredicativity is a simple error to understand;
+  -- try it before anything more complicated.
   | check_eq_result `cterHasProblem` cteImpredicative
   = do
     tyvar_eq_info <- extraTyVarEqInfo (tv1, Nothing) ty2
@@ -1674,6 +1671,12 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
         -- to be helpful since this is just an unimplemented feature.
     return (main_msg, [])
 
+  -- Incompatible kinds
+  -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
+  -- GHC.Tc.Solver.Canonical
+  | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
+  = return (mkBlockedEqErr item, [])
+
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
                        -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
@@ -1681,20 +1684,21 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
      -- The cases below don't really apply to ReprEq (except occurs check)
   = do
     tv_extra <- extraTyVarEqInfo (tv1, Nothing) ty2
-    reason <-
-      if errorItemEqRel item == ReprEq
-      then RepresentationalEq tv_extra <$> coercible_msg ty1 ty2
-      else return $ DifferentTyVars tv_extra
-    let main_msg =
-          CannotUnifyVariable
-            { mismatchMsg       = headline_msg
-            , cannotUnifyReason = reason }
+    reason <- if errorItemEqRel item == ReprEq
+              then RepresentationalEq tv_extra <$> coercible_msg ty1 ty2
+              else return $ DifferentTyVars tv_extra
+    let main_msg = CannotUnifyVariable
+                     { mismatchMsg       = headline_msg
+                     , cannotUnifyReason = reason }
     return (main_msg, add_sig)
 
-  | cterHasOccursCheck check_eq_result
+  | tv1 `elemVarSet` tyCoVarsOfType ty2
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
     -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
+    --
+    -- Use tyCoVarsOfType because it might have begun as the canonical
+    -- constraint (Dual (Dual a)) ~ a, and been swizzled by mkEqnErr_help
   = let ambiguity_infos = eqInfoMsgs ty1 ty2
 
         interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
@@ -1712,11 +1716,6 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
             , cannotUnifyReason = occurs_err }
 
     in return (main_msg, [])
-
-    -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
-    -- GHC.Tc.Solver.Canonical
-  | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
-  = return (mkBlockedEqErr item, [])
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1765,9 +1764,8 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     return (msg, add_sig)
 
   | otherwise
-  = do
-    err <- reportEqErr ctxt item (mkTyVarTy tv1) ty2
-    return (err, [])
+  = do { err <- reportEqErr ctxt item (mkTyVarTy tv1) ty2
+       ; return (err, []) }
         -- This *can* happen (#6123)
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
@@ -1781,7 +1779,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     -- there is an error is not sufficient. See #21430.
     mb_concrete_reason
       | Just frr_orig <- isConcreteTyVar_maybe tv1
-      , not (isConcrete ty2)
+      , not (isConcreteType ty2)
       = Just $ frr_reason frr_orig tv1 ty2
       | Just (tv2, frr_orig) <- isConcreteTyVarTy_maybe ty2
       , not (isConcreteTyVar tv1)
@@ -1799,10 +1797,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
 
     check_eq_result = case ei_m_reason item of
       Just (NonCanonicalReason result) -> result
-      _ -> checkTyVarEq tv1 ty2
-        -- in T2627b, we report an error for F (F a0) ~ a0. Note that the type
-        -- variable is on the right, so we don't get useful info for the CIrredCan,
-        -- and have to compute the result of checkTyVarEq here.
+      _                                -> cteOK
 
     insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 

@@ -597,9 +597,9 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                         --            a DFunUnfolding in mk_worker_unfolding
   , not (exprIsTrivial rhs)        -- Not x = y |> co; Wrinkle 1
   , not (hasInlineUnfolding info)  -- Not INLINE things: Wrinkle 4
-  , isConcrete (typeKind work_ty)  -- Don't peel off a cast if doing so would
-                                   -- lose the underlying runtime representation.
-                                   -- See Note [Preserve RuntimeRep info in cast w/w]
+  , isConcreteType (typeKind work_ty) -- Don't peel off a cast if doing so would
+                                      -- lose the underlying runtime representation.
+                                      -- See Note [Preserve RuntimeRep info in cast w/w]
   , not (isOpaquePragma (idInlinePragma old_bndr)) -- Not for OPAQUE bindings
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM

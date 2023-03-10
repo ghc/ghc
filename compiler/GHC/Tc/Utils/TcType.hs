@@ -38,7 +38,7 @@ module GHC.Tc.Utils.TcType (
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
-  tcTypeLevel, tcTyVarLevel, maxTcLevel,
+  tcTypeLevel, tcTyVarLevel, maxTcLevel, minTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -47,7 +47,7 @@ module GHC.Tc.Utils.TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
-  isConcreteTyVarTy, isConcreteTyVarTy_maybe,
+  isConcreteTyVarTy, isConcreteTyVarTy_maybe, isConcreteInfo,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -653,7 +653,7 @@ data MetaDetails
   | Indirect TcType
 
 -- | What restrictions are on this metavariable around unification?
--- These are checked in GHC.Tc.Utils.Unify.startSolvingByUnification.
+-- These are checked in GHC.Tc.Utils.Unify.checkTopShape
 data MetaInfo
    = TauTv         -- ^ This MetaTv is an ordinary unification variable
                    -- A TauTv is always filled in with a tau-type, which
@@ -714,6 +714,9 @@ Note [TcLevel invariants]
   and skolem (SkolemTv)
   and each Implication
   has a level number (of type TcLevel)
+
+* INVARIANT (KindInv) Given a type variable (tv::ki) at at level L,
+                      the free vars of `ki` all have level <= L
 
 * INVARIANTS.  In a tree of Implications,
 
@@ -796,6 +799,9 @@ touchable; but then 'b' has escaped its scope into the outer implication.
 
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
 maxTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `max` b)
+
+minTcLevel :: TcLevel -> TcLevel -> TcLevel
+minTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `min` b)
 
 topTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
@@ -1199,6 +1205,10 @@ isConcreteTyVar_maybe tv
   = Just conc_orig
   | otherwise
   = Nothing
+
+isConcreteInfo :: MetaInfo -> Bool
+isConcreteInfo (ConcreteTv {}) = True
+isConcreteInfo _               = False
 
 -- | Is this type variable a concrete type variable, i.e.
 -- it is a metavariable with 'ConcreteTv' 'MetaInfo'?

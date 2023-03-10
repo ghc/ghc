@@ -1,36 +1,13 @@
 
 T22793.hs:15:42: error: [GHC-25897]
-    • Couldn't match kind ‘ka’ with ‘k1’
-      Expected kind ‘ks’, but ‘a’ has kind ‘ka’
+    • Expected kind ‘ks’, but ‘a’ has kind ‘ka’
       ‘ka’ is a rigid type variable bound by
         the type signature for ‘bob’
         at T22793.hs:13:26-27
-      ‘k1’ is a rigid type variable bound by
-        the type signature for ‘bob’
-        at T22793.hs:13:16-17
-    • In the second argument of ‘Foo’, namely ‘a’
-      In the type signature:
-        bob :: forall {k1}
-                      {ks}
-                      {ka}
-                      q
-                      (p :: k1 -> q -> Type)
-                      (f :: ka -> q)
-                      (s :: ks)
-                      (t :: ks)
-                      (a :: ka)
-                      (b :: ka). Foo s a => p a (f b) -> p s (f t)
-
-T22793.hs:16:11: error: [GHC-25897]
-    • Couldn't match kind ‘ks’ with ‘k1’
-      Expected kind ‘k1’, but ‘a’ has kind ‘ka’
       ‘ks’ is a rigid type variable bound by
         the type signature for ‘bob’
         at T22793.hs:13:21-22
-      ‘k1’ is a rigid type variable bound by
-        the type signature for ‘bob’
-        at T22793.hs:13:16-17
-    • In the first argument of ‘p’, namely ‘a’
+    • In the second argument of ‘Foo’, namely ‘a’
       In the type signature:
         bob :: forall {k1}
                       {ks}

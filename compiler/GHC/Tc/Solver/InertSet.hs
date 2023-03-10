@@ -36,7 +36,7 @@ module GHC.Tc.Solver.InertSet (
     -- * Cycle breaker vars
     CycleBreakerVarStack,
     pushCycleBreakerVarStack,
-    insertCycleBreakerBinding,
+    addCycleBreakerBindings,
     forAllCycleBreakerBindings_
 
   ) where
@@ -237,13 +237,15 @@ instance Outputable WorkList where
 *                                                                      *
 ********************************************************************* -}
 
-type CycleBreakerVarStack = NonEmpty [(TcTyVar, TcType)]
+type CycleBreakerVarStack = NonEmpty (Bag (TcTyVar, TcType))
    -- ^ a stack of (CycleBreakerTv, original family applications) lists
    -- first element in the stack corresponds to current implication;
    --   later elements correspond to outer implications
    -- used to undo the cycle-breaking needed to handle
    -- Note [Type equality cycles] in GHC.Tc.Solver.Canonical
    -- Why store the outer implications? For the use in mightEqualLater (only)
+   --
+   -- Why NonEmpty? So there is always a top element to add to
 
 data InertSet
   = IS { inert_cans :: InertCans
@@ -291,7 +293,7 @@ emptyInertCans
 emptyInert :: InertSet
 emptyInert
   = IS { inert_cans           = emptyInertCans
-       , inert_cycle_breakers = [] :| []
+       , inert_cycle_breakers = emptyBag :| []
        , inert_famapp_cache   = emptyFunEqs
        , inert_solved_dicts   = emptyDictMap }
 
@@ -722,7 +724,7 @@ applying S(f,_) to t.
 
 -----------------------------------------------------------------------------
 Our main invariant:
-   the CEqCans in inert_eqs should be a terminating generalised substitution
+   the EqCts in inert_eqs should be a terminating generalised substitution
 -----------------------------------------------------------------------------
 
 Note that termination is not the same as idempotence.  To apply S to a
@@ -814,7 +816,7 @@ Main Theorem [Stability under extension]
       (T3) lhs not in t      -- No occurs check in the work item
           -- If lhs is a type family application, we require only that
           -- lhs is not *rewritable* in t. See Note [Rewritable] and
-          -- Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+          -- Note [EqCt occurs check] in GHC.Tc.Types.Constraint.
 
       AND, for every (lhs1 -fs-> s) in S:
            (K0) not (fw >= fs)
@@ -849,7 +851,7 @@ The idea is that
 
 * T3 is guaranteed by an occurs-check on the work item.
   This is done during canonicalisation, in checkTypeEq; invariant
-  (TyEq:OC) of CEqCan. See also Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
+  (TyEq:OC) of CEqCan. See also Note [EqCt occurs check] in GHC.Tc.Types.Constraint.
 
 * (K1-3) are the "kick-out" criteria.  (As stated, they are really the
   "keep" criteria.) If the current inert S contains a triple that does
@@ -1633,13 +1635,13 @@ mightEqualLater inert_set given_pred given_loc wanted_pred wanted_loc
       | otherwise
       = False
 
-    -- like startSolvingByUnification, but allows cbv variables to unify
+    -- Like checkTopShape, but allows cbv variables to unify
     can_unify :: TcTyVar -> MetaInfo -> Type -> Bool
     can_unify _lhs_tv TyVarTv rhs_ty  -- see Example 3 from the Note
       | Just rhs_tv <- getTyVar_maybe rhs_ty
       = case tcTyVarDetails rhs_tv of
           MetaTv { mtv_info = TyVarTv } -> True
-          MetaTv {}                     -> False  -- could unify with anything
+          MetaTv {}                     -> False  -- Could unify with anything
           SkolemTv {}                   -> True
           RuntimeUnk                    -> True
       | otherwise  -- not a var on the RHS
@@ -1811,7 +1813,7 @@ lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
 -- to avoid #20231. This function (and its one usage site) is the only reason
 -- that we store a stack instead of just the top environment.
   | Just tyfam_app <- assert (isCycleBreakerTyVar cbv) $
-                      firstJusts (NE.map (lookup cbv) cbvs_stack)
+                      firstJusts (NE.map (lookupBag cbv) cbvs_stack)
   = tyfam_app
   | otherwise
   = pprPanic "lookupCycleBreakerVar found an unbound cycle breaker" (ppr cbv $$ ppr cbvs_stack)
@@ -1819,15 +1821,16 @@ lookupCycleBreakerVar cbv (IS { inert_cycle_breakers = cbvs_stack })
 -- | Push a fresh environment onto the cycle-breaker var stack. Useful
 -- when entering a nested implication.
 pushCycleBreakerVarStack :: CycleBreakerVarStack -> CycleBreakerVarStack
-pushCycleBreakerVarStack = ([] <|)
+pushCycleBreakerVarStack = (emptyBag <|)
 
 -- | Add a new cycle-breaker binding to the top environment on the stack.
-insertCycleBreakerBinding :: TcTyVar   -- ^ cbv, must be a CycleBreakerTv
-                          -> TcType    -- ^ cbv's expansion
-                          -> CycleBreakerVarStack -> CycleBreakerVarStack
-insertCycleBreakerBinding cbv expansion (top_env :| rest_envs)
-  = assert (isCycleBreakerTyVar cbv) $
-    ((cbv, expansion) : top_env) :| rest_envs
+addCycleBreakerBindings :: Bag (TcTyVar, Type)   -- ^ (cbv,expansion) pairs
+                        -> InertSet -> InertSet
+addCycleBreakerBindings prs ics
+  = assertPpr (all (isCycleBreakerTyVar . fst) prs) (ppr prs) $
+    ics { inert_cycle_breakers = add_to (inert_cycle_breakers ics) }
+  where
+    add_to (top_env :| rest_envs) = (prs `unionBags` top_env) :| rest_envs
 
 -- | Perform a monadic operation on all pairs in the top environment
 -- in the stack.

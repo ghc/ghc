@@ -8,17 +8,16 @@ module GHC.Tc.Solver.Equality(
 
 import GHC.Prelude
 
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
-import GHC.Tc.Utils.Unify
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.TcMType( promoteMetaTyVarTo )
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Types( findFunEqsByTyCon )
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
 
@@ -635,8 +634,8 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
        ; let redn1 = mkReduction co1 ty1'
 
        ; new_ev <- rewriteEqEvidence emptyRewriterSet ev' swapped
-                     redn1
-                     (mkReflRedn Representational ps_ty2)
+                     redn1 (mkReflRedn Representational ps_ty2)
+
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
 
 ---------
@@ -1375,8 +1374,8 @@ But if w2 is swapped around, to
 
     [W] w3 : F beta ~ F a
 
-then we'll kick w1 out of the inert
-set (it mentions the LHS of w3). We then rewrite w1 to
+then we'll kick w1 out of the inert set (it mentions the LHS of w3). We then
+rewrite w1 to
 
     [W] w4 : UnF (F a) ~ beta
 
@@ -1498,13 +1497,13 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ki1 xi2 ki2
                                         -- will have k2 ~ k1, so flip it to k1 ~ k2
           NotSwapped -> id
 
--- guaranteed that typeKind lhs == typeKind rhs
 canEqCanLHSHomo :: CtEvidence
                 -> EqRel -> SwapFlag
                 -> CanEqLHS           -- lhs (or, if swapped, rhs)
                 -> TcType             -- pretty lhs
                 -> TcType -> TcType   -- rhs, pretty rhs
                 -> TcS (StopOrContinue Ct)
+-- Guaranteed that typeKind lhs == typeKind rhs
 canEqCanLHSHomo ev eq_rel swapped lhs1 ps_xi1 xi2 ps_xi2
   | (xi2', mco) <- split_cast_ty xi2
   , Just lhs2 <- canEqLHS_maybe xi2'
@@ -1531,25 +1530,27 @@ canEqCanLHS2 :: CtEvidence              -- lhs ~ (rhs |> mco)
 canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
   | lhs1 `eqCanEqLHS` lhs2
     -- It must be the case that mco is reflexive
-  = canEqReflexive ev eq_rel (canEqLHSType lhs1)
+  = canEqReflexive ev eq_rel lhs1_ty
 
   | TyVarLHS tv1 <- lhs1
   , TyVarLHS tv2 <- lhs2
-  , swapOverTyVars (isGiven ev) tv1 tv2
-  = do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
-       ; new_ev <- do_swap
-       ; canEqCanLHSFinish new_ev eq_rel IsSwapped (TyVarLHS tv2)
-                                                   (ps_xi1 `mkCastTyMCo` sym_mco) }
+  = -- See Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
+    do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
+       ; if swapOverTyVars (isGiven ev) tv1 tv2
+         then finish_with_swapping
+         else finish_without_swapping }
 
-  | TyVarLHS tv1 <- lhs1
-  , TyFamLHS fun_tc2 fun_args2 <- lhs2
-  = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
+  | TyVarLHS {} <- lhs1
+  , TyFamLHS {} <- lhs2
+  = if put_tyvar_on_lhs
+    then finish_without_swapping
+    else finish_with_swapping
 
-  | TyFamLHS fun_tc1 fun_args1 <- lhs1
-  , TyVarLHS tv2 <- lhs2
-  = do { new_ev <- do_swap
-       ; canEqTyVarFunEq new_ev eq_rel IsSwapped tv2 ps_xi2
-                                                 fun_tc1 fun_args1 ps_xi1 sym_mco }
+  | TyFamLHS {} <- lhs1
+  , TyVarLHS {} <- lhs2
+  = if put_tyvar_on_lhs
+    then finish_with_swapping
+    else finish_without_swapping
 
   | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyFamLHS fun_tc2 fun_args2 <- lhs2
@@ -1599,83 +1600,95 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
        ; let tvs1 = tyCoVarsOfTypes fun_args1
              tvs2 = tyCoVarsOfTypes fun_args2
 
+             -- See Note [Orienting TyFamLHS/TyFamLHS]
+             swap_for_size = typesSize fun_args2 > typesSize fun_args1
+
+             -- See Note [Orienting TyFamLHS/TyFamLHS]
              swap_for_rewriting = anyVarSet (isTouchableMetaTyVar tclvl) tvs2 &&
-                          -- swap 'em: Note [Put touchable variables on the left]
+                                  -- See Note [Put touchable variables on the left]
                                   not (anyVarSet (isTouchableMetaTyVar tclvl) tvs1)
-                          -- this check is just to avoid unfruitful swapping
+                                  -- This second check is just to avoid unfruitful swapping
 
-               -- If we have F a ~ F (F a), we want to swap.
-             swap_for_occurs
-               | cterHasNoProblem   $ checkTyFamEq fun_tc2 fun_args2
-                                                   (mkTyConApp fun_tc1 fun_args1)
-               , cterHasOccursCheck $ checkTyFamEq fun_tc1 fun_args1
-                                                   (mkTyConApp fun_tc2 fun_args2)
-               = True
-
-               | otherwise
-               = False
-
-       ; if swap_for_rewriting || swap_for_occurs
-         then do { new_ev <- do_swap
-                 ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
+       ; if swap_for_rewriting || swap_for_size
+         then finish_with_swapping
          else finish_without_swapping }
-
-  -- that's all the special cases. Now we just figure out which non-special case
-  -- to continue to.
-  | otherwise
-  = finish_without_swapping
-
   where
     sym_mco = mkSymMCo mco
+    role    = eqRelRole eq_rel
+    lhs1_ty  = canEqLHSType lhs1
+    lhs2_ty  = canEqLHSType lhs2
 
-    do_swap = rewriteCastedEquality ev eq_rel swapped (canEqLHSType lhs1) (canEqLHSType lhs2) mco
-    finish_without_swapping = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+    finish_without_swapping
+      = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
 
+    -- Swapping. We have   ev : lhs1 ~ lhs2 |> co
+    -- We swap to      new_ev : lhs2 ~ lhs1 |> sym co
+    --                     ev = grefl1 ; sym new_ev ; grefl2
+    --      where grefl1 : lhs1 ~ lhs1 |> sym co
+    --            grefl2 : lhs2 ~ lhs2 |> co
+    finish_with_swapping
+      = do { let lhs1_redn = mkGReflRightMRedn role lhs1_ty sym_mco
+                 lhs2_redn = mkGReflLeftMRedn  role lhs2_ty mco
+           ; new_ev <-rewriteEqEvidence emptyRewriterSet ev swapped lhs1_redn lhs2_redn
+           ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
 
--- This function handles the case where one side is a tyvar and the other is
--- a type family application. Which to put on the left?
---   If the tyvar is a touchable meta-tyvar, put it on the left, as this may
---   be our only shot to unify.
---   Otherwise, put the function on the left, because it's generally better to
---   rewrite away function calls. This makes types smaller. And it seems necessary:
---     [W] F alpha ~ alpha
---     [W] F alpha ~ beta
---     [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
---   If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
---   Test case: indexed-types/should_compile/CEqCanOccursCheck
-canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
-                                            -- or (rhs |> mco) ~ lhs if swapped
-                -> EqRel -> SwapFlag
-                -> TyVar -> TcType          -- lhs (or if swapped rhs), pretty lhs
-                -> TyCon -> [Xi] -> TcType  -- rhs (or if swapped lhs) fun and args, pretty rhs
-                -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
-                -> TcS (StopOrContinue Ct)
-canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv1 rhs
-       ; if | case is_touchable of { Untouchable -> False; _ -> True }
-            , cterHasNoProblem $
-                checkTyVarEq tv1 rhs `cterRemoveProblem` cteTypeFamily
-            -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
+    put_tyvar_on_lhs = isWanted ev && eq_rel == NomEq
+    -- See Note [Orienting TyVarLHS/TyFamLHS]
+    -- Same conditions as for canEqCanLHSFinish_try_unification
+    -- which we are setting ourselves up for here
 
-            | otherwise
-              -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
-                                  (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
-                                  mco
-                    ; canEqCanLHSFinish new_ev eq_rel IsSwapped
-                                  (TyFamLHS fun_tc2 fun_args2)
-                                  (ps_xi1 `mkCastTyMCo` sym_mco) } }
-  where
-    sym_mco = mkSymMCo mco
-    rhs = ps_xi2 `mkCastTyMCo` mco
+{- Note [Orienting TyVarLHS/TyFamLHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What if one side is a TyVarLHS and the other is a TyFamLHS, (a ~ F tys)?
+Which to put on the left?  Answer:
+
+* If there is no chance of unifying, put the type family on the left,
+  (F tys ~ a), because it's generally better to rewrite away function
+  calls.  See `put_tyvar_on_lhs` in canEqCanLHS2; and
+  Note [Orienting TyVarLHS/TyFamLHS]
+
+* But if there /is/ a chance of unifying, put the tyvar on the left,
+  (a ~ F tys), as this may be our only shot to unify. Again see
+  `put_tyvar_on_lhs`.
+
+* But if we /fail/ to unify then flip back to (F tys ~ a) because it's
+  generally better to rewrite away function calls. See the call to
+  `swapAndFinish` in `canEqCanLHSFinish_try_unification`
+
+  It's important to flip back. Consider
+    [W] F alpha ~ alpha
+    [W] F alpha ~ beta
+    [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
+  If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
+  Test case: indexed-types/should_compile/CEqCanOccursCheck
+
+Note [Orienting TyFamLHS/TyFamLHS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have a TyFamLHS on both sides, we choose how to orient it.
+
+* swap_for_size.  If we have
+      S a ~ F (G (H (Maybe a)))
+  then we swap so that we tend to rewrite the bigger type (F (G (H (Maybe a))))
+  into the smaller one (S a).  This same test tends to avoid occurs-check
+  errors.  E.g.
+      S g ~ F (G (S g))
+  Here (S g) occurs on the RHS, so this is not canonical.  But if we swap it
+  around, it /is/ canonical
+      F (G (S g)) ~ S g
+
+* swap_for_rewriting: put touchable meta-tyvars on the left:
+  see Note [Put touchable variables on the left]
+-}
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
-canEqCanLHSFinish :: CtEvidence
-                  -> EqRel -> SwapFlag
-                  -> CanEqLHS             -- lhs (or, if swapped, rhs)
-                  -> TcType               -- rhs (or, if swapped, lhs)
-                  -> TcS (StopOrContinue Ct)
-canEqCanLHSFinish ev eq_rel swapped lhs rhs
+canEqCanLHSFinish, canEqCanLHSFinish_try_unification,
+                   canEqCanLHSFinish_no_unification
+    :: CtEvidence
+    -> EqRel -> SwapFlag
+    -> CanEqLHS             -- lhs (or, if swapped, rhs)
+    -> TcType               -- rhs (or, if swapped, lhs)
+    -> TcS (StopOrContinue Ct)
     -- RHS is fully rewritten, but with type synonyms
     --   preserved as much as possible
     -- Guaranteed preconditions that
@@ -1683,71 +1696,25 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
     --    (TyEq:N)  checked in can_eq_nc'
     --    (TyEq:TV) handled in canEqCanLHS2
 
-  = do { -- rewriteEqEvidence performs the swap if necessary
-         new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
-                                     (mkReflRedn role lhs_ty)
-                                     (mkReflRedn role rhs)
+---------------------------
+canEqCanLHSFinish ev eq_rel swapped lhs rhs
+  = do { traceTcS "canEqCanLHSFinish" $
+         vcat [ text "ev:" <+> ppr ev
+              , text "swapped:" <+> ppr swapped
+              , text "lhs:" <+> ppr lhs
+              , text "rhs:" <+> ppr rhs ]
 
-       -- Assertion: (TyEq:K) is already satisfied
+         -- Assertion: (TyEq:K) is already satisfied
        ; massert (canEqLHSKind lhs `eqType` typeKind rhs)
 
-       -- Assertion: (TyEq:N) is already satisfied (if applicable)
+         -- Assertion: (TyEq:N) is already satisfied (if applicable)
        ; assertPprM ty_eq_N_OK $
            vcat [ text "CanEqCanLHSFinish: (TyEq:N) not satisfied"
                 , text "rhs:" <+> ppr rhs ]
 
-       -- Do checkTypeEq to guarantee (TyEq:OC), (TyEq:F)
-       -- Must do the occurs check even on tyvar/tyvar equalities,
-       -- in case have  x ~ (y :: ..x...); this is #12593.
-       ; let result0 = checkTypeEq lhs rhs `cterRemoveProblem` cteTypeFamily
-                       -- cterRemoveProblem cteTypeFamily: type families are OK here
-                       -- NB: no occCheckExpand here; see Note [Rewriting synonyms]
-                       --     in GHC.Tc.Solver.Rewrite
+       ; canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs }
 
-             -- (a ~R# b a) is soluble if b later turns out to be Identity
-             result = case eq_rel of
-                        NomEq  -> result0
-                        ReprEq -> cterSetOccursCheckSoluble result0
-
-             non_canonical_result what
-                = do { traceTcS ("canEqCanLHSFinish: " ++ what) (ppr lhs $$ ppr rhs)
-                     ; solveIrredEquality (NonCanonicalReason result) new_ev }
-
-       ; if cterHasNoProblem result
-         then do { traceTcS "CEqCan" (ppr lhs $$ ppr rhs)
-                 ; ics <- getInertCans
-                 ; interactEq ics (EqCt { eq_ev = new_ev, eq_eq_rel = eq_rel
-                                        , eq_lhs = lhs, eq_rhs = rhs }) }
-
-         else do { m_stuff <- breakTyEqCycle_maybe ev result lhs rhs
-                           -- See Note [Type equality cycles];
-                           -- returning Nothing is the vastly common case
-                 ; case m_stuff of
-                     { Nothing -> non_canonical_result "Can't make canonical"
-
-
-                     ; Just rhs_redn@(Reduction _ new_rhs) ->
-              do { traceTcS "canEqCanLHSFinish breaking a cycle" $
-                      vcat [ text "lhs:" <+> ppr lhs, text "rhs:" <+> ppr rhs
-                           , text "new_rhs:" <+> ppr new_rhs ]
-
-                   -- This check is Detail (1) in the Note
-                 ; if cterHasOccursCheck (checkTypeEq lhs new_rhs)
-                   then non_canonical_result "Note [Type equality cycles] Detail (1)"
-
-                   else do { -- See Detail (6) of Note [Type equality cycles]
-                             new_new_ev <- rewriteEqEvidence emptyRewriterSet
-                                             new_ev NotSwapped
-                                             (mkReflRedn Nominal lhs_ty)
-                                             rhs_redn
-                           ; ics <- getInertCans
-                           ; interactEq ics (EqCt { eq_ev = new_new_ev, eq_eq_rel = eq_rel
-                                                  , eq_lhs = lhs, eq_rhs = new_rhs }) }}}}}
   where
-    role = eqRelRole eq_rel
-
-    lhs_ty = canEqLHSType lhs
-
     -- This is about (TyEq:N): check that we don't have a saturated application
     -- of a newtype TyCon at the top level of the RHS, if the constructor
     -- of the newtype is in scope.
@@ -1765,13 +1732,177 @@ canEqCanLHSFinish ev eq_rel swapped lhs rhs
       | otherwise
       = return True
 
+-----------------------
+canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
+  -- Try unification; for Wanted, Nominal equalities with a meta-tyvar on the LHS
+  | isWanted ev      -- See Note [Do not unify Givens]
+  , NomEq <- eq_rel  -- See Note [Do not unify representational equalities]
+  , TyVarLHS tv <- lhs
+  = do { given_eq_lvl <- getInnermostGivenEqLevel
+       ; if not (touchabilityAndShapeTest given_eq_lvl tv rhs)
+         then if | Just can_rhs <- canTyFamEqLHS_maybe rhs
+                 -> swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
+                    -- See Note [Orienting TyVarLHS/TyFamLHS]
+
+                 | otherwise
+                 -> canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
+         else
+
+    -- We have a touchable unification variable on the left
+    do { check_result <- checkTouchableTyVarEq ev tv rhs
+       ; case check_result of {
+            PuFail reason
+              | Just can_rhs <- canTyFamEqLHS_maybe rhs
+              -> swapAndFinish ev eq_rel swapped (mkTyVarTy tv) can_rhs
+                -- Swap back: see Note [Orienting TyVarLHS/TyFamLHS]
+
+              | reason `cterHasOnlyProblems` do_not_prevent_rewriting
+              -> canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
+
+              | otherwise
+              -> tryIrredInstead reason ev eq_rel swapped lhs rhs ;
+
+            PuOK rhs_redn _ ->
+
+    -- Success: we can solve by unification
+    do { -- In the common case where rhs_redn is Refl, we don't need to rewrite
+         -- the evidence even if swapped=IsSwapped.   Suppose the original was
+         --     [W] co : Int ~ alpha
+         -- We unify alpha := Int, and set co := <Int>.  No need to
+         -- swap to   co = sym co'
+         --           co' = <Int>
+         new_ev <- if isReflCo (reductionCoercion rhs_redn)
+                   then return ev
+                   else rewriteEqEvidence emptyRewriterSet ev swapped
+                            (mkReflRedn Nominal (mkTyVarTy tv)) rhs_redn
+
+       ; let tv_ty     = mkTyVarTy tv
+             final_rhs = reductionReducedType rhs_redn
+             tv_lvl    = tcTyVarLevel tv
+
+       ; traceTcS "Sneaky unification:" $
+         vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr final_rhs,
+               text "Coercion:" <+> pprEq tv_ty final_rhs,
+               text "Left Kind is:" <+> ppr (typeKind tv_ty),
+               text "Right Kind is:" <+> ppr (typeKind final_rhs) ]
+
+       -- Update the unification variable itself
+       ; unifyTyVar tv final_rhs
+
+       -- Provide Refl evidence for the constraint
+       -- Ignore 'swapped' because it's Refl!
+       ; setEvBindIfWanted new_ev IsCoherent $
+         evCoercion (mkNomReflCo final_rhs)
+
+       -- Set the unification flag if we have done outer unifications
+       -- that might affect an earlier implication constraint
+       ; ambient_lvl <- getTcLevel
+       ; when (ambient_lvl `strictlyDeeperThan` tv_lvl) $
+         setUnificationFlag tv_lvl
+
+       -- Kick out any constraints that can now be rewritten
+       ; n_kicked <- kickOutAfterUnification tv
+
+       ; return (Stop new_ev (text "Solved by unification" <+> pprKicked n_kicked)) }}}}
+
+  -- Otherwise unification is off the table
+  | otherwise
+  = canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
+
+  where
+    -- Some problems prevent /unification/ but not /rewriting/
+    -- Skolem-escape: if we have [W] alpha[2] ~ Maybe b[3]
+    --    we can't unify (skolem-escape); but it /is/ canonical,
+    --    and hence we /can/ use it for rewriting
+    -- Concrete-ness:  alpha[conc] ~ b[sk]
+    --    We can use it to rewrite; we still have to solve the original
+    -- Coercion holes: see wrinkle (2) of
+    --    Note [Equalities with incompatible kinds]
+    do_not_prevent_rewriting :: CheckTyEqResult
+    do_not_prevent_rewriting = cteProblem cteSkolemEscape S.<>
+                               cteProblem cteConcrete     S.<>
+                               cteProblem cteCoercionHole
+
+---------------------------
+-- Unification is off the table
+canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
+  = do { -- Do checkTypeEq to guarantee (TyEq:OC), (TyEq:F)
+         -- Must do the occurs check even on tyvar/tyvar equalities,
+         -- in case have  x ~ (y :: ..x...); this is #12593.
+       ; check_result <- checkTypeEq ev eq_rel lhs rhs
+
+       ; let lhs_ty = canEqLHSType lhs
+       ; case check_result of
+            PuFail reason
+
+              -- If we had F a ~ G (F a), which gives an occurs check,
+              -- then swap it to G (F a) ~ F a, which does not
+              -- However `swap_for_size` above will orient it with (G (F a)) on
+              -- the left anwyway, so the next four lines of code are redundant
+              -- I'm leaving them here in case they become relevant again
+--              | TyFamLHS {} <- lhs
+--              , Just can_rhs <- canTyFamEqLHS_maybe rhs
+--              , reason `cterHasOnlyProblem` cteSolubleOccurs
+--              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
+--              | otherwise
+
+              -> tryIrredInstead reason ev eq_rel swapped lhs rhs
+
+            PuOK rhs_redn _
+              -> do { new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                                   (mkReflRedn (eqRelRole eq_rel) lhs_ty)
+                                   rhs_redn
+
+                    -- Important: even if the coercion is Refl,
+                    --   * new_ev has reductionReducedType on the RHS
+                    --   * eq_rhs is set to reductionReducedType
+                    -- See Note [Forgetful synonyms in checkTyConApp] in GHC.Tc.Utils.Unify
+                    ; interactEq (EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
+                                       , eq_lhs = lhs
+                                       , eq_rhs = reductionReducedType rhs_redn }) } }
+
+----------------------
+swapAndFinish :: CtEvidence -> EqRel -> SwapFlag
+              -> TcType -> CanEqLHS      -- ty ~ F tys
+              -> TcS (StopOrContinue Ct)
+-- We have an equality alpha ~ F tys, that we can't unify e.g because 'tys'
+-- mentions alpha, it would not be a canonical constraint as-is.
+-- We want to flip it to (F tys ~ a), whereupon it is canonical
+swapAndFinish ev eq_rel swapped lhs_ty can_rhs
+  = do { new_ev <- rewriteEqEvidence emptyRewriterSet ev (flipSwap swapped)
+                       (mkReflRedn role (canEqLHSType can_rhs))
+                       (mkReflRedn role lhs_ty)
+       ; interactEq (EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
+                          , eq_lhs = can_rhs, eq_rhs = lhs_ty }) }
+  where
+    role = eqRelRole eq_rel
+
+----------------------
+tryIrredInstead :: CheckTyEqResult -> CtEvidence -> EqRel -> SwapFlag
+                -> CanEqLHS -> TcType -> TcS (StopOrContinue Ct)
+-- We have a non-canonical equality
+-- We still swap it if 'swapped' says so, so that it is oriented
+-- in the direction that the error message reporting machinery
+-- expects it; e.g.  (m ~ t m) rather than (t m ~ m)
+-- This is not very important, and only affects error reporting.
+tryIrredInstead reason ev eq_rel swapped lhs rhs
+  = do { traceTcS "cantMakeCanonical" (ppr reason $$ ppr lhs $$ ppr rhs)
+       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                       (mkReflRedn role (canEqLHSType lhs))
+                       (mkReflRedn role rhs)
+       ; solveIrredEquality (NonCanonicalReason reason) new_ev }
+  where
+    role = eqRelRole eq_rel
+
+-----------------------
 -- | Solve a reflexive equality constraint
 canEqReflexive :: CtEvidence    -- ty ~ ty
                -> EqRel
                -> TcType        -- ty
                -> TcS (StopOrContinue Ct)   -- always Stop
 canEqReflexive ev eq_rel ty
-  = do { setEvBindIfWanted ev IsCoherent (evCoercion $ mkReflCo (eqRelRole eq_rel) ty)
+  = do { setEvBindIfWanted ev IsCoherent $
+         evCoercion (mkReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
 {- Note [Equalities with incompatible kinds]
@@ -1806,8 +1937,15 @@ Wrinkles:
      and unifying alpha effectively promotes this wanted to a given. Doing so
      means we lose track of the rewriter set associated with the wanted.
 
+     Another way to say it: we must not have a co_hole in a Given, and
+     unification effectively makes a Given.  (This is not very well motivated;
+     may need to dig deeper if anything goes wrong.)
+
      On the other hand, w is perfectly suitable for rewriting, because of the
-     way we carefully track rewriter sets.
+     way we carefully track rewriter sets.  So we include cteCoercionHole in
+     `do_not_prevent_rewriting` in `canEqCanLHSFinish_try_unification`. (Side
+     note: I think this is an open choice. Maybe we'd get better error
+     messages if we did not use these equalities for rewriting.)
 
      We thus allow w to be a CEqCan, but we prevent unification. See
      Note [Unification preconditions] in GHC.Tc.Utils.Unify.
@@ -1823,18 +1961,19 @@ Wrinkles:
      [W] (a :: k1) ~ ((rhs |> sym co) :: k1) to the irreducibles. Some time
      later, we solve co, and fill in co's coercion hole. This kicks out
      the irreducible as described in (2).
-     But now, during canonicalization, we see the cast
-     and remove it, in canEqCast. By the time we get into canEqCanLHS, the equality
-     is heterogeneous again, and the process repeats.
 
-     To avoid this, we don't strip casts off a type if the other type
-     in the equality is a CanEqLHS (the scenario above can happen with a
-     type family, too. testcase: typecheck/should_compile/T13822).
-     And this is an improvement regardless:
-     because tyvars can, generally, unify with casted types, there's no
-     reason to go through the work of stripping off the cast when the
-     cast appears opposite a tyvar. This is implemented in the cast case
-     of can_eq_nc'.
+     But now, during canonicalization, we see the cast and remove it, in
+     canEqCast. By the time we get into canEqCanLHS, the equality is
+     heterogeneous again, and the process repeats.
+
+     To avoid this, we don't strip casts off a type if the other type in the
+     equality is a CanEqLHS (the scenario above can happen with a type
+     family, too. testcase: typecheck/should_compile/T13822).
+
+     And this is an improvement regardless: because tyvars can, generally,
+     unify with casted types, there's no reason to go through the work of
+     stripping off the cast when the cast appears opposite a tyvar. This is
+     implemented in the cast case of can_eq_nc'.
 
 Historical note:
 
@@ -1911,10 +2050,10 @@ use them for rewriting. (NB: A rigid type constructor is at the
 top of all RHSs, preventing reorienting in canEqTyVarFunEq in the tyvar
 cases.)
 
-The key idea is to replace the outermost type family applications in the RHS of the
-starred constraints with a fresh variable, which we'll call a cycle-breaker
-variable, or cbv. Then, relate the cbv back with the original type family application
-via new equality constraints. Our situations thus become:
+The key idea is to replace the outermost type family applications in the RHS of
+the starred constraints with a fresh variable, which we'll call a cycle-breaker
+variable, or cbv. Then, relate the cbv back with the original type family
+application via new equality constraints. Our situations thus become:
 
   instance C (Maybe b)
   [G] a ~ Maybe cbv
@@ -1936,32 +2075,34 @@ or
   [W] Code a ~ '[ '[ alpha ] ]
 
 This transformation (creating the new types and emitting new equality
-constraints) is done in breakTyEqCycle_maybe.
+constraints) is done by the `FamAppBreaker` field of `TEFA_Break`, which
+in turn lives in the `tef_fam_app` field of `TyEqFlags`.  And that in
+turn controls the behaviour of the workhorse: GHC.Tc.Utils.Unify.checkTyEqRhs.
 
 The details depend on whether we're working with a Given or a Wanted.
 
 Given
 -----
+We emit a new Given, [G] F a ~ cbv, equating the type family application
+to our new cbv. This is actually done by `break_given` in
+`GHC.Tc.Solver.Monad.checkTypeEq`.
 
-We emit a new Given, [G] F a ~ cbv, equating the type family application to
-our new cbv. Note its orientation: The type family ends up on the left; see
-commentary on canEqTyVarFunEq, which decides how to orient such cases. No
-special treatment for CycleBreakerTvs is necessary. This scenario is now
-easily soluble, by using the first Given to rewrite the Wanted, which can now
-be solved.
+Note its orientation: The type family ends up on the left; see
+Note [Orienting TyFamLHS/TyFamLHS]d. No special treatment for
+CycleBreakerTvs is necessary. This scenario is now easily soluble, by using
+the first Given to rewrite the Wanted, which can now be solved.
 
 (The first Given actually also rewrites the second one, giving
 [G] F (Maybe cbv) ~ cbv, but this causes no trouble.)
 
-Of course, we don't want our fresh variables leaking into e.g. error messages.
-So we fill in the metavariables with their original type family applications
-after we're done running the solver (in nestImplicTcS and runTcSWithEvBinds).
-This is done by restoreTyVarCycles, which uses the inert_cycle_breakers field in
-InertSet, which contains the pairings invented in breakTyEqCycle_maybe.
+Of course, we don't want our fresh variables leaking into e.g. error
+messages.  So we fill in the metavariables with their original type family
+applications after we're done running the solver (in nestImplicTcS and
+runTcSWithEvBinds).  This is done by `restoreTyVarCycles`, which uses the
+`inert_cycle_breakers` field in InertSet, which contains the pairings
+invented in `break_given`.
 
-That is:
-
-We transform
+That is, we transform
   [G] g : lhs ~ ...(F lhs)...
 to
   [G] (Refl lhs) : F lhs ~ cbv      -- CEqCan
@@ -1972,10 +2113,10 @@ Note that
 * `cbv` is a is a meta-tyvar, but it is completely untouchable.
 * We track the cycle-breaker variables in inert_cycle_breakers in InertSet
 * We eventually fill in the cycle-breakers, with `cbv := F lhs`.
-  No one else fills in cycle-breakers!
+  No one else fills in CycleBreakerTvs!
 * The evidence for the new `F lhs ~ cbv` constraint is Refl, because we know
   this fill-in is ultimately going to happen.
-* In inert_cycle_breakers, we remember the (cbv, F lhs) pair; that is, we
+* In `inert_cycle_breakers`, we remember the (cbv, F lhs) pair; that is, we
   remember the /original/ type.  The [G] F lhs ~ cbv constraint may be rewritten
   by other givens (eg if we have another [G] lhs ~ (b,c)), but at the end we
   still fill in with cbv := F lhs
@@ -1984,9 +2125,12 @@ Note that
 
 Wanted
 ------
-The fresh cycle-breaker variables here must actually be normal, touchable
-metavariables. That is, they are TauTvs. Nothing at all unusual. Repeating
-the example from above, we have
+First, we do not cycle-break unless the LHS is a unifiable type variable
+See Note [Don't cycle-break Wanteds when not unifying] in GHC.Tc.Solver.Monad.
+
+OK, so suppose the LHS is a unifiable type variable.  The fresh cycle-breaker
+variables here must actually be normal, touchable metavariables. That is, they
+are TauTvs. Nothing at all unusual. Repeating the example from above, we have
 
   *[W] alpha ~ (Arg alpha -> Res alpha)
 
@@ -1996,22 +2140,20 @@ and we turn this into
   [W] Arg alpha ~ cbv1
   [W] Res alpha ~ cbv2
 
-where cbv1 and cbv2 are fresh TauTvs. Why TauTvs? See [Why TauTvs] below.
+where cbv1 and cbv2 are fresh TauTvs.  This is actually done by `break_wanted`
+in `GHC.Tc.Solver.Monad.checkTouchableTyVarEq`.
+
+Why TauTvs? See [Why TauTvs] below.
 
 Critically, we emit the two new constraints (the last two above)
-directly instead of calling unifyWanted. (Otherwise, we'd end up unifying cbv1
-and cbv2 immediately, achieving nothing.)
-Next, we unify alpha := cbv1 -> cbv2, having eliminated the occurs check. This
-unification -- which must be the next step after breaking the cycles --
-happens in the course of normal behavior of top-level
-interactions, later in the solver pipeline. We know this unification will
-indeed happen because breakTyEqCycle_maybe, which decides whether to apply
-this logic, checks to ensure unification will succeed in its final_check.
-(In particular, the LHS must be a touchable tyvar, never a type family. We don't
-yet have an example of where this logic is needed with a type family, and it's
-unclear how to handle this case, so we're skipping for now.) Now, we're
-here (including further context from our original example, from the top of the
-Note):
+directly instead of calling unifyWanted. (Otherwise, we'd end up
+unifying cbv1 and cbv2 immediately, achieving nothing.)  Next, we
+unify alpha := cbv1 -> cbv2, having eliminated the occurs check. This
+unification happens immediately following a successful call to
+checkTouchableTyVarEq, in canEqCanLHSFinish_try_unification.
+
+Now, we're here (including further context from our original example,
+from the top of the Note):
 
   instance C (a -> b)
   [W] Arg (cbv1 -> cbv2) ~ cbv1
@@ -2080,62 +2222,54 @@ Note that we need to unify the cbvs here; if we did not, there would be
 no way to solve those constraints. That's why the cycle-breakers are
 ordinary TauTvs.
 
-In all cases
-------------
+How all this is implemented
+---------------------------
+We implement all this via the `TEFA_Break` constructor of `TyEqFamApp`,
+itself stored in the `tef_fam_app` field of `TyEqFlags`, which controls
+the behaviour of `GHC.Tc.Utils.Unify.checkTyEqRhs`.  The `TEFA_Break`
+stuff happens when `checkTyEqRhs` encounters a family application.
 
-We detect this scenario by the following characteristics:
- - a constraint with a soluble occurs-check failure
-   (as indicated by the cteSolubleOccurs bit set in a CheckTyEqResult
-   from checkTypeEq)
- - and a nominal equality
- - and either
-    - a Given flavour (but see also Detail (7) below)
-    - a Wanted flavour, with a touchable metavariable on the left
+We try the cycle-breaking trick:
+* For Wanteds, when there is a touchable unification variable on the left
+* For Givens, regardless of the LHS
 
-We don't use this trick for representational equalities, as there is no
-concrete use case where it is helpful (unlike for nominal equalities).
-Furthermore, because function applications can be CanEqLHSs, but newtype
-applications cannot, the disparities between the cases are enough that it
-would be effortful to expand the idea to representational equalities. A quick
-attempt, with
+EXCEPT that, in both cases, as `GHC.Tc.Solver.Monad.mkTEFA_Break` shows, we
+don't use this trick:
 
+* When the constraint we are looking at was itself created by cycle-breaking;
+  see Detail (7) below.
+
+* For representational equalities, as there is no concrete use case where it is
+  helpful (unlike for nominal equalities).
+
+  Furthermore, because function applications can be CanEqLHSs, but newtype
+  applications cannot, the disparities between the cases are enough that it
+  would be effortful to expand the idea to representational equalities. A quick
+  attempt, with
       data family N a b
-
       f :: (Coercible a (N a b), Coercible (N a b) b) => a -> b
       f = coerce
+  failed with "Could not match 'b' with 'b'." Further work is held off
+  until when we have a concrete incentive to explore this dark corner.
 
-failed with "Could not match 'b' with 'b'." Further work is held off
-until when we have a concrete incentive to explore this dark corner.
+More details:
 
-Details:
+ (1) We don't look under foralls, at all, in `checkTyEqRhs`.  There might be
+     a cyclic occurrence underneath, in a case like
+          [G] lhs ~ forall b. ... lhs ....
+     but it doesn't matter because we will classify the constraint as Irred,
+     so it will not be used for rewriting.
 
- (1) We don't look under foralls, at all, when substituting away type family
-     applications, because doing so can never be fruitful. Recall that we
-     are in a case like [G] lhs ~ forall b. ... lhs ....   Until we have a type
-     family that can pull the body out from a forall (e.g. type instance F (forall b. ty) = ty),
-     this will always be
-     insoluble. Note also that the forall cannot be in an argument to a
-     type family, or that outer type family application would already have
-     been substituted away.
+     Earlier versions required an extra, post-breaking, check.  Skipping this
+     check causes typecheck/should_fail/GivenForallLoop and polykinds/T18451 to
+     loop.  But now it is all simpler, with no need for a second check.
 
-     However, we still must check to make sure that breakTyEqCycle_maybe actually
-     succeeds in getting rid of all occurrences of the offending lhs. If
-     one is hidden under a forall, this won't be true. A similar problem can
-     happen if the variable appears only in a kind
-     (e.g. k ~ ... (a :: k) ...). So we perform an additional check after
-     performing the substitution. It is tiresome to re-run all of checkTypeEq
-     here, but reimplementing just the occurs-check is even more tiresome.
+ (2) Historical Note: our goal here is to avoid loops in rewriting. We can thus
+     skip looking in coercions, as we don't rewrite in coercions in the
+     algorithm in GHC.Solver.Rewrite.  This doesn't seem relevant any more.
+     We cycle break to make the constraint canonical.
 
-     Skipping this check causes typecheck/should_fail/GivenForallLoop and
-     polykinds/T18451 to loop.
-
- (2) Our goal here is to avoid loops in rewriting. We can thus skip looking
-     in coercions, as we don't rewrite in coercions in the algorithm in
-     GHC.Solver.Rewrite. (This is another reason
-     we need to re-check that we've gotten rid of all occurrences of the
-     offending variable.)
-
- (3) As we're substituting as described in this Note, we can build ill-kinded
+ (3) As we cycle-break as described in this Note, we can build ill-kinded
      types. For example, if we have Proxy (F a) b, where (b :: F a), then
      replacing this with Proxy cbv b is ill-kinded. However, we will later
      set cbv := F a, and so the zonked type will be well-kinded again.
@@ -2151,37 +2285,36 @@ Details:
      that we never assume anything about its structure, like that it has a
      result type or a RuntimeRep argument).
 
- (4) The evidence for the produced Givens is all just reflexive, because
-     we will eventually set the cycle-breaker variable to be the type family,
-     and then, after the zonk, all will be well. See also the notes at the
-     end of the Given section of this Note.
+ (4) The evidence for the produced Givens is all just reflexive, because we
+     will eventually set the cycle-breaker variable to be the type family, and
+     then, after the zonk, all will be well. See also the notes at the end of
+     the Given section of this Note.
 
- (5) The approach here is inefficient because it replaces every (outermost)
-     type family application with a type variable, regardless of whether that
-     particular appplication is implicated in the occurs check.  An alternative
-     would be to replce only type-family applications that mention the offending LHS.
-     For instance, we could choose to
-     affect only type family applications that mention the offending LHS:
-     e.g. in a ~ (F b, G a), we need to replace only G a, not F b. Furthermore,
-     we could try to detect cases like a ~ (F a, F a) and use the same
-     tyvar to replace F a. (Cf.
-     Note [Flattening type-family applications when matching instances]
-     in GHC.Core.Unify, which
-     goes to this extra effort.) There may be other opportunities for
-     improvement. However, this is really a very small corner case.
-     The investment to craft a clever,
-     performant solution seems unworthwhile.
+ (5) The implementation in `checkTyEqRhs` is efficient because it only replaces
+     a type family application with a type variable, if that particular
+     appplication is implicated in the occurs check.  For example:
+         [W] alpha ~ Maybe (F alpha, G beta)
+     We'll end up calling GHC.Tc.Utils.Unify.checkFamApp
+       * On `F alpha`, which fail and calls the cycle-breaker in TEFA_Break
+       * On `G beta`, which succeeds no problem.
 
- (6) We often get the predicate associated with a constraint from its
-     evidence with ctPred. We thus must not only make sure the generated
-     CEqCan's fields have the updated RHS type (that is, the one produced
-     by replacing type family applications with fresh variables),
-     but we must also update the evidence itself. This is done by the call to rewriteEqEvidence
-     in canEqCanLHSFinish.
+     However, we make no attempt to detect cases like a ~ (F a, F a) and use the
+     same tyvar to replace F a. The constraint solver will common them up later!
+     (Cf. Note [Flattening type-family applications when matching instances] in
+     GHC.Core.Unify, which goes to this extra effort.) However, this is really
+     a very small corner case.  The investment to craft a clever, performant
+     solution seems unworthwhile.
+
+ (6) We often get the predicate associated with a constraint from its evidence
+     with ctPred. We thus must not only make sure the generated CEqCan's fields
+     have the updated RHS type (that is, the one produced by replacing type
+     family applications with fresh variables), but we must also update the
+     evidence itself. This is done by the call to rewriteEqEvidence in
+     canEqCanLHSFinish.
 
  (7) We don't wish to apply this magic on the equalities created
-     by this very same process.
-     Consider this, from typecheck/should_compile/ContextStack2:
+     by this very same process. Consider this, from
+     typecheck/should_compile/ContextStack2:
 
        type instance TF (a, b) = (TF a, TF b)
        t :: (a ~ TF (a, Int)) => ...
@@ -2207,25 +2340,18 @@ Details:
 
        [G] (TF cbv1, TF cbv2) ~ cbv1
 
-     which looks remarkably like the Given we started with. If left
-     unchecked, this will end up breaking cycles again, looping ad
-     infinitum (and resulting in a context-stack reduction error,
-     not an outright loop). The solution is easy: don't break cycles
-     on an equality generated by breaking cycles. Instead, we mark this
-     final Given as a CIrredCan with a NonCanonicalReason with the soluble
-     occurs-check bit set (only).
+     which looks remarkably like the Given we started with. If left unchecked,
+     this will end up breaking cycles again, looping ad infinitum (and
+     resulting in a context-stack reduction error, not an outright loop). The
+     solution is easy: don't break cycles on an equality generated by breaking
+     cycles. Instead, we mark this final Given as a CIrredCan with a
+     NonCanonicalReason with the soluble occurs-check bit set (only).
 
      We track these equalities by giving them a special CtOrigin,
-     CycleBreakerOrigin. This works for both Givens and Wanteds, as
-     we need the logic in the W case for e.g. typecheck/should_fail/T17139.
-     Because this logic needs to work for Wanteds, too, we cannot
-     simply look for a CycleBreakerTv on the left: Wanteds don't use them.
-
- (8) We really want to do this all only when there is a soluble occurs-check
-     failure, not when other problems arise (such as an impredicative
-     equality like alpha ~ forall a. a -> a). That is why breakTyEqCycle_maybe
-     uses cterHasOnlyProblem when looking at the result of checkTypeEq, which
-     checks for many of the invariants on a CEqCan.
+     CycleBreakerOrigin. This works for both Givens and Wanteds, as we need the
+     logic in the W case for e.g. typecheck/should_fail/T17139.  Because this
+     logic needs to work for Wanteds, too, we cannot simply look for a
+     CycleBreakerTv on the left: Wanteds don't use them.
 
 
 **********************************************************************
@@ -2234,22 +2360,6 @@ Details:
 *                                                                    *
 **********************************************************************
 -}
-
-rewriteCastedEquality :: CtEvidence     -- :: lhs ~ (rhs |> mco), or (rhs |> mco) ~ lhs
-                      -> EqRel -> SwapFlag
-                      -> TcType         -- lhs
-                      -> TcType         -- rhs
-                      -> MCoercion      -- mco
-                      -> TcS CtEvidence -- :: (lhs |> sym mco) ~ rhs
-                                        -- result is independent of SwapFlag
-rewriteCastedEquality ev eq_rel swapped lhs rhs mco
-  = rewriteEqEvidence emptyRewriterSet ev swapped lhs_redn rhs_redn
-  where
-    lhs_redn = mkGReflRightMRedn role lhs sym_mco
-    rhs_redn = mkGReflLeftMRedn  role rhs mco
-
-    sym_mco = mkSymMCo mco
-    role    = eqRelRole eq_rel
 
 rewriteEqEvidence :: RewriterSet        -- New rewriters
                                         -- See GHC.Tc.Types.Constraint
@@ -2355,25 +2465,24 @@ But it's not so simple:
   call to strictly_more_visible.
 -}
 
-interactEq :: InertCans -> EqCt -> TcS (StopOrContinue Ct)
-interactEq inerts
-  work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
+interactEq :: EqCt -> TcS (StopOrContinue Ct)
+interactEq work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
 
-  | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
-  = do { setEvBindIfWanted ev IsCoherent $
-         evCoercion (maybeSymCo swapped $
-                     downgradeRole (eqRelRole eq_rel)
-                                   (ctEvRole ev_i)
-                                   (ctEvCoercion ev_i))
-       ; stopWith ev "Solved from inert" }
+  = do { inerts <- getInertCans
+       ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
+            -> do { setEvBindIfWanted ev IsCoherent $
+                    evCoercion (maybeSymCo swapped $
+                                downgradeRole (eqRelRole eq_rel)
+                                              (ctEvRole ev_i)
+                                              (ctEvCoercion ev_i))
+                  ; stopWith ev "Solved from inert" }
 
-  | otherwise
-  = case lhs of
-       TyVarLHS tv -> tryToSolveByUnification tv work_item
-
-       TyFamLHS tc args -> do { improveLocalFunEqs inerts tc args work_item
-                              ; improveTopFunEqs tc args work_item
-                              ; finishEqCt work_item }
+            | otherwise
+            -> case lhs of
+                 TyVarLHS {}      -> finishEqCt work_item
+                 TyFamLHS tc args -> do { improveLocalFunEqs inerts tc args work_item
+                                        ; improveTopFunEqs tc args work_item
+                                        ; finishEqCt work_item } }
 
 
 inertsCanDischarge :: InertCans -> EqCt
@@ -2422,81 +2531,32 @@ inertsCanDischarge inerts (EqCt { eq_lhs = lhs_w, eq_rhs = rhs_w
 inertsCanDischarge _ _ = Nothing
 
 
-----------------------
--- We have a meta-tyvar on the left, and metaTyVarUpdateOK has said "yes"
--- So try to solve by unifying.
--- Three reasons why not:
---    Skolem escape
---    Given equalities (GADTs)
---    Unifying a TyVarTv with a non-tyvar type
-tryToSolveByUnification :: TcTyVar   -- LHS tyvar
-                        -> EqCt
-                        -> TcS (StopOrContinue Ct)
-tryToSolveByUnification tv
-  work_item@(EqCt { eq_rhs = rhs, eq_ev = ev, eq_eq_rel = eq_rel })
 
-  | ReprEq <- eq_rel   -- See Note [Do not unify representational equalities]
-  = do { traceTcS "Not unifying representational equality" (ppr work_item)
-       ; dont_unify }
+{- Note [Do not unify Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GADT match
+   data T a where
+      T1 :: T Int
+      ...
 
-  | otherwise
-  = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv rhs
-       ; traceTcS "tryToSolveByUnification" (vcat [ ppr tv <+> char '~' <+> ppr rhs
-                                                  , ppr is_touchable ])
+   f x = case x of
+           T1 -> True
+           ...
 
-       ; case is_touchable of
-           Untouchable -> dont_unify
-           -- For the latter two cases see Note [Solve by unification]
+So we get f :: T alpha[1] -> beta[1]
+          x :: T alpha[1]
+and from the T1 branch we get the implication
+   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
 
-           TouchableSameLevel -> solveByUnification ev tv rhs
+Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
+process [G] alpha[1] ~ Int, we don't have any given-equalities in the
+inert set, and hence there are no given equalities to make alpha untouchable.
 
-           TouchableOuterLevel free_metas tv_lvl
-             -> do { wrapTcS $ mapM_ (promoteMetaTyVarTo tv_lvl) free_metas
-                   ; setUnificationFlag tv_lvl
-                   ; solveByUnification ev tv rhs } }
-  where
-    dont_unify = finishEqCt work_item
+NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
+never happens: invariant (GivenInv) in Note [TcLevel invariants]
+in GHC.Tc.Utils.TcType.
 
-solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS (StopOrContinue Ct)
--- Solve with the identity coercion
--- Precondition: kind(xi) equals kind(tv)
--- Precondition: CtEvidence is Wanted
--- Precondition: CtEvidence is nominal
--- Returns: work_item where
---        work_item = the new Given constraint
---
--- NB: No need for an occurs check here, because solveByUnification always
---     arises from a CEqCan, a *canonical* constraint.  Its invariant (TyEq:OC)
---     says that in (a ~ xi), the type variable a does not appear in xi.
---     See GHC.Tc.Types.Constraint.Ct invariants.
---
--- Post: tv is unified (by side effect) with xi;
---       we often write tv := xi
-solveByUnification ev tv xi
-  = do { let tv_ty = mkTyVarTy tv
-       ; traceTcS "Sneaky unification:" $
-                       vcat [text "Unifies:" <+> ppr tv <+> text ":=" <+> ppr xi,
-                             text "Coercion:" <+> pprEq tv_ty xi,
-                             text "Left Kind is:" <+> ppr (typeKind tv_ty),
-                             text "Right Kind is:" <+> ppr (typeKind xi) ]
-       ; unifyTyVar tv xi
-       ; setEvBindIfWanted ev IsCoherent (evCoercion (mkNomReflCo xi))
-       ; n_kicked <- kickOutAfterUnification tv
-       ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
-
-{- Note [Avoid double unifications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The spontaneous solver has to return a given which mentions the unified unification
-variable *on the left* of the equality. Here is what happens if not:
-  Original wanted:  (a ~ alpha),  (alpha ~ Int)
-We spontaneously solve the first wanted, without changing the order!
-      given : a ~ alpha      [having unified alpha := a]
-Now the second wanted comes along, but it cannot rewrite the given, so we simply continue.
-At the end we spontaneously solve that guy, *reunifying*  [alpha := Int]
-
-We avoid this problem by orienting the resulting given so that the unification
-variable is on the left (note that alternatively we could attempt to
-enforce this at canonicalization).
+Simple solution: never unify in Givens!
 
 Note [Do not unify representational equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

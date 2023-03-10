@@ -1,4 +1,4 @@
-
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
@@ -23,7 +23,7 @@ module GHC.Core.TyCo.FVs
         almostDevoidCoVarOfCo,
 
         -- Injective free vars
-        injectiveVarsOfType, injectiveVarsOfTypes,
+        injectiveVarsOfType, injectiveVarsOfTypes, isInjectiveInType,
         invisibleVarsOfType, invisibleVarsOfTypes,
 
         -- Any and No Free vars
@@ -53,7 +53,7 @@ module GHC.Core.TyCo.FVs
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView )
+import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
 import {-# SOURCE #-} GHC.Core.Coercion( coercionLKind )
 
 import GHC.Builtin.Types.Prim( funTyFlagTyCon )
@@ -806,6 +806,28 @@ visVarsOfTypes = foldMap visVarsOfType
 *                                                                      *
 ********************************************************************* -}
 
+isInjectiveInType :: TyVar -> Type -> Bool
+-- True <=> tv /definitely/ appears injectively in ty
+-- A bit more efficient that (tv `elemVarSet` injectiveTyVarsOfType ty)
+-- Ignore occurence in coercions, and even in injective positions of
+-- type families.
+isInjectiveInType tv ty
+  = go ty
+  where
+    go ty | Just ty' <- rewriterView ty = go ty'
+    go (TyVarTy tv')                    = tv' == tv
+    go (AppTy f a)                      = go f || go a
+    go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
+    go (TyConApp tc tys)                = go_tc tc tys
+    go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
+                                          || (tv /= tv' && go ty)
+    go LitTy{}                          = False
+    go (CastTy ty _)                    = go ty
+    go CoercionTy{}                     = False
+
+    go_tc tc tys | isTypeFamilyTyCon tc = False
+                 | otherwise            = any go tys
+
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:
 --
@@ -836,24 +858,29 @@ injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
-    go ty                  | Just ty' <- coreView ty
-                           = go ty'
-    go (TyVarTy v)         = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)         = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)   =
-      case tyConInjectivityInfo tc of
-        Injective inj
-          |  look_under_tfs || not (isTypeFamilyTyCon tc)
-          -> mapUnionFV go $
-             filterByList (inj ++ repeat True) tys
+    go ty | Just ty' <- rewriterView ty = go ty'
+    go (TyVarTy v)                      = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)                      = go f `unionFV` go a
+    go (FunTy _ w ty1 ty2)              = go w `unionFV` go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)                = go_tc tc tys
+    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `unionFV` delFV tv (go ty)
+    go LitTy{}                          = emptyFV
+    go (CastTy ty _)                    = go ty
+    go CoercionTy{}                     = emptyFV
+
+    go_tc tc tys
+      | isTypeFamilyTyCon tc
+      = if | look_under_tfs
+           , Injective flags <- tyConInjectivityInfo tc
+           -> mapUnionFV go $
+              filterByList (flags ++ repeat True) tys
                          -- Oversaturated arguments to a tycon are
                          -- always injective, hence the repeat True
-        _ -> emptyFV
-    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) `unionFV` delFV tv (go ty)
-    go LitTy{}                   = emptyFV
-    go (CastTy ty _)             = go ty
-    go CoercionTy{}              = emptyFV
+           | otherwise   -- No injectivity info for this type family
+           -> emptyFV
+
+      | otherwise        -- Data type, injective in all positions
+      = mapUnionFV go tys
 
 -- | Returns the free variables of a 'Type' that are in injective positions.
 -- Specifically, it finds the free variables while:

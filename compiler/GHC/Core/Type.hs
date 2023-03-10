@@ -184,7 +184,7 @@ module GHC.Core.Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView,
+        coreView, coreFullView, rewriterView,
 
         tyConsOfType,
 
@@ -233,7 +233,7 @@ module GHC.Core.Type (
 
         -- * Kinds
         isTYPEorCONSTRAINT,
-        isConcrete, isFixedRuntimeRepKind,
+        isConcreteType, isFixedRuntimeRepKind,
     ) where
 
 import GHC.Prelude
@@ -361,6 +361,19 @@ import GHC.Data.Maybe   ( orElse, isJust )
 ************************************************************************
 -}
 
+rewriterView :: Type -> Maybe Type
+-- Unwrap a type synonym only when either:
+--   The type synonym is forgetful, or
+--   the type synonym mentions a type family in its expansion
+-- See Note [Rewriting synonyms]
+{-# INLINE rewriterView #-}
+rewriterView (TyConApp tc tys)
+  | isTypeSynonymTyCon tc
+  , isForgetfulSynTyCon tc || not (isFamFreeTyCon tc)
+  = expandSynTyConApp_maybe tc tys
+rewriterView _other
+  = Nothing
+
 coreView :: Type -> Maybe Type
 -- ^ This function strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
@@ -402,7 +415,11 @@ expandSynTyConApp_maybe :: TyCon -> [Type] -> Maybe Type
 expandSynTyConApp_maybe tc arg_tys
   | Just (tvs, rhs) <- synTyConDefn_maybe tc
   , arg_tys `saturates` tyConArity tc
-  = Just (expand_syn tvs rhs arg_tys)
+  = Just $! (expand_syn tvs rhs arg_tys)
+    -- Why strict application? Because every client of this function will evaluat
+    -- that (expand_syn ...) thunk, so it's more efficient not to build a thunk.
+    -- Mind you, this function is always INLINEd, so the client context is probably
+    -- enough to avoid thunk construction and so the $! is just belt-and-braces.
   | otherwise
   = Nothing
 
@@ -2204,14 +2221,27 @@ buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
 -- This function is here because here is where we have
 --   isFamFree and isTauTy
 buildSynTyCon name binders res_kind roles rhs
-  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
+  = mkSynonymTyCon name binders res_kind roles rhs
+                   is_tau is_fam_free is_forgetful is_concrete
   where
     is_tau       = isTauTy rhs
     is_fam_free  = isFamFreeTy rhs
-    is_forgetful = any (not . (`elemVarSet` tyCoVarsOfType rhs) . binderVar) binders ||
-                   uniqSetAny isForgetfulSynTyCon (tyConsOfType rhs)
-         -- NB: This is allowed to be conservative, returning True more often
+    is_concrete  = uniqSetAll isConcreteTyCon rhs_tycons
+         -- NB: is_concrete is allowed to be conservative, returning False
+         --     more often than it could.  e.g.
+         --       type S a b = b
+         --       type family F a
+         --       type T a = S (F a) a
+         -- We will mark T as not-concrete, even though (since S ignore its first
+         -- argument, it could be marked concrete.
+
+    is_forgetful = not (all ((`elemVarSet` rhs_tyvars) . binderVar) binders) ||
+                   uniqSetAny isForgetfulSynTyCon rhs_tycons
+         -- NB: is_forgetful is allowed to be conservative, returning True more often
          -- than it should. See comments on GHC.Core.TyCon.isForgetfulSynTyCon
+
+    rhs_tycons = tyConsOfType   rhs
+    rhs_tyvars = tyCoVarsOfType rhs
 
 {-
 ************************************************************************
@@ -2750,29 +2780,26 @@ argsHaveFixedRuntimeRep ty
     (bndrs, _) = splitPiTys ty
 
 -- | Checks that a kind of the form 'Type', 'Constraint'
--- or @'TYPE r@ is concrete. See 'isConcrete'.
+-- or @'TYPE r@ is concrete. See 'isConcreteType'.
 --
 -- __Precondition:__ The type has kind `TYPE blah` or `CONSTRAINT blah`
 isFixedRuntimeRepKind :: HasDebugCallStack => Kind -> Bool
 isFixedRuntimeRepKind k
   = assertPpr (isTYPEorCONSTRAINT k) (ppr k) $
     -- the isLiftedTypeKind check is necessary b/c of Constraint
-    isConcrete k
+    isConcreteType k
 
 -- | Tests whether the given type is concrete, i.e. it
 -- whether it consists only of concrete type constructors,
 -- concrete type variables, and applications.
 --
 -- See Note [Concrete types] in GHC.Tc.Utils.Concrete.
-isConcrete :: Type -> Bool
-isConcrete = go
+isConcreteType :: Type -> Bool
+isConcreteType = go
   where
-    go ty | Just ty' <- coreView ty = go ty'
     go (TyVarTy tv)        = isConcreteTyVar tv
     go (AppTy ty1 ty2)     = go ty1 && go ty2
-    go (TyConApp tc tys)
-      | isConcreteTyCon tc = all go tys
-      | otherwise          = False
+    go (TyConApp tc tys)   = go_tc tc tys
     go ForAllTy{}          = False
     go (FunTy _ w t1 t2)   =  go w
                            && go (typeKind t1) && go t1
@@ -2780,6 +2807,21 @@ isConcrete = go
     go LitTy{}             = True
     go CastTy{}            = False
     go CoercionTy{}        = False
+
+    go_tc tc tys
+      | isForgetfulSynTyCon tc  -- E.g. type S a = Int
+                                -- Then (S x) is concrete even if x isn't
+      , Just ty' <- expandSynTyConApp_maybe tc tys
+      = go ty'
+
+      -- Apart from forgetful synonyms, isConcreteTyCon
+      -- is enough; no need to expand.  This is good for e.g
+      --      type LiftedRep = BoxedRep Lifted
+      | isConcreteTyCon tc
+      = all go tys
+
+      | otherwise  -- E.g. type families
+      = False
 
 
 {-

@@ -48,7 +48,7 @@ module GHC.Tc.Solver.Monad (
     newWanted,
     newWantedNC, newWantedEvVarNC,
     newBoundEvVarId,
-    unifyTyVar, reportUnifications, touchabilityTest, TouchabilityTestResult(..),
+    unifyTyVar, reportUnifications, touchabilityAndShapeTest,
     setEvBind, setWantedEq,
     setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
@@ -115,13 +115,10 @@ module GHC.Tc.Solver.Monad (
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
     checkWellStagedDFun,
-    pprEq,                                   -- Smaller utils, re-exported from TcM
-                                             -- TODO (DV): these are only really used in the
-                                             -- instance matcher in GHC.Tc.Solver. I am wondering
-                                             -- if the whole instance matcher simply belongs
-                                             -- here
+    pprEq,
 
-    breakTyEqCycle_maybe, rewriterView
+    -- Enforcing invariants for type equalities
+    checkTypeEq, checkTouchableTyVarEq
 ) where
 
 import GHC.Prelude
@@ -169,7 +166,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
-import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import qualified GHC.Rename.Env as TcM
@@ -188,14 +184,14 @@ import GHC.Utils.Misc( equalLength )
 import GHC.Exts (oneShot)
 import Control.Monad
 import Data.IORef
-import Data.List ( mapAccumL, partition, zip4 )
+import Data.List ( mapAccumL, zip4 )
 import Data.Foldable
 import qualified Data.Semigroup as S
 
 #if defined(DEBUG)
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Data.Graph.Directed
 #endif
-
 
 {- *********************************************************************
 *                                                                      *
@@ -1312,85 +1308,6 @@ reportUnifications (TcS thing_inside)
        ; TcM.updTcRef (tcs_unified env) (+ n_unifs)
        ; return (n_unifs, res) }
 
-data TouchabilityTestResult
-  -- See Note [Solve by unification] in GHC.Tc.Solver.Interact
-  -- which points out that having TouchableSameLevel is just an optimisation;
-  -- we could manage with TouchableOuterLevel alone (suitably renamed)
-  = TouchableSameLevel
-  | TouchableOuterLevel [TcTyVar]   -- Promote these
-                        TcLevel     -- ..to this level
-  | Untouchable
-
-instance Outputable TouchabilityTestResult where
-  ppr TouchableSameLevel            = text "TouchableSameLevel"
-  ppr (TouchableOuterLevel tvs lvl) = text "TouchableOuterLevel" <> parens (ppr lvl <+> ppr tvs)
-  ppr Untouchable                   = text "Untouchable"
-
-touchabilityTest :: CtFlavour -> TcTyVar -> TcType -> TcS TouchabilityTestResult
--- This is the key test for untouchability:
--- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
--- and Note [Solve by unification] in GHC.Tc.Solver.Interact
-touchabilityTest flav tv1 rhs
-  | flav /= Given  -- See Note [Do not unify Givens]
-  , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
-  = do { can_continue_solving <- wrapTcS $ startSolvingByUnification info rhs
-       ; if not can_continue_solving
-         then return Untouchable
-         else
-    do { ambient_lvl  <- getTcLevel
-       ; given_eq_lvl <- getInnermostGivenEqLevel
-
-       ; if | tv_lvl `sameDepthAs` ambient_lvl
-            -> return TouchableSameLevel
-
-            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
-            , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
-            -> return (TouchableOuterLevel free_metas tv_lvl)
-
-            | otherwise
-            -> return Untouchable } }
-  | otherwise
-  = return Untouchable
-  where
-     (free_metas, free_skols) = partition isPromotableMetaTyVar $
-                                nonDetEltsUniqSet               $
-                                tyCoVarsOfType rhs
-
-     does_not_escape tv_lvl fv
-       | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
-       | otherwise  = True
-       -- Coercion variables are not an escape risk
-       -- If an implication binds a coercion variable, it'll have equalities,
-       -- so the "intervening given equalities" test above will catch it
-       -- Coercion holes get filled with coercions, so again no problem.
-
-{- Note [Do not unify Givens]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this GADT match
-   data T a where
-      T1 :: T Int
-      ...
-
-   f x = case x of
-           T1 -> True
-           ...
-
-So we get f :: T alpha[1] -> beta[1]
-          x :: T alpha[1]
-and from the T1 branch we get the implication
-   forall[2] (alpha[1] ~ Int) => beta[1] ~ Bool
-
-Now, clearly we don't want to unify alpha:=Int!  Yet at the moment we
-process [G] alpha[1] ~ Int, we don't have any given-equalities in the
-inert set, and hence there are no given equalities to make alpha untouchable.
-
-NB: if it were alpha[2] ~ Int, this argument wouldn't hold.  But that
-never happens: invariant (GivenInv) in Note [TcLevel invariants]
-in GHC.Tc.Utils.TcType.
-
-Simple solution: never unify in Givens!
--}
-
 getDefaultInfo ::  TcS ([Type], (Bool, Bool))
 getDefaultInfo = wrapTcS TcM.tcGetDefaultTys
 
@@ -2142,110 +2059,174 @@ unifyWanteds rewriters ctlocs roles rhss lhss = unify_wanteds rewriters $ zip4 c
 ************************************************************************
 -}
 
--- | Conditionally replace all type family applications in the RHS with fresh
--- variables, emitting givens that relate the type family application to the
--- variable. See Note [Type equality cycles] in GHC.Tc.Solver.Canonical.
--- This only works under conditions as described in the Note; otherwise, returns
--- Nothing.
-breakTyEqCycle_maybe :: CtEvidence
-                     -> CheckTyEqResult   -- result of checkTypeEq
-                     -> CanEqLHS
-                     -> TcType     -- RHS
-                     -> TcS (Maybe ReductionN)
-                         -- new RHS that doesn't have any type families
-breakTyEqCycle_maybe (ctLocOrigin . ctEvLoc -> CycleBreakerOrigin _) _ _ _
-  -- see Detail (7) of Note
-  = return Nothing
+checkTouchableTyVarEq
+   :: CtEvidence
+   -> TcTyVar    -- A touchable meta-tyvar
+   -> TcType     -- The RHS
+   -> TcS (PuResult () Reduction)
+-- Used for Nominal, Wanted equalities, with a touchable meta-tyvar on LHS
+-- If checkTouchableTyVarEq tv ty = PuOK redn cts
+--   then we can unify
+--       tv := ty |> redn
+--   with extra wanteds 'cts'
+-- If it returns (PuFail reason) we can't unify, and the reason explains why.
+checkTouchableTyVarEq ev lhs_tv rhs
+  | simpleUnifyCheck True lhs_tv rhs
+    -- True <=> type families are ok on the RHS
+  = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
+       ; return (pure (mkReflRedn Nominal rhs)) }
 
-breakTyEqCycle_maybe ev cte_result lhs rhs
-  | NomEq <- eq_rel
+  | otherwise
+  = do { traceTcS "checkTouchableTyVarEq {" (ppr lhs_tv $$ ppr rhs)
+       ; check_result <- wrapTcS (check_rhs rhs)
+       ; traceTcS "checkTouchableTyVarEq }" (ppr lhs_tv $$ ppr check_result)
+       ; case check_result of
+            PuFail reason -> return (PuFail reason)
+            PuOK redn cts -> do { emitWork (bagToList cts)
+                                ; return (pure redn) } }
 
-  , cte_result `cterHasOnlyProblem` cteSolubleOccurs
-     -- only do this if the only problem is a soluble occurs-check
-     -- See Detail (8) of the Note.
-
-  = do { should_break <- final_check
-       ; if should_break then do { redn <- go rhs
-                                 ; return (Just redn) }
-                         else return Nothing }
   where
-    flavour = ctEvFlavour ev
-    eq_rel  = ctEvEqRel ev
+    (lhs_tv_info, lhs_tv_lvl) = case tcTyVarDetails lhs_tv of
+       MetaTv { mtv_info = info, mtv_tclvl = lvl } -> (info,lvl)
+       _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
+            -- lhs_tv should be a meta-tyvar
 
-    final_check = case flavour of
-      Given  -> return True
-      Wanted    -- Wanteds work only with a touchable tyvar on the left
-                -- See "Wanted" section of the Note.
-        | TyVarLHS lhs_tv <- lhs ->
-          do { result <- touchabilityTest Wanted lhs_tv rhs
-             ; return $ case result of
-                          Untouchable -> False
-                          _           -> True }
-        | otherwise -> return False
+    is_concrete_lhs_tv = isConcreteInfo lhs_tv_info
 
-    -- This could be considerably more efficient. See Detail (5) of Note.
-    go :: TcType -> TcS ReductionN
-    go ty | Just ty' <- rewriterView ty = go ty'
-    go (Rep.TyConApp tc tys)
-      | isTypeFamilyTyCon tc  -- worried about whether this type family is not actually
-                              -- causing trouble? See Detail (5) of Note.
-      = do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
-                 fun_app                = mkTyConApp tc fun_args
-                 fun_app_kind           = typeKind fun_app
-           ; fun_redn <- emit_work fun_app_kind fun_app
-           ; arg_redns <- unzipRedns <$> mapM go extra_args
-           ; return $ mkAppRedns fun_redn arg_redns }
-              -- Worried that this substitution will change kinds?
-              -- See Detail (3) of Note
+    check_rhs rhs
+       -- Crucial special case for  alpha ~ F tys
+       -- We don't want to flatten that (F tys)!
+       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
+       = if is_concrete_lhs_tv
+         then failCheckWith (cteProblem cteConcrete)
+         else recurseIntoTyConApp arg_flags tc tys
+       | otherwise
+       = checkTyEqRhs flags rhs
 
-      | otherwise
-      = do { arg_redns <- unzipRedns <$> mapM go tys
-           ; return $ mkTyConAppRedn Nominal tc arg_redns }
+    flags = TEF { tef_foralls  = False -- isRuntimeUnkSkol lhs_tv
+                , tef_fam_app  = mkTEFA_Break ev NomEq break_wanted
+                , tef_unifying = Unifying lhs_tv_info lhs_tv_lvl LC_Promote
+                , tef_lhs      = TyVarLHS lhs_tv
+                , tef_occurs   = cteInsolubleOccurs }
 
-    go (Rep.AppTy ty1 ty2)
-      = mkAppRedn <$> go ty1 <*> go ty2
-    go (Rep.FunTy vis w arg res)
-      = mkFunRedn Nominal vis <$> go w <*> go arg <*> go res
-    go (Rep.CastTy ty cast_co)
-      = mkCastRedn1 Nominal ty cast_co <$> go ty
-    go ty@(Rep.TyVarTy {})    = skip ty
-    go ty@(Rep.LitTy {})      = skip ty
-    go ty@(Rep.ForAllTy {})   = skip ty  -- See Detail (1) of Note
-    go ty@(Rep.CoercionTy {}) = skip ty  -- See Detail (2) of Note
+    arg_flags = famAppArgFlags flags
 
-    skip ty = return $ mkReflRedn Nominal ty
+    break_wanted fam_app
+      -- Occurs check or skolem escape; so flatten
+      = do { let fam_app_kind = typeKind fam_app
+           ; reason <- checkPromoteFreeVars cteInsolubleOccurs
+                            lhs_tv lhs_tv_lvl (tyCoVarsOfType fam_app_kind)
+           ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
+             then failCheckWith reason
+             else
+        do { let tv_info | isConcreteInfo lhs_tv_info = lhs_tv_info
+                         | otherwise                  = TauTv
+                -- Make a concrete tyvar if lhs_tv is concrete
+                -- e.g.  alpha[2,conc] ~ Maybe (F beta[4])
+                --       We want to flatten to
+                --       alpha[2,conc] ~ Maybe gamma[2,conc]
+                --       gamma[2,conc] ~ F beta[4]
+           ; new_tv_ty <- TcM.newMetaTyVarTyWithInfo lhs_tv_lvl tv_info fam_app_kind
+           ; let pty = mkPrimEqPredRole Nominal fam_app new_tv_ty
+           ; hole <- TcM.newCoercionHole pty
+           ; let new_ev = CtWanted { ctev_pred      = pty
+                                   , ctev_dest      = HoleDest hole
+                                   , ctev_loc       = cb_loc
+                                   , ctev_rewriters = ctEvRewriters ev }
+           ; return (PuOK (mkReduction (HoleCo hole) new_tv_ty)
+                          (singleCt (mkNonCanonical new_ev))) } }
 
-    emit_work :: TcKind         -- of the function application
-              -> TcType         -- original function application
-              -> TcS ReductionN -- rewritten type (the fresh tyvar)
-    emit_work fun_app_kind fun_app = case flavour of
-      Given ->
-        do { new_tv <- wrapTcS (TcM.newCycleBreakerTyVar fun_app_kind)
-           ; let new_ty     = mkTyVarTy new_tv
-                 given_pred = mkHeteroPrimEqPred fun_app_kind fun_app_kind
-                                                 fun_app new_ty
-                 given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
-           ; new_given <- newGivenEvVar new_loc (given_pred, given_term)
-           ; traceTcS "breakTyEqCycle replacing type family in Given" (ppr new_given)
-           ; emitWorkNC [new_given]
-           ; updInertTcS $ \is ->
-               is { inert_cycle_breakers = insertCycleBreakerBinding new_tv fun_app
-                                             (inert_cycle_breakers is) }
-           ; return $ mkReflRedn Nominal new_ty }
-                -- Why reflexive? See Detail (4) of the Note
+    -- See Detail (7) of the Note
+    cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
 
-      Wanted ->
-        do { new_tv <- wrapTcS (TcM.newFlexiTyVar fun_app_kind)
-           ; let new_ty = mkTyVarTy new_tv
-           ; co <- emitNewWantedEq new_loc (ctEvRewriters ev) Nominal new_ty fun_app
-           ; return $ mkReduction (mkSymCo co) new_ty }
+------------------------
+checkTypeEq :: CtEvidence -> EqRel -> CanEqLHS -> TcType
+            -> TcS (PuResult () Reduction)
+-- Used for general CanEqLHSs, ones that do
+-- not have a touchable type variable on the LHS (i.e. not unifying)
+checkTypeEq ev eq_rel lhs rhs
+  | isGiven ev
+  = do { traceTcS "checkTypeEq {" (vcat [ text "lhs:" <+> ppr lhs
+                                        , text "rhs:" <+> ppr rhs ])
+       ; check_result <- wrapTcS (check_given_rhs rhs)
+       ; traceTcS "checkTypeEq }" (ppr check_result)
+       ; case check_result of
+            PuFail reason -> return (PuFail reason)
+            PuOK redn prs -> do { new_givens <- mapBagM mk_new_given prs
+                                ; emitWorkNC (bagToList new_givens)
+                                ; updInertTcS (addCycleBreakerBindings prs)
+                                ; return (pure redn) } }
 
-      -- See Detail (7) of the Note
-    new_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
+  | otherwise  -- Wanted
+  = do { check_result <- wrapTcS (checkTyEqRhs wanted_flags rhs)
+       ; case check_result of
+            PuFail reason -> return (PuFail reason)
+            PuOK redn cts -> do { emitWork (bagToList cts)
+                                ; return (pure redn) } }
+  where
+    check_given_rhs rhs
+       -- See Note [Special case for top-level of Given equality]
+       | Just (TyFamLHS tc tys) <- canTyFamEqLHS_maybe rhs
+       = recurseIntoTyConApp arg_flags tc tys
+       | otherwise
+       = checkTyEqRhs given_flags rhs
 
--- does not fit scenario from Note
-breakTyEqCycle_maybe _ _ _ _ = return Nothing
+    arg_flags = famAppArgFlags given_flags
 
+    given_flags = TEF { tef_lhs      = lhs
+                      , tef_foralls  = False
+                      , tef_unifying = NotUnifying
+                      , tef_fam_app  = mkTEFA_Break ev eq_rel break_given
+                      , tef_occurs   = occ_prob }
+        -- TEFA_Break used for: [G] a ~ Maybe (F a)
+        --                   or [W] F a ~ Maybe (F a)
+
+    wanted_flags = TEF { tef_lhs      = lhs
+                       , tef_foralls  = False
+                       , tef_unifying = NotUnifying
+                       , tef_fam_app  = TEFA_Recurse
+                       , tef_occurs   = occ_prob }
+        -- TEFA_Recurse: see Note [Don't cycle-break Wanteds when not unifying]
+
+    -- occ_prob: see Note [Occurs check and representational equality]
+    occ_prob = case eq_rel of
+                 NomEq  -> cteInsolubleOccurs
+                 ReprEq -> cteSolubleOccurs
+
+    break_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
+    break_given fam_app
+      = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
+           ; return (PuOK (mkReflRedn Nominal (mkTyVarTy new_tv))
+                          (unitBag (new_tv, fam_app))) }
+                    -- Why reflexive? See Detail (4) of the Note
+
+    ---------------------------
+    mk_new_given :: (TcTyVar, TcType) -> TcS CtEvidence
+    mk_new_given (new_tv, fam_app)
+      = newGivenEvVar cb_loc (given_pred, given_term)
+      where
+        new_ty     = mkTyVarTy new_tv
+        given_pred = mkPrimEqPred fam_app new_ty
+        given_term = evCoercion $ mkNomReflCo new_ty  -- See Detail (4) of Note
+
+    -- See Detail (7) of the Note
+    cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
+
+mkTEFA_Break :: CtEvidence -> EqRel -> FamAppBreaker a -> TyEqFamApp a
+mkTEFA_Break ev eq_rel breaker
+  | NomEq <- eq_rel
+  , not cycle_breaker_origin
+  = TEFA_Break breaker
+  | otherwise
+  = TEFA_Recurse
+  where
+    -- cycle_breaker_origin: see Detail (7) of Note [Type equality cycles]
+    -- in GHC.Tc.Solver.Equality
+    cycle_breaker_origin = case ctLocOrigin (ctEvLoc ev) of
+                              CycleBreakerOrigin {} -> True
+                              _                     -> False
+
+-------------------------
 -- | Fill in CycleBreakerTvs with the variables they stand for.
 -- See Note [Type equality cycles] in GHC.Tc.Solver.Canonical.
 restoreTyVarCycles :: InertSet -> TcM ()
@@ -2254,12 +2235,74 @@ restoreTyVarCycles is
 {-# SPECIALISE forAllCycleBreakerBindings_ ::
       CycleBreakerVarStack -> (TcTyVar -> TcType -> TcM ()) -> TcM () #-}
 
--- Unwrap a type synonym only when either:
---   The type synonym is forgetful, or
---   the type synonym mentions a type family in its expansion
--- See Note [Rewriting synonyms] in GHC.Tc.Solver.Rewrite.
-rewriterView :: TcType -> Maybe TcType
-rewriterView ty@(Rep.TyConApp tc _)
-  | isForgetfulSynTyCon tc || (isTypeSynonymTyCon tc && not (isFamFreeTyCon tc))
-  = coreView ty
-rewriterView _other = Nothing
+
+{- Note [Occurs check and representational equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(a ~R# b a) is soluble if b later turns out to be Identity
+So we treat this as a "soluble occurs check".
+
+Note [Special case for top-level of Given equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We take care when examining
+    [G] F ty ~ G (...(F ty)...)
+where both sides are TyFamLHSs.  We don't want to flatten that RHS to
+    [G] F ty ~ cbv
+    [G] G (...(F ty)...) ~ cbv
+Instead we'd like to say "occurs-check" and swap LHS and RHS, which yields a
+canonical constraint
+    [G] G (...(F ty)...) ~ F ty
+That tents to rewrite a big type to smaller one. This happens in T15703,
+where we had:
+    [G] Pure g ~ From1 (To1 (Pure g))
+Making a loop breaker and rewriting left to right just makes much bigger
+types than swapping it over.
+
+(We might hope to have swapped it over before getting to checkTypeEq,
+but better safe than sorry.)
+
+NB: We never see a TyVarLHS here, such as
+    [G] a ~ F tys here
+because we'd have swapped it to
+   [G] F tys ~ a
+in canEqCanLHS2, before getting to checkTypeEq.
+
+Note [Don't cycle-break Wanteds when not unifying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consdier
+  [W] a[2] ~ Maybe (F a[2])
+
+Should we cycle-break this Wanted, thus?
+
+  [W] a[2] ~ Maybe delta[2]
+  [W] delta[2] ~ F a[2]
+
+For a start, this is dodgy because we might just unify delta, thus undoing
+what we have done, and getting an infinite loop in the solver.  Even if we
+somehow prevented ourselves from doing so, is there any merit in the split?
+Maybe: perhaps we can use that equality on `a` to unlock other constraints?
+Consider
+  type instance F (Maybe _) = Bool
+
+  [G] g1: a ~ Maybe Bool
+  [W] w1: a ~ Maybe (F a)
+
+If we loop-break w1 to get
+  [W] w1': a ~ Maybe gamma
+  [W] w3:  gamma ~ F a
+Now rewrite w3 with w1'
+  [W] w3':  gamma ~ F (Maybe gamma)
+Now use the type instance to get
+  gamma := Bool
+Now we are left with
+  [W] w1': a ~ Maybe Bool
+which we can solve from the Given.
+
+BUT in this situation we could have rewritten the
+/original/ Wanted from the Given, like this:
+  [W] w1': Maybe Bool ~ Maybe (F (Maybe Bool))
+and that is readily soluble.
+
+In short: loop-breaking Wanteds, when we aren't unifying,
+seems of no merit.  Hence TEFA_Recurse, rather than TEFA_Break,
+in `wanted_flags` in `checkTypeEq`.
+-}

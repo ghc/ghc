@@ -19,7 +19,7 @@ module GHC.Data.Bag (
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, nonEmptyToBag, bagToList, headMaybe, mapAccumBagL,
         concatMapBag, concatMapBagPair, mapMaybeBag, unzipBag,
-        mapBagM, mapBagM_,
+        mapBagM, mapBagM_, lookupBag,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
         anyBagM, filterBagM
@@ -38,6 +38,7 @@ import Data.List ( partition, mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup ( (<>) )
+import Control.Applicative( Alternative( (<|>) ) )
 
 infixr 3 `consBag`
 infixl 3 `snocBag`
@@ -114,6 +115,16 @@ filterBagM pred (TwoBags b1 b2) = do
 filterBagM pred (ListBag vs) = do
   sat <- filterM pred (toList vs)
   return (listToBag sat)
+
+lookupBag :: Eq a => a -> Bag (a,b) -> Maybe b
+lookupBag _ EmptyBag        = Nothing
+lookupBag k (UnitBag kv)    = lookup_one k kv
+lookupBag k (TwoBags b1 b2) = lookupBag k b1 <|> lookupBag k b2
+lookupBag k (ListBag xs)    = foldr ((<|>) . lookup_one k) Nothing xs
+
+lookup_one :: Eq a => a -> (a,b) -> Maybe b
+lookup_one k (k',v) | k==k'     = Just v
+                    | otherwise = Nothing
 
 allBag :: (a -> Bool) -> Bag a -> Bool
 allBag _ EmptyBag        = True

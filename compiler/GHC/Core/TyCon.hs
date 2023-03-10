@@ -833,11 +833,17 @@ data TyConDetails =
                                  --          any type synonym families (data families
                                  --          are fine), again after expanding any
                                  --          nested synonyms
-        synIsForgetful :: Bool   -- True <=  at least one argument is not mentioned
+
+        synIsForgetful :: Bool,  -- True <=  at least one argument is not mentioned
                                  --          in the RHS (or is mentioned only under
                                  --          forgetful synonyms)
                                  -- Test is conservative, so True does not guarantee
-                                 -- forgetfulness.
+                                 -- forgetfulness. False conveys definite information
+                                 -- (definitely not forgetful); True is always safe.
+
+        synIsConcrete :: Bool    -- True <= If 'tys' are concrete then the expansion
+                                 --         of (S tys) is definitely concrete
+                                 -- But False is always safe
     }
 
   -- | Represents families (both type and data)
@@ -1873,13 +1879,17 @@ mkPrimTyCon name binders res_kind roles
 
 -- | Create a type synonym 'TyCon'
 mkSynonymTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
-               -> [Role] -> Type -> Bool -> Bool -> Bool -> TyCon
-mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free is_forgetful
+               -> [Role] -> Type
+               -> Bool -> Bool -> Bool -> Bool
+               -> TyCon
+mkSynonymTyCon name binders res_kind roles rhs is_tau
+               is_fam_free is_forgetful is_concrete
   = mkTyCon name binders res_kind roles $
     SynonymTyCon { synTcRhs       = rhs
                  , synIsTau       = is_tau
                  , synIsFamFree   = is_fam_free
-                 , synIsForgetful = is_forgetful }
+                 , synIsForgetful = is_forgetful
+                 , synIsConcrete  = is_concrete }
 
 -- | Create a type family 'TyCon'
 mkFamilyTyCon :: Name -> [TyConBinder] -> Kind  -- ^ /result/ kind
@@ -1976,11 +1986,10 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
   where
     go _                             Phantom          = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
     go (AlgTyCon {})                 Nominal          = True
-    go (AlgTyCon {algTcRhs = rhs})   Representational
-      = isGenInjAlgRhs rhs
+    go (AlgTyCon {algTcRhs = rhs})   Representational = isGenInjAlgRhs rhs
     go (SynonymTyCon {})             _                = False
     go (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
-                                                  Nominal          = True
+                                                  Nominal = True
     go (FamilyTyCon { famTcInj = Injective inj }) Nominal = and inj
     go (FamilyTyCon {})              _                = False
     go (PrimTyCon {})                _                = True
@@ -1995,6 +2004,10 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
 -- (where r is the role passed in):
 --   If (T tys ~r t), then (t's head ~r T).
 -- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Canonical"
+--
+-- NB: at Nominal role, isGenerativeTyCon is simple:
+--     isGenerativeTyCon tc Nominal
+--       = not (isTypeFamilyTyCon tc || isSynonymTyCon tc)
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon tc@(TyCon { tyConDetails = details }) role
    = go role details
@@ -2348,28 +2361,23 @@ tcHasFixedRuntimeRep tc@(TyCon { tyConDetails = details })
   | TcTyCon{}         <- details = False
   | PromotedDataCon{} <- details = pprPanic "tcHasFixedRuntimeRep datacon" (ppr tc)
 
--- | Is this 'TyCon' concrete (i.e. not a synonym/type family)?
---
+-- | Is this 'TyCon' concrete?
+-- More specifically, if 'tys' are all concrete, is (T tys) concrete?
+--      (for synonyms this requires us to look at the RHS)
 -- Used for representation polymorphism checks.
+-- See Note [Concrete types] in GHC.Tc.Utils.Concrete
 isConcreteTyCon :: TyCon -> Bool
-isConcreteTyCon = isConcreteTyConFlavour . tyConFlavour
+isConcreteTyCon tc@(TyCon { tyConDetails = details })
+  = case details of
+      AlgTyCon {}        -> True   -- Includes AbstractTyCon
+      PrimTyCon {}       -> True
+      PromotedDataCon {} -> True
+      FamilyTyCon {}     -> False
 
--- | Is this 'TyConFlavour' concrete (i.e. not a synonym/type family)?
---
--- Used for representation polymorphism checks.
-isConcreteTyConFlavour :: TyConFlavour tc -> Bool
-isConcreteTyConFlavour = \case
-  ClassFlavour             -> True
-  TupleFlavour {}          -> True
-  SumFlavour               -> True
-  DataTypeFlavour          -> True
-  NewtypeFlavour           -> True
-  AbstractTypeFlavour      -> True  -- See Note [Concrete types] in GHC.Tc.Utils.Concrete
-  OpenFamilyFlavour {}     -> False
-  ClosedTypeFamilyFlavour  -> False
-  TypeSynonymFlavour       -> False
-  BuiltInTypeFlavour       -> True
-  PromotedDataConFlavour   -> True
+      SynonymTyCon { synIsConcrete = is_conc } -> is_conc
+
+      TcTyCon {} -> pprPanic "isConcreteTyCon" (ppr tc)
+                    -- isConcreteTyCon is only used on "real" tycons
 
 {-
 -----------------------------------------------

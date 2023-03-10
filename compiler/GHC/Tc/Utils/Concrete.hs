@@ -22,7 +22,7 @@ import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
                                , mkGReflRightMCo, mkNomReflCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcrete, typeKind, tyVarKind, coreView
+import GHC.Core.Type           ( isConcreteType, typeKind, tyVarKind, coreView
                                , mkTyVarTy, mkTyConApp, mkFunTy, mkAppTy )
 
 import GHC.Tc.Types            ( TcM, ThStage(..), PendingStuff(..) )
@@ -87,7 +87,7 @@ as a central point of reference for this topic.
     Note [The Concrete mechanism]
 
     Instead of simply checking that a type `ty` is concrete (i.e. computing
-    'isConcrete`), we emit an equality constraint:
+    'isConcreteType`), we emit an equality constraint:
 
        co :: ty ~# concrete_ty
 
@@ -183,7 +183,7 @@ Definition: a type is /concrete/ iff it is:
             - a concrete type constructor (as defined below), or
             - a concrete type variable (see Note [ConcreteTv] below), or
             - an application of a concrete type to another concrete type
-GHC.Core.Type.isConcrete checks whether a type meets this definition.
+GHC.Core.Type.isConcreteType checks whether a type meets this definition.
 
 Definition: a /concrete type constructor/ is defined by
             - a promoted data constructor
@@ -627,8 +627,6 @@ makeTypeConcrete :: ConcreteTvOrigin -> TcType -> TcM (TcType, [NotConcreteReaso
 -- that `TupleRep '[ beta[conc], F Int ]` is not concrete because of the
 -- type family application `F Int`. But we could decompose by setting
 -- alpha := TupleRep '[ beta, gamma[conc] ] and emitting `[W] gamma[conc] ~ F Int`.
---
--- This would be useful in startSolvingByUnification.
 makeTypeConcrete conc_orig ty =
   do { res@(ty', _) <- runWriterT $ go ty
      ; traceTc "makeTypeConcrete" $
@@ -640,7 +638,7 @@ makeTypeConcrete conc_orig ty =
     go ty
       | Just ty <- coreView ty
       = go ty
-      | isConcrete ty
+      | isConcreteType ty
       = pure ty
     go ty@(TyVarTy tv) -- not a ConcreteTv (already handled above)
       = do { mb_filled <- lift $ isFilledMetaTyVar_maybe tv

@@ -61,7 +61,7 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
-        typeSize, coercionSize, provSize,
+        typeSize, typesSize, coercionSize, provSize,
 
         -- * Multiplicities
         Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
@@ -1786,14 +1786,19 @@ noView _ = Nothing
 --     function is used only in reporting, not decision-making.
 
 typeSize :: Type -> Int
+-- The size of the syntax tree of a type.  No special treatment
+-- for type synonyms or type families.
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
-typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
+typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co
+
+typesSize :: [Type] -> Int
+typesSize tys = foldr ((+) . typeSize) 0 tys
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty

@@ -35,6 +35,7 @@ import Data.Maybe
 import Data.Foldable ( foldlM, for_ )
 import GHC.Utils.Misc (HasCallStack)
 import Data.List.NonEmpty ( NonEmpty )
+import Control.Applicative( Alternative( (<|>) ) )
 
 infixr 4 `orElse`
 
@@ -47,7 +48,7 @@ infixr 4 `orElse`
 -}
 
 firstJust :: Maybe a -> Maybe a -> Maybe a
-firstJust a b = firstJusts [a, b]
+firstJust = (<|>)
 
 -- | Takes a list of @Maybes@ and returns the first @Just@ if there is one, or
 -- @Nothing@ otherwise.

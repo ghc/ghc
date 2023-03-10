@@ -1,6 +1,6 @@
 [1 of 1] Processing number-unknown
-  [1 of 2] Compiling NumberUnknown[sig] ( number-unknown\NumberUnknown.hsig, nothing )
-  [2 of 2] Compiling NumberStuff      ( number-unknown\NumberStuff.hs, nothing )
+  [1 of 2] Compiling NumberUnknown[sig] ( number-unknown/NumberUnknown.hsig, nothing )
+  [2 of 2] Compiling NumberStuff      ( number-unknown/NumberStuff.hs, nothing )
 
 RepPolyBackpack1.bkp:17:5: error: [GHC-55287]
     The second pattern in the equation for ‘funcA’

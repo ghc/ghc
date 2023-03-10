@@ -34,14 +34,16 @@ module GHC.Tc.Types.Constraint (
         CtIrredReason(..), isInsolubleReason,
 
         CheckTyEqResult, CheckTyEqProblem, cteProblem, cterClearOccursCheck,
-        cteOK, cteImpredicative, cteTypeFamily,
+        cteOK, cteImpredicative, cteTypeFamily, cteCoercionHole,
         cteInsolubleOccurs, cteSolubleOccurs, cterSetOccursCheckSoluble,
+        cteConcrete, cteSkolemEscape,
+        impredicativeProblem, insolubleOccursProblem, solubleOccursProblem,
 
-        cterHasNoProblem, cterHasProblem, cterHasOnlyProblem,
+        cterHasNoProblem, cterHasProblem, cterHasOnlyProblem, cterHasOnlyProblems,
         cterRemoveProblem, cterHasOccursCheck, cterFromKind,
 
-        CanEqLHS(..), canEqLHS_maybe, canEqLHSKind, canEqLHSType,
-        eqCanEqLHS,
+        CanEqLHS(..), canEqLHS_maybe, canTyFamEqLHS_maybe,
+        canEqLHSKind, canEqLHSType, eqCanEqLHS,
 
         Hole(..), HoleSort(..), isOutOfScopeHole,
         DelayedError(..), NotConcreteError(..),
@@ -148,38 +150,6 @@ import Data.List  ( intersperse )
 *   These are the constraints the low-level simplifier works with      *
 *                                                                      *
 ************************************************************************
-
-Note [CEqCan occurs check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-A CEqCan relates a CanEqLHS (a type variable or type family applications) on
-its left to an arbitrary type on its right. It is used for rewriting.
-Because it is used for rewriting, it would be disastrous if the RHS
-were to mention the LHS: this would cause a loop in rewriting.
-
-We thus perform an occurs-check. There is, of course, some subtlety:
-
-* For type variables, the occurs-check looks deeply. This is because
-  a CEqCan over a meta-variable is also used to inform unification,
-  in GHC.Tc.Solver.Interact.solveByUnification. If the LHS appears
-  anywhere, at all, in the RHS, unification will create an infinite
-  structure, which is bad.
-
-* For type family applications, the occurs-check is shallow; it looks
-  only in places where we might rewrite. (Specifically, it does not
-  look in kinds or coercions.) An occurrence of the LHS in, say, an
-  RHS coercion is OK, as we do not rewrite in coercions. No loop to
-  be found.
-
-  You might also worry about the possibility that a type family
-  application LHS doesn't exactly appear in the RHS, but something
-  that reduces to the LHS does. Yet that can't happen: the RHS is
-  already inert, with all type family redexes reduced. So a simple
-  syntactic check is just fine.
-
-The occurs check is performed in GHC.Tc.Utils.Unify.checkTypeEq
-and forms condition T3 in Note [Extending the inert equalities]
-in GHC.Tc.Solver.InertSet.
-
 -}
 
 -- | A 'Xi'-type is one that has been fully rewritten with respect
@@ -265,22 +235,54 @@ data Ct
 
 {- Note [Invariants of EqCt]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-An EqCt carries a canonical equality constraint, that satisfies these invariants:
-  * See Note [inert_eqs: the inert equalities] in GHC.Tc.Solver.InertSet
-  * Many are checked in checkTypeEq in GHC.Tc.Utils.Unify
+An EqCt is a canonical equality constraint, one that can live in the inert set,
+and that can be used to rewrite other constrtaints. It satisfies these invariants:
   * (TyEq:OC) lhs does not occur in rhs (occurs check)
-              Note [CEqCan occurs check]
+              Note [EqCt occurs check]
   * (TyEq:F) rhs has no foralls
       (this avoids substituting a forall for the tyvar in other types)
   * (TyEq:K) typeKind lhs `tcEqKind` typeKind rhs; Note [Ct kind invariant]
   * (TyEq:N) If the equality is representational, rhs is not headed by a saturated
-    application of a newtype TyCon.
-    See Note [No top-level newtypes on RHS of representational equalities]
-    in GHC.Tc.Solver.Canonical. (Applies only when constructor of newtype is
-    in scope.)
-  * (TyEq:TV) If rhs (perhaps under a cast) is also CanEqLHS, then it is oriented
-    to give best chance of unification happening; eg if rhs is touchable then lhs is too
-    Note [TyVar/TyVar orientation] in GHC.Tc.Utils.Unify
+    application of a newtype TyCon. See GHC.Tc.Solver.Equality
+    Note [No top-level newtypes on RHS of representational equalities].
+    (Applies only when constructor of newtype is in scope.)
+  * (TyEq:U) An EqCt is not immediately unifiable. If we can unify a:=ty, we
+    will not form an EqCt (a ~ ty).
+
+These invariants ensure that the EqCts in inert_eqs constitute a terminating
+generalised substitution. See Note [inert_eqs: the inert equalities]
+in GHC.Tc.Solver.InertSet for what these words mean!
+
+Note [EqCt occurs check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A CEqCan relates a CanEqLHS (a type variable or type family applications) on
+its left to an arbitrary type on its right. It is used for rewriting.
+Because it is used for rewriting, it would be disastrous if the RHS
+were to mention the LHS: this would cause a loop in rewriting.
+
+We thus perform an occurs-check. There is, of course, some subtlety:
+
+* For type variables, the occurs-check looks deeply. This is because
+  a CEqCan over a meta-variable is also used to inform unification,
+  in GHC.Tc.Solver.Interact.solveByUnification. If the LHS appears
+  anywhere, at all, in the RHS, unification will create an infinite
+  structure, which is bad.
+
+* For type family applications, the occurs-check is shallow; it looks
+  only in places where we might rewrite. (Specifically, it does not
+  look in kinds or coercions.) An occurrence of the LHS in, say, an
+  RHS coercion is OK, as we do not rewrite in coercions. No loop to
+  be found.
+
+  You might also worry about the possibility that a type family
+  application LHS doesn't exactly appear in the RHS, but something
+  that reduces to the LHS does. Yet that can't happen: the RHS is
+  already inert, with all type family redexes reduced. So a simple
+  syntactic check is just fine.
+
+The occurs check is performed in GHC.Tc.Utils.Unify.checkTyEqRhs
+and forms condition T3 in Note [Extending the inert equalities]
+in GHC.Tc.Solver.InertSet.
 -}
 
 data EqCt -- An equality constraint; see Note [Invariants of EqCt]
@@ -293,11 +295,11 @@ data EqCt -- An equality constraint; see Note [Invariants of EqCt]
 
 ------------
 -- | A 'CanEqLHS' is a type that can appear on the left of a canonical
--- equality: a type variable or exactly-saturated type family application.
+-- equality: a type variable or /exactly-saturated/ type family application.
 data CanEqLHS
   = TyVarLHS TcTyVar
-  | TyFamLHS TyCon  -- ^ of the family
-             [Xi]   -- ^ exactly saturating the family
+  | TyFamLHS TyCon  -- ^ TyCon of the family
+             [Xi]   -- ^ Arguments, /exactly saturating/ the family
 
 instance Outputable CanEqLHS where
   ppr (TyVarLHS tv)              = ppr tv
@@ -478,7 +480,7 @@ isInsolubleReason AbstractTyConReason       = True
 --
 ------------------------------------------------------------------------------
 
--- | A set of problems in checking the validity of a type equality.
+-- | A /set/ of problems in checking the validity of a type equality.
 -- See 'checkTypeEq'.
 newtype CheckTyEqResult = CTER Word8
 
@@ -491,19 +493,34 @@ cterHasNoProblem :: CheckTyEqResult -> Bool
 cterHasNoProblem (CTER 0) = True
 cterHasNoProblem _        = False
 
--- | An individual problem that might be logged in a 'CheckTyEqResult'
+-- | An /individual/ problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
-cteImpredicative, cteTypeFamily, cteInsolubleOccurs, cteSolubleOccurs :: CheckTyEqProblem
-cteImpredicative   = CTEP (bit 0)   -- forall or (=>) encountered
-cteTypeFamily      = CTEP (bit 1)   -- type family encountered
-cteInsolubleOccurs = CTEP (bit 2)   -- occurs-check
-cteSolubleOccurs   = CTEP (bit 3)   -- occurs-check under a type function or in a coercion
-                                    -- must be one bit to the left of cteInsolubleOccurs
--- See also Note [Insoluble occurs check] in GHC.Tc.Errors
+cteImpredicative, cteTypeFamily, cteInsolubleOccurs,
+  cteSolubleOccurs, cteCoercionHole, cteConcrete,
+  cteSkolemEscape :: CheckTyEqProblem
+cteImpredicative   = CTEP (bit 0)   -- Forall or (=>) encountered
+cteTypeFamily      = CTEP (bit 1)   -- Type family encountered
+
+cteInsolubleOccurs = CTEP (bit 2)   -- Occurs-check
+cteSolubleOccurs   = CTEP (bit 3)   -- Occurs-check under a type function, or in a coercion,
+                                    -- or in a representational equality; see
+   -- See Note [Occurs check and representational equality]
+   -- cteSolubleOccurs must be one bit to the left of cteInsolubleOccurs
+   -- See also Note [Insoluble occurs check] in GHC.Tc.Errors
+
+cteCoercionHole    = CTEP (bit 4)   -- Coercion hole encountered
+cteConcrete        = CTEP (bit 5)   -- Type variable that can't be made concrete
+                                    --    e.g. alpha[conc] ~ Maybe beta[tv]
+cteSkolemEscape    = CTEP (bit 6)   -- Skolem escape e.g.  alpha[2] ~ b[sk,4]
 
 cteProblem :: CheckTyEqProblem -> CheckTyEqResult
 cteProblem (CTEP mask) = CTER mask
+
+impredicativeProblem, insolubleOccursProblem, solubleOccursProblem :: CheckTyEqResult
+impredicativeProblem   = cteProblem cteImpredicative
+insolubleOccursProblem = cteProblem cteInsolubleOccurs
+solubleOccursProblem   = cteProblem cteSolubleOccurs
 
 occurs_mask :: Word8
 occurs_mask = insoluble_mask .|. soluble_mask
@@ -518,6 +535,9 @@ CTER bits `cterHasProblem` CTEP mask = (bits .&. mask) /= 0
 -- | Check whether a 'CheckTyEqResult' has one 'CheckTyEqProblem' and no other
 cterHasOnlyProblem :: CheckTyEqResult -> CheckTyEqProblem -> Bool
 CTER bits `cterHasOnlyProblem` CTEP mask = bits == mask
+
+cterHasOnlyProblems :: CheckTyEqResult -> CheckTyEqResult -> Bool
+CTER bits `cterHasOnlyProblems` CTER mask = (bits .&. complement mask) == 0
 
 cterRemoveProblem :: CheckTyEqResult -> CheckTyEqProblem -> CheckTyEqResult
 cterRemoveProblem (CTER bits) (CTEP mask) = CTER (bits .&. complement mask)
@@ -555,18 +575,31 @@ instance Semigroup CheckTyEqResult where
 instance Monoid CheckTyEqResult where
   mempty = cteOK
 
+instance Eq CheckTyEqProblem where
+  (CTEP b1) == (CTEP b2) = b1==b2
+
+instance Outputable CheckTyEqProblem where
+  ppr prob@(CTEP bits) = case lookup prob allBits of
+                Just s  -> text s
+                Nothing -> text "unknown:" <+> ppr bits
+
 instance Outputable CheckTyEqResult where
-  ppr cter | cterHasNoProblem cter = text "cteOK"
+  ppr cter | cterHasNoProblem cter
+           = text "cteOK"
            | otherwise
-           = parens $ fcat $ intersperse vbar $ set_bits
-    where
-      all_bits = [ (cteImpredicative,   "cteImpredicative")
-                 , (cteTypeFamily,      "cteTypeFamily")
-                 , (cteInsolubleOccurs, "cteInsolubleOccurs")
-                 , (cteSolubleOccurs,   "cteSolubleOccurs") ]
-      set_bits = [ text str
-                 | (bitmask, str) <- all_bits
-                 , cter `cterHasProblem` bitmask ]
+           = braces $ fcat $ intersperse vbar $
+             [ text str
+             | (bitmask, str) <- allBits
+             , cter `cterHasProblem` bitmask ]
+
+allBits :: [(CheckTyEqProblem, String)]
+allBits = [ (cteImpredicative,   "cteImpredicative")
+          , (cteTypeFamily,      "cteTypeFamily")
+          , (cteInsolubleOccurs, "cteInsolubleOccurs")
+          , (cteSolubleOccurs,   "cteSolubleOccurs")
+          , (cteConcrete,        "cteConcrete")
+          , (cteSkolemEscape,    "cteSkolemEscape")
+          , (cteCoercionHole,    "cteCoercionHole") ]
 
 {- Note [CIrredCan constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -735,6 +768,11 @@ canEqLHS_maybe xi
   | Just tv <- getTyVar_maybe xi
   = Just $ TyVarLHS tv
 
+  | otherwise
+  = canTyFamEqLHS_maybe xi
+
+canTyFamEqLHS_maybe :: Xi -> Maybe CanEqLHS
+canTyFamEqLHS_maybe xi
   | Just (tc, args) <- tcSplitTyConApp_maybe xi
   , isTypeFamilyTyCon tc
   , args `lengthIs` tyConArity tc
@@ -1193,11 +1231,11 @@ nonDefaultableTyVarsOfWC (WC { wc_simple = simples, wc_impl = implics, wc_errors
           EqPred NomEq lhs rhs
             | Just tv <- getTyVar_maybe lhs
             , isConcreteTyVar tv
-            , not (isConcrete rhs)
+            , not (isConcreteType rhs)
             -> unitVarSet tv
             | Just tv <- getTyVar_maybe rhs
             , isConcreteTyVar tv
-            , not (isConcrete lhs)
+            , not (isConcreteType lhs)
             -> unitVarSet tv
           _ -> emptyVarSet
 

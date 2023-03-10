@@ -893,12 +893,14 @@ isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
   | GhcRn <- ghcPass @p          = go_x_rn x
   where
+    go_x_tc :: XXExprGhcTc -> Bool
     go_x_tc (WrapExpr      (HsWrap _ e))     = isAtomicHsExpr e
     go_x_tc (ExpansionExpr (HsExpanded a _)) = isAtomicHsExpr a
     go_x_tc (ConLikeTc {})                   = True
     go_x_tc (HsTick {}) = False
     go_x_tc (HsBinTick {}) = False
 
+    go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
     go_x_rn (HsExpanded a _) = isAtomicHsExpr a
 
 isAtomicHsExpr _ = False

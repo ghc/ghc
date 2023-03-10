@@ -3366,10 +3366,10 @@ pprTcSolverReportMsg ctxt
      , mismatchTyVarInfo     = tv_info
      , mismatchAmbiguityInfo = ambig_infos
      , mismatchCoercibleInfo = coercible_info })
-  = hang (pprMismatchMsg ctxt mismatch_msg)
-     2 (vcat ( maybe empty (pprTyVarInfo ctxt) tv_info
-             : maybe empty pprCoercibleMsg coercible_info
-             : map pprAmbiguityInfo ambig_infos ))
+  = vcat ([ pprMismatchMsg ctxt mismatch_msg
+          , maybe empty (pprTyVarInfo ctxt) tv_info
+          , maybe empty pprCoercibleMsg coercible_info ]
+          ++ (map pprAmbiguityInfo ambig_infos))
 pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
   vcat (map make_msg frr_origs)
   where
@@ -3418,7 +3418,7 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
         CastTy inner_ty _
           -- A confusing cast is one that is responsible
           -- for a representation-polymorphism error.
-          -> isConcrete (typeKind inner_ty)
+          -> isConcreteType (typeKind inner_ty)
         _ -> False
 
     type_printout :: Type -> SDoc

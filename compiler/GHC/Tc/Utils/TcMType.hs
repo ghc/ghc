@@ -23,8 +23,10 @@ module GHC.Tc.Utils.TcMType (
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
   newOpenBoxedTypeKind,
-  newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
-  newAnonMetaTyVar, newConcreteTyVar, cloneMetaTyVar,
+  newMetaKindVar, newMetaKindVars,
+  newMetaTyVarTyAtLevel, newMetaTyVarTyWithInfo,
+  newAnonMetaTyVar, newConcreteTyVar,
+  cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
 
   newMultiplicityVar,
@@ -823,7 +825,7 @@ cloneTyVarTyVar name kind
 newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin
                  -> FastString -> TcKind -> TcM TcTyVar
 newConcreteTyVar reason fs kind
-  = assertPpr (isConcrete kind) assert_msg $
+  = assertPpr (isConcreteType kind) assert_msg $
     newNamedAnonMetaTyVar fs (ConcreteTv reason) kind
   where
     assert_msg = text "newConcreteTyVar: non-concrete kind" <+> ppr kind
@@ -882,6 +884,18 @@ cloneMetaTyVar tv
                            _ -> pprPanic "cloneMetaTyVar" (ppr tv)
               tyvar = mkTcTyVar name' (tyVarKind tv) details'
         ; traceTc "cloneMetaTyVar" (ppr tyvar)
+        ; return tyvar }
+
+cloneMetaTyVarWithInfo :: MetaInfo -> TcLevel -> TcTyVar -> TcM TcTyVar
+cloneMetaTyVarWithInfo info tc_lvl tv
+  = assert (isTcTyVar tv) $
+    do  { ref  <- newMutVar Flexi
+        ; name' <- cloneMetaTyVarName (tyVarName tv)
+        ; let details = MetaTv { mtv_info  = info
+                               , mtv_ref   = ref
+                               , mtv_tclvl = tc_lvl }
+              tyvar = mkTcTyVar name' (tyVarKind tv) details
+        ; traceTc "cloneMetaTyVarWithInfo" (ppr tyvar)
         ; return tyvar }
 
 -- Works for both type and kind variables
@@ -955,7 +969,7 @@ writeMetaTyVarRef tyvar ref ty
        ; let zonked_ty_kind = typeKind zonked_ty
              zonked_ty_lvl  = tcTypeLevel zonked_ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
-             level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
+             level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty $$ ppr zonked_ty
              kind_check_ok = zonked_ty_kind `eqType` zonked_tv_kind
              -- Note [Extra-constraint holes in partial type signatures] in GHC.Tc.Gen.HsType
 
@@ -1098,6 +1112,15 @@ newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
   = do  { details <- newTauTvDetailsAtLevel tc_lvl
         ; name    <- newMetaTyVarName (fsLit "p")
+        ; return (mkTyVarTy (mkTcTyVar name kind details)) }
+
+newMetaTyVarTyWithInfo :: TcLevel -> MetaInfo -> TcKind -> TcM TcType
+newMetaTyVarTyWithInfo tc_lvl info kind
+  = do { ref <- newMutVar Flexi
+       ; let details = MetaTv { mtv_info  = info
+                              , mtv_ref   = ref
+                              , mtv_tclvl = tc_lvl }
+        ; name <- newMetaTyVarName (fsLit "p")
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
 {- *********************************************************************

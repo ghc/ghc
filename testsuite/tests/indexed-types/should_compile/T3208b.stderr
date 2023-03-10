@@ -1,6 +1,6 @@
 
 T3208b.hs:15:10: error: [GHC-05617]
-    • Could not deduce ‘OTerm o0 ~ STerm a’ arising from a use of ‘fce’
+    • Could not deduce ‘STerm o0 ~ OTerm a’ arising from a use of ‘fce’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
         bound by the type signature for:
                    fce' :: forall a c.
@@ -15,7 +15,7 @@ T3208b.hs:15:10: error: [GHC-05617]
         fce' :: a -> c (bound at T3208b.hs:15:1)
 
 T3208b.hs:15:15: error: [GHC-05617]
-    • Could not deduce ‘STerm o0 ~ STerm a’
+    • Could not deduce ‘OTerm o0 ~ OTerm a’
         arising from a use of ‘apply’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
         bound by the type signature for:
@@ -23,7 +23,7 @@ T3208b.hs:15:15: error: [GHC-05617]
                            (OTerm a ~ STerm a, OBJECT a, SUBST a) =>
                            a -> c
         at T3208b.hs:14:1-56
-      NB: ‘STerm’ is a non-injective type family
+      NB: ‘OTerm’ is a non-injective type family
       The type variable ‘o0’ is ambiguous
     • In the first argument of ‘fce’, namely ‘(apply f)’
       In the expression: fce (apply f)

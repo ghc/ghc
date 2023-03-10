@@ -21,7 +21,8 @@ piResultTy :: HasDebugCallStack => Type -> Type -> Type
 typeKind :: HasDebugCallStack => Type -> Type
 typeTypeOrConstraint :: HasDebugCallStack => Type -> TypeOrConstraint
 
-coreView :: Type -> Maybe Type
+coreView       :: Type -> Maybe Type
+rewriterView   :: Type -> Maybe Type
 isRuntimeRepTy :: Type -> Bool
 isLevityTy :: Type -> Bool
 isMultiplicityTy :: Type -> Bool
