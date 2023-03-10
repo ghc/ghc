@@ -1859,11 +1859,12 @@ tryEtaExpandRhs :: SimplEnv -> BindContext -> OutId -> OutExpr
                 -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 tryEtaExpandRhs env bind_cxt bndr rhs
-  | do_eta_expand           -- If the current manifest arity isn't enough
-                            --    (never true for join points)
-  , seEtaExpand env         -- and eta-expansion is on
-  , wantEtaExpansion rhs
-  = -- Do eta-expansion.
+  | seEtaExpand env         -- If Eta-expansion is on
+  , wantEtaExpansion rhs    -- and we'd like to eta-expand e
+  , do_eta_expand           -- and e's manifest arity is lower than
+                            --     what it could be
+                            --     (never true for join points)
+  =                         -- Do eta-expansion.
     assertPpr( not (isJoinBC bind_cxt) ) (ppr bndr) $
        -- assert: this never happens for join points; see GHC.Core.Opt.Arity
        --         Note [Do not eta-expand join points]
