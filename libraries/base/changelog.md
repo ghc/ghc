@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.18.0.0 *TBA*
+## 4.18.0.0 *March 2023*
 
   * Add `INLINABLE` pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
