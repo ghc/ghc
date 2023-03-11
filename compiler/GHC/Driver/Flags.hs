@@ -706,6 +706,7 @@ data WarningFlag =
    | Opt_WarnInconsistentFlags                       -- Since 9.8
    | Opt_WarnDataKindsTC                             -- Since 9.10
    | Opt_WarnDeprecatedTypeAbstractions              -- Since 9.10
+   | Opt_WarnDefaultedExceptionContext               -- Since 9.10
    deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | Return the names of a WarningFlag
@@ -821,6 +822,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnInconsistentFlags                       -> "inconsistent-flags" :| []
   Opt_WarnDataKindsTC                             -> "data-kinds-tc" :| []
   Opt_WarnDeprecatedTypeAbstractions              -> "deprecated-type-abstractions" :| []
+  Opt_WarnDefaultedExceptionContext               -> "defaulted-exception-context" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

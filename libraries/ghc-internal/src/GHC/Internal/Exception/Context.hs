@@ -46,6 +46,9 @@ import GHC.Internal.Data.Type.Equality ( (:~~:)(HRefl) )
 --
 -- 'ExceptionContext's can be merged via concatenation using the 'Semigroup'
 -- instance or 'mergeExceptionContext'.
+--
+-- Note that GHC will automatically solve implicit constraints of type 'ExceptionContext'
+-- with 'emptyExceptionContext'.
 data ExceptionContext = ExceptionContext [SomeExceptionAnnotation]
 
 instance Semigroup ExceptionContext where

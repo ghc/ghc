@@ -2594,6 +2594,23 @@ of ``-W(no-)*``.
     removed. Users can enable the :extension:`DataKinds` extension to avoid
     issues (thus silencing the warning).
 
+.. ghc-flag:: -Wdefaulted-exception-context
+    :shortdesc: warn when an :base-ref:`Control.Exception.Context.ExceptionContext`
+                implicit parameter is defaulted to
+                :base-ref:`Control.Exception.Context.emptyExceptionContext`.
+    :type: dynamic
+    :reverse: -Wnop-defaulted-exception-context
+
+    :since: 9.10.1
+
+    Introduced in GHC 9.10.1 with the introduction of an implicit
+    :base-ref:`Control.Exception.Context.ExceptionContext`` context to
+    :base-ref:`Control.Exception.SomeException`. To preserve compatibility
+    with earlier compilers, this constraints is implicitly defaulted to
+    :base-ref:`Control.Exception.Context.emptyExceptionContext` when no other
+    evidence is available. As this behavior may result in dropped exception context
+    this warning is provided to give notice when defaulting occurs.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
