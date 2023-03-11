@@ -542,10 +542,11 @@ simplifyTopWanteds wanteds
 defaultExceptionContext :: Ct -> MaybeT TcS ()
 defaultExceptionContext ct
   = do { ClassPred cls tys <- pure $ classifyPredType (ctPred ct)
-       ; Just {} <- pure $ isCallStackPred cls tys
+       ; Just {} <- pure $ isExceptionContextPred cls tys
        ; emptyEC <- Var <$> lift (lookupId emptyExceptionContextName)
        ; let ev = ctEvidence ct
        ; let ev_tm = mkEvCast emptyEC (wrapIP (ctEvPred ev))
+       ; lift $ warnTcS $ TcRnDefaultedExceptionContext (ctLoc ct)
        ; lift $ setEvBindIfWanted ev ev_tm
        }
 

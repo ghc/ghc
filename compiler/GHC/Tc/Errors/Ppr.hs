@@ -1238,6 +1238,18 @@ instance Diagnostic TcRnMessage where
           = vcat [ text "Starting from GHC 9.10, this warning will turn into an error." ]
         user_manual =
           vcat [ text "See the user manual, § Undecidable instances and loopy superclasses." ]
+    TcRnDefaultedExceptionContext ct_loc ->
+      mkSimpleDecorated $ vcat [ header, warning, proposal ]
+      where
+        header, warning, proposal :: SDoc
+        header
+          = vcat [ text "Solving for an implicit ExceptionContext constraint"
+                 , nest 2 $ pprCtOrigin (ctLocOrigin ct_loc) <> text "." ]
+        warning
+          = vcat [ text "Future versions of GHC will turn this warning into an error." ]
+        proposal
+          = vcat [ text "See GHC Proposal #330." ]
+
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1646,6 +1658,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnLoopySuperclassSolve{}
       -> WarningWithFlag Opt_WarnLoopySuperclassSolve
+    TcRnDefaultedExceptionContext{}
+      -> WarningWithoutFlag --WarningWithFlag TODO
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2064,6 +2078,8 @@ instance Diagnostic TcRnMessage where
         cls_or_qc = case ctLocOrigin wtd_loc of
           ScOrigin c_or_q _ -> c_or_q
           _                 -> IsClsInst -- shouldn't happen
+    TcRnDefaultedExceptionContext _
+      -> noHints
 
   diagnosticCode = constructorCode
 
