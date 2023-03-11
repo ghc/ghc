@@ -123,7 +123,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Lexeme
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
-import GHC.Utils.Exception (throwIO, ErrorCall(..), SomeException(..))
+import GHC.Utils.Exception (throwIO, ErrorCall(..))
 
 import GHC.Utils.TmpFs ( newTempName, TempFileLifetime(..) )
 
