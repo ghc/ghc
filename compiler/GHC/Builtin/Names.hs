@@ -456,6 +456,10 @@ basicKnownKeyNames
         -- Overloaded record fields
         hasFieldClassName,
 
+        -- ExceptionContext
+        exceptionContextTyConName,
+        emptyExceptionContextName,
+
         -- Call Stacks
         callStackTyConName,
         emptyCallStackName, pushCallStackName,
@@ -565,7 +569,8 @@ gHC_PRIM, gHC_PRIM_PANIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, gHC_DESUGAR, rANDOM, gHC_EXTS, gHC_IS_LIST,
-    cONTROL_EXCEPTION_BASE, gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
+    cONTROL_EXCEPTION_BASE, gHC_EXCEPTION_CONTEXT,
+    gHC_TYPEERROR, gHC_TYPELITS, gHC_TYPELITS_INTERNAL,
     gHC_TYPENATS, gHC_TYPENATS_INTERNAL,
     dATA_COERCE, dEBUG_TRACE, uNSAFE_COERCE, fOREIGN_C_CONSTPTR :: Module
 
@@ -627,6 +632,7 @@ rANDOM          = mkGhcInternalModule (fsLit "System.Random")
 gHC_EXTS        = mkGhcInternalModule (fsLit "GHC.Exts")
 gHC_IS_LIST     = mkGhcInternalModule (fsLit "GHC.IsList")
 cONTROL_EXCEPTION_BASE = mkGhcInternalModule (fsLit "Control.Exception.Base")
+gHC_EXCEPTION_CONTEXT = mkGhcInternalModule (fsLit "GHC.Exception.Context")
 gHC_GENERICS    = mkGhcInternalModule (fsLit "GHC.Generics")
 gHC_TYPEERROR   = mkGhcInternalModule (fsLit "GHC.TypeError")
 gHC_TYPELITS    = mkGhcInternalModule (fsLit "GHC.TypeLits")
@@ -1607,6 +1613,13 @@ hasFieldClassName :: Name
 hasFieldClassName
  = clsQual gHC_RECORDS (fsLit "HasField") hasFieldClassNameKey
 
+-- ExceptionContext
+exceptionContextTyConName, emptyExceptionContextName :: Name
+exceptionContextTyConName =
+    tcQual gHC_EXCEPTION_CONTEXT (fsLit "ExceptionContext") exceptionContextTyConKey
+emptyExceptionContextName
+  = varQual gHC_EXCEPTION_CONTEXT (fsLit "emptyExceptionContext") emptyExceptionContextKey
+
 -- Source Locations
 callStackTyConName, emptyCallStackName, pushCallStackName,
   srcLocDataConName :: Name
@@ -2086,6 +2099,9 @@ constPtrTyConKey = mkPreludeTyConUnique 417
 
 jsvalTyConKey = mkPreludeTyConUnique 418
 
+exceptionContextTyConKey :: Unique
+exceptionContextTyConKey = mkPreludeTyConUnique 420
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2535,6 +2551,9 @@ fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 560
 
 makeStaticKey :: Unique
 makeStaticKey = mkPreludeMiscIdUnique 561
+
+emptyExceptionContextKey :: Unique
+emptyExceptionContextKey = mkPreludeMiscIdUnique 562
 
 -- Unsafe coercion proofs
 unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: Unique

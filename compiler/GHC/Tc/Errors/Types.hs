@@ -4240,6 +4240,14 @@ data TcRnMessage where
   -}
   TcRnIllegalInvisibleTypePattern :: HsTyPat GhcPs -> TcRnMessage
 
+  {-| TcRnDefaultedExceptionContext is a warning that is triggered when the
+      backward-compatibility logic solving for implicit ExceptionContext
+      constraints fires.
+
+      Test cases: DefaultExceptionContext
+  -}
+  TcRnDefaultedExceptionContext :: CtLoc -> TcRnMessage
+
   deriving Generic
 
 ----

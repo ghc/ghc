@@ -587,6 +587,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindingNameConflict"                       = 10498
   GhcDiagnosticCode "NonCanonicalMonoid"                            = 50928
   GhcDiagnosticCode "NonCanonicalMonad"                             = 22705
+  GhcDiagnosticCode "TcRnDefaultedExceptionContext"                 = 46235
   GhcDiagnosticCode "TcRnImplicitImportOfPrelude"                   = 20540
   GhcDiagnosticCode "TcRnMissingMain"                               = 67120
   GhcDiagnosticCode "TcRnGhciUnliftedBind"                          = 17999
