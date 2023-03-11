@@ -44,7 +44,9 @@ start with the event type id and a 64-bit timestamp:
 
     EventLog :
           EVENT_HEADER_BEGIN
+          EVENT_HET_BEGIN -- header event types begin
           EventType*
+          EVENT_HET_END -- header event types end
           EVENT_HEADER_END
           EVENT_DATA_BEGIN
           Event*
@@ -200,7 +202,7 @@ Thread and scheduling events
 .. event-type:: THREAD_LABEL
 
    :tag: 44
-   :length: fixed
+   :length: variable
    :field ThreadId: thread id
    :field String: label
 
@@ -332,9 +334,10 @@ in :ref:`nonmoving-gc-events`.
    :field Word64: bytes of fragmentation, the difference between total mblock size
                   and total block size. When all mblocks are full of full blocks,
                   this number is 0.
-   :field Word64: number of parallel garbage collection threads
+   :field Word32: number of parallel garbage collection threads
    :field Word64: maximum number of bytes copied by any single collector thread
    :field Word64: total bytes copied by all collector threads
+   :field Word64: the amount of balanced data copied by all threads
 
    Report various information about a major collection.
 
@@ -549,10 +552,10 @@ Tracing events
 .. event-type:: BLOCK_MARKER
 
    :tag: 18
-   :length: variable
+   :length: fixed
    :field Word32: size
    :field Word64: end time in nanoseconds
-   :field String: marker name
+   :field Word16: capability number
 
    TODO
 
