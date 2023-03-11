@@ -553,11 +553,12 @@ Tracing events
 
    :tag: 18
    :length: fixed
-   :field Word32: size
+   :field Word32: block size
    :field Word64: end time in nanoseconds
-   :field Word16: capability number
+   :field Word16: capability number, invalid if ``0xffff``.
 
-   TODO
+   Marks a chunk of events. The events that fit in the next ``block size``
+   bytes all belong to the block marker capability.
 
 .. event-type:: USER_MSG
 
