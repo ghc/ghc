@@ -2301,6 +2301,7 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnIncompleteRecordSelectors -> warnSpec x
   Opt_WarnDataKindsTC -> warnSpec x
   Opt_WarnDeprecatedTypeAbstractions -> warnSpec x
+  Opt_WarnDefaultedExceptionContext -> warnSpec x
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]
 warningGroupsDeps = map mk warningGroups

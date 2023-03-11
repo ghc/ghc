@@ -456,6 +456,10 @@ basicKnownKeyNames
         -- Overloaded record fields
         hasFieldClassName,
 
+        -- ExceptionContext
+        exceptionContextTyConName,
+        emptyExceptionContextName,
+
         -- Call Stacks
         callStackTyConName,
         emptyCallStackName, pushCallStackName,
@@ -577,6 +581,7 @@ gHC_INTERNAL_BASE, gHC_INTERNAL_ENUM,
     gHC_INTERNAL_SHOW, gHC_INTERNAL_READ, gHC_INTERNAL_NUM, gHC_INTERNAL_MAYBE,
     gHC_INTERNAL_LIST, gHC_INTERNAL_TUPLE, gHC_INTERNAL_DATA_EITHER,
     gHC_INTERNAL_DATA_FOLDABLE, gHC_INTERNAL_DATA_TRAVERSABLE,
+    gHC_INTERNAL_EXCEPTION_CONTEXT,
     gHC_INTERNAL_CONC, gHC_INTERNAL_IO, gHC_INTERNAL_IO_Exception,
     gHC_INTERNAL_ST, gHC_INTERNAL_IX, gHC_INTERNAL_STABLE, gHC_INTERNAL_PTR, gHC_INTERNAL_ERR, gHC_INTERNAL_REAL,
     gHC_INTERNAL_FLOAT, gHC_INTERNAL_TOP_HANDLER, gHC_INTERNAL_SYSTEM_IO, gHC_INTERNAL_DYNAMIC,
@@ -628,6 +633,7 @@ gHC_INTERNAL_RANDOM                 = mkGhcInternalModule (fsLit "GHC.Internal.S
 gHC_INTERNAL_EXTS                   = mkGhcInternalModule (fsLit "GHC.Internal.Exts")
 gHC_INTERNAL_IS_LIST                = mkGhcInternalModule (fsLit "GHC.Internal.IsList")
 gHC_INTERNAL_CONTROL_EXCEPTION_BASE = mkGhcInternalModule (fsLit "GHC.Internal.Control.Exception.Base")
+gHC_INTERNAL_EXCEPTION_CONTEXT = mkGhcInternalModule (fsLit "GHC.Internal.Exception.Context")
 gHC_INTERNAL_GENERICS               = mkGhcInternalModule (fsLit "GHC.Internal.Generics")
 gHC_INTERNAL_TYPEERROR              = mkGhcInternalModule (fsLit "GHC.Internal.TypeError")
 gHC_INTERNAL_TYPELITS               = mkGhcInternalModule (fsLit "GHC.Internal.TypeLits")
@@ -1615,6 +1621,13 @@ hasFieldClassName :: Name
 hasFieldClassName
  = clsQual gHC_INTERNAL_RECORDS (fsLit "HasField") hasFieldClassNameKey
 
+-- ExceptionContext
+exceptionContextTyConName, emptyExceptionContextName :: Name
+exceptionContextTyConName =
+    tcQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "ExceptionContext") exceptionContextTyConKey
+emptyExceptionContextName
+  = varQual gHC_INTERNAL_EXCEPTION_CONTEXT (fsLit "emptyExceptionContext") emptyExceptionContextKey
+
 -- Source Locations
 callStackTyConName, emptyCallStackName, pushCallStackName,
   srcLocDataConName :: Name
@@ -2094,6 +2107,9 @@ constPtrTyConKey = mkPreludeTyConUnique 417
 
 jsvalTyConKey = mkPreludeTyConUnique 418
 
+exceptionContextTyConKey :: Unique
+exceptionContextTyConKey = mkPreludeTyConUnique 420
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2543,6 +2559,9 @@ fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 560
 
 makeStaticKey :: Unique
 makeStaticKey = mkPreludeMiscIdUnique 561
+
+emptyExceptionContextKey :: Unique
+emptyExceptionContextKey = mkPreludeMiscIdUnique 562
 
 -- Unsafe coercion proofs
 unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: Unique

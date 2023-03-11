@@ -1,0 +1,6 @@
+
+WarnDefaultedExceptionContext.hs:1:1: warning: [GHC-46235] [-Wdefaulted-exception-context]
+    Solving for an implicit ExceptionContext constraint
+      arising from a use of ‘SomeException’.
+    Future versions of GHC will turn this warning into an error.
+    See GHC Proposal #330.
