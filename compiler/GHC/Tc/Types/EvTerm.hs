@@ -38,7 +38,9 @@ evDelayedError ty msg
 evCallStack :: (MonadThings m, HasModule m, HasDynFlags m) =>
     EvCallStack -> m EvExpr
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-evCallStack cs = do
+evCallStack EvCsEmpty =
+  Var <$> lookupId emptyCallStackName
+evCallStack (EvCsPushCall fs loc tm) = do
   df            <- getDynFlags
   let platform = targetPlatform df
   m             <- getModule
@@ -52,8 +54,6 @@ evCallStack cs = do
                         , return $ mkIntExprInt platform (srcSpanEndLine l)
                         , return $ mkIntExprInt platform (srcSpanEndCol l)
                         ]
-
-  emptyCS <- Var <$> lookupId emptyCallStackName
 
   pushCSVar <- lookupId pushCallStackName
   let pushCS name loc rest =
@@ -69,6 +69,4 @@ evCallStack cs = do
         let ip_co = unwrapIP (exprType tm)
         return (pushCS nameExpr locExpr (Cast tm ip_co))
 
-  case cs of
-    EvCsPushCall fs loc tm -> mkPush fs loc tm
-    EvCsEmpty              -> return emptyCS
+  mkPush fs loc tm
