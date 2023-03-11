@@ -26,7 +26,8 @@ module GHC.Core.Predicate (
 
   -- Implicit parameters
   isIPLikePred, hasIPSuperClasses, isIPTyCon, isIPClass,
-  isCallStackTy, isCallStackPred, isCallStackPredTy,
+  isCallStackPred, isCallStackPredTy,
+  isExceptionContextPred,
   isIPPred_maybe,
 
   -- Evidence variables
@@ -289,6 +290,28 @@ has_ip_super_classes rec_clss cls tys
 
 initIPRecTc :: RecTcChecker
 initIPRecTc = setRecTcMaxBound 1 initRecTc
+
+-- --------------------- ExceptionContext predicates --------------------------
+
+-- | Is a 'PredType' an @ExceptionContext@ implicit parameter?
+--
+-- If so, return the name of the parameter.
+isExceptionContextPred :: Class -> [Type] -> Maybe FastString
+isExceptionContextPred cls tys
+  | [ty1, ty2] <- tys
+  , isIPClass cls
+  , isExceptionContextTy ty2
+  = isStrLitTy ty1
+  | otherwise
+  = Nothing
+
+-- | Is a type a 'CallStack'?
+isExceptionContextTy :: Type -> Bool
+isExceptionContextTy ty
+  | Just tc <- tyConAppTyCon_maybe ty
+  = tc `hasKey` exceptionContextTyConKey
+  | otherwise
+  = False
 
 -- --------------------- CallStack predicates ---------------------------------
 

@@ -57,11 +57,13 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Ppr
+import GHC.Core (Expr(Var))
 import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
 import GHC.Builtin.Types ( liftedRepTy, liftedDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Types.TyThing ( MonadThings(lookupId) )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Basic    ( IntWithInf, intGtLimit
@@ -73,7 +75,8 @@ import Control.Monad
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Data.Maybe     ( mapMaybe, isJust )
+import GHC.Data.Maybe     ( mapMaybe, isJust, runMaybeT, MaybeT )
+import Control.Monad.Trans.Class (lift)
 
 {-
 *********************************************************************************
@@ -534,46 +537,65 @@ simplifyTopWanteds wanteds
 
     try_callstack_defaulting :: WantedConstraints -> TcS WantedConstraints
     try_callstack_defaulting wc
-      | isEmptyWC wc
-      = return wc
-      | otherwise
-      = defaultCallStacks wc
+      = defaultConstraints [defaultCallStack, defaultExceptionContext] wc
+
+defaultExceptionContext :: Ct -> MaybeT TcS ()
+defaultExceptionContext ct
+  = do { ClassPred cls tys <- pure $ classifyPredType (ctPred ct)
+       ; Just {} <- pure $ isCallStackPred cls tys
+       ; emptyEC <- Var <$> lift (lookupId emptyExceptionContextName)
+       ; let ev = ctEvidence ct
+       ; let ev_tm = mkEvCast emptyEC (wrapIP (ctEvPred ev))
+       ; lift $ setEvBindIfWanted ev ev_tm
+       }
 
 -- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
-defaultCallStacks :: WantedConstraints -> TcS WantedConstraints
 -- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
-defaultCallStacks wanteds
+defaultCallStack :: Ct -> MaybeT TcS ()
+defaultCallStack ct
+  = do { ClassPred cls tys <- pure $ classifyPredType (ctPred ct)
+       ; Just {} <- pure $ isCallStackPred cls tys
+       ; lift $ solveCallStack (ctEvidence ct) EvCsEmpty
+       }
+
+defaultConstraints :: [Ct -> MaybeT TcS ()]
+                   -> WantedConstraints
+                   -> TcS WantedConstraints
+-- See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
+defaultConstraints defaulting_strategies wanteds
+  | isEmptyWC wanteds = return wanteds
+  | otherwise
   = do simples <- handle_simples (wc_simple wanteds)
        mb_implics <- mapBagM handle_implic (wc_impl wanteds)
        return (wanteds { wc_simple = simples
                        , wc_impl = catBagMaybes mb_implics })
-
   where
+    handle_simples :: Bag Ct -> TcS (Bag Ct)
+    handle_simples simples
+      = catBagMaybes <$> mapBagM handle_simple simples
+      where
+        handle_simple :: Ct -> TcS (Maybe Ct)
+        handle_simple ct = go defaulting_strategies
+          where
+            go [] = return (Just ct)
+            go (f:fs) = do
+                mb <- runMaybeT (f ct)
+                case mb of
+                  Just () -> return Nothing
+                  Nothing -> go fs
 
-  handle_simples simples
-    = catBagMaybes <$> mapBagM defaultCallStack simples
-
-  handle_implic :: Implication -> TcS (Maybe Implication)
-  -- The Maybe is because solving the CallStack constraint
-  -- may well allow us to discard the implication entirely
-  handle_implic implic
-    | isSolvedStatus (ic_status implic)
-    = return (Just implic)
-    | otherwise
-    = do { wanteds <- setEvBindsTcS (ic_binds implic) $
-                      -- defaultCallStack sets a binding, so
-                      -- we must set the correct binding group
-                      defaultCallStacks (ic_wanted implic)
-         ; setImplicationStatus (implic { ic_wanted = wanteds }) }
-
-  defaultCallStack ct
-    | ClassPred cls tys <- classifyPredType (ctPred ct)
-    , Just {} <- isCallStackPred cls tys
-    = do { solveCallStack (ctEvidence ct) EvCsEmpty
-         ; return Nothing }
-
-  defaultCallStack ct
-    = return (Just ct)
+    handle_implic :: Implication -> TcS (Maybe Implication)
+    -- The Maybe is because solving the CallStack constraint
+    -- may well allow us to discard the implication entirely
+    handle_implic implic
+      | isSolvedStatus (ic_status implic)
+      = return (Just implic)
+      | otherwise
+      = do { wanteds <- setEvBindsTcS (ic_binds implic) $
+                        -- defaultCallStack sets a binding, so
+                        -- we must set the correct binding group
+                        defaultConstraints defaulting_strategies (ic_wanted implic)
+           ; setImplicationStatus (implic { ic_wanted = wanteds }) }
 
 
 {- Note [When to do type-class defaulting]
