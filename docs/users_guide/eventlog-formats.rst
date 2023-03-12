@@ -539,6 +539,15 @@ Task events
 
    Marks the migration of a task to a new capability.
 
+.. event-type:: TASK_DELETE
+
+   :tag: 57
+   :length: fixed
+   :field TaskId: task id
+
+   Marks the deletion of a task.
+
+
 Tracing events
 ~~~~~~~~~~~~~~
 
