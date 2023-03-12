@@ -122,6 +122,18 @@ environment which the program is being run in.
 
    Describes the environment variables present in the program's environment.
 
+.. event-type:: WALL_CLOCK_TIME
+
+   :tag: 43
+   :length: fixed
+   :field CapSetId: Capability set
+   :field Word64: Unix epoch seconds
+   :field Word32: Nanoseconds
+
+   Records the wall clock time to make it possible to correlate events from
+   elsewhere with the eventlog.
+
+
 Thread and scheduling events
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
