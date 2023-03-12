@@ -164,6 +164,7 @@ Thread and scheduling events
       * 12: BlockedOnSTM
       * 13: BlockedOnDoProc
       * 16: BlockedOnMsgThrowTo
+      * 20: BlockedOnMVarRead
 
    :field ThreadId: thread id of thread being blocked on (only for some status
                     values)
