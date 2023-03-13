@@ -36,7 +36,7 @@ from my_typing import *
 from threading import Timer
 from collections import OrderedDict
 
-import threading
+import contextvars
 
 global wantToStop
 wantToStop = False
@@ -80,15 +80,15 @@ def get_all_ways() -> Set[WayName]:
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
 
-global testopts_local
-testopts_local = threading.local()
+global testopts_ctx_var
+testopts_ctx_var = contextvars.ContextVar('testopts_ctx_var') # type: ignore
 
 def getTestOpts() -> TestOptions:
-    return testopts_local.x
+    return testopts_ctx_var.get()
 
 def setLocalTestOpts(opts: TestOptions) -> None:
-    global testopts_local
-    testopts_local.x = opts
+    global testopts_ctx_var
+    testopts_ctx_var.set(opts)
 
 def isCross() -> bool:
     """ Are we testing a cross-compiler? """

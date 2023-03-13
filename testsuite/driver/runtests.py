@@ -309,7 +309,7 @@ if windows:
                 path = format_path(path)
                 ghc_env['PATH'] = os.pathsep.join([path, ghc_env.get("PATH", "")])
 
-testopts_local.x = TestOptions()
+testopts_ctx_var.set(TestOptions())
 
 # if timeout == -1 then we try to calculate a sensible value
 if config.timeout == -1:
