@@ -26,7 +26,7 @@ from pathlib import Path
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name
 from testglobals import getConfig, ghc_env, TestConfig, t, \
@@ -484,25 +484,28 @@ if config.list_broken:
 else:
     # Now run all the tests
     try:
-        with ThreadPoolExecutor(max_workers=config.threads) as executor:
+        async def run_parallelTests():
+            sem = asyncio.Semaphore(config.threads)
+            ts = []
+
             for oneTest in parallelTests:
                 if stopping():
                     break
-                oneTest(executor)
+                ts.append(oneTest(sem))
 
-            # wait for parallel tests to finish
-            if not stopping():
-                executor.shutdown(wait=True)
+            return await asyncio.gather(*ts)
+
+        # wait for parallel tests to finish
+        asyncio.run(run_parallelTests())
 
         # Run the following tests purely sequential
-        with ThreadPoolExecutor(max_workers=1) as executor:
+        async def run_aloneTests():
             for oneTest in aloneTests:
                 if stopping():
                     break
-                oneTest(executor)
+                await oneTest(None)
 
-            if not stopping():
-                executor.shutdown(wait=True)
+        asyncio.run(run_aloneTests())
 
     except KeyboardInterrupt:
         pass

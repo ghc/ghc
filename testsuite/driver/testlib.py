@@ -36,6 +36,7 @@ from my_typing import *
 from threading import Timer
 from collections import OrderedDict
 
+import asyncio
 import contextvars
 
 global wantToStop
@@ -209,14 +210,8 @@ def have_library(lib: str) -> bool:
 
         print(cmd_line)
 
-        p = subprocess.Popen(cmd_line,
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
-                             env=ghc_env)
-        # read from stdout and stderr to avoid blocking due to
-        # buffers filling
-        p.communicate()
-        r = p.wait()
+        cp = subprocess.run(cmd_line, capture_output=True, env=ghc_env)
+        r = cp.returncode
         got_it = r == 0
         have_lib_cache[lib] = got_it
 
@@ -1030,8 +1025,11 @@ parallelTests = []
 aloneTests = []
 allTestNames = set([])  # type: Set[TestName]
 
-def runTest(executor, opts, name: TestName, func, args):
-    return executor.submit(test_common_work, name, opts, func, args)
+async def runTest(sem, opts, name: TestName, func, args):
+    if sem is None:
+        return await test_common_work(name, opts, func, args)
+    async with sem:
+        return await test_common_work(name, opts, func, args)
 
 # name  :: String
 # setup :: [TestOpt] -> IO ()
@@ -1069,7 +1067,7 @@ def test(name: TestName,
     if name in config.broken_tests:
         myTestOpts.expect = 'fail'
 
-    thisTest = lambda executor: runTest(executor, myTestOpts, name, func, args)
+    thisTest = lambda sem: runTest(sem, myTestOpts, name, func, args)
     if myTestOpts.alone:
         aloneTests.append(thisTest)
     else:
@@ -1089,7 +1087,7 @@ do_not_copy = ('.hi', '.o', '.dyn_hi'
               , '.dyn_o', '.out'
               ,'.hi-boot', '.o-boot') # 12112
 
-def test_common_work(name: TestName, opts,
+async def test_common_work(name: TestName, opts,
                      func, args) -> None:
     try:
         t.total_tests += 1
@@ -1192,7 +1190,7 @@ def test_common_work(name: TestName, opts,
             if stopping():
                 break
             try:
-                do_test(name, way, func, args, files)
+                await do_test(name, way, func, args, files)
             except KeyboardInterrupt:
                 stopNow()
             except Exception as e:
@@ -1216,9 +1214,9 @@ def test_common_work(name: TestName, opts,
     except Exception as e:
         framework_fail(name, None, 'Unhandled exception: ' + str(e))
 
-def do_test(name: TestName,
+async def do_test(name: TestName,
             way: WayName,
-            func: Callable[..., PassFail],
+            func: Callable[..., Awaitable[PassFail]],
             args,
             files: Set[str]
             ) -> None:
@@ -1287,7 +1285,7 @@ def do_test(name: TestName,
     if opts.pre_cmd:
         stdout_path = in_testdir(name, 'pre_cmd_stdout')
         stderr_path = in_testdir(name, 'pre_cmd_stderr')
-        exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
+        exit_code = await runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
                            stdout = stdout_path,
                            stderr = stderr_path,
                            print_output = config.verbose >= 3)
@@ -1303,7 +1301,7 @@ def do_test(name: TestName,
             # Don't continue and try to run the test if the pre_cmd fails.
             return
 
-    result = func(*[name,way] + args)
+    result = await func(*[name,way] + args)
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
@@ -1382,20 +1380,20 @@ def framework_warn(name: TestName, way: WayName, reason: str) -> None:
 # altogether by using the setup function ignore_stdout instead of
 # run_command.
 
-def run_command( name, way, cmd ):
-    return simple_run( name, '', override_options(cmd), '' )
+async def run_command( name, way, cmd ):
+    return await simple_run( name, '', override_options(cmd), '' )
 
-def makefile_test( name, way, target=None ):
+async def makefile_test( name, way, target=None ):
     if target is None:
         target = name
 
     cmd = '$MAKE -s --no-print-directory {target}'.format(target=target)
-    return run_command(name, way, cmd)
+    return await run_command(name, way, cmd)
 
 # -----------------------------------------------------------------------------
 # GHCi tests
 
-def ghci_script( name, way, script):
+async def ghci_script( name, way, script):
     flags = ' '.join(get_compiler_flags())
     way_flags = ' '.join(config.way_flags[way])
 
@@ -1406,54 +1404,54 @@ def ghci_script( name, way, script):
       # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script
-    return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+    return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 # -----------------------------------------------------------------------------
 # Compile-only tests
 
-def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [],  [], extra_hc_opts )
+async def compile( name, way, extra_hc_opts ):
+    return await do_compile( name, way, False, None, [],  [], extra_hc_opts )
 
-def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], [], extra_hc_opts )
+async def compile_fail( name, way, extra_hc_opts ):
+    return await do_compile( name, way, True, None, [], [], extra_hc_opts )
 
-def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+async def backpack_typecheck( name, way, extra_hc_opts ):
+    return await do_compile( name, way, False, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
-def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
+async def backpack_typecheck_fail( name, way, extra_hc_opts ):
+    return await do_compile( name, way, True, None, [], [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
-def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], [], extra_hc_opts, backpack=True )
+async def backpack_compile( name, way, extra_hc_opts ):
+    return await do_compile( name, way, False, None, [], [], extra_hc_opts, backpack=True )
 
-def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], [], extra_hc_opts, backpack=True )
+async def backpack_compile_fail( name, way, extra_hc_opts ):
+    return await do_compile( name, way, True, None, [], [], extra_hc_opts, backpack=True )
 
-def backpack_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
+async def backpack_run( name, way, extra_hc_opts ):
+    return await compile_and_run__( name, way, None, [], extra_hc_opts, backpack=True )
 
-def multimod_compile( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, False, top_mod, [], [], extra_hc_opts )
+async def multimod_compile( name, way, top_mod, extra_hc_opts ):
+    return await do_compile( name, way, False, top_mod, [], [], extra_hc_opts )
 
-def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, True, top_mod, [], [], extra_hc_opts )
+async def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
+    return await do_compile( name, way, True, top_mod, [], [], extra_hc_opts )
 
-def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_with, suppress_stdout=True ):
-    return do_compile( name, way, False, top_mod, [], [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
+async def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_with, suppress_stdout=True ):
+    return await do_compile( name, way, False, top_mod, [], [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
 
-def multiunit_compile( name, way, units, extra_hc_opts ):
-    return do_compile( name, way, False, None, [], units, extra_hc_opts )
+async def multiunit_compile( name, way, units, extra_hc_opts ):
+    return await do_compile( name, way, False, None, [], units, extra_hc_opts )
 
-def multiunit_compile_fail( name, way, units, extra_hc_opts ):
-    return do_compile( name, way, True, None, [], units, extra_hc_opts )
+async def multiunit_compile_fail( name, way, units, extra_hc_opts ):
+    return await do_compile( name, way, True, None, [], units, extra_hc_opts )
 
-def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, False, top_mod, extra_mods, [], extra_hc_opts)
+async def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return await do_compile( name, way, False, top_mod, extra_mods, [], extra_hc_opts)
 
-def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
+async def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return await do_compile( name, way, True, top_mod, extra_mods, [], extra_hc_opts)
 
-def do_compile(name: TestName,
+async def do_compile(name: TestName,
                way: WayName,
                should_fail: bool,
                top_mod: Optional[Path],
@@ -1464,12 +1462,12 @@ def do_compile(name: TestName,
                ) -> PassFail:
     # print 'Compile only, extra args = ', extra_hc_opts
 
-    result = extras_build( way, extra_mods, extra_hc_opts )
+    result = await extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
        return result
     extra_hc_opts = result.hc_opts
 
-    result = simple_build(name, way, extra_hc_opts, should_fail, top_mod, units, False, True, **kwargs)
+    result = await simple_build(name, way, extra_hc_opts, should_fail, top_mod, units, False, True, **kwargs)
 
     if badResult(result):
         return result
@@ -1482,7 +1480,7 @@ def do_compile(name: TestName,
     actual_stderr_file = add_suffix(name, 'comp.stderr')
     diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
 
-    if not compare_outputs(way, 'stderr',
+    if not await compare_outputs(way, 'stderr',
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
@@ -1498,14 +1496,14 @@ def do_compile(name: TestName,
     # no problems found, this test passed
     return passed()
 
-def compile_cmp_asm(name: TestName,
+async def compile_cmp_asm(name: TestName,
                     way: WayName,
                     ext: str,
                     extra_hc_opts: str
                     ) -> PassFail:
     if extra_hc_opts:
         print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
+    result = await simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1517,7 +1515,7 @@ def compile_cmp_asm(name: TestName,
     expected_asm_file = find_expected_file(name, 'asm')
     actual_asm_file = add_suffix(name, 's')
 
-    if not compare_outputs(way, 'asm',
+    if not await compare_outputs(way, 'asm',
                            join_normalisers(normalise_errmsg, normalise_asm),
                            expected_asm_file, actual_asm_file):
         return failBecause('asm mismatch')
@@ -1525,7 +1523,7 @@ def compile_cmp_asm(name: TestName,
     # no problems found, this test passed
     return passed()
 
-def compile_grep_asm(name: TestName,
+async def compile_grep_asm(name: TestName,
                      way: WayName,
                      ext: str,
                      is_substring: bool,
@@ -1533,7 +1531,7 @@ def compile_grep_asm(name: TestName,
                      ) -> PassFail:
     if extra_hc_opts:
         print('Compile and grep asm, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
+    result = await simple_build(name + '.' + ext, way, '-keep-s-files -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1549,13 +1547,13 @@ def compile_grep_asm(name: TestName,
     # no problems found, this test passed
     return passed()
 
-def compile_grep_core(name: TestName,
+async def compile_grep_core(name: TestName,
                       way: WayName,
                       extra_hc_opts: str
                       ) -> PassFail:
     if extra_hc_opts:
         print('Compile only, extra args = ', extra_hc_opts)
-    result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, [], False, False)
+    result = await simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, [], False, False)
 
     if badResult(result):
         return result
@@ -1573,7 +1571,7 @@ def compile_grep_core(name: TestName,
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__(name: TestName,
+async def compile_and_run__(name: TestName,
                       way: WayName,
                       top_mod: Path,
                       extra_mods: List[str],
@@ -1582,38 +1580,38 @@ def compile_and_run__(name: TestName,
                       ) -> PassFail:
     # print 'Compile and run, extra args = ', extra_hc_opts
 
-    result = extras_build( way, extra_mods, extra_hc_opts )
+    result = await extras_build( way, extra_mods, extra_hc_opts )
     if badResult(result):
        return result
     extra_hc_opts = result.hc_opts
     assert extra_hc_opts is not None
 
     if way.startswith('ghci'): # interpreted...
-        return interpreter_run(name, way, extra_hc_opts, top_mod)
+        return await interpreter_run(name, way, extra_hc_opts, top_mod)
     else: # compiled...
-        result = simple_build(name, way, extra_hc_opts, False, top_mod, [], True, True, backpack = backpack)
+        result = await simple_build(name, way, extra_hc_opts, False, top_mod, [], True, True, backpack = backpack)
         if badResult(result):
             return result
 
         cmd = './' + name + exe_extension()
 
         # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+        return await simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
-def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, None, [], extra_hc_opts)
+async def compile_and_run( name, way, extra_hc_opts ):
+    return await compile_and_run__( name, way, None, [], extra_hc_opts)
 
-def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
-    return compile_and_run__( name, way, top_mod, [], extra_hc_opts)
+async def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
+    return await compile_and_run__( name, way, top_mod, [], extra_hc_opts)
 
-def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
+async def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return await compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
     return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
 
-def static_stats( name, way, stats_file ):
+async def static_stats( name, way, stats_file ):
     opts = getTestOpts()
     return check_stats(name, way, in_statsdir(stats_file), opts.stats_range_fields)
 
@@ -1699,9 +1697,9 @@ def check_stats(name: TestName,
 # -----------------------------------------------------------------------------
 # Build a single-module program
 
-def extras_build( way, extra_mods, extra_hc_opts ):
+async def extras_build( way, extra_mods, extra_hc_opts ):
     for mod, opts in extra_mods:
-        result = simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, [], False, False)
+        result = await simple_build(mod, way, opts + ' ' + extra_hc_opts, False, None, [], False, False)
         if not (mod.endswith('.hs') or mod.endswith('.lhs')):
             extra_hc_opts += ' %s' % Path(mod).with_suffix('.o')
         if badResult(result):
@@ -1709,7 +1707,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return passed(hc_opts=extra_hc_opts)
 
-def simple_build(name: Union[TestName, str],
+async def simple_build(name: Union[TestName, str],
                  way: WayName,
                  extra_hc_opts: str,
                  should_fail: bool,
@@ -1781,7 +1779,7 @@ def simple_build(name: Union[TestName, str],
     if filter_with != '':
         cmd = cmd + ' | ' + filter_with
 
-    exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
+    exit_code = await runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
     actual_stderr_path = in_testdir(name, 'comp.stderr')
 
@@ -1815,7 +1813,7 @@ def simple_build(name: Union[TestName, str],
 # from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
-def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> Any:
+async def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> Any:
     opts = getTestOpts()
 
     # figure out what to use for stdin
@@ -1858,7 +1856,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
     # run the command
-    exit_code = runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
+    exit_code = await runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
 
     # check the exit code
     if exit_code != opts.exit_code:
@@ -1869,11 +1867,11 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         message = format_bad_exit_code_message(exit_code)
         return failBecause(message)
 
-    if not (opts.ignore_stderr or stderr_ok(name, way) or opts.combined_output):
+    if not (opts.ignore_stderr or await stderr_ok(name, way) or opts.combined_output):
         return failBecause('bad stderr',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
-    if not (opts.ignore_stdout or stdout_ok(name, way)):
+    if not (opts.ignore_stdout or await stdout_ok(name, way)):
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -1882,9 +1880,9 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     check_prof = '-p' in my_rts_flags
 
     # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
-    if check_hp and (exit_code <= 127 or exit_code == 251) and not check_hp_ok(name):
+    if check_hp and (exit_code <= 127 or exit_code == 251) and not await check_hp_ok(name):
         return failBecause('bad heap profile')
-    if check_prof and not check_prof_ok(name, way):
+    if check_prof and not await check_prof_ok(name, way):
         return failBecause('bad profile')
 
     # Check runtime stats if desired.
@@ -1900,7 +1898,7 @@ def rts_flags(way: WayName) -> str:
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
 
-def interpreter_run(name: TestName,
+async def interpreter_run(name: TestName,
                     way: WayName,
                     extra_hc_opts: str,
                     top_mod: Path
@@ -1951,7 +1949,7 @@ def interpreter_run(name: TestName,
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
-    exit_code = runCmd(cmd, script, stdout, stderr, opts.run_timeout_multiplier)
+    exit_code = await runCmd(cmd, script, stdout, stderr, opts.run_timeout_multiplier)
 
     # split the stdout into compilation/program output
     split_file(stdout, delimiter,
@@ -1974,11 +1972,11 @@ def interpreter_run(name: TestName,
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if not (opts.ignore_stderr or stderr_ok(name, way)):
+    if not (opts.ignore_stderr or await stderr_ok(name, way)):
         return failBecause('bad stderr',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
-    elif not (opts.ignore_stdout or stdout_ok(name, way)):
+    elif not (opts.ignore_stdout or await stdout_ok(name, way)):
         return failBecause('bad stdout',
                            stderr=read_stderr(name),
                            stdout=read_stdout(name))
@@ -2014,7 +2012,7 @@ def get_compiler_flags() -> List[str]:
 
     return flags
 
-def stdout_ok(name: TestName, way: WayName) -> bool:
+async def stdout_ok(name: TestName, way: WayName) -> bool:
    actual_stdout_file = add_suffix(name, 'run.stdout')
    expected_stdout_file = find_expected_file(name, 'stdout')
 
@@ -2025,7 +2023,7 @@ def stdout_ok(name: TestName, way: WayName) -> bool:
       actual_stdout_path = in_testdir(actual_stdout_file)
       return check_stdout(actual_stdout_path, extra_norm)
 
-   return compare_outputs(way, 'stdout', extra_norm,
+   return await compare_outputs(way, 'stdout', extra_norm,
                           expected_stdout_file, actual_stdout_file)
 
 def read_stdout( name: TestName ) -> str:
@@ -2041,11 +2039,11 @@ def dump_stdout( name: TestName ) -> None:
         print("Stdout (", name, "):")
         safe_print(s)
 
-def stderr_ok(name: TestName, way: WayName) -> bool:
+async def stderr_ok(name: TestName, way: WayName) -> bool:
    actual_stderr_file = add_suffix(name, 'run.stderr')
    expected_stderr_file = find_expected_file(name, 'stderr')
 
-   return compare_outputs(way, 'stderr',
+   return await compare_outputs(way, 'stderr',
                           join_normalisers(normalise_errmsg, getTestOpts().extra_errmsg_normaliser), \
                           expected_stderr_file, actual_stderr_file,
                           whitespace_normaliser=normalise_whitespace)
@@ -2105,20 +2103,20 @@ def write_file(f: Path, s: str) -> None:
 # Another solution would be to open files in binary mode always, and
 # operate on bytes.
 
-def check_hp_ok(name: TestName) -> bool:
+async def check_hp_ok(name: TestName) -> bool:
     opts = getTestOpts()
 
     # do not qualify for hp2ps because we should be in the right directory
     hp2psCmd = 'cd "{opts.testdir}" && {{hp2ps}} {name}'.format(**locals())
 
-    hp2psResult = runCmd(hp2psCmd, print_output=True)
+    hp2psResult = await runCmd(hp2psCmd, print_output=True)
 
     actual_ps_path = in_testdir(name, 'ps')
 
     if hp2psResult == 0:
         if actual_ps_path.exists():
-            if does_ghostscript_work():
-                gsResult = runCmd(genGSCmd(actual_ps_path))
+            if await does_ghostscript_work():
+                gsResult = await runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
                     return True
                 else:
@@ -2133,7 +2131,7 @@ def check_hp_ok(name: TestName) -> bool:
         print("hp2ps error when processing heap profile for " + name)
         return False
 
-def check_prof_ok(name: TestName, way: WayName) -> bool:
+async def check_prof_ok(name: TestName, way: WayName) -> bool:
     expected_prof_file = find_expected_file(name, 'prof.sample')
     expected_prof_path = in_testdir(expected_prof_file)
 
@@ -2153,7 +2151,7 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
         print("%s is empty" % actual_prof_path)
         return(False)
 
-    return compare_outputs(way, 'prof', normalise_prof,
+    return await compare_outputs(way, 'prof', normalise_prof,
                             expected_prof_file, actual_prof_file,
                             whitespace_normaliser=normalise_whitespace)
 
@@ -2161,7 +2159,7 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
 # new output. Returns true if output matched or was accepted, false
 # otherwise. See Note [Output comparison] for the meaning of the
 # normaliser and whitespace_normaliser parameters.
-def compare_outputs(way: WayName,
+async def compare_outputs(way: WayName,
                     kind: str,
                     normaliser: OutputNormalizer,
                     expected_file, actual_file, diff_file=None,
@@ -2199,7 +2197,7 @@ def compare_outputs(way: WayName,
 
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
-            r = runCmd('diff -uw "{0}" "{1}"'.format(null2unix_null(expected_normalised_path),
+            r = await runCmd('diff -uw "{0}" "{1}"'.format(null2unix_null(expected_normalised_path),
                                                         actual_normalised_path),
                         stdout=diff_file,
                         print_output=True)
@@ -2207,7 +2205,7 @@ def compare_outputs(way: WayName,
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = runCmd('diff -u "{0}" "{1}"'.format(null2unix_null(expected_normalised_path),
+                r = await runCmd('diff -u "{0}" "{1}"'.format(null2unix_null(expected_normalised_path),
                                                            actual_normalised_path),
                            stdout=diff_file,
                            print_output=True)
@@ -2569,7 +2567,7 @@ def dump_file(f: Path):
     except Exception:
         print('')
 
-def runCmd(cmd: str,
+async def runCmd(cmd: str,
            stdin: Union[None, Path]=None,
            stdout: Union[None, Path]=None,
            stderr: Union[None, int, Path]=None,
@@ -2586,9 +2584,9 @@ def runCmd(cmd: str,
     stdout_buffer = b''
     stderr_buffer = b''
 
-    hStdErr = subprocess.PIPE
-    if stderr is subprocess.STDOUT:
-        hStdErr = subprocess.STDOUT
+    hStdErr = asyncio.subprocess.PIPE
+    if stderr is asyncio.subprocess.STDOUT:
+        hStdErr = asyncio.subprocess.STDOUT
 
     try:
         # cmd is a complex command in Bourne-shell syntax
@@ -2596,13 +2594,9 @@ def runCmd(cmd: str,
         # Hence it must ultimately be run by a Bourne shell. It's timeout's job
         # to invoke the Bourne shell
 
-        r = subprocess.Popen([timeout_prog, timeout, cmd],
-                             stdin=stdin_file,
-                             stdout=subprocess.PIPE,
-                             stderr=hStdErr,
-                             env=ghc_env)
+        proc = await asyncio.create_subprocess_exec(timeout_prog, timeout, cmd, stdin=stdin_file, stdout=asyncio.subprocess.PIPE, stderr=hStdErr, env=ghc_env)
 
-        stdout_buffer, stderr_buffer = r.communicate()
+        stdout_buffer, stderr_buffer = await proc.communicate()
     finally:
         if stdin_file:
             stdin_file.close()
@@ -2622,13 +2616,13 @@ def runCmd(cmd: str,
             if isinstance(stderr, Path):
                 stderr.write_bytes(stderr_buffer)
 
-    if r.returncode == 98:
+    if proc.returncode == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()
-    if r.returncode == 99 and getTestOpts().exit_code != 99:
+    if proc.returncode == 99 and getTestOpts().exit_code != 99:
         # Only print a message when timeout killed the process unexpectedly.
         if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
-    return r.returncode
+    return proc.returncode # type: ignore
 
 # Each message should be kept lowercase
 def exit_code_specific_message(exit_code: int) -> str:
@@ -2647,34 +2641,45 @@ def format_bad_exit_code_message(exit_code: int) -> str:
 def genGSCmd(psfile: Path) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
-@memoize
-def does_ghostscript_work() -> bool:
+does_ghostscript_work_cache = None
+
+async def does_ghostscript_work() -> bool:
     """
     Detect whether Ghostscript is functional.
     """
+    global does_ghostscript_work_cache
+    if does_ghostscript_work_cache is not None:
+        return does_ghostscript_work_cache
+
     def gsNotWorking(reason: str) -> None:
         print("GhostScript not available for hp2ps tests:", reason)
 
     if config.gs is None:
+        does_ghostscript_work_cache = False
         return False
 
     try:
-        if runCmd(genGSCmd(config.top / 'config' / 'good.ps')) != 0:
+        if await runCmd(genGSCmd(config.top / 'config' / 'good.ps')) != 0:
             gsNotWorking("gs can't process good input")
+            does_ghostscript_work_cache = False
             return False
     except Exception as e:
         gsNotWorking('error invoking gs on bad input: %s' % e)
+        does_ghostscript_work_cache = False
         return False
 
     try:
         cmd = genGSCmd(config.top / 'config' / 'bad.ps') + ' >/dev/null 2>&1'
-        if runCmd(cmd) == 0:
+        if await runCmd(cmd) == 0:
             gsNotWorking('gs accepts bad input')
+            does_ghostscript_work_cache = False
             return False
     except Exception as e:
         gsNotWorking('error invoking gs on bad input: %s' % e)
+        does_ghostscript_work_cache = False
         return False
 
+    does_ghostscript_work_cache = True
     return True
 
 def add_suffix( name: Union[str, Path], suffix: str ) -> Path:

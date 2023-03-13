@@ -49,11 +49,10 @@ def str_info(s: str) -> str:
 def getStdout(cmd_and_args: List[str]):
     # Can't use subprocess.check_output, since we also verify that
     # no stderr was produced
-    p = subprocess.Popen([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
-    (stdout, stderr) = p.communicate()
-    r = p.wait()
+    cp = subprocess.run([strip_quotes(cmd_and_args[0])] + cmd_and_args[1:], capture_output=True)
+    r = cp.returncode
+    stdout = cp.stdout
+    stderr = cp.stderr
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
