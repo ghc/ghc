@@ -89,8 +89,6 @@ library
   -- "ghc-bignum" and not "ghc-bignum-1.0".
   ghc-options: -this-unit-id ghc-bignum
 
-  include-dirs: include
-
   if flag(gmp)
       cpp-options: -DBIGNUM_GMP
       other-modules:
