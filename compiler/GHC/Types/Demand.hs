@@ -36,7 +36,7 @@ module GHC.Types.Demand (
     lazyApply1Dmd, lazyApply2Dmd, strictOnceApply1Dmd, strictManyApply1Dmd,
     -- ** Other @Demand@ operations
     oneifyCard, oneifyDmd, strictifyDmd, strictifyDictDmd, lazifyDmd,
-    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds,
+    peelCallDmd, peelManyCalls, mkCalledOnceDmd, mkCalledOnceDmds, calledOnceArity,
     mkWorkerDemand, subDemandIfEvaluated,
     -- ** Extracting one-shot information
     argOneShots, argsOneShots, saturatedByOneShots,
@@ -1035,6 +1035,16 @@ peelManyCalls k sd = go k C_11 sd
     go k !n (viewCall -> Just (m, sd)) = go (k-1) (n `multCard` m) sd
     go _ _  _                          = (topCard, topSubDmd)
 {-# INLINE peelManyCalls #-} -- so that the pair cancels away in a `fst _` context
+
+calledOnceArity :: SubDemand -> Arity
+calledOnceArity sd = go 0 sd
+  where
+    go n (Call m sd) | isUsedOnce m = go (n+1) sd
+      -- NB: /Not/ viewCall, because we'd go infinitely deep on a Poly without
+      -- knowing the type arity (the upper bound for the threshold).
+      -- Besides, we only really are interested in C_11 or C_01 Calls for
+      -- which we'll never use Poly anyway (cf. 'CardNonOnce').
+    go n _                          = n
 
 -- | Extract the 'SubDemand' of a 'Demand'.
 -- PRECONDITION: The SubDemand must be used in a context where the expression
@@ -2135,6 +2145,7 @@ immediately specifying the incoming demand it was produced under. Despite StrSig
 being a newtype wrapper around DmdType, it actually encodes two things:
 
   * The threshold (i.e., minimum arity) to unleash the signature
+    See Note [Demand signatures are computed for a threshold arity based on idArity]
   * A demand type that is sound to unleash when the minimum arity requirement is
     met.
 
@@ -2155,9 +2166,11 @@ newtype DmdSig
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
-mkDmdSigForArity arity dmd_ty@(DmdType fvs args)
-  | arity < dmdTypeDepth dmd_ty = DmdSig $ DmdType fvs (take arity args)
-  | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
+mkDmdSigForArity threshold_arity dmd_ty@(DmdType fvs args)
+  | threshold_arity < dmdTypeDepth dmd_ty
+  = DmdSig $ DmdType (fvs { de_div = topDiv }) (take threshold_arity args)
+  | otherwise
+  = DmdSig (etaExpandDmdType threshold_arity dmd_ty)
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
 mkClosedDmdSig ds div = mkDmdSigForArity (length ds) (DmdType (mkEmptyDmdEnv div) ds)

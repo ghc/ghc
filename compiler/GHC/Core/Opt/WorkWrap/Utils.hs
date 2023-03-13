@@ -11,7 +11,7 @@ module GHC.Core.Opt.WorkWrap.Utils
    ( WwOpts(..), mkWwBodies, mkWWstr, mkWWstr_one
    , needsVoidWorkerArg
    , DataConPatContext(..)
-   , UnboxingDecision(..), canUnboxArg
+   , UnboxingDecision(..), canUnboxArg, wwArity
    , findTypeShape, IsRecDataConResult(..), isRecDataCon
    , mkAbsentFiller
    , isWorkerSmallEnough, dubiousDataConInstArgTys
@@ -207,7 +207,10 @@ mkWwBodies :: WwOpts
 -- and its unfolding(s) alike.
 --
 mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
-  = do  { massertPpr (filter isId arg_vars `equalLength` demands)
+  = do  { massertPpr (isJoinId fun_id || (filter isId arg_vars `equalLength` demands))
+                        -- Threshold arity should match manifest arity here,
+                        -- UNLESS it's a join point
+                        -- See Note [Threshold arity of join points]
                      (text "wrong wrapper arity" $$ ppr fun_id $$ ppr arg_vars $$ ppr res_ty $$ ppr demands)
 
         -- Clone and prepare arg_vars of the original fun RHS
@@ -288,6 +291,13 @@ isWorkerSmallEnough max_worker_args old_n_args vars
     -- variables which have no runtime representation.
     -- Also if the function took 82 arguments before (old_n_args), it's fine if
     -- it takes <= 82 arguments afterwards.
+
+wwArity :: Id -> CoreExpr -> Arity
+-- The arity for which we want to produce a boxity signature
+wwArity fn rhs
+  = case idJoinPointHood fn of
+      JoinPoint join_arity -> count isId $ fst $ collectNBinders join_arity rhs
+      NotJoinPoint         -> idArity fn
 
 {-
 Note [Always do CPR w/w]
