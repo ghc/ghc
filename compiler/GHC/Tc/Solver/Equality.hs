@@ -1539,15 +1539,17 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
          then finish_with_swapping
          else finish_without_swapping }
 
-  -- See Note [Always put TyVarLHS on the left]
   | TyVarLHS {} <- lhs1
   , TyFamLHS {} <- lhs2
-  = finish_without_swapping
+  = if put_tyvar_on_lhs
+    then finish_without_swapping
+    else finish_with_swapping
 
-  -- See Note [Always put TyVarLHS on the left]
   | TyFamLHS {} <- lhs1
   , TyVarLHS {} <- lhs2
-  = finish_with_swapping
+  = if put_tyvar_on_lhs
+    then finish_with_swapping
+    else finish_without_swapping
 
   | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyFamLHS fun_tc2 fun_args2 <- lhs2
@@ -1629,10 +1631,15 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
                                 (canEqLHSType lhs1) (canEqLHSType lhs2) mco
            ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
 
-{- Note [Always put TyVarLHS on the left]
+    put_tyvar_on_lhs = isWanted ev && eq_rel == NomEq
+    -- See Note [Orienting TyVarLHS/TyFamLHS]
+    -- Same conditions as for canEqCanLHSFinish_try_unification
+    -- which we are setting ourselves up for here
+
+{- Note [Orienting TyVarLHS/TyFamLHS]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What if one side is a tyvar and the other is a type family
-application, (a ~ F tys) ? Which to put on the left?  Answer:
+What if one side is a TyVarLHS and the other is a TyFamLHS, (a ~ F tys)?
+Which to put on the left?  Answer:
 * Put the tyvar on the left, (a ~ F tys) as this may be our only shot to unify.
 * But if we fail to unify and end up in cantMakeCanonical,
   then flip back to (F tys ~ a) because it's generally better

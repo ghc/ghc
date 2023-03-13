@@ -166,6 +166,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 
 import GHC.Unit.Module ( HasModule, getModule, extractModule )
 import qualified GHC.Rename.Env as TcM
@@ -189,7 +190,6 @@ import Data.Foldable
 import qualified Data.Semigroup as S
 
 #if defined(DEBUG)
-import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Data.Graph.Directed
 #endif
 
@@ -2269,18 +2269,23 @@ checkTypeEq ev eq_rel lhs rhs
 
     check_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
     check_given = case lhs of
-      TyFamLHS {} -> checkTyEqRhs ghci_tv refl_tv       check_given_fam_app refl_co
-      TyVarLHS tv -> checkTyEqRhs ghci_tv (check_tv tv) check_given_fam_app (check_co tv)
+      TyFamLHS _ _ -> checkTyEqRhs ghci_tv refl_tv       check_given_fam_app refl_co
+      TyVarLHS tv  -> checkTyEqRhs ghci_tv (check_tv tv) check_given_fam_app (check_co tv)
 
     check_wanted :: TcType -> TcM (PuResult Ct Reduction)
     check_wanted = case lhs of
-       TyFamLHS {} -> checkTyEqRhs ghci_tv refl_tv       check_wanted_fam_app refl_co
-       TyVarLHS tv -> checkTyEqRhs ghci_tv (check_tv tv) check_wanted_fam_app (check_co tv)
+       TyFamLHS tc tys -> checkTyEqRhs ghci_tv refl_tv       (check_wanted_fam_app tc tys) refl_co
+       TyVarLHS tv     -> checkTyEqRhs ghci_tv (check_tv tv) (recurseFamApp check_wanted) (check_co tv)
 
-    check_wanted_fam_app _ tc tys -- Just recurse; if there is an
-                                  -- occurs check etc, just fail
-      = do { tys_res <- mapCheck check_wanted tys
-           ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
+    -- Family-application (G tys) in [W] F lhs_tys ~ (...(G tys)...)
+    check_wanted_fam_app :: TyCon -> [TcType]
+                         -> TcType -> TyCon -> [TcType]
+                         -> TcM (PuResult Ct Reduction)
+    check_wanted_fam_app lhs_tc lhs_tys fam_app tc tys
+      | tcEqTyConApps lhs_tc lhs_tys tc tys
+      = failCheckWith (occursProblem eq_rel)
+      | otherwise
+      = recurseFamApp check_wanted fam_app tc tys
 
     check_given_fam_app fam_app tc tys
       = -- Try just checking the arguments
@@ -2317,6 +2322,13 @@ checkTypeEq ev eq_rel lhs rhs
     -- See Detail (7) of the Note
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
 
+
+recurseFamApp :: (TcType -> TcM (PuResult a Reduction))
+              -> TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
+-- Just recurse; if there is an occurs check etc, just fail
+recurseFamApp check _ tc tys
+  = do { tys_res <- mapCheck check tys
+       ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
 
 -------------------------
 checkFreeVars :: TcTyVar -> TcLevel -> TyCoVarSet -> TcM CheckTyEqResult

@@ -2710,8 +2710,11 @@ simpleCheckCo lhs_tv unifying co
 checkTyEqRhs :: forall a.
                 Bool   -- RuntimeUnk tyvar on the LHS; accept foralls
              -> (TcTyVar -> TcM (PuResult a Reduction))
+                -- What to do for tyvars
              -> (TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction))
+                -- What to do for family applications; guaranteed precisely saturated
              -> (TcCoercion -> TcM (PuResult a TcCoercion))
+                -- What to do for coercions
              -> TcType
              -> TcM (PuResult a Reduction)
 checkTyEqRhs ghci_tv check_tv flatten_fam_app check_co rhs
@@ -2750,7 +2753,14 @@ checkTyEqRhs ghci_tv check_tv flatten_fam_app check_co rhs
     go_tc :: TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
     go_tc ty tc tys
       | isTypeFamilyTyCon tc
-      = flatten_fam_app ty tc tys
+      , let arity = tyConArity tc
+      = if tys `lengthIs` arity
+        then flatten_fam_app ty tc tys  -- Common case
+        else do { let (fun_args, extra_args) = splitAt (tyConArity tc) tys
+                      fun_app                = mkTyConApp tc fun_args
+                ; fun_res   <- flatten_fam_app fun_app tc fun_args
+                ; extra_res <- mapCheck go extra_args
+                ; return (mkAppRedns <$> fun_res <*> extra_res) }
 
       | not (isFamFreeTyCon tc)  -- e.g. S a  where  type S a = F [a]
       , Just ty' <- coreView ty  -- Only synonyms and type families reply
