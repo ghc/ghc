@@ -4822,6 +4822,7 @@ compilerInfo dflags
        ("Project Patch Level",         cProjectPatchLevel),
        ("Project Patch Level1",        cProjectPatchLevel1),
        ("Project Patch Level2",        cProjectPatchLevel2),
+       ("Project Unit Id",             cProjectUnitId),
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),
        ("Build platform",              cBuildPlatformString),

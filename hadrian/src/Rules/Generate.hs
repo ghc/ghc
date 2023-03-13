@@ -483,6 +483,16 @@ generateConfigHs = do
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
+    cProjectVersionMunged  <- getSetting ProjectVersionMunged
+    -- ROMES:TODO:HASH First we attempt a fixed unit-id with version but without hash.
+    --
+    -- We now use a more informative unit-id for ghc. See Note [GHC's Unit Id]
+    -- in GHC.Unit.Types
+    --
+    -- It's crucial that the unit-id matches the unit-key -- ghc is no longer
+    -- part of the WiringMap, so we don't to go back and forth between the
+    -- unit-id and the unit-key -- we take care here that they are the same.
+    let cProjectUnitId = "ghc-" ++ cProjectVersionMunged -- ROMES:TODO:HASH
     return $ unlines
         [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
@@ -491,6 +501,7 @@ generateConfigHs = do
         , "  , cProjectName"
         , "  , cBooterVersion"
         , "  , cStage"
+        , "  , cProjectUnitId"
         , "  ) where"
         , ""
         , "import GHC.Prelude.Basic"
@@ -511,6 +522,9 @@ generateConfigHs = do
         , ""
         , "cStage                :: String"
         , "cStage                = show (" ++ stageString stage ++ " :: Int)"
+        , ""
+        , "cProjectUnitId :: String"
+        , "cProjectUnitId = " ++ show cProjectUnitId
         ]
   where
     stageString (Stage0 InTreeLibs) = "1"
@@ -530,6 +544,7 @@ generateVersionHs = do
     cProjectPatchLevel  <- getSetting ProjectPatchLevel
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
+
     return $ unlines
         [ "module GHC.Version where"
         , ""

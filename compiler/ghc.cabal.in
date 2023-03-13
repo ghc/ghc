@@ -39,7 +39,7 @@ extra-source-files:
 
 
 custom-setup
-    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.10, directory, process, filepath
+    setup-depends: base >= 3 && < 5, Cabal >= 1.6 && <3.10, directory, process, filepath, containers
 
 Flag internal-interpreter
     Description: Build with internal interpreter support.
@@ -56,6 +56,12 @@ Flag dynamic-system-linker
 Flag build-tool-depends
     Description: Use build-tool-depends
     Default: True
+
+-- While the boot compiler fixes ghc's unit-id to `ghc`, the stage0 compiler must still be compiled with `-this-unit-id ghc`
+Flag hadrian-stage0
+    Description: Enable if compiling the stage0 compiler with hadrian
+    Default: False
+    Manual: True
 
 Library
     Default-Language: Haskell2010
@@ -137,9 +143,10 @@ Library
 
     Include-Dirs: .
 
-    -- We need to set the unit id to ghc (without a version number)
-    -- as it's magic.
-    GHC-Options: -this-unit-id ghc
+    if flag(hadrian-stage0)
+        -- We need to set the unit id to ghc (without a version number)
+        -- as it's magic.
+        GHC-Options: -this-unit-id ghc
 
     c-sources:
         cbits/cutils.c

@@ -250,6 +250,16 @@ packageGhcArgs :: Args
 packageGhcArgs = do
     package <- getPackage
     ghc_ver <- readVersion <$> (expr . ghcVersionStage =<< getStage)
+    -- ROMES: Until the boot compiler no longer needs ghc's
+    -- unit-id to be "ghc", the stage0 compiler must be built
+    -- with `-this-unit-id ghc`, while the wired-in unit-id of
+    -- ghc is correctly set to the unit-id we'll generate for
+    -- stage1 (set in generateVersionHs in Rules.Generate).
+    --
+    -- However, we don't need to set the unit-id of "ghc" to "ghc" when
+    -- building stage0 because we have a flag in compiler/ghc.cabal.in that is
+    -- sets `-this-unit-id ghc` when hadrian is building stage0, which will
+    -- overwrite this one.
     pkgId   <- expr $ pkgIdentifier package
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
