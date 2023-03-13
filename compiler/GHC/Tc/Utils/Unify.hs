@@ -2664,9 +2664,8 @@ occursCheckTv lhs_tv occ_tv
 
 uTypeCheckTouchableTyVarEq :: TcTyVar -> TcType -> TcM (PuResult () ())
 uTypeCheckTouchableTyVarEq lhs_tv rhs
-  | MetaTv { mtv_info = tv_info } <- tcTyVarDetails lhs_tv
   = do { check_result <- checkTyEqRhs False
-                                      (simple_check_tv (isConcreteInfo tv_info))
+                                      simple_check_tv
                                       dont_flatten
                                       (simpleCheckCo lhs_tv True)
                                       rhs
@@ -2676,15 +2675,17 @@ uTypeCheckTouchableTyVarEq lhs_tv rhs
             PuOK redn _   -> assertPpr (isReflCo (reductionCoercion redn))
                                        (ppr lhs_tv $$ ppr rhs $$ ppr redn) $
                              return (PuOK () emptyBag) }
-
-  -- Only called on meta-tyvars
-  | otherwise = pprPanic "uTypeCHeckTouchableTyVarEq" (ppr lhs_tv)
   where
+    lhs_tv_info = case tcTyVarDetails lhs_tv of
+                   MetaTv { mtv_info = tv_info } -> tv_info
+                   _ -> pprPanic "uTypeCheckTouchableTyVarEq" (ppr lhs_tv)
+
     dont_flatten :: TcType -> TyCon -> [TcType] -> TcM (PuResult () Reduction)
     dont_flatten _ _ _ = failCheckWith (cteProblem cteTypeFamily)
      -- See Note [Prevent unification with type families]
 
-    simple_check_tv lhs_tv_is_concrete occ_tv
+    lhs_tv_is_concrete = isConcreteInfo lhs_tv_info
+    simple_check_tv occ_tv
       | occursCheckTv lhs_tv occ_tv
       = failCheckWith insolubleOccursProblem
       | lhs_tv_is_concrete, not (isConcreteTyVar occ_tv)
@@ -2762,14 +2763,18 @@ checkTyEqRhs ghci_tv check_tv flatten_fam_app check_co rhs
                 ; extra_res <- mapCheck go extra_args
                 ; return (mkAppRedns <$> fun_res <*> extra_res) }
 
-      | not (isFamFreeTyCon tc)  -- e.g. S a  where  type S a = F [a]
+      | not (isFamFreeTyCon tc) || isForgetfulSynTyCon tc
+           -- e.g. S a  where  type S a = F [a]
+           --             or   type S a = Int
+           -- ToDo: explain why
       , Just ty' <- coreView ty  -- Only synonyms and type families reply
       = go ty'                   --      False to isFamFreeTyCon
 
-      | otherwise
+      | otherwise  -- Recurse on arguments
       = do { tys_res <- mapCheck go tys
-           ; if | PuFail {} <- tys_res, Just ty' <- coreView ty
-                -> go ty'  -- Expand synonyms on failure
+           ; if | PuFail {} <- tys_res
+                , Just ty' <- coreView ty    -- Expand synonyms on failure
+                -> go ty'                    -- e.g a ~ P a where type P a = Int
                 | not (isTauTyCon tc || ghci_tv)
                 -> failCheckWith impredicativeProblem
                 | otherwise
@@ -2788,20 +2793,20 @@ touchabilityTest given_eq_lvl tv rhs
   = False
 
 -------------------------
--- | checkTopShape checks (TYVAR-TV), (COERCION-HOLE) and (CONCRETE) of
+-- | checkTopShape checks (TYVAR-TV)
 -- Note [Unification preconditions]; returns True if these conditions
 -- are satisfied. But see the Note for other preconditions, too.
 checkTopShape :: MetaInfo -> TcType -> Bool
 checkTopShape info xi
   = case info of
-      CycleBreakerTv -> False
       TyVarTv ->
-        case getTyVar_maybe xi of
+        case getTyVar_maybe xi of   -- Looks through type synonyms
            Nothing -> False
            Just tv -> case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
                         SkolemTv {} -> True
                         RuntimeUnk  -> True
                         MetaTv { mtv_info = TyVarTv } -> True
                         _                             -> False
+      CycleBreakerTv -> False  -- We never unify these
       _ -> True
 

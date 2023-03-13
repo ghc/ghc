@@ -2074,23 +2074,23 @@ checkTouchableTyVarEq
 --   with extra wanteds 'cts'
 -- If it returns (PuFail reason) we can't unify, and the reason explains why.
 checkTouchableTyVarEq ev lhs_tv rhs
-  | MetaTv { mtv_info = lhs_tv_info, mtv_tclvl = lhs_tv_lvl } <- tcTyVarDetails lhs_tv
   = do { traceTcS "checkTouchableTyVarEq" (ppr lhs_tv $$ ppr rhs)
-       ; check_result <- wrapTcS (check_rhs lhs_tv_info lhs_tv_lvl)
+       ; check_result <- wrapTcS check_rhs
        ; traceTcS "checkTouchableTyVarEq 2" (ppr lhs_tv $$ ppr check_result)
        ; case check_result of
             PuFail reason -> return (PuFail reason)
             PuOK redn cts -> do { emitWork (bagToList cts)
                                 ; return (pure redn) } }
-
-  | otherwise = pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
   where
     ghci_tv = isRuntimeUnkSkol lhs_tv
+    (lhs_tv_info, lhs_tv_lvl) = case tcTyVarDetails lhs_tv of
+         MetaTv { mtv_info = info, mtv_tclvl = lvl } -> (info,lvl)
+         _ -> pprPanic "checkTouchableTyVarEq" (ppr lhs_tv)
 
-    check_rhs lhs_tv_info lhs_tv_lvl = case coreFullView rhs of
-      TyConApp tc tys | isTypeFamilyTyCon tc
-                      , not (isConcreteTyVar lhs_tv)
-        -> -- Special case for  lhs ~ F tys
+    check_rhs = case splitTyConApp_maybe rhs of
+      Just (tc, tys) | isTypeFamilyTyCon tc
+                     , not (isConcreteTyVar lhs_tv)
+        -> -- Special case for  alpha ~ F tys
            -- We don't want to flatten that (F tys)
            do { tys_res <- mapCheck (simple_check lhs_tv_lvl) tys
               ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
@@ -2267,36 +2267,47 @@ checkTypeEq ev eq_rel lhs rhs
   where
     ghci_tv = False
 
-    check_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
-    check_given = case lhs of
-      TyFamLHS _ _ -> checkTyEqRhs ghci_tv refl_tv       check_given_fam_app refl_co
-      TyVarLHS tv  -> checkTyEqRhs ghci_tv (check_tv tv) check_given_fam_app (check_co tv)
-
+    ---------------------- Wanted ------------------
     check_wanted :: TcType -> TcM (PuResult Ct Reduction)
     check_wanted = case lhs of
-       TyFamLHS tc tys -> checkTyEqRhs ghci_tv refl_tv       (check_wanted_fam_app tc tys) refl_co
-       TyVarLHS tv     -> checkTyEqRhs ghci_tv (check_tv tv) (recurseFamApp check_wanted) (check_co tv)
+       TyFamLHS tc tys -> checkTyEqRhs ghci_tv refl_tv (cfa_wanted_fam tc tys) refl_co
+       TyVarLHS tv     -> checkTyEqRhs ghci_tv (check_tv tv) cfa_wanted_tv (check_co tv)
 
     -- Family-application (G tys) in [W] F lhs_tys ~ (...(G tys)...)
-    check_wanted_fam_app :: TyCon -> [TcType]
-                         -> TcType -> TyCon -> [TcType]
-                         -> TcM (PuResult Ct Reduction)
-    check_wanted_fam_app lhs_tc lhs_tys fam_app tc tys
+    cfa_wanted_fam :: TyCon -> [TcType]
+                   -> TcType -> TyCon -> [TcType]
+                   -> TcM (PuResult Ct Reduction)
+    cfa_wanted_fam lhs_tc lhs_tys fam_app tc tys
       | tcEqTyConApps lhs_tc lhs_tys tc tys
       = failCheckWith (occursProblem eq_rel)
       | otherwise
       = recurseFamApp check_wanted fam_app tc tys
 
-    check_given_fam_app fam_app tc tys
+    cfa_wanted_tv fam_app tc tys = recurseFamApp check_wanted fam_app tc tys
+
+    ---------------------- Given ------------------
+    check_given :: TcType -> TcM (PuResult (TcTyVar,TcType) Reduction)
+    check_given = case lhs of
+      TyFamLHS tc tys -> checkTyEqRhs ghci_tv refl_tv (cfa_given_fam tc tys) refl_co
+      TyVarLHS tv     -> checkTyEqRhs ghci_tv (check_tv tv) cfa_given_tv (check_co tv)
+
+    cfa_given_fam lhs_tc lhs_tys fam_app tc tys
+      | tcEqTyConApps lhs_tc lhs_tys tc tys
+      = break_cycle fam_app
+      | otherwise
+      = recurseFamApp check_given fam_app tc tys
+
+    cfa_given_tv fam_app tc tys
       = -- Try just checking the arguments
         do { tys_res <- mapCheck check_given tys
            ; case tys_res of {
                PuOK redns cts -> return (PuOK (mkTyConAppRedn Nominal tc redns) cts) ;
-               PuFail {}      ->
+               PuFail {}      -> break_cycle fam_app } }
 
-        do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
+    break_cycle fam_app
+      = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
            ; return (PuOK (mkReflRedn Nominal (mkTyVarTy new_tv))
-                          (unitBag (new_tv, fam_app))) } }}
+                          (unitBag (new_tv, fam_app))) }
                     -- Why reflexive? See Detail (4) of the Note
 
     refl_tv tv = okCheckRefl (mkTyVarTy tv)

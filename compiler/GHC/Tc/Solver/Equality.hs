@@ -1843,6 +1843,9 @@ Wrinkles:
      and unifying alpha effectively promotes this wanted to a given. Doing so
      means we lose track of the rewriter set associated with the wanted.
 
+     In short: we must not have a co_hole in a Given, and unification
+     effectively makes a Given
+
      On the other hand, w is perfectly suitable for rewriting, because of the
      way we carefully track rewriter sets.
 
