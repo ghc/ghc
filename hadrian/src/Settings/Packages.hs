@@ -74,6 +74,11 @@ packageArgs = do
             [ andM [expr ghcWithInterpreter, notStage0] `cabalFlag` "internal-interpreter"
             , notM cross `cabalFlag` "terminfo"
             , arg "-build-tool-depends"
+            -- ROMES: While the boot compiler is not updated wrt -this-unit-id
+            -- not being fixed to `ghc`, when building stage0, we must set
+            -- -this-unit-id to `ghc` because the boot compiler expects that.
+            -- We do it through a cabal flag in ghc.cabal
+            , stage0 ? arg "+hadrian-stage0"
             ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
