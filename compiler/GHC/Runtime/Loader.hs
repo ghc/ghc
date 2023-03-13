@@ -42,10 +42,10 @@ import GHC.Driver.Env
 import GHCi.RemoteTypes     ( HValue )
 import GHC.Core.Type        ( Type, mkTyConTy )
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.TyCon       ( TyCon )
+import GHC.Core.TyCon       ( TyCon(tyConName) )
 
 import GHC.Types.SrcLoc        ( noSrcSpan )
-import GHC.Types.Name    ( Name, nameModule_maybe )
+import GHC.Types.Name    ( Name, nameModule, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.TyThing
 import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
@@ -55,7 +55,7 @@ import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
 
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
-import GHC.Unit.Module   ( Module, ModuleName )
+import GHC.Unit.Module   ( Module, ModuleName, thisGhcUnit, GenModule(moduleUnit) )
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Env
 
@@ -171,7 +171,14 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
             Just (name, mod_iface) ->
 
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
-        ; eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
+        ; case thisGhcUnit == (moduleUnit . nameModule . tyConName) plugin_tycon of {
+            False ->
+                throwGhcExceptionIO (CmdLineError $ showSDoc dflags $ hsep
+                          [ text "The plugin module", ppr mod_name
+                          , text "was built with a compiler that is incompatible with the one loading it"
+                          ]) ;
+            True ->
+     do { eith_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case eith_plugin of
             Left actual_type ->
                 throwGhcExceptionIO (CmdLineError $
@@ -182,7 +189,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           , text "did not have the type"
                           , text "GHC.Plugins.Plugin"
                           , text "as required"])
-            Right (plugin, links, pkgs) -> return (plugin, mod_iface, links, pkgs) } } }
+            Right (plugin, links, pkgs) -> return (plugin, mod_iface, links, pkgs) } } } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
