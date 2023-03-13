@@ -3,7 +3,10 @@ module Main where
 
 import Distribution.Simple
 import Distribution.Simple.BuildPaths
+import Distribution.Types.ComponentLocalBuildInfo
+import Distribution.Types.ComponentName (ComponentName(CLibName))
 import Distribution.Types.LocalBuildInfo
+import Distribution.Types.LibraryName (LibraryName(LMainLibName))
 import Distribution.Verbosity
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
@@ -15,6 +18,7 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.Char
+import qualified Data.Map as Map
 import GHC.ResponseFile
 import System.Environment
 
@@ -85,9 +89,13 @@ ghcAutogen verbosity lbi@LocalBuildInfo{..} = do
     callProcess "deriveConstants" ["--gen-haskell-type","-o",tmp,"--target-os",targetOS]
     renameFile tmp platformConstantsPath
 
+  let cProjectUnitId = case Map.lookup (CLibName LMainLibName) componentNameMap of
+                         Just [LibComponentLocalBuildInfo{componentUnitId}] -> unUnitId componentUnitId
+                         _ -> error "Couldn't find unique cabal library when building ghc"
+
   -- Write GHC.Settings.Config
-  let configHsPath = autogenPackageModulesDir lbi </> "GHC/Settings/Config.hs"
-      configHs = generateConfigHs settings
+      configHsPath = autogenPackageModulesDir lbi </> "GHC/Settings/Config.hs"
+      configHs = generateConfigHs cProjectUnitId settings
   createDirectoryIfMissingVerbose verbosity True (takeDirectory configHsPath)
   rewriteFileEx verbosity configHsPath configHs
 
@@ -98,8 +106,9 @@ getSetting settings kh kr = go settings kr
       Nothing -> Left (show k ++ " not found in settings: " ++ show settings)
       Just v -> Right v
 
-generateConfigHs :: [(String,String)] -> String
-generateConfigHs settings = either error id $ do
+generateConfigHs :: String -- ^ ghc's cabal-generated unit-id, which matches its package-id/key
+                 -> [(String,String)] -> String
+generateConfigHs cProjectUnitId settings = either error id $ do
     let getSetting' = getSetting $ (("cStage","2"):) settings
     buildPlatform  <- getSetting' "cBuildPlatformString" "Host platform"
     hostPlatform   <- getSetting' "cHostPlatformString" "Target platform"
@@ -114,6 +123,7 @@ generateConfigHs settings = either error id $ do
         , "  , cProjectName"
         , "  , cBooterVersion"
         , "  , cStage"
+        , "  , cProjectUnitId"
         , "  ) where"
         , ""
         , "import GHC.Prelude.Basic"
@@ -134,4 +144,7 @@ generateConfigHs settings = either error id $ do
         , ""
         , "cStage                :: String"
         , "cStage                = show ("++ cStage ++ " :: Int)"
+        , ""
+        , "cProjectUnitId :: String"
+        , "cProjectUnitId = " ++ show cProjectUnitId
         ]

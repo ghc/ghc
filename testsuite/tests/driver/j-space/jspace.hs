@@ -2,6 +2,7 @@ module Main where
 
 import GHC
 import GHC.Driver.Monad
+import GHC.Driver.Session
 import System.Environment
 import GHC.Driver.Env.Types
 import GHC.Profiling
@@ -25,6 +26,9 @@ initGhcM xs = do
     let cmdOpts = ["-fforce-recomp"] ++ xs
     (df2, leftovers, _) <- parseDynamicFlags (hsc_logger session) df1 (map noLoc cmdOpts)
     setSessionDynFlags df2
+    ghcUnitId <- case lookup "Project Unit Id" (compilerInfo df2) of
+                    Nothing -> fail "failed to find ghc's unit-id in the compiler info"
+                    Just ghcUnitId -> pure ghcUnitId
     ts <- mapM (\s -> guessTarget s Nothing Nothing) $ map unLoc leftovers
     setTargets ts
     _ <- load LoadAllTargets
@@ -36,7 +40,7 @@ initGhcM xs = do
     liftIO $ do
       requestHeapCensus
       performGC
-      [ys] <- filter (isPrefixOf "ghc:GHC.Unit.Module.ModDetails.ModDetails") . lines <$> readFile "jspace.hp"
+      [ys] <- filter (isPrefixOf (ghcUnitId <> ":GHC.Unit.Module.ModDetails.ModDetails")) . lines <$> readFile "jspace.hp"
       let (n :: Int) = read (last (words ys))
       -- The output should be 50 * 8 * word_size (i.e. 3200, or 1600 on 32-bit architectures):
       -- the test contains DEPTH + WIDTH + 2 = 50 modules J, H_0, .., H_DEPTH, W_1, .., W_WIDTH,

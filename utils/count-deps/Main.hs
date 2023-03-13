@@ -56,25 +56,28 @@ calcDeps modName libdir =
         logger <- getLogger
         (df, _, _) <- parseDynamicFlags logger df [noLoc "-package=ghc"]
         setSessionDynFlags df
-        env <- getSession
-        loop env Map.empty [mkModuleName modName]
+        case lookup "Project Unit Id" (compilerInfo df) of
+          Nothing -> fail "failed to find ghc's unit-id in the compiler info"
+          Just ghcUnitId -> do
+            env <- getSession
+            loop ghcUnitId env Map.empty [mkModuleName modName]
   where
     -- Source imports are only guaranteed to show up in the 'mi_deps'
     -- of modules that import them directly and don’t propagate
     -- transitively so we loop.
-    loop :: HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
-    loop env modules (m : ms) =
+    loop :: String -> HscEnv -> Map.Map ModuleName [ModuleName] -> [ModuleName] -> Ghc (Map.Map ModuleName [ModuleName])
+    loop ghcUnitId env modules (m : ms) =
       if m `Map.member` modules
-        then loop env modules ms
+        then loop ghcUnitId env modules ms
         else do
-          mi <- liftIO $ hscGetModuleInterface env (mkModule m)
+          mi <- liftIO $ hscGetModuleInterface env (mkModule ghcUnitId m)
           let deps = modDeps mi
           modules <- return $ Map.insert m [] modules
-          loop env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) deps
-    loop _ modules [] = return modules
+          loop ghcUnitId env (Map.insert m deps modules) $ ms ++ filter (not . (`Map.member` modules)) deps
+    loop _ _ modules [] = return modules
 
-    mkModule :: ModuleName -> Module
-    mkModule = Module (stringToUnit "ghc")
+    mkModule :: String -> ModuleName -> Module
+    mkModule ghcUnitId = Module (stringToUnit ghcUnitId)
 
     modDeps :: ModIface -> [ModuleName]
     modDeps mi = map (gwib_mod . snd) $ Set.toList $ dep_direct_mods (mi_deps mi)
