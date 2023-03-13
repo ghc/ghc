@@ -665,6 +665,16 @@ rewrite_vector ki roles tys
 {-# INLINE rewrite_vector #-}
 
 
+-- Unwrap a type synonym only when either:
+--   The type synonym is forgetful, or
+--   the type synonym mentions a type family in its expansion
+-- See Note [Rewriting synonyms]
+rewriterView :: TcType -> Maybe TcType
+rewriterView ty@(TyConApp tc _)
+  | isForgetfulSynTyCon tc || (isTypeSynonymTyCon tc && not (isFamFreeTyCon tc))
+  = coreView ty
+rewriterView _other = Nothing
+
 {- Note [Do not rewrite newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We flirted with unwrapping newtypes in the rewriter -- see GHC.Tc.Solver.Canonical

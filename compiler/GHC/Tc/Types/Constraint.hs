@@ -481,7 +481,7 @@ isInsolubleReason AbstractTyConReason       = True
 --
 ------------------------------------------------------------------------------
 
--- | A set of problems in checking the validity of a type equality.
+-- | A /set/ of problems in checking the validity of a type equality.
 -- See 'checkTypeEq'.
 newtype CheckTyEqResult = CTER Word8
 
@@ -494,7 +494,7 @@ cterHasNoProblem :: CheckTyEqResult -> Bool
 cterHasNoProblem (CTER 0) = True
 cterHasNoProblem _        = False
 
--- | An individual problem that might be logged in a 'CheckTyEqResult'
+-- | An /individual/ problem that might be logged in a 'CheckTyEqResult'
 newtype CheckTyEqProblem = CTEP Word8
 
 cteImpredicative, cteTypeFamily, cteInsolubleOccurs,

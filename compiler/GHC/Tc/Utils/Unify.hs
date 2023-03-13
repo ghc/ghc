@@ -33,9 +33,9 @@ module GHC.Tc.Utils.Unify (
   matchExpectedFunKind,
   matchActualFunTySigma, matchActualFunTysRho,
 
-  checkTyEqRhs, checkTvUnif, checkCoUnif, occursCheckTv,
-  PuResult(..), failCheckWith, okCheckRefl
-
+  checkTyEqRhs, simpleCheckCo,
+  PuResult(..), failCheckWith, okCheckRefl, mapCheck,
+  AreUnifying(..), areUnifying, occursCheckTv
   ) where
 
 import GHC.Prelude
@@ -2551,140 +2551,6 @@ kind had instead been
 then this kind equality would rightly complain about unifying kappa
 with (forall k. k->*)
 
--}
-
-{-
-{-# NOINLINE checkTyVarEq #-}  -- checkTyVarEq becomes big after the `inline` fires
-checkTyVarEq :: TcTyVar -> TcType -> CheckTyEqResult
-checkTyVarEq tv ty
-  = inline checkTypeEq (TyVarLHS tv) ty
-    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
-
-{-# NOINLINE checkTyFamEq #-}  -- checkTyFamEq becomes big after the `inline` fires
-checkTyFamEq :: TyCon     -- type function
-             -> [TcType]  -- args, exactly saturated
-             -> TcType    -- RHS
-             -> CheckTyEqResult   -- always drops cteTypeFamily
-checkTyFamEq fun_tc fun_args ty
-  = inline checkTypeEq (TyFamLHS fun_tc fun_args) ty
-    `cterRemoveProblem` cteTypeFamily
-    -- inline checkTypeEq so that the `case`s over the CanEqLHS get blasted away
-
-checkTypeEq :: CanEqLHS -> TcType -> CheckTyEqResult
--- If cteHasNoProblem (checkTypeEq dflags lhs rhs), then lhs ~ rhs
--- is a canonical CEqCan.
---
--- In particular, this looks for:
---   (a) a forall type (forall a. blah)
---   (b) a predicate type (c => ty)
---   (c) a type family; see Note [Prevent unification with type families]
---   (d) an occurrence of the LHS (occurs check)
---
--- Note that an occurs-check does not mean "definite error".  For example
---   type family F a
---   type instance F Int = Int
--- consider
---   b0 ~ F b0
--- This is perfectly reasonable, if we later get b0 ~ Int.  But we
--- certainly can't unify b0 := F b0
---
--- For (a), (b), and (c) we check only the top level of the type, NOT
--- inside the kinds of variables it mentions, and for (d) see
--- Note [CEqCan occurs check] in GHC.Tc.Types.Constraint.
---
--- checkTypeEq is called from
---    * checkTyFamEq, checkTyVarEq (which inline it to specialise away the
---      case-analysis on 'lhs')
---    * checkEqCanLHSFinish, which does not know the form of 'lhs'
-checkTypeEq lhs ty
-  = go ty
-  where
-    impredicative      = cteProblem cteImpredicative
-    type_family        = cteProblem cteTypeFamily
-    insoluble_occurs   = cteProblem cteInsolubleOccurs
-    soluble_occurs     = cteProblem cteSolubleOccurs
-
-    -- The GHCi runtime debugger does its type-matching with
-    -- unification variables that can unify with a polytype
-    -- or a TyCon that would usually be disallowed by bad_tc
-    -- See Note [RuntimeUnkTv] in GHC.Runtime.Heap.Inspect
-    ghci_tv
-      | TyVarLHS tv <- lhs
-      , MetaTv { mtv_info = RuntimeUnkTv } <- tcTyVarDetails tv
-      = True
-
-      | otherwise
-      = False
-
-    go :: TcType -> CheckTyEqResult
-    go (TyVarTy tv')           = go_tv tv'
-    go (TyConApp tc tys)       = go_tc tc tys
-    go (LitTy {})              = cteOK
-    go (FunTy {ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
-                               = go w S.<> go a S.<> go r S.<>
-                                 if not ghci_tv && isInvisibleFunArg af
-                                   then impredicative
-                                   else cteOK
-    go (AppTy fun arg) = go fun S.<> go arg
-    go (CastTy ty co)  = go ty  S.<> go_co co
-    go (CoercionTy co) = go_co co
-    go (ForAllTy (Bndr tv' _) ty) = (case lhs of
-      TyVarLHS tv | tv == tv' -> go_occ (tyVarKind tv') S.<> cterClearOccursCheck (go ty)
-                  | otherwise -> go_occ (tyVarKind tv') S.<> go ty
-      _                       -> go ty)
-      S.<>
-      if ghci_tv then cteOK else impredicative
-
-    go_tv :: TcTyVar -> CheckTyEqResult
-      -- this slightly peculiar way of defining this means
-      -- we don't have to evaluate this `case` at every variable
-      -- occurrence
-    go_tv = case lhs of
-      TyVarLHS tv -> \ tv' -> go_occ (tyVarKind tv') S.<>
-                              if tv == tv' then insoluble_occurs else cteOK
-      TyFamLHS {} -> \ _tv' -> cteOK
-           -- See Note [Occurrence checking: look inside kinds] in GHC.Core.Type
-
-     -- For kinds, we only do an occurs check; we do not worry
-     -- about type families or foralls
-     -- See Note [Checking for foralls]
-    go_occ k = cterFromKind $ go k
-
-    go_tc :: TyCon -> [TcType] -> CheckTyEqResult
-      -- this slightly peculiar way of defining this means
-      -- we don't have to evaluate this `case` at every tyconapp
-    go_tc = case lhs of
-      TyVarLHS {} -> \ tc tys -> check_tc tc S.<> go_tc_args tc tys
-      TyFamLHS fam_tc fam_args -> \ tc tys ->
-        if tcEqTyConApps fam_tc fam_args tc tys
-          then insoluble_occurs
-          else check_tc tc S.<> go_tc_args tc tys
-
-      -- just look at arguments, not the tycon itself
-    go_tc_args :: TyCon -> [TcType] -> CheckTyEqResult
-    go_tc_args tc tys | isGenerativeTyCon tc Nominal = foldMap go tys
-                      | otherwise
-                      = let (tf_args, non_tf_args) = splitAt (tyConArity tc) tys in
-                        cterSetOccursCheckSoluble (foldMap go tf_args) S.<> foldMap go non_tf_args
-
-     -- no bother about impredicativity in coercions, as they're
-     -- inferred
-    go_co co | TyVarLHS tv <- lhs
-             , tv `elemVarSet` tyCoVarsOfCo co
-             = soluble_occurs
-
-        -- Don't check coercions for type families; see commentary at top of function
-             | otherwise
-             = cteOK
-
-    check_tc :: TyCon -> CheckTyEqResult
-    check_tc
-      | ghci_tv   = \ _tc -> cteOK
-      | otherwise = \ tc  -> (if isTauTyCon tc then cteOK else impredicative) S.<>
-                             (if isFamFreeTyCon tc then cteOK else type_family)
--}
-
-{-
 Note [prepareForUnification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 alpha[2] ~ ty
@@ -2762,53 +2628,94 @@ instance Applicative (PuResult a) where
   PuOK {}   <*> PuFail p2 = PuFail p2
   PuOK f c1 <*> PuOK x c2 = PuOK (f x) (c1 `unionBags` c2)
 
+instance (Outputable a, Outputable b) => Outputable (PuResult a b) where
+  ppr (PuFail prob) = text "PuFail" <+> (ppr prob)
+  ppr (PuOK x cts)  = text "PuOK" <> braces
+                        (vcat [ text "redn:" <+> ppr x
+                              , text "cts:" <+> ppr cts ])
+
 okCheckRefl :: TcType -> TcM (PuResult a Reduction)
 okCheckRefl ty = return (PuOK (mkReflRedn Nominal ty) emptyBag)
 
 failCheckWith :: CheckTyEqResult -> TcM (PuResult a b)
 failCheckWith p = return (PuFail p)
 
+mapCheck :: (x -> TcM (PuResult a Reduction))
+         -> [x]
+         -> TcM (PuResult a Reductions)
+mapCheck f xs
+  = do { (ress :: [PuResult a Reduction]) <- mapM f xs
+       ; return (unzipRedns <$> sequenceA ress) }
+         -- sequenceA :: [PuResult a Reduction] -> PuResult a [Reduction]
+         -- unzipRedns :: [Reduction] -> Reductions
+
+data AreUnifying
+  = UnifyingAt TcLevel   -- We are trying to unify a meta-tyvar at level lvl
+  | NotUnifying          -- Not attempting to unify
+
+areUnifying :: AreUnifying -> Bool
+areUnifying (UnifyingAt {}) = True
+areUnifying NotUnifying     = False
+
+occursCheckTv :: TcTyVar -> TcTyVar -> Bool
+occursCheckTv lhs_tv occ_tv
+  =  lhs_tv == occ_tv
+  || lhs_tv `elemVarSet` tyCoVarsOfType (tyVarKind occ_tv)
+
 uTypeCheckTouchableTyVarEq :: TcTyVar -> TcType -> TcM (PuResult () ())
-uTypeCheckTouchableTyVarEq tv rhs
-  | MetaTv { mtv_info = tv_info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv
-  = do { check_result <- checkTyEqRhs False dont_flatten
-                                      (checkTvUnif tv tv_info tv_lvl)
-                                      (checkCoUnif tv)
+uTypeCheckTouchableTyVarEq lhs_tv rhs
+  | MetaTv { mtv_info = tv_info } <- tcTyVarDetails lhs_tv
+  = do { check_result <- checkTyEqRhs False
+                                      (simple_check_tv (isConcreteInfo tv_info))
+                                      dont_flatten
+                                      (simpleCheckCo lhs_tv True)
                                       rhs
-             -- checkTvUnif will never do any promotion because tv_lvl is
-             -- the ambient level. But we still need the concreteness changes
 
        ; case check_result of
             PuFail reason -> return (PuFail reason)
-            PuOK redn _  -> assertPpr (isReflCo (reductionCoercion redn))
-                                      (ppr tv $$ ppr rhs $$ ppr redn) $
-                            return (PuOK () emptyBag) }
+            PuOK redn _   -> assertPpr (isReflCo (reductionCoercion redn))
+                                       (ppr lhs_tv $$ ppr rhs $$ ppr redn) $
+                             return (PuOK () emptyBag) }
 
   -- Only called on meta-tyvars
-  | otherwise = pprPanic "uTypeCHeckTouchableTyVarEq" (ppr tv)
+  | otherwise = pprPanic "uTypeCHeckTouchableTyVarEq" (ppr lhs_tv)
   where
-    dont_flatten :: TcType -> TcM (PuResult () Reduction)
-    dont_flatten _ = failCheckWith (cteProblem cteTypeFamily)
+    dont_flatten :: TcType -> TyCon -> [TcType] -> TcM (PuResult () Reduction)
+    dont_flatten _ _ _ = failCheckWith (cteProblem cteTypeFamily)
      -- See Note [Prevent unification with type families]
 
+    simple_check_tv lhs_tv_is_concrete occ_tv
+      | occursCheckTv lhs_tv occ_tv
+      = failCheckWith insolubleOccursProblem
+      | lhs_tv_is_concrete, not (isConcreteTyVar occ_tv)
+      = failCheckWith (cteProblem cteConcrete)
+      | otherwise
+      = okCheckRefl (mkTyVarTy occ_tv)
+
+simpleCheckCo :: TcTyVar -> Bool -> TcCoercion -> TcM (PuResult a Coercion)
+-- No bother about impredicativity in coercions, as they're inferred
+-- Don't check coercions for type families; see commentary at top of function
+simpleCheckCo lhs_tv unifying co
+  | lhs_tv `elemVarSet` tyCoVarsOfCo co = failCheckWith insolubleOccursProblem
+  | unifying
+  , hasCoercionHoleCo co   = failCheckWith (cteProblem cteCoercionHole)
+  | otherwise              = return (PuOK co emptyBag)
+       -- hasCoercionHoleCo:
+       -- See (COERCION-HOLE) in Note [Unification preconditions]
+       --
+       -- ToDo: could combine these two folds
+       --       (free vars and coercion holes) into one
+
+-----------------------------
 checkTyEqRhs :: forall a.
                 Bool   -- RuntimeUnk tyvar on the LHS; accept foralls
-             -> (TcType  -> TcM (PuResult a Reduction))
              -> (TcTyVar -> TcM (PuResult a Reduction))
+             -> (TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction))
              -> (TcCoercion -> TcM (PuResult a TcCoercion))
              -> TcType
              -> TcM (PuResult a Reduction)
-checkTyEqRhs ghci_tv flatten_fam_app check_tv check_co rhs
-  = case coreFullView rhs of
-      -- Special case for  lhs ~ F tys
-      -- We don't want to flatten that (F tys)
-      TyConApp tc tys | isTypeFamilyTyCon tc
-        -> do { tys_res <- go_tys tys
-              ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
-
-      -- Normal case
-      _other -> go rhs
-
+checkTyEqRhs ghci_tv check_tv flatten_fam_app check_co rhs
+  = go rhs
   where
     go :: TcType -> TcM (PuResult a Reduction)
     go ty@(LitTy {})        = okCheckRefl ty
@@ -2840,106 +2747,23 @@ checkTyEqRhs ghci_tv flatten_fam_app check_tv check_co rhs
       | ghci_tv   = okCheckRefl ty
       | otherwise = failCheckWith impredicativeProblem  -- Not allowed (TyEq:F)
 
-    go_tys :: [TcType] -> TcM (PuResult a Reductions)
-    go_tys tys = do { (ress :: [PuResult a Reduction]) <- mapM go tys
-                    ; return (unzipRedns <$> sequenceA ress) }
-                      -- sequenceA :: [PuResult a] -> PuResult [a]
-                      -- unzipRedns :: [Reduction] -> Reductions
-
     go_tc :: TcType -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
     go_tc ty tc tys
       | isTypeFamilyTyCon tc
-      = flatten_fam_app ty
+      = flatten_fam_app ty tc tys
 
       | not (isFamFreeTyCon tc)  -- e.g. S a  where  type S a = F [a]
       , Just ty' <- coreView ty  -- Only synonyms and type families reply
       = go ty'                   --      False to isFamFreeTyCon
 
       | otherwise
-      = do { tys_res <- go_tys tys
+      = do { tys_res <- mapCheck go tys
            ; if | PuFail {} <- tys_res, Just ty' <- coreView ty
                 -> go ty'  -- Expand synonyms on failure
                 | not (isTauTyCon tc || ghci_tv)
                 -> failCheckWith impredicativeProblem
                 | otherwise
                 -> return (mkTyConAppRedn Nominal tc <$> tys_res) }
-
--------------------------
-checkCoUnif :: TcTyVar -> TcCoercion -> TcM (PuResult a TcCoercion)
--- No bother about impredicativity in coercions, as they're inferred
--- Don't check coercions for type families; see commentary at top of function
-checkCoUnif lhs_tv co
-  | lhs_tv `elemVarSet` tyCoVarsOfCo co = failCheckWith insolubleOccursProblem
-  | hasCoercionHoleCo co                = failCheckWith (cteProblem cteCoercionHole)
-  | otherwise                           = return (PuOK co emptyBag)
-  -- ToDo: could combine these two folds
-  --       (free vars and coercion holes) into one
-
--------------------------
-checkTvUnif :: TcTyVar -> MetaInfo -> TcLevel  -- The LHS tv, a touchable meta tvar
-            -> TcTyVar                         -- An occurrence of a tyvar in the RHS
-            -> TcM (PuResult a Reduction)
-checkTvUnif lhs_tv lhs_tv_info lhs_tv_lvl occ_tv
-  | occursCheckTv lhs_tv occ_tv
-  = failCheckWith insolubleOccursProblem
-     -- Unification is always Nominal, so no faffing
-     -- with Note [Occurs check and representational equality]
-
-  | MetaTv { mtv_info = info_occ, mtv_tclvl = lvl_occ } <- occ_details
-  = -- Check for unified. The type started zonked, but we may have
-    -- promoted one of its type variables, and we then encounter
-    -- it for the second time.  But if so, it'll definitely be another TyVar
-    do { mb_filled <- isFilledMetaTyVar_maybe occ_tv
-       ; case mb_filled of
-            Just ty | Just occ_tv2 <- getTyVar_maybe ty
-                    -> checkTvUnif lhs_tv lhs_tv_info lhs_tv_lvl occ_tv2
-                    | otherwise -> pprPanic "checkTouchableTyVarEq" (ppr occ_tv $$ ppr ty)
-            Nothing -> check_tv2 occ_tv info_occ lvl_occ }
-
-  | SkolemTv _ lvl_occ _ <- occ_details
-  , need_to_promote lvl_occ  -- Skolem tyvar that needs promotion; skolem escape
-  = failCheckWith (cteProblem cteSkolemEscape)
-
-  | otherwise
-  = okCheckRefl (mkTyVarTy occ_tv)
-  where
-    occ_details = tcTyVarDetails occ_tv
-
-    check_tv2 occ_tv info_occ lvl_occ
-      | not (need_to_promote lvl_occ)
-      , not (need_to_make_concrete info_occ)
-      = okCheckRefl (mkTyVarTy occ_tv)  -- No-op
-
-      | tv_is_concrete
-      , cant_make_concrete info_occ
-      = failCheckWith (cteProblem cteConcrete)   -- E.g.  alpha[conc] := Maybe beta[tv]
-
-      | otherwise
-      = do { let new_info | tv_is_concrete = lhs_tv_info
-                          | otherwise      = info_occ
-           ; new_tv <- cloneMetaTyVarWithInfo new_info lhs_tv_lvl occ_tv
-           ; writeMetaTyVar occ_tv (mkTyVarTy new_tv)
-           ; traceTc "promoteTyVar" (ppr occ_tv <+> text "-->" <+> ppr new_tv)
-           ; okCheckRefl (mkTyVarTy new_tv) }
-
-    need_to_promote       lvl_occ  = lvl_occ `strictlyDeeperThan` lhs_tv_lvl
-    need_to_make_concrete info_occ = is_concrete lhs_tv_info && not (is_concrete info_occ)
-
-    cant_make_concrete (ConcreteTv {}) = False
-    cant_make_concrete TauTv           = False
-    cant_make_concrete _               = True
-    -- Don't attempt to make other type variables concrete
-    -- (e.g. SkolemTv, TyVarTv, CycleBreakerTv, RuntimeUnkTv).
-
-    tv_is_concrete = is_concrete lhs_tv_info
-
-    is_concrete (ConcreteTv {}) = True
-    is_concrete _               = False
-
-occursCheckTv :: TcTyVar -> TcTyVar -> Bool
-occursCheckTv lhs_tv occ_tv
-  =  lhs_tv == occ_tv
-  || lhs_tv `elemVarSet` tyCoVarsOfType (tyVarKind occ_tv)
 
 -------------------------
 touchabilityTest :: TcLevel -> TcTyVar -> TcType -> Bool

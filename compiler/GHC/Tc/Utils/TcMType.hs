@@ -986,7 +986,7 @@ writeMetaTyVarRef tyvar ref ty
        ; let zonked_ty_kind = typeKind zonked_ty
              zonked_ty_lvl  = tcTypeLevel zonked_ty
              level_check_ok  = not (zonked_ty_lvl `strictlyDeeperThan` tv_lvl)
-             level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
+             level_check_msg = ppr zonked_ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty $$ ppr zonked_ty
              kind_check_ok = zonked_ty_kind `eqType` zonked_tv_kind
              -- Note [Extra-constraint holes in partial type signatures] in GHC.Tc.Gen.HsType
 

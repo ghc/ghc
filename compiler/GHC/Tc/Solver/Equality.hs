@@ -1534,21 +1534,20 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 
   | TyVarLHS tv1 <- lhs1
   , TyVarLHS tv2 <- lhs2
-  , swapOverTyVars (isGiven ev) tv1 tv2
   = do { traceTcS "canEqLHS2 swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
-       ; new_ev <- do_swap
-       ; canEqCanLHSFinish new_ev eq_rel IsSwapped (TyVarLHS tv2)
-                                                   (ps_xi1 `mkCastTyMCo` sym_mco) }
+       ; if swapOverTyVars (isGiven ev) tv1 tv2
+         then finish_with_swapping
+         else finish_without_swapping }
 
-  | TyVarLHS tv1 <- lhs1
-  , TyFamLHS fun_tc2 fun_args2 <- lhs2
-  = canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
+  -- See Note [Always put TyVarLHS on the left]
+  | TyVarLHS {} <- lhs1
+  , TyFamLHS {} <- lhs2
+  = finish_without_swapping
 
-  | TyFamLHS fun_tc1 fun_args1 <- lhs1
-  , TyVarLHS tv2 <- lhs2
-  = do { new_ev <- do_swap
-       ; canEqTyVarFunEq new_ev eq_rel IsSwapped tv2 ps_xi2
-                                                 fun_tc1 fun_args1 ps_xi1 sym_mco }
+  -- See Note [Always put TyVarLHS on the left]
+  | TyFamLHS {} <- lhs1
+  , TyVarLHS {} <- lhs2
+  = finish_with_swapping
 
   | TyFamLHS fun_tc1 fun_args1 <- lhs1
   , TyFamLHS fun_tc2 fun_args2 <- lhs2
@@ -1604,7 +1603,8 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
                           -- this check is just to avoid unfruitful swapping
 
              swap_for_occurs = False
-{-
+
+{- ToDo: not sure about this
                -- If we have F a ~ F (F a), we want to swap.
              swap_for_occurs
                | cterHasNoProblem   $ checkTyFamEq fun_tc2 fun_args2
@@ -1617,55 +1617,34 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
 -}
 
        ; if swap_for_rewriting || swap_for_occurs
-         then do { new_ev <- do_swap
-                 ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
+         then finish_with_swapping
          else finish_without_swapping }
-
-  -- that's all the special cases. Now we just figure out which non-special case
-  -- to continue to.
-  | otherwise
-  = finish_without_swapping
-
   where
     sym_mco = mkSymMCo mco
 
-    do_swap = rewriteCastedEquality ev eq_rel swapped (canEqLHSType lhs1) (canEqLHSType lhs2) mco
-    finish_without_swapping = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+    finish_without_swapping
+      = canEqCanLHSFinish ev eq_rel swapped lhs1 (ps_xi2 `mkCastTyMCo` mco)
+    finish_with_swapping
+      = do { new_ev <- rewriteCastedEquality ev eq_rel swapped
+                                (canEqLHSType lhs1) (canEqLHSType lhs2) mco
+           ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
 
+{- Note [Always put TyVarLHS on the left]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What if one side is a tyvar and the other is a type family
+application, (a ~ F tys) ? Which to put on the left?  Answer:
+* Put the tyvar on the left, (a ~ F tys) as this may be our only shot to unify.
+* But if we fail to unify and end up in cantMakeCanonical,
+  then flip back to (F tys ~ a) because it's generally better
+  to rewrite away function calls. This makes types smaller.
 
--- This function handles the case where one side is a tyvar and the other is
--- a type family application. Which to put on the left?
---   If the tyvar is a touchable meta-tyvar, put it on the left, as this may
---   be our only shot to unify.
---   Otherwise, put the function on the left, because it's generally better to
---   rewrite away function calls. This makes types smaller. And it seems necessary:
---     [W] F alpha ~ alpha
---     [W] F alpha ~ beta
---     [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
---   If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
---   Test case: indexed-types/should_compile/CEqCanOccursCheck
-canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
-                                            -- or (rhs |> mco) ~ lhs if swapped
-                -> EqRel -> SwapFlag
-                -> TyVar -> TcType          -- lhs (or if swapped rhs), pretty lhs
-                -> TyCon -> [Xi] -> TcType  -- rhs (or if swapped lhs) fun and args, pretty rhs
-                -> MCoercion                -- :: kind(rhs) ~N kind(lhs)
-                -> TcS (StopOrContinue Ct)
-canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
-  = do { given_eq_lvl <- getInnermostGivenEqLevel
-       ; if | touchabilityTest given_eq_lvl tv1 rhs  -- alpha ~ F tys, alpha touchable
-            -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
-
-            | otherwise       -- F tys ~ alpha
-            -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
-                                  (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
-                                  mco
-                    ; canEqCanLHSFinish new_ev eq_rel IsSwapped
-                                  (TyFamLHS fun_tc2 fun_args2)
-                                  (ps_xi1 `mkCastTyMCo` sym_mco) } }
-  where
-    sym_mco = mkSymMCo mco
-    rhs = ps_xi2 `mkCastTyMCo` mco
+It's important to flip back. Consider
+    [W] F alpha ~ alpha
+    [W] F alpha ~ beta
+    [W] G alpha beta ~ Int   ( where we have type instance G a a = a )
+  If we end up with a stuck alpha ~ F alpha, we won't be able to solve this.
+  Test case: indexed-types/should_compile/CEqCanOccursCheck
+-}
 
 -- The RHS here is either not CanEqLHS, or it's one that we
 -- want to rewrite the LHS to (as per e.g. swapOverTyVars)
@@ -1685,8 +1664,14 @@ canEqCanLHSFinish, canEqCanLHSFinish_try_unification,
 
 ---------------------------
 canEqCanLHSFinish ev eq_rel swapped lhs rhs
-  = do { -- Assertion: (TyEq:K) is already satisfied
-         massert (canEqLHSKind lhs `eqType` typeKind rhs)
+  = do { traceTcS "canEqCanLHSFinish" $
+         vcat [ text "ev:" <+> ppr ev
+              , text "swapped:" <+> ppr swapped
+              , text "lhs:" <+> ppr lhs
+              , text "rhs:" <+> ppr rhs ]
+
+         -- Assertion: (TyEq:K) is already satisfied
+       ; massert (canEqLHSKind lhs `eqType` typeKind rhs)
 
          -- Assertion: (TyEq:N) is already satisfied (if applicable)
        ; assertPprM ty_eq_N_OK $
@@ -1724,11 +1709,13 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
          then canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
          else
 
+    -- We have a touchable unification variable on the left
     do { check_result <- checkTouchableTyVarEq ev tv rhs
        ; case check_result of {
             PuFail reason -> cantMakeCanonical reason ev eq_rel swapped lhs rhs ;
             PuOK redn _   ->
 
+    -- Success: we can solve by unification
     do { let tv_ty     = mkTyVarTy tv
              final_rhs = reductionReducedType redn
              tv_lvl    = tcTyVarLevel tv
@@ -1778,15 +1765,27 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
     do { new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
                        (mkReflRedn Nominal (canEqLHSType lhs)) rhs_redn
 
-       ; ics <- getInertCans
-       ; interactEq ics (EqCt { eq_ev = new_ev, eq_eq_rel = eq_rel
-                              , eq_lhs = lhs, eq_rhs = rhs }) }}}
+       ; interactEq (EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
+                          , eq_lhs = lhs
+                          , eq_rhs = reductionReducedType rhs_redn }) }}}
 
 ----------------------
 cantMakeCanonical :: CheckTyEqResult -> CtEvidence -> EqRel -> SwapFlag
                   -> CanEqLHS -> TcType
                   -> TcS (StopOrContinue Ct)
 cantMakeCanonical reason ev eq_rel swapped lhs rhs
+  | TyVarLHS tv <- lhs
+  , Just (tc,tys) <- splitTyConApp_maybe rhs
+  , isFamilyTyCon tc
+  , let lhs_ty = mkTyVarTy tv
+  = -- Flip (a ~ F tys) to (F tys ~ a)
+    do { new_ev <- rewriteEqEvidence emptyRewriterSet ev (flipSwap swapped)
+                           (mkReflRedn role rhs) (mkReflRedn role lhs_ty)
+       ; interactEq (EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
+                          , eq_lhs = TyFamLHS tc tys
+                          , eq_rhs = lhs_ty }) }
+
+  | otherwise
   = do { traceTcS "cantMakeCanonical" (ppr lhs $$ ppr rhs)
        ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
                            (mkReflRedn role (canEqLHSType lhs)) (mkReflRedn role rhs)
@@ -2386,24 +2385,24 @@ But it's not so simple:
   call to strictly_more_visible.
 -}
 
-interactEq :: InertCans -> EqCt -> TcS (StopOrContinue Ct)
-interactEq inerts
-  work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
+interactEq :: EqCt -> TcS (StopOrContinue Ct)
+interactEq work_item@(EqCt { eq_lhs = lhs, eq_ev = ev, eq_eq_rel = eq_rel })
 
-  | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
-  = do { setEvBindIfWanted ev IsCoherent $
-         evCoercion (maybeSymCo swapped $
-                     downgradeRole (eqRelRole eq_rel)
-                                   (ctEvRole ev_i)
-                                   (ctEvCoercion ev_i))
-       ; stopWith ev "Solved from inert" }
+  = do { inerts <- getInertCans
+       ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
+            -> do { setEvBindIfWanted ev IsCoherent $
+                    evCoercion (maybeSymCo swapped $
+                                downgradeRole (eqRelRole eq_rel)
+                                              (ctEvRole ev_i)
+                                              (ctEvCoercion ev_i))
+                  ; stopWith ev "Solved from inert" }
 
-  | otherwise
-  = case lhs of
-       TyVarLHS {}      -> finishEqCt work_item
-       TyFamLHS tc args -> do { improveLocalFunEqs inerts tc args work_item
-                              ; improveTopFunEqs tc args work_item
-                              ; finishEqCt work_item }
+            | otherwise
+            -> case lhs of
+                 TyVarLHS {}      -> finishEqCt work_item
+                 TyFamLHS tc args -> do { improveLocalFunEqs inerts tc args work_item
+                                        ; improveTopFunEqs tc args work_item
+                                        ; finishEqCt work_item } }
 
 
 inertsCanDischarge :: InertCans -> EqCt

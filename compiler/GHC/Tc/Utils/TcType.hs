@@ -38,7 +38,7 @@ module GHC.Tc.Utils.TcType (
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, deeperThanOrSame, sameDepthAs,
-  tcTypeLevel, tcTyVarLevel, maxTcLevel,
+  tcTypeLevel, tcTyVarLevel, maxTcLevel, minTcLevel,
 
   --------------------------------
   -- MetaDetails
@@ -47,7 +47,7 @@ module GHC.Tc.Utils.TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
-  isConcreteTyVarTy, isConcreteTyVarTy_maybe,
+  isConcreteTyVarTy, isConcreteTyVarTy_maybe, isConcreteInfo,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -800,6 +800,9 @@ touchable; but then 'b' has escaped its scope into the outer implication.
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
 maxTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `max` b)
 
+minTcLevel :: TcLevel -> TcLevel -> TcLevel
+minTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `min` b)
+
 topTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
 topTcLevel = TcLevel 0   -- 0 = outermost level
@@ -1202,6 +1205,10 @@ isConcreteTyVar_maybe tv
   = Just conc_orig
   | otherwise
   = Nothing
+
+isConcreteInfo :: MetaInfo -> Bool
+isConcreteInfo (ConcreteTv {}) = True
+isConcreteInfo _               = False
 
 -- | Is this type variable a concrete type variable, i.e.
 -- it is a metavariable with 'ConcreteTv' 'MetaInfo'?
