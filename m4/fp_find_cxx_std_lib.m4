@@ -51,9 +51,9 @@ EOF
         fi
 
         try_libs() {
-            dnl Try to link a plain object with CC manually
+            dnl Try to link a plain object with CXX manually
             AC_MSG_CHECKING([for linkage against '${3}'])
-            if "$CC" -o actest actest.o ${1} 2>/dev/null; then
+            if "$CXX" -o actest actest.o ${1} 2>/dev/null; then
                 CXX_STD_LIB_LIBS="${3}"
                 p="`"$CXX" --print-file-name ${2}`"
                 d="`dirname "$p"`"
