@@ -2029,7 +2029,7 @@ tcLookupTh name
      do { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return (AGlobal thing)
-            Failed msg      -> failWithTc (TcRnInterfaceLookupError name msg)
+            Failed msg      -> failWithTc (TcRnInterfaceError msg)
     }}}}
 
 notInScope :: TH.Name -> TcRnMessage

@@ -132,6 +132,7 @@ import GHC.Unit.Module.WholeCoreBindings
 import Data.IORef
 import Data.Foldable
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
+import GHC.Iface.Errors.Types
 
 {-
 This module takes
@@ -576,13 +577,14 @@ tcHiBootIface hsc_src mod
         -- to check consistency against, rather than just when we notice
         -- that an hi-boot is necessary due to a circular import.
         { hsc_env <- getTopEnv
-        ; read_result <- liftIO $ findAndReadIface hsc_env
-                                need (fst (getModuleInstantiation mod)) mod
-                                IsBoot  -- Hi-boot file
+        ; read_result <- liftIO $ findAndReadIface hsc_env need
+                                  (fst (getModuleInstantiation mod)) mod
+                                  IsBoot  -- Hi-boot file
 
         ; case read_result of {
-            Succeeded (iface, _path) -> do { tc_iface <- initIfaceTcRn $ typecheckIface iface
-                                           ; mkSelfBootInfo iface tc_iface } ;
+            Succeeded (iface, _path) ->
+              do { tc_iface <- initIfaceTcRn $ typecheckIface iface
+                 ; mkSelfBootInfo iface tc_iface } ;
             Failed err               ->
 
         -- There was no hi-boot file. But if there is circularity in
@@ -598,7 +600,10 @@ tcHiBootIface hsc_src mod
             Nothing -> return NoSelfBoot
             -- error cases
             Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
-              IsBoot -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints (elaborate err))
+              IsBoot ->
+                let diag = Can'tFindInterface err
+                             (LookingForHiBoot mod)
+                in failWithTc (TcRnInterfaceError diag)
               -- The hi-boot file has mysteriously disappeared.
               NotBoot -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints moduleLoop)
               -- Someone below us imported us!
@@ -611,8 +616,6 @@ tcHiBootIface hsc_src mod
     moduleLoop = text "Circular imports: module" <+> quotes (ppr mod)
                      <+> text "depends on itself"
 
-    elaborate err = hang (text "Could not find hi-boot interface for" <+>
-                          quotes (ppr mod) <> colon) 4 err
 
 
 mkSelfBootInfo :: ModIface -> ModDetails -> TcRn SelfBootInfo
@@ -1968,7 +1971,7 @@ tcIfaceGlobal name
 
         { mb_thing <- importDecl name   -- It's imported; go get it
         ; case mb_thing of
-            Failed err      -> failIfM (ppr name <+> err)
+            Failed err      -> failIfM (ppr name <+> pprDiagnostic err)
             Succeeded thing -> return thing
         }}}
 

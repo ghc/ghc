@@ -2,6 +2,7 @@
 {-# LANGUAGE ExplicitForAll    #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -138,7 +139,7 @@ module GHC.Tc.Utils.Monad(
   forkM,
   setImplicitEnvM,
 
-  withException,
+  withException, withIfaceErr,
 
   -- * Stuff for cost centres.
   getCCIndexM, getCCIndexTcM,
@@ -222,6 +223,8 @@ import qualified Data.Map as Map
 import GHC.Driver.Env.KnotVars
 import GHC.Linker.Types
 import GHC.Types.Unique.DFM
+import GHC.Iface.Errors.Types
+import GHC.Iface.Errors.Ppr
 
 {-
 ************************************************************************
@@ -659,6 +662,16 @@ withException ctx do_this = do
     r <- do_this
     case r of
         Failed err -> liftIO $ throwGhcExceptionIO (ProgramError (renderWithContext ctx err))
+        Succeeded result -> return result
+
+withIfaceErr :: MonadIO m => SDocContext -> m (MaybeErr MissingInterfaceError a) -> m a
+withIfaceErr ctx do_this = do
+    r <- do_this
+    case r of
+        Failed err -> do
+          let opts = defaultDiagnosticOpts @IfaceMessage
+              msg   = missingInterfaceErrorDiagnostic opts err
+          liftIO $ throwGhcExceptionIO (ProgramError (renderWithContext ctx msg))
         Succeeded result -> return result
 
 {-

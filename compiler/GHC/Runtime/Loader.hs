@@ -45,16 +45,20 @@ import GHC.Core.Type        ( Type, mkTyConTy )
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.TyCon       ( TyCon )
 
+
 import GHC.Types.SrcLoc        ( noSrcSpan )
 import GHC.Types.Name    ( Name, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.TyThing
 import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
 import GHC.Types.Name.Reader
+import GHC.Types.Unique.DFM
+
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
+import GHC.Driver.Config.Diagnostic ( initIfaceMessageOpts )
 import GHC.Unit.Module   ( Module, ModuleName )
-import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.ModIface ( ModIface_(mi_exports), ModIface )
 import GHC.Unit.Env
 
 import GHC.Utils.Panic
@@ -68,8 +72,9 @@ import Control.Monad     ( unless )
 import Data.Maybe        ( mapMaybe )
 import Unsafe.Coerce     ( unsafeCoerce )
 import GHC.Linker.Types
-import GHC.Types.Unique.DFM
 import Data.List (unzip4)
+import GHC.Iface.Errors.Ppr
+
 
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
 -- flags. Should be called after command line arguments are parsed, but before
@@ -329,7 +334,11 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         _     -> panic "lookupRdrNameInModule"
 
                 Nothing -> throwCmdLineErrorS dflags $ hsep [text "Could not determine the exports of the module", ppr mod_name]
-        err -> throwCmdLineErrorS dflags $ cannotFindModule hsc_env mod_name err
+        err ->
+          let opts   = initIfaceMessageOpts dflags
+              err_txt = missingInterfaceErrorDiagnostic opts
+                      $ cannotFindModule hsc_env mod_name err
+          in throwCmdLineErrorS dflags err_txt
   where
     doc = text "contains a name used in an invocation of lookupRdrNameInModule"
 

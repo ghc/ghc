@@ -1,20 +1,20 @@
 =====
 Name: False
 OccString: 'False'
-DataCon: False
+DataCon: Data constructor ‘False’
 =====
 Name: :
 OccString: ':'
-DataCon: :
+DataCon: Data constructor ‘:’
 =====
 Name: :->
 OccString: ':->'
-DataCon: :->
+DataCon: Data constructor ‘:->’
 =====
 Name: :->.
 OccString: ':->.'
-DataCon: :->.
+DataCon: Data constructor ‘:->.’
 =====
 Name: :->.+
 OccString: ':->.+'
-DataCon: :->.+
+DataCon: Data constructor ‘:->.+’

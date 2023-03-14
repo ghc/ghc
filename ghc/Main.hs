@@ -79,12 +79,13 @@ import GHC.Iface.Load
 import GHC.Iface.Recomp.Binary ( fingerprintBinMem )
 
 import GHC.Tc.Utils.Monad      ( initIfaceCheck )
-import System.FilePath
+import GHC.Iface.Errors.Ppr
 
 -- Standard Haskell libraries
 import System.IO
 import System.Environment
 import System.Exit
+import System.FilePath
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
@@ -1100,8 +1101,11 @@ abiHash strs = do
          r <- findImportedModule hsc_env modname NoPkgQual
          case r of
            Found _ m -> return m
-           _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
-                          cannotFindModule hsc_env modname r
+           _error    ->
+            let opts   = initIfaceMessageOpts dflags
+                err_txt = missingInterfaceErrorDiagnostic opts
+                        $ cannotFindModule hsc_env modname r
+            in throwGhcException . CmdLineError $ showSDoc dflags err_txt
 
   mods <- mapM find_it strs
 

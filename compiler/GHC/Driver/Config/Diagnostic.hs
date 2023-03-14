@@ -8,11 +8,13 @@ module GHC.Driver.Config.Diagnostic
   , initDsMessageOpts
   , initTcMessageOpts
   , initDriverMessageOpts
+  , initIfaceMessageOpts
   )
 where
 
 import GHC.Driver.Flags
 import GHC.Driver.Session
+import GHC.Prelude
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error (DiagOpts (..))
@@ -22,6 +24,8 @@ import GHC.Tc.Errors.Types
 import GHC.HsToCore.Errors.Types
 import GHC.Types.Error
 import GHC.Tc.Errors.Ppr
+import GHC.Iface.Errors.Types
+import GHC.Iface.Errors.Ppr
 
 -- | Initialise the general configuration for printing diagnostic messages
 -- For example, this configuration controls things like whether warnings are
@@ -50,11 +54,17 @@ initPsMessageOpts :: DynFlags -> DiagnosticOpts PsMessage
 initPsMessageOpts _ = NoDiagnosticOpts
 
 initTcMessageOpts :: DynFlags -> DiagnosticOpts TcRnMessage
-initTcMessageOpts dflags = TcRnMessageOpts { tcOptsShowContext = gopt Opt_ShowErrorContext dflags }
+initTcMessageOpts dflags =
+  TcRnMessageOpts { tcOptsShowContext    = gopt Opt_ShowErrorContext dflags
+                  , tcOptsIfaceOpts      = initIfaceMessageOpts dflags }
 
 initDsMessageOpts :: DynFlags -> DiagnosticOpts DsMessage
 initDsMessageOpts _ = NoDiagnosticOpts
 
+initIfaceMessageOpts :: DynFlags -> DiagnosticOpts IfaceMessage
+initIfaceMessageOpts dflags =
+                  IfaceMessageOpts { ifaceShowTriedFiles = verbosity dflags >= 3 }
+
 initDriverMessageOpts :: DynFlags -> DiagnosticOpts DriverMessage
-initDriverMessageOpts dflags = DriverMessageOpts (initPsMessageOpts dflags)
+initDriverMessageOpts dflags = DriverMessageOpts (initPsMessageOpts dflags) (initIfaceMessageOpts dflags)
 

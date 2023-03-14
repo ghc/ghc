@@ -87,6 +87,8 @@ import GHC.Data.Maybe
 import Control.Monad
 import Data.List (find)
 
+import GHC.Iface.Errors.Types
+
 checkHsigDeclM :: ModIface -> TyThing -> TyThing -> TcRn ()
 checkHsigDeclM sig_iface sig_thing real_thing = do
     let name = getName real_thing
@@ -152,7 +154,7 @@ checkHsigIface tcg_env gre_env sig_iface
         -- tcg_env (TODO: but maybe this isn't relevant anymore).
         r <- tcLookupImported_maybe name
         case r of
-          Failed err -> addErr (TcRnInterfaceLookupError name err)
+          Failed err           -> addErr (TcRnInterfaceError err)
           Succeeded real_thing -> checkHsigDeclM sig_iface sig_thing real_thing
 
       -- The hsig did NOT define this function; that means it must
@@ -262,7 +264,7 @@ findExtraSigImports hsc_env HsigFile modname = do
       reqs       = requirementMerges unit_state modname
     holes <- forM reqs $ \(Module iuid mod_name) -> do
         initIfaceLoad hsc_env
-            . withException ctx
+            . withIfaceErr ctx
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)
     return (uniqDSetToList (unionManyUniqDSets holes))
@@ -547,9 +549,8 @@ mergeSignatures
             im = fst (getModuleInstantiation m)
             ctx = initSDocContext dflags defaultUserStyle
         fmap fst
-         . withException ctx
-         $ findAndReadIface hsc_env
-                            (text "mergeSignatures") im m NotBoot
+         . withIfaceErr ctx
+         $ findAndReadIface hsc_env (text "mergeSignatures") im m NotBoot
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -980,9 +981,9 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                                                isig_mod sig_mod NotBoot
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface
-        Failed err -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-            hang (text "Could not find hi interface for signature" <+>
-                  quotes (ppr isig_mod) <> colon) 4 err
+        Failed err ->
+          failWithTc $ TcRnInterfaceError $
+          Can'tFindInterface err (LookingForSig isig_mod)
 
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)

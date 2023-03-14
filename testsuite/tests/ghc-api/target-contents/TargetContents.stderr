@@ -16,8 +16,8 @@ B.hs:3:5: error: [GHC-88464] Variable not in scope: z
 B.hs:3:5: error: [GHC-88464] Variable not in scope: z
 == Dep_Error_MM_A
 
-A.hs:3:1: error:
-    Could not find module ‘B’
+A.hs:3:1: error: [GHC-87110]
+    Could not find module ‘B’.
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 == Dep_DM_AB
 == Dep_Error_DM_AB
@@ -25,8 +25,8 @@ A.hs:3:1: error:
 B.hs:3:5: error: [GHC-88464] Variable not in scope: z
 == Dep_Error_DM_A
 
-A.hs:3:1: error:
-    Could not find module ‘B’
+A.hs:3:1: error: [GHC-87110]
+    Could not find module ‘B’.
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.
 == Dep_MD_AB
 == Dep_Error_MD_AB

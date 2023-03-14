@@ -76,7 +76,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Fixity (defaultFixity)
 
-import GHC.Unit.State (pprWithUnitState, UnitState)
+import GHC.Unit.State
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings  ( warningTxtCategory, pprWarningTxtForMsg )
 
@@ -101,13 +101,16 @@ import Data.Ord ( comparing )
 import Data.Bifunctor
 import qualified Language.Haskell.TH as TH
 import {-# SOURCE #-} GHC.Tc.Types (pprTcTyThingCategory)
+import GHC.Iface.Errors.Types
+import GHC.Iface.Errors.Ppr
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
+                                       , tcOptsIfaceOpts   :: !IfaceMessageOpts
                                        }
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
-defaultTcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext = True }
-
+defaultTcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext = True
+                                         , tcOptsIfaceOpts = defaultDiagnosticOpts @IfaceMessage }
 
 instance Diagnostic TcRnMessage where
   type DiagnosticOpts TcRnMessage = TcRnMessageOpts
@@ -1245,7 +1248,6 @@ instance Diagnostic TcRnMessage where
                            True  -> text (show item)
                            False -> text (TH.pprint item))
     TcRnReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
-    TcRnInterfaceLookupError _ sdoc -> mkSimpleDecorated sdoc
     TcRnUnsatisfiedMinimalDef mindef
       -> mkSimpleDecorated $
         vcat [text "No explicit implementation for"
@@ -1733,6 +1735,8 @@ instance Diagnostic TcRnMessage where
          ppr (frr_context frr) $$
          text "cannot be assigned a fixed runtime representation," <+>
          text "not even by defaulting."
+    TcRnInterfaceError reason
+      -> diagnosticMessage (tcOptsIfaceOpts opts) reason
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2105,8 +2109,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnReportCustomQuasiError isError _
       -> if isError then ErrorWithoutFlag else WarningWithoutFlag
-    TcRnInterfaceLookupError{}
-      -> ErrorWithoutFlag
     TcRnUnsatisfiedMinimalDef{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnMisplacedInstSig{}
@@ -2307,6 +2309,9 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnCannotDefaultConcrete{}
       -> ErrorWithoutFlag
+    TcRnInterfaceError err
+      -> interfaceErrorReason err
+
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2685,8 +2690,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnReportCustomQuasiError{}
       -> noHints
-    TcRnInterfaceLookupError{}
-      -> noHints
     TcRnUnsatisfiedMinimalDef{}
       -> noHints
     TcRnMisplacedInstSig{}
@@ -2908,6 +2911,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnCannotDefaultConcrete{}
       -> [SuggestAddTypeSignatures UnnamedBinding]
+    TcRnInterfaceError reason
+      -> interfaceErrorHints reason
 
   diagnosticCode = constructorCode
 
