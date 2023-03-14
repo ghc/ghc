@@ -73,6 +73,7 @@ import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Types.Fixity (defaultFixity)
 
 import GHC.Unit.State (pprWithUnitState, UnitState)
 import GHC.Unit.Module
@@ -994,6 +995,32 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalHsigDefaultMethods name meths
       -> mkSimpleDecorated $
         text "Illegal default method" <> plural (NE.toList meths) <+> text "in class definition of" <+> ppr name <+> text "in hsig file"
+    TcRnHsigFixityMismatch real_thing real_fixity sig_fixity
+      ->
+      let ppr_fix f = ppr f <+> if f == defaultFixity then parens (text "default") else empty
+      in mkSimpleDecorated $
+        vcat [ppr real_thing <+> text "has conflicting fixities in the module",
+              text "and its hsig file",
+              text "Main module:" <+> ppr_fix real_fixity,
+              text "Hsig file:" <+> ppr_fix sig_fixity]
+    TcRnHsigShapeMismatch (HsigShapeSortMismatch info1 info2)
+      -> mkSimpleDecorated $
+            text "While merging export lists, could not combine"
+            <+> ppr info1 <+> text "with" <+> ppr info2
+            <+> parens (text "one is a type, the other is a plain identifier")
+    TcRnHsigShapeMismatch (HsigShapeNotUnifiable name1 name2 notHere)
+      ->
+      let extra = if notHere
+                  then text "Neither name variable originates from the current signature."
+                  else empty
+      in mkSimpleDecorated $
+        text "While merging export lists, could not unify"
+        <+> ppr name1 <+> text "with" <+> ppr name2 $$ extra
+    TcRnHsigMissingModuleExport occ unit_state impl_mod
+      -> mkSimpleDecorated $
+            quotes (ppr occ)
+        <+> text "is exported by the hsig file, but not exported by the implementing module"
+        <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)
     TcRnBadGenericMethod clas op
       -> mkSimpleDecorated $
         hsep [text "Class", quotes (ppr clas),
@@ -1726,6 +1753,12 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnWarningsDeprecations
     TcRnIllegalHsigDefaultMethods{}
       -> ErrorWithoutFlag
+    TcRnHsigFixityMismatch{}
+      -> ErrorWithoutFlag
+    TcRnHsigShapeMismatch{}
+      -> ErrorWithoutFlag
+    TcRnHsigMissingModuleExport{}
+      -> ErrorWithoutFlag
     TcRnBadGenericMethod{}
       -> ErrorWithoutFlag
     TcRnWarningMinimalDefIncomplete{}
@@ -2195,6 +2228,12 @@ instance Diagnostic TcRnMessage where
     TcRnPragmaWarning{}
       -> noHints
     TcRnIllegalHsigDefaultMethods{}
+      -> noHints
+    TcRnHsigFixityMismatch{}
+      -> noHints
+    TcRnHsigShapeMismatch{}
+      -> noHints
+    TcRnHsigMissingModuleExport{}
       -> noHints
     TcRnBadGenericMethod{}
       -> noHints

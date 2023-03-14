@@ -471,6 +471,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
+  GhcDiagnosticCode "TcRnHsigFixityMismatch"                        = 93007
+  GhcDiagnosticCode "HsigShapeSortMismatch"                         = 93008
+  GhcDiagnosticCode "HsigShapeNotUnifiable"                         = 93009
+  GhcDiagnosticCode "TcRnHsigNoIface"                               = 93010
+  GhcDiagnosticCode "TcRnHsigMissingModuleExport"                   = 93011
   GhcDiagnosticCode "TcRnBadGenericMethod"                          = 59794
   GhcDiagnosticCode "TcRnWarningMinimalDefIncomplete"               = 13511
   GhcDiagnosticCode "TcRnDefaultMethodForPragmaLacksBinding"        = 28587
@@ -691,6 +696,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnPragmaWarning"        = 'Just (WarningTxt GhcRn)
   ConRecursInto "TcRnNotInScope"           = 'Just NotInScopeError
   ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason
+  ConRecursInto "TcRnHsigShapeMismatch"    = 'Just HsigShapeMismatchReason
 
     --
     -- TH errors

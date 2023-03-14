@@ -88,21 +88,6 @@ import Data.List (find)
 
 import {-# SOURCE #-} GHC.Tc.Module
 
-
-fixityMisMatch :: TyThing -> Fixity -> Fixity -> TcRnMessage
-fixityMisMatch real_thing real_fixity sig_fixity =
-  mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ppr real_thing <+> text "has conflicting fixities in the module",
-          text "and its hsig file",
-          text "Main module:" <+> ppr_fix real_fixity,
-          text "Hsig file:" <+> ppr_fix sig_fixity]
-  where
-    ppr_fix f =
-        ppr f <+>
-        (if f == defaultFixity
-            then parens (text "default")
-            else empty)
-
 checkHsigDeclM :: ModIface -> TyThing -> TyThing -> TcRn ()
 checkHsigDeclM sig_iface sig_thing real_thing = do
     let name = getName real_thing
@@ -115,7 +100,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
                         Just f -> f
     when (real_fixity /= sig_fixity) $
       addErrAt (nameSrcSpan name)
-        (fixityMisMatch real_thing real_fixity sig_fixity)
+        (TcRnHsigFixityMismatch real_thing real_fixity sig_fixity)
 
 -- | Given a 'ModDetails' of an instantiated signature (note that the
 -- 'ModDetails' must be knot-tied consistently with the actual implementation)
@@ -677,7 +662,7 @@ mergeSignatures
             -- 3(d). Extend the name substitution (performing shaping)
             mb_r <- extend_ns nsubst as2
             case mb_r of
-                Left err -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
+                Left err -> failWithTc (TcRnHsigShapeMismatch err)
                 Right nsubst' -> return (nsubst',oks',(imod, thinned_iface):ifaces)
         nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
         ok_to_use0 = mkOccSet (exportOccs (mi_exports lcl_iface0))
@@ -1004,10 +989,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
-            [] -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                        quotes (ppr occ)
-                    <+> text "is exported by the hsig file, but not exported by the implementing module"
-                    <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)
+            [] -> addErr $ TcRnHsigMissingModuleExport occ unit_state impl_mod
             _ -> return ()
     failIfErrsM
 

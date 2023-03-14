@@ -91,6 +91,7 @@ module GHC.Tc.Errors.Types (
   , DeclSort(..)
   , NonStandardGuards(..)
   , RuleLhsErrReason(..)
+  , HsigShapeMismatchReason(..)
   ) where
 
 import GHC.Prelude
@@ -105,6 +106,7 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , FixedRuntimeRepOrigin(..) )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
+import GHC.Types.Avail (AvailInfo)
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.ForeignCall (CLabelString)
@@ -2239,10 +2241,39 @@ data TcRnMessage where
     Test case:
       bkpfail40
   -}
-
   TcRnIllegalHsigDefaultMethods :: !Name -- ^ 'Name' of the class
                                 -> NE.NonEmpty (LHsBind GhcRn) -- ^ default methods
                                 -> TcRnMessage
+
+  {-| TcRnHsigFixityMismatch is an error indicating that the fixity decl in a
+    Backpack signature file differs from the one in the source file for the same
+    operator.
+
+    Test cases:
+      bkpfail37, bkpfail38
+  -}
+  TcRnHsigFixityMismatch :: !TyThing -- ^ The operator whose fixity is defined
+                         -> !Fixity -- ^ the fixity used in the source file
+                         -> !Fixity -- ^ the fixity used in the signature
+                         -> TcRnMessage
+
+  {-| TcRnHsigShapeMismatch is a group of errors related to mismatches between
+    backpack signatures.
+  -}
+  TcRnHsigShapeMismatch :: !HsigShapeMismatchReason
+                         -> TcRnMessage
+
+  {-| TcRnHsigMissingModuleExport is an error indicating that a module doesn't
+    export a name exported by its signature.
+
+    Test cases:
+      bkpfail01, bkpfail05, bkpfail09, bkpfail16, bkpfail35, bkpcabal06
+  -}
+  TcRnHsigMissingModuleExport :: !OccName -- ^ The missing name
+                              -> !UnitState -- ^ The module's unit state
+                              -> !Module -- ^ The implementation module
+                              -> TcRnMessage
+
   {-| TcRnBadGenericMethod
      This test ensures that if you provide a "more specific" type signatures
      for the default method, you must also provide a binding.
@@ -4419,3 +4450,24 @@ data NonStandardGuards where
 data RuleLhsErrReason
   = UnboundVariable RdrName NotInScopeError
   | IllegalExpression
+
+data HsigShapeMismatchReason =
+  {-| HsigShapeSortMismatch is an error indicating that an item in the
+    export list of a signature doesn't match the item of the same name in
+    another signature when merging the two – one is a type while the other is a
+    plain identifier.
+
+    Test cases:
+      none
+  -}
+  HsigShapeSortMismatch !AvailInfo !AvailInfo
+  |
+  {-| HsigShapeNotUnifiable is an error indicating that a name in the
+    export list of a signature cannot be unified with a name of the same name in
+    another signature when merging the two.
+
+    Test cases:
+      bkpfail20, bkpfail21
+  -}
+  HsigShapeNotUnifiable !Name !Name !Bool
+  deriving (Generic)
