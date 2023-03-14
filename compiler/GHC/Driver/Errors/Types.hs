@@ -8,7 +8,6 @@ module GHC.Driver.Errors.Types (
   , DriverMessage(..)
   , DriverMessageOpts(..)
   , DriverMessages, PsMessage(PsHeaderMessage)
-  , BuildingCabalPackage(..)
   , WarningMessages
   , ErrorMessages
   , WarnMsg
@@ -32,13 +31,15 @@ import GHC.Unit.Module
 import GHC.Unit.State
 
 import GHC.Parser.Errors.Types ( PsMessage(PsHeaderMessage) )
-import GHC.Tc.Errors.Types     ( TcRnMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Hs.Extension          (GhcTc)
 
 import Language.Haskell.Syntax.Decls (RuleDecl)
 
 import GHC.Generics ( Generic )
+
+import GHC.Tc.Errors.Types
+import GHC.Iface.Errors.Types
 
 -- | A collection of warning messages.
 -- /INVARIANT/: Each 'GhcMessage' in the collection should have 'SevWarning' severity.
@@ -369,17 +370,14 @@ data DriverMessage where
 
   DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
 
+  DriverInterfaceError :: !IfaceMessage -> DriverMessage
+
 deriving instance Generic DriverMessage
 
 data DriverMessageOpts =
-  DriverMessageOpts { psDiagnosticOpts :: DiagnosticOpts PsMessage }
+  DriverMessageOpts { psDiagnosticOpts :: DiagnosticOpts PsMessage
+                    , ifaceDiagnosticOpts :: DiagnosticOpts IfaceMessage }
 
--- | Pass to a 'DriverMessage' the information whether or not the
--- '-fbuilding-cabal-package' flag is set.
-data BuildingCabalPackage
-  = YesBuildingCabalPackage
-  | NoBuildingCabalPackage
-  deriving Eq
 
 -- | Checks if we are building a cabal package by consulting the 'DynFlags'.
 checkBuildingCabalPackage :: DynFlags -> BuildingCabalPackage

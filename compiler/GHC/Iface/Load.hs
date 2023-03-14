@@ -116,6 +116,7 @@ import Data.Map ( toList )
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
+import GHC.Iface.Errors.Types
 
 {-
 ************************************************************************
@@ -143,7 +144,7 @@ where the code that e1 expands to might import some defns that
 also turn out to be needed by the code that e2 expands to.
 -}
 
-tcLookupImported_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
+tcLookupImported_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 tcLookupImported_maybe name
   = do  { hsc_env <- getTopEnv
@@ -152,7 +153,7 @@ tcLookupImported_maybe name
             Just thing -> return (Succeeded thing)
             Nothing    -> tcImportDecl_maybe name }
 
-tcImportDecl_maybe :: Name -> TcM (MaybeErr SDoc TyThing)
+tcImportDecl_maybe :: Name -> TcM (MaybeErr IfaceMessage TyThing)
 -- Entry point for *source-code* uses of importDecl
 tcImportDecl_maybe name
   | Just thing <- wiredInNameTyThing_maybe name
@@ -163,7 +164,7 @@ tcImportDecl_maybe name
   | otherwise
   = initIfaceTcRn (importDecl name)
 
-importDecl :: Name -> IfM lcl (MaybeErr SDoc TyThing)
+importDecl :: Name -> IfM lcl (MaybeErr IfaceMessage TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
@@ -174,29 +175,22 @@ importDecl name
         -- Load the interface, which should populate the PTE
         ; mb_iface <- assertPpr (isExternalName name) (ppr name) $
                       loadInterface nd_doc (nameModule name) ImportBySystem
-        ; case mb_iface of {
-                Failed err_msg  -> return (Failed err_msg) ;
-                Succeeded _ -> do
+        ; case mb_iface of
+          { Failed err_msg -> return $ Failed $
+                              Can'tFindInterface err_msg (LookingForName name)
+          ; Succeeded _ -> do
 
         -- Now look it up again; this time we should find it
         { eps <- getEps
         ; case lookupTypeEnv (eps_PTE eps) name of
             Just thing -> return $ Succeeded thing
-            Nothing    -> let doc = whenPprDebug (found_things_msg eps $$ empty)
-                                    $$ not_found_msg
-                          in return $ Failed doc
+            Nothing    -> return $ Failed $
+              Can'tFindNameInInterface name
+              (filter is_interesting $ nonDetNameEnvElts $ eps_PTE eps)
     }}}
   where
     nd_doc = text "Need decl for" <+> ppr name
-    not_found_msg = hang (text "Can't find interface-file declaration for" <+>
-                                pprNameSpace (nameNameSpace name) <+> ppr name)
-                       2 (vcat [text "Probable cause: bug in .hi-boot file, or inconsistent .hi file",
-                                text "Use -ddump-if-trace to get an idea of which file caused the error"])
-    found_things_msg eps =
-        hang (text "Found the following declarations in" <+> ppr (nameModule name) <> colon)
-           2 (vcat (map ppr $ filter is_interesting $ nonDetNameEnvElts $ eps_PTE eps))
-      where
-        is_interesting thing = nameModule name == nameModule (getName thing)
+    is_interesting thing = nameModule name == nameModule (getName thing)
 
 
 {-
@@ -299,15 +293,21 @@ loadSrcInterface :: SDoc
 loadSrcInterface doc mod want_boot maybe_pkg
   = do { res <- loadSrcInterface_maybe doc mod want_boot maybe_pkg
        ; case res of
-           Failed err      -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
-           Succeeded iface -> return iface }
+           Failed    err ->
+             failWithTc $
+               TcRnInterfaceError $
+                 Can'tFindInterface err $
+                 LookingForModule mod want_boot
+           Succeeded iface ->
+             return iface
+       }
 
 -- | Like 'loadSrcInterface', but returns a 'MaybeErr'.
 loadSrcInterface_maybe :: SDoc
                        -> ModuleName
                        -> IsBootInterface     -- {-# SOURCE #-} ?
                        -> PkgQual             -- "package", if any
-                       -> RnM (MaybeErr SDoc ModIface)
+                       -> RnM (MaybeErr MissingInterfaceError ModIface)
 
 loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- We must first find which Module this import refers to.  This involves
@@ -403,11 +403,11 @@ loadInterfaceWithException doc mod_name where_from
   = do
     dflags <- getDynFlags
     let ctx = initSDocContext dflags defaultUserStyle
-    withException ctx (loadInterface doc mod_name where_from)
+    withIfaceErr ctx (loadInterface doc mod_name where_from)
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr SDoc ModIface)
+              -> IfM lcl (MaybeErr MissingInterfaceError ModIface)
 
 -- loadInterface looks in both the HPT and PIT for the required interface
 -- If not found, it loads it, and puts it in the PIT (always).
@@ -703,7 +703,7 @@ computeInterface
   -> SDoc
   -> IsBootInterface
   -> Module
-  -> IO (MaybeErr SDoc (ModIface, FilePath))
+  -> IO (MaybeErr MissingInterfaceError (ModIface, FilePath))
 computeInterface hsc_env doc_str hi_boot_file mod0 = do
   massert (not (isHoleModule mod0))
   let mhome_unit  = hsc_home_unit_maybe hsc_env
@@ -732,7 +732,7 @@ computeInterface hsc_env doc_str hi_boot_file mod0 = do
 -- @p[A=\<A>,B=\<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
-    -> TcRnIf gbl lcl (MaybeErr SDoc (UniqDSet ModuleName))
+    -> TcRnIf gbl lcl (MaybeErr MissingInterfaceError (UniqDSet ModuleName))
 moduleFreeHolesPrecise doc_str mod
  | moduleIsDefinite mod = return (Succeeded emptyUniqDSet)
  | otherwise =
@@ -769,13 +769,13 @@ moduleFreeHolesPrecise doc_str mod
             Failed err -> return (Failed err)
 
 wantHiBootFile :: Maybe HomeUnit -> ExternalPackageState -> Module -> WhereFrom
-               -> MaybeErr SDoc IsBootInterface
+               -> MaybeErr MissingInterfaceError IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
 wantHiBootFile mhome_unit eps mod from
   = case from of
        ImportByUser usr_boot
           | usr_boot == IsBoot && notHomeModuleMaybe mhome_unit mod
-          -> Failed (badSourceImport mod)
+          -> Failed (BadSourceImport mod)
           | otherwise -> Succeeded usr_boot
 
        ImportByPlugin
@@ -798,11 +798,6 @@ wantHiBootFile mhome_unit eps mod from
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
 
-badSourceImport :: Module -> SDoc
-badSourceImport mod
-  = hang (text "You cannot {-# SOURCE #-} import a module from another package")
-       2 (text "but" <+> quotes (ppr mod) <+> text "is from package"
-          <+> quotes (ppr (moduleUnit mod)))
 
 -----------------------------------------------------
 --      Loading type/class/value decls
@@ -855,7 +850,7 @@ findAndReadIface
                      -- this to check the consistency of the requirements of the
                      -- module we read out.
   -> IsBootInterface -- ^ Looking for .hi-boot or .hi file
-  -> IO (MaybeErr SDoc (ModIface, FilePath))
+  -> IO (MaybeErr MissingInterfaceError (ModIface, FilePath))
 findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
 
   let profile = targetProfile dflags
@@ -897,12 +892,12 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                     Just home_unit
                       | isHomeInstalledModule home_unit mod
                       , not (isOneShot (ghcMode dflags))
-                      -> return (Failed (homeModError mod loc))
+                      -> return (Failed (HomeModError mod loc))
                     _ -> do
                         r <- read_file logger name_cache unit_state dflags wanted_mod (ml_hi_file loc)
                         case r of
-                          Failed _
-                            -> return r
+                          Failed err
+                            -> return (Failed $ BadIfaceFile err)
                           Succeeded (iface,_fp)
                             -> do
                                 r2 <- load_dynamic_too_maybe logger name_cache unit_state
@@ -910,46 +905,47 @@ findAndReadIface hsc_env doc_str mod wanted_mod hi_boot_file = do
                                                          iface loc
                                 case r2 of
                                   Failed sdoc -> return (Failed sdoc)
-                                  Succeeded {} -> return r
+                                  Succeeded {} -> return $ Succeeded (iface,_fp)
               err -> do
                   trace_if logger (text "...not found")
                   return $ Failed $ cannotFindInterface
                                       unit_state
                                       mhome_unit
                                       profile
-                                      (Iface_Errors.mayShowLocations dflags)
                                       (moduleName mod)
                                       err
 
 -- | Check if we need to try the dynamic interface for -dynamic-too
-load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> ModLocation -> IO (MaybeErr SDoc ())
+load_dynamic_too_maybe :: Logger -> NameCache -> UnitState -> DynFlags
+                       -> Module -> ModIface -> ModLocation
+                       -> IO (MaybeErr MissingInterfaceError ())
 load_dynamic_too_maybe logger name_cache unit_state dflags wanted_mod iface loc
   -- Indefinite interfaces are ALWAYS non-dynamic.
   | not (moduleIsDefinite (mi_module iface)) = return (Succeeded ())
   | gopt Opt_BuildDynamicToo dflags = load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc
   | otherwise = return (Succeeded ())
 
-load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> ModIface -> ModLocation -> IO (MaybeErr SDoc ())
+load_dynamic_too :: Logger -> NameCache -> UnitState -> DynFlags
+                 -> Module -> ModIface -> ModLocation
+                 -> IO (MaybeErr MissingInterfaceError ())
 load_dynamic_too logger name_cache unit_state dflags wanted_mod iface loc = do
   read_file logger name_cache unit_state dflags wanted_mod (ml_dyn_hi_file loc) >>= \case
     Succeeded (dynIface, _)
      | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface)
      -> return (Succeeded ())
      | otherwise ->
-        do return $ (Failed $ dynamicHashMismatchError wanted_mod loc)
+        do return $ (Failed $ DynamicHashMismatchError wanted_mod loc)
     Failed err ->
-        do return $ (Failed $ ((text "Failed to load dynamic interface file for" <+> ppr wanted_mod <> colon) $$ err))
+        do return $ (Failed $ FailedToLoadDynamicInterface wanted_mod err)
+
+          --((text "Failed to load dynamic interface file for" <+> ppr wanted_mod <> colon) $$ err))
 
 
-dynamicHashMismatchError :: Module -> ModLocation -> SDoc
-dynamicHashMismatchError wanted_mod loc  =
-  vcat [ text "Dynamic hash doesn't match for" <+> quotes (ppr wanted_mod)
-       , text "Normal interface file from"  <+> text (ml_hi_file loc)
-       , text "Dynamic interface file from" <+> text (ml_dyn_hi_file loc)
-       , text "You probably need to recompile" <+> quotes (ppr wanted_mod) ]
 
 
-read_file :: Logger -> NameCache -> UnitState -> DynFlags -> Module -> FilePath -> IO (MaybeErr SDoc (ModIface, FilePath))
+read_file :: Logger -> NameCache -> UnitState -> DynFlags
+          -> Module -> FilePath
+          -> IO (MaybeErr ReadInterfaceError (ModIface, FilePath))
 read_file logger name_cache unit_state dflags wanted_mod file_path = do
   trace_if logger (text "readIFace" <+> text file_path)
 
@@ -964,7 +960,7 @@ read_file logger name_cache unit_state dflags wanted_mod file_path = do
                 (uninstantiateInstantiatedModule indef_mod)
   read_result <- readIface dflags name_cache wanted_mod' file_path
   case read_result of
-    Failed err -> return (Failed (badIfaceFile file_path err))
+    Failed err      -> return (Failed err)
     Succeeded iface -> return (Succeeded (iface, file_path))
                 -- Don't forget to fill in the package name...
 
@@ -985,7 +981,7 @@ readIface
   -> NameCache
   -> Module
   -> FilePath
-  -> IO (MaybeErr SDoc ModIface)
+  -> IO (MaybeErr ReadInterfaceError ModIface)
 readIface dflags name_cache wanted_mod file_path = do
   let profile = targetProfile dflags
   res <- tryMost $ readBinIface profile name_cache CheckHiWay QuietBinIFace file_path
@@ -999,9 +995,9 @@ readIface dflags name_cache wanted_mod file_path = do
         | otherwise     -> return (Failed err)
         where
           actual_mod = mi_module iface
-          err = hiModuleNameMismatchWarn wanted_mod actual_mod
+          err = HiModuleNameMismatchWarn file_path wanted_mod actual_mod
 
-    Left exn    -> return (Failed (text (showException exn)))
+    Left exn    -> return (Failed (ExceptionOccurred file_path exn))
 
 {-
 *********************************************************

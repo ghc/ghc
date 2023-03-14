@@ -153,6 +153,7 @@ import GHC.Utils.Constants
 import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
 import qualified Data.IntSet as I
 import GHC.Types.Unique
+import GHC.Iface.Errors.Types
 
 
 -- -----------------------------------------------------------------------------
@@ -2336,8 +2337,8 @@ noModError :: HscEnv -> SrcSpan -> ModuleName -> FindResult -> MsgEnvelope GhcMe
 -- ToDo: we don't have a proper line number for this error
 noModError hsc_env loc wanted_mod err
   = mkPlainErrorMsgEnvelope loc $ GhcDriverMessage $
-    DriverUnknownMessage $ UnknownDiagnostic $ mkPlainError noHints $
-    cannotFindModule hsc_env wanted_mod err
+    DriverInterfaceError $
+    (Can'tFindInterface (cannotFindModule hsc_env wanted_mod err) (LookingForModule wanted_mod NotBoot))
 
 {-
 noHsFileErr :: SrcSpan -> String -> DriverMessages

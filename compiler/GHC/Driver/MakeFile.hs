@@ -27,7 +27,6 @@ import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
-import GHC.Types.Error (UnknownDiagnostic(..))
 import GHC.Types.SourceError
 import GHC.Types.SrcLoc
 import GHC.Types.PkgQual
@@ -53,6 +52,7 @@ import Control.Monad    ( when, forM_ )
 import Data.Maybe       ( isJust )
 import Data.IORef
 import qualified Data.Set as Set
+import GHC.Iface.Errors.Types
 
 -----------------------------------------------------------------
 --
@@ -307,9 +307,8 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps = do
     fail ->
         throwOneError $
           mkPlainErrorMsgEnvelope srcloc $
-          GhcDriverMessage $ DriverUnknownMessage $
-             UnknownDiagnostic $ mkPlainError noHints $
-             cannotFindModule hsc_env imp fail
+          GhcDriverMessage $ DriverInterfaceError $
+             (Can'tFindInterface (cannotFindModule hsc_env imp fail) (LookingForModule imp is_boot))
 
 -----------------------------
 writeDependency :: FilePath -> Handle -> [FilePath] -> FilePath -> IO ()

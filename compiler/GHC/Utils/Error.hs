@@ -245,14 +245,14 @@ getInvalids vs = [d | NotValid d <- vs]
 
 ----------------
 -- | Formats the input list of structured document, where each element of the list gets a bullet.
-formatBulleted :: SDocContext -> DecoratedSDoc -> SDoc
-formatBulleted ctx (unDecorated -> docs)
-  = case msgs of
+formatBulleted :: DecoratedSDoc -> SDoc
+formatBulleted (unDecorated -> docs)
+  = sdocWithContext $ \ctx -> case msgs ctx of
         []    -> Outputable.empty
         [msg] -> msg
-        _     -> vcat $ map starred msgs
+        xs    -> vcat $ map starred xs
     where
-    msgs    = filter (not . Outputable.isEmpty ctx) docs
+    msgs ctx = filter (not . Outputable.isEmpty ctx) docs
     starred = (bullet<+>)
 
 pprMessages :: Diagnostic e => DiagnosticOpts e -> Messages e -> SDoc
@@ -274,12 +274,11 @@ pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
                                , errMsgContext   = name_ppr_ctx })
-  = sdocWithContext $ \ctx ->
-    withErrStyle name_ppr_ctx $
+  = withErrStyle name_ppr_ctx $
       mkLocMessage
         (MCDiagnostic sev (diagnosticReason e) (diagnosticCode e))
         s
-        (formatBulleted ctx $ diagnosticMessage opts e)
+        (formatBulleted $ diagnosticMessage opts e)
 
 sortMsgBag :: Maybe DiagOpts -> Bag (MsgEnvelope e) -> [MsgEnvelope e]
 sortMsgBag mopts = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

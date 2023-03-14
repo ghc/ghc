@@ -25,7 +25,7 @@ module GHC.Tc.Utils.Env(
         tcLookupRecSelParent,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
-        lookupGlobal, lookupGlobal_maybe, ioLookupDataCon,
+        lookupGlobal, lookupGlobal_maybe,
         addTypecheckedBinds,
 
         -- Local environment
@@ -136,11 +136,12 @@ import GHC.Types.Name.Reader
 import GHC.Types.TyThing
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Tc.Errors.Ppr (pprTyThingUsedWrong)
 
 import Data.IORef
 import Data.List          ( intercalate )
 import Control.Monad
+import GHC.Iface.Errors.Types
+import GHC.Types.Error
 
 {- *********************************************************************
 *                                                                      *
@@ -156,10 +157,13 @@ lookupGlobal hsc_env name
           mb_thing <- lookupGlobal_maybe hsc_env name
         ; case mb_thing of
             Succeeded thing -> return thing
-            Failed msg      -> pprPanic "lookupGlobal" msg
+            Failed err      ->
+              let msg = case err of
+                          Left name -> text "Could not find local name:" <+> ppr name
+                          Right err -> pprDiagnostic err
+              in pprPanic "lookupGlobal" msg
         }
-
-lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
+lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr (Either Name IfaceMessage) TyThing)
 -- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
 -- to the ExternalPackageTable.
@@ -170,24 +174,26 @@ lookupGlobal_maybe hsc_env name
               tcg_semantic_mod = homeModuleInstantiation mhome_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name
-              then (return
-                (Failed (text "Can't find local name: " <+> ppr name)))
-                  -- Internal names can happen in GHCi
-              else
-           -- Try home package table and external package table
-          lookupImported_maybe hsc_env name
+          then return $ Failed $ Left name
+              -- Internal names can happen in GHCi
+          else do
+            res <- lookupImported_maybe hsc_env name
+            -- Try home package table and external package table
+            return $ case res of
+              Succeeded ok -> Succeeded ok
+              Failed   err -> Failed (Right err)
         }
 
-lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
+lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr IfaceMessage TyThing)
 -- Returns (Failed err) if we can't find the interface file for the thing
 lookupImported_maybe hsc_env name
   = do  { mb_thing <- lookupType hsc_env name
         ; case mb_thing of
             Just thing -> return (Succeeded thing)
             Nothing    -> importDecl_maybe hsc_env name
-            }
+        }
 
-importDecl_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc TyThing)
+importDecl_maybe :: HscEnv -> Name -> IO (MaybeErr IfaceMessage TyThing)
 importDecl_maybe hsc_env name
   | Just thing <- wiredInNameTyThing_maybe name
   = do  { when (needWiredInHomeIface thing)
@@ -196,23 +202,6 @@ importDecl_maybe hsc_env name
         ; return (Succeeded thing) }
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
-
--- | A 'TyThing'... except it's not the right sort.
-type WrongTyThing = TyThing
-
-ioLookupDataCon :: HscEnv -> Name -> IO DataCon
-ioLookupDataCon hsc_env name = do
-  mb_thing <- ioLookupDataCon_maybe hsc_env name
-  case mb_thing of
-    Succeeded thing -> return thing
-    Failed thing    -> pprPanic "lookupDataConIO" (pprTyThingUsedWrong WrongThingDataCon (AGlobal thing) name)
-
-ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr WrongTyThing DataCon)
-ioLookupDataCon_maybe hsc_env name = do
-    thing <- lookupGlobal hsc_env name
-    return $ case thing of
-        AConLike (RealDataCon con) -> Succeeded con
-        _                          -> Failed thing
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
@@ -263,7 +252,7 @@ tcLookupGlobal name
     do  { mb_thing <- tcLookupImported_maybe name
         ; case mb_thing of
             Succeeded thing -> return thing
-            Failed msg      -> failWithTc (TcRnInterfaceLookupError name msg)
+            Failed msg      -> failWithTc (TcRnInterfaceError msg)
         }}}
 
 -- Look up only in this module's global env't. Don't look in imports, etc.

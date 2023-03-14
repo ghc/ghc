@@ -6,6 +6,6 @@
         ‘Ghci1.l’ (imported from Ghci1), ‘l’ (line 2),
         ‘all’ (imported from Prelude)
 
-<no location info>: error:
-    Could not find module ‘Ghci1’
+<no location info>: error: [GHC-35235]
+    Could not find module ‘Ghci1’.
     It is not a module in the current program, or in any known package.

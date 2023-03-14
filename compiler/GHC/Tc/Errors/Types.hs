@@ -124,6 +124,7 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType, TcPredType)
 import GHC.Types.Avail (AvailInfo)
+import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.ForeignCall (CLabelString)
@@ -151,7 +152,6 @@ import GHC.Core.TyCon (TyCon, Role)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
-import GHC.Types.Basic
 import GHC.Utils.Misc (capitalise, filterOut)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
@@ -166,6 +166,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)
+import GHC.Iface.Errors.Types
 
 {-
 Note [Migrating TcM Messages]
@@ -231,6 +232,11 @@ data TcRnMessage where
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
   TcRnUnknownMessage :: UnknownDiagnostic -> TcRnMessage
+
+  {-| Wrap an 'IfaceMessage' to a 'TcRnMessage' for when we attempt to load interface
+      files during typechecking but encounter an error. -}
+
+  TcRnInterfaceError :: !IfaceMessage -> TcRnMessage
 
   {-| TcRnMessageWithInfo is a constructor which is used when extra information is needed
       to be provided in order to qualify a diagnostic and where it was originated (and why).
@@ -2722,14 +2728,6 @@ data TcRnMessage where
     :: !Bool -- True => Error, False => Warning
     -> !String -- Error body
     -> TcRnMessage
-
-  {-| TcRnInterfaceLookupError is an error resulting from looking up a name in an interface file.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnInterfaceLookupError :: !Name -> !SDoc -> TcRnMessage
 
   {- | TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
        is missing methods that are required by the minimal definition.

@@ -119,6 +119,7 @@ import GHC.Iface.Load
 import GHC.Unit.Home
 import Data.Either
 import Control.Applicative
+import GHC.Iface.Errors.Ppr
 
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
@@ -789,7 +790,10 @@ getLinkDeps hsc_env pls replace_osuf span mods
           mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
                         loadInterface msg mod (ImportByUser NotBoot)
           iface <- case mb_iface of
-                    Maybes.Failed err      -> throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+                    Maybes.Failed err ->
+                      let opts   = initIfaceMessageOpts dflags
+                          err_txt = missingInterfaceErrorDiagnostic opts err
+                      in throwGhcExceptionIO (ProgramError (showSDoc dflags err_txt))
                     Maybes.Succeeded iface -> return iface
 
           when (mi_boot iface == IsBoot) $ link_boot_mod_error mod

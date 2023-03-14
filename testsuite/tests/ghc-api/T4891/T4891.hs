@@ -62,6 +62,6 @@ chaseConstructor !hv = do
           Right dcName -> do
             putStrLn $ "Name: "      ++ showPpr dflags dcName
             putStrLn $ "OccString: " ++ "'" ++ getOccString dcName ++ "'"
-            dc <- ioLookupDataCon hscEnv dcName
+            dc <- lookupGlobal hscEnv dcName
             putStrLn $ "DataCon: "   ++ showPpr dflags dc
     _ -> return ()

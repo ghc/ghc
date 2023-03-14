@@ -35,6 +35,8 @@ module GHC.Types.Error
    , mkDecoratedDiagnostic
    , mkDecoratedError
 
+   , pprDiagnostic
+
    , NoDiagnosticOpts(..)
 
    -- * Hints and refactoring actions

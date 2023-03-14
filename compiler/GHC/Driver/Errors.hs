@@ -13,7 +13,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Utils.Error
-import GHC.Utils.Outputable (hang, ppr, ($$), SDocContext,  text, withPprStyle, mkErrStyle, sdocStyle )
+import GHC.Utils.Outputable (hang, ppr, ($$),  text, mkErrStyle, sdocStyle, updSDocContext )
 import GHC.Utils.Logger
 import qualified GHC.Driver.CmdLine as CmdLine
 
@@ -22,21 +22,21 @@ printMessages logger msg_opts opts msgs
   = sequence_ [ let style = mkErrStyle name_ppr_ctx
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
                 in logMsg logger (MCDiagnostic sev (diagnosticReason dia) (diagnosticCode dia)) s $
-                   withPprStyle style (messageWithHints ctx dia)
+                   updSDocContext (\_ -> ctx) (messageWithHints dia)
               | MsgEnvelope { errMsgSpan       = s,
                               errMsgDiagnostic = dia,
                               errMsgSeverity   = sev,
                               errMsgContext    = name_ppr_ctx }
                   <- sortMsgBag (Just opts) (getMessages msgs) ]
   where
-    messageWithHints :: Diagnostic a => SDocContext -> a -> SDoc
-    messageWithHints ctx e =
-      let main_msg = formatBulleted ctx $ diagnosticMessage msg_opts e
+    messageWithHints :: Diagnostic a => a -> SDoc
+    messageWithHints e =
+      let main_msg = formatBulleted $ diagnosticMessage msg_opts e
           in case diagnosticHints e of
                []  -> main_msg
                [h] -> main_msg $$ hang (text "Suggested fix:") 2 (ppr h)
                hs  -> main_msg $$ hang (text "Suggested fixes:") 2
-                                       (formatBulleted ctx . mkDecorated . map ppr $ hs)
+                                       (formatBulleted  $ mkDecorated . map ppr $ hs)
 
 handleFlagWarnings :: Logger -> GhcMessageOpts -> DiagOpts -> [CmdLine.Warn] -> IO ()
 handleFlagWarnings logger print_config opts warns = do

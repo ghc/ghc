@@ -16,7 +16,6 @@ import GHC.Driver.Flags
 import GHC.Driver.Session
 import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr ()
-import GHC.Tc.Errors.Ppr ()
 import GHC.Types.Error
 import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Unit.Types
@@ -30,6 +29,9 @@ import Data.Version
 import Language.Haskell.Syntax.Decls (RuleDecl(..))
 import GHC.Tc.Errors.Types (TcRnMessage)
 import GHC.HsToCore.Errors.Types (DsMessage)
+import GHC.Iface.Errors.Types
+import GHC.Tc.Errors.Ppr ()
+import GHC.Iface.Errors.Ppr ()
 
 --
 -- Suggestions
@@ -86,7 +88,7 @@ instance Diagnostic GhcMessage where
 
 instance Diagnostic DriverMessage where
   type DiagnosticOpts DriverMessage = DriverMessageOpts
-  defaultDiagnosticOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage)
+  defaultDiagnosticOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
   diagnosticMessage opts = \case
     DriverUnknownMessage (UnknownDiagnostic @e m)
       -> diagnosticMessage (defaultDiagnosticOpts @e) m
@@ -218,6 +220,7 @@ instance Diagnostic DriverMessage where
       -> mkSimpleDecorated $ vcat ([text "Home units are not closed."
                                   , text "It is necessary to also load the following units:" ]
                                   ++ map (\uid -> text "-" <+> ppr uid) needed_unit_ids)
+    DriverInterfaceError reason -> diagnosticMessage (ifaceDiagnosticOpts opts) reason
 
   diagnosticReason = \case
     DriverUnknownMessage m
@@ -272,6 +275,7 @@ instance Diagnostic DriverMessage where
       -> ErrorWithoutFlag
     DriverHomePackagesNotClosed {}
       -> ErrorWithoutFlag
+    DriverInterfaceError reason -> diagnosticReason reason
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -328,5 +332,6 @@ instance Diagnostic DriverMessage where
       -> noHints
     DriverHomePackagesNotClosed {}
       -> noHints
+    DriverInterfaceError reason -> diagnosticHints reason
 
   diagnosticCode = constructorCode

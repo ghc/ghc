@@ -38,6 +38,7 @@ import GHC.Generics
 import GHC.TypeLits ( Symbol, TypeError, ErrorMessage(..) )
 import GHC.TypeNats ( Nat, KnownNat, natVal' )
 import GHC.Core.InstEnv (LookupInstanceErrReason)
+import GHC.Iface.Errors.Types
 
 {- Note [Diagnostic codes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -663,6 +664,22 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "OneArgExpected"                                = 91490
   GhcDiagnosticCode "AtLeastOneArgExpected"                         = 07641
 
+  -- Interface errors
+  GhcDiagnosticCode "BadSourceImport"                               = 64852
+  GhcDiagnosticCode "HomeModError"                                  = 58427
+  GhcDiagnosticCode "DynamicHashMismatchError"                      = 54709
+  GhcDiagnosticCode "CouldntFindInFiles"                            = 94559
+  GhcDiagnosticCode "GenericMissing"                                = 87110
+  GhcDiagnosticCode "MissingPackageFiles"                           = 22211
+  GhcDiagnosticCode "MissingPackageWayFiles"                        = 88719
+  GhcDiagnosticCode "ModuleSuggestion"                              = 61948
+  GhcDiagnosticCode "MultiplePackages"                              = 45102
+  GhcDiagnosticCode "NoUnitIdMatching"                              = 51294
+  GhcDiagnosticCode "NotAModule"                                    = 35235
+  GhcDiagnosticCode "Can'tFindNameInInterface"                      = 83249
+  GhcDiagnosticCode "HiModuleNameMismatchWarn"                      = 53693
+  GhcDiagnosticCode "ExceptionOccurred"                             = 47808
+
   -- Out of scope errors
   GhcDiagnosticCode "NotInScope"                                    = 76037
   GhcDiagnosticCode "NotARecordField"                               = 22385
@@ -757,6 +774,15 @@ type family ConRecursInto con where
 
   ConRecursInto "DriverUnknownMessage"     = 'Just UnknownDiagnostic
   ConRecursInto "DriverPsHeaderMessage"    = 'Just PsMessage
+  ConRecursInto "DriverInterfaceError"     = 'Just IfaceMessage
+
+  ConRecursInto "CantFindErr"              = 'Just CantFindInstalled
+  ConRecursInto "CantFindInstalledErr"     = 'Just CantFindInstalled
+
+  ConRecursInto "CantFindInstalled"        = 'Just CantFindInstalledReason
+
+  ConRecursInto "BadIfaceFile"                 = 'Just ReadInterfaceError
+  ConRecursInto "FailedToLoadDynamicInterface" = 'Just ReadInterfaceError
 
   ----------------------------------
   -- Constructors of PsMessage
@@ -792,6 +818,11 @@ type family ConRecursInto con where
 
   ConRecursInto "TcRnRunSpliceFailure"     = 'Just RunSpliceFailReason
   ConRecursInto "ConversionFail"           = 'Just ConversionFailReason
+
+    -- Interface file errors
+
+  ConRecursInto "TcRnInterfaceError"       = 'Just IfaceMessage
+  ConRecursInto "Can'tFindInterface"       = 'Just MissingInterfaceError
 
     ------------------
     -- FFI errors

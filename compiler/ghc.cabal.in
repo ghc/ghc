@@ -503,6 +503,8 @@ Library
         GHC.Iface.Binary
         GHC.Iface.Env
         GHC.Iface.Errors
+        GHC.Iface.Errors.Types
+        GHC.Iface.Errors.Ppr
         GHC.Iface.Ext.Ast
         GHC.Iface.Ext.Binary
         GHC.Iface.Ext.Debug

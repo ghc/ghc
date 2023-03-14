@@ -83,6 +83,7 @@ import GHC.List (uncons)
 import Data.Ord
 import Data.Containers.ListUtils
 import Data.Bifunctor
+import GHC.Iface.Errors.Ppr
 
 {-
   -----------------------------------------------
@@ -292,8 +293,13 @@ check_old_iface hsc_env mod_summary maybe_iface
              read_result <- readIface read_dflags ncu (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
-                     trace_if logger (text "FYI: cannot read old interface file:" $$ nest 4 err)
-                     trace_hi_diffs logger (text "Old interface file was invalid:" $$ nest 4 err)
+                     let msg = readInterfaceErrorDiagnostic err
+                     trace_if logger
+                       $ vcat [ text "FYI: cannot read old interface file:"
+                              , nest 4 msg ]
+                     trace_hi_diffs logger $
+                       vcat [ text "Old interface file was invalid:"
+                            , nest 4 msg ]
                      return Nothing
                  Succeeded iface -> do
                      trace_if logger (text "Read the interface file" <+> text iface_path)
@@ -1323,7 +1329,7 @@ getOrphanHashes hsc_env mods = do
     dflags     = hsc_dflags hsc_env
     ctx        = initSDocContext dflags defaultUserStyle
     get_orph_hash mod = do
-          iface <- initIfaceLoad hsc_env . withException ctx
+          iface <- initIfaceLoad hsc_env . withIfaceErr ctx
                             $ loadInterface (text "getOrphanHashes") mod ImportBySystem
           return (mi_orphan_hash (mi_final_exts iface))
 
@@ -1618,7 +1624,7 @@ mkHashFun hsc_env eps name
                       -- requirements; we didn't do any /real/ typechecking
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
-                      initIfaceLoad hsc_env . withException ctx
+                      initIfaceLoad hsc_env . withIfaceErr ctx
                           $ withoutDynamicNow
                             -- If you try and load interfaces when dynamic-too
                             -- enabled then it attempts to load the dyn_hi and hi

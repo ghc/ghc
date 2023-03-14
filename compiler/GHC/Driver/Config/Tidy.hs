@@ -17,11 +17,8 @@ import GHC.Driver.Env
 import GHC.Driver.Backend
 
 import GHC.Core.Make (getMkStringIds)
-import GHC.Data.Maybe
-import GHC.Utils.Panic
-import GHC.Utils.Outputable
 import GHC.Builtin.Names
-import GHC.Tc.Utils.Env (lookupGlobal_maybe)
+import GHC.Tc.Utils.Env (lookupGlobal)
 import GHC.Types.TyThing
 import GHC.Platform.Ways
 
@@ -49,13 +46,9 @@ initStaticPtrOpts :: HscEnv -> IO StaticPtrOpts
 initStaticPtrOpts hsc_env = do
   let dflags = hsc_dflags hsc_env
 
-  let lookupM n = lookupGlobal_maybe hsc_env n >>= \case
-        Succeeded r -> pure r
-        Failed err  -> pprPanic "initStaticPtrOpts: couldn't find" (ppr (err,n))
-
-  mk_string <- getMkStringIds (fmap tyThingId . lookupM)
-  static_ptr_info_datacon <- tyThingDataCon <$> lookupM staticPtrInfoDataConName
-  static_ptr_datacon      <- tyThingDataCon <$> lookupM staticPtrDataConName
+  mk_string <- getMkStringIds (fmap tyThingId . lookupGlobal hsc_env )
+  static_ptr_info_datacon <- tyThingDataCon <$> lookupGlobal hsc_env staticPtrInfoDataConName
+  static_ptr_datacon      <- tyThingDataCon <$> lookupGlobal hsc_env staticPtrDataConName
 
   pure $ StaticPtrOpts
     { opt_platform = targetPlatform dflags
