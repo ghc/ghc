@@ -338,3 +338,12 @@ rtsOutOfBoundsAccess(void)
 {
     barf("Encountered out of bounds array access.");
 }
+
+// Used by code generator
+void rtsMemcpyRangeOverlap(void) GNUC3_ATTRIBUTE(__noreturn__);
+
+void
+rtsMemcpyRangeOverlap()
+{
+    barf("Encountered overlapping source/destination ranges in a memcpy-using op.");
+}
