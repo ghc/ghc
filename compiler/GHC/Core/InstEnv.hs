@@ -7,7 +7,7 @@
 The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveGeneric #-}
 
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
@@ -19,6 +19,7 @@ module GHC.Core.InstEnv (
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
         InstEnvs(..), VisibleOrphanModules, InstEnv,
+        LookupInstanceErrReason (..),
         mkInstEnv, emptyInstEnv, unionInstEnv, extendInstEnv,
         filterInstEnv, deleteFromInstEnv, deleteDFunFromInstEnv,
         anyInstEnv,
@@ -51,6 +52,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
 import GHC.Types.Id
+import GHC.Generics (Generic)
 import Data.Data        ( Data )
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
@@ -928,18 +930,28 @@ anyone noticing, so it's manifestly not ruining anyone's day.)
 -- yield 'Left errorMessage'.
 lookupUniqueInstEnv :: InstEnvs
                     -> Class -> [Type]
-                    -> Either SDoc (ClsInst, [Type])
+                    -> Either LookupInstanceErrReason (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv False instEnv cls tys of
       ([(inst, inst_tys)], _, _)
              | noFlexiVar -> Right (inst, inst_tys')
-             | otherwise  -> Left $ text "flexible type variable:" <+>
-                                    (ppr $ mkTyConApp (classTyCon cls) tys)
+             | otherwise  -> Left $ LookupInstErrFlexiVar
              where
                inst_tys'  = [ty | Just ty <- inst_tys]
                noFlexiVar = all isJust inst_tys
-      _other -> Left $ text "instance not found" <+>
-                       (ppr $ mkTyConApp (classTyCon cls) tys)
+      _other -> Left $ LookupInstErrNotFound
+
+-- | Why a particular typeclass application couldn't be looked up.
+data LookupInstanceErrReason =
+  -- | Tyvars aren't an exact match.
+  LookupInstErrNotExact
+  |
+  -- | One of the tyvars is flexible.
+  LookupInstErrFlexiVar
+  |
+  -- | No matching instance was found.
+  LookupInstErrNotFound
+  deriving (Generic)
 
 data Coherence = IsCoherent | IsIncoherent
 

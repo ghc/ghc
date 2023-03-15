@@ -20,6 +20,7 @@ module GHC.Tc.Errors.Ppr
   , pprHsDocContext
   , inHsDocContext
   , TcRnMessageOpts(..)
+  , pprTyThingUsedWrong
   )
   where
 
@@ -51,7 +52,7 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode )
+import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -100,6 +101,7 @@ import Data.Ord ( comparing )
 import Data.Bifunctor
 import GHC.Types.Name.Env
 import qualified Language.Haskell.TH as TH
+import {-# SOURCE #-} GHC.Tc.Types (pprTcTyThingCategory)
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        }
@@ -665,6 +667,10 @@ instance Diagnostic TcRnMessage where
     TcRnCannotDeriveInstance cls cls_tys mb_strat newtype_deriving reason
       -> mkSimpleDecorated $
            derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving True reason
+    TcRnLookupInstance cls tys reason
+      -> mkSimpleDecorated $
+          text "Couldn't match instance:" <+>
+           lookupInstanceErrDiagnosticMessage cls tys reason
     TcRnLazyGADTPattern
       -> mkSimpleDecorated $
            hang (text "An existential or GADT data constructor cannot be used")
@@ -1433,6 +1439,20 @@ instance Diagnostic TcRnMessage where
       hsep [ text "Unknown type variable" <> plural errorVars
            , text "on the RHS of injectivity condition:"
            , interpp'SP errorVars ]
+    TcRnBadlyStaged reason bind_lvl use_lvl
+      -> mkSimpleDecorated $
+         text "Stage error:" <+> pprStageCheckReason reason <+>
+         hsep [text "is bound at stage" <+> ppr bind_lvl,
+               text "but used at stage" <+> ppr use_lvl]
+    TcRnStageRestriction reason
+      -> mkSimpleDecorated $
+         sep [ text "GHC stage restriction:"
+             , nest 2 (vcat [ pprStageCheckReason reason <+>
+                              text "is used in a top-level splice, quasi-quote, or annotation,"
+                            , text "and must be imported, not defined locally"])]
+    TcRnTyThingUsedWrong sort thing name
+      -> mkSimpleDecorated $
+         pprTyThingUsedWrong sort thing name
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1655,6 +1675,8 @@ instance Diagnostic TcRnMessage where
            DerivErrBadConstructor{}                -> ErrorWithoutFlag
            DerivErrGenerics{}                      -> ErrorWithoutFlag
            DerivErrEnumOrProduct{}                 -> ErrorWithoutFlag
+    TcRnLookupInstance _ _ _
+      -> ErrorWithoutFlag
     TcRnLazyGADTPattern
       -> ErrorWithoutFlag
     TcRnArrowProcGADTPattern
@@ -1903,6 +1925,12 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> ErrorWithoutFlag
+    TcRnBadlyStaged{}
+      -> ErrorWithoutFlag
+    TcRnStageRestriction{}
+      -> ErrorWithoutFlag
+    TcRnTyThingUsedWrong{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2123,6 +2151,8 @@ instance Diagnostic TcRnMessage where
              -> noHints
     TcRnCannotDeriveInstance cls _ _ newtype_deriving rea
       -> deriveInstanceErrReasonHints cls newtype_deriving rea
+    TcRnLookupInstance _ _ _
+      -> noHints
     TcRnLazyGADTPattern
       -> noHints
     TcRnArrowProcGADTPattern
@@ -2390,6 +2420,12 @@ instance Diagnostic TcRnMessage where
     TcRnIncorrectTyVarOnLhsOfInjCond{}
       -> noHints
     TcRnUnknownTyVarsOnRhsOfInjCond{}
+      -> noHints
+    TcRnBadlyStaged{}
+      -> noHints
+    TcRnStageRestriction{}
+      -> noHints
+    TcRnTyThingUsedWrong{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -2769,6 +2805,18 @@ derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving pprHerald = \cas
            ppr2 = derivErrDiagnosticMessage cls cls_tys mb_strat newtype_deriving False that
        in cannotMakeDerivedInstanceHerald cls cls_tys mb_strat newtype_deriving pprHerald
           (ppr1 $$ text "  or" $$ ppr2)
+
+lookupInstanceErrDiagnosticMessage :: Class
+                                   -> [Type]
+                                   -> LookupInstanceErrReason
+                                   -> SDoc
+lookupInstanceErrDiagnosticMessage cls tys = \case
+  LookupInstErrNotExact
+    -> text "Not an exact match (i.e., some variables get instantiated)"
+  LookupInstErrFlexiVar
+    -> text "flexible type variable:" <+> (ppr $ mkTyConApp (classTyCon cls) tys)
+  LookupInstErrNotFound
+    -> text "instance not found" <+> (ppr $ mkTyConApp (classTyCon cls) tys)
 
 {- *********************************************************************
 *                                                                      *
@@ -3833,6 +3881,10 @@ pprScopeError rdr_name scope_err =
         2 (what <+> quotes (ppr rdr_name) <+> text "in this module")
     UnknownSubordinate doc ->
       quotes (ppr rdr_name) <+> text "is not a (visible)" <+> doc
+    NotInScopeTc env ->
+      vcat[text "GHC internal error:" <+> quotes (ppr rdr_name) <+>
+      text "is not in scope during type checking, but it passed the renamer",
+      text "tcl_env of environment:" <+> ppr env]
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 
@@ -3845,6 +3897,7 @@ scopeErrorHints scope_err =
     MissingBinding _ hints -> hints
     NoTopLevelBinding      -> noHints
     UnknownSubordinate {}  -> noHints
+    NotInScopeTc _         -> noHints
 
 {- *********************************************************************
 *                                                                      *
@@ -4429,3 +4482,26 @@ pprConversionFailReason = \case
     text "Function binding for"
     <+> quotes (text (TH.pprint nm))
     <+> text "has no equations"
+
+pprTyThingUsedWrong :: WrongThingSort -> TcTyThing -> Name -> SDoc
+pprTyThingUsedWrong sort thing name =
+  pprTcTyThingCategory thing <+> quotes (ppr name) <+>
+  text "used as a" <+> pprWrongThingSort sort
+
+pprWrongThingSort :: WrongThingSort -> SDoc
+pprWrongThingSort =
+  text . \case
+    WrongThingType -> "type"
+    WrongThingDataCon -> "data constructor"
+    WrongThingPatSyn -> "pattern synonym"
+    WrongThingConLike -> "constructor-like thing"
+    WrongThingClass -> "class"
+    WrongThingTyCon -> "type constructor"
+    WrongThingAxiom -> "axiom"
+
+pprStageCheckReason :: StageCheckReason -> SDoc
+pprStageCheckReason = \case
+  StageCheckInstance _ t ->
+    text "instance for" <+> quotes (ppr t)
+  StageCheckSplice t ->
+    quotes (ppr t)

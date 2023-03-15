@@ -4,7 +4,7 @@
 module GHC.Tc.Instance.Class (
      matchGlobalInst,
      ClsInstResult(..),
-     InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
+     safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated,
   ) where
 
@@ -21,6 +21,7 @@ import GHC.Tc.Utils.Instantiate(instDFunType, tcInstType)
 import GHC.Tc.Instance.Typeable
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Origin (InstanceWhat (..), SafeOverlapping)
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 import GHC.Rename.Env( addUsedGRE )
 
@@ -31,7 +32,7 @@ import GHC.Builtin.Names
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
 import GHC.Types.SafeHaskell
-import GHC.Types.Name   ( Name, pprDefinedAt )
+import GHC.Types.Name   ( Name )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
 import GHC.Types.Var
@@ -86,13 +87,6 @@ isNotAssociated (InClsInst {})     = False
 *                                                                    *
 **********************************************************************-}
 
--- | Indicates if Instance met the Safe Haskell overlapping instances safety
--- check.
---
--- See Note [Safe Haskell Overlapping Instances] in GHC.Tc.Solver
--- See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
-type SafeOverlapping = Bool
-
 data ClsInstResult
   = NoInstance   -- Definitely no instance
 
@@ -103,38 +97,12 @@ data ClsInstResult
 
   | NotSure      -- Multiple matches and/or one or more unifiers
 
-data InstanceWhat  -- How did we solve this constraint?
-  = BuiltinEqInstance    -- Built-in solver for (t1 ~ t2), (t1 ~~ t2), Coercible t1 t2
-                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
-
-  | BuiltinTypeableInstance TyCon   -- Built-in solver for Typeable (T t1 .. tn)
-                         -- See Note [Well-staged instance evidence]
-
-  | BuiltinInstance      -- Built-in solver for (C t1 .. tn) where C is
-                         --   KnownNat, .. etc (classes with no top-level evidence)
-
-  | LocalInstance        -- Solved by a quantified constraint
-                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
-
-  | TopLevInstance       -- Solved by a top-level instance decl
-      { iw_dfun_id   :: DFunId
-      , iw_safe_over :: SafeOverlapping }
-
 instance Outputable ClsInstResult where
   ppr NoInstance = text "NoInstance"
   ppr NotSure    = text "NotSure"
   ppr (OneInst { cir_new_theta = ev
                , cir_what = what })
     = text "OneInst" <+> vcat [ppr ev, ppr what]
-
-instance Outputable InstanceWhat where
-  ppr BuiltinInstance   = text "a built-in instance"
-  ppr BuiltinTypeableInstance {} = text "a built-in typeable instance"
-  ppr BuiltinEqInstance = text "a built-in equality instance"
-  ppr LocalInstance     = text "a locally-quantified instance"
-  ppr (TopLevInstance { iw_dfun_id = dfun })
-      = hang (text "instance" <+> pprSigmaType (idType dfun))
-           2 (text "--" <+> pprDefinedAt (idName dfun))
 
 safeOverlap :: InstanceWhat -> Bool
 safeOverlap (TopLevInstance { iw_safe_over = so }) = so

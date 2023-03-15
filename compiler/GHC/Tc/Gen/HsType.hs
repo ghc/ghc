@@ -1994,7 +1994,7 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
 
            APromotionErr err -> promotionErr name err
 
-           _  -> wrongThingErr "type" thing name }
+           _  -> wrongThingErr WrongThingType thing name }
 
 {-
 Note [Recursion through the kinds]

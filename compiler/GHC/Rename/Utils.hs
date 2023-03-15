@@ -43,7 +43,7 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Env
+-- import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Types.Error
 import GHC.Types.Name

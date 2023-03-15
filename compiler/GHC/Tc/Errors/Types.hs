@@ -92,6 +92,8 @@ module GHC.Tc.Errors.Types (
   , NonStandardGuards(..)
   , RuleLhsErrReason(..)
   , HsigShapeMismatchReason(..)
+  , WrongThingSort(..)
+  , StageCheckReason(..)
   ) where
 
 import GHC.Prelude
@@ -103,7 +105,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
-                           , FixedRuntimeRepOrigin(..) )
+                           , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
 import GHC.Types.Avail (AvailInfo)
@@ -125,7 +127,7 @@ import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
 import GHC.Core.DataCon (DataCon)
 import GHC.Core.FamInstEnv (FamInst)
-import GHC.Core.InstEnv (ClsInst)
+import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, TyConFlavour)
@@ -146,6 +148,7 @@ import GHC.Unit.Module.Warnings (WarningTxt)
 import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Generics ( Generic )
+import GHC.Types.Name.Env (NameEnv)
 
 {-
 Note [Migrating TcM Messages]
@@ -3209,6 +3212,51 @@ data TcRnMessage where
   -}
   TcRnUnknownTyVarsOnRhsOfInjCond :: [Name] -> TcRnMessage
 
+  {-| TcRnLookupInstance groups several errors emitted when looking up class instances.
+
+    Test cases:
+      none
+  -}
+  TcRnLookupInstance
+    :: !Class
+    -> ![Type]
+    -> !LookupInstanceErrReason
+    -> TcRnMessage
+
+  {-| TcRnBadlyStaged is an error that occurs when a TH binding is used in an
+    invalid stage.
+
+    Test cases:
+      T17820d
+  -}
+  TcRnBadlyStaged
+    :: !StageCheckReason -- ^ The binding being spliced.
+    -> !Int -- ^ The binding stage.
+    -> !Int -- ^ The stage at which the binding is used.
+    -> TcRnMessage
+
+  {-| TcRnStageRestriction is an error that occurs when a top level splice refers to
+    a local name.
+
+    Test cases:
+      T17820, T21547, T5795, qq00[1-4], annfail0{3,4,6,9}
+  -}
+  TcRnStageRestriction
+    :: !StageCheckReason -- ^ The binding being spliced.
+    -> TcRnMessage
+
+  {-| TcRnTyThingUsedWrong is an error that occurs when a thing is used where another
+    thing was expected.
+
+    Test cases:
+      none
+  -}
+  TcRnTyThingUsedWrong
+    :: !WrongThingSort -- ^ Expected thing.
+    -> !TcTyThing -- ^ Thing used wrongly.
+    -> !Name -- ^ Name of the thing used wrongly.
+    -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -4173,6 +4221,12 @@ data NotInScopeError
   -- or, a class doesn't have an associated type with this name,
   -- or, a record doesn't have a record field with this name.
   | UnknownSubordinate SDoc
+
+  -- | A name is not in scope during type checking but passed the renamer.
+  --
+  -- Test cases:
+  --   none
+  | NotInScopeTc (NameEnv TcTyThing)
   deriving Generic
 
 -- | Create a @"not in scope"@ error message for the given 'RdrName'.
@@ -4471,3 +4525,16 @@ data HsigShapeMismatchReason =
   -}
   HsigShapeNotUnifiable !Name !Name !Bool
   deriving (Generic)
+
+data WrongThingSort
+  = WrongThingType
+  | WrongThingDataCon
+  | WrongThingPatSyn
+  | WrongThingConLike
+  | WrongThingClass
+  | WrongThingTyCon
+  | WrongThingAxiom
+
+data StageCheckReason
+  = StageCheckInstance !InstanceWhat !PredType
+  | StageCheckSplice !Name

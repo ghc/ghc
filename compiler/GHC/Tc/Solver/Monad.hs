@@ -134,7 +134,7 @@ import qualified GHC.Tc.Utils.Env      as TcM
 
 import GHC.Driver.Session
 
-import GHC.Tc.Instance.Class( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
+import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Solver.Types
 import GHC.Tc.Solver.InertSet
@@ -1420,11 +1420,9 @@ checkWellStagedDFun loc what pred
         Just bind_lvl | bind_lvl > impLevel ->
           wrapTcS $ TcM.setCtLocM loc $ do
               { use_stage <- TcM.getStage
-              ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
+              ; TcM.checkWellStaged (StageCheckInstance what pred) bind_lvl (thLevel use_stage) }
         _ ->
           return ()
-  where
-    pp_thing = text "instance for" <+> quotes (ppr pred)
 
 -- | Returns the ThLevel of evidence for the solved constraint (if it has evidence)
 -- See Note [Well-staged instance evidence]

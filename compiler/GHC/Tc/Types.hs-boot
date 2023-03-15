@@ -22,3 +22,4 @@ setLclEnvLoc :: TcLclEnv -> RealSrcSpan -> TcLclEnv
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
 
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
+pprTcTyThingCategory :: TcTyThing -> SDoc

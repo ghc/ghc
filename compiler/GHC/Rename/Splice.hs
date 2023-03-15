@@ -915,7 +915,7 @@ checkThLocalName name
              Nothing -> return () ;  -- Not a locally-bound thing
              Just (top_lvl, bind_lvl, use_stage) ->
     do  { let use_lvl = thLevel use_stage
-        ; checkWellStaged (quotes (ppr name)) bind_lvl use_lvl
+        ; checkWellStaged (StageCheckSplice name) bind_lvl use_lvl
         ; traceRn "checkThLocalName" (ppr name <+> ppr bind_lvl
                                                <+> ppr use_stage
                                                <+> ppr use_lvl)

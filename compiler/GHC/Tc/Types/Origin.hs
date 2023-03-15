@@ -35,6 +35,8 @@ module GHC.Tc.Types.Origin (
   FRRArrowContext(..), pprFRRArrowContext,
   ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
 
+  -- InstanceWhat
+  InstanceWhat(..), SafeOverlapping
   ) where
 
 import GHC.Prelude
@@ -1401,3 +1403,42 @@ pprExpectedFunTyHerald (ExpectedFunTyLam match)
 pprExpectedFunTyHerald (ExpectedFunTyLamCase _ expr)
   = sep [ text "The function" <+> quotes (ppr expr)
         , text "requires" ]
+
+{- *******************************************************************
+*                                                                    *
+                       InstanceWhat
+*                                                                    *
+**********************************************************************-}
+
+-- | Indicates if Instance met the Safe Haskell overlapping instances safety
+-- check.
+--
+-- See Note [Safe Haskell Overlapping Instances] in GHC.Tc.Solver
+-- See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
+type SafeOverlapping = Bool
+
+data InstanceWhat  -- How did we solve this constraint?
+  = BuiltinEqInstance    -- Built-in solver for (t1 ~ t2), (t1 ~~ t2), Coercible t1 t2
+                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
+
+  | BuiltinTypeableInstance TyCon   -- Built-in solver for Typeable (T t1 .. tn)
+                         -- See Note [Well-staged instance evidence]
+
+  | BuiltinInstance      -- Built-in solver for (C t1 .. tn) where C is
+                         --   KnownNat, .. etc (classes with no top-level evidence)
+
+  | LocalInstance        -- Solved by a quantified constraint
+                         -- See GHC.Tc.Solver.InertSet Note [Solved dictionaries]
+
+  | TopLevInstance       -- Solved by a top-level instance decl
+      { iw_dfun_id   :: DFunId
+      , iw_safe_over :: SafeOverlapping }
+
+instance Outputable InstanceWhat where
+  ppr BuiltinInstance   = text "a built-in instance"
+  ppr BuiltinTypeableInstance {} = text "a built-in typeable instance"
+  ppr BuiltinEqInstance = text "a built-in equality instance"
+  ppr LocalInstance     = text "a locally-quantified instance"
+  ppr (TopLevInstance { iw_dfun_id = dfun })
+      = hang (text "instance" <+> pprSigmaType (idType dfun))
+           2 (text "--" <+> pprDefinedAt (idName dfun))

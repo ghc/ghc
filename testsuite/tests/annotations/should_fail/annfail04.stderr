@@ -1,5 +1,5 @@
 
-annfail04.hs:14:12:
+annfail04.hs:14:12: [GHC-18157]
     GHC stage restriction:
       instance for ‘Thing
                       Int’ is used in a top-level splice, quasi-quote, or annotation,

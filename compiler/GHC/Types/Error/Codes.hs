@@ -37,6 +37,7 @@ import GHC.Exts     ( proxy# )
 import GHC.Generics
 import GHC.TypeLits ( Symbol, TypeError, ErrorMessage(..) )
 import GHC.TypeNats ( Nat, KnownNat, natVal' )
+import GHC.Core.InstEnv (LookupInstanceErrReason)
 
 {- Note [Diagnostic codes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -535,6 +536,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnShadowedTyVarNameInFamResult"              = 99412
   GhcDiagnosticCode "TcRnIncorrectTyVarOnLhsOfInjCond"              = 88333
   GhcDiagnosticCode "TcRnUnknownTyVarsOnRhsOfInjCond"               = 48254
+  GhcDiagnosticCode "TcRnBadlyStaged"                               = 28914
+  GhcDiagnosticCode "TcRnStageRestriction"                          = 18157
+  GhcDiagnosticCode "TcRnTyThingUsedWrong"                          = 10969
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
@@ -595,6 +599,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "MissingBinding"                                = 44432
   GhcDiagnosticCode "NoTopLevelBinding"                             = 10173
   GhcDiagnosticCode "UnknownSubordinate"                            = 54721
+  GhcDiagnosticCode "NotInScopeTc"                                  = 76329
 
   -- Diagnostic codes for deriving
   GhcDiagnosticCode "DerivErrNotWellKinded"                         = 62016
@@ -624,6 +629,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DerivErrBadConstructor"                        = 16437
   GhcDiagnosticCode "DerivErrGenerics"                              = 30367
   GhcDiagnosticCode "DerivErrEnumOrProduct"                         = 58291
+
+  -- Diagnostic codes for instance lookup
+  GhcDiagnosticCode "LookupInstErrNotExact"                         = 10372
+  GhcDiagnosticCode "LookupInstErrFlexiVar"                         = 10373
+  GhcDiagnosticCode "LookupInstErrNotFound"                         = 10374
 
   -- TcRnEmptyStmtsGroupError/EmptyStatementGroupErrReason
   GhcDiagnosticCode "EmptyStmtsGroupInParallelComp"                 = 41242
@@ -693,6 +703,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnWithHsDocContext"     = 'Just TcRnMessage
 
   ConRecursInto "TcRnCannotDeriveInstance" = 'Just DeriveInstanceErrReason
+  ConRecursInto "TcRnLookupInstance"       = 'Just LookupInstanceErrReason
   ConRecursInto "TcRnPragmaWarning"        = 'Just (WarningTxt GhcRn)
   ConRecursInto "TcRnNotInScope"           = 'Just NotInScopeError
   ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason

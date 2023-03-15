@@ -60,6 +60,7 @@ module GHC.Tc.Utils.Env(
         tcGetDefaultTys,
 
         -- Template Haskell stuff
+        StageCheckReason(..),
         checkWellStaged, tcMetaTy, thLevel,
         topIdLvl, isBrackStage,
 
@@ -67,7 +68,7 @@ module GHC.Tc.Utils.Env(
         newDFunName,
         newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
-        mkWrapperName
+        mkWrapperName,
   ) where
 
 import GHC.Prelude
@@ -129,8 +130,8 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Name.Reader
 import GHC.Types.TyThing
-import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Tc.Errors.Ppr (pprTyThingUsedWrong)
 
 import Data.IORef
 import Data.List (intercalate)
@@ -192,21 +193,22 @@ importDecl_maybe hsc_env name
   | otherwise
   = initIfaceLoad hsc_env (importDecl name)
 
+-- | A 'TyThing'... except it's not the right sort.
+type WrongTyThing = TyThing
+
 ioLookupDataCon :: HscEnv -> Name -> IO DataCon
 ioLookupDataCon hsc_env name = do
   mb_thing <- ioLookupDataCon_maybe hsc_env name
   case mb_thing of
     Succeeded thing -> return thing
-    Failed msg      -> pprPanic "lookupDataConIO" msg
+    Failed thing    -> pprPanic "lookupDataConIO" (pprTyThingUsedWrong WrongThingDataCon (AGlobal thing) name)
 
-ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr SDoc DataCon)
+ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr WrongTyThing DataCon)
 ioLookupDataCon_maybe hsc_env name = do
     thing <- lookupGlobal hsc_env name
     return $ case thing of
         AConLike (RealDataCon con) -> Succeeded con
-        _                          -> Failed $
-          pprTcTyThingCategory (AGlobal thing) <+> quotes (ppr name) <+>
-                text "used as a data constructor"
+        _                          -> Failed thing
 
 addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
 addTypecheckedBinds tcg_env binds
@@ -274,42 +276,42 @@ tcLookupDataCon name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike (RealDataCon con) -> return con
-        _                          -> wrongThingErr "data constructor" (AGlobal thing) name
+        _                          -> wrongThingErr WrongThingDataCon (AGlobal thing) name
 
 tcLookupPatSyn :: Name -> TcM PatSyn
 tcLookupPatSyn name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike (PatSynCon ps) -> return ps
-        _                       -> wrongThingErr "pattern synonym" (AGlobal thing) name
+        _                       -> wrongThingErr WrongThingPatSyn (AGlobal thing) name
 
 tcLookupConLike :: Name -> TcM ConLike
 tcLookupConLike name = do
     thing <- tcLookupGlobal name
     case thing of
         AConLike cl -> return cl
-        _           -> wrongThingErr "constructor-like thing" (AGlobal thing) name
+        _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name = do
     thing <- tcLookupGlobal name
     case thing of
         ATyCon tc | Just cls <- tyConClass_maybe tc -> return cls
-        _                                           -> wrongThingErr "class" (AGlobal thing) name
+        _                                           -> wrongThingErr WrongThingClass (AGlobal thing) name
 
 tcLookupTyCon :: Name -> TcM TyCon
 tcLookupTyCon name = do
     thing <- tcLookupGlobal name
     case thing of
         ATyCon tc -> return tc
-        _         -> wrongThingErr "type constructor" (AGlobal thing) name
+        _         -> wrongThingErr WrongThingTyCon (AGlobal thing) name
 
 tcLookupAxiom :: Name -> TcM (CoAxiom Branched)
 tcLookupAxiom name = do
     thing <- tcLookupGlobal name
     case thing of
         ACoAxiom ax -> return ax
-        _           -> wrongThingErr "axiom" (AGlobal thing) name
+        _           -> wrongThingErr WrongThingAxiom (AGlobal thing) name
 
 tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
 tcLookupLocatedGlobalId = addLocMA tcLookupId
@@ -326,17 +328,13 @@ tcLookupLocatedTyCon = addLocMA tcLookupTyCon
 tcLookupInstance :: Class -> [Type] -> TcM ClsInst
 tcLookupInstance cls tys
   = do { instEnv <- tcGetInstEnvs
-       ; case lookupUniqueInstEnv instEnv cls tys of
-           Left err             ->
-             failWithTc $ mkTcRnUnknownMessage
-                        $ mkPlainError noHints (text "Couldn't match instance:" <+> err)
-           Right (inst, tys)
-             | uniqueTyVars tys -> return inst
-             | otherwise        -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints errNotExact)
+       ; let inst = lookupUniqueInstEnv instEnv cls tys >>= \ (inst, tys) ->
+                    if uniqueTyVars tys then Right inst else Left LookupInstErrNotExact
+        ; case inst of
+          Right i -> return i
+          Left err -> failWithTc (TcRnLookupInstance cls tys err)
        }
   where
-    errNotExact = text "Not an exact match (i.e., some variables get instantiated)"
-
     uniqueTyVars tys = all isTyVarTy tys
                     && hasNoDups (map getTyVar tys)
 
@@ -886,7 +884,7 @@ tcExtendRules lcl_rules thing_inside
 ************************************************************************
 -}
 
-checkWellStaged :: SDoc         -- What the stage check is for
+checkWellStaged :: StageCheckReason -- What the stage check is for
                 -> ThLevel      -- Binding level (increases inside brackets)
                 -> ThLevel      -- Use stage
                 -> TcM ()       -- Fail if badly staged, adding an error
@@ -895,22 +893,11 @@ checkWellStaged pp_thing bind_lvl use_lvl
   = return ()                   -- E.g.  \x -> [| $(f x) |]
 
   | bind_lvl == outerLevel      -- GHC restriction on top level splices
-  = stageRestrictionError pp_thing
+  = failWithTc (TcRnStageRestriction pp_thing)
 
   | otherwise                   -- Badly staged
   = failWithTc $                -- E.g.  \x -> $(f x)
-    mkTcRnUnknownMessage $ mkPlainError noHints $
-    text "Stage error:" <+> pp_thing <+>
-        hsep   [text "is bound at stage" <+> ppr bind_lvl,
-                text "but used at stage" <+> ppr use_lvl]
-
-stageRestrictionError :: SDoc -> TcM a
-stageRestrictionError pp_thing
-  = failWithTc $
-    mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [ text "GHC stage restriction:"
-        , nest 2 (vcat [ pp_thing <+> text "is used in a top-level splice, quasi-quote, or annotation,"
-                       , text "and must be imported, not defined locally"])]
+    TcRnBadlyStaged pp_thing bind_lvl use_lvl
 
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk"
@@ -1173,12 +1160,9 @@ notFound name
            Splice {}
              | isUnboundName name -> failM  -- If the name really isn't in scope
                                             -- don't report it again (#11941)
-             | otherwise -> stageRestrictionError (quotes (ppr name))
+             | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
            _ -> failWithTc $
-                mkTcRnUnknownMessage $ mkPlainError noHints $
-                vcat[text "GHC internal error:" <+> quotes (ppr name) <+>
-                     text "is not in scope during type checking, but it passed the renamer",
-                     text "tcl_env of environment:" <+> ppr (tcl_env lcl_env)]
+                mkTcRnNotInScope (getRdrName name) (NotInScopeTc (tcl_env lcl_env))
                        -- Take care: printing the whole gbl env can
                        -- cause an infinite loop, in the case where we
                        -- are in the middle of a recursive TyCon/Class group;
@@ -1186,12 +1170,9 @@ notFound name
                        -- very unhelpful, because it hides one compiler bug with another
        }
 
-wrongThingErr :: String -> TcTyThing -> Name -> TcM a
-wrongThingErr expected thing name
-  = let msg = mkTcRnUnknownMessage $ mkPlainError noHints $
-          (pprTcTyThingCategory thing <+> quotes (ppr name) <+>
-                     text "used as a" <+> text expected)
-  in failWithTc msg
+wrongThingErr :: WrongThingSort -> TcTyThing -> Name -> TcM a
+wrongThingErr expected thing name =
+  failWithTc (TcRnTyThingUsedWrong expected thing name)
 
 {- Note [Out of scope might be a staging error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

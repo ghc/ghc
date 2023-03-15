@@ -16,7 +16,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey, ipClassKey )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
-import GHC.Tc.Instance.Class ( InstanceWhat(..), safeOverlap )
+import GHC.Tc.Instance.Class ( safeOverlap )
 
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
