@@ -872,6 +872,7 @@ StgMutArrPtrs *listThreads(Capability *cap)
     const StgWord size = n_threads + mutArrPtrsCardTableSize(n_threads);
     StgMutArrPtrs *arr =
         (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_DIRTY_info, CCS_SYSTEM);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     arr->ptrs = n_threads;
     arr->size = size;
