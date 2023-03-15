@@ -24,7 +24,7 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Transform
 
 import GHC.StgToJS.Types

@@ -94,7 +94,7 @@ hexDoc v = text $ go v
 -- attempt to resugar some of the common constructs
 ghcjsRenderJsS :: RenderJs -> JStat -> Doc
 ghcjsRenderJsS r (BlockStat xs) = prettyBlock r (flattenBlocks xs)
-ghcjsRenderJsS r s              = renderJsS defaultRenderJs r s
+ghcjsRenderJsS r s               = renderJsS defaultRenderJs r s
 
 -- don't quote keys in our object literals, so closure compiler works
 ghcjsRenderJsV :: RenderJs -> JVal -> Doc

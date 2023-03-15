@@ -30,7 +30,8 @@ import Prelude
 import GHC.Platform.Host (hostPlatformArchOS)
 
 import GHC.JS.Make
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import GHC.JS.Transform
 
 import GHC.Driver.Session (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
@@ -325,12 +326,12 @@ renderLinker h mods jsFiles = do
 
   -- modules themselves
   mod_sizes <- forM compacted_mods $ \m -> do
-    !mod_size <- fromIntegral <$> putJS (cmc_js_code m)
+    !mod_size <- fromIntegral <$> putJS (satJStat $! cmc_js_code m)
     let !mod_mod  = cmc_module m
     pure (mod_mod, mod_size)
 
   -- commoned up metadata
-  !meta_length <- fromIntegral <$> putJS meta
+  !meta_length <- fromIntegral <$> putJS (satJStat meta)
 
   -- module exports
   mapM_ (putBS . cmc_exports) compacted_mods
@@ -564,7 +565,7 @@ extractDeps ar_state units deps loc =
     mod           = depsModule deps
     newline       = BC.pack "\n"
     mk_exports    = mconcat . intersperse newline . filter (not . BS.null) . map oiRaw
-    mk_js_code    = mconcat . map oiStat
+    mk_js_code    = mconcat . map (unsatJStat . oiStat)
     collectCode l = ModuleCode
                       { mc_module   = mod
                       , mc_js_code  = mk_js_code l

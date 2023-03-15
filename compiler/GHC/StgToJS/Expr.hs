@@ -30,7 +30,8 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import GHC.JS.Transform
 import GHC.JS.Make
 
 import GHC.StgToJS.Apply
@@ -910,7 +911,7 @@ caseCond = \case
   DataAlt da -> return $ Just (toJExpr $ dataConTag da)
   LitAlt l   -> genLit l >>= \case
     [e] -> pure (Just e)
-    es  -> pprPanic "caseCond: expected single-variable literal" (ppr es)
+    es  -> pprPanic "caseCond: expected single-variable literal" (ppr $ fmap satJExpr es)
 
 -- fixme use single tmp var for all branches
 -- | Load parameters from constructor

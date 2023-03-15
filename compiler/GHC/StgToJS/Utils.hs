@@ -12,16 +12,15 @@ import GHC.Prelude
 import GHC.StgToJS.Types
 import GHC.StgToJS.ExprCtx
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 
 import GHC.Core.TyCon
 
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Outputable
 
-assignToTypedExprs :: HasDebugCallStack => [TypedExpr] -> [JExpr] -> JStat
+assignToTypedExprs :: [TypedExpr] -> [JExpr] -> JStat
 assignToTypedExprs tes es =
   assignAllEqual (concatMap typex_expr tes) es
 
@@ -30,18 +29,19 @@ assignTypedExprs tes es =
   -- TODO: check primRep (typex_typ) here?
   assignToTypedExprs tes (concatMap typex_expr es)
 
-assignToExprCtx :: HasDebugCallStack => ExprCtx -> [JExpr] -> JStat
+assignToExprCtx :: ExprCtx -> [JExpr] -> JStat
 assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
 
 -- | Assign first expr only (if it exists), performing coercions between some
 -- PrimReps (e.g. StablePtr# and Addr#).
-assignCoerce1 :: HasDebugCallStack => [TypedExpr] -> [TypedExpr] -> JStat
+assignCoerce1 :: [TypedExpr] -> [TypedExpr] -> JStat
 assignCoerce1 [x] [y] = assignCoerce x y
 assignCoerce1 []  []  = mempty
-assignCoerce1 x   y   = pprPanic "assignCoerce1"
+assignCoerce1 _x _y   = pprPanic "assignCoerce1"
                           (vcat [ text "lengths do not match"
-                                , ppr x
-                                , ppr y
+                                -- FIXME: Outputable instance removed until JStg replaces JStat
+                                -- , ppr x
+                                -- , ppr y
                                 ])
 
 -- | Assign p2 to p1 with optional coercion

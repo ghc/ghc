@@ -131,7 +131,7 @@ where
 
 import GHC.Prelude hiding ((.|.))
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 
 import Control.Arrow ((***))
 

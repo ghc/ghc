@@ -31,7 +31,7 @@ import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Regs (stack,sp)
 
 import GHC.JS.Make
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 
 import GHC.Types.Unique.Map
 

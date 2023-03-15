@@ -30,7 +30,7 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 
 import GHC.StgToJS.DataCon

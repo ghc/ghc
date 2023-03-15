@@ -43,7 +43,7 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Symbols
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 
 import GHC.Core.DataCon

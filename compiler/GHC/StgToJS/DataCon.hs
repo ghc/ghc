@@ -27,7 +27,8 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import GHC.JS.Transform
 import GHC.JS.Make
 
 import GHC.StgToJS.Closure
@@ -58,7 +59,10 @@ genCon ctx con args
   = allocCon ctxi con currentCCS args
 
   | xs <- concatMap typex_expr (ctxTarget ctx)
-  = pprPanic "genCon: unhandled DataCon" (ppr (con, args, xs))
+  = pprPanic "genCon: unhandled DataCon" (ppr (con
+                                              , fmap satJExpr args
+                                              , fmap satJExpr xs
+                                              ))
 
 -- | Allocate a data constructor. Allocate in this context means bind the data
 -- constructor to 'to'
@@ -86,7 +90,7 @@ allocUnboxedCon con = \case
     | isBoolDataCon con && dataConTag con == 2 -> true_
   [x]
     | isUnboxableCon con -> x
-  xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con,xs))
+  xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con, fmap satJExpr xs))
 
 -- | Allocate an entry function. See 'GHC.StgToJS.hs' for the object layout.
 allocDynamicE :: Bool          -- ^ csInlineAlloc from StgToJSConfig

@@ -13,7 +13,7 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax hiding (JUOp (..))
+import GHC.JS.Unsat.Syntax hiding (JUOp (..))
 import GHC.JS.Make
 
 import GHC.StgToJS.Heap

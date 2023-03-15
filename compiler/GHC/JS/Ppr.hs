@@ -56,11 +56,11 @@ x $$$ y = nest 2 $ x $+$ y
 -- | Render a syntax tree as a pretty-printable document
 -- (simply showing the resultant doc produces a nice,
 -- well formatted String).
-renderJs :: (JsToDoc a, JMacro a) => a -> Doc
+renderJs :: (JsToDoc a) => a -> Doc
 renderJs = renderJs' defaultRenderJs
 
-renderJs' :: (JsToDoc a, JMacro a) => RenderJs -> a -> Doc
-renderJs' r = jsToDocR r . jsSaturate Nothing
+renderJs' :: (JsToDoc a) => RenderJs -> a -> Doc
+renderJs' r = jsToDocR r
 
 data RenderJs = RenderJs
   { renderJsS :: !(RenderJs -> JStat -> Doc)
@@ -78,11 +78,11 @@ jsToDoc = jsToDocR defaultRenderJs
 -- | Render a syntax tree as a pretty-printable document, using a given prefix
 -- to all generated names. Use this with distinct prefixes to ensure distinct
 -- generated names between independent calls to render(Prefix)Js.
-renderPrefixJs :: (JsToDoc a, JMacro a) => FastString -> a -> Doc
-renderPrefixJs pfx = renderPrefixJs' defaultRenderJs pfx
+renderPrefixJs :: (JsToDoc a, JMacro a) => a -> Doc
+renderPrefixJs = renderPrefixJs' defaultRenderJs
 
-renderPrefixJs' :: (JsToDoc a, JMacro a) => RenderJs -> FastString -> a -> Doc
-renderPrefixJs' r pfx = jsToDocR r . jsSaturate (Just $ "jmId_" `mappend` pfx)
+renderPrefixJs' :: (JsToDoc a, JMacro a) => RenderJs -> a -> Doc
+renderPrefixJs' r = jsToDocR r
 
 braceNest :: Doc -> Doc
 braceNest x = char '{' <+> nest 2 x $$ char '}'
@@ -108,15 +108,14 @@ instance JsToDoc [JStat] where
 defRenderJsS :: RenderJs -> JStat -> Doc
 defRenderJsS r = \case
   IfStat cond x y -> hangBrace (text "if" <> parens (jsToDocR r cond))
-                               (jsToDocR r x)
-                     $$ mbElse
+                      (jsToDocR r x)
+                      $$ mbElse
         where mbElse | y == BlockStat []  = PP.empty
                      | otherwise = hangBrace (text "else") (jsToDocR r y)
   DeclStat x Nothing  -> text "var" <+> jsToDocR r x
   DeclStat x (Just e) -> text "var" <+> jsToDocR r x <+> char '=' <+> jsToDocR r e
   WhileStat False p b -> hangBrace (text "while" <> parens (jsToDocR r p)) (jsToDocR r b)
   WhileStat True  p b -> (hangBrace (text "do") (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
-  UnsatBlock e        -> jsToDocR r $ pseudoSaturate e
   BreakStat l         -> maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
   ContinueStat l      -> maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
   LabelStat (LexicalFastString l) s -> ftext l <> char ':' $$ printBS s
@@ -150,7 +149,7 @@ defRenderJsS r = \case
     --                             });
     --
     ValExpr (JFunc is b) -> sep [jsToDocR r i <+> text "= function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is) <> char '{', nest 2 (jsToDocR r b), text "}"]
-    _                    -> jsToDocR r i <+> char '=' <+> jsToDocR r x
+    _                      -> jsToDocR r i <+> char '=' <+> jsToDocR r x
   UOpStat op x
     | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
     | isPre op                 -> ftext (uOpText op) <> optParens r x
@@ -160,8 +159,8 @@ defRenderJsS r = \case
 flattenBlocks :: [JStat] -> [JStat]
 flattenBlocks = \case
   BlockStat y:ys -> flattenBlocks y ++ flattenBlocks ys
-  y:ys           -> y : flattenBlocks ys
-  []             -> []
+  y:ys            -> y : flattenBlocks ys
+  []              -> []
 
 optParens :: RenderJs -> JExpr -> Doc
 optParens r x = case x of
@@ -180,7 +179,6 @@ defRenderJsE r = \case
     | isPre op                 -> ftext (uOpText op) <> optParens r x
     | otherwise                -> optParens r x <> ftext (uOpText op)
   ApplExpr je xs -> jsToDocR r je <> (parens . hsep . punctuate comma $ map (jsToDocR r) xs)
-  UnsatExpr e    -> jsToDocR r $ pseudoSaturate e
 
 defRenderJsV :: RenderJs -> JVal -> Doc
 defRenderJsV r = \case
@@ -202,7 +200,6 @@ defRenderJsV r = \case
                           -- because we sort the elements lexically
                           $ sortOn (LexicalFastString . fst) (nonDetEltsUniqMap m)
   JFunc is b -> parens $ hangBrace (text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
-  UnsatVal f -> jsToDocR r $ pseudoSaturate f
 
 defRenderJsI :: RenderJs -> Ident -> Doc
 defRenderJsI _ (TxtI t) = ftext t
@@ -235,7 +232,7 @@ encodeJsonChar = \case
             let h = showHex cp ""
             in  text (prefix ++ replicate (pad - length h) '0' ++ h)
 
-uOpText :: JUOp -> FastString
+uOpText :: UOp -> FastString
 uOpText = \case
   NotOp     -> "!"
   BNotOp    -> "~"
@@ -251,7 +248,7 @@ uOpText = \case
   PreDecOp  -> "--"
   PostDecOp -> "--"
 
-opText :: JOp -> FastString
+opText :: Op -> FastString
 opText = \case
   EqOp          -> "=="
   StrictEqOp    -> "==="
@@ -278,13 +275,13 @@ opText = \case
   InOp          -> "in"
 
 
-isPre :: JUOp -> Bool
+isPre :: UOp -> Bool
 isPre = \case
   PostIncOp -> False
   PostDecOp -> False
   _         -> True
 
-isAlphaOp :: JUOp -> Bool
+isAlphaOp :: UOp -> Bool
 isAlphaOp = \case
   NewOp    -> True
   TypeofOp -> True

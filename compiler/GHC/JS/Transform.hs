@@ -8,10 +8,7 @@
 {-# LANGUAGE BlockArguments #-}
 
 module GHC.JS.Transform
-  ( mapIdent
-  , mapStatIdent
-  , mapExprIdent
-  , identsS
+  ( identsS
   , identsV
   , identsE
   -- * Saturation
@@ -24,68 +21,25 @@ module GHC.JS.Transform
   , composOpM
   , composOpM_
   , composOpFold
+  , satJExpr
+  , satJStat
+  , unsatJStat
   )
 where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import qualified GHC.JS.Syntax as Sat
+import GHC.JS.Unsat.Syntax
 
 import Data.Functor.Identity
 import Control.Monad
-import Data.Bifunctor
+import Control.Arrow ((***))
 
 import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique.Map
 
-mapExprIdent :: (Ident -> JExpr) -> JExpr -> JExpr
-mapExprIdent f = fst (mapIdent f)
-
-mapStatIdent :: (Ident -> JExpr) -> JStat -> JStat
-mapStatIdent f = snd (mapIdent f)
-
--- | Map on every variable ident
-mapIdent :: (Ident -> JExpr) -> (JExpr -> JExpr, JStat -> JStat)
-mapIdent f = (map_expr, map_stat)
-  where
-    map_expr = \case
-      ValExpr    v        -> map_val v
-      SelExpr    e i      -> SelExpr (map_expr e) i
-      IdxExpr    e1 e2    -> IdxExpr (map_expr e1) (map_expr e2)
-      InfixExpr  o e1 e2  -> InfixExpr o (map_expr e1) (map_expr e2)
-      UOpExpr    o e      -> UOpExpr o (map_expr e)
-      IfExpr     e1 e2 e3 -> IfExpr (map_expr e1) (map_expr e2) (map_expr e3)
-      ApplExpr   e es     -> ApplExpr (map_expr e) (fmap map_expr es)
-      UnsatExpr  me       -> UnsatExpr (fmap map_expr me)
-
-    map_val v = case v of
-      JVar     i  -> f i
-      JList    es -> ValExpr $ JList (fmap map_expr es)
-      JDouble{}   -> ValExpr $ v
-      JInt{}      -> ValExpr $ v
-      JStr{}      -> ValExpr $ v
-      JRegEx{}    -> ValExpr $ v
-      JHash me    -> ValExpr $ JHash (fmap map_expr me)
-      JFunc is s  -> ValExpr $ JFunc is (map_stat s)
-      UnsatVal v2 -> ValExpr $ UnsatVal v2
-
-    map_stat s = case s of
-      DeclStat i e          -> DeclStat i (fmap map_expr e)
-      ReturnStat e          -> ReturnStat (map_expr e)
-      IfStat     e s1 s2    -> IfStat (map_expr e) (map_stat s1) (map_stat s2)
-      WhileStat  b e s2     -> WhileStat b (map_expr e) (map_stat s2)
-      ForInStat  b i e s2   -> ForInStat b i (map_expr e) (map_stat s2)
-      SwitchStat e les s2   -> SwitchStat (map_expr e) (fmap (bimap map_expr map_stat) les) (map_stat s2)
-      TryStat    s2 i s3 s4 -> TryStat (map_stat s2) i (map_stat s3) (map_stat s4)
-      BlockStat  ls         -> BlockStat (fmap map_stat ls)
-      ApplStat   e es       -> ApplStat (map_expr e) (fmap map_expr es)
-      UOpStat    o e        -> UOpStat o (map_expr e)
-      AssignStat e1 e2      -> AssignStat (map_expr e1) (map_expr e2)
-      UnsatBlock ms         -> UnsatBlock (fmap map_stat ms)
-      LabelStat  l s2       -> LabelStat l (map_stat s2)
-      BreakStat{}           -> s
-      ContinueStat{}        -> s
 
 {-# INLINE identsS #-}
 identsS :: JStat -> [Ident]
@@ -262,3 +216,203 @@ jsSaturate_ e = IS $ jfromGADT <$> go (jtoGADT e)
                JMGExpr (UnsatExpr  us) -> go =<< (JMGExpr <$> runIdentSupply us)
                JMGVal  (UnsatVal   us) -> go =<< (JMGVal  <$> runIdentSupply us)
                _ -> composOpM go v
+
+
+--------------------------------------------------------------------------------
+--                            Translation
+--
+-- This will be moved after GHC.JS.Syntax is removed
+--------------------------------------------------------------------------------
+satJStat :: JStat -> Sat.JStat
+satJStat = witness . proof
+  where proof = jsSaturate Nothing
+
+        -- This is an Applicative but we can't use it because no type variables :(
+        witness :: JStat -> Sat.JStat
+        witness (DeclStat i rhs)      = Sat.DeclStat i (fmap satJExpr rhs)
+        witness (ReturnStat e)        = Sat.ReturnStat (satJExpr e)
+        witness (IfStat c t e)        = Sat.IfStat (satJExpr c) (witness t) (witness e)
+        witness (WhileStat is_do c e) = Sat.WhileStat is_do (satJExpr c) (witness e)
+        witness (ForInStat is_each i iter body) = Sat.ForInStat is_each i
+                                                  (satJExpr iter)
+                                                  (witness body)
+        witness (SwitchStat struct ps def) = Sat.SwitchStat
+                                             (satJExpr struct)
+                                             (map (satJExpr *** witness) ps)
+                                             (witness def)
+        witness (TryStat t i c f)     = Sat.TryStat (witness t) i (witness c) (witness f)
+        witness (BlockStat bs)        = Sat.BlockStat $! fmap witness bs
+        witness (ApplStat rator rand) = Sat.ApplStat (satJExpr rator) (satJExpr <$> rand)
+        witness (UOpStat rator rand)  = Sat.UOpStat  (satJUOp rator) (satJExpr rand)
+        witness (AssignStat lhs rhs)  = Sat.AssignStat (satJExpr lhs) (satJExpr rhs)
+        witness (LabelStat lbl stmt)  = Sat.LabelStat lbl (witness stmt)
+        witness (BreakStat Nothing)   = Sat.BreakStat Nothing
+        witness (BreakStat (Just l))  = Sat.BreakStat $! Just l
+        witness (ContinueStat Nothing)  = Sat.ContinueStat Nothing
+        witness (ContinueStat (Just l)) = Sat.ContinueStat $! Just l
+        witness UnsatBlock{}            = error "satJStat: discovered an Unsat...impossibly"
+
+
+satJExpr :: JExpr -> Sat.JExpr
+satJExpr = go
+  where
+    go (ValExpr v)        = Sat.ValExpr (satJVal v)
+    go (SelExpr obj i)    = Sat.SelExpr (satJExpr obj) i
+    go (IdxExpr o i)      = Sat.IdxExpr (satJExpr o) (satJExpr i)
+    go (InfixExpr op l r) = Sat.InfixExpr (satJOp op) (satJExpr l) (satJExpr r)
+    go (UOpExpr op r)     = Sat.UOpExpr (satJUOp op) (satJExpr r)
+    go (IfExpr c t e)     = Sat.IfExpr (satJExpr c) (satJExpr t) (satJExpr e)
+    go (ApplExpr rator rands) = Sat.ApplExpr (satJExpr rator) (satJExpr <$> rands)
+    go UnsatExpr{}        = error "satJExpr: discovered an Unsat...impossibly"
+
+satJOp :: JOp -> Sat.Op
+satJOp = go
+  where
+    go EqOp         = Sat.EqOp
+    go StrictEqOp   = Sat.StrictEqOp
+    go NeqOp        = Sat.NeqOp
+    go StrictNeqOp  = Sat.StrictNeqOp
+    go GtOp         = Sat.GtOp
+    go GeOp         = Sat.GeOp
+    go LtOp         = Sat.LtOp
+    go LeOp         = Sat.LeOp
+    go AddOp        = Sat.AddOp
+    go SubOp        = Sat.SubOp
+    go MulOp        = Sat.MulOp
+    go DivOp        = Sat.DivOp
+    go ModOp        = Sat.ModOp
+    go LeftShiftOp  = Sat.LeftShiftOp
+    go RightShiftOp = Sat.RightShiftOp
+    go ZRightShiftOp = Sat.ZRightShiftOp
+    go BAndOp       = Sat.BAndOp
+    go BOrOp        = Sat.BOrOp
+    go BXorOp       = Sat.BXorOp
+    go LAndOp       = Sat.LAndOp
+    go LOrOp        = Sat.LOrOp
+    go InstanceofOp = Sat.InstanceofOp
+    go InOp         = Sat.InOp
+
+satJUOp :: JUOp -> Sat.UOp
+satJUOp = go
+  where
+    go NotOp     = Sat.NotOp
+    go BNotOp    = Sat.BNotOp
+    go NegOp     = Sat.NegOp
+    go PlusOp    = Sat.PlusOp
+    go NewOp     = Sat.NewOp
+    go TypeofOp  = Sat.TypeofOp
+    go DeleteOp  = Sat.DeleteOp
+    go YieldOp   = Sat.YieldOp
+    go VoidOp    = Sat.VoidOp
+    go PreIncOp  = Sat.PreIncOp
+    go PostIncOp = Sat.PostIncOp
+    go PreDecOp  = Sat.PreDecOp
+    go PostDecOp = Sat.PostDecOp
+
+satJVal :: JVal -> Sat.JVal
+satJVal = go
+  where
+    go (JVar i)    = Sat.JVar i
+    go (JList xs)  = Sat.JList (satJExpr <$> xs)
+    go (JDouble d) = Sat.JDouble (Sat.SaneDouble (unSaneDouble d))
+    go (JInt i)    = Sat.JInt   i
+    go (JStr f)    = Sat.JStr   f
+    go (JRegEx f)  = Sat.JRegEx f
+    go (JHash m)   = Sat.JHash (satJExpr <$> m)
+    go (JFunc args body) = Sat.JFunc args (satJStat body)
+    go UnsatVal{} = error "jvalToSatVar: discovered an Sat...impossibly"
+
+unsatJStat :: Sat.JStat -> JStat
+unsatJStat = go_back
+  where
+        -- This is an Applicative but we can't use it because no type variables :(
+        go_back :: Sat.JStat -> JStat
+        go_back (Sat.DeclStat i rhs)      = DeclStat i (fmap unsatJExpr rhs)
+        go_back (Sat.ReturnStat e)        = ReturnStat (unsatJExpr e)
+        go_back (Sat.IfStat c t e)        = IfStat (unsatJExpr c) (go_back t) (go_back e)
+        go_back (Sat.WhileStat is_do c e) = WhileStat is_do (unsatJExpr c) (go_back e)
+        go_back (Sat.ForInStat is_each i iter body) = ForInStat is_each i
+                                                  (unsatJExpr iter)
+                                                  (go_back body)
+        go_back (Sat.SwitchStat struct ps def) = SwitchStat
+                                             (unsatJExpr struct)
+                                             (map (unsatJExpr *** go_back) ps)
+                                             (go_back def)
+        go_back (Sat.TryStat t i c f)     = TryStat (go_back t) i (go_back c) (go_back f)
+        go_back (Sat.BlockStat bs)        = BlockStat $! fmap go_back bs
+        go_back (Sat.ApplStat rator rand) = ApplStat (unsatJExpr rator) (unsatJExpr <$> rand)
+        go_back (Sat.UOpStat rator rand)  = UOpStat  (unsatJUOp rator) (unsatJExpr rand)
+        go_back (Sat.AssignStat lhs rhs)  = AssignStat (unsatJExpr lhs) (unsatJExpr rhs)
+        go_back (Sat.LabelStat lbl stmt)  = LabelStat lbl (go_back stmt)
+        go_back (Sat.BreakStat Nothing)   = BreakStat Nothing
+        go_back (Sat.BreakStat (Just l))  = BreakStat $! Just l
+        go_back (Sat.ContinueStat Nothing)  = ContinueStat Nothing
+        go_back (Sat.ContinueStat (Just l)) = ContinueStat $! Just l
+
+
+unsatJExpr :: Sat.JExpr -> JExpr
+unsatJExpr = go
+  where
+    go (Sat.ValExpr v)        = ValExpr (unsatJVal v)
+    go (Sat.SelExpr obj i)    = SelExpr (unsatJExpr obj) i
+    go (Sat.IdxExpr o i)      = IdxExpr (unsatJExpr o) (unsatJExpr i)
+    go (Sat.InfixExpr op l r) = InfixExpr (satOpToJOp op) (unsatJExpr l) (unsatJExpr r)
+    go (Sat.UOpExpr op r)     = UOpExpr (unsatJUOp op) (unsatJExpr r)
+    go (Sat.IfExpr c t e)     = IfExpr (unsatJExpr c) (unsatJExpr t) (unsatJExpr e)
+    go (Sat.ApplExpr rator rands) = ApplExpr (unsatJExpr rator) (unsatJExpr <$> rands)
+
+satOpToJOp :: Sat.Op -> JOp
+satOpToJOp = go
+  where
+    go Sat.EqOp         = EqOp
+    go Sat.StrictEqOp   = StrictEqOp
+    go Sat.NeqOp        = NeqOp
+    go Sat.StrictNeqOp  = StrictNeqOp
+    go Sat.GtOp         = GtOp
+    go Sat.GeOp         = GeOp
+    go Sat.LtOp         = LtOp
+    go Sat.LeOp         = LeOp
+    go Sat.AddOp        = AddOp
+    go Sat.SubOp        = SubOp
+    go Sat.MulOp        = MulOp
+    go Sat.DivOp        = DivOp
+    go Sat.ModOp        = ModOp
+    go Sat.LeftShiftOp  = LeftShiftOp
+    go Sat.RightShiftOp = RightShiftOp
+    go Sat.ZRightShiftOp = ZRightShiftOp
+    go Sat.BAndOp       = BAndOp
+    go Sat.BOrOp        = BOrOp
+    go Sat.BXorOp       = BXorOp
+    go Sat.LAndOp       = LAndOp
+    go Sat.LOrOp        = LOrOp
+    go Sat.InstanceofOp = InstanceofOp
+    go Sat.InOp         = InOp
+
+unsatJUOp :: Sat.UOp -> JUOp
+unsatJUOp = go
+  where
+    go Sat.NotOp     = NotOp
+    go Sat.BNotOp    = BNotOp
+    go Sat.NegOp     = NegOp
+    go Sat.PlusOp    = PlusOp
+    go Sat.NewOp     = NewOp
+    go Sat.TypeofOp  = TypeofOp
+    go Sat.DeleteOp  = DeleteOp
+    go Sat.YieldOp   = YieldOp
+    go Sat.VoidOp    = VoidOp
+    go Sat.PreIncOp  = PreIncOp
+    go Sat.PostIncOp = PostIncOp
+    go Sat.PreDecOp  = PreDecOp
+    go Sat.PostDecOp = PostDecOp
+
+unsatJVal :: Sat.JVal -> JVal
+unsatJVal = go
+  where
+    go (Sat.JVar i)    = JVar i
+    go (Sat.JList xs)  = JList (unsatJExpr <$> xs)
+    go (Sat.JDouble d) = JDouble (SaneDouble (Sat.unSaneDouble d))
+    go (Sat.JInt i)    = JInt   i
+    go (Sat.JStr f)    = JStr   f
+    go (Sat.JRegEx f)  = JRegEx f
+    go (Sat.JHash m)   = JHash (unsatJExpr <$> m)
+    go (Sat.JFunc args body) = JFunc args (unsatJStat body)

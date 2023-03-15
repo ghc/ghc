@@ -27,7 +27,7 @@ where
 
 import GHC.Prelude hiding ((.|.))
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 
 import GHC.StgToJS.Arg

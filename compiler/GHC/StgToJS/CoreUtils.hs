@@ -6,7 +6,8 @@ module GHC.StgToJS.CoreUtils where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import GHC.JS.Transform
 
 import GHC.StgToJS.Types
 
@@ -246,17 +247,17 @@ primRepSize p = varSlotCount (primRepVt p)
 
 -- | Associate the given values to each RrimRep in the given order, taking into
 -- account the number of slots per PrimRep
-assocPrimReps :: Outputable a => [PrimRep] -> [a] -> [(PrimRep, [a])]
+assocPrimReps :: [PrimRep] -> [JExpr] -> [(PrimRep, [JExpr])]
 assocPrimReps []     _  = []
 assocPrimReps (r:rs) vs = case (primRepSize r,vs) of
   (NoSlot,   xs)     -> (r,[])    : assocPrimReps rs xs
   (OneSlot,  x:xs)   -> (r,[x])   : assocPrimReps rs xs
   (TwoSlots, x:y:xs) -> (r,[x,y]) : assocPrimReps rs xs
-  err                -> pprPanic "assocPrimReps" (ppr err)
+  err                -> pprPanic "assocPrimReps" (ppr $ fmap (map satJExpr) $ err)
 
 -- | Associate the given values to the Id's PrimReps, taking into account the
 -- number of slots per PrimRep
-assocIdPrimReps :: Outputable a => Id -> [a] -> [(PrimRep, [a])]
+assocIdPrimReps :: Id -> [JExpr] -> [(PrimRep, [JExpr])]
 assocIdPrimReps i = assocPrimReps (idPrimReps i)
 
 -- | Associate the given JExpr to the Id's PrimReps, taking into account the

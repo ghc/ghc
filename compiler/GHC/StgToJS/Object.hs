@@ -77,7 +77,8 @@ import System.IO
 
 import GHC.Settings.Constants (hiVersion)
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import qualified GHC.JS.Syntax as Sat
 import GHC.StgToJS.Types
 
 import GHC.Unit.Module
@@ -402,83 +403,100 @@ instance Binary ExpFun where
   put_ bh (ExpFun isIO args res) = put_ bh isIO >> put_ bh args >> put_ bh res
   get bh                        = ExpFun <$> get bh <*> get bh <*> get bh
 
-instance Binary JStat where
-  put_ bh (DeclStat i e)       = putByte bh 1  >> put_ bh i >> put_ bh e
-  put_ bh (ReturnStat e)       = putByte bh 2  >> put_ bh e
-  put_ bh (IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
-  put_ bh (WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
-  put_ bh (ForInStat b i e s)  = putByte bh 5  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
-  put_ bh (SwitchStat e ss s)  = putByte bh 6  >> put_ bh e  >> put_ bh ss >> put_ bh s
-  put_ bh (TryStat s1 i s2 s3) = putByte bh 7  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
-  put_ bh (BlockStat xs)       = putByte bh 8  >> put_ bh xs
-  put_ bh (ApplStat e es)      = putByte bh 9  >> put_ bh e  >> put_ bh es
-  put_ bh (UOpStat o e)        = putByte bh 10 >> put_ bh o  >> put_ bh e
-  put_ bh (AssignStat e1 e2)   = putByte bh 11 >> put_ bh e1 >> put_ bh e2
-  put_ _  (UnsatBlock {})      = error "put_ bh JStat: UnsatBlock"
-  put_ bh (LabelStat l s)      = putByte bh 12 >> put_ bh l  >> put_ bh s
-  put_ bh (BreakStat ml)       = putByte bh 13 >> put_ bh ml
-  put_ bh (ContinueStat ml)    = putByte bh 14 >> put_ bh ml
+instance Binary Sat.JStat where
+  put_ bh (Sat.DeclStat i e)       = putByte bh 1  >> put_ bh i >> put_ bh e
+  put_ bh (Sat.ReturnStat e)       = putByte bh 2  >> put_ bh e
+  put_ bh (Sat.IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
+  put_ bh (Sat.WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
+  put_ bh (Sat.ForInStat b i e s)  = putByte bh 5  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
+  put_ bh (Sat.SwitchStat e ss s)  = putByte bh 6  >> put_ bh e  >> put_ bh ss >> put_ bh s
+  put_ bh (Sat.TryStat s1 i s2 s3) = putByte bh 7  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
+  put_ bh (Sat.BlockStat xs)       = putByte bh 8  >> put_ bh xs
+  put_ bh (Sat.ApplStat e es)      = putByte bh 9  >> put_ bh e  >> put_ bh es
+  put_ bh (Sat.UOpStat o e)        = putByte bh 10 >> put_ bh o  >> put_ bh e
+  put_ bh (Sat.AssignStat e1 e2)   = putByte bh 11 >> put_ bh e1 >> put_ bh e2
+  put_ bh (Sat.LabelStat l s)      = putByte bh 12 >> put_ bh l  >> put_ bh s
+  put_ bh (Sat.BreakStat ml)       = putByte bh 13 >> put_ bh ml
+  put_ bh (Sat.ContinueStat ml)    = putByte bh 14 >> put_ bh ml
   get bh = getByte bh >>= \case
-    1  -> DeclStat     <$> get bh <*> get bh
-    2  -> ReturnStat   <$> get bh
-    3  -> IfStat       <$> get bh <*> get bh <*> get bh
-    4  -> WhileStat    <$> get bh <*> get bh <*> get bh
-    5  -> ForInStat    <$> get bh <*> get bh <*> get bh <*> get bh
-    6  -> SwitchStat   <$> get bh <*> get bh <*> get bh
-    7  -> TryStat      <$> get bh <*> get bh <*> get bh <*> get bh
-    8  -> BlockStat    <$> get bh
-    9  -> ApplStat     <$> get bh <*> get bh
-    10 -> UOpStat      <$> get bh <*> get bh
-    11 -> AssignStat   <$> get bh <*> get bh
-    12 -> LabelStat    <$> get bh <*> get bh
-    13 -> BreakStat    <$> get bh
-    14 -> ContinueStat <$> get bh
+    1  -> Sat.DeclStat     <$> get bh <*> get bh
+    2  -> Sat.ReturnStat   <$> get bh
+    3  -> Sat.IfStat       <$> get bh <*> get bh <*> get bh
+    4  -> Sat.WhileStat    <$> get bh <*> get bh <*> get bh
+    5  -> Sat.ForInStat    <$> get bh <*> get bh <*> get bh <*> get bh
+    6  -> Sat.SwitchStat   <$> get bh <*> get bh <*> get bh
+    7  -> Sat.TryStat      <$> get bh <*> get bh <*> get bh <*> get bh
+    8  -> Sat.BlockStat    <$> get bh
+    9  -> Sat.ApplStat     <$> get bh <*> get bh
+    10 -> Sat.UOpStat      <$> get bh <*> get bh
+    11 -> Sat.AssignStat   <$> get bh <*> get bh
+    12 -> Sat.LabelStat    <$> get bh <*> get bh
+    13 -> Sat.BreakStat    <$> get bh
+    14 -> Sat.ContinueStat <$> get bh
     n -> error ("Binary get bh JStat: invalid tag: " ++ show n)
 
-instance Binary JExpr where
-  put_ bh (ValExpr v)          = putByte bh 1 >> put_ bh v
-  put_ bh (SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
-  put_ bh (IdxExpr e1 e2)      = putByte bh 3 >> put_ bh e1 >> put_ bh e2
-  put_ bh (InfixExpr o e1 e2)  = putByte bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
-  put_ bh (UOpExpr o e)        = putByte bh 5 >> put_ bh o  >> put_ bh e
-  put_ bh (IfExpr e1 e2 e3)    = putByte bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
-  put_ bh (ApplExpr e es)      = putByte bh 7 >> put_ bh e  >> put_ bh es
-  put_ _  (UnsatExpr {})       = error "put_ bh JExpr: UnsatExpr"
-  get bh = getByte bh >>= \case
-    1 -> ValExpr   <$> get bh
-    2 -> SelExpr   <$> get bh <*> get bh
-    3 -> IdxExpr   <$> get bh <*> get bh
-    4 -> InfixExpr <$> get bh <*> get bh <*> get bh
-    5 -> UOpExpr   <$> get bh <*> get bh
-    6 -> IfExpr    <$> get bh <*> get bh <*> get bh
-    7 -> ApplExpr  <$> get bh <*> get bh
-    n -> error ("Binary get bh JExpr: invalid tag: " ++ show n)
 
-instance Binary JVal where
-  put_ bh (JVar i)      = putByte bh 1 >> put_ bh i
-  put_ bh (JList es)    = putByte bh 2 >> put_ bh es
-  put_ bh (JDouble d)   = putByte bh 3 >> put_ bh d
-  put_ bh (JInt i)      = putByte bh 4 >> put_ bh i
-  put_ bh (JStr xs)     = putByte bh 5 >> put_ bh xs
-  put_ bh (JRegEx xs)   = putByte bh 6 >> put_ bh xs
-  put_ bh (JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
-  put_ bh (JFunc is s)  = putByte bh 8 >> put_ bh is >> put_ bh s
-  put_ _  (UnsatVal {}) = error "put_ bh JVal: UnsatVal"
+
+instance Binary Sat.JExpr where
+  put_ bh (Sat.ValExpr v)          = putByte bh 1 >> put_ bh v
+  put_ bh (Sat.SelExpr e i)        = putByte bh 2 >> put_ bh e  >> put_ bh i
+  put_ bh (Sat.IdxExpr e1 e2)      = putByte bh 3 >> put_ bh e1 >> put_ bh e2
+  put_ bh (Sat.InfixExpr o e1 e2)  = putByte bh 4 >> put_ bh o  >> put_ bh e1 >> put_ bh e2
+  put_ bh (Sat.UOpExpr o e)        = putByte bh 5 >> put_ bh o  >> put_ bh e
+  put_ bh (Sat.IfExpr e1 e2 e3)    = putByte bh 6 >> put_ bh e1 >> put_ bh e2 >> put_ bh e3
+  put_ bh (Sat.ApplExpr e es)      = putByte bh 7 >> put_ bh e  >> put_ bh es
   get bh = getByte bh >>= \case
-    1 -> JVar    <$> get bh
-    2 -> JList   <$> get bh
-    3 -> JDouble <$> get bh
-    4 -> JInt    <$> get bh
-    5 -> JStr    <$> get bh
-    6 -> JRegEx  <$> get bh
-    7 -> JHash . listToUniqMap <$> get bh
-    8 -> JFunc   <$> get bh <*> get bh
-    n -> error ("Binary get bh JVal: invalid tag: " ++ show n)
+    1 -> Sat.ValExpr   <$> get bh
+    2 -> Sat.SelExpr   <$> get bh <*> get bh
+    3 -> Sat.IdxExpr   <$> get bh <*> get bh
+    4 -> Sat.InfixExpr <$> get bh <*> get bh <*> get bh
+    5 -> Sat.UOpExpr   <$> get bh <*> get bh
+    6 -> Sat.IfExpr    <$> get bh <*> get bh <*> get bh
+    7 -> Sat.ApplExpr  <$> get bh <*> get bh
+    n -> error ("Binary get bh UnsatExpr: invalid tag: " ++ show n)
+
+
+instance Binary Sat.JVal where
+  put_ bh (Sat.JVar i)      = putByte bh 1 >> put_ bh i
+  put_ bh (Sat.JList es)    = putByte bh 2 >> put_ bh es
+  put_ bh (Sat.JDouble d)   = putByte bh 3 >> put_ bh d
+  put_ bh (Sat.JInt i)      = putByte bh 4 >> put_ bh i
+  put_ bh (Sat.JStr xs)     = putByte bh 5 >> put_ bh xs
+  put_ bh (Sat.JRegEx xs)   = putByte bh 6 >> put_ bh xs
+  put_ bh (Sat.JHash m)     = putByte bh 7 >> put_ bh (sortOn (LexicalFastString . fst) $ nonDetEltsUniqMap m)
+  put_ bh (Sat.JFunc is s)  = putByte bh 8 >> put_ bh is >> put_ bh s
+  get bh = getByte bh >>= \case
+    1 -> Sat.JVar    <$> get bh
+    2 -> Sat.JList   <$> get bh
+    3 -> Sat.JDouble <$> get bh
+    4 -> Sat.JInt    <$> get bh
+    5 -> Sat.JStr    <$> get bh
+    6 -> Sat.JRegEx  <$> get bh
+    7 -> Sat.JHash . listToUniqMap <$> get bh
+    8 -> Sat.JFunc   <$> get bh <*> get bh
+    n -> error ("Binary get bh Sat.JVal: invalid tag: " ++ show n)
 
 instance Binary Ident where
   put_ bh (TxtI xs) = put_ bh xs
   get bh = TxtI <$> get bh
 
+-- we need to preserve NaN and infinities, unfortunately the Binary instance for Double does not do this
+instance Binary Sat.SaneDouble where
+  put_ bh (Sat.SaneDouble d)
+    | isNaN d               = putByte bh 1
+    | isInfinite d && d > 0 = putByte bh 2
+    | isInfinite d && d < 0 = putByte bh 3
+    | isNegativeZero d      = putByte bh 4
+    | otherwise             = putByte bh 5 >> put_ bh (castDoubleToWord64 d)
+  get bh = getByte bh >>= \case
+    1 -> pure $ Sat.SaneDouble (0    / 0)
+    2 -> pure $ Sat.SaneDouble (1    / 0)
+    3 -> pure $ Sat.SaneDouble ((-1) / 0)
+    4 -> pure $ Sat.SaneDouble (-0)
+    5 -> Sat.SaneDouble . castWord64ToDouble <$> get bh
+    n -> error ("Binary get bh SaneDouble: invalid tag: " ++ show n)
+
+-- FIXME: remove after Unsat replaces JStat
 -- we need to preserve NaN and infinities, unfortunately the Binary instance for Double does not do this
 instance Binary SaneDouble where
   put_ bh (SaneDouble d)
@@ -516,11 +534,11 @@ instance Binary CIRegs where
     2 -> CIRegs <$> get bh <*> get bh
     n -> error ("Binary get bh CIRegs: invalid tag: " ++ show n)
 
-instance Binary JOp where
+instance Binary Sat.Op where
   put_ bh = putEnum bh
   get bh = getEnum bh
 
-instance Binary JUOp where
+instance Binary Sat.UOp where
   put_ bh = putEnum bh
   get bh = getEnum bh
 

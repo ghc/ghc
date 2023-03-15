@@ -524,6 +524,7 @@ Library
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.Transform
+        GHC.JS.Unsat.Syntax
         GHC.Linker
         GHC.Linker.Config
         GHC.Linker.Dynamic

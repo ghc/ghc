@@ -27,7 +27,7 @@ module GHC.StgToJS.Rts.Rts where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
 
@@ -314,11 +314,11 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
 
 -- | print the embedded RTS to a String
 rtsText :: StgToJSConfig -> String
-rtsText = show . pretty . rts
+rtsText = show . pretty . satJStat . rts
 
 -- | print the RTS declarations to a String.
 rtsDeclsText :: String
-rtsDeclsText = show . pretty $ rtsDecls
+rtsDeclsText = show . pretty . satJStat $ rtsDecls
 
 -- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
 rts :: StgToJSConfig -> JStat

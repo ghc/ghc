@@ -22,7 +22,7 @@ module GHC.StgToJS.Rts.Types where
 import GHC.Prelude
 
 import GHC.JS.Make
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 

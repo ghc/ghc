@@ -10,7 +10,7 @@ import GHC.Linker.Types (SptEntry(..))
 import GHC.Fingerprint.Type
 import GHC.Types.Literal
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 
 import GHC.StgToJS.Types

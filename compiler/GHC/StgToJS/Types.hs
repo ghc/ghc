@@ -23,7 +23,8 @@ module GHC.StgToJS.Types where
 
 import GHC.Prelude
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
+import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Make
 import GHC.JS.Ppr ()
 
@@ -36,7 +37,7 @@ import GHC.Types.Var
 import GHC.Types.ForeignCall
 
 import Control.Monad.Trans.State.Strict
-import GHC.Utils.Outputable (Outputable (..), text, SDocContext, (<+>), ($$))
+import GHC.Utils.Outputable (Outputable (..), text, SDocContext)
 
 import GHC.Data.FastString
 import GHC.Data.FastMutInt
@@ -281,7 +282,6 @@ data StaticLit
 instance Outputable StaticLit where
   ppr x = text (show x)
 
-
 instance ToJExpr StaticLit where
   toJExpr (BoolLit b)           = toJExpr b
   toJExpr (IntLit i)            = toJExpr i
@@ -318,7 +318,7 @@ data ObjUnit = ObjUnit
   { oiSymbols  :: ![FastString]   -- ^ toplevel symbols (stored in index)
   , oiClInfo   :: ![ClosureInfo]  -- ^ closure information of all closures in block
   , oiStatic   :: ![StaticInfo]   -- ^ static closure data
-  , oiStat     :: JStat           -- ^ the code
+  , oiStat     :: Sat.JStat       -- ^ the code
   , oiRaw      :: !BS.ByteString  -- ^ raw JS code
   , oiFExports :: ![ExpFun]
   , oiFImports :: ![ForeignJSRef]
@@ -353,16 +353,18 @@ data TypedExpr = TypedExpr
   , typex_expr :: [JExpr]
   }
 
-instance Outputable TypedExpr where
-  ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
-          $$  text "PrimReps: " <+> ppr (typex_typ x)
+-- FIXME: temporarily removed until JStg replaces JStat
+-- instance Outputable TypedExpr where
+--   ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
+--           $$  text "PrimReps: " <+> ppr (typex_typ x)
 
 -- | A Primop result is either an inlining of some JS payload, or a primitive
 -- call to a JS function defined in Shim files in base.
 data PrimRes
   = PrimInline JStat  -- ^ primop is inline, result is assigned directly
   | PRPrimCall JStat  -- ^ primop is async call, primop returns the next
-                      --     function to run. result returned to stack top in registers
+                      -- function to run. result returned to stack top in
+                      -- registers
 
 data ExprResult
   = ExprCont

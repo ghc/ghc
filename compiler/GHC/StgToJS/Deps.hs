@@ -26,7 +26,7 @@ import GHC.StgToJS.Object as Object
 import GHC.StgToJS.Types
 import GHC.StgToJS.Ids
 
-import GHC.JS.Syntax
+import GHC.JS.Unsat.Syntax
 
 import GHC.Types.Id
 import GHC.Types.Unique
