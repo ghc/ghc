@@ -10,10 +10,18 @@ def check_bounds_test(name):
          [ignore_stderr, exit_code(127 if opsys('mingw32') else 134)],
          compile_and_run, ['-fcheck-prim-bounds'])
 
-check_bounds_test('CheckBoundsWriteArray')
-check_bounds_test('CheckBoundsIndexArray')
+check_bounds_test('CheckBoundsWriteArray') # Check past end
+check_bounds_test('CheckBoundsIndexArray') # Check past end
+check_bounds_test('CheckBoundsReadSmallArray') # Check before start
 check_bounds_test('CheckBoundsReadInt8Array')
-check_bounds_test('CheckBoundsReadWord8ArrayAsInt32')
+check_bounds_test('CheckBoundsReadInt64Array')  # read past end
+check_bounds_test('CheckBoundsReadWord64Array') # read before start
+check_bounds_test('CheckBoundsReadWord8ArrayAsInt32')  # Check last byte
+check_bounds_test('CheckBoundsReadWord8ArrayAsWord32') # Check first byte
 check_bounds_test('CheckBoundsCopyByteArray')
-check_bounds_test('CheckBoundsCompareByteArray')
+check_bounds_test('CheckBoundsCompareByteArray')  # Check last byte, 2nd array
+check_bounds_test('CheckBoundsCompareByteArray2') # Check first byte, 1st array
+check_bounds_test('CheckBoundsCompareByteArray3') # Check negative length
+check_bounds_test('CheckOverlapCopyByteArray')
+check_bounds_test('CheckOverlapCopyAddrToByteArray')
 

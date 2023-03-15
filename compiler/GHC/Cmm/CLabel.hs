@@ -65,6 +65,7 @@ module GHC.Cmm.CLabel (
         mkSMAP_DIRTY_infoLabel,
         mkBadAlignmentLabel,
         mkOutOfBoundsAccessLabel,
+        mkMemcpyRangeOverlapLabel,
         mkArrWords_infoLabel,
         mkSRTInfoLabel,
 
@@ -649,7 +650,8 @@ mkDirty_MUT_VAR_Label,
     mkCAFBlackHoleInfoTableLabel,
     mkSMAP_FROZEN_CLEAN_infoLabel, mkSMAP_FROZEN_DIRTY_infoLabel,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel,
-    mkOutOfBoundsAccessLabel, mkMUT_VAR_CLEAN_infoLabel :: CLabel
+    mkOutOfBoundsAccessLabel, mkMemcpyRangeOverlapLabel,
+    mkMUT_VAR_CLEAN_infoLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
@@ -667,7 +669,8 @@ mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsL
 mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
 mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
 mkBadAlignmentLabel             = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_badAlignment")      CmmEntry
-mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess") Nothing ForeignLabelInExternalPackage IsFunction
+mkOutOfBoundsAccessLabel        = mkForeignLabel (fsLit "rtsOutOfBoundsAccess")  Nothing ForeignLabelInExternalPackage IsFunction
+mkMemcpyRangeOverlapLabel       = mkForeignLabel (fsLit "rtsMemcpyRangeOverlap") Nothing ForeignLabelInExternalPackage IsFunction
 mkMUT_VAR_CLEAN_infoLabel       = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_MUT_VAR_CLEAN")     CmmInfo
 
 mkSRTInfoLabel :: Int -> CLabel
