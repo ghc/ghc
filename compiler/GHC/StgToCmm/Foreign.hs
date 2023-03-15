@@ -8,7 +8,9 @@
 
 module GHC.StgToCmm.Foreign (
   cgForeignCall,
-  emitPrimCall, emitCCall,
+  emitPrimCall,
+  emitCCall,
+  emitCCallNeverReturns,
   emitForeignCall,
   emitSaveThreadState,
   saveThreadState,
@@ -194,17 +196,31 @@ continuation, resulting in just one proc point instead of two. Yay!
 -}
 
 
-emitCCall :: [(CmmFormal,ForeignHint)]
-          -> CmmExpr
-          -> [(CmmActual,ForeignHint)]
-          -> FCode ()
-emitCCall hinted_results fn hinted_args
+emitCCall' :: CmmReturnInfo
+           -> [(CmmFormal,ForeignHint)]
+           -> CmmExpr
+           -> [(CmmActual,ForeignHint)]
+           -> FCode ()
+emitCCall' ret_info hinted_results fn hinted_args
   = void $ emitForeignCall PlayRisky results target args
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
     target = ForeignTarget fn fc
-    fc = ForeignConvention CCallConv arg_hints result_hints CmmMayReturn
+    fc = ForeignConvention CCallConv arg_hints result_hints ret_info
+
+emitCCall :: [(CmmFormal,ForeignHint)]
+          -> CmmExpr
+          -> [(CmmActual,ForeignHint)]
+          -> FCode ()
+emitCCall = emitCCall' CmmMayReturn
+
+emitCCallNeverReturns
+  :: [(CmmFormal,ForeignHint)]
+  -> CmmExpr
+  -> [(CmmActual,ForeignHint)]
+  -> FCode ()
+emitCCallNeverReturns = emitCCall' CmmNeverReturns
 
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
