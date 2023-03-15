@@ -60,3 +60,4 @@ test('UnliftedTVar2', normal, compile_and_run, [''])
 test('UnliftedWeakPtr', normal, compile_and_run, [''])
 
 test('T21624', normal, compile_and_run, [''])
+test('T23071', ignore_stdout, compile_and_run, [''])
