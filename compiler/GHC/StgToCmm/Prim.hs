@@ -311,7 +311,7 @@ emitPrimOp cfg primop =
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
   SizeofByteArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
-    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
+    emitAssign (CmmLocal res) (byteArraySize platform profile arg)
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
@@ -320,7 +320,7 @@ emitPrimOp cfg primop =
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
   GetSizeofMutableByteArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
-    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
+    emitAssign (CmmLocal res) (byteArraySize platform profile arg)
 
 
 --  #define touchzh(o)                  /* nothing */
@@ -394,15 +394,10 @@ emitPrimOp cfg primop =
 -- Getting the size of pointer arrays
 
   SizeofArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
-    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg
-      (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)))
-        (bWord platform))
+    emitAssign (CmmLocal res) (ptrArraySize platform profile arg)
   SizeofMutableArrayOp      -> emitPrimOp cfg SizeofArrayOp
   SizeofSmallArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
-    emit $ mkAssign (CmmLocal res)
-     (cmmLoadIndexW platform arg
-     (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)))
-        (bWord platform))
+    emitAssign (CmmLocal res) (smallPtrArraySize platform profile arg)
 
   SizeofSmallMutableArrayOp    -> emitPrimOp cfg SizeofSmallArrayOp
   GetSizeofSmallMutableArrayOp -> emitPrimOp cfg SizeofSmallArrayOp
@@ -2097,8 +2092,8 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [LocalReg]
                  -> [CmmExpr]
                  -> FCode ()
-doWriteOffAddrOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = mkBasicIndexedWrite 0 maybe_pre_write_cast addr idx_ty idx val
+doWriteOffAddrOp castOp idx_ty [] [addr,idx, val]
+   = mkBasicIndexedWrite 0 addr idx_ty idx (maybeCast castOp val)
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
@@ -2107,11 +2102,12 @@ doWriteByteArrayOp :: Maybe MachOp
                    -> [LocalReg]
                    -> [CmmExpr]
                    -> FCode ()
-doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
+doWriteByteArrayOp castOp idx_ty [] [addr,idx, rawVal]
    = do profile <- getProfile
         platform <- getPlatform
+        let val = maybeCast castOp rawVal
         doByteArrayBoundsCheck idx addr idx_ty (cmmExprType platform val)
-        mkBasicIndexedWrite (arrWordsHdrSize profile) maybe_pre_write_cast addr idx_ty idx val
+        mkBasicIndexedWrite (arrWordsHdrSize profile) addr idx_ty idx val
 doWriteByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
@@ -2134,7 +2130,7 @@ doWritePtrArrayOp addr idx val
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
        emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite hdr_size Nothing addr ty idx val
+       mkBasicIndexedWrite hdr_size addr ty idx val
 
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
        -- the write barrier.  We must write a byte into the mark table:
@@ -2142,14 +2138,9 @@ doWritePtrArrayOp addr idx val
        emit $ mkStore (
          cmmOffsetExpr platform
           (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
-                         (loadArrPtrsSize profile addr))
+                         (ptrArraySize platform profile addr))
           (CmmMachOp (mo_wordUShr platform) [idx, mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
          ) (CmmLit (CmmInt 1 W8))
-
-loadArrPtrsSize :: Profile -> CmmExpr -> CmmExpr
-loadArrPtrsSize profile addr = cmmLoadBWord platform (cmmOffsetB platform addr off)
- where off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (profileConstants profile)
-       platform = profilePlatform profile
 
 mkBasicIndexedRead :: AlignmentSpec
                    -> ByteOff      -- Initial offset in bytes
@@ -2169,18 +2160,15 @@ mkBasicIndexedRead alignment off (Just cast) ty res base idx_ty idx
                                    cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx])
 
 mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
-                    -> Maybe MachOp -- Optional value cast
                     -> CmmExpr      -- Base address
                     -> CmmType      -- Type of element by which we are indexing
                     -> CmmExpr      -- Index
                     -> CmmExpr      -- Value to write
                     -> FCode ()
-mkBasicIndexedWrite off Nothing base idx_ty idx val
+mkBasicIndexedWrite off base idx_ty idx val
    = do platform <- getPlatform
         let alignment = alignmentFromTypes (cmmExprType platform val) idx_ty
         emitStore' alignment (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) val
-mkBasicIndexedWrite off (Just cast) base idx_ty idx val
-   = mkBasicIndexedWrite off Nothing base idx_ty idx (CmmMachOp cast [val])
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
@@ -2207,6 +2195,30 @@ cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx
 
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
+
+maybeCast :: Maybe MachOp -> CmmExpr -> CmmExpr
+maybeCast Nothing val = val
+maybeCast (Just cast) val = CmmMachOp cast [val]
+
+ptrArraySize :: Platform -> Profile -> CmmExpr -> CmmExpr
+ptrArraySize platform profile arr =
+  cmmLoadBWord platform (cmmOffsetB platform arr sz_off)
+  where sz_off = fixedHdrSize profile
+               + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)
+
+smallPtrArraySize :: Platform -> Profile -> CmmExpr -> CmmExpr
+smallPtrArraySize platform profile arr =
+  cmmLoadBWord platform (cmmOffsetB platform arr sz_off)
+  where sz_off = fixedHdrSize profile
+               + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)
+
+byteArraySize :: Platform -> Profile -> CmmExpr -> CmmExpr
+byteArraySize platform profile arr =
+  cmmLoadBWord platform (cmmOffsetB platform arr sz_off)
+  where sz_off = fixedHdrSize profile
+               + pc_OFFSET_StgArrBytes_bytes (platformConstants platform)
+
+
 
 ------------------------------------------------------------------------------
 -- Helpers for translating vector primops.
@@ -2453,10 +2465,9 @@ doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
     profile <- getProfile
     platform <- getPlatform
 
-    ifNonZero n $ do
-        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off n) (-1)
-        doByteArrayBoundsCheck (last_touched_idx ba1_off) ba1 b8 b8
-        doByteArrayBoundsCheck (last_touched_idx ba2_off) ba2 b8 b8
+    whenCheckBounds $ ifNonZero n $ do
+        emitRangeBoundsCheck ba1_off n (byteArraySize platform profile ba1)
+        emitRangeBoundsCheck ba2_off n (byteArraySize platform profile ba2)
 
     ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize profile)) ba1_off
     ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize profile)) ba2_off
@@ -2519,7 +2530,7 @@ doCopyByteArrayOp = emitCopyByteArray copy
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
     copy _src _dst dst_p src_p bytes align =
-        emitMemcpyCall dst_p src_p bytes align
+        emitCheckedMemcpyCall dst_p src_p bytes align
 
 -- | Takes a source 'MutableByteArray#', an offset in the source
 -- array, a destination 'MutableByteArray#', an offset into the
@@ -2548,10 +2559,9 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     profile <- getProfile
     platform <- getPlatform
 
-    ifNonZero n $ do
-        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off n) (-1)
-        doByteArrayBoundsCheck (last_touched_idx src_off) src b8 b8
-        doByteArrayBoundsCheck (last_touched_idx dst_off) dst b8 b8
+    whenCheckBounds $ ifNonZero n $ do
+        emitRangeBoundsCheck src_off n (byteArraySize platform profile src)
+        emitRangeBoundsCheck dst_off n (byteArraySize platform profile dst)
 
     let byteArrayAlignment = wordAlignment platform
         srcOffAlignment = cmmExprAlignment src_off
@@ -2569,11 +2579,10 @@ doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     profile <- getProfile
     platform <- getPlatform
-    ifNonZero bytes $ do
-        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off bytes) (-1)
-        doByteArrayBoundsCheck (last_touched_idx src_off) src b8 b8
+    whenCheckBounds $ ifNonZero bytes $ do
+        emitRangeBoundsCheck src_off bytes (byteArraySize platform profile src)
     src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
-    emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
+    emitCheckedMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source array, a
 -- destination 'Addr#', and the number of bytes to copy.  Copies the given
@@ -2590,18 +2599,20 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
     profile <- getProfile
     platform <- getPlatform
-    ifNonZero bytes $ do
-        let last_touched_idx off = cmmOffsetB platform (cmmAddWord platform off bytes) (-1)
-        doByteArrayBoundsCheck (last_touched_idx dst_off) dst b8 b8
+    whenCheckBounds $ ifNonZero bytes $ do
+        emitRangeBoundsCheck dst_off bytes (byteArraySize platform profile dst)
     dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
-    emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
+    emitCheckedMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 ifNonZero :: CmmExpr -> FCode () -> FCode ()
 ifNonZero e it = do
     platform <- getPlatform
     let pred = cmmNeWord platform e (zeroExpr platform)
     code <- getCode it
-    emit =<< mkCmmIfThen' pred code (Just False)
+    emit =<< mkCmmIfThen' pred code (Just True)
+      -- This function is used for range operation bounds-checks;
+      -- Most calls to those ops will not have range length zero.
+
 
 -- ----------------------------------------------------------------------------
 -- Setting byte arrays
@@ -2615,8 +2626,8 @@ doSetByteArrayOp ba off len c = do
     profile <- getProfile
     platform <- getPlatform
 
-    doByteArrayBoundsCheck off ba b8 b8
-    doByteArrayBoundsCheck (cmmOffset platform (cmmAddWord platform off len) (-1)) ba b8 b8
+    whenCheckBounds $ ifNonZero len $
+      emitRangeBoundsCheck off len (byteArraySize platform profile ba)
 
     let byteArrayAlignment = wordAlignment platform -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
@@ -2687,7 +2698,7 @@ doCopyArrayOp = emitCopyArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
+           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform bytes)
                (wordAlignment platform)
 
 
@@ -2729,8 +2740,11 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst     <- assignTempE dst0
         dst_off <- assignTempE dst_off0
 
-        doPtrArrayBoundsCheck (cmmAddWord platform src_off (mkIntExpr platform n)) src
-        doPtrArrayBoundsCheck (cmmAddWord platform dst_off (mkIntExpr platform n)) dst
+        whenCheckBounds $ do
+          emitRangeBoundsCheck src_off (mkIntExpr platform n)
+                                       (ptrArraySize platform profile src)
+          emitRangeBoundsCheck dst_off (mkIntExpr platform n)
+                                       (ptrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
         emitCopyUpdRemSetPush platform (arrPtrsHdrSize profile) dst dst_off n
@@ -2749,7 +2763,7 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
 
         -- The base address of the destination card table
         dst_cards_p <- assignTempE $ cmmOffsetExprW platform dst_elems_p
-                       (loadArrPtrsSize profile dst)
+                       (ptrArraySize platform profile dst)
 
         emitSetCards dst_off dst_cards_p n
 
@@ -2761,7 +2775,7 @@ doCopySmallArrayOp = emitCopySmallArray copy
     -- they're of different types)
     copy _src _dst dst_p src_p bytes =
         do platform <- getPlatform
-           emitMemcpyCall dst_p src_p (mkIntExpr platform bytes)
+           emitCheckedMemcpyCall dst_p src_p (mkIntExpr platform bytes)
                (wordAlignment platform)
 
 
@@ -2798,9 +2812,11 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         src     <- assignTempE src0
         dst     <- assignTempE dst0
 
-        when (n /= 0) $ do
-            doSmallPtrArrayBoundsCheck (cmmAddWord platform src_off (mkIntExpr platform n)) src
-            doSmallPtrArrayBoundsCheck (cmmAddWord platform dst_off (mkIntExpr platform n)) dst
+        whenCheckBounds $ do
+          emitRangeBoundsCheck src_off (mkIntExpr platform n)
+                                       (smallPtrArraySize platform profile src)
+          emitRangeBoundsCheck dst_off (mkIntExpr platform n)
+                                       (smallPtrArraySize platform profile dst)
 
         -- Nonmoving collector write barrier
         emitCopyUpdRemSetPush platform (smallArrPtrsHdrSize profile) dst dst_off n
@@ -2895,7 +2911,7 @@ emitCloneSmallArray info_p res_r src src_off n = do
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
--- | Takes and offset in the destination array, the base address of
+-- | Takes an offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
 -- number of cards). The number of elements may not be zero.
 -- Marks the relevant cards as dirty.
@@ -2948,7 +2964,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize profile) Nothing addr ty idx val
+    mkBasicIndexedWrite (smallArrPtrsHdrSize profile) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
@@ -3074,6 +3090,26 @@ emitMemcpyCall dst src n align =
         (MO_Memcpy (alignmentBytes align))
         [ dst, src, n ]
 
+-- | Emit a call to @memcpy@, but check for range
+-- overlap when -fcheck-prim-bounds is on.
+emitCheckedMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
+emitCheckedMemcpyCall dst src n align = do
+    whenCheckBounds (getPlatform >>= doCheck)
+    emitMemcpyCall dst src n align
+  where
+    doCheck platform = do
+        overlapCheckFailed <- getCode $
+          emitCCallNeverReturns [] (mkLblExpr mkMemcpyRangeOverlapLabel) []
+        emit =<< mkCmmIfThen' rangesOverlap overlapCheckFailed (Just False)
+      where
+        rangesOverlap = (checkDiff dst src `or` checkDiff src dst) `ne` zero
+        checkDiff p q = (p `minus` q) `uLT` n
+        or = cmmOrWord platform
+        minus = cmmSubWord platform
+        uLT  = cmmULtWord platform
+        ne   = cmmNeWord platform
+        zero = zeroExpr platform
+
 -- | Emit a call to @memmove@.
 emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> Alignment -> FCode ()
 emitMemmoveCall dst src n align =
@@ -3168,50 +3204,68 @@ emitCtzCall res x width =
 -- Array bounds checking
 ---------------------------------------------------------------------------
 
-doBoundsCheck :: CmmExpr  -- ^ accessed index
-              -> CmmExpr  -- ^ array size (in elements)
-              -> FCode ()
-doBoundsCheck idx sz = do
-    do_bounds_check <- stgToCmmDoBoundsCheck <$> getStgToCmmConfig
-    platform        <- getPlatform
-    when do_bounds_check (doCheck platform)
-  where
-    doCheck platform = do
-        boundsCheckFailed <- getCode $ emitCCall [] (mkLblExpr mkOutOfBoundsAccessLabel) []
-        emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
-      where
-        uGE = cmmUGeWord platform
-        and = cmmAndWord platform
-        zero = zeroExpr platform
-        ne  = cmmNeWord platform
-        isOutOfBounds = ((idx `uGE` sz) `and` (idx `ne` zero)) `ne` zero
+whenCheckBounds :: FCode () -> FCode ()
+whenCheckBounds a = do
+  config <- getStgToCmmConfig
+  case stgToCmmDoBoundsCheck config of
+    False -> pure ()
+    True  -> a
 
--- We want to make sure that the array size computation is pushed into the
--- Opt_DoBoundsChecking check to avoid regregressing compiler performance when
--- it's disabled.
-{-# INLINE doBoundsCheck #-}
+emitBoundsCheck :: CmmExpr  -- ^ accessed index
+                -> CmmExpr  -- ^ array size (in elements)
+                -> FCode ()
+emitBoundsCheck idx sz = do
+    assertM (stgToCmmDoBoundsCheck <$> getStgToCmmConfig)
+    platform <- getPlatform
+    boundsCheckFailed <- getCode $
+      emitCCallNeverReturns [] (mkLblExpr mkOutOfBoundsAccessLabel) []
+    let isOutOfBounds = cmmUGeWord platform idx sz
+    emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
+
+emitRangeBoundsCheck :: CmmExpr  -- ^ first accessed index
+                     -> CmmExpr  -- ^ number of accessed indices (non-zero)
+                     -> CmmExpr  -- ^ array size (in elements)
+                     -> FCode ()
+emitRangeBoundsCheck idx len arrSizeExpr = do
+    assertM (stgToCmmDoBoundsCheck <$> getStgToCmmConfig)
+    config <- getStgToCmmConfig
+    platform <- getPlatform
+    arrSize <- assignTempE arrSizeExpr
+    -- arrSizeExpr is probably a load we don't want to duplicate
+    rangeTooLargeReg <- newTemp (bWord platform)
+    lastSafeIndexReg <- newTemp (bWord platform)
+    _ <- withSequel (AssignTo [lastSafeIndexReg, rangeTooLargeReg] False) $
+      cmmPrimOpApp config WordSubCOp [arrSize, len] Nothing
+    boundsCheckFailed <- getCode $
+      emitCCallNeverReturns [] (mkLblExpr mkOutOfBoundsAccessLabel) []
+    let
+      rangeTooLarge = CmmReg (CmmLocal rangeTooLargeReg)
+      lastSafeIndex = CmmReg (CmmLocal lastSafeIndexReg)
+      badStartIndex = (idx `uGT` lastSafeIndex)
+      isOutOfBounds = (rangeTooLarge `or` badStartIndex) `neq` zero
+      uGT = cmmUGtWord platform
+      or = cmmOrWord platform
+      neq = cmmNeWord platform
+      zero = zeroExpr platform
+    emit =<< mkCmmIfThen' isOutOfBounds boundsCheckFailed (Just False)
 
 doPtrArrayBoundsCheck
     :: CmmExpr  -- ^ accessed index (in bytes)
     -> CmmExpr  -- ^ pointer to @StgMutArrPtrs@
     -> FCode ()
-doPtrArrayBoundsCheck idx arr = do
+doPtrArrayBoundsCheck idx arr = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
-    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
-        sz_off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)
-    doBoundsCheck idx sz
+    emitBoundsCheck idx (ptrArraySize platform profile arr)
 
 doSmallPtrArrayBoundsCheck
     :: CmmExpr  -- ^ accessed index (in bytes)
     -> CmmExpr  -- ^ pointer to @StgMutArrPtrs@
     -> FCode ()
-doSmallPtrArrayBoundsCheck idx arr = do
+doSmallPtrArrayBoundsCheck idx arr = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
-    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
-        sz_off = fixedHdrSize profile + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)
-    doBoundsCheck idx sz
+    emitBoundsCheck idx (smallPtrArraySize platform profile arr)
 
 doByteArrayBoundsCheck
     :: CmmExpr  -- ^ accessed index (in elements)
@@ -3219,18 +3273,18 @@ doByteArrayBoundsCheck
     -> CmmType  -- ^ indexing type
     -> CmmType  -- ^ element type
     -> FCode ()
-doByteArrayBoundsCheck idx arr idx_ty elem_ty = do
+doByteArrayBoundsCheck idx arr idx_ty elem_ty = whenCheckBounds $ do
     profile <- getProfile
     platform <- getPlatform
-    let sz = cmmLoadBWord platform (cmmOffset platform arr sz_off)
-        sz_off = fixedHdrSize profile + pc_OFFSET_StgArrBytes_bytes (platformConstants platform)
-        elem_sz = widthInBytes $ typeWidth elem_ty
-        idx_sz = widthInBytes $ typeWidth idx_ty
-        -- Ensure that the last byte of the access is within the array
-        idx_bytes = cmmOffsetB platform
-          (cmmMulWord platform idx (mkIntExpr platform idx_sz))
-          (elem_sz - 1)
-    doBoundsCheck idx_bytes sz
+    let elem_w = typeWidth elem_ty
+        idx_w = typeWidth idx_ty
+        elem_sz = mkIntExpr platform $ widthInBytes elem_w
+        arr_sz = byteArraySize platform profile arr
+        effective_arr_sz =
+          cmmUShrWord platform arr_sz (mkIntExpr platform (widthInLog idx_w))
+    if elem_w == idx_w
+      then emitBoundsCheck idx effective_arr_sz  -- aligned => simpler check
+      else assert (idx_w == W8) (emitRangeBoundsCheck idx elem_sz arr_sz)
 
 ---------------------------------------------------------------------------
 -- Pushing to the update remembered set
