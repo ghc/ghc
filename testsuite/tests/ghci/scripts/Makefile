@@ -69,4 +69,4 @@ T12023:
 
 .PHONY: T19650_setup
 T19650_setup:
-	'$(GHC_PKG)' latest base > my_package_env
+	'$(GHC_PKG)' field base id --simple-output > my_package_env

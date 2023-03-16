@@ -85,7 +85,7 @@ commonCabalArgs :: Stage -> Args
 commonCabalArgs stage = do
   verbosity <- expr getVerbosity
   pkg       <- getPackage
-  package_id <- expr $ pkgIdentifier pkg
+  package_id <- expr $ pkgUnitId stage pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
   mconcat [ -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
@@ -101,7 +101,7 @@ commonCabalArgs stage = do
             , arg "--cabal-file"
             , arg $ pkgCabalFile pkg
             , arg "--ipid"
-            , arg "$pkg-$version"
+            , arg package_id
             , arg "--prefix"
             , arg prefix
 

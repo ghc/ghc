@@ -45,7 +45,7 @@ libraryRules = do
 registerStaticLib :: FilePath -> FilePath -> Action ()
 registerStaticLib root archivePath = do
     -- Simply need the ghc-pkg database .conf file.
-    GhcPkgPath _ stage _ (LibA name _ w)
+    GhcPkgPath _ stage _ (LibA name _ _ w)
         <- parsePath (parseGhcPkgLibA root)
                     "<.a library (register) path parser>"
                     archivePath
@@ -56,7 +56,7 @@ registerStaticLib root archivePath = do
 -- the second argument.
 buildStaticLib :: FilePath -> FilePath -> Action ()
 buildStaticLib root archivePath = do
-    l@(BuildPath _ stage _ (LibA pkgname _ way))
+    l@(BuildPath _ stage _ (LibA pkgname _ _ way))
         <- parsePath (parseBuildLibA root)
                      "<.a library (build) path parser>"
                      archivePath
@@ -75,7 +75,7 @@ buildStaticLib root archivePath = do
 registerDynamicLib :: FilePath -> String -> FilePath -> Action ()
 registerDynamicLib root suffix dynlibpath = do
     -- Simply need the ghc-pkg database .conf file.
-    (GhcPkgPath _ stage _ (LibDyn name _ w _))
+    (GhcPkgPath _ stage _ (LibDyn name _ _ w _))
         <- parsePath (parseGhcPkgLibDyn root suffix)
                             "<dyn register lib parser>"
                             dynlibpath
@@ -99,7 +99,7 @@ buildDynamicLib root suffix dynlibpath = do
 -- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 buildGhciLibO :: FilePath -> FilePath -> Action ()
 buildGhciLibO root ghcilibPath = do
-    l@(BuildPath _ stage _ (LibGhci _ _ _))
+    l@(BuildPath _ stage _ (LibGhci _ _ _ _))
         <- parsePath (parseBuildLibGhci root)
                      "<.o ghci lib (build) path parser>"
                      ghcilibPath
@@ -134,7 +134,7 @@ files etc.
 
 buildPackage :: FilePath -> FilePath -> Action ()
 buildPackage root fp = do
-  l@(BuildPath _ _ _ (PkgStamp _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
+  l@(BuildPath _ _ _ (PkgStamp _ _ _ way)) <- parsePath (parseStampPath root) "<.stamp parser>" fp
   let ctx = stampContext l
   srcs <- hsSources ctx
   gens <- interpretInContext ctx generatedDependencies
@@ -226,47 +226,47 @@ needLibrary cs = need =<< concatMapM (libraryTargets True) cs
 
 -- * Library paths types and parsers
 
--- | > libHS<pkg name>-<pkg version>[_<way suffix>].a
-data LibA = LibA String [Integer] Way deriving (Eq, Show)
+-- | > libHS<pkg name>-<pkg version>-<pkg hash>[_<way suffix>].a
+data LibA = LibA String [Integer] String Way deriving (Eq, Show)
 
 -- | > <so or dylib>
 data DynLibExt = So | Dylib deriving (Eq, Show)
 
--- | > libHS<pkg name>-<pkg version>[_<way suffix>]-ghc<ghc version>.<so|dylib>
-data LibDyn = LibDyn String [Integer] Way DynLibExt deriving (Eq, Show)
+-- | > libHS<pkg name>-<pkg version>-<pkg hash>[_<way suffix>]-ghc<ghc version>.<so|dylib>
+data LibDyn = LibDyn String [Integer] String Way DynLibExt deriving (Eq, Show)
 
--- | > HS<pkg name>-<pkg version>[_<way suffix>].o
-data LibGhci = LibGhci String [Integer] Way deriving (Eq, Show)
+-- | > HS<pkg name>-<pkg version>-<pkg hash>[_<way suffix>].o
+data LibGhci = LibGhci String [Integer] String Way deriving (Eq, Show)
 
 -- | Get the 'Context' corresponding to the build path for a given static library.
 libAContext :: BuildPath LibA -> Context
-libAContext (BuildPath _ stage pkgpath (LibA pkgname _ way)) =
+libAContext (BuildPath _ stage pkgpath (LibA pkgname _ _ way)) =
     Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given GHCi library.
 libGhciContext :: BuildPath LibGhci -> Context
-libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ way)) =
+libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ _ way)) =
     Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given dynamic library.
 libDynContext :: BuildPath LibDyn -> Context
-libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
+libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ _ way _)) =
     Context stage pkg way Final
   where
     pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given static library.
 stampContext :: BuildPath PkgStamp -> Context
-stampContext (BuildPath _ stage _ (PkgStamp pkgname _ way)) =
+stampContext (BuildPath _ stage _ (PkgStamp pkgname _ _ way)) =
     Context stage pkg way Final
   where
     pkg = unsafeFindPackageByName pkgname
 
-data PkgStamp = PkgStamp String [Integer] Way deriving (Eq, Show)
+data PkgStamp = PkgStamp String [Integer] String Way deriving (Eq, Show)
 
 
 -- | Parse a path to a ghci library to be built, making sure the path starts
@@ -313,34 +313,34 @@ parseGhcPkgLibDyn root ext = parseGhcPkgPath root (parseLibDynFilename ext)
 parseLibAFilename :: Parsec.Parsec String () LibA
 parseLibAFilename = do
     _ <- Parsec.string "libHS"
-    (pkgname, pkgver) <- parsePkgId
+    (pkgname, pkgver, pkghash) <- parsePkgId
     way <- parseWaySuffix vanilla
     _ <- Parsec.string ".a"
-    return (LibA pkgname pkgver way)
+    return (LibA pkgname pkgver pkghash way)
 
 -- | Parse the filename of a ghci library to be built into a 'LibGhci' value.
 parseLibGhciFilename :: Parsec.Parsec String () LibGhci
 parseLibGhciFilename = do
     _ <- Parsec.string "HS"
-    (pkgname, pkgver) <- parsePkgId
+    (pkgname, pkgver, pkghash) <- parsePkgId
     _ <- Parsec.string "."
     way <- parseWayPrefix vanilla
     _ <- Parsec.string "o"
-    return (LibGhci pkgname pkgver way)
+    return (LibGhci pkgname pkgver pkghash way)
 
 -- | Parse the filename of a dynamic library to be built into a 'LibDyn' value.
 parseLibDynFilename :: String -> Parsec.Parsec String () LibDyn
 parseLibDynFilename ext = do
     _ <- Parsec.string "libHS"
-    (pkgname, pkgver) <- parsePkgId
+    (pkgname, pkgver, pkghash) <- parsePkgId
     way <- addWayUnit Dynamic <$> parseWaySuffix dynamic
     _ <- optional $ Parsec.string "-ghc" *> parsePkgVersion
     _ <- Parsec.string ("." ++ ext)
-    return (LibDyn pkgname pkgver way $ if ext == "so" then So else Dylib)
+    return (LibDyn pkgname pkgver pkghash way $ if ext == "so" then So else Dylib)
 
 parseStamp :: Parsec.Parsec String () PkgStamp
 parseStamp = do
     _ <- Parsec.string "stamp-"
-    (pkgname, pkgver) <- parsePkgId
+    (pkgname, pkgver, pkghash) <- parsePkgId
     way <- parseWaySuffix vanilla
-    return (PkgStamp pkgname pkgver way)
+    return (PkgStamp pkgname pkgver pkghash way)

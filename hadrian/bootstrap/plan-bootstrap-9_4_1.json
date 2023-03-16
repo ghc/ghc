@@ -127,6 +127,15 @@
       "version": "2.14.2"
     },
     {
+      "cabal_sha256": "64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a",
+      "flags": [],
+      "package": "base16-bytestring",
+      "revision": 0,
+      "source": "hackage",
+      "src_sha256": "1d5a91143ef0e22157536093ec8e59d226a68220ec89378d5dcaeea86472c784",
+      "version": "1.0.2.0"
+    },
+    {
       "cabal_sha256": "a692159828c2cd278eaec317b3a7e9fb6d7b787c8a19f086004d15d9fa1fd72c",
       "flags": [
         "-llvm"
@@ -136,6 +145,18 @@
       "source": "hackage",
       "src_sha256": "845ce5db4c98cefd517323e005f87effceff886987305e421c4ef616dc0505d1",
       "version": "0.8.3"
+    },
+    {
+      "cabal_sha256": "72ce9095872eae653addca5f412ac8070d6282d8e1c8578c2237c33f2cbbf4bc",
+      "flags": [
+        "-exe",
+        "+use-cbits"
+      ],
+      "package": "cryptohash-sha256",
+      "revision": 2,
+      "source": "hackage",
+      "src_sha256": "73a7dc7163871a80837495039a099967b11f5c4fe70a118277842f7a713c6bf6",
+      "version": "0.11.102.1"
     },
     {
       "cabal_sha256": "3ac58d7341976173d1052e7b2837d119212d9afcf911735667c7f1ab67aec25f",

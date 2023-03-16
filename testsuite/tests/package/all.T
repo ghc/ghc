@@ -19,4 +19,4 @@ test('package09e', normal, compile_fail, ['-package "containers (Data.Map as M, 
 test('package10',  normal, compile,      ['-hide-all-packages -package "ghc (GHC.Types.Unique.FM as Prelude)" '])
 
 test('T4806', normalise_version('containers'), compile_fail, ['-ignore-package containers'])
-test('T4806a', normalise_version('deepseq', 'containers'), compile_fail, ['-ignore-package deepseq'])
+test('T4806a', normalise_version('deepseq', 'containers', 'template-haskell'), compile_fail, ['-ignore-package deepseq'])

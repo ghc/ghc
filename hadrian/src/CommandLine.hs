@@ -1,7 +1,7 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdCompleteSetting,
-    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
+    cmdDocsArgs, cmdUnitIdHash, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix, DocArgs(..), defaultDocArgs
     ) where
 
@@ -28,6 +28,7 @@ data CommandLineArgs = CommandLineArgs
     , freeze1        :: Bool
     , freeze2        :: Bool
     , skipDepends    :: Bool
+    , unitIdHash     :: Bool
     , bignum         :: Maybe String
     , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
@@ -47,6 +48,7 @@ defaultCommandLineArgs = CommandLineArgs
     , freeze1        = False
     , freeze2        = False
     , skipDepends    = False
+    , unitIdHash     = False
     , bignum         = Nothing
     , bignumCheck    = False
     , progressInfo   = Brief
@@ -135,6 +137,9 @@ readFreeze1, readFreeze2, readSkipDepends :: Either String (CommandLineArgs -> C
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
 readSkipDepends = Right $ \flags -> flags { skipDepends = True }
+
+readUnitIdHash :: Either String (CommandLineArgs -> CommandLineArgs)
+readUnitIdHash = Right $ \flags -> flags { unitIdHash = True }
 
 readProgressInfo :: String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -269,6 +274,8 @@ optDescrs =
       "Freeze Stage1 GHC."
     , Option [] ["freeze2"] (NoArg readFreeze2)
       "Freeze Stage2 GHC."
+    , Option [] ["hash-unit-ids"] (NoArg readUnitIdHash)
+      "Include package hashes in unit ids."
     , Option [] ["skip-depends"] (NoArg readSkipDepends)
       "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BACKEND")
@@ -379,6 +386,9 @@ lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
 
 lookupSkipDepends :: Map.HashMap TypeRep Dynamic -> Bool
 lookupSkipDepends = skipDepends . lookupExtra defaultCommandLineArgs
+
+cmdUnitIdHash :: Action Bool
+cmdUnitIdHash = unitIdHash <$> cmdLineArgs
 
 cmdBignum :: Action (Maybe String)
 cmdBignum = bignum <$> cmdLineArgs

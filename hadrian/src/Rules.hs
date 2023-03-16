@@ -8,6 +8,7 @@ import qualified Hadrian.Oracles.Cabal.Rules
 import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
+import qualified Hadrian.Haskell.Hash
 
 import Expression
 import qualified Oracles.Flavour
@@ -142,6 +143,7 @@ oracleRules :: Rules ()
 oracleRules = do
     Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
     Hadrian.Oracles.Cabal.Rules.cabalOracle
+    Hadrian.Haskell.Hash.pkgHashOracle
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
     Hadrian.Oracles.Path.pathOracle
     Hadrian.Oracles.TextFile.textFileOracle

@@ -226,7 +226,7 @@ update_package_db: install_bin install_lib
 	$(INSTALL_DATA) mk/system-cxx-std-lib-1.0.conf "$(DESTDIR)$(ActualLibsDir)/package.conf.d"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
-		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)"),$(shell echo $(notdir $p) | sed 's/.conf//g')))
+		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-[0-9.]*-[0-9a-zA-Z]*\.conf//g'),$(shell echo "$p" | sed 's:\0xxx\0:   :g'),$(docdir),$(shell mk/relpath.sh "$(ActualLibsDir)" "$(docdir)"),$(shell echo $(notdir $p) | sed 's/.conf//g')))
 	'$(DESTDIR)$(ActualBinsDir)/$(CrossCompilePrefix)ghc-pkg' --global-package-db "$(DESTDIR)$(ActualLibsDir)/package.conf.d" recache
 
 install_mingw:

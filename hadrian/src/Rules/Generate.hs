@@ -14,6 +14,7 @@ import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Hadrian.Haskell.Cabal.Type (PackageData(version))
+import Hadrian.Haskell.Cabal
 import Hadrian.Oracles.Cabal (readPackageData)
 import Packages
 import Rules.Libffi
@@ -483,16 +484,15 @@ generateConfigHs = do
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
-    cProjectVersionMunged  <- getSetting ProjectVersionMunged
-    -- ROMES:TODO:HASH First we attempt a fixed unit-id with version but without hash.
-    --
-    -- We now use a more informative unit-id for ghc. See Note [GHC's Unit Id]
-    -- in GHC.Unit.Types
+    -- We now give a unit-id with a version and a hash to ghc.
+    -- See Note [GHC's Unit Id] in GHC.Unit.Types
     --
     -- It's crucial that the unit-id matches the unit-key -- ghc is no longer
     -- part of the WiringMap, so we don't to go back and forth between the
-    -- unit-id and the unit-key -- we take care here that they are the same.
-    let cProjectUnitId = "ghc-" ++ cProjectVersionMunged -- ROMES:TODO:HASH
+    -- unit-id and the unit-key -- we take care that they are the same by using
+    -- 'pkgUnitId' on 'compiler' (the ghc-library package) to create the
+    -- unit-id in both situations.
+    cProjectUnitId <- expr . (`pkgUnitId` compiler) =<< getStage
     return $ unlines
         [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
@@ -589,3 +589,5 @@ generatePlatformHostHs = do
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
+
+

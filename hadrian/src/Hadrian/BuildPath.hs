@@ -110,17 +110,28 @@ parseWayUnit = Parsec.choice
     , Parsec.char 'l'     *> pure Logging
     ] Parsec.<?> "way unit (thr, debug, dyn, p, l)"
 
--- | Parse a @"pkgname-pkgversion"@ string into the package name and the
+-- | Parse a @"pkgname-pkgversion-pkghash"@ string into the package name and the
 -- integers that make up the package version.
-parsePkgId :: Parsec.Parsec String () (String, [Integer])
-parsePkgId = parsePkgId' "" Parsec.<?> "package identifier (<name>-<version>)"
+--
+-- If no hash was assigned, an empty string is returned in its place.
+parsePkgId :: Parsec.Parsec String () (String, [Integer], String)
+parsePkgId = parsePkgId' "" Parsec.<?> "package identifier (<name>-<version>(-<hash>?))"
   where
     parsePkgId' currName = do
         s <- Parsec.many1 Parsec.alphaNum
         _ <- Parsec.char '-'
         let newName = if null currName then s else currName ++ "-" ++ s
-        Parsec.choice [ (newName,) <$> parsePkgVersion
-                      , parsePkgId' newName ]
+        Parsec.choice
+          [ (,,) newName <$> parsePkgVersion
+                         <*> Parsec.option "" (Parsec.try $ do
+                              _ <- Parsec.char '-'
+                              -- Ensure we're not parsing a libDynName as a hash
+                              _ <- Parsec.notFollowedBy (Parsec.string "ghc" *> parsePkgVersion)
+                              parsePkgHash)
+          , parsePkgId' newName ]
+
+parsePkgHash :: Parsec.Parsec String () String
+parsePkgHash = Parsec.many1 Parsec.alphaNum
 
 -- | Parse "."-separated integers that describe a package's version.
 parsePkgVersion :: Parsec.Parsec String () [Integer]
