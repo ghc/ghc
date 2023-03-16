@@ -193,8 +193,10 @@
 
 #if SIZEOF_W == 4
 #define cmpxchgW cmpxchg32
+#define xchgW xchg32
 #elif SIZEOF_W == 8
 #define cmpxchgW cmpxchg64
+#define xchgW xchg64
 #endif
 
 /* -----------------------------------------------------------------------------

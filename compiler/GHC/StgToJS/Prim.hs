@@ -801,6 +801,8 @@ genPrim prof bound ty op = case op of
   AtomicModifyMutVar2Op -> \[r1,r2] [m,f] -> PrimInline $ appT [r1,r2] "h$atomicModifyMutVar2" [m,f]
   AtomicModifyMutVar_Op -> \[r1,r2] [m,f] -> PrimInline $ appT [r1,r2] "h$atomicModifyMutVar" [m,f]
 
+  AtomicSwapMutVarOp    -> \[r] [mv,v] -> PrimInline $ mconcat
+                                                [ r |= mv .^ "val", mv .^ "val" |= v ]
   CasMutVarOp -> \[status,r] [mv,o,n] -> PrimInline $ ifS (mv .^ "val" .===. o)
                    (mconcat [status |= zero_, r |= n, mv .^ "val" |= n])
                    (mconcat [status |= one_ , r |= mv .^ "val"])

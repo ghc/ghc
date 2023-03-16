@@ -2604,6 +2604,13 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
 
+primop  AtomicSwapMutVarOp "atomicSwapMutVar#" GenPrimOp
+   MutVar# s v -> v -> State# s -> (# State# s, v #)
+   {Atomically exchange the value of a 'MutVar#'.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
 -- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Looking at the type of atomicModifyMutVar2#, one might wonder why

@@ -127,12 +127,7 @@ atomicModifyIORef'_ ref f = do
 -- | Atomically replace the contents of an 'IORef', returning
 -- the old contents.
 atomicSwapIORef :: IORef a -> a -> IO a
--- Bad implementation! This will be a primop shortly.
-atomicSwapIORef (IORef (STRef ref)) new = IO $ \s ->
-  case atomicModifyMutVar2# ref (\_old -> Box new) s of
-    (# s', old, Box _new #) -> (# s', old #)
-
-data Box a = Box a
+atomicSwapIORef (IORef (STRef ref)) new = IO (atomicSwapMutVar# ref new)
 
 -- | A strict version of 'Data.IORef.atomicModifyIORef'.  This forces both the
 -- value stored in the 'IORef' and the value returned.

@@ -689,6 +689,17 @@ stg_newMutVarzh ( gcptr init )
     return (mv);
 }
 
+stg_atomicSwapMutVarzh ( gcptr mv, gcptr new )
+ /* MutVar# s a -> a -> State# s -> (# State#, a #) */
+{
+    W_ old;
+    (old) = prim %xchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, new);
+    if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", old "ptr");
+    }
+    return (old);
+}
+
 // RRN: To support the "ticketed" approach, we return the NEW rather
 // than old value if the CAS is successful.  This is received in an
 // opaque form in the Haskell code, preventing the compiler from
