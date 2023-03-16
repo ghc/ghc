@@ -42,6 +42,7 @@ import           GHC.Driver.Monad
 import           GHC.Driver.Env
 import           GHC.Driver.Ppr
 import           GHC.Types.Name
+import           GHC.Types.Name.Reader
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable
 import           GHC.Types.SrcLoc
@@ -58,9 +59,8 @@ data ModInfo = ModInfo
       -- ^ Generated set of information about all spans in the
       -- module that correspond to some kind of identifier for
       -- which there will be type info and/or location info.
-    , modinfoInfo       :: !ModuleInfo
-      -- ^ Again, useful from GHC for accessing information
-      -- (exports, instances, scope) from a module.
+    , modinfoRdrEnv     :: !(Strict.Maybe GlobalRdrEnv)
+      -- ^ What's in scope in the module.
     , modinfoLastUpdate :: !UTCTime
       -- ^ The timestamp of the file used to generate this record.
     }
@@ -174,9 +174,9 @@ findName infos span0 mi string =
           UnhelpfulSpan {} -> tryExternalModuleResolution
           RealSrcSpan   {} -> return (getName name)
   where
+    rdrs = modInfo_rdrs mi
     tryExternalModuleResolution =
-      case find (matchName $ mkFastString string)
-                (fromMaybe [] (modInfoTopLevelScope (modinfoInfo mi))) of
+      case find (matchName $ mkFastString string) rdrs of
         Nothing -> throwE "Couldn't resolve to any modules."
         Just imported -> resolveNameFromModule infos imported
 
@@ -198,8 +198,10 @@ resolveNameFromModule infos name = do
                             ppr modL)) return $
              M.lookup (moduleName modL) infos
 
+     let all_names = modInfo_rdrs info
+
      maybe (throwE "No matching export in any local modules.") return $
-         find (matchName name) (modInfoExports (modinfoInfo info))
+         find (matchName name) all_names
   where
     matchName :: Name -> Name -> Bool
     matchName x y = occNameFS (getOccName x) ==
@@ -311,9 +313,25 @@ getModInfo name = do
     p <- parseModule m
     typechecked <- typecheckModule p
     let allTypes = processAllTypeCheckedModule typechecked
-    let i = tm_checked_module_info typechecked
+        module_info = tm_checked_module_info typechecked
+        !rdr_env = case modInfoRdrEnv module_info of
+          Just rdrs -> Strict.Just rdrs
+          Nothing   -> Strict.Nothing
     ts <- liftIO $ getModificationTime $ srcFilePath m
-    return (ModInfo m allTypes i ts)
+    return $
+      ModInfo
+        { modinfoSummary    = m
+        , modinfoSpans      = allTypes
+        , modinfoRdrEnv     = rdr_env
+        , modinfoLastUpdate = ts
+        }
+
+-- | Get the 'Name's from the 'GlobalRdrEnv' of the 'ModInfo', if any.
+modInfo_rdrs :: ModInfo -> [Name]
+modInfo_rdrs mi =
+  case modinfoRdrEnv mi of
+    Strict.Nothing  -> []
+    Strict.Just env -> map greMangledName $ globalRdrEnvElts env
 
 -- | Get ALL source spans in the module.
 processAllTypeCheckedModule :: TypecheckedModule -> [SpanInfo]

@@ -2346,8 +2346,12 @@ typeAtCmd str = runExceptGhciMonad $ do
     (span',sample) <- exceptT $ parseSpanArg str
     infos      <- lift $ mod_infos <$> getGHCiState
     (info, ty) <- findType infos span' sample
-    lift $ printForUserModInfo (modinfoInfo info)
-                               (sep [text sample,nest 2 (dcolon <+> ppr ty)])
+    let mb_rdr_env = case modinfoRdrEnv info of
+          Strict.Just rdrs -> Just rdrs
+          Strict.Nothing   -> Nothing
+    lift $ printForUserGlobalRdrEnv
+              mb_rdr_env
+              (sep [text sample,nest 2 (dcolon <+> ppr ty)])
 
 -----------------------------------------------------------------------------
 -- | @:uses@ command
