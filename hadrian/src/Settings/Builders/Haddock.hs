@@ -42,7 +42,7 @@ haddockBuilderArgs = mconcat
         version  <- expr $ pkgVersion  pkg
         synopsis <- expr $ pkgSynopsis pkg
         haddocks <- expr $ haddockDependencies context
-        haddocks_with_versions <- expr $ sequence $ [(,h) <$> pkgIdentifier p | (p, h) <- haddocks]
+        haddocks_with_versions <- expr $ sequence $ [(,h) <$> pkgSimpleIdentifier p | (p, h) <- haddocks]
         hVersion <- expr $ pkgVersion haddock
         statsDir <- expr $ haddockStatsFilesDir
         baseUrlTemplate <- expr (docsBaseUrl <$> userSetting defaultDocArgs)

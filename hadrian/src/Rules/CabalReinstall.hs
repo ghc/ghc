@@ -10,7 +10,7 @@ import Utilities
 import qualified System.Directory.Extra as IO
 import Data.Either
 import Rules.BinaryDist
-import Hadrian.Haskell.Cabal (pkgIdentifier)
+import Hadrian.Haskell.Cabal (pkgSimpleIdentifier)
 import Oracles.Setting
 
 {-
@@ -54,7 +54,7 @@ cabalBuildRules = do
         need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
 
         distDir        <- Context.distDir Stage1
-        rtsDir         <- pkgIdentifier rts
+        rtsDir         <- pkgSimpleIdentifier rts
 
         let ghcBuildDir      = root -/- stageString Stage1
             rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir

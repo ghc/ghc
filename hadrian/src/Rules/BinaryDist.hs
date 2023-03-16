@@ -132,7 +132,7 @@ bindistRules = do
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
         distDir        <- Context.distDir Stage1
-        rtsDir         <- pkgIdentifier rts
+        rtsDir         <- pkgSimpleIdentifier rts
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty

@@ -84,8 +84,9 @@ cabalSetupArgs = builder (Cabal Setup) ? do
 commonCabalArgs :: Stage -> Args
 commonCabalArgs stage = do
   verbosity <- expr getVerbosity
+  ctx       <- getContext
   pkg       <- getPackage
-  package_id <- expr $ pkgIdentifier pkg
+  package_id <- expr $ pkgSimpleIdentifier pkg
   let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
   mconcat [ -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,

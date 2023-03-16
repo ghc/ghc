@@ -72,7 +72,7 @@ distDir st = do
 
 pkgFileName :: Package -> String -> String -> Action FilePath
 pkgFileName package prefix suffix = do
-    pid  <- pkgIdentifier package
+    pid  <- pkgSimpleIdentifier package
     return $ prefix ++ pid ++ suffix
 
 pkgFile :: Context -> String -> String -> Action FilePath
@@ -97,7 +97,7 @@ pkgSetupConfigFile context = pkgSetupConfigDir context <&> (-/- "setup-config")
 pkgHaddockFile :: Context -> Action FilePath
 pkgHaddockFile Context {..} = do
     root <- buildRoot
-    version <- pkgIdentifier package
+    version <- pkgSimpleIdentifier package
     return $ root -/- "doc/html/libraries" -/- version -/- pkgName package <.> "haddock"
 
 -- | Path to the registered ghc-pkg library file of a given 'Context', e.g.:
@@ -106,7 +106,7 @@ pkgHaddockFile Context {..} = do
 pkgRegisteredLibraryFile :: Context -> Action FilePath
 pkgRegisteredLibraryFile context@Context {..} = do
     libDir    <- libPath context
-    pkgId     <- pkgIdentifier package
+    pkgId     <- pkgSimpleIdentifier package
     fileName  <- pkgRegisteredLibraryFileName context
     distDir   <- distDir stage
     return $ if Dynamic `wayUnit` way
@@ -136,8 +136,8 @@ pkgGhciLibraryFile context@Context {..} = do
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
-pkgConfFile Context {..} = do
-    pid  <- pkgIdentifier package
+pkgConfFile context@Context {..} = do
+    pid  <- pkgSimpleIdentifier package
     dbPath <- packageDbPath (PackageDbLoc stage iplace)
     return $ dbPath -/- pid <.> "conf"
 

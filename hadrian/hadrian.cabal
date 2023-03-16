@@ -55,6 +55,7 @@ executable hadrian
                        , Hadrian.BuildPath
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
+                       , Hadrian.Haskell.Hash
                        , Hadrian.Haskell.Cabal.Type
                        , Hadrian.Haskell.Cabal.Parse
                        , Hadrian.Oracles.ArgsHash
@@ -163,6 +164,8 @@ executable hadrian
                        , transformers         >= 0.4     && < 0.7
                        , unordered-containers >= 0.2.1   && < 0.3
                        , text                 >= 1.2     && < 3
+                       , cryptohash-sha256    >= 0.11    && < 0.12
+                       , base16-bytestring    >= 0.1.1 && < 1.1.0.0
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints
