@@ -27,6 +27,7 @@
 #include "StablePtr.h"
 #include "StableName.h"
 #include "Hash.h"
+#include "rts/storage/Closures.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)
@@ -358,13 +359,16 @@ thread_stack(P_ p, P_ stack_end)
         }
 
         case RET_BCO: {
-            p++;
-            StgBCO *bco = (StgBCO *)*p;
-            thread((StgClosure **)p);
-            p++;
-            W_ size = BCO_BITMAP_SIZE(bco);
-            thread_large_bitmap(p, BCO_BITMAP(bco), size);
-            p += size;
+            StgRetBCO* retBCO;
+            StgBCO* bco;
+            StgWord size;
+
+            retBCO = (StgRetBCO *) p;
+            bco = retBCO->bco;
+            thread((StgClosure **) &retBCO->bco);
+            size = BCO_BITMAP_SIZE(bco);
+            thread_large_bitmap((P_) &retBCO->args, BCO_BITMAP(bco), size);
+            p += sizeofW(StgRetBCO) + size;
             continue;
         }
 
