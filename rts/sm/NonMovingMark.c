@@ -1183,6 +1183,7 @@ trace_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             continue;
 
         case RET_BCO: {
+            // TODO: Adjust
             sp++;
             markQueuePushClosure_(queue, *(StgClosure**)sp);
             StgBCO *bco = (StgBCO *)*sp;

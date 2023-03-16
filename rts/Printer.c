@@ -596,6 +596,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         }
 
         case RET_BCO: {
+            // TODO: Adjust
             StgWord c = *sp;
             StgBCO *bco = ((StgBCO *)sp[1]);
 

@@ -977,6 +977,7 @@ traversePushStack(traverseState *ts, StgClosure *cp, stackElement *sep,
             continue;
 
         case RET_BCO: {
+            // TODO: Adjust
             StgBCO *bco;
 
             p++;

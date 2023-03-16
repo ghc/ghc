@@ -135,6 +135,7 @@ checkStackFrame( StgPtr c )
         return 1 + size;
 
     case RET_BCO: {
+      // TODO: Adjust
         StgBCO *bco;
         uint32_t size;
         bco = (StgBCO *)*(c+1);
