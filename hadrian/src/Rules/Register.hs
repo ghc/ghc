@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Rules.Register (
     configurePackageRules, registerPackageRules, registerPackages,
     libraryTargets
@@ -20,11 +21,16 @@ import Utilities
 import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
 import qualified Data.Set         as Set
+import qualified Data.Char        as Char
+import Data.Bifunctor (bimap)
 
 import Distribution.Version (Version)
-import qualified Distribution.Parsec as Cabal
-import qualified Distribution.Types.PackageName as Cabal
 import qualified Distribution.Types.PackageId as Cabal
+import qualified Distribution.Types.PackageName as Cabal
+import qualified Distribution.Parsec as Cabal
+import qualified Distribution.Compat.Parsing as Cabal
+import qualified Distribution.Parsec.FieldLineStream as Cabal
+import qualified Distribution.Compat.CharParsing as CabalCharParsing
 
 import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 import qualified System.Directory            as IO
@@ -183,7 +189,7 @@ buildConfFinal rs context@Context {..} _conf = do
     -- so that if any change ends up modifying a library (but not its .conf
     -- file), we still rebuild things that depend on it.
     dir <- (-/-) <$> libPath context <*> distDir stage
-    pkgid <- pkgIdentifier package
+    pkgid <- pkgUnitId stage package
     files <- liftIO $
       (++) <$> getDirectoryFilesIO "." [dir -/- "*libHS"++pkgid++"*"]
            <*> getDirectoryFilesIO "." [dir -/- pkgid -/- "**"]
@@ -251,11 +257,33 @@ getPackageNameFromConfFile conf
                             takeBaseName conf ++ ": " ++ err
         Right (name, _) -> return name
 
+-- | Parse a cabal-like name
 parseCabalName :: String -> Either String (String, Version)
-parseCabalName = fmap f . Cabal.eitherParsec
+-- Try to parse a name with a hash, but otherwise parse a name without one.
+parseCabalName s = bimap show id (Cabal.runParsecParser parser "<parseCabalName>" $ Cabal.fieldLineStreamFromString s)
   where
-    f :: Cabal.PackageId -> (String, Version)
-    f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
+    parser = Cabal.try nameWithHashParser <|> (extractVersion <$> Cabal.parsec)
+
+    extractVersion :: Cabal.PackageId -> (String, Version)
+    extractVersion pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
+    -- Definition similar to 'Parsec PackageIdentifier' from Cabal but extended
+    -- with logic for parsing the hash (despite not returning it)
+    nameWithHashParser :: Cabal.ParsecParser (String, Version)
+    nameWithHashParser = Cabal.PP $ \_ -> do
+      xs' <- Parsec.sepBy component (Parsec.char '-')
+      case reverse xs' of
+        _hash:version_str:xs ->
+          case Cabal.simpleParsec @Version version_str of
+            Nothing -> fail ("failed to parse a version from " <> version_str)
+            Just v  ->
+              if not (null xs) && all (\c ->  all (/= '.') c && not (all Char.isDigit c)) xs
+              then return $ (intercalate "-" (reverse xs), v)
+              else fail "all digits or a dot in a portion of package name"
+        _ -> fail "couldn't parse a hash, a version and a name"
+      where
+        component = CabalCharParsing.munch1 (\c ->  Char.isAlphaNum c || c == '.')
+
+
 
 -- | Return extra library targets.
 extraTargets :: Context -> Action [FilePath]

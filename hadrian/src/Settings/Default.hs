@@ -17,7 +17,6 @@ import qualified Data.Set as Set
 
 import qualified Hadrian.Builder.Sphinx
 import qualified Hadrian.Builder.Tar
-import Hadrian.Haskell.Cabal.Type
 
 import CommandLine
 import Expression

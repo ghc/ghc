@@ -70,15 +70,15 @@ distDir st = do
     hostArch       <- cabalArchString <$> setting arch
     return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
 
-pkgFileName :: Package -> String -> String -> Action FilePath
-pkgFileName package prefix suffix = do
-    pid  <- pkgIdentifier package
+pkgFileName :: Context -> Package -> String -> String -> Action FilePath
+pkgFileName context package prefix suffix = do
+    pid  <- pkgUnitId (stage context) package
     return $ prefix ++ pid ++ suffix
 
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do
     path <- buildPath context
-    fileName <- pkgFileName package prefix suffix
+    fileName <- pkgFileName context package prefix suffix
     return $ path -/- fileName
 
 -- | Path to inplace package configuration file of a given 'Context'.
@@ -95,9 +95,9 @@ pkgSetupConfigFile context = pkgSetupConfigDir context <&> (-/- "setup-config")
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/doc/html/array/array.haddock@.
 pkgHaddockFile :: Context -> Action FilePath
-pkgHaddockFile Context {..} = do
+pkgHaddockFile context@Context {..} = do
     root <- buildRoot
-    version <- pkgIdentifier package
+    version <- pkgUnitId stage package
     return $ root -/- "doc/html/libraries" -/- version -/- pkgName package <.> "haddock"
 
 -- | Path to the registered ghc-pkg library file of a given 'Context', e.g.:
@@ -106,7 +106,7 @@ pkgHaddockFile Context {..} = do
 pkgRegisteredLibraryFile :: Context -> Action FilePath
 pkgRegisteredLibraryFile context@Context {..} = do
     libDir    <- libPath context
-    pkgId     <- pkgIdentifier package
+    pkgId     <- pkgUnitId stage package
     fileName  <- pkgRegisteredLibraryFileName context
     distDir   <- distDir stage
     return $ if Dynamic `wayUnit` way
@@ -115,9 +115,9 @@ pkgRegisteredLibraryFile context@Context {..} = do
 
 -- | Just the final filename portion of pkgRegisteredLibraryFile
 pkgRegisteredLibraryFileName :: Context -> Action FilePath
-pkgRegisteredLibraryFileName Context{..} = do
+pkgRegisteredLibraryFileName context@Context{..} = do
     extension <- libsuf stage way
-    pkgFileName package "libHS" extension
+    pkgFileName context package "libHS" extension
 
 
 -- | Path to the library file of a given 'Context', e.g.:
@@ -136,8 +136,8 @@ pkgGhciLibraryFile context@Context {..} = do
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
-pkgConfFile Context {..} = do
-    pid  <- pkgIdentifier package
+pkgConfFile context@Context {..} = do
+    pid  <- pkgUnitId stage package
     dbPath <- packageDbPath (PackageDbLoc stage iplace)
     return $ dbPath -/- pid <.> "conf"
 
