@@ -194,12 +194,10 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        -- Report un-quantifiable type variables:
        -- see Note [Unquantified tyvars in a pattern synonym]
        ; dvs <- candidateQTyVarsOfTypes prov_theta
-       ; let mk_doc tidy_env
+       ; let err_ctx tidy_env
                = do { (tidy_env2, theta) <- zonkTidyTcTypes tidy_env prov_theta
-                    ; return ( tidy_env2
-                             , sep [ text "the provided context:"
-                                   , pprTheta theta ] ) }
-       ; doNotQuantifyTyVars dvs mk_doc
+                    ; return ( tidy_env2, UninfTyCtx_ProvidedContext theta ) }
+       ; doNotQuantifyTyVars dvs err_ctx
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; rec_fields <- lookupConstructorFields name

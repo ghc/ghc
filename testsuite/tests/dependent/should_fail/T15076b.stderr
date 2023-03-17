@@ -1,4 +1,4 @@
-T15076b.hs:9:8: error:
+T15076b.hs:9:8: error: [GHC-71451]
     • Cannot generalise type; skolem ‘a’ would escape its scope
       if I tried to quantify (x0 :: a) in this type:
         forall a (f :: forall (x :: a). Proxy @{a} x -> *).

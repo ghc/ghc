@@ -94,6 +94,7 @@ module GHC.Tc.Errors.Types (
   , HsigShapeMismatchReason(..)
   , WrongThingSort(..)
   , StageCheckReason(..)
+  , UninferrableTyvarCtx(..)
   ) where
 
 import GHC.Prelude
@@ -3257,6 +3258,41 @@ data TcRnMessage where
     -> !Name -- ^ Name of the thing used wrongly.
     -> TcRnMessage
 
+  {-| TcRnCannotDefaultKindVar is an error that occurs when attempting to use
+    unconstrained kind variables whose type isn't @Type@, without -XPolyKinds.
+
+    Test cases:
+      T11334b
+  -}
+  TcRnCannotDefaultKindVar
+    :: !TyVar -- ^ The unconstrained variable.
+    -> !Kind -- ^ Kind of the variable.
+    -> TcRnMessage
+
+  {-| TcRnUninferrableTyvar is an error that occurs when metavariables
+    in a type could not be defaulted.
+
+    Test cases:
+      T17301, T17562, T17567, T17567StupidTheta, T15474, T21479
+  -}
+  TcRnUninferrableTyvar
+    :: ![TyCoVar] -- ^ The variables that could not be defaulted.
+    -> !UninferrableTyvarCtx -- ^ Description of the surrounding context.
+    -> TcRnMessage
+
+  {-| TcRnSkolemEscape is an error that occurs when type variables from an
+    outer scope is used in a context where they should be locally scoped.
+
+    Test cases:
+      T15076, T15076b, T14880-2, T15825, T14880, T15807, T16946, T14350,
+      T14040A, T15795, T15795a, T14552
+  -}
+  TcRnSkolemEscape
+    :: ![TcTyVar] -- ^ The variables that would escape.
+    -> !TcTyVar -- ^ The variable that is being quantified.
+    -> !Type -- ^ The type in which they occur.
+    -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -4538,3 +4574,11 @@ data WrongThingSort
 data StageCheckReason
   = StageCheckInstance !InstanceWhat !PredType
   | StageCheckSplice !Name
+
+data UninferrableTyvarCtx
+  = UninfTyCtx_ClassContext [TcType]
+  | UninfTyCtx_DataContext [TcType]
+  | UninfTyCtx_ProvidedContext [TcType]
+  | UninfTyCtx_TyfamRhs TcType
+  | UninfTyCtx_TysynRhs TcType
+  | UninfTyCtx_Sig TcType (LHsSigType GhcRn)

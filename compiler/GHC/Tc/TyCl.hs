@@ -35,7 +35,8 @@ import GHC.Driver.Config.HsToCore
 import GHC.Hs
 
 import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..)
-                           , mkTcRnUnknownMessage, IllegalNewtypeReason (..) )
+                           , mkTcRnUnknownMessage, IllegalNewtypeReason (..)
+                           , UninferrableTyvarCtx (..) )
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -2455,11 +2456,9 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        --   class (forall a. a b ~ a c) => C b c
        -- The kind of `a` is unconstrained.
        ; dvs <- candidateQTyVarsOfTypes ctxt
-       ; let mk_doc tidy_env = do { (tidy_env2, ctxt) <- zonkTidyTcTypes tidy_env ctxt
-                                  ; return ( tidy_env2
-                                           , sep [ text "the class context:"
-                                                 , pprTheta ctxt ] ) }
-       ; doNotQuantifyTyVars dvs mk_doc
+       ; let err_ctx tidy_env = do { (tidy_env2, ctxt) <- zonkTidyTcTypes tidy_env ctxt
+                                  ; return (tidy_env2, UninfTyCtx_ClassContext ctxt) }
+       ; doNotQuantifyTyVars dvs err_ctx
 
        -- The pushLevelAndSolveEqualities will report errors for any
        -- unsolved equalities, so these zonks should not encounter
@@ -2873,11 +2872,9 @@ tcTySynRhs roles_info tc_name hs_ty
          --   type T = forall a. Proxy a
          -- The kind of `a` is unconstrained.
        ; dvs <- candidateQTyVarsOfType rhs_ty
-       ; let mk_doc tidy_env = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
-                                  ; return ( tidy_env2
-                                           , sep [ text "the type synonym right-hand side:"
-                                                 , ppr rhs_ty ] ) }
-       ; doNotQuantifyTyVars dvs mk_doc
+       ; let err_ctx tidy_env = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
+                                  ; return (tidy_env2, UninfTyCtx_TysynRhs rhs_ty) }
+       ; doNotQuantifyTyVars dvs err_ctx
 
        ; ze          <- mkEmptyZonkEnv NoFlexi
        ; (ze, bndrs) <- zonkTyVarBindersX ze tc_bndrs
@@ -2918,12 +2915,10 @@ tcDataDefn err_ctxt roles_info tc_name
        --   data (forall a. a b ~ a c) => T b c
        -- The kind of 'a' is unconstrained.
        ; dvs <- candidateQTyVarsOfTypes stupid_tc_theta
-       ; let mk_doc tidy_env
+       ; let err_ctx tidy_env
                = do { (tidy_env2, theta) <- zonkTidyTcTypes tidy_env stupid_tc_theta
-                    ; return ( tidy_env2
-                             , sep [ text "the datatype context:"
-                                   , pprTheta theta ] ) }
-       ; doNotQuantifyTyVars dvs mk_doc
+                    ; return (tidy_env2, UninfTyCtx_DataContext theta) }
+       ; doNotQuantifyTyVars dvs err_ctx
 
              -- Check that we don't use kind signatures without the extension
        ; kind_signatures <- xoptM LangExt.KindSignatures
@@ -3178,12 +3173,10 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_hs_bndrs hs_pats hs_rhs_ty
        -- See Note [Error on unconstrained meta-variables] in GHC.Tc.Utils.TcMType
        -- Example: typecheck/should_fail/T17301
        ; dvs_rhs <- candidateQTyVarsOfType rhs_ty
-       ; let mk_doc tidy_env
+       ; let err_ctx tidy_env
                = do { (tidy_env2, rhs_ty) <- zonkTidyTcType tidy_env rhs_ty
-                    ; return ( tidy_env2
-                             , sep [ text "type family equation right-hand side:"
-                                   , ppr rhs_ty ] ) }
-       ; doNotQuantifyTyVars dvs_rhs mk_doc
+                    ; return (tidy_env2, UninfTyCtx_TyfamRhs rhs_ty) }
+       ; doNotQuantifyTyVars dvs_rhs err_ctx
 
        ; ze              <- mkEmptyZonkEnv NoFlexi
        ; (ze, final_tvs) <- zonkTyBndrsX      ze final_tvs

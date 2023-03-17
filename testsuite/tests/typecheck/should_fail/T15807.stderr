@@ -1,5 +1,5 @@
 
-T15807.hs:12:3: error:
+T15807.hs:12:3: error: [GHC-71451]
     • Cannot generalise type; skolem ‘f’ would escape its scope
       if I tried to quantify (f0 :: f -> *) in this type:
         forall f (a :: f). f a %1 -> App @f @f0 a

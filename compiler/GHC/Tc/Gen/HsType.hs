@@ -473,7 +473,7 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
        -- Default any unconstrained variables free in the kind
        -- See Note [Escaping kind in type signatures]
        ; exp_kind_dvs <- candidateQTyVarsOfType exp_kind
-       ; doNotQuantifyTyVars exp_kind_dvs (mk_doc exp_kind)
+       ; doNotQuantifyTyVars exp_kind_dvs (err_ctx exp_kind)
 
        ; traceTc "tc_lhs_sig_type" (ppr hs_outer_bndrs $$ ppr outer_bndrs)
        ; outer_bndrs <- scopedSortOuter outer_bndrs
@@ -488,10 +488,9 @@ tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
 
        ; return (implic, mkInfForAllTys kvs ty1) }
   where
-    mk_doc exp_kind tidy_env
+    err_ctx exp_kind tidy_env
       = do { (tidy_env2, exp_kind) <- zonkTidyTcType tidy_env exp_kind
-           ; return (tidy_env2, hang (text "The kind" <+> ppr exp_kind)
-                                   2 (text "of type signature:" <+> ppr full_hs_ty)) }
+           ; return (tidy_env2, UninfTyCtx_Sig exp_kind full_hs_ty) }
 
 
 

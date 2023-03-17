@@ -40,7 +40,7 @@ import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.Rep (Type(..))
 import GHC.Core.TyCo.Ppr (pprWithExplicitKindsWhen,
-                          pprSourceTyCon, pprTyVars, pprWithTYPE)
+                          pprSourceTyCon, pprTyVars, pprWithTYPE, pprTyVar, pprTidiedType)
 import GHC.Core.PatSyn ( patSynName, pprPatSynType )
 import GHC.Core.Predicate
 import GHC.Core.Type
@@ -1453,6 +1453,34 @@ instance Diagnostic TcRnMessage where
     TcRnTyThingUsedWrong sort thing name
       -> mkSimpleDecorated $
          pprTyThingUsedWrong sort thing name
+    TcRnCannotDefaultKindVar var knd ->
+      mkSimpleDecorated $
+      (vcat [ text "Cannot default kind variable" <+> quotes (ppr var)
+            , text "of kind:" <+> ppr knd
+            , text "Perhaps enable PolyKinds or add a kind signature" ])
+    TcRnUninferrableTyvar tidied_tvs context ->
+      mkSimpleDecorated $
+      pprWithExplicitKindsWhen True $
+      vcat [ text "Uninferrable type variable"
+              <> plural tidied_tvs
+              <+> pprWithCommas pprTyVar tidied_tvs
+              <+> text "in"
+            , pprUninferrableTyvarCtx context ]
+    TcRnSkolemEscape escapees tv orig_ty ->
+      mkSimpleDecorated $
+      pprWithExplicitKindsWhen True $
+      vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees
+                , quotes $ pprTyVars escapees
+                , text "would escape" <+> itsOrTheir escapees <+> text "scope"
+                ]
+          , sep [ text "if I tried to quantify"
+                , pprTyVar tv
+                , text "in this type:"
+                ]
+          , nest 2 (pprTidiedType orig_ty)
+          , text "(Indeed, I sometimes struggle even printing this correctly,"
+          , text " due to its ill-scoped nature.)"
+          ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1930,6 +1958,12 @@ instance Diagnostic TcRnMessage where
     TcRnStageRestriction{}
       -> ErrorWithoutFlag
     TcRnTyThingUsedWrong{}
+      -> ErrorWithoutFlag
+    TcRnCannotDefaultKindVar{}
+      -> ErrorWithoutFlag
+    TcRnUninferrableTyvar{}
+      -> ErrorWithoutFlag
+    TcRnSkolemEscape{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2426,6 +2460,12 @@ instance Diagnostic TcRnMessage where
     TcRnStageRestriction{}
       -> noHints
     TcRnTyThingUsedWrong{}
+      -> noHints
+    TcRnCannotDefaultKindVar{}
+      -> noHints
+    TcRnUninferrableTyvar{}
+      -> noHints
+    TcRnSkolemEscape{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -4505,3 +4545,19 @@ pprStageCheckReason = \case
     text "instance for" <+> quotes (ppr t)
   StageCheckSplice t ->
     quotes (ppr t)
+
+pprUninferrableTyvarCtx :: UninferrableTyvarCtx -> SDoc
+pprUninferrableTyvarCtx = \case
+  UninfTyCtx_ClassContext theta ->
+    sep [ text "the class context:", pprTheta theta ]
+  UninfTyCtx_DataContext theta ->
+    sep [ text "the datatype context:", pprTheta theta ]
+  UninfTyCtx_ProvidedContext theta ->
+    sep [ text "the provided context:" , pprTheta theta ]
+  UninfTyCtx_TyfamRhs rhs_ty ->
+    sep [ text "the type family equation right-hand side:" , ppr rhs_ty ]
+  UninfTyCtx_TysynRhs rhs_ty ->
+    sep [ text "the type synonym right-hand side:" , ppr rhs_ty ]
+  UninfTyCtx_Sig exp_kind full_hs_ty ->
+    hang (text "the kind" <+> ppr exp_kind) 2
+         (text "of the type signature:" <+> ppr full_hs_ty)

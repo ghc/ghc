@@ -1,5 +1,5 @@
 
-T15795a.hs:9:3: error:
+T15795a.hs:9:3: error: [GHC-71451]
     • Cannot generalise type; skolem ‘u’ would escape its scope
       if I tried to quantify (cat10 :: u) in this type:
         forall u (a :: u). F @u @cat10 a

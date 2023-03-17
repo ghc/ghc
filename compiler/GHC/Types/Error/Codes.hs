@@ -539,6 +539,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBadlyStaged"                               = 28914
   GhcDiagnosticCode "TcRnStageRestriction"                          = 18157
   GhcDiagnosticCode "TcRnTyThingUsedWrong"                          = 10969
+  GhcDiagnosticCode "TcRnCannotDefaultKindVar"                      = 79924
+  GhcDiagnosticCode "TcRnUninferrableTyvar"                         = 16220
+  GhcDiagnosticCode "TcRnSkolemEscape"                              = 71451
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

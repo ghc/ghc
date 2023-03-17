@@ -131,7 +131,6 @@ import GHC.Types.Name
 import GHC.Types.Var.Set
 
 import GHC.Builtin.Types
-import GHC.Types.Error
 import GHC.Types.Var.Env
 import GHC.Types.Unique.Set
 import GHC.Types.Basic ( TypeOrKind(..)
@@ -1853,10 +1852,7 @@ defaultTyVar def_strat tv
            ; writeMetaTyVar kv liftedTypeKind
            ; return True }
       | otherwise
-      = do { addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-               (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
-                     , text "of kind:" <+> ppr (tyVarKind kv')
-                     , text "Perhaps enable PolyKinds or add a kind signature" ])
+      = do { addErr $ TcRnCannotDefaultKindVar kv' (tyVarKind kv')
            -- We failed to default it, so return False to say so.
            -- Hence, it'll get skolemised.  That might seem odd, but we must either
            -- promote, skolemise, or zap-to-Any, to satisfy GHC.Tc.Gen.HsType
@@ -2053,7 +2049,7 @@ C. Examine the class declaration at the top of this Note again.
 -}
 
 doNotQuantifyTyVars :: CandidatesQTvs
-                    -> (TidyEnv -> TcM (TidyEnv, SDoc))
+                    -> (TidyEnv -> TcM (TidyEnv, UninferrableTyvarCtx))
                             -- ^ like "the class context (D a b, E foogle)"
                     -> TcM ()
 -- See Note [Error on unconstrained meta-variables]
@@ -2072,14 +2068,7 @@ doNotQuantifyTyVars dvs where_found
        ; unless (null leftover_metas) $
          do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- where_found tidy_env1
-            ; let msg = mkTcRnUnknownMessage            $
-                        mkPlainError noHints          $
-                        pprWithExplicitKindsWhen True $
-                    vcat [ text "Uninferrable type variable"
-                           <> plural tidied_tvs
-                           <+> pprWithCommas pprTyVar tidied_tvs
-                           <+> text "in"
-                         , where_doc ]
+            ; let msg = TcRnUninferrableTyvar tidied_tvs where_doc
             ; failWithTcM (tidy_env2, msg) }
        ; traceTc "doNotQuantifyTyVars success" empty }
 
@@ -2741,21 +2730,8 @@ naughtyQuantification orig_ty tv escapees
                     -- variables; very confusing to users!
 
              orig_ty'   = tidyType env orig_ty1
-             ppr_tidied = pprTyVars . map (tidyTyCoVarOcc env)
-             msg = mkTcRnUnknownMessage $ mkPlainError noHints $
-                   pprWithExplicitKindsWhen True $
-                   vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees'
-                              , quotes $ ppr_tidied escapees'
-                              , text "would escape" <+> itsOrTheir escapees' <+> text "scope"
-                              ]
-                        , sep [ text "if I tried to quantify"
-                              , ppr_tidied [tv]
-                              , text "in this type:"
-                              ]
-                        , nest 2 (pprTidiedType orig_ty')
-                        , text "(Indeed, I sometimes struggle even printing this correctly,"
-                        , text " due to its ill-scoped nature.)"
-                        ]
+             tidied = map (tidyTyCoVarOcc env) escapees'
+             msg = TcRnSkolemEscape tidied (tidyTyCoVarOcc env tv) orig_ty'
 
        ; failWithTcM (env, msg) }
 

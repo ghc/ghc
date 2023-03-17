@@ -1,5 +1,5 @@
 
-T15795.hs:12:3: error:
+T15795.hs:12:3: error: [GHC-71451]
     • Cannot generalise type; skolem ‘k’ would escape its scope
       if I tried to quantify (a0 :: k) in this type:
         forall k (b :: k). T @k @a0 b
